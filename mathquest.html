@@ -1,0 +1,716 @@
+<!-- MathQuest.html -->
+<!DOCTYPE html>
+<html>
+<head>
+<script>window.SP_BUILD={"page":"mathquest","routes":{"home":"index.html","gameroom":"gameroom.html","minigames":"minigames.html","stacking":"stacking.html","setup":"setup.html","achievements":"achievements.html","maze":"maze.html","robot":"robot.html","checkers":"checkers.html","chess":"chess.html","pinball":"pinball.html","hopper":"hopper.html","turbo":"turbo.html","memory":"memory.html","mathquest":"mathquest.html","doubleup":"doubleup.html","blockdrop":"blockdrop.html","popblocks":"popblocks.html","numbergrid":"numbergrid.html","numberboard":"numberboard.html","wordboard":"wordboard.html","sweetswap":"sweetswap.html","beatcorner":"beatcorner.html","slabrall":"slabrall.html","brawlbuddies":"brawlbuddies.html","alignext":"alignext.html","soulbopper":"soulbopper.html","snakize":"snakize.html","polyplot":"polyplot.html","wisdeck":"wisdeck.html","eyesbrain":"eyesbrain.html","workshop":"workshop.html","room":"room.html","collection":"collection.html","poseparty":"poseparty.html"}};</script>
+<script src="app/boot.js"></script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-title" content="STEAM Playground">
+<meta name="theme-color" content="#2CA6DE">
+<title>STEAM Playground</title>
+<script src="app/offline-ui.js" defer></script>
+
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link href="fonts/fonts.css" rel="stylesheet">
+<script src="inc/Themes.js"></script>
+<style>
+  /* Math Quest keeps its own look in play (each world brings its colours); menus follow the player's look. */
+  :root{
+    --bg:#1F3A68; --card:#FFFFFF; --panel:#EAF3FF; --ink:#1E2B4A; --ink-soft:#5B6C8F;
+    --pink:#FF4D8D; --violet:#5B4BE0; --gold:#FFC845; --mint:#2EC4B6; --green:#4CB963; --danger:#E5484D;
+    --terracotta:#3D7DD8; --mustard:#FFC845; --dusty-blue:#5B6C8F; /* used by UiKit */
+    --w1:#FFE8B8; --w2:#FF9F68; --wink:#2B2250; --wcard:rgba(255,255,255,0.92);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html{height:100%;background:#F2F7FF;}
+  body{margin:0;min-height:100%;min-height:100dvh;background:#F2F7FF;color:var(--ink);font-family:'Nunito',sans-serif;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);overscroll-behavior:none;}
+  .hidden{display:none !important;}
+  h1,h2,h3{font-family:'Fredoka',sans-serif;margin:0;}
+  button{font-family:inherit;}
+  .top-btn{position:fixed;top:calc(10px + env(safe-area-inset-top));left:calc(10px + env(safe-area-inset-left));z-index:300;
+    border:none;border-radius:14px;background:var(--card);color:var(--ink-soft);cursor:pointer;padding:8px 12px;
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.82rem;box-shadow:0 3px 0 rgba(0,0,0,0.08);}
+  /* ---------- menus ---------- */
+  .screen{max-width:960px;margin:0 auto;padding:62px 18px 40px;}
+  .title{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;margin-bottom:12px;}
+  .title h1{font-size:2rem;} .title p{margin:0;color:var(--ink-soft);font-weight:700;}
+  .title .logo{font-size:2.8rem;animation:mqlogo 2.4s ease-in-out infinite;}
+  @keyframes mqlogo{0%,100%{transform:rotate(-6deg) scale(1);}50%{transform:rotate(6deg) scale(1.08);}}
+  .who{display:inline-flex;align-items:center;gap:8px;margin-top:6px;background:var(--card);border-radius:14px;padding:6px 12px;font-weight:800;font-size:0.85rem;}
+  .who button{border:none;background:none;color:var(--pink);font-weight:800;cursor:pointer;font-size:inherit;text-decoration:underline;padding:0;}
+  .pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;}
+  .pick{background:var(--card);border:3px solid transparent;border-radius:20px;padding:14px 10px;cursor:pointer;position:relative;
+    display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;box-shadow:0 5px 0 rgba(0,0,0,0.07);color:inherit;}
+  .pick:active{transform:translateY(4px);box-shadow:0 1px 0 rgba(0,0,0,0.07);}
+  .pick .big{font-size:2.2rem;line-height:1;} .pick .nm{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1rem;} .pick .sub{font-size:0.75rem;color:var(--ink-soft);font-weight:700;}
+  .pick canvas{width:72px;height:84px;}
+  .section-head{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1.05rem;margin:16px 0 8px;color:var(--ink-soft);text-align:center;}
+  /* series + world pickers: one row each, scroll sideways on phones */
+  .chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+  .chip{border:3px solid transparent;border-radius:16px;background:var(--card);color:var(--ink);cursor:pointer;padding:8px 12px;min-height:48px;
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.95rem;display:inline-flex;align-items:center;gap:6px;box-shadow:0 4px 0 rgba(0,0,0,0.07);}
+  .chip .ic{font-size:1.4rem;line-height:1;}
+  .chip.on{border-color:var(--pink);background:#FF4D8D;color:#fff;}
+  .lvl.challenge{background:linear-gradient(135deg,#1E3A8A,#2EC4B6) !important;color:#fff !important;} .lvl.challenge *{color:#fff !important;} .lvl.challenge.locked{filter:grayscale(.5);opacity:.7;}
+  .lvl.challenge{grid-column:1/-1;} .lvl.challenge .big{font-size:2rem;} .lvl.challenge .lives,.lvl.challenge .best span{background:rgba(255,255,255,0.18) !important;color:#fff !important;}
+  .chip .mult{font-size:0.7rem;font-weight:900;margin-left:5px;background:#FFC845;color:#3A2500;border-radius:8px;padding:1px 6px;}
+  html .chip.on .mult{color:#3A2500 !important;}
+  /* the picked maths + world must stay visible in every look (looks restyle cards, which hid the pick) */
+  html .chip.on, html [data-theme] .chip.on, html .chip.on.t-card{background:linear-gradient(135deg,#FF4D8D,#FF8A3D) !important;color:#fff !important;border-color:#FFE066 !important;box-shadow:0 0 0 3px rgba(255,224,102,0.55),0 4px 0 rgba(0,0,0,0.2) !important;position:relative;}
+  html .chip.on *{color:#fff !important;}
+  /* iPad Safari inside the Apps Script frame sometimes skips repainting a chip whose class changed: each chip + level card gets its own layer (2026-11-03) */
+  .chips, .chip, .levels .lvl{transform:translateZ(0);-webkit-transform:translateZ(0);backface-visibility:hidden;-webkit-backface-visibility:hidden;}
+  .chip.pick:active, .levels .lvl.pick:active, .chip:active{transform:translateZ(0) translateY(4px);}
+  .chip.on::after{content:'✓';position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;background:#2EC4B6;color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 0 rgba(0,0,0,0.2);}
+  .worlds .chip{flex-direction:column;gap:2px;min-width:104px;padding:8px 10px;}
+  .worlds .chip .ic{font-size:1.8rem;} .worlds .chip small{font-size:0.66rem;font-weight:800;opacity:.85;}
+  @media (max-width:640px){ .chips{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;padding:2px 2px 8px;scrollbar-width:none;} .chips::-webkit-scrollbar{display:none;} .chip{flex:none;} }
+  .levels{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  @media (min-width:1100px){ .levels{grid-template-columns:repeat(6,1fr);} }
+  @media (max-width:640px){ .levels{grid-template-columns:repeat(2,1fr);} .title h1{font-size:1.6rem;} }
+  .lvl .num{position:absolute;top:8px;left:10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.75rem;color:var(--ink-soft);}
+  .lvl .badge{position:absolute;top:6px;right:8px;font-size:1rem;}
+  .lvl.recommended{border-color:var(--mint);}
+  .lvl.recommended::after{content:'Great for you!';position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);white-space:nowrap;background:var(--mint);color:#fff;font-size:0.62rem;font-weight:800;padding:2px 8px;border-radius:8px;}
+  .lvl.locked{opacity:.55;cursor:not-allowed;filter:grayscale(.6);}
+  .lvl .learn{font-size:0.7rem;font-weight:800;color:var(--pink);}
+  .lvl .lives{font-size:0.66rem;font-weight:800;background:var(--panel);border-radius:10px;padding:2px 6px;}
+  .lvl .best{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 8px;font-size:0.74rem;font-weight:800;}
+  .lvl .best span{background:var(--panel);border-radius:10px;padding:2px 8px;} .lvl .best.none{color:var(--ink-soft);}
+  .lvl.hardcore{background:linear-gradient(160deg,#7A1020 0%,#2E0609 62%,#0E0204 100%) !important;color:#FFECEC !important;border-color:#FF4040 !important;}
+  .lvl.hardcore .nm,.lvl.hardcore .sub,.lvl.hardcore .num,.lvl.hardcore .learn,.lvl.hardcore .lives,.lvl.hardcore .best,.lvl.hardcore .best.none{color:#FFECEC !important;}
+  .lvl.hardcore .best span,.lvl.hardcore .lives{background:rgba(255,255,255,0.16) !important;color:#FFECEC !important;}
+  .lvl.hardcore .big{filter:drop-shadow(0 0 8px rgba(255,64,64,0.85));}
+  .lvl.hardcore:not(.locked){box-shadow:0 0 0 2px #FF4040,0 0 18px rgba(255,64,64,0.45) !important;}
+  .lvl.hardcore.locked{opacity:.8;filter:grayscale(.3);}
+  .rules{background:var(--card);border-radius:18px;padding:8px 14px;margin-top:16px;}
+  .rules summary{cursor:pointer;font-family:'Fredoka',sans-serif;font-weight:700;padding:6px 0;}
+  .rules li{margin:5px 0;font-size:0.9rem;}
+  .btn{font-family:'Fredoka',sans-serif;font-weight:600;font-size:0.95rem;border:none;border-radius:14px;cursor:pointer;padding:11px 16px;color:#fff;background:linear-gradient(135deg,#3D7DD8,#5B4BE0);box-shadow:0 4px 0 rgba(0,0,0,0.12);}
+  .btn:active{transform:translateY(3px);} .btn.soft{background:var(--panel);color:var(--ink);}
+  .empty{text-align:center;color:var(--ink-soft);font-weight:800;padding:20px;}
+
+  /* ---------- play ---------- */
+  #scr-play{position:fixed;inset:0;display:flex;flex-direction:column;background:linear-gradient(180deg,var(--w1),var(--w2));color:var(--wink);overflow:hidden;}
+  #scr-play.dark{--wink:#FFFFFF;--wcard:rgba(20,16,60,0.72);}
+  .hud{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;padding:calc(8px + env(safe-area-inset-top)) 10px 4px;position:relative;z-index:5;}
+  .pill{background:rgba(0,0,0,0.28);border:none;color:#fff;border-radius:14px;padding:6px 10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.9rem;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
+  button.pill{cursor:pointer;min-width:40px;min-height:36px;justify-content:center;} button.pill:active{transform:translateY(2px);}
+  .pill.lvl-pill{background:linear-gradient(135deg,#3D7DD8,#5B4BE0);} .pill.lvl-pill.hc{background:linear-gradient(135deg,#B3122B,#3A0A10);}
+  .pill.score{font-size:1.05rem;min-width:84px;justify-content:center;}
+  .pill.hot{background:linear-gradient(135deg,#FF9F1C,#FF4D8D);animation:pulse .7s ease-in-out infinite;}
+  .pill.warn{background:var(--danger);animation:pulse .8s ease-in-out infinite;} @keyframes pulse{50%{transform:scale(1.08);}}
+  .timebar{height:8px;margin:0 12px 4px;border-radius:6px;background:rgba(0,0,0,0.16);overflow:hidden;flex:none;}
+  .timebar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#4CB963,#FFC845);border-radius:6px;transition:width .25s linear;}
+  .timebar.low i{background:linear-gradient(90deg,#E5484D,#FF9F1C);}
+  .arena{flex:1;min-height:0;display:grid;grid-template-rows:1fr auto;gap:10px;padding:4px 12px var(--safe-b, 18px);max-width:920px;width:100%;margin:0 auto;position:relative;}
+  .qcard{position:relative;min-height:0;background:var(--wcard);border-radius:26px;padding:12px 14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;box-shadow:0 6px 0 rgba(0,0,0,0.12);overflow:hidden;}
+  .qcard.pop{animation:qpop .35s cubic-bezier(.2,1.6,.4,1);}
+  @keyframes qpop{0%{transform:scale(.92);opacity:.4;}100%{transform:scale(1);opacity:1;}}
+  .qcard.shake{animation:shake .45s ease;}
+  @keyframes shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-9px) rotate(-1deg);}40%{transform:translateX(9px) rotate(1deg);}60%{transform:translateX(-5px);}80%{transform:translateX(5px);}}
+  .qno{position:absolute;top:8px;left:12px;font-weight:800;font-size:0.8rem;opacity:.7;}
+  .mascot{position:absolute;top:4px;right:10px;font-size:2rem;line-height:1;transition:transform .2s;}
+  .mascot.happy{animation:hop .5s ease;} .mascot.sad{animation:droop .6s ease;}
+  @keyframes hop{30%{transform:translateY(-14px) rotate(-10deg) scale(1.15);}60%{transform:translateY(0) rotate(6deg);}}
+  @keyframes droop{40%{transform:rotate(-18deg) translateY(4px);}}
+  .say-btn{position:absolute;bottom:8px;right:10px;border:none;border-radius:14px;background:rgba(0,0,0,0.12);color:inherit;font-size:1.3rem;width:46px;height:46px;cursor:pointer;}
+  .word{font-weight:800;font-size:clamp(1rem,min(3vw,3vh),1.5rem);text-align:center;max-width:620px;line-height:1.35;}
+  .eq{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(2rem,min(10vw,9vh),5rem);line-height:1.1;text-align:center;letter-spacing:1px;}
+  .eq .q{display:inline-block;min-width:1.2em;padding:0 .2em;border-radius:14px;background:rgba(255,200,69,0.45);animation:qmark 1.2s ease-in-out infinite;}
+  @keyframes qmark{50%{background:rgba(255,200,69,0.85);}}
+  .eq .q.got{background:#4CB963;color:#fff;animation:none;}
+  /* picture numbers */
+  .vis{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;max-width:100%;--vs:2rem;}
+  .grp{display:flex;flex-wrap:wrap;gap:2px;justify-content:center;max-width:min(46vw,420px);font-size:var(--vs);line-height:1.05;}
+  .grp span{display:inline-block;animation:drop .4s cubic-bezier(.2,1.6,.4,1) both;}
+  .grp span.gone{opacity:.28;position:relative;} .grp span.gone::after{content:'✖';position:absolute;left:50%;top:50%;transform:translate(-50%,-55%);color:#E5484D;font-size:.8em;opacity:1;}
+  @keyframes drop{0%{transform:translateY(-14px) scale(.4);opacity:0;}100%{transform:none;opacity:1;}}
+  .op{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(2rem,7vmin,3.4rem);}
+  .arr{display:grid;gap:3px;font-size:var(--vs);line-height:1;}
+  .baskets{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+  .basket{display:flex;flex-direction:column;align-items:center;font-size:calc(var(--vs) * 1.2);}
+  .basket b{font-family:'Fredoka',sans-serif;font-size:clamp(1rem,3vmin,1.5rem);background:rgba(255,200,69,0.6);border-radius:10px;padding:0 8px;}
+  .nline{width:100%;max-width:640px;height:70px;}
+  .nline text{font-family:'Fredoka',sans-serif;font-weight:700;font-size:12px;fill:currentColor;}
+  .hintline{font-weight:800;font-size:0.85rem;opacity:.8;}
+  .answers{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+  .answers.three{grid-template-columns:repeat(3,1fr);}
+  .ans{border:none;border-radius:22px;min-height:76px;cursor:pointer;font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(1.6rem,6vw,2.4rem);
+    color:#1E2B4A;background:#FFFFFF;box-shadow:0 6px 0 rgba(0,0,0,0.18);position:relative;transition:transform .08s;}
+  .ans:active{transform:translateY(4px);box-shadow:0 2px 0 rgba(0,0,0,0.18);}
+  .ans .k{position:absolute;top:6px;left:10px;font-size:0.7rem;opacity:.45;}
+  .ans.right{background:#4CB963;color:#fff;animation:jelly .5s ease;} .ans.wrong{background:#E5484D;color:#fff;animation:shake .4s ease;}
+  .ans.off{opacity:.25;pointer-events:none;} .ans.show{box-shadow:0 0 0 4px #4CB963,0 6px 0 rgba(0,0,0,0.18);}
+  @keyframes jelly{30%{transform:scale(1.12,0.9);}60%{transform:scale(0.95,1.08);}100%{transform:scale(1);}}
+  .tools{display:flex;gap:8px;justify-content:center;}
+  .tool{border:none;border-radius:14px;background:rgba(255,255,255,0.85);color:#1E2B4A;cursor:pointer;padding:8px 14px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.95rem;min-height:44px;box-shadow:0 3px 0 rgba(0,0,0,0.12);}
+  .tool:disabled{opacity:.4;cursor:default;}
+  /* phones held sideways: question left, answers right */
+  @media (orientation:landscape) and (max-height:520px){
+    .arena{grid-template-rows:1fr;grid-template-columns:1.25fr 1fr;align-items:stretch;}
+    .side-col{display:flex;flex-direction:column;justify-content:center;gap:8px;}
+    .ans{min-height:58px;} .eq{font-size:clamp(1.6rem,6vh,2.6rem);} .vis{--vs:1.4rem;} .mascot{font-size:1.5rem;}
+    .hud{padding-top:calc(4px + env(safe-area-inset-top));} .pill{padding:4px 8px;font-size:0.8rem;}
+  }
+  .side-col{display:flex;flex-direction:column;gap:8px;}
+  .banner{position:absolute;left:50%;top:30px;transform:translateX(-50%);z-index:20;pointer-events:none;width:max-content;max-width:min(92vw,440px);text-align:center;
+    background:rgba(25,10,45,0.85);color:#fff;border-radius:14px;padding:8px 14px;font-family:'Fredoka',sans-serif;font-weight:700;opacity:0;transition:opacity .25s;}
+  .banner.on{opacity:1;} .banner.gold{background:linear-gradient(135deg,#FF9F1C,#FF4D8D);} .banner.bad{background:rgba(229,72,77,0.95);}
+  .praise{position:fixed;left:50%;top:38%;z-index:30;transform:translate(-50%,-50%);pointer-events:none;text-align:center;white-space:nowrap;font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(1.4rem,5vw,2.6rem);color:#fff;
+    padding:12px 22px;border-radius:22px;background:linear-gradient(135deg,#3D7DD8,#2EC4B6,#5B4BE0);box-shadow:0 8px 0 rgba(0,0,0,0.25);animation:praise-in .7s cubic-bezier(.2,1.6,.4,1) both;}
+  @keyframes praise-in{0%{transform:translate(-50%,-50%) scale(.2) rotate(-12deg);opacity:0;}100%{transform:translate(-50%,-50%) scale(1);opacity:1;}}
+  .spark{position:fixed;z-index:50;pointer-events:none;font-size:1.3rem;animation:spark .8s ease-out forwards;}
+  @keyframes spark{to{transform:translate(var(--dx),var(--dy)) scale(.3);opacity:0;}}
+  .float{position:fixed;z-index:51;pointer-events:none;font-family:'Fredoka',sans-serif;font-weight:700;font-size:1.4rem;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,0.35);animation:floatup .9s ease-out forwards;}
+  @keyframes floatup{to{transform:translateY(-60px);opacity:0;}}
+  /* result */
+  .result{position:fixed;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(25,10,45,0.6);overflow-y:auto;}
+  .result{flex-direction:column;justify-content:flex-start;} .result::after{content:'';flex:0 0 var(--safe-b, 18px);}   /* bottom headroom: buttons stay above the phone's swipe-up bar */
+  .result-card{margin:auto;background:var(--card);color:var(--ink);border-radius:26px;padding:24px 22px;max-width:400px;width:100%;text-align:center;box-shadow:0 18px 50px rgba(0,0,0,0.35);display:flex;flex-direction:column;gap:10px;align-items:center;}
+  .result-card .big{font-size:3.4rem;} .result-card h2{font-size:1.55rem;}
+  .result-card h2.cheer{background:linear-gradient(90deg,#3D7DD8,#2EC4B6,#5B4BE0);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .rating .st{font-size:2rem;display:inline-block;animation:star-pop .5s cubic-bezier(.2,1.8,.4,1) both;} .rating .st.off{filter:grayscale(1);opacity:.25;}
+  @keyframes star-pop{0%{transform:scale(0) rotate(-40deg);}100%{transform:scale(1);}}
+  .score-big{font-family:'Fredoka',sans-serif;font-weight:700;font-size:2rem;color:#3D49B8;}
+  .stats{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;} .stats span{background:var(--panel);border-radius:10px;padding:4px 10px;font-weight:800;font-size:0.82rem;}
+  .save-note{font-weight:800;font-size:0.85rem;color:var(--ink-soft);}
+  .tip{background:var(--panel);border-radius:14px;padding:8px 12px;font-weight:800;font-size:0.88rem;}
+  .hc-note{background:linear-gradient(135deg,#7A1020,#2E0609);color:#FFECEC;border-radius:14px;padding:10px 12px;font-weight:800;font-size:0.9rem;}
+  .new-badge,.title-new,.feat-new{display:inline-block;background:linear-gradient(135deg,#FFC845,#FF9F1C);color:#3A2500;border-radius:10px;padding:4px 10px;font-weight:800;margin:2px;}
+  .res-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+  .confetti{position:fixed;top:-40px;z-index:390;font-size:1.6rem;pointer-events:none;animation:fall linear forwards;}
+  @keyframes fall{to{transform:translateY(110vh) rotate(540deg);}}
+  @media (prefers-reduced-motion: reduce){ .title .logo{animation:none;} }
+</style>
+</head>
+<body ontouchstart="">
+<script src="inc/UiKit.js"></script>
+<script src="inc/BallSkins.js"></script>
+<script src="inc/AvatarKit.js"></script>
+<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button>
+
+<section class="screen hidden" id="scr-player">
+  <div class="title"><div class="logo">🧮</div><h1>Math Quest</h1><p>Who's playing?</p></div>
+  <div class="pick-grid" id="player-list"></div>
+</section>
+
+<section class="screen hidden" id="scr-menu">
+  <div class="title"><div class="logo">🧮</div><h1>Math Quest</h1><p>Count, add, take away, times and share — in five worlds!</p>
+    <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
+  <div class="section-head">1. Pick your maths</div>
+  <div class="chips" id="series-list"></div>
+  <div class="section-head">2. Pick a world</div>
+  <div class="chips worlds" id="world-list"></div>
+  <div class="section-head">3. Pick a level</div>
+  <div class="levels" id="level-list"></div>
+  <details class="rules"><summary>📖 How to play</summary><ul>
+    <li><b>Answer:</b> tap the right number (or press 1, 2, 3, 4). Tap 🔊 to hear the question again.</li>
+    <li><b>Pictures:</b> on the first levels you can count the pictures, hop along the number line, count the rows or share into baskets.</li>
+    <li><b>Points:</b> ➕ ×1 · ➖ ×1.15 · ✖️ ×1.5 · ➗ ×1.6 · 🔀 Mixed ×1.8 — harder maths scores more.</li>
+    <li><b>Streaks:</b> right answers in a row give bonus points 🔥. Finish before the clock runs out for a time bonus.</li>
+    <li><b>Stars:</b> more right answers and more time left = more stars. Get most of them right to pass the level.</li>
+    <li><b>💡 Hint:</b> takes away one wrong answer (3 per round).</li>
+    <li><b>✖️ ➗ Tables:</b> Hard uses the 7, 8, 9, 11, 12 and 13 times tables (no easy 10s), Extreme 9 and 12–17, Hardcore 12–19.</li>
+    <li><b>⏱️ Minute Challenge:</b> opens after Intermediate. 60 seconds of mixed sums (tables 6, 7, 8, 9, 11, 12) — a mistake doesn't end it, but costs 50 points. Count your ✅ and beat your best!</li>
+    <li><b>💀 Hardcore:</b> opens after Extreme. The biggest numbers, the fastest clock, no hints — one wrong answer ends the round. Points ×3!</li>
+  </ul></details>
+  <div class="ui-leaders" id="leaders"></div>
+</section>
+
+<section class="hidden" id="scr-play">
+  <div class="hud">
+    <button class="pill" data-sound="none" onclick="leavePlay()" title="Back to the levels">◀</button>
+    <span class="pill lvl-pill" id="hud-level"></span>
+    <span class="pill score" id="hud-score">0</span>
+    <span class="pill" id="hud-streak">🔥 0</span>
+    <span class="pill" id="hud-q">❓ 1/10</span>
+    <span class="pill" id="hud-time">⏱ 1:30</span>
+    <span class="pill hidden" id="hud-left"></span>
+    <button class="pill" data-sound="none" onclick="toggleVoice()" id="voice-btn" title="Read the questions out loud">🔈</button>
+  </div>
+  <div class="timebar" id="timebar"><i id="timefill"></i></div>
+  <div class="arena" id="arena">
+    <div class="qcard" id="qcard">
+      <div class="banner" id="banner"></div>
+      <span class="qno" id="qno"></span>
+      <span class="mascot" id="mascot">🦉</span>
+      <div class="word hidden" id="word"></div>
+      <div class="vis hidden" id="vis"></div>
+      <div class="eq" id="eq"></div>
+      <div class="hintline hidden" id="hintline"></div>
+      <button class="say-btn" data-sound="none" onclick="sayQ()" title="Hear the question">🔊</button>
+    </div>
+    <div class="side-col">
+      <div class="answers" id="answers"></div>
+      <div class="tools"><button class="tool" id="hint-btn" data-sound="pop" onclick="useHint()">💡 Hint (3)</button></div>
+    </div>
+  </div>
+</section>
+<div class="result hidden" id="result"><div class="result-card" id="result-card"></div></div>
+
+<script>
+const WEBAPP_URL = ''+__SP("webAppUrl")+'';
+const CURRENT_PLAYER = ''+__SP("player")+''; window.SP_PAGE = 'mathquest';
+const MODE_LINK = ''+__SP("mode")+'';   // ✨ modes-3: ?mode=<id> (Code.gs MODES_) — opened once, after the player pick
+UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});   // loader + menus in the player's look before the server answers
+const SESSION_START = Number(''+__SP("sessionStart")+'') || null;
+const DURATION_MIN = Number(''+__SP("durationMin")+'') || null;
+const GAME_ID = 'math-quest';
+const $ = id => document.getElementById(id);
+const pick = a => a[rnd(a.length)];
+const randInt = (a, b) => a + rnd(b - a + 1);
+function fmt(ms){ const s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function say(text){ try{ if(!UISound.get().enabled || !window.speechSynthesis) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 0.95; u.pitch = 1.2; u.volume = Math.max(0.2, UISound.get().volume); speechSynthesis.speak(u); }catch(e){} }
+function shuffle(a){ for(let i = a.length - 1; i > 0; i--){ const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+/* ================= LEVELS · SERIES · WORLDS ================= */
+// One progress line for the game (server: LEVEL_GAMES['math-quest']): the level is the difficulty, the series (➕ ➖ ✖️ ➗ 🔀)
+// and the world are pickers. Passing a level in any series opens the next level for every series.
+// add/sub: biggest number · mul: [max rows, max per row] · div: [max divisor, max answer]
+const LEVELS = [
+  {name: 'Basic', emoji: '🌱', qs: 8, time: 120, choices: 3, add: 5, mul: [2, 5], div: [2, 4], missing: 0, words: 0, blurb: 'Count the pictures — numbers up to 5'},
+  {name: 'Junior', emoji: '🐣', qs: 10, time: 120, choices: 3, add: 10, mul: [3, 5], div: [3, 5], missing: 0, words: 0, blurb: 'Up to 10, with pictures and a number line'},
+  {name: 'Intermediate', emoji: '🔦', qs: 10, time: 100, choices: 4, add: 20, mul: [5, 10], div: [5, 10], missing: 0.25, words: 0.15, blurb: 'Up to 20 and missing numbers'},
+  {name: 'Hard', emoji: '⚡', qs: 12, time: 95, choices: 4, add: 100, mul: [12, 12], div: [12, 12], tables: [7, 8, 9, 11, 12, 13], missing: 0.3, words: 0.3, blurb: 'Two-digit numbers, times tables, story sums'},
+  {name: 'Extreme', emoji: '🌋', qs: 12, time: 90, choices: 4, add: 1000, mul: [12, 12], div: [12, 12], tables: [9, 12, 13, 14, 15, 16, 17], big: true, missing: 0.35, words: 0.35, blurb: 'Big numbers, quick thinking'},
+  // 💀 Hardcore: Extreme numbers (and bigger), the fastest clock, no hints — one wrong answer ends the round. ×3 points.
+  {name: 'Hardcore', emoji: '💀', qs: 15, time: 80, choices: 4, add: 1000, mul: [12, 12], div: [12, 20], tables: [12, 13, 14, 15, 16, 17, 18, 19], big: true, missing: 0.4, words: 0.35, hardcore: true, blurb: 'One wrong answer ends it! No hints, ×3 points'}
+];
+// ⏱️ Minute Challenge (bonus card, opens after Intermediate): 60 s of Mixed sums, wrong answers don't end it — count ✅ and ❌.
+// Times / share use the 6 7 8 9 11 12 tables (no easy 10s). Best result is kept on this device + sent as a feat.
+const CHALLENGE = {name: 'Minute Challenge', emoji: '⏱️', qs: 999, time: 60, choices: 4, add: 100, mul: [12, 12], div: [12, 12], tables: [6, 7, 8, 9, 11, 12], missing: 0, words: 0, challenge: true, blurb: '60 seconds of mixed sums — how many can you get?'};
+const SERIES = {
+  // mult = points multiplier so the scores stay fair: ➕ is the easiest, 🔀 Mixed (switching every question) the hardest (Aowu 2026-11-03)
+  add: {name: 'Add', icon: '➕', sym: '+', word: 'plus', mult: 1},
+  sub: {name: 'Take away', icon: '➖', sym: '−', word: 'minus', mult: 1.15},
+  mul: {name: 'Times', icon: '✖️', sym: '×', word: 'times', mult: 1.5},
+  div: {name: 'Share', icon: '➗', sym: '÷', word: 'divided by', mult: 1.6},
+  mix: {name: 'Mixed', icon: '🔀', sym: '', word: '', mult: 1.8}
+};
+const SERIES_KEYS = Object.keys(SERIES), OPS = ['add', 'sub', 'mul', 'div'];
+function seriesMult(){ const k = (typeof G !== 'undefined' && G && G.series) || series; return (SERIES[k] || SERIES.add).mult || 1; }
+// Each world: play colours, things to count, the story nouns, a mascot.
+const WORLDS = {
+  school: {name: 'School & College', icon: '🏫', sub: 'Pencils, books and apples', c: ['#FFE8B8', '#FF9F68'], dark: false, items: ['🍎', '✏️', '📚', '⭐', '🖍️'], noun: 'pencils', box: 'pencil cases', mascot: '🦉', deco: '🎓'},
+  space: {name: 'Space', icon: '🚀', sub: 'Rocket base and stars', c: ['#241A5C', '#5B3BD8'], dark: true, items: ['⭐', '🪐', '🚀', '🌙', '☄️'], noun: 'stars', box: 'rockets', mascot: '🧑‍🚀', deco: '🛰️'},
+  lab: {name: 'Science Lab', icon: '🔬', sub: 'Test tubes and bubbles', c: ['#C8F7F0', '#5BC0EB'], dark: false, items: ['🧪', '🧫', '⚗️', '🫧', '🔬'], noun: 'test tubes', box: 'racks', mascot: '🤖', deco: '⚛️'},
+  animals: {name: 'Animals', icon: '🐾', sub: 'Puppies, kittens and chicks', c: ['#C9F2C7', '#5CC45A'], dark: false, items: ['🐶', '🐱', '🐰', '🐥', '🐢'], noun: 'puppies', box: 'baskets', mascot: '🦁', deco: '🌳'},
+  market: {name: 'Market', icon: '🛒', sub: 'Fruit, veg and coins', c: ['#FFE3EC', '#FF7AA2'], dark: false, items: ['🍎', '🍌', '🥕', '🪙', '🍓'], noun: 'apples', box: 'bags', mascot: '🧺', deco: '🏷️'}
+};
+const WORLD_KEYS = Object.keys(WORLDS);
+const AGE_START = {'4-5': 0, '6-7': 1, '8-9': 2, '10+': 3};
+const PRAISE = ['Number whiz', 'Maths star', 'Super brain', 'Brilliant', 'Amazing'];
+const RIGHT_WORDS = ['Yes!', 'Great!', 'Super!', 'Correct!', 'Nice one!', 'Brilliant!'];
+const TIPS = {
+  add: 'Tip: start with the bigger number and count on with your fingers.',
+  sub: 'Tip: start at the big number and count back — or count up from the small one.',
+  mul: 'Tip: times is quick adding — 3 × 4 is 4 + 4 + 4.',
+  div: 'Tip: sharing is the times table backwards — 12 ÷ 3 asks "3 times what is 12?"',
+  mix: 'Tip: look at the sign first — + − × ÷ — then work it out.'
+};
+
+/* ================= QUESTIONS ================= */
+// q = {op, a, b, ans, show: 'a+b=?' parts, missing: 'a'|'b'|'' , word, vis: {...}|null, choices: [..]}
+function young(age){ return age === '4-5' || age === '6-7'; }
+function pictures(lvl, age){ return lvl <= 1 || (lvl === 2 && young(age)); }
+const NO_TEN = [2, 3, 4, 5, 6, 7, 8, 9, 11, 12];   // the other number in a table sum: never the easy 10
+function makeNums(op, lvl, Lx){
+  const L = Lx || LEVELS[lvl]; let a, b, ans;
+  // no '0 + n' or 'n − 0' sums: both numbers are at least 1
+  if(op === 'add'){ const max = L.add, lo = L.big ? 100 : lvl >= 3 ? 10 : 2; ans = randInt(lo, max); a = randInt(Math.max(1, lvl >= 3 ? Math.floor(ans * 0.2) : 1), ans - 1); b = ans - a; }
+  else if(op === 'sub'){ const max = L.add, lo = L.big ? 100 : lvl >= 3 ? 10 : 2; a = randInt(lo, max); b = randInt(1, a - (lvl <= 1 ? 0 : 1)); ans = a - b; }
+  else if(op === 'mul'){
+    if(L.big && Math.random() < 0.45){ a = randInt(11, lvl === 5 ? 99 : 49); b = randInt(2, 9); }   // 2-digit × 1-digit
+    else if(L.tables){ a = pick(L.tables); b = pick(NO_TEN); }   // the hard tables (Hard 7 8 9 11 12 13 · Extreme 9 12–17 · no easy 10s)
+    else { a = randInt(lvl === 0 ? 1 : 2, L.mul[0]); b = randInt(lvl <= 1 ? 1 : 2, L.mul[1]); }
+    if(Math.random() < 0.5 && !(L.big && a > 12) && !(L.tables && a > 12)){ const t = a; a = b; b = t; }
+    ans = a * b;
+  } else {   // div: always a whole answer
+    const d = L.tables ? pick(L.tables) : randInt(2, L.div[0]), q = L.tables ? pick(NO_TEN) : randInt(lvl <= 1 ? 1 : 2, L.div[1]); a = d * q; b = d; ans = q;
+  }
+  return {op, a, b, ans};
+}
+function makeQ(series, lvl, world, age, Lx){
+  const L = Lx || LEVELS[lvl], W = WORLDS[world] || WORLDS.school;
+  const op = series === 'mix' ? pick(lvl === 0 ? ['add', 'sub', 'add', 'sub', 'mul', 'div'] : OPS) : series;
+  const q = makeNums(op, lvl, L);
+  q.missing = ''; q.word = ''; q.vis = null;
+  if(L.missing && Math.random() < L.missing){ q.missing = Math.random() < 0.5 ? 'a' : 'b'; }
+  if(!q.missing && L.words && Math.random() < L.words){ q.word = storyText(q, W); }
+  if(pictures(lvl, age) && !q.word && !q.missing) q.vis = visFor(q, W, lvl);
+  q.ask = q.missing === 'a' ? q.a : q.missing === 'b' ? q.b : q.ans;   // the number the child has to find
+  q.choices = choicesFor(q, L.choices);
+  return q;
+}
+function storyText(q, W){
+  const n = W.noun;
+  if(q.op === 'add') return 'You have ' + q.a + ' ' + n + '. You get ' + q.b + ' more. How many ' + n + ' now?';
+  if(q.op === 'sub') return 'There are ' + q.a + ' ' + n + '. ' + q.b + ' go away. How many are left?';
+  if(q.op === 'mul') return q.a + ' ' + W.box + ' with ' + q.b + ' ' + n + ' in each. How many ' + n + ' altogether?';
+  return 'Share ' + q.a + ' ' + n + ' into ' + q.b + ' ' + W.box + '. How many in each?';
+}
+function visFor(q, W, lvl){
+  const it = pick(W.items);
+  if(q.op === 'add'){ if(q.ans <= 12 && q.a <= 10 && q.b <= 10) return {type: 'groups', it, a: q.a, b: q.b, it2: pick(W.items)}; if(q.ans <= 20) return {type: 'line', from: q.a, step: q.b, max: Math.max(10, Math.ceil(q.ans / 5) * 5)}; return null; }
+  if(q.op === 'sub'){ if(q.a <= 12) return {type: 'takeaway', it, a: q.a, b: q.b}; if(q.a <= 20) return {type: 'line', from: q.a, step: -q.b, max: Math.max(10, Math.ceil(q.a / 5) * 5)}; return null; }
+  if(q.op === 'mul'){ if(q.a * q.b <= 40 && q.a <= 8 && q.b <= 10) return {type: 'array', it, rows: q.a, cols: q.b}; return null; }
+  if(q.a <= 24) return {type: 'share', it, total: q.a, baskets: q.b};
+  return null;
+}
+// Answer buttons: the right number + close mistakes kids really make (off by one/ten, wrong sign), never negative, never twice.
+function choicesFor(q, n){
+  const r = q.ask, set = new Set([r]), near = [r + 1, r - 1, r + 2, r - 2];
+  if(r >= 20) near.push(r + 10, r - 10);
+  if(q.op === 'add' && !q.missing) near.push(Math.abs(q.a - q.b));
+  if(q.op === 'sub' && !q.missing) near.push(q.a + q.b);
+  if(q.op === 'mul' && !q.missing) near.push(q.a + q.b, q.a * (q.b + 1), q.a * (q.b - 1));
+  if(q.op === 'div' && !q.missing) near.push(q.ans + 1, q.b, q.a - q.b);
+  shuffle(near).forEach(v => { if(set.size < n && Number.isInteger(v) && v >= 0 && v !== r) set.add(v); });
+  let k = 3; while(set.size < n){ const v = r + (Math.random() < 0.5 ? -1 : 1) * k++; if(v >= 0) set.add(v); }
+  return shuffle([...set]);
+}
+function eqParts(q){
+  const s = SERIES[q.op].sym, blank = '<span class="q" id="qmark">?</span>';
+  if(q.missing === 'a') return [blank, s, q.b, '=', q.ans];
+  if(q.missing === 'b') return [q.a, s, blank, '=', q.ans];
+  return [q.a, s, q.b, '=', blank];
+}
+function sayText(q){
+  const w = SERIES[q.op].word;
+  if(q.word) return q.word;
+  if(q.missing === 'a') return 'What number ' + w + ' ' + q.b + ' makes ' + q.ans + '?';
+  if(q.missing === 'b') return q.a + ' ' + w + ' what makes ' + q.ans + '?';
+  return q.a + ' ' + w + ' ' + q.b + '. What do you get?';
+}
+
+/* ================= STATE ================= */
+let S = {players: [], progress: {}, settings: {}, avatars: {}, player: '', age: ''};
+let G = null, lockHandle = null, series = 'add', world = 'school', timerId = 0, voiceOn = false;
+function store(k){ return 'sp_mathquest_' + k + ':' + (S.player || ''); }
+function loadPrefs(){ try{ const s = localStorage.getItem(store('series')); if(SERIES[s]) series = s; const w = localStorage.getItem(store('world')); if(WORLDS[w]) world = w; const v = localStorage.getItem(store('voice')); voiceOn = v ? v === '1' : young(S.age); }catch(e){ voiceOn = young(S.age); } }
+function savePrefs(){ try{ localStorage.setItem(store('series'), series); localStorage.setItem(store('world'), world); localStorage.setItem(store('voice'), voiceOn ? '1' : '0'); }catch(e){} }
+function myAvatar(name){ const a = (S.avatars || {})[name || S.player]; return a ? fixAv(a) : defaultAvatar(name || S.player || 'player'); }
+window.feedbackContext = () => ({page: 'Math Quest', game: GAME_ID, level: G ? LEVELS[G.lvl].name + ' · ' + SERIES[G.series].name + ' · ' + WORLDS[G.world].name : ''});
+
+/* ================= MENUS ================= */
+function showScreen(name){
+  ['player', 'menu', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
+  $('back-btn').classList.toggle('hidden', name === 'play'); window.scrollTo(0, 0);
+}
+function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
+function canPlay(i){ const p = progressOf(S.player); if(i === 5) return p.unlocked >= 5; if(i === 4) return p.unlocked >= 4; return i <= Math.max(p.unlocked, AGE_START[S.age] || 0); }
+function renderPlayers(){
+  const box = $('player-list'); box.innerHTML = '';
+  if(!S.players.length){ box.innerHTML = '<div class="empty">No players yet — add one on the Dashboard first.</div>'; return; }
+  S.players.forEach(p => { const b = document.createElement('button'); b.className = 'pick'; b.setAttribute('data-sound', 'pop');
+    const c = document.createElement('canvas'); c.width = 144; c.height = 168; b.appendChild(c);
+    b.insertAdjacentHTML('beforeend', '<div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age ? p.Age + ' yrs' : '') + '</div>');
+    try { drawPreviewCanvas(c, myAvatar(p.Name), {name: p.Name, t: 1}); } catch(e){}
+    b.onclick = () => choosePlayer(p.Name); box.appendChild(b); });
+}
+function choosePlayer(name){
+  UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
+  const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
+  loadPrefs(); $('who-name').textContent = name; renderMenu(); showScreen('menu');
+}
+function changePlayer(){ renderPlayers(); showScreen('player'); }
+// The series + world rows: built once per menu visit, a tap only moves the highlight (no page jump).
+function renderMenu(){
+  $('series-list').innerHTML = SERIES_KEYS.map(k => '<button class="chip' + (k === series ? ' on' : '') + '" data-sound="pop" data-series="' + k + '"><span class="ic">' + SERIES[k].icon + '</span>' + SERIES[k].name + (SERIES[k].mult > 1 ? '<small class="mult">×' + SERIES[k].mult + '</small>' : '') + '</button>').join('');
+  $('world-list').innerHTML = WORLD_KEYS.map(k => '<button class="chip' + (k === world ? ' on' : '') + '" data-sound="pop" data-world="' + k + '"><span class="ic">' + WORLDS[k].icon + '</span>' + WORLDS[k].name + '<small>' + WORLDS[k].sub + '</small></button>').join('');
+  $('series-list').querySelectorAll('[data-series]').forEach(b => b.onclick = () => { series = b.dataset.series; savePrefs(); $('series-list').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); renderLevels(); });
+  $('world-list').querySelectorAll('[data-world]').forEach(b => b.onclick = () => { world = b.dataset.world; savePrefs(); $('world-list').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); });
+  renderLevels();
+}
+function rangeText(L){
+  if(series === 'mul') return L.tables ? '✖️ tables ' + L.tables.join(' ') + (L.big ? ' + big ones' : '') : '✖️ up to ' + L.mul[0] + ' × ' + L.mul[1] + (L.big ? ' + big ones' : '');
+  if(series === 'div') return L.tables ? '➗ share by ' + L.tables.join(' ') : '➗ up to ' + (L.div[0] * L.div[1]) + ' ÷ ' + L.div[0];
+  return SERIES[series].icon + ' up to ' + L.add;
+}
+function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">No score yet</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span>' + (b.timeSec ? '<span>⏱ ' + fmt(b.timeSec * 1000) + '</span>' : '') + '<span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
+function renderLevels(){
+  const box = $('level-list'); box.innerHTML = ''; if(window.UI && UI.leaders) UI.leaders($('leaders'), 'math-quest', S.player); const p = progressOf(S.player), rec = AGE_START[S.age];
+  LEVELS.forEach((L, i) => {
+    const open = canPlay(i), done = p.unlocked > i, b = document.createElement('button');
+    b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (L.hardcore ? ' hardcore' : ''); b.setAttribute('data-sound', open ? 'pop' : 'none');
+    b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">🏅</span>' : open ? '' : '<span class="badge">🔒</span>') +
+      '<div class="big">' + L.emoji + '</div><div class="nm">' + L.name + '</div><div class="learn">' + rangeText(L) + '</div>' +
+      '<div class="lives">' + L.qs + ' questions · ⏱ ' + fmt(L.time * 1000) + (L.hardcore ? ' · 💀 1 mistake' : '') + '</div>' +
+      '<div class="sub">' + (L.hardcore && !open ? '🔒 Beat Extreme to open 💀 Hardcore' : L.blurb) + '</div>' + bestHtml(p, i);
+    b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore' : i === 4 ? 'Pass Hard to unlock Extreme!' : 'Pass the level before to unlock it'); return; } startGame(i); };
+    box.appendChild(b);
+  });
+  // ⏱️ Minute Challenge card
+  const cOpen = p.unlocked >= 3, cb = challengeBest(), c = document.createElement('button');
+  c.className = 'pick lvl challenge' + (cOpen ? '' : ' locked'); c.setAttribute('data-sound', cOpen ? 'pop' : 'none');
+  c.innerHTML = (cOpen ? '' : '<span class="badge">🔒</span>') + '<div class="big">⏱️</div><div class="nm">Minute Challenge</div><div class="learn">🔀 mixed · ✖️ ➗ tables 6 7 8 9 11 12</div>' +
+    '<div class="lives">60 seconds · count ✅ and ❌</div><div class="sub">' + (cOpen ? CHALLENGE.blurb : '🔒 Pass Intermediate to open') + '</div>' +
+    (cb ? '<div class="best"><span>✅ best ' + cb.right + '</span><span>🏆 ' + cb.score.toLocaleString() + '</span></div>' : '<div class="best none">No try yet</div>');
+  c.onclick = () => { if(!cOpen){ UISound.play('error'); UI.toast('Pass Intermediate to open the ⏱️ Minute Challenge'); return; } startGame('c'); };
+  box.appendChild(c);
+}
+function challengeKey(){ return 'sp_mathquest_challenge:' + (S.player || ''); }
+function challengeBest(){ try { return JSON.parse(localStorage.getItem(challengeKey()) || 'null'); } catch(e){ return null; } }
+
+/* ================= GAME ================= */
+function startGame(lvl){
+  clearInterval(timerId); hideResult();
+  const ch = lvl === 'c', L = ch ? CHALLENGE : LEVELS[lvl], W = WORLDS[world];
+  if(ch) lvl = 3;   // Hard-sized numbers for ➕ ➖
+  G = {lvl, L, series: ch ? 'mix' : series, world, challenge: ch, age: S.age, qi: 0, q: null, right: 0, wrong: 0, streak: 0, bestStreak: 0, score: 0, hints: L.hardcore ? 0 : 3, usedHint: false,
+    locked: false, over: false, t0: performance.now(), paused: false, pausedAt: 0, pausedTotal: 0, limit: L.time * 1000, answers: []};
+  const sp = $('scr-play'); sp.style.setProperty('--w1', W.c[0]); sp.style.setProperty('--w2', W.c[1]); sp.classList.toggle('dark', !!W.dark);
+  $('hud-level').textContent = L.emoji + ' ' + L.name + ' · ' + SERIES[G.series].icon + ' ' + W.icon; $('hud-level').classList.toggle('hc', !!L.hardcore);
+  $('mascot').textContent = W.mascot; $('hint-btn').classList.toggle('hidden', !!L.hardcore || ch);
+  $('voice-btn').textContent = voiceOn ? '🔊' : '🔈';
+  showScreen('play');
+  nextQ();
+  timerId = setInterval(tick, 200);
+  showBanner(ch ? '⏱️ 60 seconds — answer as many as you can!' : L.hardcore ? '💀 Hardcore: one wrong answer ends it — go!' : W.icon + ' ' + W.name + ' — ' + L.qs + ' questions, go!', L.hardcore ? 'bad' : 'gold');
+}
+function elapsed(){ return G ? performance.now() - G.t0 - G.pausedTotal - (G.paused ? performance.now() - G.pausedAt : 0) : 0; }
+function timeLeft(){ return G ? Math.max(0, G.limit - elapsed()) : 0; }
+function nextQ(){
+  if(!G) return;
+  G.q = makeQ(G.series, G.lvl, G.world, G.age, G.L); G.locked = false; G.usedHint = false;
+  renderQ(); hud();
+  if(voiceOn) setTimeout(() => { if(G && !G.over) sayQ(); }, 250);
+}
+function renderQ(){
+  const q = G.q, card = $('qcard');
+  $('qno').textContent = G.challenge ? '⏱️ Question ' + (G.qi + 1) : 'Question ' + (G.qi + 1) + ' of ' + G.L.qs;
+  $('word').classList.toggle('hidden', !q.word); $('word').textContent = q.word;
+  const vis = $('vis'); vis.innerHTML = q.vis ? visHtml(q.vis) : ''; vis.classList.toggle('hidden', !q.vis);
+  $('eq').innerHTML = eqParts(q).join(' ');
+  $('hintline').classList.add('hidden');
+  const ans = $('answers'); ans.className = 'answers' + (q.choices.length === 3 ? ' three' : '');
+  ans.innerHTML = q.choices.map((v, i) => '<button class="ans" data-sound="none" data-v="' + v + '"><span class="k">' + (i + 1) + '</span>' + v.toLocaleString() + '</button>').join('');
+  ans.querySelectorAll('.ans').forEach(b => b.onclick = () => answer(Number(b.dataset.v), b));
+  $('hint-btn').textContent = '💡 Hint (' + G.hints + ')'; $('hint-btn').disabled = G.hints <= 0;
+  card.classList.remove('pop', 'shake'); void card.offsetWidth; card.classList.add('pop');
+}
+// Picture numbers for little ones: groups to count, take-away with ✖, arrays for times, baskets for sharing, a number line.
+function visHtml(v){
+  const many = n => n <= 4 ? 'clamp(2.4rem,9vmin,5rem)' : n <= 8 ? 'clamp(2rem,7vmin,4rem)' : n <= 12 ? 'clamp(1.7rem,5.2vmin,3rem)' : n <= 24 ? 'clamp(1.3rem,3.8vmin,2.2rem)' : 'clamp(1rem,2.8vmin,1.6rem)';
+  const items = (ch, n, cls) => Array.from({length: n}, (_, i) => '<span class="' + (cls ? cls(i) : '') + '" style="animation-delay:' + (i * 0.04).toFixed(2) + 's">' + ch + '</span>').join('');
+  if(v.type === 'groups') return '<div class="grp" style="--vs:' + many(Math.max(v.a, v.b)) + '">' + items(v.it, v.a) + '</div><span class="op">+</span><div class="grp" style="--vs:' + many(Math.max(v.a, v.b)) + '">' + items(v.it2, v.b) + '</div>';
+  if(v.type === 'takeaway') return '<div class="grp" style="--vs:' + many(v.a) + '">' + items(v.it, v.a, i => i >= v.a - v.b ? 'gone' : '') + '</div>';
+  if(v.type === 'array') return '<div class="arr" style="--vs:' + many(v.rows * v.cols) + ';grid-template-columns:repeat(' + v.cols + ',auto)">' + items(v.it, v.rows * v.cols) + '</div>';
+  if(v.type === 'share') return '<div class="grp" style="--vs:' + many(v.total) + '">' + items(v.it, v.total) + '</div><div class="baskets">' + Array.from({length: v.baskets}, () => '<div class="basket">🧺<b>?</b></div>').join('') + '</div>';
+  if(v.type === 'line') return lineSvg(v);
+  return '';
+}
+function lineSvg(v){
+  const max = v.max, W = 640, pad = 22, x = n => pad + (W - pad * 2) * n / max, to = v.from + v.step;
+  let s = '<svg class="nline" viewBox="0 0 ' + W + ' 70" aria-hidden="true"><line x1="' + pad + '" y1="50" x2="' + (W - pad) + '" y2="50" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>';
+  for(let n = 0; n <= max; n++){ const big = n % 5 === 0; s += '<line x1="' + x(n) + '" y1="' + (big ? 42 : 45) + '" x2="' + x(n) + '" y2="' + (big ? 58 : 55) + '" stroke="currentColor" stroke-width="' + (big ? 2.5 : 1.5) + '"/>'; if(big || max <= 10) s += '<text x="' + x(n) + '" y="69" text-anchor="middle">' + n + '</text>'; }
+  const dir = v.step >= 0 ? 1 : -1;
+  for(let k = 0; k < Math.abs(v.step); k++){ const a = v.from + k * dir, b = a + dir, mx = (x(a) + x(b)) / 2; s += '<path d="M' + x(a) + ' 44 Q' + mx + ' ' + 14 + ' ' + x(b) + ' 44" fill="none" stroke="' + (dir > 0 ? '#4CB963' : '#E5484D') + '" stroke-width="2.5" stroke-dasharray="4 3"/>'; }
+  s += '<circle cx="' + x(v.from) + '" cy="50" r="7" fill="#3D7DD8"/><text x="' + x(v.from) + '" y="34" text-anchor="middle">start</text>';
+  return s + '</svg>';
+}
+function answer(v, btn){
+  if(!G || G.locked || G.over || G.paused) return;
+  G.locked = true; const q = G.q, ok = v === q.ask;
+  G.answers.push({q: q.a + SERIES[q.op].sym + q.b, ok});
+  $('answers').querySelectorAll('.ans').forEach(b => { if(Number(b.dataset.v) === q.ask) b.classList.add(ok ? 'right' : 'show'); });
+  const mark = $('qmark');
+  if(ok){
+    G.right++; if(!G.usedHint) G.streak++; G.bestStreak = Math.max(G.bestStreak, G.streak);
+    const pts = Math.round((100 * (G.lvl + 1) + Math.min(G.streak, 20) * 10 * (G.lvl + 1)) * (G.L.hardcore ? 3 : 1) * (G.usedHint ? 0.5 : 1) * seriesMult());
+    G.score += pts; floatText(btn, '+' + pts); sparkle(btn);
+    if(mark){ mark.textContent = q.ask.toLocaleString(); mark.classList.add('got'); }
+    UISound.play('success'); mascot('happy');
+    if([3, 5, 10, 15].includes(G.streak)){ showBanner('🔥 ' + G.streak + ' in a row!', 'gold'); if(G.streak >= 5) UISound.play('unlock'); }
+    else if(voiceOn) say(pick(RIGHT_WORDS));
+  } else {
+    G.wrong++; G.streak = 0; btn.classList.add('wrong'); UISound.play('error'); mascot('sad');
+    const card = $('qcard'); card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
+    if(mark) mark.textContent = q.ask.toLocaleString();
+    const hl = $('hintline'); hl.textContent = 'The answer is ' + q.ask.toLocaleString() + ' — ' + explain(q); hl.classList.remove('hidden');
+    if(voiceOn) say('The answer is ' + q.ask);
+    if(G.L.hardcore){ hud(); setTimeout(() => finishGame('hardcore'), 1300); return; }
+  }
+  G.qi++; hud();
+  setTimeout(() => { if(!G || G.over) return; if(G.qi >= G.L.qs) finishGame('done'); else nextQ(); }, ok ? (G.challenge ? 350 : 650) : (G.challenge ? 900 : 1500));
+}
+function explain(q){
+  const s = SERIES[q.op].sym;
+  return q.a.toLocaleString() + ' ' + s + ' ' + q.b.toLocaleString() + ' = ' + q.ans.toLocaleString();
+}
+function useHint(){
+  if(!G || G.locked || G.over || G.hints <= 0 || G.L.hardcore) return;
+  const wrong = [...$('answers').querySelectorAll('.ans:not(.off)')].filter(b => Number(b.dataset.v) !== G.q.ask);
+  if(wrong.length <= 1) return;
+  pick(wrong).classList.add('off'); G.hints--; G.usedHint = true;
+  $('hint-btn').textContent = '💡 Hint (' + G.hints + ')'; $('hint-btn').disabled = G.hints <= 0;
+  showBanner('💡 One wrong answer is gone (half points for this one)');
+}
+function sayQ(){ if(G && G.q) say(sayText(G.q)); }
+function toggleVoice(){ voiceOn = !voiceOn; savePrefs(); $('voice-btn').textContent = voiceOn ? '🔊' : '🔈'; if(voiceOn) sayQ(); else try{ speechSynthesis.cancel(); }catch(e){} }
+function mascot(kind){ const m = $('mascot'); m.classList.remove('happy', 'sad'); void m.offsetWidth; m.classList.add(kind); }
+function tick(){
+  if(!G || G.over || G.paused) return;
+  hud();
+  if(timeLeft() <= 0) finishGame('time');
+}
+let hudLow = false;
+function hud(){
+  if(!G) return;
+  const left = timeLeft(), frac = left / G.limit;
+  $('hud-score').textContent = G.score.toLocaleString();
+  const st = $('hud-streak'); st.textContent = '🔥 ' + G.streak; st.classList.toggle('hot', G.streak >= 3);
+  $('hud-q').textContent = G.challenge ? '✅ ' + G.right + ' · ❌ ' + G.wrong : '❓ ' + Math.min(G.qi + 1, G.L.qs) + '/' + G.L.qs;
+  const tm = $('hud-time'); tm.textContent = '⏱ ' + fmt(left); tm.classList.toggle('warn', left < 10000);
+  $('timefill').style.width = (frac * 100).toFixed(1) + '%'; $('timebar').classList.toggle('low', frac < 0.2);
+  if(left < 10000 && !hudLow){ hudLow = true; showBanner('⏱ 10 seconds left!', 'bad'); } if(left >= 10000) hudLow = false;
+  if(lockHandle){ const l = lockHandle.remainingMs(), el = $('hud-left'); el.classList.remove('hidden'); el.textContent = '⌛ ' + fmt(l); el.classList.toggle('warn', l < 120000); }
+}
+function pauseGame(){ if(G && !G.paused && !G.over){ G.paused = true; G.pausedAt = performance.now(); } }
+function resume(){ if(G && G.paused && !G.over){ G.pausedTotal += performance.now() - G.pausedAt; G.paused = false; } }
+function leavePlay(){
+  if(!G || G.over){ backToMenu(); return; }
+  pauseGame();
+  UI.confirm({icon: '◀', title: 'Leave this round?', body: 'This round will not be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(ok) backToMenu(); else resume(); });
+}
+function backToMenu(){ clearInterval(timerId); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); renderMenu(); showScreen('menu'); }
+document.addEventListener('keydown', e => {
+  if(!G || G.over || $('scr-play').classList.contains('hidden')) return;
+  const n = Number(e.key); if(n >= 1 && n <= 4){ const b = $('answers').querySelectorAll('.ans')[n - 1]; if(b && !b.classList.contains('off')) answer(Number(b.dataset.v), b); e.preventDefault(); }
+  if(e.key === 'v' || e.key === 'V') sayQ();
+  if(e.key === 'h' || e.key === 'H') useHint();
+});
+
+/* ================= FINISH ================= */
+function starsFor(acc, frac){ return acc >= 0.95 && frac >= 0.3 ? 3 : acc >= 0.8 ? 2 : 1; }
+function finishGame(why){
+  if(!G || G.over) return;
+  G.over = true; clearInterval(timerId);
+  if(G.challenge) return challengeOver();
+  const g = G, L = g.L, secs = Math.max(1, Math.round(Math.min(elapsed(), g.limit) / 1000)), asked = g.right + g.wrong;
+  const acc = asked ? g.right / L.qs : 0, allDone = g.qi >= L.qs;
+  const cleared = why !== 'hardcore' && allDone && (L.hardcore ? g.wrong === 0 : acc >= 0.6);
+  const bonus = cleared ? Math.round(Math.round(timeLeft() / 1000) * 10 * (g.lvl + 1) * (L.hardcore ? 3 : 1) * seriesMult()) : 0;
+  g.score += bonus;
+  const stars = cleared ? starsFor(acc, timeLeft() / g.limit) : 0;
+  const stats = {correct: g.right, bestStreak: g.bestStreak, perfect: cleared && g.wrong === 0 ? 1 : 0, rounds: 1};
+  if(g.score > 0 || cleared) saveWin(S.player, g.lvl, {timeSec: secs, stars, score: g.score, theme: g.world + ':' + g.series, cleared, stats});
+  const W = WORLDS[g.world];
+  if(cleared){ const pr = pick(PRAISE); party('🎉 ' + pr + ', ' + S.player + '!'); say(pr + ', ' + S.player + '!'); confetti(['🧮', '⭐', '🎉', W.icon, SERIES[g.series].icon, '💯'], 40); UISound.play('success'); }
+  else { UISound.play('pop'); say(why === 'time' ? 'Time is up! Good try!' : why === 'hardcore' ? 'Hardcore over. Try again!' : 'Good try! Let\'s practise.'); }
+  setTimeout(() => {
+    if(G !== g) return;
+    const title = cleared ? (g.wrong === 0 ? 'Perfect round!' : 'Level passed!') : why === 'time' ? 'Time\'s up!' : why === 'hardcore' ? '💀 Hardcore over!' : 'So close!';
+    const next = cleared && g.lvl < 5;
+    showResult('<div class="big">' + (cleared ? (g.wrong === 0 ? '💯' : '🏆') : why === 'hardcore' ? '💀' : W.mascot) + '</div><h2 class="' + (cleared ? 'cheer' : '') + '">' + title + '</h2>' +
+      (cleared ? '<div class="rating">' + [0, 1, 2].map(k => '<span class="st' + (k < stars ? '' : ' off') + '" style="animation-delay:' + (0.25 + k * 0.25) + 's">⭐</span>').join('') + '</div>' : '') +
+      '<div class="score-big">🏆 <span id="score-count">0</span></div>' +
+      '<div class="stats"><span>✅ ' + g.right + ' / ' + L.qs + '</span><span>🔥 best ' + g.bestStreak + '</span><span>⏱ ' + fmt(secs * 1000) + '</span>' + (bonus ? '<span>⚡ time bonus ' + bonus.toLocaleString() + '</span>' : '') + (L.hardcore ? '<span>💀 ×3</span>' : '') + '</div>' +
+      (why === 'hardcore' ? '<div class="hc-note">💀 Hardcore ends on the first mistake — try again!</div>' : '') +
+      (!cleared ? '<div class="tip">' + (why === 'time' ? '⏱ Answer a little quicker — the time bonus is big! ' : !allDone ? '' : '🎯 Get ' + Math.ceil(L.qs * 0.6) + ' right to pass. ') + TIPS[g.series] + '</div>' : '') +
+      '<div class="save-note" id="save-note">' + (g.score > 0 || cleared ? '<span class="ui-spin a-bounce">🧮</span> Saving your score…' : 'Not saved — answer some questions to get a score.') + '</div>' +
+      '<div class="res-btns">' + (next ? '<button class="btn" id="b-next">' + (g.lvl === 4 ? '💀 Try Hardcore ▶' : 'Next level ▶') + '</button>' : '') + '<button class="btn' + (next ? ' soft' : '') + '" id="b-again">🔁 Play again</button><button class="btn soft" id="b-menu">◀ Back</button></div>');
+    countUp($('score-count'), g.score, 1000);
+    $('b-again').onclick = () => startGame(g.lvl);
+    $('b-menu').onclick = () => backToMenu();
+    if($('b-next')) $('b-next').onclick = () => { const p = progressOf(S.player); p.unlocked = Math.max(p.unlocked, g.lvl + 1); startGame(g.lvl + 1); };
+  }, cleared ? 1500 : 800);
+}
+// ⏱️ Minute Challenge result: ✅ right, ❌ mistakes, accuracy; best kept on this device; feats sent to the server.
+function challengeOver(){
+  const g = G, score = Math.max(0, g.score - g.wrong * 50), acc = g.right + g.wrong ? Math.round(g.right / (g.right + g.wrong) * 100) : 0;
+  const old = challengeBest(), best = !old || g.right > old.right || (g.right === old.right && score > old.score);
+  if(best) try { localStorage.setItem(challengeKey(), JSON.stringify({right: g.right, wrong: g.wrong, score: score})); } catch(e){}
+  if(S.player && g.right) google.script.run.withFailureHandler(() => {}).saveFeats(S.player, 'math-quest', {sprintBest: g.right, sprintRounds: 1, correct: g.right, bestStreak: g.bestStreak});
+  if(best && g.right){ party('⏱️ New best: ' + g.right + ' right!'); confetti(['⏱️', '⭐', '🧮', '🎉'], 30); UISound.play('success'); say('New best! ' + g.right + ' right!'); } else { UISound.play('pop'); say(g.right + ' right! Good try!'); }
+  setTimeout(() => {
+    if(G !== g) return;
+    showResult('<div class="big">⏱️</div><h2 class="' + (best ? 'cheer' : '') + '">' + (best ? 'New best!' : 'Time\'s up!') + '</h2>' +
+      '<div class="score-big">🏆 <span id="score-count">0</span></div>' +
+      '<div class="stats"><span>✅ ' + g.right + ' right</span><span>❌ ' + g.wrong + ' mistake' + (g.wrong === 1 ? '' : 's') + '</span><span>🎯 ' + acc + '%</span><span>🔥 best ' + g.bestStreak + '</span></div>' +
+      '<div class="tip">' + (old && !best ? 'Your best is ✅ ' + old.right + ' — ' : '') + 'Mistakes cost 50 points each, so think fast but carefully!</div>' +
+      '<div class="save-note">⏱️ Best results are kept on this device</div>' +
+      '<div class="res-btns"><button class="btn" id="b-again">🔁 Try again</button><button class="btn soft" id="b-menu">◀ Back</button></div>');
+    countUp($('score-count'), score, 900);
+    $('b-again').onclick = () => startGame('c'); $('b-menu').onclick = () => backToMenu();
+  }, 700);
+}
+function party(text){ const p = document.createElement('div'); p.className = 'praise'; p.textContent = text; document.body.appendChild(p); setTimeout(() => p.remove(), 1600); }
+function sparkle(el){ const r = el.getBoundingClientRect(); for(let k = 0; k < 7; k++){ const s = document.createElement('div'); s.className = 'spark'; s.textContent = pick(['✨', '⭐', '💫']); const a = Math.random() * 6.28, d = 40 + Math.random() * 40; s.style.cssText = 'left:' + (r.left + r.width / 2) + 'px;top:' + (r.top + r.height / 2) + 'px;--dx:' + Math.cos(a) * d + 'px;--dy:' + Math.sin(a) * d + 'px'; document.body.appendChild(s); setTimeout(() => s.remove(), 850); } }
+function floatText(el, text){ const r = el.getBoundingClientRect(), s = document.createElement('div'); s.className = 'float'; s.textContent = text; s.style.cssText = 'left:' + (r.left + r.width / 2 - 20) + 'px;top:' + (r.top - 6) + 'px'; document.body.appendChild(s); setTimeout(() => s.remove(), 950); }
+let bannerTimer = 0;
+function showBanner(text, kind){ const b = $('banner'); b.textContent = text; b.classList.toggle('gold', kind === 'gold'); b.classList.toggle('bad', kind === 'bad'); b.classList.add('on'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('on'), 1900); }
+
+/* ================= SAVE ================= */
+const PENDING_KEY = 'sp_mathquest_pending';
+function readPending(){ try{ return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); }catch(e){ return []; } }
+function writePending(list){ try{ localStorage.setItem(PENDING_KEY, JSON.stringify(list.slice(-20))); }catch(e){} }
+function flushPending(){ const list = readPending(); if(!list.length) return; writePending([]); list.forEach(w => google.script.run.withFailureHandler(() => writePending(readPending().concat([w]))).saveLevelResult(GAME_ID, w.name, w.lvl, w.extra)); }
+function putNote(html){ const put = () => { const n = $('save-note'); if(n) n.innerHTML = html; return !!n; }; if(!put()) setTimeout(put, 1700); }
+function saveWin(name, lvlIdx, extra, tries){
+  tries = tries || 0;
+  const p = S.progress[name] || (S.progress[name] = {unlocked: 0, tokens: [], best: []});
+  if(extra.cleared) p.unlocked = Math.max(p.unlocked, lvlIdx + 1);
+  google.script.run.withSuccessHandler(res => {
+      const best = (p.best || []).slice(); if(res.best) best[lvlIdx] = res.best;
+      S.progress[name] = {unlocked: res.unlocked, tokens: res.tokens, best}; flushPending(); putNote(saveText(res));
+    }).withFailureHandler(err => {
+      if(tries < 1){ setTimeout(() => saveWin(name, lvlIdx, extra, tries + 1), 1200); return; }
+      writePending(readPending().concat([{name, lvl: lvlIdx, extra}])); putNote('⚠️ Could not save yet — it will be sent again next time.');
+    }).saveLevelResult(GAME_ID, name, lvlIdx, extra);
+}
+function saveText(res){
+  let h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New high score!' : res.best && res.best.score ? 'Your best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Score saved';
+  const fe = res.feats; if(fe){ (fe.newTitles || []).forEach(t => { h += '<br><span class="title-new">🏷️ New title: ' + t.icon + ' ' + UI.esc(t.name) + '</span>'; }); (fe.newBadges || []).forEach(b => { h += '<br><span class="feat-new">' + b.medal + ' ' + b.icon + ' ' + UI.esc(b.name) + ' · ' + b.tierName + '</span>'; }); }
+  return h;
+}
+function countUp(el, to, ms){ if(!el) return; const t0 = performance.now(); (function tick(now){ const p = Math.max(0, Math.min(1, (now - t0) / ms)); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))).toLocaleString(); if(p < 1) requestAnimationFrame(tick); })(t0); }
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+function hideResult(){ $('result').classList.add('hidden'); }
+function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pick(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
+function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
+function goGameroom(){ UI.go(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
+
+/* ================= BOOT ================= */
+function boot(){
+  UI.loading('math-quest');
+  google.script.run.withSuccessHandler(d => {
+      UI.loaded();
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {};
+      UISound.applySettings(S.settings);
+      const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
+      lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
+      flushPending();
+      if(CURRENT_PLAYER && S.players.some(p => p.Name === CURRENT_PLAYER)) choosePlayer(CURRENT_PLAYER); else { renderPlayers(); showScreen('player'); }
+    }).withFailureHandler(() => { UI.loaded(); UI.toast('Could not load players — check the connection', 'err'); renderPlayers(); showScreen('player'); })
+    .getLevelGameData(GAME_ID, CURRENT_PLAYER);
+}
+boot();
+/* ✨ MODE SPOTLIGHT (modes-3): ?mode=<id> opens this game straight in that mode after the player pick · "✨ Also try" on the start page · started modes → UI.modeTried */
+const MS_GAME = 'math-quest';
+function msOpen(id){
+  if(id !== 'minute') return; const c = document.querySelector('#scr-menu .lvl.challenge'); if(c){ if(c.scrollIntoView) c.scrollIntoView({block: 'center'}); c.click(); }
+}
+function msNow(){ return ''; }
+function msWrap(fn, idOf){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ try{ const id = idOf.apply(this, arguments); if(id && UI.modeTried) UI.modeTried(S.player || CURRENT_PLAYER, MS_GAME, id); }catch(e){} return f.apply(this, arguments); }; }
+function msAfter(fn, after){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ const r = f.apply(this, arguments); try{ after.apply(this, arguments); }catch(e){} return r; }; }
+msWrap('startGame', x => x === 'c' ? 'minute' : '');
+msAfter('choosePlayer', name => {
+  if(!window.UI || !UI.modeLink) return;
+  const id = UI.modeLink(MODE_LINK); if(id) msOpen(id);
+  UI.alsoTry({game: MS_GAME, player: name, current: msNow, at: () => document.querySelector('#scr-menu .title'), open: msOpen});
+});
+/* ✨ END MODE SPOTLIGHT */
+</script>
+</body>
+</html>
+<!-- (r9+back-1+modes-3) END OF MathQuest.html -->

@@ -1,0 +1,636 @@
+<!-- DoubleUp.html -->
+<!DOCTYPE html>
+<html>
+<head>
+<script>window.SP_BUILD={"page":"doubleup","routes":{"home":"index.html","gameroom":"gameroom.html","minigames":"minigames.html","stacking":"stacking.html","setup":"setup.html","achievements":"achievements.html","maze":"maze.html","robot":"robot.html","checkers":"checkers.html","chess":"chess.html","pinball":"pinball.html","hopper":"hopper.html","turbo":"turbo.html","memory":"memory.html","mathquest":"mathquest.html","doubleup":"doubleup.html","blockdrop":"blockdrop.html","popblocks":"popblocks.html","numbergrid":"numbergrid.html","numberboard":"numberboard.html","wordboard":"wordboard.html","sweetswap":"sweetswap.html","beatcorner":"beatcorner.html","slabrall":"slabrall.html","brawlbuddies":"brawlbuddies.html","alignext":"alignext.html","soulbopper":"soulbopper.html","snakize":"snakize.html","polyplot":"polyplot.html","wisdeck":"wisdeck.html","eyesbrain":"eyesbrain.html","workshop":"workshop.html","room":"room.html","collection":"collection.html","poseparty":"poseparty.html"}};</script>
+<script src="app/boot.js"></script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-title" content="STEAM Playground">
+<meta name="theme-color" content="#2CA6DE">
+<title>STEAM Playground</title>
+<script src="app/offline-ui.js" defer></script>
+
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link href="fonts/fonts.css" rel="stylesheet">
+<script src="inc/Themes.js"></script>
+<style>
+  /* Double Up (number-slide, 2048-style). Menus follow the player's look; the play screen wears the theme's colours. */
+  :root{
+    --bg:#3A2A1E; --card:#FFFFFF; --panel:#FFF1E2; --ink:#3B2A20; --ink-soft:#8A6F5C;
+    --pink:#FF6B8B; --violet:#7A5CFA; --gold:#FFC845; --mint:#2EC4B6; --green:#4CB963; --danger:#E5484D;
+    --terracotta:#F28C28; --mustard:#FFC845; --dusty-blue:#8A6F5C; /* used by UiKit */
+    --t1:#FFF4E6; --t2:#FFD9B0; --board:#BBA38D; --slot:rgba(255,255,255,0.35);
+  }
+  html{height:100%;background:#FFF7EE;}
+  body{margin:0;min-height:100%;min-height:100dvh;background:#FFF7EE;color:var(--ink);font-family:'Nunito',sans-serif;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);overscroll-behavior:none;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html{height:100%;background:#F3F2FF;}
+  body{margin:0;min-height:100%;min-height:100dvh;background:#F3F2FF;color:var(--ink);font-family:'Nunito',sans-serif;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);overscroll-behavior:none;}
+  .hidden{display:none !important;}
+  h1,h2,h3{font-family:'Fredoka',sans-serif;margin:0;}
+  button{font-family:inherit;}
+  .top-btn{position:fixed;top:calc(10px + env(safe-area-inset-top));left:calc(10px + env(safe-area-inset-left));z-index:300;
+    border:none;border-radius:14px;background:var(--card);color:var(--ink-soft);cursor:pointer;padding:8px 12px;
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.82rem;box-shadow:0 3px 0 rgba(0,0,0,0.08);}
+  /* ---------- menus ---------- */
+  .screen{max-width:960px;margin:0 auto;padding:62px 18px 40px;}
+  .title{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;margin-bottom:12px;}
+  .title h1{font-size:2rem;} .title p{margin:0;color:var(--ink-soft);font-weight:700;}
+  .title .logo{font-size:2.8rem;animation:nglogo 2.6s ease-in-out infinite;}
+  @keyframes nglogo{0%,100%{transform:rotate(-6deg) scale(1);}50%{transform:rotate(6deg) scale(1.08);}}
+  .who{display:inline-flex;align-items:center;gap:8px;margin-top:6px;background:var(--card);border-radius:14px;padding:6px 12px;font-weight:800;font-size:0.85rem;}
+  .who button{border:none;background:none;color:color-mix(in srgb, var(--pink) 70%, var(--ink));font-weight:800;cursor:pointer;font-size:inherit;text-decoration:underline;padding:0;}
+  .pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;}
+  .pick{background:var(--card);border:3px solid transparent;border-radius:20px;padding:14px 10px;cursor:pointer;position:relative;
+    display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;box-shadow:0 5px 0 rgba(0,0,0,0.07);color:inherit;}
+  .pick:active{transform:translateY(4px);box-shadow:0 1px 0 rgba(0,0,0,0.07);}
+  .pick .big{font-size:2.2rem;line-height:1;} .pick .nm{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1rem;} .pick .sub{font-size:0.75rem;color:var(--ink-soft);font-weight:700;}
+  .pick canvas{width:72px;height:84px;}
+  .section-head{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1.05rem;margin:16px 0 8px;color:var(--ink-soft);text-align:center;}
+  .chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+  .chip{border:3px solid transparent;border-radius:16px;background:var(--card);color:var(--ink);cursor:pointer;padding:8px 10px;min-width:108px;
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.92rem;display:inline-flex;flex-direction:column;align-items:center;gap:3px;box-shadow:0 4px 0 rgba(0,0,0,0.07);}
+  .chip .ic{font-size:1.25rem;line-height:1;letter-spacing:1px;white-space:nowrap;}
+  .chip.on{border-color:var(--pink);background:#FF4D8D;color:#fff;}
+  /* the picked look must stay visible in every app look (looks restyle cards and chips, which hid the pick — Aowu 2026-11-03) */
+  html .chip.on, html [data-theme] .chip.on, html .chip.on.t-card{background:linear-gradient(135deg,#FF4D8D,#FF8A3D) !important;color:#fff !important;border-color:#FFE066 !important;box-shadow:0 0 0 3px rgba(255,224,102,0.55),0 4px 0 rgba(0,0,0,0.2) !important;position:relative;}
+  html .chip.on *{color:#fff !important;}
+  /* iPad Safari inside the Apps Script frame sometimes skips repainting a chip whose class changed: each chip + level card gets its own layer (2026-11-03) */
+  .chips, .chip, .levels .lvl{transform:translateZ(0);-webkit-transform:translateZ(0);backface-visibility:hidden;-webkit-backface-visibility:hidden;}
+  .chip.pick:active, .levels .lvl.pick:active, .chip:active{transform:translateZ(0) translateY(4px);}
+  .chip.on::after{content:'✓';position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;background:#2EC4B6;color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 0 rgba(0,0,0,0.2);}
+  @media (max-width:640px){ .chips{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;padding:2px 2px 8px;scrollbar-width:none;} .chips::-webkit-scrollbar{display:none;} .chip{flex:none;} }
+  .levels{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  @media (min-width:1100px){ .levels{grid-template-columns:repeat(6,1fr);} }
+  @media (max-width:640px){ .levels{grid-template-columns:repeat(2,1fr);} .title h1{font-size:1.6rem;} }
+  .lvl .num{position:absolute;top:8px;left:10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.75rem;color:var(--ink-soft);}
+  .lvl .badge{position:absolute;top:6px;right:8px;font-size:1rem;}
+  .lvl.recommended{border-color:var(--mint);}
+  .lvl.recommended::after{content:'Great for you!';position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);white-space:nowrap;background:var(--mint);color:#fff;font-size:0.62rem;font-weight:800;padding:2px 8px;border-radius:8px;}
+  .lvl.locked{opacity:.55;cursor:not-allowed;filter:grayscale(.6);}
+  .lvl .learn{font-size:0.72rem;font-weight:800;color:color-mix(in srgb, var(--pink) 70%, var(--ink));}   /* audit: 2.7:1 → readable */
+  .lvl .lives{font-size:0.66rem;font-weight:800;background:var(--panel);border-radius:10px;padding:2px 6px;}
+  .lvl .best{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 8px;font-size:0.74rem;font-weight:800;}
+  .lvl .best span{background:var(--panel);border-radius:10px;padding:2px 8px;} .lvl .best.none{color:var(--ink-soft);}
+  .lvl.hardcore{background:linear-gradient(160deg,#7A1020 0%,#2E0609 62%,#0E0204 100%) !important;color:#FFECEC !important;border-color:#FF4040 !important;}
+  .lvl.hardcore .nm,.lvl.hardcore .sub,.lvl.hardcore .num,.lvl.hardcore .learn,.lvl.hardcore .lives,.lvl.hardcore .best,.lvl.hardcore .best.none{color:#FFECEC !important;}
+  .lvl.hardcore .best span,.lvl.hardcore .lives{background:rgba(255,255,255,0.16) !important;color:#FFECEC !important;}
+  .lvl.hardcore .big{filter:drop-shadow(0 0 8px rgba(255,64,64,0.85));}
+  .lvl.hardcore:not(.locked){box-shadow:0 0 0 2px #FF4040,0 0 18px rgba(255,64,64,0.45) !important;}
+  .lvl.hardcore.locked{opacity:.8;filter:grayscale(.3);}
+  .mini{display:inline-grid;gap:1px;background:var(--ink-soft);border:2px solid var(--ink-soft);border-radius:6px;overflow:hidden;}
+  .mini i{display:block;width:9px;height:9px;background:var(--panel);} .mini i.f{background:var(--violet);}
+  .lvl.hardcore .mini{background:#FF8080;border-color:#FF8080;} .lvl.hardcore .mini i{background:#3A0A10;} .lvl.hardcore .mini i.f{background:#FFECEC;}
+  .rules{background:var(--card);border-radius:18px;padding:8px 14px;margin-top:16px;}
+  .rules summary{cursor:pointer;font-family:'Fredoka',sans-serif;font-weight:700;padding:6px 0;}
+  .rules li{margin:5px 0;font-size:0.9rem;}
+  .btn{font-family:'Fredoka',sans-serif;font-weight:600;font-size:0.95rem;border:none;border-radius:14px;cursor:pointer;padding:11px 16px;color:#fff;background:linear-gradient(135deg,#5B4BE0,#FF4D8D);box-shadow:0 4px 0 rgba(0,0,0,0.12);}
+  .btn:active{transform:translateY(3px);} .btn.soft{background:var(--panel);color:var(--ink);}
+  .empty{text-align:center;color:var(--ink-soft);font-weight:800;padding:20px;}
+
+
+  .chain{font-size:1rem;letter-spacing:1px;white-space:nowrap;}
+  .lvl.challenge{background:linear-gradient(160deg,#1E4E8C 0%,#0F2A52 70%) !important;color:#EAF4FF !important;border-color:#7FC8FF !important;grid-column:1 / -1;}
+  .lvl.challenge .nm,.lvl.challenge .sub,.lvl.challenge .num,.lvl.challenge .learn,.lvl.challenge .lives,.lvl.challenge .best,.lvl.challenge .best.none{color:#EAF4FF !important;}
+  .lvl.challenge .lives,.lvl.challenge .best span{background:rgba(255,255,255,0.16) !important;}
+  .lvl.challenge.locked{opacity:.75;}
+
+  /* ---------- play ---------- */
+  #scr-play{position:fixed;inset:0;display:flex;flex-direction:column;background:linear-gradient(180deg,var(--t1),var(--t2));color:var(--ink);overflow:hidden;user-select:none;-webkit-user-select:none;}
+  #scr-play.dark{color:#fff;}
+  .hud{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;padding:calc(8px + env(safe-area-inset-top)) 10px 4px;position:relative;z-index:5;flex:none;}
+  .pill{background:rgba(0,0,0,0.3);border:none;color:#fff;border-radius:14px;padding:6px 10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.9rem;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
+  button.pill{cursor:pointer;min-width:40px;min-height:36px;justify-content:center;} button.pill:active{transform:translateY(2px);} button.pill:disabled{opacity:.4;cursor:default;}
+  .pill.lvl-pill{background:linear-gradient(135deg,#F28C28,#FF6B8B);} .pill.lvl-pill.hc{background:linear-gradient(135deg,#B3122B,#3A0A10);} .pill.lvl-pill.ch{background:linear-gradient(135deg,#1E4E8C,#3FA9F5);}
+  .pill.score{font-size:1.05rem;min-width:80px;justify-content:center;}
+  .pill.goal{background:rgba(255,255,255,0.85);color:#3B2A20;}
+  .goalrow{display:flex;align-items:center;justify-content:center;gap:8px;flex:none;padding:0 10px 6px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.92rem;}
+  .goalrow .ladder{display:flex;gap:2px;align-items:center;font-size:1.05rem;overflow-x:auto;max-width:92vw;scrollbar-width:none;}
+  .goalrow .ladder span{opacity:.35;transition:opacity .3s,transform .3s;} .goalrow .ladder span.got{opacity:1;} .goalrow .ladder span.top{transform:scale(1.35);}
+  .goalrow .ladder span.goal{opacity:1;filter:drop-shadow(0 0 4px #FFC845);}
+  .goalrow .ladder i{font-style:normal;font-size:0.7rem;opacity:.4;}
+  .arena{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;gap:14px;padding:4px 10px;position:relative;}
+  .board{position:relative;background:var(--board);border-radius:18px;box-shadow:0 8px 0 rgba(0,0,0,0.18);touch-action:none;flex:none;}
+  .slot{position:absolute;border-radius:12px;background:var(--slot);}
+  .rock{position:absolute;border-radius:12px;background:linear-gradient(160deg,#8C8C8C,#5A5A5A);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 -4px 0 rgba(0,0,0,0.25);}
+  .tile{position:absolute;border-radius:12px;display:flex;align-items:center;justify-content:center;transition:transform .11s ease-in-out;will-change:transform;
+    font-family:'Fredoka',sans-serif;font-weight:700;color:#fff;box-shadow:0 3px 0 rgba(0,0,0,0.15);}
+  .tile .in{width:100%;height:100%;border-radius:inherit;display:flex;align-items:center;justify-content:center;position:relative;background:inherit;}
+  .tile.new .in{animation:appear .2s ease .1s both;} @keyframes appear{0%{transform:scale(0);}100%{transform:scale(1);}}
+  .tile.merged .in{animation:mpop .22s ease .1s both;} @keyframes mpop{0%{transform:scale(1);}50%{transform:scale(1.22);}100%{transform:scale(1);}}
+  .tile .pic{line-height:1;}
+  .tile .num{position:absolute;right:5px;bottom:2px;opacity:.95;line-height:1;background:rgba(0,0,0,0.28);border-radius:8px;padding:1px 5px;text-shadow:none;}
+  .tile.big{box-shadow:0 0 18px rgba(255,210,80,0.85),0 3px 0 rgba(0,0,0,0.15);}
+  .pad{display:none;flex:none;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(2,52px);gap:6px;justify-content:center;padding:4px 0 var(--safe-b, 18px);}
+  body.touch .pad{display:grid;}
+  .pad button{border:none;border-radius:14px;background:rgba(255,255,255,0.88);color:#3B2A20;font-size:1.4rem;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,0.18);font-family:'Fredoka',sans-serif;font-weight:700;}
+  .pad button:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,0.18);}
+  .pad .u{grid-column:2;grid-row:1;} .pad .l{grid-column:1;grid-row:2;} .pad .d{grid-column:2;grid-row:2;} .pad .r{grid-column:3;grid-row:2;}
+  .pad-side{display:none;}
+  @media (orientation:landscape) and (max-height:560px){
+    body.touch .pad{display:none;}
+    body.touch .pad-side{display:grid;grid-template-columns:repeat(3,54px);grid-template-rows:repeat(3,50px);gap:5px;flex:none;}
+    .pad-side button{border:none;border-radius:14px;background:rgba(255,255,255,0.88);color:#3B2A20;font-size:1.3rem;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,0.18);font-family:'Fredoka',sans-serif;font-weight:700;}
+    .pad-side .u{grid-column:2;grid-row:1;} .pad-side .l{grid-column:1;grid-row:2;} .pad-side .r{grid-column:3;grid-row:2;} .pad-side .d{grid-column:2;grid-row:3;}
+    .hud{padding-top:calc(4px + env(safe-area-inset-top));} .pill{padding:4px 8px;font-size:0.8rem;} .goalrow{padding-bottom:2px;}
+  }
+  .banner{position:absolute;left:50%;top:6px;transform:translateX(-50%);z-index:20;pointer-events:none;width:max-content;max-width:min(92vw,440px);text-align:center;
+    background:rgba(40,20,10,0.88);color:#fff;border-radius:14px;padding:8px 14px;font-family:'Fredoka',sans-serif;font-weight:700;opacity:0;transition:opacity .25s;}
+  .banner.on{opacity:1;} .banner.gold{background:linear-gradient(135deg,#FF9F1C,#FF6B8B);} .banner.bad{background:rgba(229,72,77,0.95);}
+  .praise{position:fixed;left:50%;top:38%;z-index:30;transform:translate(-50%,-50%);pointer-events:none;text-align:center;white-space:nowrap;font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(1.4rem,5vw,2.6rem);color:#fff;
+    padding:12px 22px;border-radius:22px;background:linear-gradient(135deg,#F28C28,#FF6B8B,#7A5CFA);box-shadow:0 8px 0 rgba(0,0,0,0.25);animation:praise-in .7s cubic-bezier(.2,1.6,.4,1) both;}
+  @keyframes praise-in{0%{transform:translate(-50%,-50%) scale(.2) rotate(-12deg);opacity:0;}100%{transform:translate(-50%,-50%) scale(1);opacity:1;}}
+  .spark{position:fixed;z-index:50;pointer-events:none;font-size:1.3rem;animation:spark .8s ease-out forwards;}
+  @keyframes spark{to{transform:translate(var(--dx),var(--dy)) scale(.3);opacity:0;}}
+  @media (max-width:520px){ .hud{flex-wrap:nowrap;gap:4px;padding-left:6px;padding-right:6px;} .pill{padding:5px 7px;font-size:0.8rem;} button.pill{min-width:34px;min-height:32px;} .pill.score{min-width:60px;font-size:0.92rem;} }
+  /* result */
+  .result{position:fixed;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(25,10,45,0.6);overflow-y:auto;}
+  .result{flex-direction:column;justify-content:flex-start;} .result::after{content:'';flex:0 0 var(--safe-b, 18px);}   /* bottom headroom: buttons stay above the phone's swipe-up bar */
+  .result-card{margin:auto;background:var(--card);color:var(--ink);border-radius:26px;padding:24px 22px;max-width:400px;width:100%;text-align:center;box-shadow:0 18px 50px rgba(0,0,0,0.35);display:flex;flex-direction:column;gap:10px;align-items:center;}
+  .result-card .big{font-size:3.4rem;} .result-card h2{font-size:1.55rem;}
+  .result-card h2.cheer{background:linear-gradient(90deg,#5B4BE0,#2EC4B6,#FF4D8D);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .rating .st{font-size:2rem;display:inline-block;animation:star-pop .5s cubic-bezier(.2,1.8,.4,1) both;} .rating .st.off{filter:grayscale(1);opacity:.25;}
+  @keyframes star-pop{0%{transform:scale(0) rotate(-40deg);}100%{transform:scale(1);}}
+  .score-big{font-family:'Fredoka',sans-serif;font-weight:700;font-size:2rem;color:#3D49B8;}
+  .stats{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;} .stats span{background:var(--panel);border-radius:10px;padding:4px 10px;font-weight:800;font-size:0.82rem;}
+  .save-note{font-weight:800;font-size:0.85rem;color:var(--ink-soft);}
+  .tip{background:var(--panel);border-radius:14px;padding:8px 12px;font-weight:800;font-size:0.88rem;}
+  .hc-note{background:linear-gradient(135deg,#7A1020,#2E0609);color:#FFECEC;border-radius:14px;padding:10px 12px;font-weight:800;font-size:0.9rem;}
+  .new-badge,.title-new,.feat-new{display:inline-block;background:linear-gradient(135deg,#FFC845,#FF9F1C);color:#3A2500;border-radius:10px;padding:4px 10px;font-weight:800;margin:2px;}
+  .res-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+  .confetti{position:fixed;top:-40px;z-index:390;font-size:1.6rem;pointer-events:none;animation:fall linear forwards;}
+  @keyframes fall{to{transform:translateY(110vh) rotate(540deg);}}
+  @media (prefers-reduced-motion: reduce){ .title .logo{animation:none;} }
+
+</style>
+</head>
+<body ontouchstart="">
+<script src="inc/UiKit.js"></script>
+<script src="inc/BallSkins.js"></script>
+<script src="inc/AvatarKit.js"></script>
+<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button>
+
+<section class="screen hidden" id="scr-player">
+  <div class="title"><div class="logo">🔀</div><h1>Double Up</h1><p>Who's playing?</p></div>
+  <div class="pick-grid" id="player-list"></div>
+</section>
+
+<section class="screen hidden" id="scr-menu">
+  <div class="title"><div class="logo">🔀</div><h1>Double Up</h1><p>Slide the tiles — two the same join and grow up!</p>
+    <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
+  <div class="section-head">1. Pick what grows</div>
+  <div class="chips" id="theme-list"></div>
+  <div class="section-head">2. Pick a level</div>
+  <div class="levels" id="level-list"></div>
+  <details class="rules"><summary>📖 How to play</summary><ul>
+    <li><b>Slide:</b> swipe ↑ ↓ ← → (or use the arrow buttons / arrow keys). Every tile slides as far as it can.</li>
+    <li><b>Double up:</b> two tiles that are the same join into one bigger tile (2 + 2 = 4, 4 + 4 = 8 …). In picture themes they grow up: 🥚 → 🐣 → 🐥 → 🐔 …</li>
+    <li><b>Win:</b> make the goal tile shown on the level. After every slide a new small tile appears — when the board is full and nothing can join, the game is over.</li>
+    <li><b>↶ Undo:</b> as many as you like on Basic and Junior, 3 on Intermediate, 1 on Hard. Stars: ⭐⭐⭐ = no undo used.</li>
+    <li><b>🪨 Rock (Extreme):</b> a rock that never moves — slide around it!</li>
+    <li><b>💀 Hardcore:</b> make 4096, no undo — points ×3. <b>🏔️ Challenge:</b> a tiny 3 × 3 board — can you reach 1024? (2048 can't fit on 3 × 3!)</li>
+    <li><b>Tip:</b> keep your biggest tile in a corner and build towards it.</li>
+  </ul></details>
+  <div class="ui-leaders" id="leaders"></div>
+</section>
+
+<section class="hidden" id="scr-play">
+  <div class="hud">
+    <button class="pill" data-sound="none" onclick="leavePlay()" title="Back to the levels">◀</button>
+    <span class="pill lvl-pill" id="hud-level"></span>
+    <span class="pill score" id="hud-score">0</span>
+    <span class="pill" id="hud-moves">👆 0</span>
+    <span class="pill hidden" id="hud-left"></span>
+    <button class="pill" data-sound="none" onclick="undo()" id="undo-btn" title="Undo (U)">↶</button>
+    <button class="pill" data-sound="none" onclick="toggleVoice()" id="voice-btn" title="Voice">🔈</button>
+  </div>
+  <div class="goalrow"><span id="goal-txt"></span><div class="ladder" id="ladder"></div></div>
+  <div class="arena" id="arena">
+    <div class="banner" id="banner"></div>
+    <div class="board" id="board"></div>
+    <div class="pad-side" id="pad-side"><button class="u" data-dir="up">▲</button><button class="l" data-dir="left">◀</button><button class="r" data-dir="right">▶</button><button class="d" data-dir="down">▼</button></div>
+  </div>
+  <div class="pad" id="pad"><button class="u" data-dir="up">▲</button><button class="l" data-dir="left">◀</button><button class="d" data-dir="down">▼</button><button class="r" data-dir="right">▶</button></div>
+</section>
+<div class="result hidden" id="result"><div class="result-card" id="result-card"></div></div>
+
+<script>
+const WEBAPP_URL = ''+__SP("webAppUrl")+'';
+const CURRENT_PLAYER = ''+__SP("player")+''; window.SP_PAGE = 'doubleup';
+const MODE_LINK = ''+__SP("mode")+'';   // ✨ modes-3: ?mode=<id> (Code.gs MODES_) — opened once, after the player pick
+UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});   // loader + menus in the player's look before the server answers
+const SESSION_START = Number(''+__SP("sessionStart")+'') || null;
+const DURATION_MIN = Number(''+__SP("durationMin")+'') || null;
+const GAME_ID = 'double-up';
+const $ = id => document.getElementById(id);
+const pick = a => a[rnd(a.length)];
+const randInt = (a, b) => a + rnd(b - a + 1);
+function fmt(ms){ const s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+let voiceOn = true;
+function say(text){ try{ if(!voiceOn || !UISound.get().enabled || !window.speechSynthesis) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 1; u.pitch = 1.2; u.volume = Math.max(0.2, UISound.get().volume); speechSynthesis.speak(u); }catch(e){} }
+function shuffle(a){ for(let i = a.length - 1; i > 0; i--){ const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+/* ================= LEVELS · THEMES ================= */
+// n × n board, goal tile, undo = how many (Infinity = as many as you like), rocks = tiles that never move.
+// The 🏔️ Challenge is a bonus board, not a 7th level: its best is saved on the server as feats double-up.chTile / chScore (max),
+// with a copy on this device (old device-only bests are sent to the server once).
+const LEVELS = [
+  {name: 'Basic', emoji: '🌱', n: 4, goal: 128, undo: Infinity, rocks: 0, blurb: 'Make 128 — undo as much as you like'},
+  {name: 'Junior', emoji: '🐣', n: 4, goal: 512, undo: Infinity, rocks: 0, blurb: 'Make 512'},
+  {name: 'Intermediate', emoji: '🔦', n: 4, goal: 1024, undo: 3, rocks: 0, blurb: 'Make 1024 — 3 undos'},
+  {name: 'Hard', emoji: '⚡', n: 4, goal: 2048, undo: 1, rocks: 0, blurb: 'Make 2048 — 1 undo'},
+  {name: 'Extreme', emoji: '🌋', n: 4, goal: 2048, undo: 0, rocks: 1, blurb: 'Make 2048 around a 🪨 rock — no undo'},
+  {name: 'Hardcore', emoji: '💀', n: 4, goal: 4096, undo: 0, rocks: 0, hardcore: true, blurb: 'Make 4096 — no undo, ×3 points'}
+];
+const CHALLENGE = {name: 'Challenge', emoji: '🏔️', n: 3, goal: 1024, undo: 0, rocks: 0, challenge: true, blurb: 'Tiny 3 × 3 board — reach 1024 (2048 can\'t fit on 3 × 3!)'};
+// Each theme: what each tile is (2, 4, 8 … 8192) + its name (said out loud) + tile colours.
+const THEMES = {
+  numbers: {name: 'Numbers', icon: '🔢', pics: null, names: null, bg: ['#FFF4E6', '#FFD9B0'], board: '#BBA38D',
+    col: ['#EEE4DA', '#EDE0C8', '#F2B179', '#F59563', '#F67C5F', '#F65E3B', '#EDCF72', '#EDCC61', '#EDC850', '#EDC53F', '#EDC22E', '#7A5CFA', '#3D3A8C'], ink: ['#776E65', '#776E65']},
+  animals: {name: 'Animal grow-up', icon: '🐣', pics: ['🥚', '🐣', '🐥', '🐔', '🐰', '🐱', '🐶', '🐷', '🐮', '🦁', '🐘', '🐳', '🦄'],
+    names: ['egg', 'hatching chick', 'chick', 'hen', 'bunny', 'kitten', 'puppy', 'piggy', 'cow', 'lion', 'elephant', 'whale', 'unicorn'], bg: ['#E8FBE0', '#9FDB86'], board: '#6BAE5A',
+    col: ['#FFF8E1', '#FFF1C1', '#FFE38A', '#FFD166', '#FFB4A2', '#F7A072', '#E5989B', '#F28482', '#B5838D', '#E9C46A', '#90BE6D', '#43AA8B', '#9B5DE5']},
+  dino: {name: 'Dino', icon: '🦖', pics: ['🥚', '🦴', '🦎', '🐊', '🐢', '🐍', '🦕', '🦖', '🐉', '🌋', '☄️', '🌍', '👑'],
+    names: ['dino egg', 'bone', 'lizard', 'crocodile', 'turtle', 'snake', 'long neck', 'T-rex', 'dragon', 'volcano', 'meteor', 'dino world', 'dino king'], bg: ['#F5E6CC', '#C79A5A'], board: '#8C6239',
+    col: ['#F2E3C6', '#E9D5A8', '#C9D84A', '#A7C957', '#6A994E', '#7BC67E', '#5FB3B3', '#3E9B5A', '#D4A64A', '#E07A5F', '#BC4749', '#6D597A', '#3D405B']},
+  space: {name: 'Space', icon: '🪐', pics: ['✨', '🌑', '🌙', '🌍', '🪐', '☀️', '⭐', '🌟', '💫', '☄️', '🌌', '🛸', '🚀'],
+    names: ['stardust', 'tiny moon', 'moon', 'earth', 'planet', 'sun', 'star', 'shining star', 'star burst', 'comet', 'galaxy', 'flying saucer', 'super rocket'], bg: ['#1B1F4A', '#3C2A7A'], board: '#141634', dark: true,
+    col: ['#3A3F7A', '#45508F', '#4F63A8', '#4A7BC0', '#5E8FD8', '#7A6CF0', '#9B5DE5', '#C77DFF', '#F15BB5', '#FF8FAB', '#FFB703', '#FB8500', '#E63946']},
+  fantasy: {name: 'Fantasy gems', icon: '💎', pics: ['🔹', '🔷', '💠', '💎', '🔮', '🪄', '👑', '🏰', '🦄', '🐉', '🧞', '🌈', '✨'],
+    names: ['tiny gem', 'blue gem', 'flower gem', 'diamond', 'crystal ball', 'magic wand', 'crown', 'castle', 'unicorn', 'dragon', 'genie', 'rainbow', 'pure magic'], bg: ['#FCE7FF', '#C9A7FF'], board: '#7B4FB8',
+    col: ['#EADCFF', '#D9C2FF', '#C7A7FF', '#B38CFF', '#A06CF5', '#FF9ED2', '#FF7AD9', '#FFB86B', '#FFD36E', '#7DFFB2', '#7AE7FF', '#5B8CFF', '#3D3A8C']},
+  sweets: {name: 'Sweets', icon: '🧁', pics: ['🍬', '🍭', '🍪', '🧁', '🍩', '🍰', '🍫', '🍦', '🍨', '🥧', '🎂', '🍯', '🏆'],
+    names: ['sweetie', 'lollipop', 'cookie', 'cupcake', 'doughnut', 'cake slice', 'chocolate', 'ice cream', 'sundae', 'pie', 'birthday cake', 'honey pot', 'sweet trophy'], bg: ['#FFE8F0', '#FFB3CC'], board: '#D46A8C',
+    col: ['#FFF0F5', '#FFE0EC', '#FFD1DF', '#FFC2D4', '#FFB3CC', '#FF9EBB', '#E07A9E', '#C9A27E', '#A67C52', '#FFD36E', '#FFB703', '#F28C28', '#E63946']}
+};
+const THEME_KEYS = Object.keys(THEMES);
+Object.keys(THEMES).forEach(k => { const T = THEMES[k]; T.syms = T.pics ? T.pics.slice(0, 4) : ['2', '4', '8', '16']; });
+const AGE_START = {'4-5': 0, '6-7': 1, '8-9': 2, '10+': 3};
+const PRAISE = ['Double star', 'Tile master', 'Super slider', 'Brilliant', 'Amazing'];
+const TIPS = [
+  'Tip: keep your biggest tile in a corner — and keep sliding towards that corner.',
+  'Tip: try to use only 3 directions (for example ← ↓ →) and save the 4th for emergencies.',
+  'Tip: keep the row with your biggest tile full, so it never moves away from the corner.',
+  'Tip: join the small tiles early, before the board fills up.'
+];
+const DIRS = {left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1]};
+
+let S = {players: [], progress: {}, settings: {}, avatars: {}, challenge: {}, player: '', age: ''};
+let G = null, theme = 'animals', timerId = 0, lockHandle = null;
+window.feedbackContext = () => ({page: 'Double Up', game: GAME_ID, level: G ? G.L.name + ' · ' + THEMES[G.theme].name : ''});
+function prefKey(){ return 'sp_doubleup_prefs:' + S.player; }
+function loadPrefs(){ try{ const p = JSON.parse(localStorage.getItem(prefKey()) || '{}'); if(THEMES[p.theme]) theme = p.theme; if(p.voice === false) voiceOn = false; }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(prefKey(), JSON.stringify({theme, voice: voiceOn})); }catch(e){} }
+function chKey(){ return 'sp_doubleup_challenge:' + S.player; }
+function chLocal(){ try{ return JSON.parse(localStorage.getItem(chKey()) || 'null'); }catch(e){ return null; } }
+function chBetter(a, b){ return !b || (a && (a.tile > b.tile || (a.tile === b.tile && a.score > b.score))); }
+// Best of the server (S.challenge) and this device.
+function chBest(name){ name = name || S.player; const sv = (S.challenge || {})[name] || null, lo = name === S.player ? chLocal() : null; if(!sv) return lo; if(!lo) return sv; return {tile: Math.max(sv.tile, lo.tile), score: Math.max(sv.score, lo.score)}; }
+function chSend(rec, tries){
+  tries = tries || 0; const name = S.player;
+  google.script.run.withSuccessHandler(() => { const sv = S.challenge[name] || {tile: 0, score: 0}; S.challenge[name] = {tile: Math.max(sv.tile, rec.tile), score: Math.max(sv.score, rec.score)}; })
+    .withFailureHandler(() => { if(tries < 1) setTimeout(() => chSend(rec, tries + 1), 1200); })
+    .saveFeats(name, GAME_ID, {chTile: rec.tile, chScore: rec.score});
+}
+// A best that only lives on this device (from before the server save) goes to the server once.
+function chMigrate(){ const lo = chLocal(), sv = (S.challenge || {})[S.player]; if(lo && (!sv || lo.tile > sv.tile || lo.score > sv.score)) chSend(lo); }
+function chFamily(){ let top = null; Object.keys(S.challenge || {}).forEach(n => { const r = S.challenge[n]; if(!top || r.tile > top.tile || (r.tile === top.tile && r.score > top.score)) top = Object.assign({name: n}, r); }); return top; }
+function myAvatar(name){ return (S.avatars && S.avatars[name]) || defaultAvatar(name); }
+const lg = v => Math.round(Math.log2(v));   // 2 → 1, 4 → 2 …
+
+/* ================= ENGINE (pure) ================= */
+// Board: c[y * n + x] = null | ROCK | tile {id, v}. A slide returns {moved, gained, merges: [tile], best}.
+const ROCK = 'rock';
+let NEXT_ID = 1;
+function emptyCells(B){ const out = []; B.c.forEach((t, i) => { if(!t) out.push(i); }); return out; }
+function addRandom(B){ const e = emptyCells(B); if(!e.length) return null; const i = pick(e), t = {id: NEXT_ID++, v: Math.random() < 0.9 ? 2 : 4, isNew: true}; B.c[i] = t; return t; }
+function newBoard(L){ const B = {n: L.n, c: new Array(L.n * L.n).fill(null)}; for(let k = 0; k < L.rocks; k++){ const e = emptyCells(B).filter(i => { const x = i % L.n, y = (i / L.n) | 0; return x > 0 && y > 0 && x < L.n - 1 && y < L.n - 1; }); B.c[pick(e.length ? e : emptyCells(B))] = ROCK; } addRandom(B); addRandom(B); return B; }
+function cloneB(B){ return {n: B.n, c: B.c.map(t => t && t !== ROCK ? {id: t.id, v: t.v} : t)}; }
+// The lines to walk for a direction: each line starts at the wall the tiles slide towards.
+function lines(n, dir){
+  const out = [];
+  for(let a = 0; a < n; a++){ const line = [];
+    for(let b = 0; b < n; b++){ let x, y;
+      if(dir === 'left'){ x = b; y = a; } else if(dir === 'right'){ x = n - 1 - b; y = a; } else if(dir === 'up'){ x = a; y = b; } else { x = a; y = n - 1 - b; }
+      line.push(y * n + x); }
+    out.push(line); }
+  return out;
+}
+function slide(B, dir){
+  const n = B.n, res = {moved: false, gained: 0, merges: [], best: 0};
+  lines(n, dir).forEach(line => {
+    // a rock splits the line into parts that slide on their own
+    let part = [];
+    const flush = () => {
+      const tiles = part.map(i => B.c[i]).filter(Boolean), out = [];
+      for(let k = 0; k < tiles.length; k++){
+        const t = tiles[k], nx = tiles[k + 1];
+        if(nx && nx.v === t.v){ const m = {id: NEXT_ID++, v: t.v * 2, from: [t.id, nx.id], merged: true}; out.push(m); res.gained += m.v; res.merges.push(m); res.best = Math.max(res.best, m.v); k++; }
+        else out.push(t);
+      }
+      part.forEach((i, k) => { const before = B.c[i], after = out[k] || null; if((before && before.id) !== (after && after.id)) res.moved = true; B.c[i] = after; });
+      part = [];
+    };
+    line.forEach(i => { if(B.c[i] === ROCK){ flush(); } else part.push(i); });
+    flush();
+  });
+  return res;
+}
+function canMove(B){
+  const n = B.n; if(B.c.some(t => !t)) return true;
+  for(let y = 0; y < n; y++) for(let x = 0; x < n; x++){ const t = B.c[y * n + x]; if(t === ROCK) continue;
+    const r = x < n - 1 ? B.c[y * n + x + 1] : null, d = y < n - 1 ? B.c[(y + 1) * n + x] : null;
+    if(r && r !== ROCK && r.v === t.v) return true; if(d && d !== ROCK && d.v === t.v) return true; }
+  return false;
+}
+function maxTile(B){ return Math.max(0, ...B.c.filter(t => t && t !== ROCK).map(t => t.v)); }
+
+/* ================= MENUS ================= */
+function showScreen(name){
+  ['player', 'menu', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
+  $('back-btn').classList.toggle('hidden', name === 'play'); window.scrollTo(0, 0);
+}
+function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
+function canPlay(i){ const p = progressOf(S.player); if(i === 5) return p.unlocked >= 5; if(i === 4) return p.unlocked >= 4; return i <= Math.max(p.unlocked, AGE_START[S.age] || 0); }
+function renderPlayers(){
+  const box = $('player-list'); box.innerHTML = '';
+  if(!S.players.length){ box.innerHTML = '<div class="empty">No players yet — add one on the Dashboard first.</div>'; return; }
+  S.players.forEach(p => { const b = document.createElement('button'); b.className = 'pick'; b.setAttribute('data-sound', 'pop');
+    const c = document.createElement('canvas'); c.width = 144; c.height = 168; b.appendChild(c);
+    b.insertAdjacentHTML('beforeend', '<div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age ? p.Age + ' yrs' : '') + '</div>');
+    try { drawPreviewCanvas(c, myAvatar(p.Name), {name: p.Name, t: 1}); } catch(e){}
+    b.onclick = () => choosePlayer(p.Name); box.appendChild(b); });
+}
+function choosePlayer(name){
+  UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
+  const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
+  loadPrefs(); $('who-name').textContent = name; renderMenu(); showScreen('menu');
+  chMigrate();
+}
+function changePlayer(){ renderPlayers(); showScreen('player'); }
+
+// Theme row: built once per menu visit, a tap only moves the highlight (no page jump).
+function renderMenu(){
+  $('theme-list').innerHTML = THEME_KEYS.map(k => '<button class="chip' + (k === theme ? ' on' : '') + '" data-sound="pop" data-theme-key="' + k + '"><span class="ic">' + THEMES[k].syms.slice(0, 4).join('') + '</span>' + THEMES[k].name + '</button>').join('');
+  $('theme-list').querySelectorAll('[data-theme-key]').forEach(b => b.onclick = () => { theme = b.dataset.themeKey; savePrefs(); $('theme-list').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); });
+  renderLevels();
+}
+
+function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">No score yet</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span>' + (b.timeSec ? '<span>⏱ ' + fmt(b.timeSec * 1000) + '</span>' : '') + '<span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
+
+function picOf(v, T){ T = T || THEMES[theme]; return T.pics ? T.pics[Math.min(T.pics.length - 1, lg(v) - 1)] : String(v); }
+function renderLevels(){
+  const box = $('level-list'); box.innerHTML = ''; if(window.UI && UI.leaders) UI.leaders($('leaders'), GAME_ID, S.player);
+  const p = progressOf(S.player), rec = AGE_START[S.age], T = THEMES[theme];
+  const card = (L, i, open, done, best) => {
+    const b = document.createElement('button');
+    b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (L.hardcore ? ' hardcore' : '') + (L.challenge ? ' challenge' : ''); b.setAttribute('data-sound', open ? 'pop' : 'none');
+    const chain = T.pics ? [2, 4, 8].map(v => picOf(v, T)).join('→') + '…' + picOf(L.goal, T) : '2→4→8…' + L.goal;
+    b.innerHTML = '<span class="num">' + (L.challenge ? '★' : i + 1) + '</span>' + (done ? '<span class="badge">🏅</span>' : open ? '' : '<span class="badge">🔒</span>') +
+      '<div class="big">' + L.emoji + '</div><div class="nm">' + L.name + '</div><div class="chain">' + chain + '</div>' +
+      '<div class="learn">' + L.n + ' × ' + L.n + ' · make ' + L.goal + (L.rocks ? ' · 🪨' : '') + '</div>' +
+      '<div class="lives">' + (L.undo === Infinity ? '↶ undo any time' : L.undo ? '↶ ×' + L.undo : 'no undo') + (L.hardcore ? ' · ×3' : '') + '</div>' +
+      '<div class="sub">' + (!open && (L.hardcore || L.challenge) ? '🔒 Beat Extreme to open' : L.blurb) + '</div>' + best;
+    return b;
+  };
+  LEVELS.forEach((L, i) => {
+    const open = canPlay(i), b = card(L, i, open, p.unlocked > i, bestHtml(p, i));
+    b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore' : i === 4 ? 'Pass Hard to unlock Extreme!' : 'Pass the level before to unlock it'); return; } startGame(i); };
+    box.appendChild(b);
+  });
+  const cb = chBest(), chOpen = p.unlocked >= 5, fam = chFamily();
+  const famHtml = fam && fam.name !== S.player ? '<div class="best fam"><span>👑 family best: ' + UI.esc(fam.name) + ' ' + picOf(fam.tile, T) + ' ' + fam.tile + '</span></div>' : '';
+  const b = card(CHALLENGE, -1, chOpen, cb && cb.tile >= CHALLENGE.goal, (cb ? '<div class="best"><span>🏆 ' + Number(cb.score).toLocaleString() + '</span><span>best ' + picOf(cb.tile, T) + ' ' + cb.tile + '</span></div>' : '<div class="best none">No score yet</div>') + famHtml);
+  b.id = 'challenge-card';
+  b.onclick = () => { if(!chOpen){ UISound.play('error'); UI.toast('Beat Extreme to open the 🏔️ Challenge'); return; } startGame('challenge'); };
+  box.appendChild(b);
+}
+
+/* ================= GAME ================= */
+if(window.matchMedia('(pointer:coarse)').matches || navigator.maxTouchPoints > 0 || 'ontouchstart' in window) document.body.classList.add('touch');
+let CELL = 80, GAP = 10;
+function startGame(lvl){
+  hideResult(); clearInterval(timerId);
+  const L = lvl === 'challenge' ? CHALLENGE : LEVELS[lvl], T = THEMES[theme];
+  G = {lvl, L, theme, B: newBoard(L), score: 0, moves: 0, merges: 0, undos: L.undo, undosUsed: 0, hist: [], best: 0, won: false, over: false, busy: false,
+    t0: performance.now(), paused: false, pausedAt: 0, pausedTotal: 0, els: {}};
+  G.best = maxTile(G.B);
+  const sp = $('scr-play'); sp.style.setProperty('--t1', T.bg[0]); sp.style.setProperty('--t2', T.bg[1]); sp.style.setProperty('--board', T.board); sp.classList.toggle('dark', !!T.dark);
+  $('hud-level').textContent = L.emoji + ' ' + L.name + ' · ' + T.icon; $('hud-level').classList.toggle('hc', !!L.hardcore); $('hud-level').classList.toggle('ch', !!L.challenge);
+  $('undo-btn').classList.toggle('hidden', !L.undo); $('voice-btn').textContent = voiceOn ? '🔊' : '🔈';
+  showScreen('play'); renderLadder(); layout(); hud(); requestAnimationFrame(() => { if(G) layout(); });
+  timerId = setInterval(hud, 1000);
+  const gname = T.names ? T.names[lg(L.goal) - 1] : '';
+  showBanner('🎯 Make ' + (T.pics ? picOf(L.goal, T) + ' ' : '') + L.goal + '!', L.hardcore ? 'bad' : 'gold');
+  say('Slide the tiles. Make ' + (gname ? 'the ' + gname + ', ' : '') + L.goal + '!');
+}
+function layout(){
+  if(!G) return;
+  const ar = $('arena'), n = G.B.n, side = getComputedStyle($('pad-side')).display !== 'none' ? $('pad-side').offsetWidth + 20 : 0;
+  const room = Math.min(ar.clientWidth - 20 - side, ar.clientHeight - 12, 620);
+  GAP = Math.max(6, Math.round(room * 0.025)); CELL = Math.floor((room - GAP * (n + 1)) / n);
+  const b = $('board'), size = CELL * n + GAP * (n + 1); b.style.width = b.style.height = size + 'px';
+  b.innerHTML = ''; G.els = {};
+  for(let i = 0; i < n * n; i++){ const s = document.createElement('div'); s.className = G.B.c[i] === ROCK ? 'rock' : 'slot'; place(s, i); if(G.B.c[i] === ROCK) s.innerHTML = '<span style="font-size:' + Math.round(CELL * 0.55) + 'px">🪨</span>'; b.appendChild(s); }
+  render(true);
+}
+window.addEventListener('resize', () => { if(G) layout(); });
+function xy(i){ const n = G.B.n; return [GAP + (i % n) * (CELL + GAP), GAP + ((i / n) | 0) * (CELL + GAP)]; }
+function place(el, i){ const [x, y] = xy(i); el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.width = el.style.height = CELL + 'px'; }
+function tileHtml(t){
+  const T = THEMES[G.theme], k = lg(t.v) - 1, col = T.col[Math.min(T.col.length - 1, k)];
+  const fs = T.pics ? Math.round(CELL * 0.6) : Math.round(CELL * (t.v < 100 ? 0.48 : t.v < 1000 ? 0.4 : 0.32));
+  const ink = T.pics ? '#fff' : (k < 2 ? '#776E65' : '#fff');
+  return {bg: col, ink, html: '<div class="in"><span class="pic" style="font-size:' + fs + 'px">' + picOf(t.v, T) + '</span>' + (T.pics ? '<span class="num" style="font-size:' + Math.max(10, Math.round(CELL * 0.2)) + 'px">' + t.v + '</span>' : '') + '</div>'};
+}
+// Tiles are DOM elements keyed by id: slide = move with transform, merge = the two old ones slide in and a new one pops.
+function render(instant, moved){
+  const b = $('board'), seen = new Set();
+  G.B.c.forEach((t, i) => {
+    if(!t || t === ROCK) return; seen.add(t.id);
+    let el = G.els[t.id];
+    const [x, y] = xy(i);
+    if(!el){
+      el = document.createElement('div'); el.className = 'tile'; el.dataset.v = t.v; const h = tileHtml(t); el.style.background = h.bg; el.style.color = h.ink; el.innerHTML = h.html;
+      el.style.width = el.style.height = CELL + 'px'; el.style.left = '0'; el.style.top = '0';
+      if(t.merged && !instant){ el.classList.add('merged'); (t.from || []).forEach(fid => { const old = G.els[fid]; if(old){ old.style.transform = 'translate(' + x + 'px,' + y + 'px)'; old.style.zIndex = 1; setTimeout(() => old.remove(), 120); delete G.els[fid]; } }); }
+      else if(t.isNew && !instant) el.classList.add('new');
+      if(t.v >= 512) el.classList.add('big');
+      el.style.transform = 'translate(' + x + 'px,' + y + 'px)'; el.style.zIndex = 2;
+      if(t.merged && !instant) el.style.transitionDelay = '0s';
+      b.appendChild(el); G.els[t.id] = el;
+      delete t.isNew; delete t.merged; delete t.from;
+    } else el.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+  });
+  Object.keys(G.els).forEach(id => { if(!seen.has(Number(id))){ const el = G.els[id]; setTimeout(() => el.remove(), 130); delete G.els[id]; } });
+}
+function move(dir){
+  if(!G || G.over || G.paused || G.busy) return;
+  const before = cloneB(G.B), res = slide(G.B, dir);
+  if(!res.moved){ UISound.play('tap'); return; }
+  if(G.L.undo){ G.hist.push({B: before, score: G.score, best: G.best}); if(G.hist.length > 30) G.hist.shift(); }
+  G.moves++; G.score += res.gained; G.merges += res.merges.length;
+  const added = addRandom(G.B);
+  G.busy = true; setTimeout(() => { if(G) G.busy = false; }, 90);
+  render(false, true);
+  const T = THEMES[G.theme];
+  if(res.merges.length){ UISound.play(res.best >= 64 ? 'success' : 'pop'); res.merges.forEach(m => { const el = G.els[m.id]; if(el && m.v >= 32) setTimeout(() => sparkle(el), 120); }); }
+  else UISound.play('tap');
+  if(res.best > G.best){ G.best = res.best; renderLadder(true);
+    if(res.best >= 16){ const nm = T.names ? T.names[lg(res.best) - 1] : ''; showBanner('✨ New: ' + picOf(res.best) + (nm ? ' ' + nm : '') + ' (' + res.best + ')!', 'gold'); say((nm ? 'A ' + nm + '! ' : '') + res.best + '!'); } }
+  hud();
+  if(!G.won && G.best >= G.L.goal){ G.won = true; setTimeout(() => finishGame('goal'), 450); return; }
+  if(!canMove(G.B)) setTimeout(() => finishGame('stuck'), 500);
+}
+function undo(){
+  if(!G || G.over || !G.hist.length || G.undos <= 0) return;
+  const h = G.hist.pop(); G.B = h.B; G.score = h.score; G.best = h.best; G.undos--; G.undosUsed++;
+  UISound.play('pop'); layout(); renderLadder(); hud();
+}
+function renderLadder(bump){
+  const T = THEMES[G.theme], top = lg(Math.max(G.L.goal, 2)), parts = [];
+  for(let k = 1; k <= top; k++){ const v = Math.pow(2, k); parts.push('<span class="' + (v <= G.best ? 'got' : '') + (v === G.best ? ' top' : '') + (v === G.L.goal ? ' goal' : '') + '" title="' + v + '">' + (T.pics ? picOf(v, T) : (v === G.L.goal || v === G.best ? v : '·')) + '</span>'); if(k < top) parts.push('<i>›</i>'); }
+  $('ladder').innerHTML = parts.join(''); $('goal-txt').textContent = '🎯';
+  if(bump){ const el = $('ladder').querySelector('.top'); if(el) el.scrollIntoView({block: 'nearest', inline: 'center'}); }
+}
+// swipes on the whole play screen, arrow keys, on-screen arrows
+let sw = null;
+$('scr-play').addEventListener('pointerdown', e => { if(e.target.closest('button')) return; sw = {x: e.clientX, y: e.clientY}; });
+$('scr-play').addEventListener('pointerup', e => { if(!sw) return; const dx = e.clientX - sw.x, dy = e.clientY - sw.y; sw = null; if(Math.max(Math.abs(dx), Math.abs(dy)) < 24) return; move(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up')); });
+$('scr-play').addEventListener('pointercancel', () => { sw = null; });
+document.querySelectorAll('[data-dir]').forEach(b => b.addEventListener('click', () => move(b.dataset.dir)));
+const KEYS = {ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', a: 'left', d: 'right', w: 'up', s: 'down', A: 'left', D: 'right', W: 'up', S: 'down'};
+document.addEventListener('keydown', e => {
+  if(!G || G.over || $('scr-play').classList.contains('hidden') || !$('result').classList.contains('hidden')) return;
+  if(KEYS[e.key]){ move(KEYS[e.key]); e.preventDefault(); }
+  if(e.key === 'u' || e.key === 'U' || ((e.ctrlKey || e.metaKey) && e.key === 'z')){ undo(); e.preventDefault(); }
+});
+function elapsed(){ return G ? performance.now() - G.t0 - G.pausedTotal - (G.paused ? performance.now() - G.pausedAt : 0) : 0; }
+function hud(){
+  if(!G) return;
+  $('hud-score').textContent = G.score.toLocaleString(); $('hud-moves').textContent = '👆 ' + G.moves;
+  const u = $('undo-btn'); u.textContent = '↶' + (G.L.undo === Infinity ? '' : ' ' + G.undos); u.disabled = !G.hist.length || G.undos <= 0;
+  if(lockHandle){ const l = lockHandle.remainingMs(), el = $('hud-left'); el.classList.remove('hidden'); el.textContent = '⌛ ' + fmt(l); el.classList.toggle('warn', l < 120000); }
+}
+function toggleVoice(){ voiceOn = !voiceOn; savePrefs(); $('voice-btn').textContent = voiceOn ? '🔊' : '🔈'; if(!voiceOn) try{ speechSynthesis.cancel(); }catch(e){} }
+function pauseGame(){ if(G && !G.paused && !G.over){ G.paused = true; G.pausedAt = performance.now(); } }
+function resume(){ if(G && G.paused && !G.over){ G.pausedTotal += performance.now() - G.pausedAt; G.paused = false; } }
+function leavePlay(){
+  if(!G || G.over){ backToMenu(); return; }
+  pauseGame();
+  UI.confirm({icon: '◀', title: 'Leave this game?', body: 'This game will not be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(ok) backToMenu(); else resume(); });
+}
+function backToMenu(){ clearInterval(timerId); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); renderMenu(); showScreen('menu'); }
+
+/* ================= FINISH ================= */
+function finishGame(why){
+  if(!G || G.over) return;
+  G.over = true; clearInterval(timerId);
+  const g = G, L = g.L, secs = Math.max(1, Math.round(elapsed() / 1000)), cleared = why === 'goal', T = THEMES[g.theme];
+  if(L.hardcore) g.score *= 3;
+  const stars = !cleared ? 0 : g.undosUsed === 0 ? 3 : g.undosUsed <= 3 ? 2 : 1;
+  const stats = {merges: g.merges, bestTile: g.best, rounds: 1};
+  if(L.challenge){
+    // 🏔️ Challenge: kept on this device (best tile + score); not a level, so not sent as a level result.
+    const cb = chLocal(); if(!cb || g.best > cb.tile || (g.best === cb.tile && g.score > cb.score)) try{ localStorage.setItem(chKey(), JSON.stringify({tile: g.best, score: g.score, at: Date.now()})); }catch(e){}
+    if(g.score > 0) chSend({tile: g.best, score: g.score});
+  } else if(g.score > 0) saveWin(S.player, g.lvl, {timeSec: secs, stars, score: g.score, theme: g.theme, cleared, stats});
+  const nm = T.names ? T.names[lg(g.best) - 1] : '';
+  if(cleared){ const pr = pick(PRAISE); party('🎉 ' + pr + ', ' + S.player + '!'); say(pr + ', ' + S.player + '! You made ' + L.goal + '!'); confetti(['🔀', '⭐', '🎉', picOf(L.goal, T), picOf(L.goal / 2, T)], 40); UISound.play('success'); }
+  else { UISound.play('pop'); say('No more moves! Your best was ' + (nm ? 'the ' + nm + ', ' : '') + g.best + '.'); }
+  setTimeout(() => {
+    if(G !== g) return;
+    const next = cleared && !L.challenge && g.lvl < 5, cb = L.challenge ? chBest() : null;
+    showResult('<div class="big">' + (cleared ? picOf(g.best, T) : '🔀') + '</div><h2 class="' + (cleared ? 'cheer' : '') + '">' + (cleared ? (L.challenge ? 'Challenge beaten!' : stars === 3 ? 'Perfect double up!' : 'Level passed!') : 'No more moves!') + '</h2>' +
+      (cleared && !L.challenge ? '<div class="rating">' + [0, 1, 2].map(k => '<span class="st' + (k < stars ? '' : ' off') + '" style="animation-delay:' + (0.25 + k * 0.25) + 's">⭐</span>').join('') + '</div>' : '') +
+      '<div class="score-big">🏆 <span id="score-count">0</span></div>' +
+      '<div class="stats"><span>' + (T.pics ? picOf(g.best, T) + ' ' : '') + 'best ' + g.best + (nm ? ' (' + nm + ')' : '') + '</span><span>👆 ' + g.moves + ' slides</span><span>⏱ ' + fmt(secs * 1000) + '</span>' + (L.undo ? '<span>↶ ' + g.undosUsed + ' undo</span>' : '') + (L.hardcore ? '<span>💀 ×3</span>' : '') + '</div>' +
+      (!cleared ? '<div class="tip">🎯 Make ' + L.goal + ' to pass. ' + pick(TIPS) + '</div>' : stars < 3 && !L.challenge ? '<div class="tip">⭐⭐⭐ = no undo. ' + pick(TIPS) + '</div>' : '') +
+      '<div class="save-note" id="save-note">' + (L.challenge ? '🏔️ Your best challenge: ' + (cb ? picOf(cb.tile, T) + ' ' + cb.tile + ' · 🏆 ' + Number(cb.score).toLocaleString() : '—') + ' (saved for your family)' : g.score > 0 ? '<span class="ui-spin a-bounce">🔀</span> Saving your score…' : 'Not saved — join some tiles to get a score.') + '</div>' +
+      '<div class="res-btns">' + (next ? '<button class="btn" id="b-next">' + (g.lvl === 4 ? '💀 Try Hardcore ▶' : 'Next level ▶') + '</button>' : '') + '<button class="btn' + (next ? ' soft' : '') + '" id="b-again">🔁 Play again</button><button class="btn soft" id="b-menu">◀ Back</button></div>');
+    countUp($('score-count'), g.score, 1000);
+    $('b-again').onclick = () => startGame(g.lvl);
+    $('b-menu').onclick = () => backToMenu();
+    if($('b-next')) $('b-next').onclick = () => { const p = progressOf(S.player); p.unlocked = Math.max(p.unlocked, g.lvl + 1); S.progress[S.player] = p; startGame(g.lvl + 1); };
+  }, cleared ? 1700 : 1000);
+}
+function party(text){ const p = document.createElement('div'); p.className = 'praise'; p.textContent = text; document.body.appendChild(p); setTimeout(() => p.remove(), 1600); }
+function sparkle(el){ if(!el) return; const r = el.getBoundingClientRect(); for(let k = 0; k < 7; k++){ const s = document.createElement('div'); s.className = 'spark'; s.textContent = pick(['✨', '⭐', '💫']); const a = Math.random() * 6.28, d = 40 + Math.random() * 40; s.style.cssText = 'left:' + (r.left + r.width / 2) + 'px;top:' + (r.top + r.height / 2) + 'px;--dx:' + Math.cos(a) * d + 'px;--dy:' + Math.sin(a) * d + 'px'; document.body.appendChild(s); setTimeout(() => s.remove(), 850); } }
+let bannerTimer = 0;
+function showBanner(text, kind){ const b = $('banner'); b.textContent = text; b.classList.toggle('gold', kind === 'gold'); b.classList.toggle('bad', kind === 'bad'); b.classList.add('on'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('on'), 2000); }
+
+
+/* ================= SAVE ================= */
+const PENDING_KEY = 'sp_doubleup_pending';
+function readPending(){ try{ return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); }catch(e){ return []; } }
+function writePending(list){ try{ localStorage.setItem(PENDING_KEY, JSON.stringify(list.slice(-20))); }catch(e){} }
+function flushPending(){ const list = readPending(); if(!list.length) return; writePending([]); list.forEach(w => google.script.run.withFailureHandler(() => writePending(readPending().concat([w]))).saveLevelResult(GAME_ID, w.name, w.lvl, w.extra)); }
+function putNote(html){ const put = () => { const n = $('save-note'); if(n) n.innerHTML = html; return !!n; }; if(!put()) setTimeout(put, 1900); }
+function saveWin(name, lvlIdx, extra, tries){
+  tries = tries || 0;
+  const p = S.progress[name] || (S.progress[name] = {unlocked: 0, tokens: [], best: []});
+  if(extra.cleared) p.unlocked = Math.max(p.unlocked, lvlIdx + 1);
+  google.script.run.withSuccessHandler(res => {
+      const best = (p.best || []).slice(); if(res.best) best[lvlIdx] = res.best;
+      S.progress[name] = {unlocked: res.unlocked, tokens: res.tokens, best}; flushPending(); putNote(saveText(res));
+    }).withFailureHandler(err => {
+      if(tries < 1){ setTimeout(() => saveWin(name, lvlIdx, extra, tries + 1), 1200); return; }
+      writePending(readPending().concat([{name, lvl: lvlIdx, extra}])); putNote('⚠️ Could not save yet — it will be sent again next time.');
+    }).saveLevelResult(GAME_ID, name, lvlIdx, extra);
+}
+function saveText(res){
+  let h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New high score!' : res.best && res.best.score ? 'Your best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Score saved';
+  const fe = res.feats; if(fe){ (fe.newTitles || []).forEach(t => { h += '<br><span class="title-new">🏷️ New title: ' + t.icon + ' ' + UI.esc(t.name) + '</span>'; }); (fe.newBadges || []).forEach(b => { h += '<br><span class="feat-new">' + b.medal + ' ' + b.icon + ' ' + UI.esc(b.name) + ' · ' + b.tierName + '</span>'; }); }
+  return h;
+}
+function countUp(el, to, ms){ if(!el) return; const t0 = performance.now(); (function tick(now){ const p = Math.max(0, Math.min(1, (now - t0) / ms)); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))).toLocaleString(); if(p < 1) requestAnimationFrame(tick); })(t0); }
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+function hideResult(){ $('result').classList.add('hidden'); }
+function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pick(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
+function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
+function goGameroom(){ UI.go(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
+
+/* ================= BOOT ================= */
+function boot(){
+  UI.loading(GAME_ID);
+  google.script.run.withSuccessHandler(d => {
+      UI.loaded();
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {}; S.challenge = d.challenge || {};
+      UISound.applySettings(S.settings);
+      const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
+      lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
+      flushPending();
+      if(CURRENT_PLAYER && S.players.some(p => p.Name === CURRENT_PLAYER)) choosePlayer(CURRENT_PLAYER); else { renderPlayers(); showScreen('player'); }
+    }).withFailureHandler(() => { UI.loaded(); UI.toast('Could not load players — check the connection', 'err'); renderPlayers(); showScreen('player'); })
+    .getLevelGameData(GAME_ID, CURRENT_PLAYER);
+}
+boot();
+
+/* ✨ MODE SPOTLIGHT (modes-3): ?mode=<id> opens this game straight in that mode after the player pick · "✨ Also try" on the start page · started modes → UI.modeTried */
+const MS_GAME = 'double-up';
+function msOpen(id){
+  if(id !== 'challenge') return; const c = document.getElementById('challenge-card'); if(c){ if(c.scrollIntoView) c.scrollIntoView({block: 'center'}); c.click(); }
+}
+function msNow(){ return ''; }
+function msWrap(fn, idOf){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ try{ const id = idOf.apply(this, arguments); if(id && UI.modeTried) UI.modeTried(S.player || CURRENT_PLAYER, MS_GAME, id); }catch(e){} return f.apply(this, arguments); }; }
+function msAfter(fn, after){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ const r = f.apply(this, arguments); try{ after.apply(this, arguments); }catch(e){} return r; }; }
+msWrap('startGame', x => x === 'challenge' ? 'challenge' : '');
+msAfter('choosePlayer', name => {
+  if(!window.UI || !UI.modeLink) return;
+  const id = UI.modeLink(MODE_LINK); if(id) msOpen(id);
+  UI.alsoTry({game: MS_GAME, player: name, current: msNow, at: () => document.querySelector('#scr-menu .title'), open: msOpen});
+});
+/* ✨ END MODE SPOTLIGHT */
+</script>
+</body>
+</html>
+<!-- (11n+back-1+modes-3) END OF DoubleUp.html -->
