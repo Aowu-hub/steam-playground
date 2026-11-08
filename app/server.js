@@ -588,6 +588,7 @@ const MODES_ = [
   { game: 'artifactory', id: 'lathe', icon: '🌀', name: 'Artifactory Lathe', pitch: 'Carve a cup, a yo-yo or a trophy while it spins', route: 'artifactory', added: '2026-11-08', tried: { feat: [['artifactory', 'lathe']] } },
   { game: 'artifactory', id: 'stone', icon: '💎', name: 'Artifactory Gems', pitch: 'Polish a rough stone and cut a sparkling gem', route: 'artifactory', added: '2026-11-08', tried: { feat: [['artifactory', 'stone']] } },
   { game: 'artifactory', id: 'finish', icon: '🎨', name: 'Artifactory Finish', pitch: 'Paint, varnish and engrave your name', route: 'artifactory', added: '2026-11-08', tried: { feat: [['artifactory', 'finish']] } },
+  { game: 'geoscout', id: 'journey', icon: '📖', name: 'GeoScout Journey', pitch: 'Story chapters with number friends', route: 'geoscout', added: '2026-11-09', tried: { feat: [['geoscout', 'journeys']] } },
   { game: 'geoscout', id: 'scale', icon: '⚖️', name: 'GeoScout Scale', pitch: 'More, less or the same? Weigh yourself!', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '⚖️ Scale' } },
   { game: 'geoscout', id: 'shape', icon: '🔷', name: 'GeoScout Shape builder', pitch: 'Build squares, rectangles and steps', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🔷 Shape builder', feat: [['geoscout', 'shapes']] } },
   { game: 'geoscout', id: 'tens', icon: '🔟', name: 'GeoScout Tens tower', pitch: 'Ten ones snap into a ten-tower!', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🔟 Tens tower', feat: [['geoscout', 'tens']] } },
@@ -1255,6 +1256,7 @@ function getLevelGameData(gameId, player) {
   if (gameId === 'soul-bopper') out.bopper = bopperData_(players);
   if (gameId === 'polyplot') out.polyplot = polyplotData_(players);
   if (gameId === 'eyes-brain') out.ebr = ebrData_(players);
+  if (gameId === 'geoscout') out.geoJourney = geoJourneyData_(players);   // 🔢 GeoScout 📖 Journey: chapters done per player (feat journeys)
   if (gameId === 'wisdeck') { out.wisCards = wisCardRows_(); out.wisDaily = wisDaily_(); const all = activePlayers_(listProfilesFull()); out.wdBack = {}; all.forEach(p => { try { out.wdBack[p.Name] = itemsFor_(p.Name, all).owned.wdback || 0; } catch (e) { out.wdBack[p.Name] = 0; } }); }   // 🃏 sheet-tab cards + 📅 today's family board + 🂠 card backs owned
   if (gameId === 'wisdeck') { out.progressCount = {}; out.progressJack = {}; players.forEach(p => { out.progressCount[p.Name] = levelProgressFor_(p.Name, 'wiscount'); out.progressJack[p.Name] = levelProgressFor_(p.Name, 'wisjack'); }); }   // 🃏 WisDeck page shows all three boards   // 👀🧠 🎯 today's family number + 🏅 brain levels + 🔢 keypad skins owned   // ⬛ field journal + line trails owned   // 👻💣 battle unlocks (+ bomb skins, round 4)
   if (gameId === 'alignext') { out.progressOmni = {}; players.forEach(p => { out.progressOmni[p.Name] = levelProgressFor_(p.Name, 'omnifile'); }); }   // 🔴 Alignext page shows both boards (Drop + ❌⭕ Omnifile)
@@ -2921,6 +2923,17 @@ function milesLedger_() {
   MILES_MEMO_ = { ss: ss_(), sum: sum };
   return sum;
 }
+// 🔢 GeoScout 📖 Journey (gs-3): chapters are played in order; finishing one saves feat journeys (max) and gives Adventure miles the FIRST time only
+function geoJourneyData_(players) { const f = featRows_(), out = {}; players.forEach(p => { out[p.Name] = f.filter(r => r.name === p.Name && r.game === 'geoscout' && r.stat === 'journeys').reduce((m, r) => Math.max(m, Number(r.value) || 0), 0); }); return out; }
+function geoJourneyDone(name, chapter) {
+  name = String(name || '').trim(); chapter = Math.floor(Number(chapter));
+  if (!name || !(chapter >= 1 && chapter <= 6)) return { ok: false, err: 'bad chapter' };
+  const before = featRows_().filter(r => r.name === name && r.game === 'geoscout' && r.stat === 'journeys').reduce((m, r) => Math.max(m, Number(r.value) || 0), 0);
+  const first = chapter > before, miles = first ? 5 + chapter : 0;
+  const feats = saveFeats(name, 'geoscout', { journeys: chapter, games: 1 });
+  if (first) addMiles_(name, miles, 'GeoScout Journey chapter ' + chapter);
+  return { ok: true, first: first, miles: miles, feats: feats };
+}
 function addMiles_(name, miles, reason) {
   const m = Math.floor(Number(miles)); if (!name || !m) return 0;
   let sh = ss_().getSheetByName(MILES_TAB);
@@ -4009,7 +4022,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+wd-9+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gs-2+gr-4+af-2) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+wd-9+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+af-2+gs-3) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -4340,459 +4353,6 @@ function poseTestSheet_() {
 // END OF PoseTest.gs
 
 ;
-/* ===== ArtifactoryCode.gs ===== */
-// ArtifactoryCode.gs — 🏭 Artifactory (artifact + factory): the maker app's server side.
-// Own file because Code.gs is past ~300 KB. Same global scope as Code.gs (uses getSettings, saveSetting, activePlayers_, …).
-//  · Materials are COUNTS, never a log: Settings `Bag_<Name>` = {"oak": 3, …, "_d": "yyyy-MM-dd" (last daily delivery)} and
-//    `FamilyShelf` = {"m": {mat: n}, "req": [{id, by, mat, n, got, at}]} (requests capped at 20).
-//  · Crafted things live in the tab "Artifacts" (one row per item; Look / Materials / Tools / Owners / Team / Votes as JSON).
-//  · Outfits: Settings `Outfits_<Name>` = [{n: name, av: avatar}] (≤ 6).
-//  · Crafted wearables are worn through the avatar's `cw` field ({head|neck|wrist|ring|hand: {id, …look}}); the server always
-//    copies the look from the Artifacts row (artWear_) so nobody can wear a thing they don't own.
-//  · Blueprint challenges save on the Archive board `artifactory` (Theme = "<station> · <thing>", best per station in the detail card).
-
-/* ---------- materials ---------- */
-// id: [icon, name, group]. Keep in step with Artifactory.html ART.MATS and AvatarKit ART_MAT (colours).
-const ART_MATS_ = {
-  oak: ['🪵', 'Oak', 'wood'], bamboo: ['🎋', 'Bamboo', 'wood'], teak: ['🟫', 'Teak', 'wood'],
-  iron: ['⚙️', 'Iron', 'metal'], copper: ['🟠', 'Copper', 'metal'], tin: ['🥫', 'Tin', 'metal'], bronze: ['🥉', 'Bronze', 'metal'], silver: ['🥈', 'Silver', 'metal'], gold: ['🥇', 'Gold', 'metal'],
-  granite: ['🪨', 'Granite', 'stone'], jade: ['💚', 'Jade', 'stone'], crystal: ['💎', 'Crystal', 'stone'], ruby: ['❤️', 'Ruby', 'stone'], sapphire: ['💙', 'Sapphire', 'stone'], amethyst: ['💜', 'Amethyst', 'stone'],
-  clay: ['🏺', 'Clay', 'craft'], fabric: ['🧶', 'Fabric', 'craft'], leather: ['👜', 'Leather-look', 'craft'], glass: ['🫙', 'Glass', 'craft'], filament: ['🧵', 'Plastic filament', 'craft'],
-  led: ['💡', 'LEDs', 'parts'], battery: ['🔋', 'Batteries', 'parts'], paint: ['🎨', 'Paint', 'finish'], varnish: ['✨', 'Varnish', 'finish'], dye: ['🧪', 'Dyes', 'finish'],
-  flower: ['🌸', 'Flowers', 'nature'], sand: ['⏳', 'Sand', 'nature'],
-};
-const ART_STARTER_ = { oak: 6, bamboo: 4, teak: 2, copper: 4, tin: 2, silver: 3, gold: 3, iron: 2, granite: 3, jade: 2, crystal: 2, ruby: 1, amethyst: 1, paint: 6, varnish: 3, clay: 3, fabric: 2, sand: 2 };
-// daily delivery: 3 picks, common things more often
-const ART_DAILY_ = ['oak', 'oak', 'bamboo', 'bamboo', 'teak', 'copper', 'copper', 'tin', 'iron', 'silver', 'gold', 'granite', 'granite', 'jade', 'crystal', 'ruby', 'sapphire', 'amethyst', 'paint', 'paint', 'varnish', 'clay', 'fabric', 'sand', 'led', 'battery', 'flower', 'dye'];
-const ART_BAG_MAX_ = 999;
-
-/* ---------- what each station makes ---------- */
-// kind: [station, wear slot ('' = not worn), main cost, name, icon, what it's for]
-const ART_KINDS_ = {
-  cup: ['lathe', 'hand', 2, 'Cup', '🥤', 'Hold it — or put it on a shelf'],
-  bangle: ['lathe', 'wrist', 1, 'Bangle', '⭕', 'Wear it on your wrist'],
-  pen: ['lathe', 'hand', 1, 'Pen', '🖊️', 'Hold it — a maker always has a pen'],
-  yoyo: ['lathe', 'hand', 1, 'Yo-yo', '🪀', 'Hold it and do tricks'],
-  piece: ['lathe', 'hand', 1, 'Chess piece', '♟️', 'A game piece — game skins come later'],
-  trophy: ['lathe', 'hand', 3, 'Trophy', '🏆', 'Hold it high!'],
-  ball: ['lathe', 'hand', 2, 'Ball', '⚽', 'Hold it — or play catch'],
-  gem: ['stone', '', 0, 'Gem', '💎', 'A loose gem — set it later or keep it'],
-  ring: ['stone', 'ring', 1, 'Ring', '💍', 'Wear it on your finger'],
-  necklace: ['stone', 'neck', 1, 'Necklace', '📿', 'Wear it round your neck'],
-  crown: ['stone', 'head', 3, 'Crown', '👑', 'Wear it on your head'],
-  tag: ['stone', '', 1, 'Pet tag', '🏷️', 'A tag for your pet'],
-  // round 2 (af-2): the rest of the Machine Hall
-  board: ['planer', 'hand', 1, 'Name board', '🪵', 'Hold it or hang it — engrave your name'],
-  frame: ['planer', 'hand', 2, 'Picture frame', '🖼️', 'A frame for your best picture'],
-  stand: ['planer', 'hand', 2, 'Display stand', '🏛️', 'Show off your best thing'],
-  badge: ['weld', 'neck', 1, 'Hero badge', '🛡️', 'Pin it on'],
-  robot: ['weld', 'hand', 2, 'Mini robot', '🤖', 'A little metal friend to hold'],
-  sign: ['weld', 'hand', 2, 'Name sign', '🪧', 'Hold up your name'],
-  medal: ['forge', 'neck', 1, 'Medal', '🏅', 'Wear it round your neck'],
-  key: ['forge', 'hand', 1, 'Key', '🗝️', 'A key you forged yourself'],
-  charm: ['forge', 'neck', 1, 'Heart charm', '💖', 'Wear it round your neck'],
-  bowl: ['pottery', 'hand', 2, 'Bowl', '🥣', 'Hold it — or fill it with snacks'],
-  vase: ['pottery', 'hand', 3, 'Vase', '🏺', 'For flowers'],
-  petbowl: ['pottery', '', 2, 'Pet bowl', '🐾', 'A bowl for your pet'],
-  scarf: ['sew', 'neck', 1, 'Scarf', '🧣', 'Wear it round your neck'],
-  cape: ['sew', 'back', 2, 'Cape', '🦸', 'Wear it on your back'],
-  bag: ['sew', 'hand', 2, 'Bag', '👜', 'Carry it'],
-  flag: ['sew', 'hand', 1, 'Flag', '🚩', 'Wave it'],
-  lantern: ['light', 'hand', 1, 'Lantern', '🏮', 'A glowing light to hold'],
-};
-const ART_STATIONS_ = { lathe: ['🌀', 'Lathe'], finish: ['🎨', 'Finish bench'], stone: ['💎', 'Stone polishing'], planer: ['🪚', 'Planer + sander'], weld: ['🔥', 'Welding'], forge: ['⚒️', 'Forge'], pottery: ['🏺', 'Pottery wheel'], sew: ['🧵', 'Sewing + loom'], light: ['🔌', 'Light-up bench'] };
-// what each round-2 station takes (the player picks one; the kind says how many)
-const ART_STATION_MATS_ = { planer: ['oak', 'bamboo', 'teak'], weld: ['iron', 'copper', 'tin', 'bronze', 'silver', 'gold'], forge: ['iron', 'copper', 'tin', 'bronze', 'silver', 'gold'], pottery: ['clay'], sew: ['fabric', 'leather'] };
-// round 2 opening gift (once per bag): materials for the new machines
-const ART_GIFT2_ = { iron: 3, copper: 2, clay: 6, fabric: 4, led: 3, battery: 3, glass: 2, dye: 2 };
-const ART_LATHE_MATS_ = ['oak', 'bamboo', 'teak', 'copper', 'tin', 'silver', 'gold', 'granite', 'jade'];
-const ART_STONES_ = ['granite', 'jade', 'crystal', 'ruby', 'sapphire', 'amethyst'];
-const ART_SETTINGS_ = ['copper', 'tin', 'iron', 'bronze', 'silver', 'gold'];
-const ART_PER_PLAYER_ = 60;
-const ART_WEAR_SLOTS_ = ['head', 'neck', 'wrist', 'ring', 'hand', 'back'];
-
-/* ---------- tab: Artifacts ---------- */
-const ART_TAB = 'Artifacts';
-const ART_COL = { id: 0, maker: 1, station: 2, kind: 3, name: 4, look: 5, mats: 6, tools: 7, owners: 8, team: 9, made: 10, stars: 11, from: 12, show: 13, votes: 14, deleted: 15 };
-const ART_HEADERS = [
-  ['Item ID', 'itemId', 'Made by the app. Do not edit.'],
-  ['Maker', 'maker', 'Who made it (Profiles name)'],
-  ['Station', 'station', 'lathe · finish · stone … (where it was made)'],
-  ['Kind', 'kind', 'cup · bangle · pen · yoyo · piece · trophy · ball · gem · ring · necklace · crown · tag'],
-  ['Name', 'name', 'The name the maker gave it'],
-  ['Look', 'look', 'Shape, material, paint, gem … (JSON)'],
-  ['Materials', 'materials', 'Materials used, as counts (JSON)'],
-  ['Tools', 'tools', 'Stations used, as a JSON list'],
-  ['Owners', 'owners', 'Who has it (JSON list)'],
-  ['Team', 'team', 'Made together with (JSON list)'],
-  ['Made', 'made', 'yyyy-MM-dd HH:mm'],
-  ['Stars', 'stars', 'Best blueprint stars 0-3'],
-  ['From', 'from', 'Remix of this item ID'],
-  ['In the show', 'inShow', 'yes = in the Design Show'],
-  ['Votes', 'votes', 'JSON {voter: stars 1-3}'],
-  ['Deleted', 'deleted', 'yes = the maker removed it'],
-];
-const ART_WIDTH = ART_HEADERS.length;
-function artSheet_() {
-  let sh = ss_().getSheetByName(ART_TAB);
-  if (!sh) {
-    sh = ss_().insertSheet(ART_TAB);
-    sh.getRange(1, 1, 1, ART_WIDTH).setValues([ART_HEADERS.map(h => h[0] + '\n' + h[1])]);
-    styleArtifactsSheet();
-  }
-  return sh;
-}
-// Look of the Artifacts tab (sheet standard). Safe to re-run from the editor.
-function styleArtifactsSheet() {
-  const sh = ss_().getSheetByName(ART_TAB);
-  if (!sh) return;
-  try {
-    const head = sh.getRange(1, 1, 1, ART_WIDTH);
-    head.setValues([ART_HEADERS.map(h => '🔒 ' + h[0] + '\n' + h[1])])
-      .setBackground('#7C3AED').setFontColor('#FFFFFF').setFontWeight('bold')
-      .setHorizontalAlignment('center').setVerticalAlignment('middle').setWrap(true);
-    head.setNotes([ART_HEADERS.map(h => h[2])]);
-    sh.setRowHeight(1, 46); sh.setFrozenRows(1); sh.setFrozenColumns(2);
-    sh.getRange(2, 1, sh.getMaxRows() - 1, ART_WIDTH).setNumberFormat('@').setFontSize(10).setVerticalAlignment('middle').setWrap(false);
-    [150, 110, 80, 80, 150, 240, 160, 140, 160, 120, 130, 60, 120, 70, 160, 70].forEach((w, i) => sh.setColumnWidth(i + 1, w));
-    sh.getRange(2, 1, sh.getMaxRows() - 1, 1).setFontFamily('Roboto Mono').setFontColor('#757575');
-    sh.getBandings().forEach(b => b.remove());
-    sh.getRange(1, 1, sh.getMaxRows(), ART_WIDTH).applyRowBanding().setHeaderRowColor('#7C3AED').setFirstRowColor('#FFFFFF').setSecondRowColor('#F3EEFF');
-    sh.getProtections(SpreadsheetApp.ProtectionType.SHEET)
-      .filter(p => String(p.getDescription()).indexOf('🔒 STEAM Playground') === 0).forEach(p => p.remove());
-    sh.protect().setDescription('🔒 STEAM Playground — Artifacts (app managed)').setWarningOnly(true);
-  } catch (e) {
-    Logger.log('styleArtifactsSheet: ' + e.message);
-  }
-}
-let ARTS_MEMO_ = null;
-function artRows_() {
-  if (ARTS_MEMO_ && ARTS_MEMO_.ss === ss_()) return ARTS_MEMO_.rows;
-  const sh = ss_().getSheetByName(ART_TAB), C = ART_COL;
-  let rows = [];
-  if (sh && sh.getLastRow() > 1) {
-    const j = (v, f) => { try { const x = JSON.parse(v || ''); return x == null ? f : x; } catch (e) { return f; } };
-    rows = sh.getRange(2, 1, sh.getLastRow() - 1, ART_WIDTH).getValues().map((r, i) => ({
-      row: i + 2, id: String(r[C.id]).trim(), maker: String(r[C.maker]), station: String(r[C.station]), kind: String(r[C.kind]), name: String(r[C.name]),
-      look: j(r[C.look], {}), mats: j(r[C.mats], {}), tools: j(r[C.tools], []), owners: j(r[C.owners], []), team: j(r[C.team], []), made: String(r[C.made]),
-      stars: Number(r[C.stars]) || 0, from: String(r[C.from] || ''), show: String(r[C.show]).toLowerCase() === 'yes', votes: j(r[C.votes], {}),
-      deleted: String(r[C.deleted]).toLowerCase() === 'yes' })).filter(a => a.id && !a.deleted && ART_KINDS_[a.kind]);
-  }
-  ARTS_MEMO_ = { ss: ss_(), rows: rows };
-  return rows;
-}
-function writeArt_(a) {
-  const sh = artSheet_(), row = [a.id, a.maker, a.station, a.kind, a.name, JSON.stringify(a.look || {}), JSON.stringify(a.mats || {}), JSON.stringify(a.tools || []), JSON.stringify(a.owners || []),
-    JSON.stringify(a.team || []), a.made, String(a.stars || 0), a.from || '', a.show ? 'yes' : '', JSON.stringify(a.votes || {}), a.deleted ? 'yes' : ''];
-  if (a.row) sh.getRange(a.row, 1, 1, ART_WIDTH).setValues([row]);
-  else { const r = sh.getLastRow() + 1; sh.getRange(r, 1, 1, ART_WIDTH).setNumberFormat('@').setValues([row]); a.row = r; }
-  ARTS_MEMO_ = null;
-}
-function publicArt_(a) {
-  return { id: a.id, maker: a.maker, station: a.station, kind: a.kind, name: a.name, look: a.look, mats: a.mats, tools: a.tools, owners: a.owners, team: a.team, made: a.made, stars: a.stars, from: a.from, show: a.show };
-}
-function artsOf_(name) { return artRows_().filter(a => a.owners.indexOf(name) !== -1); }
-
-/* ---------- looks (kept small and safe) ---------- */
-const ART_HEX_ = /^#[0-9a-fA-F]{6}$/;
-function artInt_(v, lo, hi) { const n = Math.floor(Number(v)); return isNaN(n) ? lo : Math.max(lo, Math.min(hi, n)); }
-// {k kind, m material, p profile (16 × 0-20, lathe), c paint, v varnish, s stickers, e engraving, g gem, cut, q quality, gl glow}
-function cleanArtLook_(kind, look) {
-  look = look || {};
-  const out = { k: kind };
-  if (ART_MATS_[look.m]) out.m = String(look.m);
-  if (Array.isArray(look.p)) { const p = look.p.slice(0, 24).map(x => artInt_(x, 0, 20)); if (p.length >= 6) out.p = p; }
-  if (ART_HEX_.test(String(look.c || ''))) out.c = String(look.c);
-  if (look.v) out.v = 1;
-  if (Array.isArray(look.s)) { const s = look.s.slice(0, 3).map(x => artInt_(x, 0, 7)); if (s.length) out.s = s; }
-  const e = String(look.e || '').replace(/[<>"'`\\]/g, '').trim().slice(0, 12); if (e) out.e = e;
-  if (ART_STONES_.indexOf(look.g) !== -1) out.g = String(look.g);
-  if (look.cut != null) out.cut = artInt_(look.cut, 0, 4);
-  if (look.q != null) out.q = artInt_(look.q, 0, 100);
-  if (look.gl) out.gl = 1;
-  if (look.th != null) out.th = artInt_(look.th, 0, 20);
-  if (/^[01]{36}$/.test(String(look.wv || ''))) out.wv = String(look.wv);
-  if (ART_HEX_.test(String(look.c2 || ''))) out.c2 = String(look.c2);
-  if (ART_HEX_.test(String(look.lc || ''))) out.lc = String(look.lc);
-  if (Number(look.ku) > 0) out.ku = Math.floor(Number(look.ku));
-  return out;
-}
-// Avatar `cw` (crafted wear) structure check — ownership is checked in artWear_ (saveAvatar / outfits).
-function cleanCraftWear_(cw) {
-  if (!cw || typeof cw !== 'object') return null;
-  const out = {};
-  ART_WEAR_SLOTS_.forEach(slot => {
-    const it = cw[slot]; if (!it || typeof it !== 'object' || !it.id) return;
-    const kind = String(it.k || ''); if (!ART_KINDS_[kind] || ART_KINDS_[kind][1] !== slot) return;
-    const look = cleanArtLook_(kind, it); look.id = String(it.id).slice(0, 24); out[slot] = look;
-  });
-  return Object.keys(out).length ? out : null;
-}
-// Only things this player owns can be worn; the look always comes from the Artifacts row.
-function artWear_(name, cw) {
-  const clean = cleanCraftWear_(cw); if (!clean) return null;
-  const mine = artsOf_(name), out = {};
-  Object.keys(clean).forEach(slot => { const a = mine.find(x => x.id === clean[slot].id); if (a && ART_KINDS_[a.kind][1] === slot) out[slot] = Object.assign(cleanArtLook_(a.kind, a.look), { id: a.id }); });
-  return Object.keys(out).length ? out : null;
-}
-
-/* ---------- bag + family shelf (counts) ---------- */
-function artBag_(st, name) {
-  let b = null; try { b = JSON.parse(st['Bag_' + name] || ''); } catch (e) { b = null; }
-  if (!b || typeof b !== 'object') b = Object.assign({}, ART_STARTER_);
-  const out = {}; Object.keys(ART_MATS_).forEach(m => { const n = artInt_(b[m], 0, ART_BAG_MAX_); if (n) out[m] = n; });
-  if (b._d) out._d = String(b._d);
-  if (!b._g2) { artAdd_(out, ART_GIFT2_); }   // af-2 opening gift for the new machines (kept once the bag is saved)
-  out._g2 = 1;
-  return out;
-}
-function artSaveBag_(name, bag) { saveSetting('Bag_' + name, JSON.stringify(bag)); return bag; }
-function artShelfOf_(st) {
-  let s = null; try { s = JSON.parse(st.FamilyShelf || ''); } catch (e) { s = null; }
-  s = s && typeof s === 'object' ? s : {};
-  const m = {}; Object.keys(ART_MATS_).forEach(k => { const n = artInt_((s.m || {})[k], 0, ART_BAG_MAX_); if (n) m[k] = n; });
-  const req = (Array.isArray(s.req) ? s.req : []).filter(r => r && ART_MATS_[r.mat]).slice(-20).map(r => ({ id: String(r.id), by: String(r.by), mat: String(r.mat), n: artInt_(r.n, 1, 20), got: artInt_(r.got, 0, 20), at: Number(r.at) || 0 }));
-  return { m: m, req: req };
-}
-function artSaveShelf_(s) { saveSetting('FamilyShelf', JSON.stringify(s)); return s; }
-function artTake_(bag, cost) {   // cost = {mat: n} → throws if short
-  Object.keys(cost).forEach(m => { if ((bag[m] || 0) < cost[m]) throw new Error('Not enough ' + ART_MATS_[m][1].toLowerCase() + ' — you have ' + (bag[m] || 0) + ', need ' + cost[m] + '.'); });
-  Object.keys(cost).forEach(m => { bag[m] = (bag[m] || 0) - cost[m]; if (!bag[m]) delete bag[m]; });
-  return bag;
-}
-function artAdd_(bag, add) { Object.keys(add || {}).forEach(m => { if (ART_MATS_[m]) bag[m] = Math.min(ART_BAG_MAX_, (bag[m] || 0) + artInt_(add[m], 0, ART_BAG_MAX_)); if (!bag[m]) delete bag[m]; }); return bag; }
-
-/* ---------- boot ---------- */
-function getArtifactoryData(player) {
-  const out = getLevelGameData('artifactory', player);
-  const players = activePlayers_(listProfilesFull()), st = out.settings || getSettings();
-  const me = player && players.some(p => p.Name === player) ? player : '';
-  const items = me ? itemsFor_(me, players) : { owned: {}, ways: {} };
-  out.player = me;
-  out.bag = me ? artBag_(st, me) : {};
-  out.dailyReady = !!me && out.bag._d !== today_();
-  out.shelf = artShelfOf_(st);
-  out.arts = me ? artsOf_(me).map(publicArt_) : [];
-  out.items = { lines: itemMeta_(), owned: items.owned, ways: items.ways, seen: me ? seenFor_(st, me) : {} };
-  out.outfits = me ? jsonSetting_(st, 'Outfits_' + me, []) : [];
-  out.hasPin = !!(me && st['PlayerPIN_' + me]);
-  out.creations = creationRows_().filter(c => players.some(p => p.Name === c.maker)).map(c => publicCreation_(c, me));   // 🔨 Furniture Workshop area
-  out.giftsLeft = me ? giftsLeft_(st, me) : 0;
-  out.mats = ART_MATS_; out.kinds = ART_KINDS_;
-  return out;
-}
-function checkArtPlayer_(name) { checkPlayer_(name); }
-
-/* ---------- 🎁 daily delivery: 3 materials once a day ---------- */
-function artClaimDaily(name) {
-  checkArtPlayer_(name);
-  const lock = LockService.getScriptLock(); lock.waitLock(10000);
-  try {
-    const bag = artBag_(getSettings(), name), day = today_();
-    if (bag._d === day) return { bag: bag, got: {}, already: true };
-    const got = {}; let h = 0; const key = name + day; for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-    for (let i = 0; i < 3; i++) { h = (h * 1103515245 + 12345) >>> 0; const m = ART_DAILY_[h % ART_DAILY_.length]; got[m] = (got[m] || 0) + 1; }
-    artAdd_(bag, got); bag._d = day; artSaveBag_(name, bag);
-    safeRecordFeats_(name, 'artifactory', { daily: 1 });
-    return { bag: bag, got: got };
-  } finally { lock.releaseLock(); }
-}
-
-/* ---------- 🔨 make something ---------- */
-// req = {station, kind, mat, setting (stone station: metal for the setting), look, name, blueprint: {level, score, stars, timeSec}}
-function artCraft(name, req) {
-  checkArtPlayer_(name);
-  req = req || {};
-  const kind = String(req.kind || ''), K = ART_KINDS_[kind];
-  if (!K) throw new Error('Pick something to make.');
-  const station = K[0], cost = {};
-  if (station === 'lathe') {
-    if (ART_LATHE_MATS_.indexOf(req.mat) === -1) throw new Error('Pick a blank to turn.');
-    cost[req.mat] = K[2];
-  } else if (station === 'stone') {
-    if (ART_STONES_.indexOf(req.mat) === -1) throw new Error('Pick a rough stone.');
-    cost[req.mat] = 1;
-    if (K[2]) { if (ART_SETTINGS_.indexOf(req.setting) === -1) throw new Error('Pick a metal for the setting.'); cost[req.setting] = (cost[req.setting] || 0) + K[2]; }
-  } else if (station === 'light') {
-    cost.glass = 1; cost.led = 1; cost.battery = 1;
-  } else if (ART_STATION_MATS_[station]) {
-    if (ART_STATION_MATS_[station].indexOf(req.mat) === -1) throw new Error('Pick what to make it from.');
-    cost[req.mat] = K[2];
-  }
-  const lock = LockService.getScriptLock(); lock.waitLock(10000);
-  try {
-    if (artRows_().filter(a => a.maker === name).length >= ART_PER_PLAYER_) throw new Error('Your maker shelf is full (' + ART_PER_PLAYER_ + ' things) — recycle one first.');
-    const bag = artTake_(artBag_(getSettings(), name), cost);
-    const look = cleanArtLook_(kind, req.look);
-    if (station === 'lathe') { look.m = req.mat; delete look.g; }
-    if (station === 'stone') { look.g = req.mat; if (K[2]) look.m = req.setting; else delete look.m; }
-    if (ART_STATION_MATS_[station]) { look.m = req.mat; delete look.g; }
-    delete look.ku;   // 🏺 the kiln takes the same ~5 s waiting step as every machine (Aowu 2026-11-09)
-    if (station === 'light') { look.gl = 1; if (!look.lc) look.lc = '#FFE45C'; }
-    var bp = req.blueprint && typeof req.blueprint === 'object' ? req.blueprint : null;
-    var stars = bp ? artInt_(bp.stars, 0, 3) : 0;
-    const title = String(req.name || '').replace(/[<>"`\\]/g, '').trim().slice(0, 28) || (name + "'s " + ART_KINDS_[kind][3]);
-    const a = { id: 'a' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36), maker: name, station: station, kind: kind, name: title, look: look, mats: cost,
-      tools: [station], owners: [name], team: [], made: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'), stars: stars, from: '', show: false, votes: {} };
-    writeArt_(a); artSaveBag_(name, bag);
-    var stats = { made: 1, games: 1 }; stats[station] = 1;
-    if (kind === 'gem' || station === 'stone') stats.gems = 1;
-    if (station === 'light') stats.glows = 1;
-    var res = { item: publicArt_(a), bag: bag }, theme = ART_STATIONS_[station][0] + ' ' + ART_STATIONS_[station][1] + ' · ' + ART_KINDS_[kind][3];
-    if (bp) { stats.blueprints = 1; if (stars === 3) { stats.perfect = 1; if (station === 'lathe') stats.latheStars = 1; if (station === 'stone') stats.stoneStars = 1; } }
-  } finally { lock.releaseLock(); }
-  return artAfter_(name, res, bp, stars, stats, theme);   // the Archive save takes the lock itself, so it runs after ours is released
-}
-function artAfter_(name, res, bp, stars, stats, theme) {
-  if (bp) {
-    res.level = saveLevelResult('artifactory', name, artInt_(bp.level, 0, 5), { score: artInt_(bp.score, 0, 100000), stars: stars, timeSec: artInt_(bp.timeSec, 0, 36000), theme: theme, cleared: stars > 0, stats: stats });
-    res.feats = res.level.feats;
-  } else res.feats = safeRecordFeats_(name, 'artifactory', stats);
-  return res;
-}
-
-/* ---------- 🎨 finish bench: paint, varnish, stickers, engrave ---------- */
-// fin = {c, v, s, e, coats, blueprint: {level, score, stars, timeSec}}
-function artFinish(name, id, fin) {
-  checkArtPlayer_(name);
-  fin = fin || {};
-  const lock = LockService.getScriptLock(); lock.waitLock(10000);
-  try {
-    const a = artRows_().find(x => x.id === String(id));
-    if (!a || a.owners.indexOf(name) === -1) throw new Error('You don\'t have that one.');
-    if (a.maker !== name) throw new Error('Only ' + a.maker + ' can change this one — ✨ Remix comes later!');
-    const cost = {};
-    const col = ART_HEX_.test(String(fin.c || '')) ? String(fin.c) : '';
-    if (col && col !== a.look.c) cost.paint = artInt_(fin.coats, 1, 3);
-    if (fin.v && !a.look.v) cost.varnish = 1;
-    const bag = artTake_(artBag_(getSettings(), name), cost);
-    const look = Object.assign({}, a.look);
-    if (col) look.c = col;
-    if (fin.v) look.v = 1;
-    if (Array.isArray(fin.s)) { const s = fin.s.slice(0, 3).map(x => artInt_(x, 0, 7)); if (s.length) look.s = s; else delete look.s; }
-    if (fin.e != null) { const e = String(fin.e).replace(/[<>"'`\\]/g, '').trim().slice(0, 12); if (e) look.e = e; else delete look.e; }
-    a.look = cleanArtLook_(a.kind, look);
-    if (a.tools.indexOf('finish') === -1) a.tools.push('finish');
-    Object.keys(cost).forEach(m => { a.mats[m] = (a.mats[m] || 0) + cost[m]; });
-    var bp = fin.blueprint && typeof fin.blueprint === 'object' ? fin.blueprint : null;
-    var stars = bp ? artInt_(bp.stars, 0, 3) : 0;
-    if (stars > a.stars) a.stars = stars;
-    writeArt_(a); artSaveBag_(name, bag);
-    var stats = { finish: 1, games: 1 };
-    if (fin.e) stats.engraved = 1;
-    var res = { item: publicArt_(a), bag: bag }, theme = '🎨 Finish bench · ' + ART_KINDS_[a.kind][3];
-    if (bp) { stats.blueprints = 1; if (stars === 3) stats.perfect = 1; }
-  } finally { lock.releaseLock(); }
-  return artAfter_(name, res, bp, stars, stats, theme);
-}
-// 🔌 light-up bench: add LEDs to something you made (1 LED + 1 battery)
-function artGlow(name, id, opt) {
-  checkArtPlayer_(name);
-  opt = opt || {};
-  const lock = LockService.getScriptLock(); lock.waitLock(10000);
-  try {
-    const a = artRows_().find(x => x.id === String(id));
-    if (!a || a.owners.indexOf(name) === -1) throw new Error('You don\'t have that one.');
-    if (a.maker !== name) throw new Error('Only ' + a.maker + ' can change this one.');
-    const cost = { led: 1, battery: 1 }, bag = artTake_(artBag_(getSettings(), name), cost);
-    a.look = cleanArtLook_(a.kind, Object.assign({}, a.look, { gl: 1, lc: ART_HEX_.test(String(opt.lc || '')) ? opt.lc : '#FFE45C' }));
-    if (a.tools.indexOf('light') === -1) a.tools.push('light');
-    Object.keys(cost).forEach(m => { a.mats[m] = (a.mats[m] || 0) + cost[m]; });
-    var bp = opt.blueprint && typeof opt.blueprint === 'object' ? opt.blueprint : null, stars = bp ? artInt_(bp.stars, 0, 3) : 0;
-    if (stars > a.stars) a.stars = stars;
-    writeArt_(a); artSaveBag_(name, bag);
-    var stats = { light: 1, glows: 1, games: 1 }; if (bp) { stats.blueprints = 1; if (stars === 3) stats.perfect = 1; }
-    var res = { item: publicArt_(a), bag: bag }, theme = '🔌 Light-up bench · ' + ART_KINDS_[a.kind][3];
-  } finally { lock.releaseLock(); }
-  return artAfter_(name, res, bp, stars, stats, theme);
-}
-function artRename(name, id, title) {
-  checkArtPlayer_(name);
-  const a = artRows_().find(x => x.id === String(id));
-  if (!a || a.maker !== name) throw new Error('Only the maker can rename it.');
-  a.name = String(title || '').replace(/[<>"`\\]/g, '').trim().slice(0, 28) || a.name; writeArt_(a);
-  return publicArt_(a);
-}
-
-/* ---------- 🧺 family shelf + 🙏 requests (counts only) ---------- */
-function artShelfPut(name, mat, n) {
-  checkArtPlayer_(name); if (!ART_MATS_[mat]) throw new Error('Unknown material.');
-  n = artInt_(n, 1, 50);
-  const lock = LockService.getScriptLock(); lock.waitLock(10000);
-  try {
-    const st = getSettings(), bag = artTake_(artBag_(st, name), { [mat]: n }), shelf = artShelfOf_(st);
-    shelf.m[mat] = Math.min(ART_BAG_MAX_, (shelf.m[mat] || 0) + n);
-    // a share fills open requests for this material first
-    let left = n; shelf.req.forEach(r => { if (left && r.mat === mat && r.got < r.n && r.by !== name) { const g = Math.min(left, r.n - r.got); r.got += g; left -= g; } });
-    artSaveBag_(name, bag); artSaveShelf_(shelf);
-    safeRecordFeats_(name, 'artifactory', { shared: n });
-    return { bag: bag, shelf: shelf };
-  } finally { lock.releaseLock(); }
-}
-function artShelfTake(name, mat, n) {
-  checkArtPlayer_(name); if (!ART_MATS_[mat]) throw new Error('Unknown material.');
-  n = artInt_(n, 1, 10);
-  const lock = LockService.getScriptLock(); lock.waitLock(10000);
-  try {
-    const st = getSettings(), shelf = artShelfOf_(st);
-    if ((shelf.m[mat] || 0) < n) throw new Error('The family shelf has only ' + (shelf.m[mat] || 0) + ' ' + ART_MATS_[mat][1].toLowerCase() + '.');
-    shelf.m[mat] -= n; if (!shelf.m[mat]) delete shelf.m[mat];
-    const bag = artAdd_(artBag_(st, name), { [mat]: n });
-    artSaveBag_(name, bag); artSaveShelf_(shelf);
-    return { bag: bag, shelf: shelf };
-  } finally { lock.releaseLock(); }
-}
-function artRequest(name, mat, n) {
-  checkArtPlayer_(name); if (!ART_MATS_[mat]) throw new Error('Unknown material.');
-  const lock = LockService.getScriptLock(); lock.waitLock(10000);
-  try {
-    const shelf = artShelfOf_(getSettings());
-    if (shelf.req.filter(r => r.by === name && r.got < r.n).length >= 3) throw new Error('You already have 3 open requests.');
-    shelf.req.push({ id: 'r' + Date.now().toString(36), by: name, mat: mat, n: artInt_(n, 1, 20), got: 0, at: Date.now() });
-    shelf.req = shelf.req.slice(-20); artSaveShelf_(shelf);
-    return { shelf: shelf };
-  } finally { lock.releaseLock(); }
-}
-// Give straight to someone's request (from your bag into their bag).
-function artGive(name, reqId, n) {
-  checkArtPlayer_(name);
-  const lock = LockService.getScriptLock(); lock.waitLock(10000);
-  try {
-    const st = getSettings(), shelf = artShelfOf_(st), r = shelf.req.find(x => x.id === String(reqId));
-    if (!r || r.got >= r.n) throw new Error('That request is done already.');
-    if (r.by === name) throw new Error('That is your own request 🙂');
-    const g = Math.min(artInt_(n, 1, 20), r.n - r.got);
-    const bag = artTake_(artBag_(st, name), { [r.mat]: g }), theirs = artAdd_(artBag_(st, r.by), { [r.mat]: g });
-    r.got += g;
-    artSaveBag_(name, bag); artSaveBag_(r.by, theirs); artSaveShelf_(shelf);
-    safeRecordFeats_(name, 'artifactory', { gifts: g });
-    return { bag: bag, shelf: shelf };
-  } finally { lock.releaseLock(); }
-}
-
-/* ---------- 💾 outfits ---------- */
-function saveArtOutfits(name, list) {
-  checkArtPlayer_(name);
-  const players = activePlayers_(listProfilesFull()), owned = itemsFor_(name, players).owned;
-  const clean = (Array.isArray(list) ? list : []).slice(0, 6).map((o, i) => {
-    if (!o || !o.av) return null;
-    const av = cleanAvatar_(o.av, owned); if (!av) return null;
-    const cw = artWear_(name, o.av.cw); if (cw) av.cw = cw; else delete av.cw;
-    return { n: String(o.n || 'Outfit ' + (i + 1)).replace(/[<>"'`\\]/g, '').trim().slice(0, 14) || 'Outfit ' + (i + 1), av: av };
-  });
-  while (clean.length && !clean[clean.length - 1]) clean.pop();
-  saveSetting('Outfits_' + name, JSON.stringify(clean));
-  return clean;
-}
-
-/* ---------- 🧰 Maker shelf (Collection page) ---------- */
-function artShelf_(players) {
-  const out = {}; players.forEach(p => { out[p.Name] = artsOf_(p.Name).map(publicArt_); });
-  return out;
-}
-// (af-2) END OF ArtifactoryCode.gs
-
-;
 /* ===== on the device only: the grown-up PIN arrives hashed from the family Sheet (OfflineSync.gs) ===== */
 function verifyAdminPin(pin) { var s = String(getSettings().AdminPIN || ''), p = String(pin || ''); if (s.indexOf('#sha256:') === 0) return !!p && s.slice(8) === __hex('steam-admin:' + p); return !!s && s === p; }
 return {"include": typeof include === 'function' ? include : undefined,
@@ -4852,6 +4412,7 @@ return {"include": typeof include === 'function' ? include : undefined,
 "saveWisDeck": typeof saveWisDeck === 'function' ? saveWisDeck : undefined,
 "saveFeats": typeof saveFeats === 'function' ? saveFeats : undefined,
 "savePlayerTitle": typeof savePlayerTitle === 'function' ? savePlayerTitle : undefined,
+"geoJourneyDone": typeof geoJourneyDone === 'function' ? geoJourneyDone : undefined,
 "getMyItems": typeof getMyItems === 'function' ? getMyItems : undefined,
 "getItemsData": typeof getItemsData === 'function' ? getItemsData : undefined,
 "markItemsSeen": typeof markItemsSeen === 'function' ? markItemsSeen : undefined,
@@ -4899,19 +4460,7 @@ return {"include": typeof include === 'function' ? include : undefined,
 "doPost": typeof doPost === 'function' ? doPost : undefined,
 "savePoseCollection": typeof savePoseCollection === 'function' ? savePoseCollection : undefined,
 "saveBoothDesign": typeof saveBoothDesign === 'function' ? saveBoothDesign : undefined,
-"savePoseTest": typeof savePoseTest === 'function' ? savePoseTest : undefined,
-"styleArtifactsSheet": typeof styleArtifactsSheet === 'function' ? styleArtifactsSheet : undefined,
-"getArtifactoryData": typeof getArtifactoryData === 'function' ? getArtifactoryData : undefined,
-"artClaimDaily": typeof artClaimDaily === 'function' ? artClaimDaily : undefined,
-"artCraft": typeof artCraft === 'function' ? artCraft : undefined,
-"artFinish": typeof artFinish === 'function' ? artFinish : undefined,
-"artGlow": typeof artGlow === 'function' ? artGlow : undefined,
-"artRename": typeof artRename === 'function' ? artRename : undefined,
-"artShelfPut": typeof artShelfPut === 'function' ? artShelfPut : undefined,
-"artShelfTake": typeof artShelfTake === 'function' ? artShelfTake : undefined,
-"artRequest": typeof artRequest === 'function' ? artRequest : undefined,
-"artGive": typeof artGive === 'function' ? artGive : undefined,
-"saveArtOutfits": typeof saveArtOutfits === 'function' ? saveArtOutfits : undefined};
+"savePoseTest": typeof savePoseTest === 'function' ? savePoseTest : undefined};
 } };
 
 const VER = self.STEAM_GS.ver;
