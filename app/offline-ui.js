@@ -26,8 +26,12 @@
     '.off-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.off-btns button,.off-btns a{flex:1 1 140px;min-height:46px;border:0;border-radius:14px;font:700 15px Fredoka,Nunito,sans-serif;cursor:pointer;background:#2CA6DE;color:#fff;text-decoration:none;display:flex;align-items:center;justify-content:center;padding:8px 12px}',
     '.off-btns .ghost{background:#eef2f4;color:#37474f}.off-btns .warnb{background:#fbe3dc;color:#a8401c}',
     '.off-msg{min-height:1.4em;font-weight:700}.off-msg.err{color:#c0392b}.off-msg.good{color:#1e8e5a}',
-    '.off-upd{position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top));z-index:7050;display:flex;align-items:center;gap:10px;padding:10px 12px 10px 16px;border-radius:18px;background:#1E9E62;color:#fff;font:700 15px Fredoka,Nunito,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:calc(100vw - 24px)}',
-    '.off-upd button{border:0;border-radius:12px;min-height:40px;padding:6px 14px;font:700 15px Fredoka,Nunito,sans-serif;cursor:pointer;background:#fff;color:#1E9E62}.off-upd .x{background:transparent;color:#fff;padding:6px 8px}',
+    '.off-upd{position:fixed;inset:0;z-index:7050;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(20,14,40,.55);animation:offfade .25s ease-out}',
+    '.off-upd .box{width:min(420px,100%);background:#fff;color:#22313a;border-radius:26px;padding:26px 22px 20px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4);border:4px solid #1E9E62;animation:offpop .35s cubic-bezier(.2,1.4,.4,1)}',
+    '.off-upd .ic{font-size:64px;line-height:1;display:inline-block;animation:offbob 1.6s ease-in-out infinite}',
+    '.off-upd h3{margin:10px 0 4px;font:700 28px/1.15 Fredoka,Nunito,sans-serif;color:#1E9E62}.off-upd p{margin:0 0 16px;font:600 16px/1.4 Nunito,sans-serif;color:#4a5a60}',
+    '@keyframes offfade{from{opacity:0}}@keyframes offpop{from{transform:scale(.7);opacity:0}}@keyframes offbob{50%{transform:translateY(-6px) rotate(-6deg)}}',
+    '.off-upd button{display:block;width:100%;border:0;border-radius:16px;min-height:58px;font:700 22px Fredoka,Nunito,sans-serif;cursor:pointer;background:#1E9E62;color:#fff;box-shadow:0 5px 0 #157a4b}.off-upd button:active{transform:translateY(4px);box-shadow:0 1px 0 #157a4b}.off-upd .x{margin-top:10px;min-height:44px;font-size:16px;background:#eef2f4;color:#37474f;box-shadow:none}',
     '.off-install{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--safe-b,18px) + 50px);z-index:940;width:min(520px,calc(100vw - 24px));display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:18px;background:#fff;color:#2f3b40;box-shadow:0 8px 26px rgba(0,0,0,.22);font:600 14px/1.3 Nunito,sans-serif}',
     '.off-install .ic{font-size:26px}.off-install .tx{flex:1;min-width:0}.off-install button{border:0;border-radius:12px;min-height:40px;padding:6px 12px;font:700 14px Fredoka,Nunito,sans-serif;cursor:pointer;background:#2CA6DE;color:#fff}.off-install .x{background:#eef2f4;color:#37474f}',
     '#off-online-only .off-card{text-align:center}#off-online-only .big{font-size:56px;line-height:1}',
@@ -174,12 +178,13 @@
   function swAsk(msg) { return new Promise(function (ok) { if (!SW || !SW.controller) return ok(null); var id = Math.random().toString(36).slice(2); msg.id = id; var f = function (e) { if (e.data && e.data.id === id) { SW.removeEventListener('message', f); ok(e.data); } }; SW.addEventListener('message', f); SW.controller.postMessage(msg); setTimeout(function () { SW.removeEventListener('message', f); ok(null); }, 120000); }); }
   function setUpdate(r) { if (r && r.pending) { upd = { ready: true, ver: r.pending }; A._setUpdate(upd); updCard(); } }
   function updCard() {
-    if (!upd || !SHELL[PAGE] || playing() || document.getElementById('off-upd')) return;
+    if (!upd || !SHELL[PAGE] || playing() || upd.later || document.getElementById('off-upd')) return;
+    if (showOn() || document.querySelector('.off-ov')) return setTimeout(updCard, 800);   // after the 🚀 Welcome Show / another card
     var c = document.createElement('div'); c.className = 'off-upd'; c.id = 'off-upd';
-    c.innerHTML = '<span>🆕 New update ready!</span><button id="off-upd-go">⟳ Update</button><button class="x" id="off-upd-x" aria-label="Later">✕</button>';
+    c.innerHTML = '<div class="box" role="dialog" aria-label="New update ready"><span class="ic">🆕</span><h3>New update ready!</h3><p>New games and fixes are on this ' + KIND + '. Tap to start them — it takes a few seconds.</p><button id="off-upd-go">⟳ Update now</button><button class="x" id="off-upd-x">Later</button></div>';
     document.body.appendChild(c);
     c.querySelector('#off-upd-go').onclick = applyUpdate;
-    c.querySelector('#off-upd-x').onclick = function () { c.remove(); };
+    c.querySelector('#off-upd-x').onclick = function () { upd.later = true; c.remove(); };   // the 🆕 chip stays; next app open switches it on
   }
   function applyUpdate() { swAsk({ t: 'apply' }).then(function () { location.reload(); }); }
   A.checkUpdate = function () { return swAsk({ t: 'check' }).then(function (r) { setUpdate(r); return r; }); };
