@@ -1549,8 +1549,8 @@ function igDrawStrip(g, P){
 function igDrawPianist(g, P, now, box){
   const V = I.view, b = box, dark = !!I.T.dark; if(b.w < 40) return;
   g.save(); g.beginPath(); g.rect(b.x, b.y, b.w, b.h); g.clip();
-  const land = I.box.land, k = land ? Math.min(b.w * 0.86 / 80, (b.h * 0.5) / 70, 2.4) : Math.min((b.h - 8) / 84, 2.2), pw = Math.min(b.w * (land ? 0.9 : 0.6), 88 * k);
-  const fy = land ? b.y + b.h * 0.42 + 64 * k * 0.5 : b.y + 4 + 70 * k, pianoTop = fy - 36 * k, ph = land ? pw * 0.55 : b.y + b.h - 2 - pianoTop, cx = b.x + b.w / 2, base = pianoTop + ph;   // hands rest on the keys
+  const tall = avTall(P.who), land = I.box.land, k = land ? Math.min(b.w * 0.86 / 80, (b.h * 0.42 - 4) / Math.max(1, tall - 32), (b.h * 0.5) / 70, 2.4) : Math.min((b.h - 8) / (Math.max(70, tall) + 14), 2.2), pw = Math.min(b.w * (land ? 0.9 : 0.6), 88 * k);
+  const fy = land ? b.y + b.h * 0.42 + 64 * k * 0.5 : b.y + 4 + Math.max(70, tall) * k, pianoTop = fy - 36 * k, ph = land ? pw * 0.55 : b.y + b.h - 2 - pianoTop, cx = b.x + b.w / 2, base = pianoTop + ph;   // hands rest on the keys
   const beat = igBeat(), nod = Math.abs(Math.sin(beat * Math.PI)) * 2, f = (pkPos(P.lastKey) - V.wLo) / Math.max(1, V.whites - 1), age = now - (P.lastHitAt || 0), press = age < 140 ? 1 - age / 140 : 0;
   const big = P.mood === 'big' && now - P.moodT < 600, oops = P.mood === 'oops' && now - P.moodT < 1200, cool = P.combo >= 20;
   let pose;
@@ -1954,11 +1954,23 @@ function drawDrumPart(g, P, now){
     g.restore(); return true; });
 }
 // 🧑 you on the drum throne: sticks swing to the side of the piece you hit, head nods, combo 20 = 😎, win = stick twirl + cymbal crash
+// 📏 how tall an avatar really is (rides, hats, wings, big costumes): painted once off-screen at k = 1, in avatar units above the feet
+const AV_TALL_ = new Map();
+function avTall(who, pose){
+  let av; try{ av = myAvatar(who); }catch(e){ return 70; } const key = who + ':' + JSON.stringify(av); if(AV_TALL_.has(key)) return AV_TALL_.get(key);
+  let top = 70;
+  try{ const W = 400, H = 400, base = 300, oc = document.createElement('canvas'); oc.width = W; oc.height = H; const og = oc.getContext('2d', {willReadFrequently: true});
+    drawAvatar(og, {name: who, av, dir: 1, walkT: 0}, W / 2, base, 1, {t: 0, pose: pose || {armL: 1.9, armR: 1.9, item: '🥢', itemHand: 'R'}, noShadow: true, still: true});
+    const d = og.getImageData(0, 0, W, H).data; let y0 = H;
+    for(let y = 0; y < H && y0 === H; y++) for(let x = 0; x < W; x++) if(d[(y * W + x) * 4 + 3] > 12){ y0 = y; break; }
+    if(y0 < H) top = Math.max(60, Math.min(260, base - y0 + 2)); }catch(e){}
+  AV_TALL_.set(key, top); return top;
+}
 function igDrawDrummer(g, P, now, box){
   const b = box, dark = !!I.T.dark, land = b.h > b.w * 1.1; if(b.w < 40) return;   // tall side panel vs a wide band (phone top / desktop middle)
   g.save(); if(!(I.box && I.box.centreDrum && b === I.box.av)){ g.beginPath(); g.rect(b.x, b.y, b.w, b.h); g.clip(); }
-  const k = land ? Math.min(b.w * 0.86 / 80, (b.h * 0.5) / 70, 2.4) : Math.min((b.h - 8) / 84, 2.2), cx = b.x + b.w / 2;
-  const fy = land ? b.y + b.h * 0.42 + 32 * k : b.y + 4 + 70 * k, kitTop = fy - 30 * k;
+  const tall = avTall(P.who), k = land ? Math.min(b.w * 0.86 / 80, (b.h * 0.42 - 4) / Math.max(1, tall - 32), (b.h * 0.5) / 70, 2.4) : Math.min((b.h - 8) / (Math.max(70, tall) + 14), 2.2), cx = b.x + b.w / 2;
+  const fy = land ? b.y + b.h * 0.42 + 32 * k : b.y + 4 + Math.max(70, tall) * k, kitTop = fy - 30 * k;   // 📏 the head always inside the box
   const pc = DP[P.lastPiece || 'snare'], side = pc ? (pc.x < 0.45 ? -1 : pc.x > 0.55 ? 1 : 0) : 0, age = now - (P.lastHitAt || 0), hit = age < 160 ? 1 - age / 160 : 0;
   const beat = igBeat(), nod = Math.abs(Math.sin(beat * Math.PI)) * 2, cool = P.combo >= 20, oops = P.missRow >= 3;
   let pose;
@@ -2511,4 +2523,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (bc-5+back-1+modes-3+bc-6+bc-7) END OF BeatCorner.html -->
+<!-- (bc-5+back-1+modes-3+bc-6+bc-7+bc-8) END OF BeatCorner.html -->

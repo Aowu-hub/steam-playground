@@ -145,7 +145,8 @@
   #cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
 .chipcol{position:absolute;top:6px;display:flex;flex-direction:column;gap:7px;z-index:5;pointer-events:none;width:168px;}
   .chipcol.l{left:6px;} .chipcol.r{right:6px;}
-  .chipstrip{display:flex;gap:6px;padding:2px 6px 5px;overflow-x:auto;flex:0 0 auto;z-index:5;}
+  .chipstrip{display:flex;gap:6px;padding:2px 6px 5px;overflow:visible;flex:0 0 auto;z-index:5;}   /* mg-1: no sideways scroll bar — on narrow phones the fighter cards wrap into 2 rows */
+  @media (max-width:520px){ .chipstrip{flex-wrap:wrap;gap:4px 6px;} .chipstrip > .pchip{flex:1 1 40%;min-width:0;} .chipstrip .pchip .tx{flex:1 1 auto;} .chipstrip .pchip .pw{flex-wrap:wrap;row-gap:2px;} }
   /* 🪪 fighter cards (sb-8): portrait in the seat colour, power tiles, hearts, round stars, states + little reactions */
   .pchip{position:relative;display:flex;align-items:center;gap:6px;min-width:0;flex:0 0 auto;padding:3px 8px 3px 3px;border-radius:16px;
     background:linear-gradient(135deg,rgba(40,22,72,0.92),rgba(20,10,40,0.88));border:2px solid var(--pc,#FF7A1A);box-shadow:0 3px 0 rgba(0,0,0,0.35),inset 0 1px 0 rgba(255,255,255,0.12);}
@@ -264,7 +265,6 @@
 <section class="screen hidden" id="scr-menu">
   <div class="title"><div class="logo"><span class="gh">👻</span><span class="bm">💣</span></div><h1>Soul Bopper</h1><p>Plant, pop, and come back as a ghost!</p>
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
-  <div class="section-head">🎮 Pick a mode</div>
   <div class="modes" id="mode-list"></div>
   <div class="section-head" id="level-head">🎚️ Pick a level</div>
   <div class="levels" id="level-list"></div>
@@ -1210,6 +1210,19 @@ const MODES = {
 };
 const MODE_KEYS = ['battle', 'classic', 'hold', 'stage'];
 const MODE_READY = {battle: true, classic: true, hold: true, stage: true};
+/* 🗂️ MODE GROUPS (mg-1) */
+const MODE_GROUPS = [
+  {k: 'battle', icon: '⚔️', en: 'Battle', th: 'ต่อสู้', c: '#E0452B'},
+  {k: 'party', icon: '💩', en: 'Party', th: 'ปาร์ตี้', c: '#C27C0E'},
+  {k: 'story', icon: '🗺️', en: 'Story', th: 'ผจญภัย', c: '#2F7BEA'}
+];   // 🗂️ mg-1 mode groups (header icon + English + Thai), fixed order
+const MODE_LIST = [   // 🗂️ start page buttons by group (mg-1)
+  {k: 'battle', g: 'battle', icon: '⚔️', name: 'Battle', sub: 'Last one standing — come back as a 👻', next: '👇 then pick a level'},
+  {k: 'hold', g: 'battle', icon: '🏳️', name: 'Hold the land', sub: 'Stand in the glowing zone', next: '👇 then pick a level'},
+  {k: 'classic', g: 'party', icon: '💩', name: 'Classic Avatar', sub: 'Poo bombs! Out players throw from the edge', next: '👇 then pick a level'},
+  {k: 'stage', g: 'story', icon: '🗺️', name: 'Stage', sub: '7 worlds × 5 stages + a boss', next: '👇 then a level, then a world'}
+];
+/* 🗂️ END MODE GROUPS */
 const SEAT_COL = ['#FF7A1A', '#3D8BFD', '#2EC27E', '#C04BFF'];
 const BOT_COL = '#9C8FB8';
 const BOT_KIND = {sleepy: ['😴', 'Sleepy'], smart: ['🧠', 'Smart'], hunter: ['🎯', 'Hunter'], trapper: ['🪤', 'Trapper']};
@@ -1288,8 +1301,9 @@ function renderMenu(){
 }
 function renderModes(){
   const box = $('mode-list');
-  box.innerHTML = MODE_KEYS.map(k => { const m = MODES[k]; return '<button class="mode' + (SET.mode === k ? ' on' : '') + (MODE_READY[k] ? '' : ' soon') + '" data-k="' + k + '" data-sound="tap"><div class="big">' + m.icon + '</div><div class="nm">' + m.name + '</div><div class="sub">' + (MODE_READY[k] ? m.sub : '🔜 Coming soon') + '</div></button>'; }).join('');
-  box.querySelectorAll('.mode').forEach(b => b.onclick = () => { const k = b.dataset.k; if(!MODE_READY[k]){ UISound.play('error'); UI.toast('🔜 ' + MODES[k].name + ' is coming soon!'); return; } SET.mode = k; savePrefs(); box.querySelectorAll('.mode').forEach(x => x.classList.toggle('on', x === b)); renderLevels(); });
+  UI.modeGroups(box, MODE_GROUPS, MODE_LIST.map(m => Object.assign({}, m, {on: SET.mode === m.k, soon: !MODE_READY[m.k]})), {   // 🗂️ mg-1
+    next: () => $('level-head'),
+    onPick: k => { if(!MODE_READY[k]){ UISound.play('error'); UI.toast('🔜 ' + MODES[k].name + ' is coming soon!'); return 'stop'; } SET.mode = k; savePrefs(); renderLevels(); }});
 }
 function renderLevels(){
   const box = $('level-list'); box.innerHTML = ''; const p = progressOf(S.player), rec = AGE_START[S.age], u = unlockedOf(S.player);
@@ -2358,4 +2372,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (sb-8+r33+back-1+modes-3) END OF SoulBopper.html -->
+<!-- (sb-8+r33+back-1+modes-3+mg-1) END OF SoulBopper.html -->

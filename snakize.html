@@ -1223,6 +1223,30 @@ const MODES = {
 };
 const MODE_KEYS = Object.keys(MODES);
 const BUILT_MODES = ['feast', 'gate', 'castle', 'tale'];   // modes switched on in this build (rounds)
+/* 🗂️ MODE GROUPS (mg-1) */
+const MODE_GROUPS = [
+  {k: 'arcade', icon: '🐍', en: 'Arcade', th: 'อาร์เคด', c: '#22A863'},
+  {k: 'land', icon: '🏰', en: 'Land battle', th: 'ยึดพื้นที่', c: '#E07B12'},
+  {k: 'story', icon: '📜', en: 'Story', th: 'เนื้อเรื่อง', c: '#8E5CF7'}
+];   // 🗂️ mg-1 mode groups (header icon + English + Thai), fixed order
+const MODE_LIST = [   // 🗂️ start page buttons by group (mg-1) — the game still uses MODES[k] for play
+  {k: 'feast', g: 'arcade', icon: '🍎', name: 'Snakeast', sub: 'Eat, grow, reach the length', next: '👇 then pick a level'},
+  {k: 'endless', g: 'arcade', icon: '♾️', name: 'Endless', sub: 'No target — beat your best', next: '👇 then pick a level (Junior +)'},
+  {k: 'gate', g: 'arcade', icon: '🧭', name: 'Snakigate', sub: 'Steer anywhere — be the longest', next: '👇 then pick a level'},
+  {k: 'castle', g: 'land', icon: '🏰', name: 'Snakastle', sub: 'Loop back home to grab land', next: '👇 then pick a level'},
+  {k: 'tale', g: 'story', icon: '📜', name: 'Snaketale', sub: 'Story quests from your family', next: '👇 then pick a chapter'}
+];
+function mgOn(k){ return k === 'endless' ? (SET.mode === 'feast' && !!SET.endless) : (SET.mode === k && !(k === 'feast' && SET.endless)); }
+function mgRender(){
+  UI.modeGroups($('mode-list'), MODE_GROUPS, MODE_LIST.map(m => Object.assign({}, m, {on: mgOn(m.k), id: 'mode-' + m.k, soon: m.k !== 'endless' && BUILT_MODES.indexOf(m.k) < 0})), {
+    next: () => $('level-head'),
+    onPick: k => {
+      if(k !== 'endless' && BUILT_MODES.indexOf(k) < 0){ UISound.play('error'); UI.toast(MODES[k].icon + ' ' + MODES[k].name + ' is coming soon!'); return 'stop'; }
+      if(k === 'endless'){ SET.mode = 'feast'; SET.endless = true; } else { SET.mode = k; if(k === 'feast') SET.endless = false; }
+      savePrefs(); renderMenu(); return false;
+    }});
+}
+/* 🗂️ END MODE GROUPS */
 const LV_ICON = ['🌱', '🐣', '🔦', '⚡', '🌋', '💀'];
 const LEVEL_UI = {
   feast: [
@@ -1323,9 +1347,7 @@ function changePlayer(){ renderPlayers(); showScreen('player'); }
 function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">No win yet</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span><span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
 function renderMenu(){
   const ml = $('mode-list');
-  ml.innerHTML = MODE_KEYS.map(k => { const m = MODES[k], built = BUILT_MODES.indexOf(k) >= 0;
-    return '<button class="mode' + (SET.mode === k ? ' on' : '') + (built ? '' : ' soon') + '" id="mode-' + k + '" data-k="' + k + '" data-sound="tap"><div class="big">' + m.icon + '</div><div class="nm">' + m.name + '</div><div class="tagline">' + m.tag + '</div><div class="sub">' + (built ? m.sub : '🔜 Coming soon') + '</div></button>'; }).join('');
-  ml.querySelectorAll('.mode').forEach(b => b.onclick = () => { const k = b.dataset.k; if(BUILT_MODES.indexOf(k) < 0){ UISound.play('error'); UI.toast(MODES[k].icon + ' ' + MODES[k].name + ' is coming soon!'); return; } SET.mode = k; savePrefs(); renderMenu(); });
+  mgRender();   // 🗂️ mg-1: modes in groups (MODE_GROUPS + MODE_LIST)
   if(SET.mode === 'tale'){ renderTale(); howTo(); return; }
   renderLevels(); renderMenuRow(); howTo();
   if(window.UI && UI.leaders && MODES[SET.mode].id !== 'snaketale') UI.leaders($('leaders'), MODES[SET.mode].id, S.player);
@@ -1354,7 +1376,7 @@ function renderMenuRow(){
   if(SET.mode === 'feast'){
     const b = document.createElement('button'); b.className = 'chip' + (SET.endless ? ' on' : ''); b.id = 'endless-btn'; b.setAttribute('data-sound', 'tap');
     b.textContent = '♾️ Endless (no target — beat your best score, Junior and up)';
-    b.onclick = () => { SET.endless = !SET.endless; savePrefs(); b.classList.toggle('on', SET.endless); renderLevels(); };
+    b.onclick = () => { SET.endless = !SET.endless; savePrefs(); b.classList.toggle('on', SET.endless); renderLevels(); mgRender(); };
     row.appendChild(b);
   }
 }
@@ -2307,4 +2329,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11y-4+r33+r36+back-1+modes-3) END OF Snakize.html -->
+<!-- (11y-4+r33+r36+back-1+modes-3+mg-1) END OF Snakize.html -->
