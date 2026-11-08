@@ -254,6 +254,11 @@
   .tile.wobble{animation:wobble .45s ease-in-out;} @keyframes wobble{20%{transform:rotate(-9deg);}40%{transform:rotate(8deg);}60%{transform:rotate(-6deg);}80%{transform:rotate(4deg);}}
   .tile.flip{animation:flip .38s ease-out both;} @keyframes flip{0%{transform:perspective(200px) rotateX(-90deg) translateY(-30%);opacity:.2;}100%{transform:perspective(200px) rotateX(0);opacity:1;}}
   .spark{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#FFE066;box-shadow:0 0 6px #FFE066;pointer-events:none;z-index:3;}
+  /* 🎨 LetterSkins (GeoRead gr-4): the player's letter look on the tiles — Classic keeps Lettercraft's own look; state colours (yellow / green / red) still win */
+  .tile.lsk-t:not(.pend):not(.ghost):not(.blank){background:var(--lsk-bg) center/118% 118% no-repeat, var(--lsk-c);color:var(--lsk-ink);}
+  .rt.lsk-t:not(.blank){background:var(--lsk-bg) center/118% 118% no-repeat, var(--lsk-c);color:var(--lsk-ink);}
+  .lsk-row{display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px;font-weight:800;color:var(--ink-soft);font-size:.85rem;}
+  .lsk-row .chips{flex-wrap:nowrap;overflow-x:auto;max-width:100%;padding:4px 2px 6px;}
   .rt{touch-action:none;}
   .rt.lift{opacity:.35;outline:2px dashed rgba(255,255,255,0.9);outline-offset:-3px;}
   .rt.inbox{visibility:hidden;}
@@ -284,6 +289,7 @@
 <script src="inc/UiKit.js"></script>
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
+<script src="inc/LetterSkins.js"></script>
 <script src="inc/WordMeanings.js"></script>
 <script src="inc/WordExtra.js"></script>
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button>
@@ -298,6 +304,7 @@
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
   <div class="section-head">1. Pick a board</div>
   <div class="chips" id="theme-list"></div>
+  <div class="lsk-row"><span>🎨 Tile look:</span><div class="chips" id="lsk-list"></div></div>
   <div class="section-head">2. Pick a level</div>
   <div class="levels" id="level-list"></div>
   <details class="rules"><summary>📖 How to play</summary><ul>
@@ -749,6 +756,13 @@ function passDevice(P){
 }
 function setActs(on){ ['b-play', 'b-check', 'b-hint', 'b-recall', 'b-mix', 'b-swap', 'b-pass'].forEach(id => { $(id).disabled = !on; }); if(on){ $('b-hint').disabled = G.hintsLeft <= 0; $('hint-n').textContent = 'Hint ' + G.hintsLeft; $('b-swap').disabled = G.bag.length < 1; } }
 function setMsg(html, kind){ const m = $('msg'); m.innerHTML = html; m.className = 'msg' + (kind ? ' ' + kind : ''); }
+// 🎨 LETTER LOOKS (GeoRead gr-4): tiles + rack wear the player's pick from LetterSkins (shared with 🔤 GeoRead, sp_letterskin:<Name>); Classic / Auto = Lettercraft's own tiles
+function lcSkin(){ if(!window.LetterSkins || !S.player) return ''; const k = LetterSkins.get(S.player), own = (S.letterSkins || {})[S.player] || 0; return k === 'auto' || k === 'classic' || !LetterSkins.SKINS[k] || !LetterSkins.canUse(k, own) ? '' : k; }
+function lcSkinStyle(k, t){ const v = LetterSkins.isVowel(String(t).toLowerCase()), P = LetterSkins.SKINS[k][v ? 'v' : 'c'], u = LetterSkins.url(k, '', 64, {flat: true, vowel: v}); return '--lsk-bg:url(' + u + ');--lsk-c:' + P[1] + ';--lsk-ink:' + P[2]; }
+function renderLetterLooks(){ const box = document.getElementById('lsk-list'); if(!box || !window.LetterSkins) return; LetterSkins.chips(box, LetterSkins.get(S.player), k => { LetterSkins.set(S.player, k); }, {owned: (S.letterSkins || {})[S.player] || 0, autoLabel: '🔤 Lettercraft', lockText: '🔒 Earn it in 🔤 GeoRead or Lettercraft (🎨 Letter looks in the Collection)'}); }
+const lcTileBase = tileHtml; tileHtml = function(t, cls, pts, blank){ const h = lcTileBase(t, cls, pts, blank), k = lcSkin(); return k && !blank && t && t !== '?' ? h.replace('<div class="tile', '<div style="' + lcSkinStyle(k, t) + '" class="lsk-t tile') : h; };
+const lcRackBase = renderRack; renderRack = function(hidden){ const r = lcRackBase.apply(this, arguments), k = lcSkin(), box = document.getElementById('rack'); if(k && box) Array.from(box.children).forEach(b => { const t = (b.childNodes[0] && b.childNodes[0].textContent) || ''; if(t && t !== '?' && !b.classList.contains('blank')){ b.classList.add('lsk-t'); b.setAttribute('style', (b.getAttribute('style') || '') + ';' + lcSkinStyle(k, t)); } }); return r; };
+const lcMenuBase = renderMenu; renderMenu = function(){ const r = lcMenuBase.apply(this, arguments); renderLetterLooks(); return r; };
 function renderRack(hidden){
   const P = cur(), box = $('rack'); box.innerHTML = '';
   if(!hidden && !P.bot) markFresh(P);
@@ -1485,7 +1499,7 @@ function boot(){
   UI.loading(GAME_ID);
   google.script.run.withSuccessHandler(d => {
       UI.loaded();
-      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {}; S.meanings = d.meanings || {}; Object.keys(S.meanings).forEach(k => { if(/^[A-Z]{2,15}$/.test(k) && !KID_SKIP.has(k) && !DICT.has(k)){ DICT.add(k); EXTRA_WORDS.add(k); } });   // r31: words in the Word Meanings tab are real words
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {}; S.meanings = d.meanings || {}; S.letterSkins = d.letterSkins || {}; Object.keys(S.meanings).forEach(k => { if(/^[A-Z]{2,15}$/.test(k) && !KID_SKIP.has(k) && !DICT.has(k)){ DICT.add(k); EXTRA_WORDS.add(k); } });   // r31: words in the Word Meanings tab are real words
       UISound.applySettings(S.settings);
       const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
       lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
@@ -1514,4 +1528,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (r31+emoji+r32+lc-2+back-1+modes-3) END OF WordBoard.html -->
+<!-- (r31+emoji+r32+lc-2+back-1+modes-3+gr-4) END OF WordBoard.html -->

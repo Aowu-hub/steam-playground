@@ -627,6 +627,13 @@ const MODES_ = [
   { game: 'eyes-brain', id: 'daily', icon: '🎯', name: 'Today\'s family number', pitch: 'One try at today\'s number!', route: 'eyesbrain', tried: { feat: [['eyes-brain', 'daily']] } },
   { game: 'georead', id: 'phonics', icon: '🔊', name: 'Phonics', pitch: 'Tap the sounds, bump the word!', route: 'georead', tried: { board: 'georead', themeStart: '🔊 Phonics', feat: [['georead', 'blends']] }, added: '2026-11-08' },
   { game: 'georead', id: 'build', icon: '🧱', name: 'Word builder', pitch: 'See the picture, build the word', route: 'georead', tried: { board: 'georead', themeStart: '🧱 Word builder', feat: [['georead', 'built']] }, added: '2026-11-08' },
+  { game: 'georead', id: 'rhyme', icon: '🔁', name: 'Rhyme time', pitch: 'cat · hat · bat — swap a box!', route: 'georead', tried: { board: 'georead', themeStart: '🔁 Rhyme time', feat: [['georead', 'rhymes']] }, added: '2026-11-08' },
+  { game: 'georead', id: 'sight', icon: '👀', name: 'Sight words', pitch: 'Tap the word you hear, quick!', route: 'georead', tried: { board: 'georead', themeStart: '👀 Sight words', feat: [['georead', 'sight']] }, added: '2026-11-08' },
+  { game: 'georead', id: 'trace', icon: '✏️', name: 'Trace', pitch: 'Draw Aa–Zz with your finger', route: 'georead', tried: { board: 'georead', themeStart: '✏️ Trace', feat: [['georead', 'traced']] }, added: '2026-11-08' },
+  { game: 'georead', id: 'case', icon: '🅰️', name: 'Big and small', pitch: 'Match A with a!', route: 'georead', tried: { board: 'georead', themeStart: '🅰️ Big and small', feat: [['georead', 'cases']] }, added: '2026-11-08' },
+  { game: 'georead', id: 'story', icon: '📖', name: 'Story read', pitch: 'Words light up as they are read', route: 'georead', tried: { board: 'georead', themeStart: '📖 Story read', feat: [['georead', 'stories']] }, added: '2026-11-08' },
+  { game: 'georead', id: 'types', icon: '🗂️', name: 'Word types', pitch: 'Naming, doing, describing words', route: 'georead', tried: { board: 'georead', themeStart: '🗂️ Word types', feat: [['georead', 'sorted']] }, added: '2026-11-08' },
+  { game: 'georead', id: 'journey', icon: '🗺️', name: 'Letter Journey', pitch: 'Walk the Alphabet Road!', route: 'georead', tried: { setting: 'GeoJourney_', feat: [['georead', 'chapters']] }, added: '2026-11-08' },
   { game: 'sla-brall', id: 'slashot', icon: '🏒', name: 'SlaShot', pitch: 'Table hockey — score goals!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaShot ·', feat: [['sla-brall', 'win_slashot']] } },
   { game: 'sla-brall', id: 'slapoof', icon: '🥒', name: 'SlaPoof', pitch: 'Pickleball — mind the kitchen!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaPoof ·', feat: [['sla-brall', 'win_slapoof']] } },
   { game: 'sla-brall', id: 'slaball', icon: '🎾', name: 'SlaBall', pitch: 'Tennis: 15, 30, 40, game!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaBall ·', feat: [['sla-brall', 'win_slaball']] } },
@@ -1239,6 +1246,8 @@ function getLevelGameData(gameId, player) {
   { const st = out.settings; out.avatars = {}; players.forEach(p => { out.avatars[p.Name] = parseAvatar_(st['Avatar_' + p.Name]); }); }   // 🧑 every level game gets every player's avatar (plan 11w: an avatar in every game)
   if (gameId === 'word-board') out.meanings = wordMeaningRows_();   // 📖 the Word Meanings tab (looked-up words + grown-up fixes) wins over the built-in list
   if (gameId === 'georead') out.meanings = wordMeaningRows_();   // 🔤 GeoRead word cards: the Word Meanings tab wins over the built-in list
+  if (gameId === 'georead' || gameId === 'word-board') out.letterSkins = letterSkinsOwned_(players);   // 🎨 extra letter looks each player may use (item line + Alphabet Road chapters)
+  if (gameId === 'georead') { const st = out.settings; out.journey = {}; players.forEach(p => { try { out.journey[p.Name] = JSON.parse(st['GeoJourney_' + p.Name] || '{}') || {}; } catch (e) { out.journey[p.Name] = {}; } }); }   // 🗺️ Alphabet Road progress
   if (gameId === 'double-up') { const f = featRows_(); out.challenge = {}; players.forEach(p => { const tile = f.filter(r => r.name === p.Name && r.game === 'double-up' && r.stat === 'chTile').reduce((m, r) => Math.max(m, Number(r.value) || 0), 0), score = f.filter(r => r.name === p.Name && r.game === 'double-up' && r.stat === 'chScore').reduce((m, r) => Math.max(m, Number(r.value) || 0), 0); if (tile || score) out.challenge[p.Name] = { tile: tile, score: score }; }); }   // 🏔️ Challenge bests (feats)
   if (gameId === 'brawl-buddies') { out.progressAdv = {}; players.forEach(p => { out.progressAdv[p.Name] = levelProgressFor_(p.Name, 'brawenture'); }); }   // 🗺️ Brawenture board (tales cleared → next tale opens)
   if (gameId === 'brawl-buddies') { const all = activePlayers_(listProfilesFull()); out.gear = {}; all.forEach(p => { const o = itemsFor_(p.Name, all).owned; if (o.brawlgear > 0) out.gear[p.Name] = o.brawlgear - 1; }); }   // 🥊 best Brawl gear owned (step index), drawn in fights
@@ -1855,6 +1864,14 @@ const FEAT_DEFS = {
     perfects: { name: 'Perfect rounds', icon: '⭐', kind: 'sum', tiers: [20, 200, 1000] },
     magic: { name: 'Magic e words', icon: '✨', kind: 'sum', tiers: [5, 30, 100] },
     found: { name: 'Sounds picked by ear', icon: '👂', kind: 'sum', tiers: [10, 100, 400], hidden: true },
+    chapters: { name: 'Alphabet Road chapters', icon: '🗺️', kind: 'max', tiers: [1, 3, 6], unit: 'chapters' },
+    rhymes: { name: 'Rhymes found', icon: '🔁', kind: 'sum', tiers: [10, 100, 400] },
+    sight: { name: 'Sight words read', icon: '👀', kind: 'sum', tiers: [20, 200, 800] },
+    traced: { name: 'Letters traced', icon: '✏️', kind: 'sum', tiers: [10, 52, 300] },
+    cases: { name: 'Big + small matches', icon: '🅰️', kind: 'sum', tiers: [20, 150, 600] },
+    stories: { name: 'Stories read', icon: '📖', kind: 'sum', tiers: [3, 20, 100] },
+    sorted: { name: 'Word types sorted', icon: '🗂️', kind: 'sum', tiers: [20, 150, 600] },
+    said: { name: 'Words said out loud', icon: '🎤', kind: 'sum', tiers: [5, 50, 200] },
   },
   'geoscout': {
     games: { name: 'GeoScout games', icon: '🎮', kind: 'sum', hidden: true },
@@ -2264,6 +2281,7 @@ const TITLE_DEFS = [
   { id: 'gr_sound', name: 'Sound Explorer', icon: '🔊', hint: 'Find 30 letter sounds in GeoRead', rule: f => featVal_(f, 'georead', 'sounds') >= 30 },
   { id: 'gr_wizard', name: 'Word Wizard', icon: '🧙', hint: 'Blend or build 100 words in GeoRead', rule: f => featVal_(f, 'georead', 'blends') + featVal_(f, 'georead', 'built') >= 100 },
   { id: 'gr_story', name: 'Story Star', icon: '📖', hint: 'Read 10 stories in GeoRead', rule: f => featVal_(f, 'georead', 'stories') >= 10 },
+  { id: 'gr_journey', name: 'Word Kingdom Hero', icon: '👑', hint: 'Finish all 6 chapters of the Alphabet Road in GeoRead', rule: f => featVal_(f, 'georead', 'chapters') >= 6 },
   { id: 'gs_scout', name: 'Number Scout', icon: '🔢', hint: 'Make 100 numbers in GeoScout 🧱 Count', rule: f => featVal_(f, 'geoscout', 'counts') >= 100 },
   { id: 'gs_balance', name: 'Balance Master', icon: '⚖️', hint: 'Balance the scale 100 times in GeoScout', rule: f => featVal_(f, 'geoscout', 'balances') >= 100 },
   { id: 'gs_tower', name: 'Tower Ace', icon: '🏗️', hint: 'Build 50 exact towers in GeoScout 🏗️ Wobble tower', rule: f => featVal_(f, 'geoscout', 'wobble') >= 50 },
@@ -2454,6 +2472,7 @@ function recordFeats_(name, gameId, stats) {
   if (gameId === 'soul-bopper' && stats) bopperDaily_(name, stats);   // 🎁 Soul Bopper daily treasures
   if (gameId === 'polyplot' && stats) polyplotSave_(name, stats);
   if (gameId === 'eyes-brain' && stats) ebrDaily_(name, stats);   // 👀🧠 🎁 daily treasure counters   // ⬛ 📖 field journal + 🎁 daily counters
+  if (gameId === 'georead' && stats) grDaily_(name, stats);   // 🔤 🎁 daily treasure counters
   const defs = FEAT_DEFS[gameId];
   if (!defs || !stats) return { newBadges: [], newTitles: [] };
   const players = activePlayers_(listProfilesFull());
@@ -2643,6 +2662,10 @@ const W_ = {
   days: n => ({ how: 'Play on ' + n + ' different days', r: x => x.days >= n }),
 };
 const ITEM_LINES = [
+  // 🔤 GeoRead + Lettercraft letter looks (looks only; LetterSkins.html draws them; picked per player sp_letterskin:<Name>)
+  { id: 'letterskin', name: 'Letter looks', icon: '🎨', slot: 'letterskin', game: 'georead', soon: 'Used on 🔤 GeoRead letter boxes AND 🔤 Lettercraft tiles — pick it on their menus', steps: ['Candy', 'Wood blocks', 'Jelly', 'Galaxy', 'Gold', 'Rainbow'],
+    ways: [W_.feat('georead', 'blends', 20, 'Blend 20 words in GeoRead'), W_.feat('word-board', 'words', 20, 'Make 20 words in Lettercraft'), W_.feat('georead', 'built', 20, 'Build 20 words in GeoRead'),
+      W_.feat('georead', 'stories', 5, 'Read 5 GeoRead stories'), W_.feat('word-board', 'words', 100, 'Make 100 words in Lettercraft'), W_.feat('georead', 'sounds', 40, 'Find 40 letter sounds in GeoRead')] },
   // 🂠 WisDeck card backs (looks only; the best one you own is the back of your face-down cards; painted by drawWisBack in WisDeck + Collection)
   { id: 'wdback', name: 'Card backs', icon: '🂠', slot: 'wdback', game: 'wisdeck', soon: 'Used in 🃏 WisDeck — the back of your face-down cards', steps: ['Night owl', 'Jungle', 'Deep sea', 'Lava', 'Candy', 'Galaxy', 'Golden', 'Rainbow'],
     ways: [W_.feat('wisdeck', 'cards', 10, 'Win 10 WisDeck cards'), W_.feat('wisdeck', 'right', 50, '50 right quiz answers'), W_.feat('wisdeck', 'daily', 3, 'Play 3 📅 daily decks'), W_.feat('wiscount', 'wins', 3, 'Win 3 🔢 WisCount matches'),
@@ -3295,6 +3318,8 @@ function giveCreation(from, to, id) {
 /* ---------- Daily treasures: 3 items a day (same for the whole family), each with a goal for today ---------- */
 const MINI_IDS_ = ['color-match', 'count-match', 'code-robot', 'trash-pointer'];
 const DAILY_GOALS = [
+  { id: 'grwords', icon: '🔤', how: 'Read or build 6 words in GeoRead today', r: d => (d.room.grWords || 0) >= 6 },
+  { id: 'grstory', icon: '📖', how: 'Read a GeoRead story or an Alphabet Road chapter today', r: d => (d.room.grStory || 0) >= 1 },
   { id: 'wdcards', icon: '🃏', how: 'Win 5 WisDeck cards today', r: d => (d.room.wdCards || 0) >= 5 },
   { id: 'wddaily', icon: '📅', how: 'Play today\'s WisDeck daily deck', r: d => !!d.room.wdDaily },
   { id: 'ebrrow', icon: '👀', how: '3 perfect rounds in a row in Eyes Brain Riot today', r: d => (d.room.ebrRow || 0) >= 3 },
@@ -3886,6 +3911,37 @@ function saveSnaketale(name, key, stars, diff) {
     return { tale: d, chapters: chapters, first: first, newChapter: first && /-6$/.test(key), feats: feats };
   } finally { lock.releaseLock(); }
 }
+// 🔤 GeoRead 🗺️ Letter Journey (gr-3): Settings GeoJourney_<Name> = {done: chapters finished (0–6), st: {ch: best stars}}.
+// The first time a chapter is finished: adventure miles (chapter 6 = 5, others 2). Feats: chapters (max) + what was read on the way.
+// 🎨 extra letter looks owned = max(item line 'letterskin' steps, Alphabet Road chapters done) — both games unlock them
+function letterSkinsOwned_(players) {
+  const all = activePlayers_(listProfilesFull()), st = getSettings(), out = {};
+  players.forEach(p => { let n = 0; try { n = itemsFor_(p.Name, all).owned.letterskin || 0; } catch (e) { n = 0; } let j = 0; try { j = Number((JSON.parse(st['GeoJourney_' + p.Name] || '{}') || {}).done) || 0; } catch (e) { j = 0; } out[p.Name] = Math.max(n, j); });
+  return out;
+}
+// 🎁 GeoRead daily treasure counters (today): words read / built + stories / journey chapters
+function grDaily_(name, stats) {
+  try { const d = dailyRoom_(getSettings(), name, today_()); d.grWords = (d.grWords || 0) + (Number(stats.blends) || 0) + (Number(stats.built) || 0); d.grStory = (d.grStory || 0) + (Number(stats.stories) || 0) + (Number(stats.chapters) ? 1 : 0); saveSetting('Daily_' + name, JSON.stringify(d)); } catch (e) { console.error('georead daily: ' + e.message); }
+}
+function saveGeoJourney(name, ch, stars, stats) {
+  checkPlayer_(name);
+  ch = Math.floor(Number(ch)); if (!(ch >= 0 && ch <= 5)) throw new Error('Bad chapter.');
+  stars = Math.max(1, Math.min(3, Math.floor(Number(stars)) || 1));
+  const lock = LockService.getScriptLock(); lock.waitLock(10000); let d = {}, first = false;
+  try {
+    const k = 'GeoJourney_' + name; try { d = JSON.parse(getSettings()[k] || '{}') || {}; } catch (e) { d = {}; }
+    if (!d.st || typeof d.st !== 'object') d.st = {}; d.done = Math.max(0, Math.min(6, Math.floor(Number(d.done)) || 0));
+    if (ch > d.done) throw new Error('Finish the chapter before first.');
+    first = ch === d.done; if (first) d.done = ch + 1;
+    d.st[ch] = Math.max(Number(d.st[ch]) || 0, stars);
+    saveSetting(k, JSON.stringify(d));
+  } finally { lock.releaseLock(); }
+  const miles = first ? (ch === 5 ? 5 : 2) : 0; if (miles) addMiles_(name, miles, 'GeoRead Alphabet Road chapter ' + (ch + 1));
+  const x = {}, s0 = stats || {}; ['blends', 'built', 'found', 'magic', 'perfects', 'stories', 'said'].forEach(f => { const v = Math.floor(Number(s0[f]) || 0); if (v > 0) x[f] = Math.min(200, v); });
+  x.sounds = Math.min(60, Math.floor(Number(s0.sounds) || 0)); x.chapters = d.done; x.games = 1;
+  grDaily_(name, x);   // journey counts for the daily treasures too
+  return { journey: d, first: first, miles: miles, feats: safeRecordFeats_(name, 'georead', x) };
+}
 function saveRacket(name, d) {
   if (!name || !d) return { ok: false };
   const hex = c => (typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c)) ? c : '';
@@ -3903,7 +3959,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+wd-9+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-1+gs-2) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+wd-9+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gs-2+gr-4) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -4333,6 +4389,7 @@ return {"include": typeof include === 'function' ? include : undefined,
 "checkWord": typeof checkWord === 'function' ? checkWord : undefined,
 "authorizeWordLookup": typeof authorizeWordLookup === 'function' ? authorizeWordLookup : undefined,
 "saveSnaketale": typeof saveSnaketale === 'function' ? saveSnaketale : undefined,
+"saveGeoJourney": typeof saveGeoJourney === 'function' ? saveGeoJourney : undefined,
 "saveRacket": typeof saveRacket === 'function' ? saveRacket : undefined,
 "saveWordJournal": typeof saveWordJournal === 'function' ? saveWordJournal : undefined,
 "startPoseSession": typeof startPoseSession === 'function' ? startPoseSession : undefined,
