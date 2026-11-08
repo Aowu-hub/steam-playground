@@ -579,6 +579,12 @@ function safeSeen_(players) {
 //   added = 'yyyy-mm-dd' when the mode came out → a 🆕 Dashboard card for 7 days.
 const MODES_ = [
   { game: 'geoscout', id: 'scale', icon: '⚖️', name: 'GeoScout Scale', pitch: 'More, less or the same? Weigh yourself!', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '⚖️ Scale' } },
+  { game: 'geoscout', id: 'shape', icon: '🔷', name: 'GeoScout Shape builder', pitch: 'Build squares, rectangles and steps', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🔷 Shape builder', feat: [['geoscout', 'shapes']] } },
+  { game: 'geoscout', id: 'tens', icon: '🔟', name: 'GeoScout Tens tower', pitch: 'Ten ones snap into a ten-tower!', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🔟 Tens tower', feat: [['geoscout', 'tens']] } },
+  { game: 'geoscout', id: 'next', icon: '🧩', name: 'GeoScout What comes next', pitch: 'Find the pattern!', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🧩 What comes next', feat: [['geoscout', 'patterns']] } },
+  { game: 'geoscout', id: 'frac', icon: '🍕', name: 'GeoScout Fractions', pitch: 'Which pizza slice is bigger?', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🍕 Fractions', feat: [['geoscout', 'fractions']] } },
+  { game: 'geoscout', id: 'wobble', icon: '🏗️', name: 'GeoScout Wobble tower', pitch: 'Stack to the EXACT height', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🏗️ Wobble tower', feat: [['geoscout', 'wobble']] } },
+  { game: 'geoscout', id: 'battle', icon: '⚔️', name: 'GeoScout Tower battle', pitch: '2 players — higher or lower wins!', route: 'geoscout', added: '2026-11-08', tried: { feat: [['geoscout', 'battles']] } },
   { game: 'geoscout', id: 'count', icon: '🧱', name: 'GeoScout Count', pitch: 'Snap and split blocks to make the number', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🧱 Count' } },
   { game: 'wisdeck', id: 'quiz', icon: '🧠', name: 'WisQuiz', pitch: 'Pick a category, win cards!', route: 'wisdeck', tried: { board: 'wisdeck' } },
   { game: 'wisdeck', id: 'buzz', icon: '🔔', name: 'WisBuzz', pitch: '2–4 players — buzz in first!', route: 'wisdeck', tried: { feat: [['wisdeck', 'buzzWins'], ['wisdeck', 'buzzRight']] } },
@@ -621,12 +627,6 @@ const MODES_ = [
   { game: 'eyes-brain', id: 'daily', icon: '🎯', name: 'Today\'s family number', pitch: 'One try at today\'s number!', route: 'eyesbrain', tried: { feat: [['eyes-brain', 'daily']] } },
   { game: 'georead', id: 'phonics', icon: '🔊', name: 'Phonics', pitch: 'Tap the sounds, bump the word!', route: 'georead', tried: { board: 'georead', themeStart: '🔊 Phonics', feat: [['georead', 'blends']] }, added: '2026-11-08' },
   { game: 'georead', id: 'build', icon: '🧱', name: 'Word builder', pitch: 'See the picture, build the word', route: 'georead', tried: { board: 'georead', themeStart: '🧱 Word builder', feat: [['georead', 'built']] }, added: '2026-11-08' },
-  { game: 'georead', id: 'rhyme', icon: '🔁', name: 'Rhyme time', pitch: 'cat · hat · bat — swap a box!', route: 'georead', tried: { board: 'georead', themeStart: '🔁 Rhyme time', feat: [['georead', 'rhymes']] }, added: '2026-11-08' },
-  { game: 'georead', id: 'sight', icon: '👀', name: 'Sight words', pitch: 'Tap the word you hear, quick!', route: 'georead', tried: { board: 'georead', themeStart: '👀 Sight words', feat: [['georead', 'sight']] }, added: '2026-11-08' },
-  { game: 'georead', id: 'trace', icon: '✏️', name: 'Trace', pitch: 'Draw Aa–Zz with your finger', route: 'georead', tried: { board: 'georead', themeStart: '✏️ Trace', feat: [['georead', 'traced']] }, added: '2026-11-08' },
-  { game: 'georead', id: 'case', icon: '🅰️', name: 'Big and small', pitch: 'Match A with a!', route: 'georead', tried: { board: 'georead', themeStart: '🅰️ Big and small', feat: [['georead', 'cases']] }, added: '2026-11-08' },
-  { game: 'georead', id: 'story', icon: '📖', name: 'Story read', pitch: 'Words light up as they are read', route: 'georead', tried: { board: 'georead', themeStart: '📖 Story read', feat: [['georead', 'stories']] }, added: '2026-11-08' },
-  { game: 'georead', id: 'types', icon: '🗂️', name: 'Word types', pitch: 'Naming, doing, describing words', route: 'georead', tried: { board: 'georead', themeStart: '🗂️ Word types', feat: [['georead', 'sorted']] }, added: '2026-11-08' },
   { game: 'sla-brall', id: 'slashot', icon: '🏒', name: 'SlaShot', pitch: 'Table hockey — score goals!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaShot ·', feat: [['sla-brall', 'win_slashot']] } },
   { game: 'sla-brall', id: 'slapoof', icon: '🥒', name: 'SlaPoof', pitch: 'Pickleball — mind the kitchen!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaPoof ·', feat: [['sla-brall', 'win_slapoof']] } },
   { game: 'sla-brall', id: 'slaball', icon: '🎾', name: 'SlaBall', pitch: 'Tennis: 15, 30, 40, game!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaBall ·', feat: [['sla-brall', 'win_slaball']] } },
@@ -1855,13 +1855,6 @@ const FEAT_DEFS = {
     perfects: { name: 'Perfect rounds', icon: '⭐', kind: 'sum', tiers: [20, 200, 1000] },
     magic: { name: 'Magic e words', icon: '✨', kind: 'sum', tiers: [5, 30, 100] },
     found: { name: 'Sounds picked by ear', icon: '👂', kind: 'sum', tiers: [10, 100, 400], hidden: true },
-    rhymes: { name: 'Rhymes found', icon: '🔁', kind: 'sum', tiers: [10, 100, 400] },
-    sight: { name: 'Sight words read', icon: '👀', kind: 'sum', tiers: [20, 200, 800] },
-    traced: { name: 'Letters traced', icon: '✏️', kind: 'sum', tiers: [10, 52, 300] },
-    cases: { name: 'Big + small matches', icon: '🅰️', kind: 'sum', tiers: [20, 150, 600] },
-    stories: { name: 'Stories read', icon: '📖', kind: 'sum', tiers: [3, 20, 100] },
-    sorted: { name: 'Word types sorted', icon: '🗂️', kind: 'sum', tiers: [20, 150, 600] },
-    said: { name: 'Words said out loud', icon: '🎤', kind: 'sum', tiers: [5, 50, 200] },
   },
   'geoscout': {
     games: { name: 'GeoScout games', icon: '🎮', kind: 'sum', hidden: true },
@@ -1880,6 +1873,9 @@ const FEAT_DEFS = {
     fractions: { name: 'Fractions right', icon: '🍕', kind: 'sum', tiers: [10, 100, 500] },
     battleWins: { name: 'Tower battles won', icon: '⚔️', kind: 'sum', tiers: [1, 10, 50] },
     journeys: { name: 'Journey chapters', icon: '📖', kind: 'max', tiers: [1, 3, 6] },
+    shapes: { name: 'Shapes built', icon: '🔷', kind: 'sum', tiers: [10, 100, 500] },
+    patterns: { name: 'Patterns solved', icon: '🧩', kind: 'sum', tiers: [10, 100, 500] },
+    battles: { name: 'Tower battles played', icon: '⚔️', kind: 'sum', hidden: true },
   },
   'wiscount': {   // 🃏🔢 WisCount (vs robot via saveLevelResult, 👥 2 players via saveFeats)
     games: { name: 'WisCount matches', icon: '🎮', kind: 'sum', hidden: true },
@@ -3907,7 +3903,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+wd-9+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gs-1+gr-2) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+wd-9+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-1+gs-2) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
