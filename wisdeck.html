@@ -550,7 +550,7 @@ const WD = (function(){
     metal: ['cymbals', 'gong', 'ching', 'triangle', 'handbell'], shaker: ['tambourine', 'maracas'], organ: ['pipe organ'], drone: ['didgeridoo']};
   function tuneFamily(en){ const n = String(en || '').toLowerCase(); for(const f of Object.keys(TUNE)) if(TUNE[f].includes(n)) return f; return 'other:' + n; }
   // a category whose pictures repeat (drawn dinos, shared emoji) asks with the fun fact instead of the picture
-  function picsUnique(list){ return new Set(list.map(c => c.pic)).size >= list.length * 0.8; }
+  function picsUnique(list){ return new Set(list.map(c => c.pk || c.pic)).size >= list.length * 0.8; }   // pk = card id once it has its own drawn picture (wd-13)
   function typesFor(catK, lv, list){
     const L = LEVELS[lv]; if(L.typed) return ['type'];
     const chem = catK === 'wischem';
@@ -1085,7 +1085,7 @@ function renderQ(){
   else if(q.type === 'order') h += '<div class="qt">Put them in order: smallest ' + WC.CAT[cd.cat].rank + ' first</div><div class="qt-th">เรียงจาก' + WC.CAT[cd.cat].rankTh + 'น้อยไปมาก</div>';
   else if(q.type === 'odd') h += '<div class="qt">Which one is NOT in ' + WC.CAT[cd.cat].en + ' (' + WC.CAT[cd.cat].about + ')?</div><div class="qt-th">อันไหนไม่ใช่' + WC.CAT[cd.cat].th + '</div>';
   else if(q.type === 'map'){ const co = cd.cat === 'wiscapital' ? WC.countryOf(cd) : {en: cd.en, th: cd.th}; h += '<div class="qt">' + (cd.cat === 'wiscapital' ? 'Tap the country whose capital is ' + UI.esc(cd.en) : 'Tap ' + UI.esc(co.en) + ' on the map!') + '</div><div class="qt-th">แตะ' + UI.esc(co.th) + 'บนแผนที่</div>'; }
-  else if(q.type === 'type') h += (WD.picsUnique([cd]) && WC.cards(cd.cat).filter(x => x.pic === cd.pic).length === 1 ? bigPic(cd) + '<div class="qt">' + t[0] + '</div>' : '<div class="qfact">💬 ' + UI.esc(WD.maskName(cd.fact, cd)) + '</div><div class="qt">Type its name</div>');
+  else if(q.type === 'type') h += (WD.picsUnique([cd]) && WC.cards(cd.cat).filter(x => (x.pk || x.pic) === (cd.pk || cd.pic)).length === 1 ? bigPic(cd) + '<div class="qt">' + t[0] + '</div>' : '<div class="qfact">💬 ' + UI.esc(WD.maskName(cd.fact, cd)) + '</div><div class="qt">Type its name</div>');
   h += '</div><div id="q-ans"></div><div id="q-after"></div>';
   box.innerHTML = h; renderAnswers(q);
   if(q.type === 'listen') setTimeout(sayQ, 250 * SPEED);
@@ -1622,6 +1622,14 @@ function boot(){
     .getLevelGameData(GAME_ID, CURRENT_PLAYER);
 }
 boot();
+/* 🎨 drawn pictures arrive in the background (wd-13): WisArt1, WisArt2 … from the server, one after another; the emoji shows until then */
+const ART_LOAD = {n: 0, done: false};
+function loadArt(i){ i = i || 1; if(i > 12){ ART_LOAD.done = true; return; }
+  google.script.run.withSuccessHandler(body => { if(!body){ ART_LOAD.done = true; return; } try{ new Function(body)(); }catch(e){} ART_LOAD.n = i; artArrived(); loadArt(i + 1); })
+    .withFailureHandler(() => { ART_LOAD.done = true; }).getWisArt(i); }
+function artArrived(){ WC.all().forEach(c => { if(WC.hasArt(c)) c.pk = c.id; });
+  try{ if(!$('v-learn').classList.contains('hidden') && L && L.k){ const i = L.i; $('l-strip').innerHTML = L.list.map((cd, k) => '<button class="sc" data-i="' + k + '" data-sound="none" aria-label="' + UI.esc(cd.en) + '">' + cardHtml(cd, {mini: true}) + '</button>').join(''); $('l-strip').querySelectorAll('.sc').forEach(b => b.onclick = () => showCard(Number(b.dataset.i), 0)); showCard(i, 0); } }catch(e){} }
+setTimeout(() => loadArt(1), 400);
 /* ✨ MODE SPOTLIGHT (modes-3): ?mode=<id> opens this game straight in that mode after the player pick · "✨ Also try" on the start page · started modes → UI.modeTried */
 const MS_GAME = 'wisdeck';
 function msOpen(id){
@@ -1645,4 +1653,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (back-1+modes-3+wd-12) END OF WisDeck.html -->
+<!-- (back-1+modes-3+wd-13) END OF WisDeck.html -->

@@ -250,12 +250,19 @@
   .buddy .who{display:none;position:absolute;right:8px;top:6px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.78rem;background:rgba(0,0,0,0.35);color:#fff;border-radius:10px;padding:2px 8px;}
   @media (orientation:landscape) and (max-height:560px){ .buddy{height:52px;} .swapbox{min-height:40px;padding:3px 6px;} .sb-go,.sb-x{min-height:34px;} .sb-tiles button{width:28px;height:28px;font-size:0.9rem;} }
   @media (prefers-reduced-motion: reduce){ .tile.hit2{animation:hit .35s ease;} }
+  /* 🎨 NumberSkins (GeoScout gs-4): the player's number look on the tiles — ➗ Algebros = the classic tiles; yellow / green / red / ghost state tiles still win */
+  .tile.nsk-t:not(.pend):not(.ghost):not(.blank){background:var(--nsk-bg) center/100% 100% no-repeat, var(--nsk-c);color:var(--nsk-ink);text-shadow:var(--nsk-sh);}
+  .rt.nsk-t:not(.blank){background:var(--nsk-bg) center/100% 100% no-repeat, var(--nsk-c);color:var(--nsk-ink);text-shadow:var(--nsk-sh);}
+  .nsk-row{display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px;font-weight:800;color:var(--ink-soft);font-size:.85rem;}
+  .nsk-row .chips{flex-wrap:wrap;justify-content:center;max-width:100%;padding:4px 2px 6px;}   /* wrap, never a sideways scroll bar */
+  .nsk-row .nsk-chip{padding:5px 9px;font-size:.8rem;} .nsk-row .nsk-chip img{width:34px !important;height:22px !important;border-radius:6px;} .nsk-row .chip.lock{opacity:.5;}
 </style>
 </head>
 <body ontouchstart="">
 <script src="inc/UiKit.js"></script>
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
+<script src="inc/NumberSkins.js"></script>
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button>
 
 <section class="screen hidden" id="scr-player">
@@ -268,6 +275,7 @@
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
   <div class="section-head">1. Pick a board</div>
   <div class="chips" id="theme-list"></div>
+  <div class="nsk-row"><span>🎨 Tile look:</span><div class="chips" id="nsk-list"></div></div>
   <div class="section-head">2. Pick a level</div>
   <div class="levels" id="level-list"></div>
   <details class="rules"><summary>📖 How to play</summary><ul>
@@ -281,6 +289,7 @@
     <li><b>✅ Check</b> tells you if your sentence is right before you play (green = right, red = not yet). <b>💡 Hint</b> shows a move you could make. <b>🔁 Swap</b> changes tiles (uses your turn).</li>
     <li><b>Win:</b> have more points than the robot after the last round. Stars: ⭐⭐⭐ = win by a lot.</li>
     <li><b>Levels:</b> Basic + and = with 0–9 · Junior adds − and 10 · Intermediate adds × and 11–12 · Hard: big 15 × 15 board, ÷ and tiles up to 20 · Extreme adds 2 ★ blank tiles (any tile you like) · <b>💀 Hardcore:</b> no Check, no Hint, the best robot — one wrong sentence ends the game. Points ×3!</li>
+    <li><b>🎨 Tile look:</b> ➗ Algebros = the classic tiles. Or put on your 🔢 number look from GeoScout — the same pick in both games. 🔒 More looks: play GeoScout 📖 Journey, or make number sentences here (🎨 Number looks in the Collection).</li>
     <li><b>👨‍👩‍👧 Play together:</b> 2–4 players take turns on one device — pass it on when it's the next player's turn.</li>
   </ul></details>
   <div class="ui-leaders" id="leaders"></div>
@@ -1336,7 +1345,7 @@ function boot(){
   UI.loading(GAME_ID);
   google.script.run.withSuccessHandler(d => {
       UI.loaded();
-      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {};
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {}; S.numberSkins = d.numberSkins || {};
       UISound.applySettings(S.settings);
       const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
       lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
@@ -1345,6 +1354,14 @@ function boot(){
     }).withFailureHandler(() => { UI.loaded(); UI.toast('Could not load players — check the connection', 'err'); renderPlayers(); showScreen('player'); })
     .getLevelGameData(GAME_ID, CURRENT_PLAYER);
 }
+// 🎨 NUMBER LOOKS (GeoScout gs-4): tiles + rack wear the player's pick from NumberSkins (shared with 🔢 GeoScout, sp_numberskin:<Name>); ➗ Algebros / Auto = the classic tiles
+function nbSkin(){ if(!window.NumberSkins || !S.player) return ''; const own = (S.numberSkins || {})[S.player] || 0, v = NumberSkins.raw(S.player); return v && v !== 'auto' ? NumberSkins.resolve(S.player, own, '') : ''; }
+function nbSkinStyle(k, t){ const L = String(t), op = !/^\d+$/.test(L), ink = op ? '#B3122B' : NumberSkins.tileInk(k, L); return '--nsk-bg:url(' + NumberSkins.tileUrl(k, L, 64) + ');--nsk-c:' + (op || NumberSkins.SKINS[k].plain ? '#FFF6E6' : NumberSkins.colour(k, Number(L))) + ';--nsk-ink:' + ink + ';--nsk-sh:' + (ink === '#fff' ? '0 1px 0 rgba(0,0,0,.55),0 0 3px rgba(0,0,0,.45)' : 'none'); }
+function renderNumberLooks(){ const box = document.getElementById('nsk-list'); if(!box || !window.NumberSkins) return; const v = NumberSkins.raw(S.player) || 'auto';
+  NumberSkins.chips(box, v, k => { NumberSkins.set(S.player, k); }, {auto: '➗ Algebros', owned: (S.numberSkins || {})[S.player] || 0, lockText: '🔒 Earn it in 🔢 GeoScout or ➗ Algebros (🎨 Number looks in the Collection)'}); }
+const nbTileBase = tileHtml; tileHtml = function(t, cls, pts, blank){ const h = nbTileBase(t, cls, pts, blank), k = nbSkin(); return k && !blank && t && t !== '?' ? h.replace('<div class="tile', '<div style="' + nbSkinStyle(k, t) + '" class="nsk-t tile') : h; };
+const nbRackBase = renderRack; renderRack = function(hidden){ const r = nbRackBase.apply(this, arguments), k = nbSkin(), box = document.getElementById('rack'); if(k && box) Array.from(box.children).forEach(b => { const t = (b.childNodes[0] && b.childNodes[0].textContent) || ''; if(t && t !== '?' && !b.classList.contains('blank')){ b.classList.add('nsk-t'); b.setAttribute('style', (b.getAttribute('style') || '') + ';' + nbSkinStyle(k, t)); } }); return r; };
+const nbMenuBase = renderMenu; renderMenu = function(){ const r = nbMenuBase.apply(this, arguments); renderNumberLooks(); return r; };
 boot();
 
 /* ✨ MODE SPOTLIGHT (modes-3): ?mode=<id> opens this game straight in that mode after the player pick · "✨ Also try" on the start page · started modes → UI.modeTried */
@@ -1365,4 +1382,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11v+emoji+r32+back-1+modes-3) END OF NumberBoard.html -->
+<!-- (11v+emoji+r32+back-1+modes-3+gs-4) END OF NumberBoard.html -->

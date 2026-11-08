@@ -1257,6 +1257,7 @@ function getLevelGameData(gameId, player) {
   if (gameId === 'polyplot') out.polyplot = polyplotData_(players);
   if (gameId === 'eyes-brain') out.ebr = ebrData_(players);
   if (gameId === 'geoscout') out.geoJourney = geoJourneyData_(players);   // 🔢 GeoScout 📖 Journey: chapters done per player (feat journeys)
+  if (gameId === 'geoscout' || gameId === 'number-board') out.numberSkins = numberSkinsOwned_(players);   // 🎨 number looks each player may use (item line + GeoScout Journey chapters)
   if (gameId === 'wisdeck') { out.wisCards = wisCardRows_(); out.wisDaily = wisDaily_(); const all = activePlayers_(listProfilesFull()); out.wdBack = {}; all.forEach(p => { try { out.wdBack[p.Name] = itemsFor_(p.Name, all).owned.wdback || 0; } catch (e) { out.wdBack[p.Name] = 0; } }); }   // 🃏 sheet-tab cards + 📅 today's family board + 🂠 card backs owned
   if (gameId === 'wisdeck') { out.progressCount = {}; out.progressJack = {}; players.forEach(p => { out.progressCount[p.Name] = levelProgressFor_(p.Name, 'wiscount'); out.progressJack[p.Name] = levelProgressFor_(p.Name, 'wisjack'); }); }   // 🃏 WisDeck page shows all three boards   // 👀🧠 🎯 today's family number + 🏅 brain levels + 🔢 keypad skins owned   // ⬛ field journal + line trails owned   // 👻💣 battle unlocks (+ bomb skins, round 4)
   if (gameId === 'alignext') { out.progressOmni = {}; players.forEach(p => { out.progressOmni[p.Name] = levelProgressFor_(p.Name, 'omnifile'); }); }   // 🔴 Alignext page shows both boards (Drop + ❌⭕ Omnifile)
@@ -2335,6 +2336,7 @@ const TITLE_DEFS = [
   { id: 'gs_scout', name: 'Number Scout', icon: '🔢', hint: 'Make 100 numbers in GeoScout 🧱 Count', rule: f => featVal_(f, 'geoscout', 'counts') >= 100 },
   { id: 'gs_balance', name: 'Balance Master', icon: '⚖️', hint: 'Balance the scale 100 times in GeoScout', rule: f => featVal_(f, 'geoscout', 'balances') >= 100 },
   { id: 'gs_tower', name: 'Tower Ace', icon: '🏗️', hint: 'Build 50 exact towers in GeoScout 🏗️ Wobble tower', rule: f => featVal_(f, 'geoscout', 'wobble') >= 50 },
+  { id: 'gs_story', name: 'Number Storyteller', icon: '📖', hint: 'Finish all 6 GeoScout 📖 Journey chapters', rule: f => featVal_(f, 'geoscout', 'journeys') >= 6 },
   { id: 'bc_composer', name: 'Composer', icon: '🎼', hint: 'Make 3 songs in the BeatCorner 🎼 Song Maker', rule: f => featVal_(f, 'beat-piano', 'songsMade') >= 3 },
   { id: 'bc_keys', name: 'Keyboard Kid', icon: '🎹', hint: 'Pass 5 🎹 Piano songs in BeatCorner', rule: f => featVal_(f, 'beat-piano', 'songs') >= 5 },
   { id: 'bc_drums', name: 'Drum Hero', icon: '🥁', hint: 'Pass 5 🥁 Drums songs in BeatCorner', rule: f => featVal_(f, 'beat-drums', 'songs') >= 5 },
@@ -2523,6 +2525,7 @@ function recordFeats_(name, gameId, stats) {
   if (gameId === 'polyplot' && stats) polyplotSave_(name, stats);
   if (gameId === 'eyes-brain' && stats) ebrDaily_(name, stats);   // 👀🧠 🎁 daily treasure counters   // ⬛ 📖 field journal + 🎁 daily counters
   if (gameId === 'georead' && stats) grDaily_(name, stats);   // 🔤 🎁 daily treasure counters
+  if (gameId === 'geoscout' && stats) gsDaily_(name, stats);   // 🔢 🎁 daily treasure counters
   const defs = FEAT_DEFS[gameId];
   if (!defs || !stats) return { newBadges: [], newTitles: [] };
   const players = activePlayers_(listProfilesFull());
@@ -2580,6 +2583,11 @@ function safeWisDaily_() { try { return wisDaily_(); } catch (e) { return null; 
 function getWisCardsData() {
   const body = n => HtmlService.createHtmlOutputFromFile(n).getContent().replace(/^[\s\S]*?<script>/, '').replace(/<\/script>[\s\S]*$/, '');
   return { a: body('WisCards'), b: body('WisCards2'), c: body('WisCards3'), rows: wisCardRows_() };
+}
+// 🎨 WisDeck drawn pictures, one part at a time ('' when there is no part i) — the page shows emoji until they arrive (wd-13)
+function getWisArt(i) {
+  const n = 'WisArt' + Math.max(1, Math.floor(Number(i) || 1));
+  try { return HtmlService.createHtmlOutputFromFile(n).getContent().replace(/^[\s\S]*?<script>/, '').replace(/<\/script>[\s\S]*$/, ''); } catch (e) { return ''; }
 }
 function saveWisDaily(name, rec) {
   if (!name || !activePlayers_(listProfilesFull()).some(p => p.Name === name)) throw new Error('Pick a player first.');
@@ -2712,6 +2720,10 @@ const W_ = {
   days: n => ({ how: 'Play on ' + n + ' different days', r: x => x.days >= n }),
 };
 const ITEM_LINES = [
+  // 🔢 GeoScout + ➗ Algebros number looks (looks only; NumberSkins.html draws them; picked per player sp_numberskin:<Name>; Journey chapters unlock them too)
+  { id: 'numberskin', name: 'Number looks', icon: '🎨', slot: 'numberskin', game: 'geoscout', soon: 'Used on 🔢 GeoScout number blocks AND ➗ Algebros tiles — pick it on their menus', steps: ['Candy Pops', 'Mini Monsters', 'Pixel Pals', 'Gem Stones', 'Lava Rocks', 'Royal Gold'],
+    ways: [W_.feat('geoscout', 'snaps', 20, 'Snap 20 blocks together in GeoScout'), W_.feat('number-board', 'equations', 20, 'Make 20 number sentences in Algebros'), W_.feat('geoscout', 'balances', 20, 'Balance the scale 20 times in GeoScout'),
+      W_.feat('geoscout', 'counts', 50, 'Make 50 numbers in GeoScout'), W_.feat('number-board', 'equations', 100, 'Make 100 number sentences in Algebros'), W_.feat('geoscout', 'battleWins', 5, 'Win 5 GeoScout Tower battles')] },
   // 🔤 GeoRead + Lettercraft letter looks (looks only; LetterSkins.html draws them; picked per player sp_letterskin:<Name>)
   { id: 'letterskin', name: 'Letter looks', icon: '🎨', slot: 'letterskin', game: 'georead', soon: 'Used on 🔤 GeoRead letter boxes AND 🔤 Lettercraft tiles — pick it on their menus', steps: ['Candy', 'Wood blocks', 'Jelly', 'Galaxy', 'Gold', 'Rainbow'],
     ways: [W_.feat('georead', 'blends', 20, 'Blend 20 words in GeoRead'), W_.feat('word-board', 'words', 20, 'Make 20 words in Lettercraft'), W_.feat('georead', 'built', 20, 'Build 20 words in GeoRead'),
@@ -2922,6 +2934,18 @@ function milesLedger_() {
   if (sh && sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, MILES_HEADERS.length).getValues().forEach(r => { const n = String(r[1]).trim(), m = Math.floor(Number(r[2])); if (n && m) sum[n] = (sum[n] || 0) + m; });
   MILES_MEMO_ = { ss: ss_(), sum: sum };
   return sum;
+}
+// 🎨 extra number looks owned = max(item line 'numberskin' steps, GeoScout Journey chapters done) — GeoScout AND Algebros unlock them (gs-4)
+function numberSkinsOwned_(players) {
+  const all = activePlayers_(listProfilesFull()), j = geoJourneyData_(players), out = {};
+  players.forEach(p => { let n = 0; try { n = itemsFor_(p.Name, all).owned.numberskin || 0; } catch (e) { n = 0; } out[p.Name] = Math.min(6, Math.max(n, Number(j[p.Name]) || 0)); });
+  return out;
+}
+// 🎁 GeoScout daily treasure counters (today): puzzles solved + Journey chapters / Tower battle wins
+function gsDaily_(name, stats) {
+  try { const d = dailyRoom_(getSettings(), name, today_()), x = k => Math.max(0, Number(stats[k]) || 0);
+    d.gsSolved = (d.gsSolved || 0) + ['balances', 'compares', 'counts', 'tens', 'wobble', 'fractions', 'shapes', 'patterns'].reduce((a, k) => a + x(k), 0);
+    d.gsStory = (d.gsStory || 0) + (x('journeys') ? 1 : 0) + x('battleWins'); saveSetting('Daily_' + name, JSON.stringify(d)); } catch (e) { console.error('geoscout daily: ' + e.message); }
 }
 // 🔢 GeoScout 📖 Journey (gs-3): chapters are played in order; finishing one saves feat journeys (max) and gives Adventure miles the FIRST time only
 function geoJourneyData_(players) { const f = featRows_(), out = {}; players.forEach(p => { out[p.Name] = f.filter(r => r.name === p.Name && r.game === 'geoscout' && r.stat === 'journeys').reduce((m, r) => Math.max(m, Number(r.value) || 0), 0); }); return out; }
@@ -3379,6 +3403,8 @@ function giveCreation(from, to, id) {
 /* ---------- Daily treasures: 3 items a day (same for the whole family), each with a goal for today ---------- */
 const MINI_IDS_ = ['color-match', 'count-match', 'code-robot', 'trash-pointer'];
 const DAILY_GOALS = [
+  { id: 'gssolve', icon: '🔢', how: 'Solve 8 GeoScout puzzles today', r: d => (d.room.gsSolved || 0) >= 8 },
+  { id: 'gsstory', icon: '📖', how: 'Play a GeoScout Journey chapter or win a Tower battle today', r: d => (d.room.gsStory || 0) >= 1 },
   { id: 'grwords', icon: '🔤', how: 'Read or build 6 words in GeoRead today', r: d => (d.room.grWords || 0) >= 6 },
   { id: 'grstory', icon: '📖', how: 'Read a GeoRead story or an Alphabet Road chapter today', r: d => (d.room.grStory || 0) >= 1 },
   { id: 'wdcards', icon: '🃏', how: 'Win 5 WisDeck cards today', r: d => (d.room.wdCards || 0) >= 5 },
@@ -4022,7 +4048,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+wd-9+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+af-2+gs-3) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+af-2+wd-13+gs-4) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -4861,6 +4887,7 @@ return {"include": typeof include === 'function' ? include : undefined,
 "saveMiniResult": typeof saveMiniResult === 'function' ? saveMiniResult : undefined,
 "styleFeatsSheet": typeof styleFeatsSheet === 'function' ? styleFeatsSheet : undefined,
 "getWisCardsData": typeof getWisCardsData === 'function' ? getWisCardsData : undefined,
+"getWisArt": typeof getWisArt === 'function' ? getWisArt : undefined,
 "saveWisDaily": typeof saveWisDaily === 'function' ? saveWisDaily : undefined,
 "saveWisDeck": typeof saveWisDeck === 'function' ? saveWisDeck : undefined,
 "saveFeats": typeof saveFeats === 'function' ? saveFeats : undefined,

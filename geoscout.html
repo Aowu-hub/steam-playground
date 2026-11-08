@@ -101,6 +101,8 @@
   .btn:active{transform:translateY(3px);} .btn.soft{background:var(--panel);color:var(--ink);}
   .empty{text-align:center;color:var(--ink-soft);font-weight:800;padding:20px;}
   .nsk-chip img{border-radius:6px;}
+  .nsk-new{display:flex;align-items:center;gap:10px;justify-content:center;margin:8px auto 2px;padding:8px 12px;border-radius:16px;background:linear-gradient(135deg,#FFF3C4,#FFE08A);color:#5A3A00;font-weight:800;font-size:.9rem;max-width:420px;box-shadow:0 4px 0 #E0B84A;animation:gs-ans-in .5s cubic-bezier(.2,1.6,.4,1) both;}
+  .nsk-new img{width:70px;height:44px;flex:none;}
   .theme-chip .sw{display:inline-block;width:16px;height:16px;border-radius:5px;vertical-align:-3px;margin-right:4px;border:2px solid rgba(0,0,0,0.15);}
 
   /* ---------- play ---------- */
@@ -202,7 +204,7 @@
   <div class="way-sub" id="way-sub"></div>
   <div class="opts">
     <div class="box"><h3>🎨 House theme <span class="note">(blocks, scale + room)</span></h3><div class="chips scroll" id="theme-list"></div></div>
-    <div class="box"><h3>🔢 My number blocks <span class="note">(looks only)</span></h3><div class="chips scroll" id="skin-list"></div></div>
+    <div class="box"><h3>🔢 My number blocks <span class="note">(looks only — also on ➗ Algebros tiles · 🔒 earn more in 📖 Journey)</span></h3><div class="chips scroll" id="skin-list"></div></div>
     <div class="box hidden" id="opp-box"><h3>⚔️ Battle against <span class="note">(2 players take turns on this device)</span></h3><div class="chips scroll" id="opp-list"></div></div>
   </div>
   <div class="section-head" id="level-head">🎚️ Pick a level</div>
@@ -759,7 +761,10 @@ let SET = {mode: 'scale', level: 0, theme: 'dino', skin: 'buddy'};
 let G = null, lockHandle = null, GID = 0;
 function ls(k, v){ try{ if(v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }catch(e){ return null; } }
 function store(k){ return 'sp_geoscout_' + k + ':' + (S.player || ''); }
-function loadPrefs(){ try{ const p = JSON.parse(ls(store('prefs')) || '{}'); if(MODES_ON.indexOf(p.mode) >= 0) SET.mode = p.mode; if(THEMES[p.theme]) SET.theme = p.theme; }catch(e){} SET.skin = NumberSkins.get(S.player); }
+function loadPrefs(){ try{ const p = JSON.parse(ls(store('prefs')) || '{}'); if(MODES_ON.indexOf(p.mode) >= 0) SET.mode = p.mode; if(THEMES[p.theme]) SET.theme = p.theme; }catch(e){} SET.skin = NumberSkins.resolve(S.player, nskOwned(S.player), 'buddy'); }
+// 🎨 number looks owned (gs-4): extras unlocked = max(server: item line 'numberskin' in GeoScout + ➗ Algebros, Journey chapters) and the chapters done on this device
+function nskOwned(name){ return Math.max(Number((S.numberSkins || {})[name]) || 0, journeyDone(name)); }
+const NSK_LOCK = '🔒 Earn it: finish a 📖 Journey chapter, or the 🎨 Number looks steps (GeoScout + ➗ Algebros) in the Collection';
 function savePrefs(){ ls(store('prefs'), JSON.stringify({mode: SET.mode, theme: SET.theme})); }
 function myAvatar(name){ const a = S.avatars[name]; return a ? fixAv(a) : defaultAvatar(name || 'player'); }
 const wait = ms => new Promise(r => setTimeout(r, Math.max(0, ms * SPEED)));
@@ -823,7 +828,7 @@ function renderOpts(){
   const tb = $('theme-list');
   tb.innerHTML = THEME_KEYS.map(k => '<button class="chip theme-chip' + (k === SET.theme ? ' on' : '') + '" data-k="' + k + '" data-sound="tap"><span class="sw" style="background:' + THEMES[k].sw + '"></span>' + THEMES[k].icon + ' ' + THEMES[k].name + '</button>').join('');
   tb.querySelectorAll('.chip').forEach(b => b.onclick = () => { SET.theme = b.dataset.k; savePrefs(); tb.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b)); drawLogos(); });
-  NumberSkins.chips($('skin-list'), SET.skin, k => { SET.skin = k; NumberSkins.set(S.player, k); drawLogos(); });
+  NumberSkins.chips($('skin-list'), SET.skin, k => { SET.skin = k; NumberSkins.set(S.player, k); drawLogos(); }, {owned: nskOwned(S.player), lockText: NSK_LOCK});
   renderOpp();
 }
 function renderOpp(){
@@ -856,7 +861,7 @@ function howLines(mode){
     wobble: ['🏗️ Stack blocks to EXACTLY the 🎯 height. You only get some sizes (like 5s and 4s)!', '😬 Too tall? The tower wobbles — take the top block off (↩️).', '⭐⭐⭐ = the fewest blocks. It is a maths puzzle, not a balancing game.', '⌨️ 1 / 2 / 3 add a size · Backspace takes the top off.'],
     battle: ['⚔️ Each player gets some number blocks and builds ONE tower from them (tap the blocks you want).', '🃏 The rule card says who wins the round: ⬆️ higher, ⬇️ lower or 🎯 closest to a number.', '✖️2 card (⚡ Hard+): doubles your tower.', '🙈 Pass the device — no peeking! First to 3 round wins.']
   };
-  R2.journey = ['📖 Six story chapters: the number friends meet, add (+), take away (−), make copies (×), share (÷), hop the number line and balance (=).', '▶ Tap Next (or the picture) to read on. When there is a puzzle, solve it to continue the story.', '🏅 Each chapter gives a sticker + Adventure miles (the first time) and opens the next chapter.', '🧑 You walk the road with Pip, Tik & Tok, Tri, Quadra, Hi-Five, Dicey, Stella, Ollie, Whisk, Cap, Hal and Centi!'];
+  R2.journey = ['📖 Six story chapters: the number friends meet, add (+), take away (−), make copies (×), share (÷), hop the number line and balance (=).', '▶ Tap Next (or the picture) to read on. When there is a puzzle, solve it to continue the story.', '🏅 Each chapter gives a sticker, a new 🎨 number look (also for ➗ Algebros tiles) + Adventure miles the first time, and opens the next chapter.', '🧑 You walk the road with Pip, Tik & Tok, Tri, Quadra, Hi-Five, Dicey, Stella, Ollie, Whisk, Cap, Hal and Centi!'];
   if(R2[mode]) return R2[mode];
   if(mode === 'count') return ['🎯 Make the number at the top with the blocks you are given.', '🧲 Drag a number onto another one to <b>snap</b> them together (3 + 4 → 7).', '✂️ Tap a number, then tap one of its blocks (or use ✂️ Take away) to <b>split</b> it (7 − 2 → 5 and 2). From 🐣 Junior.',
     '✖️ <b>Copy</b> makes copies and joins them (4 × 3 → 12) · ➗ <b>Share</b> splits fairly into teams (12 ÷ 3 → 4, 4, 4). From ⚡ Hard.', '⭐⭐⭐ = done in the fewest moves. ↩️ Undo takes the last move back (it still counts).', '⌨️ ← → pick · 1–9 pick a number · S split · C copy · D share · U undo.'];
@@ -1489,10 +1494,12 @@ function jNext(){ if(!G || !G.J || G.phase !== 'story' || !G.J.say) return; G.J.
 function jRetry(){ G.reveal = null; const J = G.J, st = J.ch.steps[J.i]; GS.journeyItem(G.M, st.p, st.ask); G.phase = 'play'; G.pos = {}; G.tiltLock = G.M.item.kind === 'compare'; G.answerShown = false; renderGoal(); renderBar(); }
 function jEnd(){
   const J = G.J, ch = J.ch, T = THEMES[ch.theme], name = S.player; G.phase = 'over'; $('say').classList.add('hidden'); UISound.play('success'); confetti(true); avatarDo('dance');
-  const before = journeyDone(name); ls('sp_geoscout_jr:' + name, Math.max(before, ch.id)); S.geoJourney = S.geoJourney || {}; S.geoJourney[name] = Math.max(Number(S.geoJourney[name]) || 0, ch.id);
-  const next = GS.CHAPTERS.find(c => c.id === ch.id + 1);
+  const before = journeyDone(name), ownBefore = nskOwned(name); ls('sp_geoscout_jr:' + name, Math.max(before, ch.id)); S.geoJourney = S.geoJourney || {}; S.geoJourney[name] = Math.max(Number(S.geoJourney[name]) || 0, ch.id);
+  const next = GS.CHAPTERS.find(c => c.id === ch.id + 1), ownAfter = nskOwned(name), newSkin = ownAfter > ownBefore ? NumberSkins.EXTRAS[ownAfter - 1] : '';
+  if(newSkin){ NumberSkins.set(name, newSkin); SET.skin = newSkin; }   // put the new look on straight away (they can change it on the menu)
   showResult('<div class="big">' + T.icon + '</div><h2>Chapter ' + ch.id + ' complete!</h2><div class="score-big">📖 ' + UI.esc(ch.title) + '</div>' +
     '<div class="stats"><span>🏅 Sticker: ' + T.icon + ' ' + ch.op + '</span><span>🧑 friends met: ' + Object.values(J.counts || {}).filter((v, i, a) => a.indexOf(v) === i).map(n => UI.esc(GS.charName(n))).join(', ') + '</span></div>' +
+    (newSkin ? '<div class="nsk-new" id="nsk-new"><img alt="" src="' + NumberSkins.previewUrl(newSkin, 56) + '"><span>🎨 New number look: <b>' + UI.esc(NumberSkins.SKINS[newSkin].name) + '</b> — on in 🔢 GeoScout AND ➗ Algebros!</span></div>' : '') +
     '<div class="save-note" id="save-note">💾 Saving…</div><div class="res-btns">' + (next ? '<button class="btn" data-sound="pop" onclick="startJourney(' + next.id + ')">▶ Chapter ' + next.id + '</button>' : '<button class="btn" data-sound="pop" onclick="startJourney(1)">🔁 Play again</button>') +
     '<button class="btn soft" data-sound="none" onclick="backToMenu()">◀ Back</button><button class="btn soft" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button></div>');
   google.script.run.withSuccessHandler(res => { putNote((res.first ? '🎁 +' + res.miles + ' Adventure miles!' : '✅ Saved') + featText(res.feats, '')); })
@@ -1602,7 +1609,7 @@ function boot(){
   UI.loading(GAME_ID);
   google.script.run.withSuccessHandler(d => {
       UI.loaded();
-      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {}; S.geoJourney = d.geoJourney || {};
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {}; S.geoJourney = d.geoJourney || {}; S.numberSkins = d.numberSkins || {};
       UISound.applySettings(S.settings);
       const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
       lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
@@ -1630,4 +1637,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (gs-3) END OF GeoScout.html -->
+<!-- (gs-4) END OF GeoScout.html -->
