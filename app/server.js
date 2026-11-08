@@ -579,9 +579,9 @@ function safeSeen_(players) {
 //           (+ always the ModesTried_<Name> ledger, written by the game the first time the mode starts — markModeTried).
 //   added = 'yyyy-mm-dd' when the mode came out → a 🆕 Dashboard card for 7 days.
 const MODES_ = [
-  { game: 'artifactory', id: 'whittle', icon: '🔪', name: 'Artifactory Whittling', pitch: 'Carve a spoon or a whistle — always away from your hand', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'whittle']] } },
+  { game: 'artifactory', id: 'whittle', icon: '🔪', name: 'Artifactory Whittling', pitch: 'Carve a spoon — always away from you', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'whittle']] } },
   { game: 'artifactory', id: 'print', icon: '🖨️', name: 'Artifactory 3D printing', pitch: 'Draw a shape and print it layer by layer', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'print']] } },
-  { game: 'artifactory', id: 'nature', icon: '🌿', name: 'Artifactory Nature crafts', pitch: 'Weave a bamboo hat, press flowers in resin', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'nature']] } },
+  { game: 'artifactory', id: 'nature', icon: '🌿', name: 'Artifactory Nature crafts', pitch: 'Weave a hat, press flowers in resin', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'nature']] } },
   { game: 'artifactory', id: 'lab', icon: '🧪', name: 'Artifactory Material lab', pitch: 'Make bronze, glass and dyes yourself', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'lab']] } },
   { game: 'artifactory', id: 'planer', icon: '🪚', name: 'Artifactory Planer', pitch: 'Plane a rough plank flat and smooth', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'planer']] } },
   { game: 'artifactory', id: 'weld', icon: '🔥', name: 'Artifactory Welding', pitch: 'Follow the seam with a steady hand', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'weld']] } },
@@ -589,8 +589,8 @@ const MODES_ = [
   { game: 'artifactory', id: 'pottery', icon: '🏺', name: 'Artifactory Pottery', pitch: 'Shape spinning clay, fire it in the kiln', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'pottery']] } },
   { game: 'artifactory', id: 'sew', icon: '🧵', name: 'Artifactory Loom', pitch: 'Weave a pattern for a cape or scarf', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'sew']] } },
   { game: 'artifactory', id: 'light', icon: '🔌', name: 'Artifactory Light-up', pitch: 'Close the circuit — make it glow!', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'light']] } },
-  { game: 'artifactory', id: 'lathe', icon: '🌀', name: 'Artifactory Lathe', pitch: 'Carve a cup, a yo-yo or a trophy while it spins', route: 'artifactory', added: '2026-11-08', tried: { feat: [['artifactory', 'lathe']] } },
-  { game: 'artifactory', id: 'stone', icon: '💎', name: 'Artifactory Gems', pitch: 'Polish a rough stone and cut a sparkling gem', route: 'artifactory', added: '2026-11-08', tried: { feat: [['artifactory', 'stone']] } },
+  { game: 'artifactory', id: 'lathe', icon: '🌀', name: 'Artifactory Lathe', pitch: 'Carve a cup, yo-yo or trophy as it spins', route: 'artifactory', added: '2026-11-08', tried: { feat: [['artifactory', 'lathe']] } },
+  { game: 'artifactory', id: 'stone', icon: '💎', name: 'Artifactory Gems', pitch: 'Polish a stone, cut a sparkling gem', route: 'artifactory', added: '2026-11-08', tried: { feat: [['artifactory', 'stone']] } },
   { game: 'artifactory', id: 'finish', icon: '🎨', name: 'Artifactory Finish', pitch: 'Paint, varnish and engrave your name', route: 'artifactory', added: '2026-11-08', tried: { feat: [['artifactory', 'finish']] } },
   { game: 'geoscout', id: 'journey', icon: '📖', name: 'GeoScout Journey', pitch: 'Story chapters with number friends', route: 'geoscout', added: '2026-11-09', tried: { feat: [['geoscout', 'journeys']] } },
   { game: 'geoscout', id: 'scale', icon: '⚖️', name: 'GeoScout Scale', pitch: 'More, less or the same? Weigh yourself!', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '⚖️ Scale' } },
@@ -1527,6 +1527,7 @@ function saveLevelResult(gameId, name, levelIndex, extra) {
     if (cleared) saveProgress(name, gameId, 'main', unlocked, tokens);
     const res = { unlocked: unlocked, tokens: tokens, newBadge: isNew ? badge : '' };
     Object.assign(res, safeLogScore_(name, gameId, idx, g.levelNames ? g.levelNames[idx] : badge, extra));
+    if (typeof artMarkResult_ === 'function') artMarkResult_(name, gameId);   // 🏭 af-4 level result → one material drop
     if (extra && extra.stats) { res.feats = safeRecordFeats_(name, gameId, extra.stats); snakeDaily_(name, gameId, extra.stats); }
     return res;
   } finally {
@@ -1886,6 +1887,33 @@ const FEAT_DEFS = {
     lathe: { name: 'Turned on the lathe', icon: '🌀', kind: 'sum', tiers: [3, 20, 80] },
     finish: { name: 'Finishes (paint, varnish, engrave)', icon: '🎨', kind: 'sum', tiers: [3, 20, 80] },
     stone: { name: 'Stones polished', icon: '🪨', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
     whittle: { name: 'Things whittled', icon: '🔪', kind: 'sum', tiers: [3, 20, 80] },
     print: { name: '3D prints', icon: '🖨️', kind: 'sum', tiers: [3, 20, 80] },
     nature: { name: 'Nature crafts', icon: '🌿', kind: 'sum', tiers: [3, 20, 80] },
@@ -2335,6 +2363,10 @@ const FEAT_DEFS = {
 const TIER_NAMES = ['Bronze', 'Silver', 'Gold'], TIER_ICONS = ['🥉', '🥈', '🥇'];
 // Titles a player can show under their name. f = that player's feats {game: {stat: value}}, x = extra context.
 const TITLE_DEFS = [
+  { id: 'af_smith', name: 'Forge Master', icon: '⚒️', hint: 'Forge 20 things at the ⚒️ forge', rule: f => featVal_(f, 'artifactory', 'forge') >= 20 },
+  { id: 'af_potter', name: 'Potter', icon: '🏺', hint: 'Fire 20 pots in the kiln', rule: f => featVal_(f, 'artifactory', 'pottery') >= 20 },
+  { id: 'af_printer', name: '3D Printer Pro', icon: '🖨️', hint: 'Print 20 things on the 🖨️ 3D printer', rule: f => featVal_(f, 'artifactory', 'print') >= 20 },
+  { id: 'af_show', name: 'Show Star', icon: '🎭', hint: 'Get 10 ⭐ for one crafted thing in the 🎭 Design Show', rule: f => featVal_(f, 'artifactory', 'showStars') >= 10 },
   { id: 'af_master', name: 'Master Maker', icon: '🏭', hint: 'Make 25 things in Artifactory', rule: f => featVal_(f, 'artifactory', 'made') >= 25 },
   { id: 'af_gem', name: 'Gem Cutter', icon: '💎', hint: 'Cut 10 gems at the 💎 stone station', rule: f => featVal_(f, 'artifactory', 'gems') >= 10 },
   { id: 'af_lathe', name: 'Lathe Legend', icon: '🌀', hint: 'Get 3 ⭐ on 10 lathe blueprints', rule: f => featVal_(f, 'artifactory', 'latheStars') >= 10 },
@@ -2563,6 +2595,7 @@ function recordFeats_(name, gameId, stats) {
   return { newBadges: newBadges, newTitles: newTitles };
 }
 function safeRecordFeats_(name, gameId, stats) {
+  if (stats && stats.games && typeof artMarkResult_ === 'function') { artMarkResult_(name, gameId); }   // 🏭 af-4: this result may drop a material
   try { return recordFeats_(name, gameId, stats); }
   catch (e) { console.error('Feats failed: ' + e.message); return { newBadges: [], newTitles: [], featError: String(e.message || e) }; }
 }
@@ -4058,7 +4091,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+af-3) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+af-4) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -4550,7 +4583,7 @@ function writeArt_(a) {
   ARTS_MEMO_ = null;
 }
 function publicArt_(a) {
-  return { id: a.id, maker: a.maker, station: a.station, kind: a.kind, name: a.name, look: a.look, mats: a.mats, tools: a.tools, owners: a.owners, team: a.team, made: a.made, stars: a.stars, from: a.from, show: a.show };
+  return { id: a.id, maker: a.maker, station: a.station, kind: a.kind, name: a.name, look: a.look, mats: a.mats, tools: a.tools, owners: a.owners, team: a.team, made: a.made, stars: a.stars, from: a.from, show: a.show, votes: a.show ? a.votes || {} : {} };
 }
 function artsOf_(name) { return artRows_().filter(a => a.owners.indexOf(name) !== -1); }
 
@@ -4645,6 +4678,8 @@ function getArtifactoryData(player) {
   out.creations = creationRows_().filter(c => players.some(p => p.Name === c.maker)).map(c => publicCreation_(c, me));   // 🔨 Furniture Workshop area
   out.giftsLeft = me ? giftsLeft_(st, me) : 0;
   out.mats = ART_MATS_; out.kinds = ART_KINDS_;
+  out.show = artShowList_(players);   // 🎭 Design Show (af-4)
+  out.dropsLeft = me ? ART_DROP_CAP_ - (out.bag._dd === today_() ? out.bag._dn || 0 : 0) : 0;
   return out;
 }
 function checkArtPlayer_(name) { checkPlayer_(name); }
@@ -4904,7 +4939,97 @@ function artShelf_(players) {
   const out = {}; players.forEach(p => { out[p.Name] = artsOf_(p.Name).map(publicArt_); });
   return out;
 }
-// (af-3) END OF ArtifactoryCode.gs
+
+/* ================= round 4 (af-4): remix · game drops · Design Show · Dashboard strip ================= */
+// ✨ remix any thing you own: a new copy that is yours (costs 1 of its main material), then change it at the finish bench / light-up bench
+function artRemix(name, id) {
+  checkArtPlayer_(name);
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const src = artRows_().find(x => x.id === String(id));
+    if (!src || src.owners.indexOf(name) === -1) throw new Error('You can only remix things you have.');
+    if (artRows_().filter(a => a.maker === name).length >= ART_PER_PLAYER_) throw new Error('Your maker shelf is full (' + ART_PER_PLAYER_ + ' things) — recycle one first.');
+    const main = Object.keys(src.mats || {}).find(m => ART_MATS_[m]) || 'oak', cost = {}; cost[main] = 1;
+    const bag = artTake_(artBag_(getSettings(), name), cost);
+    const look = JSON.parse(JSON.stringify(src.look || {}));
+    const a = { id: 'a' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36), maker: name, station: src.station, kind: src.kind,
+      name: ('✨ ' + src.name.replace(/^✨\s*/, '')).slice(0, 28), look: look, mats: cost, tools: (src.tools || []).concat((src.tools || []).indexOf('remix') < 0 ? ['remix'] : []),
+      owners: [name], team: [], made: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'), stars: 0, from: src.id, show: false, votes: {} };
+    writeArt_(a); artSaveBag_(name, bag);
+    var res = { item: publicArt_(a), bag: bag }, orig = src.maker;
+  } finally { lock.releaseLock(); }
+  res.feats = safeRecordFeats_(name, 'artifactory', { remixes: 1, made: 1 });
+  if (orig !== name) safeRecordFeats_(orig, 'artifactory', { remixed: 1 });
+  return res;
+}
+// 🎁 a small material drop on a game's result card (UI.alsoTry calls it) — 1 per result, at most ART_DROP_CAP_ a day
+const ART_DROP_CAP_ = 30;
+const ART_DROP_POOL_ = ['oak', 'oak', 'bamboo', 'bamboo', 'teak', 'copper', 'copper', 'tin', 'iron', 'iron', 'silver', 'gold', 'granite', 'jade', 'crystal', 'ruby', 'sapphire', 'amethyst', 'clay', 'clay', 'fabric', 'glass', 'filament', 'led', 'battery', 'paint', 'varnish', 'dye', 'flower', 'flower', 'sand'];
+function artMarkResult_(name, game) { if (!name || !game || game === 'artifactory') return; try { CacheService.getScriptCache().put('afres:' + name + ':' + game, String(Date.now()), 900); } catch (e) {} }
+function artGameDrop(name, game) {
+  checkArtPlayer_(name);
+  game = String(game || '').replace(/[^a-z0-9-]/g, '').slice(0, 24);
+  if (!game || game === 'artifactory') return { got: {}, left: 0 };
+  let open = false; try { const c = CacheService.getScriptCache(), k = 'afres:' + name + ':' + game; open = !!c.get(k); if (open) c.remove(k); } catch (e) { open = false; }
+  if (!open) return { got: {}, left: -1 };   // no fresh result for this game (a start page, or already dropped)
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const bag = artBag_(getSettings(), name), day = today_();
+    if (bag._dd !== day) { bag._dd = day; bag._dn = 0; }
+    if (bag._dn >= ART_DROP_CAP_) return { got: {}, left: 0 };
+    const m = ART_DROP_POOL_[Math.floor(Math.random() * ART_DROP_POOL_.length)], got = {}; got[m] = 1;
+    artAdd_(bag, got); bag._dn = (bag._dn || 0) + 1; artSaveBag_(name, bag);
+    var res = { got: got, icon: ART_MATS_[m][0], mat: ART_MATS_[m][1], left: ART_DROP_CAP_ - bag._dn };
+  } finally { lock.releaseLock(); }
+  safeRecordFeats_(name, 'artifactory', { drops: 1 });
+  return res;
+}
+// 🎭 Design Show for crafted things (same rules as the 🔨 furniture show: makers enter, the family votes 1-3 ⭐, never your own)
+function artShowSet(name, id, on) {
+  checkArtPlayer_(name);
+  const a = artRows_().find(x => x.id === String(id));
+  if (!a || a.maker !== name) throw new Error('Only the maker can enter it in the show.');
+  a.show = !!on; writeArt_(a);
+  return publicArt_(a);
+}
+function artVote(voter, id, stars) {
+  checkArtPlayer_(voter);
+  const n = artInt_(stars, 0, 3);
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const a = artRows_().find(x => x.id === String(id));
+    if (!a || !a.show) throw new Error('That one is not in the show.');
+    if (a.maker === voter) throw new Error('You can\'t vote for your own — ask the family! 😊');
+    var first = !a.votes[voter];
+    if (n) a.votes[voter] = n; else delete a.votes[voter];
+    writeArt_(a); var out = publicArt_(a), total = artVotes_(a);
+  } finally { lock.releaseLock(); }
+  if (first && n) safeRecordFeats_(voter, 'artifactory', { votes: 1 });
+  safeRecordFeats_(out.maker, 'artifactory', { showStars: total });
+  return out;
+}
+function artVotes_(a) { return Object.keys(a.votes || {}).reduce((s, k) => s + (Number(a.votes[k]) || 0), 0); }
+function artShowList_(players) { const live = players.map(p => p.Name); return artRows_().filter(a => a.show && live.indexOf(a.maker) !== -1).map(publicArt_); }
+// 🎮 the family's crafted things that can be game skins (the Dashboard writes them to localStorage sp_artskins for the pickers on that device)
+const ART_SKIN_KINDS_ = ['piece', 'figure', 'trophy', 'board', 'frame', 'stand', 'gem', 'medal', 'badge', 'sign', 'pshape', 'pspin', 'scarf', 'flag', 'cape', 'bag', 'basket', 'hat', 'lantern', 'ball', 'vase', 'bowl', 'robot', 'yoyo', 'petbowl'];
+function artSkinList_(players) {
+  const live = players.map(p => p.Name), MAT = { oak: '#C08A4E', bamboo: '#CDB45A', teak: '#8A5530', iron: '#7D8590', copper: '#C8743A', tin: '#C3CAD3', bronze: '#B07A32', silver: '#D8DEE6', gold: '#F2C230', granite: '#8E8A86', jade: '#3FAE7A', crystal: '#BFE8FF', ruby: '#D3264A', sapphire: '#2457C9', amethyst: '#8E4FD0', clay: '#C46B42', fabric: '#E86A9A', leather: '#8B5A2B', glass: '#A8E0E8', filament: '#5BC0EB', flower: '#FF8FB1' };
+  return artRows_().filter(a => ART_SKIN_KINDS_.indexOf(a.kind) !== -1 && live.indexOf(a.maker) !== -1).slice(-80).reverse().map(a => {
+    const lk = a.look || {}, col = ART_HEX_.test(lk.c || '') ? lk.c : MAT[lk.m] || MAT[lk.g] || '#C08A4E';
+    return { id: a.id, k: a.kind, n: a.name, by: a.maker, m: lk.m || lk.g || '', col: col, c2: ART_HEX_.test(lk.c2 || '') ? lk.c2 : '', look: lk };
+  });
+}
+// 🏠 Dashboard maker strip: a light summary for one player
+function getArtStrip(player) {
+  const players = activePlayers_(listProfilesFull());
+  if (!players.some(p => p.Name === player)) return null;
+  const st = getSettings(), bag = artBag_(st, player), mine = artsOf_(player);
+  const total = Object.keys(bag).filter(m => ART_MATS_[m]).reduce((s, m) => s + bag[m], 0);
+  return { made: mine.filter(a => a.maker === player).length, total: total, dailyReady: bag._d !== today_(), dropsLeft: ART_DROP_CAP_ - (bag._dd === today_() ? bag._dn || 0 : 0),
+    last: mine.slice(-3).reverse().map(a => ({ id: a.id, name: a.name, kind: a.kind, look: a.look })), shelf: Object.keys(artShelfOf_(st).m).length,
+    skins: artSkinList_(players) };
+}
+// (af-4) END OF ArtifactoryCode.gs
 
 ;
 /* ===== on the device only: the grown-up PIN arrives hashed from the family Sheet (OfflineSync.gs) ===== */
@@ -5030,7 +5155,12 @@ return {"include": typeof include === 'function' ? include : undefined,
 "artShelfTake": typeof artShelfTake === 'function' ? artShelfTake : undefined,
 "artRequest": typeof artRequest === 'function' ? artRequest : undefined,
 "artGive": typeof artGive === 'function' ? artGive : undefined,
-"saveArtOutfits": typeof saveArtOutfits === 'function' ? saveArtOutfits : undefined};
+"saveArtOutfits": typeof saveArtOutfits === 'function' ? saveArtOutfits : undefined,
+"artRemix": typeof artRemix === 'function' ? artRemix : undefined,
+"artGameDrop": typeof artGameDrop === 'function' ? artGameDrop : undefined,
+"artShowSet": typeof artShowSet === 'function' ? artShowSet : undefined,
+"artVote": typeof artVote === 'function' ? artVote : undefined,
+"getArtStrip": typeof getArtStrip === 'function' ? getArtStrip : undefined};
 } };
 
 const VER = self.STEAM_GS.ver;

@@ -272,6 +272,14 @@
   .look-meta b{display:block;font-family:var(--font-display);font-size:0.9rem;}
   .look-meta small{display:block;font-size:0.7rem;font-weight:800;color:var(--ink-soft);}
   .room-btn{margin-top:8px;background:linear-gradient(135deg,#7B5CFA,#2EC4B6) !important;}
+  .maker-strip{margin-top:8px;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:18px;background:linear-gradient(135deg,#3A4256,#59647D);color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.15);animation:makerIn .5s ease both;}
+  .maker-strip canvas{width:52px;height:52px;flex:0 0 auto;border-radius:12px;background:rgba(255,255,255,.12);}
+  .maker-strip .mk-tx{flex:1 1 auto;min-width:0;text-align:left;line-height:1.2;}
+  .maker-strip .mk-tx b{display:block;font-size:.95rem;}
+  .maker-strip .mk-tx small{opacity:.85;font-size:.75rem;}
+  .maker-strip button{flex:0 0 auto;border:0;border-radius:14px;padding:10px 12px;font:inherit;font-weight:800;background:#F28C28;color:#fff;cursor:pointer;}
+  @keyframes makerIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+  @media (max-width:420px){.maker-strip canvas:nth-of-type(n+2){display:none;}}
   .myroom-btn{margin-top:8px;background:linear-gradient(135deg,#FFB547,#FF6FA5) !important;position:relative;animation:myRoomGlow 2.4s ease-in-out infinite;}
   .myroom-btn .trophy{animation:myRoomBob 1.6s ease-in-out infinite;display:inline-block;}
   @keyframes myRoomGlow{0%,100%{box-shadow:0 4px 0 rgba(0,0,0,0.18);}50%{box-shadow:0 4px 0 rgba(0,0,0,0.18),0 0 0 3px #FFD84D,0 0 20px 4px rgba(255,216,77,0.6);}}
@@ -456,6 +464,7 @@
         <span class="txt"><b id="myroom-name">My Room</b><small id="myroom-sub">Your very own room — decorate it, open gifts &amp; tidy up</small></span>
         <span class="go">➜</span>
       </button>
+      <div class="maker-strip hidden" id="maker-strip" role="group" aria-label="Artifactory"></div>
       <button class="archive-btn room-btn t-btn" id="room-btn" data-sound="none" onclick="goNav('room')">
         <span class="trophy">🏡</span>
         <span class="txt"><b>Family Room</b><small>Your avatars, pets &amp; 5 worlds</small></span>
@@ -816,6 +825,24 @@ function loadDaily(force){
   google.script.run.withSuccessHandler(d => { close(); if(who !== selectedPlayer) return; DAILY = d; renderDaily(); })
     .withFailureHandler(() => { close(); dailyFor = null; box.innerHTML = '<div class="recent-empty">Could not load today\'s treasures</div>'; }).getDailyData(who);
 }
+// 🏭 Artifactory maker strip (af-4): the 3 newest things this player made + bag + 🛠️ Craft
+let makerFor = null;
+function loadMaker(){
+  const box = document.getElementById('maker-strip'); if(!box) return;
+  if(!selectedPlayer){ makerFor = null; box.classList.add('hidden'); return; }
+  if(makerFor === selectedPlayer) return; makerFor = selectedPlayer; const who = selectedPlayer;
+  google.script.run.withSuccessHandler(d => { if(who !== selectedPlayer || !d) return; renderMaker(d); }).withFailureHandler(() => { makerFor = null; }).getArtStrip(who);
+}
+function renderMaker(d){
+  const box = document.getElementById('maker-strip'); box.classList.remove('hidden');
+  if(d.skins) try{ localStorage.setItem('sp_artskins', JSON.stringify({v: 1, at: Date.now(), list: d.skins})); }catch(e){}   // 🎮 the family's crafted things → the game skin pickers on this device
+  const last = d.last || [];
+  box.innerHTML = (last.length ? last.map(() => '<canvas width="104" height="104"></canvas>').join('') : '<canvas width="104" height="104"></canvas>') +
+    '<span class="mk-tx"><b>🏭 ' + (last.length ? 'Made by ' + UI.esc(selectedPlayer) + ': ' + d.made : 'Artifactory') + '</b><small>' + (last.length ? '🎒 ' + d.total + ' materials' + (d.dailyReady ? ' · 📦 a delivery is waiting!' : '') : 'Turn, forge, weave — and wear what you make') + '</small></span>' +
+    '<button data-sound="pop" onclick="goArtifactory()">🛠️ Craft</button>';
+  box.querySelectorAll('canvas').forEach((c, i) => { const g = c.getContext('2d'), a = last[i]; g.clearRect(0, 0, 104, 104); if(a && window.artDraw) artDraw(g, a.look, 52, 96, 80, 1); else if(window.emo) emo(g, '🏭', 52, 52, 56); });
+}
+function goArtifactory(){ UI.go(WEBAPP_URL + '?page=artifactory' + (selectedPlayer ? '&player=' + encodeURIComponent(selectedPlayer) : ''), 'craft', 'Opening Artifactory'); }
 function renderDaily(){
   const box = document.getElementById('tr-list'); if(!DAILY) return;
   box.innerHTML = DAILY.picks.map(p => {
@@ -842,6 +869,7 @@ function paintTreasure(c, p){
 function updatePlayCta(){
   refreshModeNews();   // ✨ modes-2
   loadDaily();
+  loadMaker();   // 🏭 af-4
   const btn = document.getElementById('play-btn'), hint = document.getElementById('play-hint');
   btn.disabled = !selectedPlayer;
   const mn = document.getElementById('myroom-name'); if(mn) mn.textContent = selectedPlayer ? selectedPlayer + "'s Room" : 'My Room';
@@ -1077,4 +1105,4 @@ loadDashboard();
 </script>
 </body>
 </html>
-<!-- (r24+emoji+news-1+ebr-4+wd-5+modes-2+ws-3) END OF Landing.html -->
+<!-- (r24+emoji+news-1+ebr-4+wd-5+modes-2+ws-3+af-4) END OF Landing.html -->

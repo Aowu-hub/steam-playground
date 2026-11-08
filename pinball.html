@@ -508,7 +508,7 @@ function chooseDesign(lvl){
 /* ---------- Ball skins (unlocked in the Collection, picked here, saved per player on this device) ---------- */
 function ballKey(){ return 'sp_ball:' + (S.player || ''); }   // one pick shared with 🏓 SlaBrall (old key read once below)
 function ownedBalls(){ return Math.min(BallSkins.count, Number((S.ballSkins || {})[S.player]) || 0); }
-function ballSkin(){ let raw = null; try { raw = localStorage.getItem(ballKey()); if(raw == null) raw = localStorage.getItem('sp_pinball_ball:' + (S.player || '')); } catch(e){} if(raw == null || raw === '') return -1; const v = Number(raw); return Number.isFinite(v) && v >= 0 && v < ownedBalls() ? v : -1; }
+function ballSkin(){ let raw = null; try { raw = localStorage.getItem(ballKey()); if(raw == null) raw = localStorage.getItem('sp_pinball_ball:' + (S.player || '')); } catch(e){} if(raw == null || raw === '') return -1; if(BallSkins.artOf && BallSkins.artOf(raw)) return raw; const v = Number(raw); return Number.isFinite(v) && v >= 0 && v < ownedBalls() ? v : -1; }
 function renderBalls(){
   const box = $('ball-list'), have = ownedBalls(), cur = ballSkin(); box.innerHTML = '';
   for(let v = -1; v < have; v++){
@@ -520,6 +520,11 @@ function renderBalls(){
     b.onclick = () => { try { localStorage.setItem(ballKey(), String(v)); } catch(e){} renderBalls(); };
     box.appendChild(b);
   }
+  if(BallSkins.artList) BallSkins.artList().forEach(a => {   // 🏭 af-4: balls made in Artifactory (by anyone in the family)
+    const v = 'art:' + a.id, b = document.createElement('button'); b.className = 'bsk' + (v === cur ? ' on' : ''); b.setAttribute('data-sound', 'pop');
+    const c = document.createElement('canvas'); c.width = c.height = 80; b.appendChild(c); b.insertAdjacentHTML('beforeend', '🏭 ' + UI.esc(a.n) + '<small style="display:block;opacity:.75">by ' + UI.esc(a.by) + '</small>');
+    BallSkins.draw(c.getContext('2d'), v, 40, 40, 26, 1); b.onclick = () => { try { localStorage.setItem(ballKey(), v); } catch(e){} renderBalls(); }; box.appendChild(b); });
+  if(BallSkins.craftLink){ const b = document.createElement('button'); b.className = 'art-craft'; b.style.cssText = 'border:3px dashed var(--violet,#6B3BE0);background:var(--panel);border-radius:16px;padding:4px 6px 3px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-weight:800;font-size:0.68rem;color:var(--ink);font-family:inherit;min-width:52px;'; b.setAttribute('data-sound', 'pop'); b.innerHTML = '<span style="font-size:1.6rem;line-height:40px">✨</span>Craft a new one'; b.onclick = () => BallSkins.craftLink('lathe'); box.appendChild(b); }
   $('ball-note').textContent = have >= BallSkins.count ? '⭐ Every ball skin unlocked!' : (BallSkins.count - have) + ' more ball skins to unlock — see 📖 Collection';
 }
 // A small picture of a table in this design.
@@ -915,7 +920,7 @@ function bkWorld(now, B){
     for(let k = 6; k > 0; k--){ ctx.fillStyle = 'hsla(' + ((k * 40 + now / 4) % 360) + ',90%,65%,' + (0.08 * (7 - k)) + ')'; ctx.beginPath(); ctx.arc(B.x, 820 + k * 16, 26 - k * 2.5, 0, 7); ctx.fill(); }
     const r = 26, gr = ctx.createRadialGradient(B.x - r * 0.3, 820 - r * 0.35, 1, B.x, 820, r); gr.addColorStop(0, '#FFFFFF'); gr.addColorStop(0.45, D.ball); gr.addColorStop(1, '#3E4558');
     glowAt(ctx, B.x, 820, r + 28, '#FFFFFF'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(B.x, 820, r, 0, 7); ctx.fill();
-    if(G.skin >= 0) BallSkins.draw(ctx, G.skin, B.x, 820, r, T);
+    if(G.skin >= 0 || typeof G.skin === 'string') BallSkins.draw(ctx, G.skin, B.x, 820, r, T);
     // HUD: time + bonus total + steer hints
     const left = Math.max(0, Math.ceil(BK.world - B.t));
     ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(CX - 170, 40, 340, 46, 20) : ctx.rect(CX - 170, 40, 340, 46); ctx.fill();
@@ -1705,7 +1710,7 @@ function draw(now){
     ctx.fillStyle = 'rgba(0,0,0,' + (riding ? 0.22 : 0.32) + ')'; ctx.beginPath(); ctx.arc(b.x + (riding ? 10 : 3), b.y + (riding ? 16 : 5), b.r, 0, 7); ctx.fill();
     // motion blur at high speed
     if(sp2 > 1100 && !riding){ for(let k = 1; k <= 3; k++){ ctx.fillStyle = 'rgba(220,230,245,' + (0.18 / k) + ')'; ctx.beginPath(); ctx.arc(b.x - b.vx * 0.006 * k, b.y - b.vy * 0.006 * k, r * (1 - k * 0.08), 0, 7); ctx.fill(); } }
-    if(skin >= 0){ BallSkins.draw(ctx, skin, b.x, b.y, r, now / 1000); ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.ellipse(b.x - r * 0.35, b.y - r * 0.42, r * 0.28, r * 0.15, -0.5, 0, 7); ctx.fill(); return; }
+    if(skin >= 0 || typeof skin === 'string'){ BallSkins.draw(ctx, skin, b.x, b.y, r, now / 1000); ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.ellipse(b.x - r * 0.35, b.y - r * 0.42, r * 0.28, r * 0.15, -0.5, 0, 7); ctx.fill(); return; }
     // chrome: dark rim, bright sky reflection that slides with the ball's position
     const gr = ctx.createRadialGradient(b.x - r * 0.3, b.y - r * 0.35, 1, b.x, b.y, r); gr.addColorStop(0, '#FFFFFF'); gr.addColorStop(0.45, D.ball); gr.addColorStop(0.85, '#7B8498'); gr.addColorStop(1, '#3E4558');
     ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 7); ctx.fill();
@@ -1976,4 +1981,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (r30+11m+back-1) END OF Pinball.html -->
+<!-- (r30+11m+back-1+af-4) END OF Pinball.html -->

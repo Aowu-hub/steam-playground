@@ -1465,6 +1465,13 @@ function buildSkin(){
     b.onclick = () => { if(b.classList.contains('lock')){ UISound.play('error'); UI.toast('🔒 ' + SKIN_HOW[i]); return; } const p = skinPick(me); p.s = p.s || {}; p.s[SET.theme] = i; ls('sp_snakeskin:' + me, JSON.stringify(p)); buildSkin(); buildThemes(); }; });
   box.querySelectorAll('#skin-types .skinchip').forEach(b => { drawSnakePreview(b.querySelector('canvas').getContext('2d'), 160, 90, {theme: SET.theme, step: cur.step, type: b.dataset.t}, 1);
     b.onclick = () => { if(b.classList.contains('lock')){ UISound.play('error'); UI.toast('🔒 ' + (TYPE_HOW[b.dataset.t] || 'Keep playing!')); return; } const p = skinPick(me); p.type = b.dataset.t; ls('sp_snakeskin:' + me, JSON.stringify(p)); buildSkin(); buildThemes(); }; });
+  const arts = artSnakes(), p0 = skinPick(me);   // 🏭 af-4: colour my snake like something the family made
+  const row = document.createElement('div'); row.innerHTML = '<div class="note" style="margin:8px 0 4px">🏭 Colours from Artifactory:</div><div class="skins" id="skin-arts"><button class="skinchip' + (!p0.art ? ' on' : '') + '" data-art="" data-sound="tap"><span>🎨 My colour</span></button>' +
+    arts.map(a => '<button class="skinchip' + (p0.art === a.id ? ' on' : '') + '" data-art="' + a.id + '" data-sound="tap"><span style="display:inline-block;width:22px;height:22px;border-radius:50%;vertical-align:middle;background:' + a.col + ';border:3px solid ' + (a.c2 || a.col) + '"></span><span>' + UI.esc(a.n) + ' · ' + UI.esc(a.by) + '</span></button>').join('') +
+    '<button class="skinchip art-craft" data-sound="tap" data-craft="1"><span>✨ Craft a new one</span></button></div>';
+  box.appendChild(row);
+  row.querySelectorAll('[data-art]').forEach(b => b.onclick = () => { const p = skinPick(me); if(b.dataset.art) p.art = b.dataset.art; else delete p.art; ls('sp_snakeskin:' + me, JSON.stringify(p)); buildSkin(); buildThemes(); });
+  row.querySelector('[data-craft]').onclick = () => { if(UI.craftLink) UI.craftLink('sew', me); };
 }
 const SKIN_HOW = ['Free', 'Play 5 games in this world', 'Eat 300 food in this world', 'Win a Hard level in this world', 'Grow to 60 long in this world', 'Win an Extreme level in this world', 'Win 💀 Hardcore in this world'];
 const TYPE_HOW = {python: 'Play 10 Snakize games', rattle: 'Use 20 skills', cobra: 'Eat 20 golden food in Snakeast', anaconda: 'Grow to 40 long', viper: 'Pop 5 snakes in Snakigate', seasnake: 'Own 40 % land in Snakastle', coral: 'Win 3 family duels', boa: 'Win a Hard level in any mode', titanoboa: 'Finish Snaketale chapter 1', seaserpent: 'Finish Snaketale chapter 2', conga: 'Finish Snaketale chapter 3', mecha: 'Finish Snaketale chapter 4', comet: 'Finish Snaketale chapter 5', feather: 'Finish Snaketale chapter 6'};
@@ -1811,15 +1818,18 @@ function lookFor(st, si){
   if(!s.human && !st.preview) return {theme, step: 1, type: SNAKE_TYPES[(si * 5) % 9].id, col, seed: si};
   const nm = st.seats && st.seats[si] ? st.seats[si].name : S.player, my = mySkin(nm, theme);
   const hood = st.hood && st.hood[si] ? Math.max(0, 1 - (performance.now() - st.hood[si]) / 1500) : 0;
-  return {theme, step: my.step, type: my.type, col, seed: si, hood, rattle: s.dashT > 0};
+  return {theme, step: my.step, type: my.type, col: my.art && /^#[0-9a-f]{6}$/i.test(my.art.col || '') ? my.art.col : col, seed: si, hood, rattle: s.dashT > 0};
 }
 function skinsOf(name){ return (S.skins && S.skins[name]) || {worlds: {}, types: ['garden'], best: 1}; }
 function skinPick(name){ try{ return JSON.parse(ls('sp_snakeskin:' + name) || '{}') || {}; }catch(e){ return {}; } }
+// 🏭 af-4: woven / printed things made in Artifactory colour your snake (list = localStorage sp_artskins)
+function artSnakes(){ let L = []; try{ L = JSON.parse(ls('sp_artskins') || '{}').list || []; }catch(e){} return L.filter(a => a && a.id && ['scarf', 'cape', 'bag', 'flag', 'basket', 'hat', 'pshape', 'pspin'].indexOf(a.k) >= 0).slice(0, 12); }
 function mySkin(name, theme){
   const own = skinsOf(name), steps = own.worlds[theme] || [0], p = skinPick(name);
   let step = p.s && p.s[theme] != null ? Number(p.s[theme]) : Math.max.apply(null, steps); if(steps.indexOf(step) < 0) step = Math.max.apply(null, steps);
   let type = p.type || 'garden'; if((own.types || ['garden']).indexOf(type) < 0) type = 'garden';
-  return {step, type};
+  const art = p.art ? artSnakes().find(a => a.id === p.art) : null;
+  return {step, type, art};
 }
 function drawPreviewRider(g, st, si, x, y, k, face, t){ const av = st.avs[si]; if(!av) return; drawAvatar(g, {name: 'p', av, dir: face}, x, y, k, {t, pose: RIDE_POSE, still: true}); }
 function drawFxGrid(g, st, cell){
@@ -2329,4 +2339,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11y-4+r33+r36+back-1+modes-3+mg-1) END OF Snakize.html -->
+<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4) END OF Snakize.html -->

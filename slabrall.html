@@ -243,11 +243,10 @@
 <section class="screen hidden" id="scr-menu">
   <div class="title"><div class="logo">🏓</div><h1>SlaBrall</h1><p>Slap the ball — keep the rally going!</p>
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
-  <div class="section-head">1 · Pick a sport</div>
   <div class="sports" id="sport-list"></div>
-  <div class="section-head">2 · Pick a level</div>
+  <div class="section-head">Pick a level</div>
   <div class="levels" id="level-list"></div>
-  <button class="btn cup-btn" id="cup-btn" data-sound="pop" onclick="openCup()">🏆 <span id="cup-btn-t">Tournament</span> <small id="cup-btn-s">4 or 8 teams · bracket · trophy</small></button>
+  <button class="btn cup-btn hidden" id="cup-btn-old" data-sound="pop" onclick="openCup()">🏆 <span id="cup-btn-t">Tournament</span> <small id="cup-btn-s">4 or 8 teams · bracket · trophy</small></button>
   <details class="rules"><summary>📖 How to play</summary><ul>
     <li><b>Move:</b> W A S D (or the arrows when you play alone). On a tablet, drag on your side of the court.</li>
     <li><b>Hit:</b> walk into the ball — your avatar swings by itself. Moving <b>forward</b> into the ball = topspin (red trail), <b>back</b> = backspin (blue), <b>sideways</b> = curve (green).</li>
@@ -1401,17 +1400,25 @@ function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return 
 function renderMenu(){
   // sports: built once per visit, then only the .on class moves (no page jump)
   const sl = $('sport-list');
-  if(!sl.children.length){
-    SB.SPORT_ORDER.forEach(k => { const sp = SB.SPORTS[k], b = document.createElement('button'); b.className = 'sport'; b.dataset.k = k; b.setAttribute('data-sound', 'tap');
-      b.innerHTML = '<div class="big">' + sp.icon + '</div><div class="nm">' + sp.name + '</div><div class="sub">' + UI.esc(SPORT_TAG[k]) + '</div>';
-      b.onclick = () => { SET.sport = k; savePrefs(); markSports(); }; sl.appendChild(b); });
+  if(!sl.children.length){   // 🗂️ mg-1: 🏓 Sports · 🏆 Cup boxes
+    UI.modeGroups(sl, MODE_GROUPS, mgList(), {next: k => k === 'cup' ? null : $('level-list'),
+      onPick: k => { if(k === 'cup'){ openCup(); return 'stop'; } SET.sport = k; savePrefs(); markSports(); return false; }});
   }
-  markSports(); renderLevels(); cupBtnLabel();
+  markSports(); renderLevels(); cupBtnLabel(); mgCupLabel();
   if(window.UI && UI.leaders) UI.leaders($('leaders'), GAME_ID, S.player);
   $('pow-list').innerHTML = SB.POWER_KEYS.map(k => { const P = SB.POWERS[k]; return '<div>' + P.icon + ' <b>' + P.name + '</b> <small>(' + TIER_NAME[P.tier] + ')</small><br>' + UI.esc(P.about) + '</div>'; }).join('');
 }
 const SPORT_TAG = {slashot: 'Table hockey — score goals', slapoof: 'Pickleball — mind the kitchen', slaball: 'Tennis — 15 · 30 · 40', slapong: 'Ping-pong on a table', slawall: 'Padel — walls are in play'};
-function markSports(){ $('sport-list').querySelectorAll('.sport').forEach(b => b.classList.toggle('on', b.dataset.k === SET.sport)); }
+/* 🗂️ MODE GROUPS (mg-1) */
+const MODE_GROUPS = [
+  {k: 'sports', icon: '🏓', en: 'Sports', th: 'กีฬา', c: '#2F7BEA'},
+  {k: 'cup', icon: '🏆', en: 'Cup', th: 'ทัวร์นาเมนต์', c: '#C9760A'}
+];   // 🗂️ mg-1 mode groups (header icon + English + Thai), fixed order
+function mgList(){ return SB.SPORT_ORDER.map(k => ({k, g: 'sports', icon: SB.SPORTS[k].icon, name: SB.SPORTS[k].name, sub: SPORT_TAG[k], next: '👇 then pick a level'}))   // 🗂️ mg-1
+  .concat([{k: 'cup', g: 'cup', icon: '🏆', name: ($('cup-btn-t') || {}).textContent || 'Tournament', sub: ($('cup-btn-s') || {}).textContent || '4 or 8 teams · bracket · trophy', next: '▶ opens the cup', id: 'cup-btn'}]); }
+function mgCupLabel(){ const b = document.querySelector('#sport-list #cup-btn'); if(!b) return; b.querySelector('.mn').textContent = $('cup-btn-t').textContent; const s = b.querySelector('.ms'); if(s) s.textContent = $('cup-btn-s').textContent; }
+/* 🗂️ END MODE GROUPS */
+function markSports(){ $('sport-list').querySelectorAll('.ui-mbtn').forEach(b => b.classList.toggle('on', b.dataset.k === SET.sport)); }
 function renderLevels(){
   const box = $('level-list'); box.innerHTML = ''; const p = progressOf(S.player), rec = AGE_START[S.age];
   SB.LEVELS.forEach((L, i) => {
@@ -2233,4 +2240,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11m-2+back-1+modes-3) END OF SlaBrall.html -->
+<!-- (11m-2+back-1+modes-3+mg-1) END OF SlaBrall.html -->

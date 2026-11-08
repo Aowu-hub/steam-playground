@@ -67,6 +67,9 @@
   .chip.pick:active, .levels .lvl.pick:active, .chip:active{transform:translateZ(0) translateY(4px);}
   .chip.on::after{content:'✓';position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;background:#2EC4B6;color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 0 rgba(0,0,0,0.2);}
   @media (max-width:640px){ .chips{flex-wrap:nowrap;justify-content:flex-start;overflow-x:auto;padding:10px 10px 8px;scrollbar-width:none;} .chips::-webkit-scrollbar{display:none;} .chip{flex:none;} }
+  @media (max-width:640px){ #scr-menu .chips{flex-wrap:wrap;justify-content:center;overflow:visible;padding:6px 4px;} }   /* mg-1: start-page chip rows wrap — no sideways scrolling row */
+  @media (max-width:640px){ #scr-menu .chips{flex-wrap:wrap;justify-content:center;overflow:visible;padding:6px 4px;} }   /* mg-1: start-page chip rows wrap — no sideways scrolling row */
+  @media (max-width:640px){ #scr-menu .chips{flex-wrap:wrap;justify-content:center;overflow:visible;padding:6px 4px;} }   /* mg-1: start-page chip rows wrap — no sideways scrolling row */
   .levels{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
   @media (min-width:1100px){ .levels{grid-template-columns:repeat(6,1fr);} }
   @media (max-width:640px){ .levels{grid-template-columns:repeat(2,1fr);} .title h1{font-size:1.5rem;} }
@@ -217,7 +220,7 @@
   <div class="title"><div class="logo">🎵</div><h1>BeatCorner</h1><p>Hit the beats when they reach the corner buttons!</p>
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
   <div class="section-head">1. Pick a way to play</div>
-  <div class="chips" id="mode-list"></div><div class="mode-blurb" id="mode-blurb"></div>
+  <div class="modes" id="mode-list"></div><div class="mode-blurb" id="mode-blurb"></div>
   <div class="section-head">2. Pick your look (the songs sound the same in every look)</div>
   <div class="chips" id="theme-list"></div>
   <div class="section-head">3. Pick a level</div>
@@ -1033,6 +1036,23 @@ const MODE_INFO = {
 };
 let MODES_ON = ['corner', 'piano', 'drums', 'band'];
 const PART_SONGS = 6, PART_CLEAR = 3;
+/* 🗂️ MODE GROUPS (mg-1) */
+const MODE_GROUPS = [
+  {k: 'songs', icon: '🎤', en: 'Songs', th: 'เพลง', c: '#E0457B'},
+  {k: 'inst', icon: '🎹', en: 'Instruments', th: 'เครื่องดนตรี', c: '#2F7BEA'},
+  {k: 'together', icon: '🎸', en: 'Together', th: 'เล่นด้วยกัน', c: '#1E9A5C'},
+  {k: 'make', icon: '✏️', en: 'Make', th: 'แต่งเพลง', c: '#C9760A'}
+];   // 🗂️ mg-1 mode groups (header icon + English + Thai), fixed order
+const MODE_LIST = [   // 🗂️ start page buttons by group (mg-1) — the game still uses MODE + MODE_INFO
+  {k: 'corner', g: 'songs', icon: '🎵', name: 'Corners', sub: 'Beats fly to 4 corner buttons', next: '👇 then a level + a song'},
+  {k: 'piano', g: 'inst', icon: '🎹', name: 'Piano', sub: 'Notes fall onto the keys', next: '👇 then a level + a song'},
+  {k: 'drums', g: 'inst', icon: '🥁', name: 'Drums', sub: 'A drum kit that grows', next: '👇 then a level + a song'},
+  {k: 'band', g: 'together', icon: '🎸', name: 'Band', sub: '2 players: piano + drums', next: '👇 then a level + a song'},
+  {k: 'maker', g: 'make', icon: '🎼', name: 'Song Maker', sub: 'Make your own song', next: '👇 then ⏺ record or ✏️ write'}
+];
+let MG_MAKER = false;
+function mgOn(k){ return k === 'maker' ? (MG_MAKER && MODE === 'piano') : (MODE === k && !(k === 'piano' && MG_MAKER)); }
+/* 🗂️ END MODE GROUPS */
 const PART_KEY = {piano: 'BeatPiano_', drums: 'BeatDrums_'};
 function partRec(part, name){ try{ return JSON.parse((S.settings || {})[PART_KEY[part] + name] || '{}') || {}; }catch(e){ return {}; } }
 function modeProgress(name){ const k = {piano: 'progressPiano', drums: 'progressDrums', band: 'progressPiano'}[MODE]; const src = k ? (S[k] || {}) : S.progress; return src[name] || {unlocked: 0, tokens: [], best: []}; }
@@ -2433,8 +2453,10 @@ function edNew(){ openEditor({notes: [], bpm: 90, name: '', emoji: '🎵', style
 /* ---------- menus for the instrument modes ---------- */
 function renderModes(){
   const box = $('mode-list'); if(!box) return;
-  box.innerHTML = MODES_ON.map(k => '<button class="chip' + (k === MODE ? ' on' : '') + '" data-sound="pop" data-mode="' + k + '"><span class="ic">' + MODE_INFO[k].icon + '</span>' + MODE_INFO[k].name + '</button>').join('');
-  box.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { MODE = b.dataset.mode; savePrefs(); if(!canPlay(selLevel)) selLevel = Math.min(AGE_START[S.age] || 0, modeProgress(S.player).unlocked); renderMenu(); });
+  UI.modeGroups(box, MODE_GROUPS, MODE_LIST.filter(m => m.k === 'maker' || MODES_ON.indexOf(m.k) >= 0).map(m => Object.assign({}, m, {on: mgOn(m.k)})), {   // 🗂️ mg-1
+    next: () => $('level-list'),
+    onPick: k => { MG_MAKER = k === 'maker'; MODE = MG_MAKER ? 'piano' : k; savePrefs(); if(!canPlay(selLevel)) selLevel = Math.min(AGE_START[S.age] || 0, modeProgress(S.player).unlocked); renderMenu();
+      if(MG_MAKER) setTimeout(() => { const b = $('fam-make'); if(b && UI.modePoint) UI.modePoint(b); }, 80); return false; }});
   $('mode-blurb').textContent = MODE_INFO[MODE].blurb;
 }
 function partSongOpen(part, lvl, i){ if(i === 0) return true; const L = partRec(part, S.player)[lvl] || {}; for(let k = i - 1; k < PART_SONGS; k++) if(L[k] && L[k].passed) return true; return false; }
@@ -2523,4 +2545,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (bc-5+back-1+modes-3+bc-6+bc-7+bc-8) END OF BeatCorner.html -->
+<!-- (bc-5+back-1+modes-3+bc-6+bc-7+bc-8+mg-1) END OF BeatCorner.html -->

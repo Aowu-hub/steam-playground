@@ -68,7 +68,7 @@
   .box h3{font-size:0.92rem;margin:2px 0 8px;color:var(--ink-soft);}
   .box .note{font-size:0.72rem;font-weight:800;color:var(--ink-soft);margin-top:6px;}
   .chips{display:flex;flex-wrap:wrap;gap:7px;}
-  .chips.scroll{flex-wrap:nowrap;overflow-x:auto;padding:4px 2px 6px;}
+  .chips.scroll{flex-wrap:wrap;padding:4px 2px 6px;}   /* mg-1: rows wrap — no sideways scroll bar */
   .chip{min-height:40px;border:2px solid transparent;cursor:pointer;background:var(--panel);color:var(--ink);font-weight:800;font-size:0.84rem;padding:7px 11px;border-radius:13px;font-family:inherit;transform:translateZ(0);backface-visibility:hidden;position:relative;flex:0 0 auto;}
   .chip:active{transform:translateZ(0) translateY(3px);}
   html .chip.on, html [data-theme] .chip.on{background:linear-gradient(135deg,#FF4F9A,#7B4DFF) !important;color:#fff !important;border-color:#FFC845 !important;box-shadow:0 0 0 2px #FFC845 !important;}
@@ -244,9 +244,8 @@
 <section class="screen hidden" id="scr-menu">
   <div class="title"><div class="logo"><span class="eye">👀</span>🧠</div><h1>Eyes Brain Riot</h1><div class="sub2">Number memory</div><p>Peek at the number, hide it, type it back!</p>
     <div class="who">👤 <span id="who-name"></span> <span class="brain" id="brain-lvl"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
-  <div class="daily" id="daily-box"></div>
-  <div class="section-head">🎮 Way to play</div>
   <div class="ways" id="way-list"></div>
+  <div class="daily" id="daily-box"></div>
   <div class="opts" id="opt-box">
     <div class="box" id="look-box"><h3>👀 Look</h3><div class="chips" id="look-list"></div><div class="note" id="look-note"></div></div>
     <div class="box" id="answer-box"><h3>✍️ Answer</h3><div class="chips" id="answer-list"></div><div class="note" id="answer-note"></div></div>
@@ -588,6 +587,18 @@ const LEVEL_UI = [
 ];
 const AGE_START = {'4-5': 0, '6-7': 0, '8-9': 1, '10+': 2};
 const WAYS_ON = ['classic', 'backwards', 'challenge', 'letters', 'colour', 'listen', 'chain', 'word', 'shapes'];
+/* 🗂️ MODE GROUPS (mg-1) */
+const MODE_GROUPS = [
+  {k: 'remember', icon: '🔢', en: 'Ways to remember', th: 'วิธีจำ', c: '#3D6BFF'},
+  {k: 'challenge', icon: '🏔️', en: 'Challenge', th: 'ท้าทาย', c: '#D9480F'},
+  {k: 'party', icon: '👥', en: 'Party', th: 'เล่นกันหลายคน', c: '#1E9A5C'}
+];   // 🗂️ mg-1 mode groups (header icon + English + Thai), fixed order
+const MODE_GROUP_OF = {classic: 'remember', backwards: 'remember', colour: 'remember', letters: 'remember', listen: 'remember', word: 'remember', shapes: 'remember', challenge: 'challenge', daily: 'challenge', chain: 'party'};   // 🗂️ mg-1
+const MODE_ORDER = ['classic', 'backwards', 'colour', 'letters', 'listen', 'word', 'shapes', 'challenge', 'daily', 'chain'];
+function mgList(){ return MODE_ORDER.filter(k => k === 'daily' || WAYS_ON.indexOf(k) >= 0).map(k => {
+  if(k === 'daily') return {k, g: 'challenge', icon: '🎯', name: 'Daily number', sub: 'Same number for everyone · one try a day', next: '▶ starts right away'};
+  const W = EBR.WAYS[k]; return {k, g: MODE_GROUP_OF[k], icon: W.icon, name: W.name, sub: W.sub + (W.min ? ' · ' + EBR.LEVELS[W.min].name + '+' : W.multi ? ' · 2–4 👥' : ''), next: '👇 then pick a level'}; }); }
+/* 🗂️ END MODE GROUPS */
 // 🏠 6 room themes = digit font + background + sounds (looks only — never the rules)
 const ROOMS = {
   dino:  {name: 'Dino Den',      icon: '🦖', top: '#1D4A2A', bot: '#4F8B36', ground: '#6B4A2B', deco: ['🌿', '🦴', '🌋', '🦕', '🌴'], fly: '🦴'},
@@ -681,9 +692,9 @@ function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return 
 function renderMenu(){ renderDaily(); renderWays(); renderOpts(); renderLevels(); renderHow(); if(window.UI && UI.leaders) UI.leaders($('leaders'), GAME_ID, S.player); }
 function renderWays(){
   const box = $('way-list');
-  box.innerHTML = WAYS_ON.map(k => { const W = EBR.WAYS[k]; return '<button class="way' + (SET.way === k ? ' on' : '') + '" data-k="' + k + '" data-sound="tap">' + (W.min ? '<span class="tag">' + EBR.LEVELS[W.min].name + '+</span>' : W.multi ? '<span class="tag">2–4 👥</span>' : '') +
-    '<div class="big">' + W.icon + '</div><div class="nm">' + W.name + '</div><div class="sub">' + W.sub + '</div></button>'; }).join('');
-  box.querySelectorAll('.way').forEach(b => b.onclick = () => { SET.way = b.dataset.k; savePrefs(); box.querySelectorAll('.way').forEach(x => x.classList.toggle('on', x === b)); renderOpts(); renderLevels(); });
+  UI.modeGroups(box, MODE_GROUPS, mgList().map(m => Object.assign({}, m, {on: m.k === SET.way})), {   // 🗂️ mg-1
+    next: k => k === 'daily' ? null : $('level-list'),
+    onPick: k => { if(k === 'daily'){ startDaily(); return 'stop'; } SET.way = k; savePrefs(); renderOpts(); renderLevels(); }});
 }
 function chipsInto(boxId, list, cur, onPick){
   const box = $(boxId); box.innerHTML = list.map(o => '<button class="chip' + (o.k === cur ? ' on' : '') + (o.lock ? ' lock' : '') + '" data-k="' + o.k + '" data-sound="tap"' + (o.title ? ' title="' + UI.esc(o.title) + '"' : '') + '>' + o.label + '</button>').join('');
@@ -1343,4 +1354,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (ebr-4+back-1+modes-3) END OF EyesBrainRiot.html -->
+<!-- (ebr-4+back-1+modes-3+mg-1) END OF EyesBrainRiot.html -->
