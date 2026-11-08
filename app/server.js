@@ -579,6 +579,12 @@ function safeSeen_(players) {
 //           (+ always the ModesTried_<Name> ledger, written by the game the first time the mode starts — markModeTried).
 //   added = 'yyyy-mm-dd' when the mode came out → a 🆕 Dashboard card for 7 days.
 const MODES_ = [
+  { game: 'artifactory', id: 'planer', icon: '🪚', name: 'Artifactory Planer', pitch: 'Plane a rough plank flat and smooth', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'planer']] } },
+  { game: 'artifactory', id: 'weld', icon: '🔥', name: 'Artifactory Welding', pitch: 'Follow the seam with a steady hand', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'weld']] } },
+  { game: 'artifactory', id: 'forge', icon: '⚒️', name: 'Artifactory Forge', pitch: 'Heat it orange, hammer it into shape', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'forge']] } },
+  { game: 'artifactory', id: 'pottery', icon: '🏺', name: 'Artifactory Pottery', pitch: 'Shape spinning clay, fire it in the kiln', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'pottery']] } },
+  { game: 'artifactory', id: 'sew', icon: '🧵', name: 'Artifactory Loom', pitch: 'Weave a pattern for a cape or scarf', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'sew']] } },
+  { game: 'artifactory', id: 'light', icon: '🔌', name: 'Artifactory Light-up', pitch: 'Close the circuit — make it glow!', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'light']] } },
   { game: 'artifactory', id: 'lathe', icon: '🌀', name: 'Artifactory Lathe', pitch: 'Carve a cup, a yo-yo or a trophy while it spins', route: 'artifactory', added: '2026-11-08', tried: { feat: [['artifactory', 'lathe']] } },
   { game: 'artifactory', id: 'stone', icon: '💎', name: 'Artifactory Gems', pitch: 'Polish a rough stone and cut a sparkling gem', route: 'artifactory', added: '2026-11-08', tried: { feat: [['artifactory', 'stone']] } },
   { game: 'artifactory', id: 'finish', icon: '🎨', name: 'Artifactory Finish', pitch: 'Paint, varnish and engrave your name', route: 'artifactory', added: '2026-11-08', tried: { feat: [['artifactory', 'finish']] } },
@@ -1873,6 +1879,13 @@ const FEAT_DEFS = {
     lathe: { name: 'Turned on the lathe', icon: '🌀', kind: 'sum', tiers: [3, 20, 80] },
     finish: { name: 'Finishes (paint, varnish, engrave)', icon: '🎨', kind: 'sum', tiers: [3, 20, 80] },
     stone: { name: 'Stones polished', icon: '🪨', kind: 'sum', tiers: [3, 20, 80] },
+    planer: { name: 'Planks planed', icon: '🪚', kind: 'sum', tiers: [3, 20, 80] },
+    weld: { name: 'Welds', icon: '🔥', kind: 'sum', tiers: [3, 20, 80] },
+    forge: { name: 'Forged', icon: '⚒️', kind: 'sum', tiers: [3, 20, 80] },
+    pottery: { name: 'Pots fired', icon: '🏺', kind: 'sum', tiers: [3, 20, 80] },
+    sew: { name: 'Woven + sewn', icon: '🧵', kind: 'sum', tiers: [3, 20, 80] },
+    light: { name: 'Circuits lit', icon: '🔌', kind: 'sum', tiers: [3, 20, 80] },
+    glows: { name: 'Things that glow', icon: '💡', kind: 'sum', tiers: [1, 10, 40] },
     gems: { name: 'Gems cut', icon: '💎', kind: 'sum', tiers: [3, 10, 50] },
     engraved: { name: 'Names engraved', icon: '✍️', kind: 'sum', tiers: [1, 10, 40] },
     blueprints: { name: 'Blueprint challenges', icon: '📐', kind: 'sum', tiers: [3, 20, 80] },
@@ -3996,7 +4009,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+wd-9+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gs-2+gr-4+af-1) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+wd-9+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gs-2+gr-4+af-2) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -4368,13 +4381,35 @@ const ART_KINDS_ = {
   necklace: ['stone', 'neck', 1, 'Necklace', '📿', 'Wear it round your neck'],
   crown: ['stone', 'head', 3, 'Crown', '👑', 'Wear it on your head'],
   tag: ['stone', '', 1, 'Pet tag', '🏷️', 'A tag for your pet'],
+  // round 2 (af-2): the rest of the Machine Hall
+  board: ['planer', 'hand', 1, 'Name board', '🪵', 'Hold it or hang it — engrave your name'],
+  frame: ['planer', 'hand', 2, 'Picture frame', '🖼️', 'A frame for your best picture'],
+  stand: ['planer', 'hand', 2, 'Display stand', '🏛️', 'Show off your best thing'],
+  badge: ['weld', 'neck', 1, 'Hero badge', '🛡️', 'Pin it on'],
+  robot: ['weld', 'hand', 2, 'Mini robot', '🤖', 'A little metal friend to hold'],
+  sign: ['weld', 'hand', 2, 'Name sign', '🪧', 'Hold up your name'],
+  medal: ['forge', 'neck', 1, 'Medal', '🏅', 'Wear it round your neck'],
+  key: ['forge', 'hand', 1, 'Key', '🗝️', 'A key you forged yourself'],
+  charm: ['forge', 'neck', 1, 'Heart charm', '💖', 'Wear it round your neck'],
+  bowl: ['pottery', 'hand', 2, 'Bowl', '🥣', 'Hold it — or fill it with snacks'],
+  vase: ['pottery', 'hand', 3, 'Vase', '🏺', 'For flowers'],
+  petbowl: ['pottery', '', 2, 'Pet bowl', '🐾', 'A bowl for your pet'],
+  scarf: ['sew', 'neck', 1, 'Scarf', '🧣', 'Wear it round your neck'],
+  cape: ['sew', 'back', 2, 'Cape', '🦸', 'Wear it on your back'],
+  bag: ['sew', 'hand', 2, 'Bag', '👜', 'Carry it'],
+  flag: ['sew', 'hand', 1, 'Flag', '🚩', 'Wave it'],
+  lantern: ['light', 'hand', 1, 'Lantern', '🏮', 'A glowing light to hold'],
 };
-const ART_STATIONS_ = { lathe: ['🌀', 'Lathe'], finish: ['🎨', 'Finish bench'], stone: ['💎', 'Stone polishing'] };
+const ART_STATIONS_ = { lathe: ['🌀', 'Lathe'], finish: ['🎨', 'Finish bench'], stone: ['💎', 'Stone polishing'], planer: ['🪚', 'Planer + sander'], weld: ['🔥', 'Welding'], forge: ['⚒️', 'Forge'], pottery: ['🏺', 'Pottery wheel'], sew: ['🧵', 'Sewing + loom'], light: ['🔌', 'Light-up bench'] };
+// what each round-2 station takes (the player picks one; the kind says how many)
+const ART_STATION_MATS_ = { planer: ['oak', 'bamboo', 'teak'], weld: ['iron', 'copper', 'tin', 'bronze', 'silver', 'gold'], forge: ['iron', 'copper', 'tin', 'bronze', 'silver', 'gold'], pottery: ['clay'], sew: ['fabric', 'leather'] };
+// round 2 opening gift (once per bag): materials for the new machines
+const ART_GIFT2_ = { iron: 3, copper: 2, clay: 6, fabric: 4, led: 3, battery: 3, glass: 2, dye: 2 };
 const ART_LATHE_MATS_ = ['oak', 'bamboo', 'teak', 'copper', 'tin', 'silver', 'gold', 'granite', 'jade'];
 const ART_STONES_ = ['granite', 'jade', 'crystal', 'ruby', 'sapphire', 'amethyst'];
 const ART_SETTINGS_ = ['copper', 'tin', 'iron', 'bronze', 'silver', 'gold'];
 const ART_PER_PLAYER_ = 60;
-const ART_WEAR_SLOTS_ = ['head', 'neck', 'wrist', 'ring', 'hand'];
+const ART_WEAR_SLOTS_ = ['head', 'neck', 'wrist', 'ring', 'hand', 'back'];
 
 /* ---------- tab: Artifacts ---------- */
 const ART_TAB = 'Artifacts';
@@ -4475,6 +4510,11 @@ function cleanArtLook_(kind, look) {
   if (look.cut != null) out.cut = artInt_(look.cut, 0, 4);
   if (look.q != null) out.q = artInt_(look.q, 0, 100);
   if (look.gl) out.gl = 1;
+  if (look.th != null) out.th = artInt_(look.th, 0, 20);
+  if (/^[01]{36}$/.test(String(look.wv || ''))) out.wv = String(look.wv);
+  if (ART_HEX_.test(String(look.c2 || ''))) out.c2 = String(look.c2);
+  if (ART_HEX_.test(String(look.lc || ''))) out.lc = String(look.lc);
+  if (Number(look.ku) > 0) out.ku = Math.floor(Number(look.ku));
   return out;
 }
 // Avatar `cw` (crafted wear) structure check — ownership is checked in artWear_ (saveAvatar / outfits).
@@ -4502,6 +4542,8 @@ function artBag_(st, name) {
   if (!b || typeof b !== 'object') b = Object.assign({}, ART_STARTER_);
   const out = {}; Object.keys(ART_MATS_).forEach(m => { const n = artInt_(b[m], 0, ART_BAG_MAX_); if (n) out[m] = n; });
   if (b._d) out._d = String(b._d);
+  if (!b._g2) { artAdd_(out, ART_GIFT2_); }   // af-2 opening gift for the new machines (kept once the bag is saved)
+  out._g2 = 1;
   return out;
 }
 function artSaveBag_(name, bag) { saveSetting('Bag_' + name, JSON.stringify(bag)); return bag; }
@@ -4571,6 +4613,11 @@ function artCraft(name, req) {
     if (ART_STONES_.indexOf(req.mat) === -1) throw new Error('Pick a rough stone.');
     cost[req.mat] = 1;
     if (K[2]) { if (ART_SETTINGS_.indexOf(req.setting) === -1) throw new Error('Pick a metal for the setting.'); cost[req.setting] = (cost[req.setting] || 0) + K[2]; }
+  } else if (station === 'light') {
+    cost.glass = 1; cost.led = 1; cost.battery = 1;
+  } else if (ART_STATION_MATS_[station]) {
+    if (ART_STATION_MATS_[station].indexOf(req.mat) === -1) throw new Error('Pick what to make it from.');
+    cost[req.mat] = K[2];
   }
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
@@ -4579,6 +4626,9 @@ function artCraft(name, req) {
     const look = cleanArtLook_(kind, req.look);
     if (station === 'lathe') { look.m = req.mat; delete look.g; }
     if (station === 'stone') { look.g = req.mat; if (K[2]) look.m = req.setting; else delete look.m; }
+    if (ART_STATION_MATS_[station]) { look.m = req.mat; delete look.g; }
+    delete look.ku;   // 🏺 the kiln takes the same ~5 s waiting step as every machine (Aowu 2026-11-09)
+    if (station === 'light') { look.gl = 1; if (!look.lc) look.lc = '#FFE45C'; }
     var bp = req.blueprint && typeof req.blueprint === 'object' ? req.blueprint : null;
     var stars = bp ? artInt_(bp.stars, 0, 3) : 0;
     const title = String(req.name || '').replace(/[<>"`\\]/g, '').trim().slice(0, 28) || (name + "'s " + ART_KINDS_[kind][3]);
@@ -4587,6 +4637,7 @@ function artCraft(name, req) {
     writeArt_(a); artSaveBag_(name, bag);
     var stats = { made: 1, games: 1 }; stats[station] = 1;
     if (kind === 'gem' || station === 'stone') stats.gems = 1;
+    if (station === 'light') stats.glows = 1;
     var res = { item: publicArt_(a), bag: bag }, theme = ART_STATIONS_[station][0] + ' ' + ART_STATIONS_[station][1] + ' · ' + ART_KINDS_[kind][3];
     if (bp) { stats.blueprints = 1; if (stars === 3) { stats.perfect = 1; if (station === 'lathe') stats.latheStars = 1; if (station === 'stone') stats.stoneStars = 1; } }
   } finally { lock.releaseLock(); }
@@ -4631,6 +4682,27 @@ function artFinish(name, id, fin) {
     if (fin.e) stats.engraved = 1;
     var res = { item: publicArt_(a), bag: bag }, theme = '🎨 Finish bench · ' + ART_KINDS_[a.kind][3];
     if (bp) { stats.blueprints = 1; if (stars === 3) stats.perfect = 1; }
+  } finally { lock.releaseLock(); }
+  return artAfter_(name, res, bp, stars, stats, theme);
+}
+// 🔌 light-up bench: add LEDs to something you made (1 LED + 1 battery)
+function artGlow(name, id, opt) {
+  checkArtPlayer_(name);
+  opt = opt || {};
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const a = artRows_().find(x => x.id === String(id));
+    if (!a || a.owners.indexOf(name) === -1) throw new Error('You don\'t have that one.');
+    if (a.maker !== name) throw new Error('Only ' + a.maker + ' can change this one.');
+    const cost = { led: 1, battery: 1 }, bag = artTake_(artBag_(getSettings(), name), cost);
+    a.look = cleanArtLook_(a.kind, Object.assign({}, a.look, { gl: 1, lc: ART_HEX_.test(String(opt.lc || '')) ? opt.lc : '#FFE45C' }));
+    if (a.tools.indexOf('light') === -1) a.tools.push('light');
+    Object.keys(cost).forEach(m => { a.mats[m] = (a.mats[m] || 0) + cost[m]; });
+    var bp = opt.blueprint && typeof opt.blueprint === 'object' ? opt.blueprint : null, stars = bp ? artInt_(bp.stars, 0, 3) : 0;
+    if (stars > a.stars) a.stars = stars;
+    writeArt_(a); artSaveBag_(name, bag);
+    var stats = { light: 1, glows: 1, games: 1 }; if (bp) { stats.blueprints = 1; if (stars === 3) stats.perfect = 1; }
+    var res = { item: publicArt_(a), bag: bag }, theme = '🔌 Light-up bench · ' + ART_KINDS_[a.kind][3];
   } finally { lock.releaseLock(); }
   return artAfter_(name, res, bp, stars, stats, theme);
 }
@@ -4718,7 +4790,7 @@ function artShelf_(players) {
   const out = {}; players.forEach(p => { out[p.Name] = artsOf_(p.Name).map(publicArt_); });
   return out;
 }
-// (af-1) END OF ArtifactoryCode.gs
+// (af-2) END OF ArtifactoryCode.gs
 
 ;
 /* ===== on the device only: the grown-up PIN arrives hashed from the family Sheet (OfflineSync.gs) ===== */
@@ -4833,6 +4905,7 @@ return {"include": typeof include === 'function' ? include : undefined,
 "artClaimDaily": typeof artClaimDaily === 'function' ? artClaimDaily : undefined,
 "artCraft": typeof artCraft === 'function' ? artCraft : undefined,
 "artFinish": typeof artFinish === 'function' ? artFinish : undefined,
+"artGlow": typeof artGlow === 'function' ? artGlow : undefined,
 "artRename": typeof artRename === 'function' ? artRename : undefined,
 "artShelfPut": typeof artShelfPut === 'function' ? artShelfPut : undefined,
 "artShelfTake": typeof artShelfTake === 'function' ? artShelfTake : undefined,
