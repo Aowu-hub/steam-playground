@@ -204,6 +204,7 @@ function doGet(e) {
 
     wisdeck: 'WisDeck',   // 🃏 WisDeck: learn-by-quiz card game (plan 11z)
     eyesbrain: 'EyesBrainRiot',   // 👀🧠 Eyes Brain Riot: number memory (plan 11k) — keep on its own line (another route's comment once swallowed it → Dashboard)
+    georead: 'GeoRead',   // 🔤 GeoRead: phonics with letter boxes (plan GeoRead) — keep on its own line
     geoscout: 'GeoScout',   // 🔢 GeoScout: number blocks + balance scale (Geometric · Scale · Count) — keep on its own line
     workshop: 'Workshop',
     room: 'Room',
@@ -618,6 +619,8 @@ const MODES_ = [
   { game: 'eyes-brain', id: 'word', icon: '📝', name: 'Word mode', pitch: 'Remember short words', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '📝 Word mode' } },
   { game: 'eyes-brain', id: 'shapes', icon: '🧩', name: 'Shapes', pitch: 'Remember shape patterns', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '🧩 Shapes' } },
   { game: 'eyes-brain', id: 'daily', icon: '🎯', name: 'Today\'s family number', pitch: 'One try at today\'s number!', route: 'eyesbrain', tried: { feat: [['eyes-brain', 'daily']] } },
+  { game: 'georead', id: 'phonics', icon: '🔊', name: 'Phonics', pitch: 'Tap the sounds, bump the word!', route: 'georead', tried: { board: 'georead', themeStart: '🔊 Phonics', feat: [['georead', 'blends']] }, added: '2026-11-08' },
+  { game: 'georead', id: 'build', icon: '🧱', name: 'Word builder', pitch: 'See the picture, build the word', route: 'georead', tried: { board: 'georead', themeStart: '🧱 Word builder', feat: [['georead', 'built']] }, added: '2026-11-08' },
   { game: 'sla-brall', id: 'slashot', icon: '🏒', name: 'SlaShot', pitch: 'Table hockey — score goals!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaShot ·', feat: [['sla-brall', 'win_slashot']] } },
   { game: 'sla-brall', id: 'slapoof', icon: '🥒', name: 'SlaPoof', pitch: 'Pickleball — mind the kitchen!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaPoof ·', feat: [['sla-brall', 'win_slapoof']] } },
   { game: 'sla-brall', id: 'slaball', icon: '🎾', name: 'SlaBall', pitch: 'Tennis: 15, 30, 40, game!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaBall ·', feat: [['sla-brall', 'win_slaball']] } },
@@ -705,7 +708,7 @@ function modesData_(players) {
 /* ============ 📣 DASHBOARD NEWS ============ */
 // New games (first 14 days), 🌋 Extreme / 💀 Hardcore family records set in the last 7 days, games nobody has tried yet,
 // 🏁 milestones, ⚔️ close calls / 🚦 jams at the top, 📬 mail waiting and 🎂 birthdays (Settings Birthday_<Name> = 'MM-DD').
-const NEW_GAMES_ = [['geoscout', '2026-11-08', 'Numbers you can touch!'], ['beat-piano', '2026-11-08', '🎹 Piano + 🥁 Drums + 🎸 Band — new ways to play!'], ['wisdeck', '2026-11-08', 'Learn, quiz, collect!'], ['eyes-brain', '2026-11-07', 'Remember the number!'], ['polyplot', '2026-11-07', 'Close shapes, catch creatures!'], ['soul-bopper', '2026-11-07', 'Bomber maze + ghosts!'], ['snakeast', '2026-11-07', 'Ride your snake!'], ['alignext', '2026-11-07', 'Line them up!'], ['brawl-buddies', '2026-11-07', 'Cartoon bonk battle!'], ['pose-party', '2026-11-07', 'Strike a pose!'], ['sla-brall', '2026-11-06', '5 racket sports!'], ['beat-corner', '2026-11-04', 'Hit the beat!'], ['sweet-swap', '2026-11-03', 'Swap to match 3'], ['word-board', '2026-11-03', 'Crossword words'], ['number-board', '2026-11-03', 'Crossword math']];
+const NEW_GAMES_ = [['georead', '2026-11-08', 'Hear the letters, bump them into words!'], ['geoscout', '2026-11-08', 'Numbers you can touch!'], ['beat-piano', '2026-11-08', '🎹 Piano + 🥁 Drums + 🎸 Band — new ways to play!'], ['wisdeck', '2026-11-08', 'Learn, quiz, collect!'], ['eyes-brain', '2026-11-07', 'Remember the number!'], ['polyplot', '2026-11-07', 'Close shapes, catch creatures!'], ['soul-bopper', '2026-11-07', 'Bomber maze + ghosts!'], ['snakeast', '2026-11-07', 'Ride your snake!'], ['alignext', '2026-11-07', 'Line them up!'], ['brawl-buddies', '2026-11-07', 'Cartoon bonk battle!'], ['pose-party', '2026-11-07', 'Strike a pose!'], ['sla-brall', '2026-11-06', '5 racket sports!'], ['beat-corner', '2026-11-04', 'Hit the beat!'], ['sweet-swap', '2026-11-03', 'Swap to match 3'], ['word-board', '2026-11-03', 'Crossword words'], ['number-board', '2026-11-03', 'Crossword math']];
 const NEWS_ALIAS_ = { 'beat-piano': { id: 'beat-corner', name: 'BeatCorner 🎹 Piano + 🥁 Drums', icon: '🎹', route: 'beatcorner&game=piano' } };   // news ids that are a new way to play inside an existing game (plan 11-bc)
 function safeNews_(players) { try { return newsFor_(players, new Date()); } catch (e) { return []; } }
 function rowBetter_(byScore) {
@@ -893,6 +896,8 @@ function getAdminData() {
 // a row is only added when its GameID is missing. Edit a row in the sheet
 // freely afterwards (name, icon, Status); it is never overwritten.
 const BUILT_IN_GAMES = [
+  { GameID: 'georead', GameName: 'GeoRead', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Reading + Phonics (letter sounds, blending, spelling)',
+    Status: 'Live', PageRoute: 'georead', Icon: '🔤', Description: 'Phonics with letter boxes: your avatar carries letter boxes — tap one to hear its SOUND, bump them together to blend ("c… a… t… cat!"). 🔊 Phonics and 🧱 Word builder, 6 levels from s a t p to magic e and 2-syllable words, 6 house themes and letter-box looks to pick' },
   { GameID: 'geoscout', GameName: 'GeoScout', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Math (counting, + − × ÷, comparing, balance, shapes)',
     Status: 'Live', PageRoute: 'geoscout', Icon: '🔢', Description: 'Numbers you can touch: number blocks with faces — snap them to add, split to take away, copy to multiply, share to divide. ⚖️ Scale (> < = and balance, even weigh your avatar) and 🧱 Count (make the number), 6 house themes as blocks' },
   { GameID: 'wisdeck', GameName: 'WisDeck', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Science + World + History facts (flags, maps, animals, space, chemistry, inventions) in English + Thai',
@@ -1030,6 +1035,11 @@ function saveMazeResult(name, levelIndex, extra) {
 // Same model as the maze: Progress row (GameID, SeriesID 'main'),
 // UnlockedLevel = levels cleared (0-5), Tokens = one badge per level.
 const LEVEL_GAMES = {
+  // 🔤 GeoRead (plan GeoRead): one Archive board for every way to play (the Theme column says the mode: "🔊 Phonics · 🦖 Jungle Gate")
+  'georead': {
+    badges: ['Reader Basic', 'Reader Junior', 'Reader Intermediate', 'Reader Hard', 'Reader Extreme', 'Reader Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
   // 🔢 GeoScout: one Archive board for every way to play (the Theme column says the way: "⚖️ Scale · 🦖 Dino Quarry"); the detail card shows the best per way
   'geoscout': {
     badges: ['Scout Basic', 'Scout Junior', 'Scout Intermediate', 'Scout Hard', 'Scout Extreme', 'Scout Hardcore'],
@@ -1222,6 +1232,7 @@ function getLevelGameData(gameId, player) {
   if (gameId === 'beat-corner') out.familySongs = safeFamilySongs_();   // 🎼 Song Maker: every family song (plan 11-bc round 4)
   { const st = out.settings; out.avatars = {}; players.forEach(p => { out.avatars[p.Name] = parseAvatar_(st['Avatar_' + p.Name]); }); }   // 🧑 every level game gets every player's avatar (plan 11w: an avatar in every game)
   if (gameId === 'word-board') out.meanings = wordMeaningRows_();   // 📖 the Word Meanings tab (looked-up words + grown-up fixes) wins over the built-in list
+  if (gameId === 'georead') out.meanings = wordMeaningRows_();   // 🔤 GeoRead word cards: the Word Meanings tab wins over the built-in list
   if (gameId === 'double-up') { const f = featRows_(); out.challenge = {}; players.forEach(p => { const tile = f.filter(r => r.name === p.Name && r.game === 'double-up' && r.stat === 'chTile').reduce((m, r) => Math.max(m, Number(r.value) || 0), 0), score = f.filter(r => r.name === p.Name && r.game === 'double-up' && r.stat === 'chScore').reduce((m, r) => Math.max(m, Number(r.value) || 0), 0); if (tile || score) out.challenge[p.Name] = { tile: tile, score: score }; }); }   // 🏔️ Challenge bests (feats)
   if (gameId === 'brawl-buddies') { out.progressAdv = {}; players.forEach(p => { out.progressAdv[p.Name] = levelProgressFor_(p.Name, 'brawenture'); }); }   // 🗺️ Brawenture board (tales cleared → next tale opens)
   if (gameId === 'brawl-buddies') { const all = activePlayers_(listProfilesFull()); out.gear = {}; all.forEach(p => { const o = itemsFor_(p.Name, all).owned; if (o.brawlgear > 0) out.gear[p.Name] = o.brawlgear - 1; }); }   // 🥊 best Brawl gear owned (step index), drawn in fights
@@ -1592,7 +1603,7 @@ function recordsFor_(gameId, players) {
 }
 
 // Games shown on the Achievements records board.
-const RECORD_GAMES = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'pose-party', 'brawl-buddies', 'brawenture', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'beat-piano', 'beat-drums', 'geoscout'];
+const RECORD_GAMES = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'pose-party', 'brawl-buddies', 'brawenture', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'beat-piano', 'beat-drums', 'geoscout', 'georead'];
 // Per level: the fastest finish and the top score among active players.
 function gameRecords_(gameId, players) {
   const names = {};
@@ -1664,7 +1675,7 @@ function gameBoard_(gameId, players) {
   const levels = Array.from({ length: nLv }, () => ({}));
   const tries = Array.from({ length: nLv }, () => ({}));   // how many times each player finished each level (Archive detail cards)
   rows.forEach(r => { tries[r.level][r.name] = (tries[r.level][r.name] || 0) + 1; const cur = levels[r.level][r.name]; if (!cur || better(r, cur)) levels[r.level][r.name] = r; });
-  if (gameId === 'eyes-brain' || gameId === 'geoscout') {   // 👀🧠 / 🔢 best per way to play per level (detail card)
+  if (gameId === 'eyes-brain' || gameId === 'geoscout' || gameId === 'georead') {   // 👀🧠 / 🔢 best per way to play per level (detail card)
     const ways = Array.from({ length: nLv }, () => ({}));
     rows.forEach(r => { const w = String(r.theme || '').split(' · ')[0] || '🔢 Classic'; const cur = ways[r.level][w]; if (!cur || r.score > cur.score) ways[r.level][w] = { name: r.name, score: r.score, stars: r.stars }; });
     return { byScore: byScore, levels: levels.map((m, lv) => { const list = Object.keys(m).map(k => m[k]).sort((a, b) => better(a, b) ? -1 : better(b, a) ? 1 : 0);
@@ -1830,6 +1841,15 @@ const FEATS_HEADERS = [
 ];
 const FEATS_WIDTH = FEATS_HEADERS.length;
 const FEAT_DEFS = {
+  'georead': {
+    games: { name: 'GeoRead games', icon: '🎮', kind: 'sum', hidden: true },
+    sounds: { name: 'Letter sounds found', icon: '🔊', kind: 'max', tiers: [10, 25, 45], unit: 'sounds' },
+    blends: { name: 'Words blended', icon: '💥', kind: 'sum', tiers: [10, 100, 500] },
+    built: { name: 'Words built', icon: '🧱', kind: 'sum', tiers: [10, 100, 500] },
+    perfects: { name: 'Perfect rounds', icon: '⭐', kind: 'sum', tiers: [20, 200, 1000] },
+    magic: { name: 'Magic e words', icon: '✨', kind: 'sum', tiers: [5, 30, 100] },
+    found: { name: 'Sounds picked by ear', icon: '👂', kind: 'sum', tiers: [10, 100, 400], hidden: true },
+  },
   'geoscout': {
     games: { name: 'GeoScout games', icon: '🎮', kind: 'sum', hidden: true },
     snaps: { name: 'Blocks snapped (+)', icon: '🧲', kind: 'sum', tiers: [20, 200, 1000] },
@@ -2232,6 +2252,9 @@ const FEAT_DEFS = {
 const TIER_NAMES = ['Bronze', 'Silver', 'Gold'], TIER_ICONS = ['🥉', '🥈', '🥇'];
 // Titles a player can show under their name. f = that player's feats {game: {stat: value}}, x = extra context.
 const TITLE_DEFS = [
+  { id: 'gr_sound', name: 'Sound Explorer', icon: '🔊', hint: 'Find 30 letter sounds in GeoRead', rule: f => featVal_(f, 'georead', 'sounds') >= 30 },
+  { id: 'gr_wizard', name: 'Word Wizard', icon: '🧙', hint: 'Blend or build 100 words in GeoRead', rule: f => featVal_(f, 'georead', 'blends') + featVal_(f, 'georead', 'built') >= 100 },
+  { id: 'gr_story', name: 'Story Star', icon: '📖', hint: 'Read 10 stories in GeoRead', rule: f => featVal_(f, 'georead', 'stories') >= 10 },
   { id: 'gs_scout', name: 'Number Scout', icon: '🔢', hint: 'Make 100 numbers in GeoScout 🧱 Count', rule: f => featVal_(f, 'geoscout', 'counts') >= 100 },
   { id: 'gs_balance', name: 'Balance Master', icon: '⚖️', hint: 'Balance the scale 100 times in GeoScout', rule: f => featVal_(f, 'geoscout', 'balances') >= 100 },
   { id: 'gs_tower', name: 'Tower Ace', icon: '🏗️', hint: 'Build 50 exact towers in GeoScout 🏗️ Wobble tower', rule: f => featVal_(f, 'geoscout', 'wobble') >= 50 },
@@ -2401,7 +2424,7 @@ function featBadges_(f) {
   return out;
 }
 function titleContext_(name, players) {
-  const cleared = {}, bigGames = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'pose-party', 'brawl-buddies', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'geoscout'];
+  const cleared = {}, bigGames = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'pose-party', 'brawl-buddies', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'geoscout', 'georead'];
   let allRound = true;
   bigGames.forEach(g => {
     const p = g === 'maze' ? mazeProgressFor_(name) : levelProgressFor_(name, g);
@@ -3871,7 +3894,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+wd-9+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gs-1) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+wd-9+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gs-1+gr-1) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
