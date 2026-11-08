@@ -6,7 +6,7 @@
    • ./?page=gameroom&player=… is answered with gameroom.html straight away (no hop through index.html)
    This file rarely changes; the app's own version lives in files.json. */
 'use strict';
-const SW_REV = 1;
+const SW_REV = 2;
 const META = 'steam-meta';
 const SCOPE = new URL('./', self.location.href).href;
 let STATE = null;   // {current, pending, previous}
@@ -84,6 +84,9 @@ self.addEventListener('fetch', e => {
       const page = url.searchParams.get('page');
       if (page && page !== 'home' && c) { const list = await listOf(s.current); const f = list && list.routes && list.routes[page]; if (f) rel = f; else rel = 'index.html'; }
       else rel = 'index.html';
+    }
+    if (rel === 'link.json') {   // the family link: newest from the internet (a key set up after install works at once), else the stored copy
+      try { const r = await fetch(SCOPE + 'link.json?t=' + Date.now(), { cache: 'no-store' }); if (r.ok) return r; } catch (err) { }
     }
     if (c) { const hit = await c.match(SCOPE + rel); if (hit) return hit; }
     try { return await fetch(req); }
