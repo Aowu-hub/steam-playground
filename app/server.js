@@ -758,6 +758,7 @@ function modesData_(players) {
 // 🏁 milestones, ⚔️ close calls / 🚦 jams at the top, 📬 mail waiting and 🎂 birthdays (Settings Birthday_<Name> = 'MM-DD').
 const NEW_GAMES_ = [['artifactory', '2026-11-08', 'Make it yourself — real tools, real lessons!'], ['georead', '2026-11-08', 'Hear the letters, bump them into words!'], ['geoscout', '2026-11-08', 'Numbers you can touch!'], ['beat-piano', '2026-11-08', '🎹 Piano + 🥁 Drums + 🎸 Band — new ways to play!'], ['wisdeck', '2026-11-08', 'Learn, quiz, collect!'], ['eyes-brain', '2026-11-07', 'Remember the number!'], ['polyplot', '2026-11-07', 'Close shapes, catch creatures!'], ['soul-bopper', '2026-11-07', 'Bomber maze + ghosts!'], ['snakeast', '2026-11-07', 'Ride your snake!'], ['alignext', '2026-11-07', 'Line them up!'], ['brawl-buddies', '2026-11-07', 'Cartoon bonk battle!'], ['pose-party', '2026-11-07', 'Strike a pose!'], ['sla-brall', '2026-11-06', '5 racket sports!'], ['beat-corner', '2026-11-04', 'Hit the beat!'], ['sweet-swap', '2026-11-03', 'Swap to match 3'], ['word-board', '2026-11-03', 'Crossword words'], ['number-board', '2026-11-03', 'Crossword math']];
 const NEWS_ALIAS_ = { 'beat-piano': { id: 'beat-corner', name: 'BeatCorner 🎹 Piano + 🥁 Drums', icon: '🎹', route: 'beatcorner&game=piano' } };   // news ids that are a new way to play inside an existing game (plan 11-bc)
+function gameNewOrder_() { const seen = {}, out = []; NEW_GAMES_.forEach(x => { if (NEWS_ALIAS_[x[0]] || seen[x[0]]) return; seen[x[0]] = 1; out.push(x[0]); }); return out; }   // 🆕 gro-1: Gameroom newest first
 function safeNews_(players) { try { return newsFor_(players, new Date()); } catch (e) { return []; } }
 function rowBetter_(byScore) {
   return (a, b) => {
@@ -900,6 +901,7 @@ function getGameroomData(player) {
   const me = profile ? getLeaderboard().filter(x => x.name === player)[0] : null;
   return {
     games: games,
+    newOrder: gameNewOrder_(),   // 🆕 gro-1
     badges: badges,
     records: records,
     playerAge: profile ? (profile.Age || '') : '',
@@ -4111,7 +4113,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+af-4+mg-1+ebr-6) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+af-4+mg-1+ebr-6+gro-1) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */

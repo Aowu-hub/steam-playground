@@ -162,6 +162,13 @@
   .fav-tip{font-size:0.82rem;font-weight:800;color:var(--ink-soft);margin:-4px 0 10px;}
   .mini .fav{top:6px;right:6px;width:34px;height:34px;font-size:1rem;background:rgba(255,255,255,0.88);}
   .mini.faved{box-shadow:0 0 0 3px #FF6B8B,0 5px 0 rgba(0,0,0,0.25);}
+  /* ⬆️ gro-1: move a favourite up one step inside the favourites zone */
+  .fav-up{position:absolute;z-index:3;top:56px;right:10px;width:40px;height:40px;border-radius:50%;background:#FFE1EA;display:flex;align-items:center;justify-content:center;
+    font-size:1.1rem;line-height:1;cursor:pointer;box-shadow:0 3px 0 rgba(0,0,0,0.12);transition:transform .15s;}
+  .fav-up:active{transform:scale(.85);}
+  .mini .fav-up{top:44px;right:6px;width:34px;height:34px;font-size:0.95rem;}
+  .faved.moved{animation:favmoved .5s cubic-bezier(.2,1.6,.4,1);}
+  @keyframes favmoved{0%{transform:translateY(14px) scale(.96);}100%{transform:none;}}
   .title{font-family:var(--font-display,'Fredoka',sans-serif);font-weight:700;font-size:1.25rem;line-height:1.15;}
   .focus{font-size:0.78rem;font-weight:800;color:var(--ink-soft);}
   .card-body .title,.card-body .tagline{padding-right:46px;}
@@ -254,6 +261,7 @@
   }
   @media (max-height:500px) and (orientation:landscape){   /* phone landscape: one row of icon chips, so a whole card still fits the screen */
     .mchip{padding:2px 6px;} .mchip:not(.more) .mn{display:none;} .mode-chips{max-height:26px;flex-wrap:nowrap;}
+    .game-card .desc{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;} .game-card .focus{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}   /* gro-1: long cards (Artifactory, GeoRead) fit too */
     .mode-strip{margin:10px 0 8px;padding:6px 10px 4px;} .mode-strip .ms-head{margin-bottom:4px;} .ms-card .ms-in{padding:5px 9px;} .ms-dots{margin-top:3px;}
   }
   @media (prefers-reduced-motion: reduce){ .ms-card.in{animation:none;} }
@@ -610,6 +618,7 @@ function focusIcon(f){
 /* ---------- STATE ---------- */
 let allGames = [];
 let progress = {};
+let NEW_ORDER = [];         /* 🆕 gro-1: GameIDs newest first (server NEW_GAMES_ dates); games older than that list follow in reverse sheet order */
 let favs = [];               /* ❤️ this player's favourite GameIDs, first starred first */
 let filter = 'all';          // 'all' | 'foryou' | a STEAMFocus value
 let currentPlayerAge = null;
@@ -642,6 +651,7 @@ function applyRoom(d){
   try{ const f = JSON.parse(((d.settings || {})['Fav_' + CURRENT_PLAYER]) || '[]'); favs = Array.isArray(f) ? f : []; }catch(e){ favs = []; }
   document.getElementById('trophies').textContent = d.trophies || 0;
   applyLook(d.settings);
+  if(Array.isArray(d.newOrder)) NEW_ORDER = d.newOrder;   // 🆕 gro-1
   onGames(d.games || []);
   renderModeStrip();
 }
@@ -719,8 +729,8 @@ function renderFilters(){
 
 function render(){
   const shown = allGames.filter(matches);
-  // Age-matched games first (stable otherwise).
-  const order = g => { const f = favs.indexOf(g.GameID); return f >= 0 ? f - 1000 : (isAgeMatch(g) ? 0 : 1); };   /* ❤️ favourites first */
+  // gro-1: ❤️ favourites first (the player's own order), then NEWEST games first (new games are the last rows of the Games tab).
+  const order = g => { const f = favs.indexOf(g.GameID); if(f >= 0) return f - 100000; const n = NEW_ORDER.indexOf(g.GameID); return n >= 0 ? n - 50000 : -allGames.indexOf(g); };
   const big = shown.filter(g => !isMini(g)).sort((a, b) => order(a) - order(b));
   const mini = shown.filter(isMini).sort((a, b) => order(a) - order(b));
   const grid = document.getElementById('game-grid'), mg = document.getElementById('mini-grid');
@@ -867,7 +877,7 @@ function bigCard(g){
       (g.Description ? '<div class="desc">' + UI.esc(g.Description) + '</div>' : '') +
       '<div class="foot">' + foot + '<span class="play t-btn">Play ▶</span></div>' + favHtml(g) +
     '</div>';
-  b.onclick = e => { const mc = e.target.closest('.mchip'); if(mc){ chipTap(mc, g); return; } if(e.target.closest('.fav')){ toggleFav(g); return; } if(e.target.closest('.help-btn')){ showHelp(g); return; } openGame(g); };
+  b.onclick = e => { const mc = e.target.closest('.mchip'); if(mc){ chipTap(mc, g); return; } if(e.target.closest('.fav-up')){ moveFavUp(g); return; } if(e.target.closest('.fav')){ toggleFav(g); return; } if(e.target.closest('.help-btn')){ showHelp(g); return; } openGame(g); };
   return b;
 }
 // ❓ How to play this game (UiKit GAME_HELP), with a Play button right in the card.
@@ -894,7 +904,25 @@ function openGameroomGuide(){ UI.guide(gameroomGuide()); }
 
 // ❤️ Favourites: tap the heart — the game moves to the top for this player (saved on this device at once, then on the server).
 function favHtml(g){ if(!CURRENT_PLAYER) return ''; const on = favs.indexOf(g.GameID) >= 0;
-  return '<span class="fav' + (on ? ' on' : '') + '" role="button" tabindex="0" data-fav="' + UI.esc(g.GameID) + '" aria-pressed="' + on + '" title="' + (on ? 'Remove from my favourites' : 'Add to my favourites') + '">' + (on ? '❤️' : '🤍') + '</span>'; }
+  return '<span class="fav' + (on ? ' on' : '') + '" role="button" tabindex="0" data-fav="' + UI.esc(g.GameID) + '" aria-pressed="' + on + '" title="' + (on ? 'Remove from my favourites' : 'Add to my favourites') + '">' + (on ? '❤️' : '🤍') + '</span>' +
+    (on && favAbove(g) ? '<span class="fav-up" role="button" tabindex="0" data-up="' + UI.esc(g.GameID) + '" title="Move up" aria-label="Move ' + UI.esc(nameOf(g)) + ' up one step">⬆️</span>' : ''); }
+// ⬆️ gro-1: the favourite just above this one in the SAME section (big cards / mini games), or null
+function favAbove(g){
+  const mini = isMini(g), at = favs.indexOf(g.GameID);
+  for(let i = at - 1; i >= 0; i--){ const o = allGames.find(x => x.GameID === favs[i]); if(o && isMini(o) === mini && matches(o)) return o; }
+  return null;
+}
+function moveFavUp(g){
+  const up = favAbove(g); if(!up) return;
+  const a = favs.indexOf(g.GameID), b = favs.indexOf(up.GameID); favs[a] = up.GameID; favs[b] = g.GameID;
+  UISound.play('pop');
+  const c = readRoom(); if(c){ c.settings = c.settings || {}; c.settings['Fav_' + CURRENT_PLAYER] = JSON.stringify(favs); writeRoom(c); }
+  render();
+  const card = document.querySelector('.fav[data-fav="' + g.GameID + '"]'); const box = card && card.closest('.game-card, .mini');
+  if(box){ box.classList.add('moved'); const u = box.querySelector('.fav-up'); if(u) u.focus({preventScroll: true}); }
+  UI.toast('⬆️ ' + nameOf(g) + ' moved up');
+  google.script.run.withFailureHandler(() => UI.toast('Could not save favourites — they are kept on this device', 'err')).saveFavorites(CURRENT_PLAYER, favs.slice());
+}
 function toggleFav(g){
   const id = g.GameID, at = favs.indexOf(id), add = at < 0;
   if(add) favs.push(id); else favs.splice(at, 1);
@@ -907,6 +935,7 @@ function toggleFav(g){
   google.script.run.withFailureHandler(() => UI.toast('Could not save favourites — they are kept on this device', 'err')).saveFavorites(CURRENT_PLAYER, favs.slice());
 }
 document.addEventListener('keydown', e => { const h = e.target && e.target.closest && e.target.closest('.help-btn'); if(h && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); e.stopPropagation(); const g = allGames.find(x => x.GameID === h.dataset.help); if(g) showHelp(g); } }, true);
+document.addEventListener('keydown', e => { const u = e.target && e.target.closest && e.target.closest('.fav-up'); if(u && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); e.stopPropagation(); const g = allGames.find(x => x.GameID === u.dataset.up); if(g) moveFavUp(g); } }, true);   // ⬆️ gro-1
 document.addEventListener('keydown', e => { const f = e.target && e.target.closest && e.target.closest('.fav'); if(f && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); e.stopPropagation(); const g = allGames.find(x => x.GameID === f.dataset.fav); if(g) toggleFav(g); } }, true);
 
 function miniTile(g){
@@ -918,7 +947,7 @@ function miniTile(g){
   b.innerHTML = (fy ? '<span class="ribbon">⭐ For you</span>' : '') +
     '<span class="mi">' + UI.esc(g.Icon) + '</span><span class="mn">' + UI.esc(nameOf(g)) + '</span>' +
     '<span class="mf">' + UI.esc(a.tag || g.STEAMFocus || '') + '</span>' + bestTag(g) + favHtml(g);
-  b.onclick = e => { if(e.target.closest('.fav')){ toggleFav(g); return; } openGame(g); };
+  b.onclick = e => { if(e.target.closest('.fav-up')){ moveFavUp(g); return; } if(e.target.closest('.fav')){ toggleFav(g); return; } openGame(g); };
   return b;
 }
 
@@ -1058,4 +1087,4 @@ loadGameroom();
 </script>
 </body>
 </html>
-<!-- (11m+11j+11i+11x-1+11y-1+sb-4+pp-4+ebr-3+r34+wd-1+bc-3+r35b+modes-2+gr-1+gs-2+af-1+mg-1) END OF Gameroom.html -->
+<!-- (11m+11j+11i+11x-1+11y-1+sb-4+pp-4+ebr-3+r34+wd-1+bc-3+r35b+modes-2+gr-1+gs-2+af-1+mg-1+gro-1) END OF Gameroom.html -->
