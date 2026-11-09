@@ -1281,7 +1281,7 @@ function getLevelGameData(gameId, player) {
   if (gameId === 'polyplot') out.polyplot = polyplotData_(players);
   if (gameId === 'eyes-brain') out.ebr = ebrData_(players);
   if (gameId === 'geoscout') out.geoJourney = geoJourneyData_(players);   // 🔢 GeoScout 📖 Journey: chapters done per player (feat journeys)
-  if (gameId === 'geoscout' || gameId === 'number-board') out.numberSkins = numberSkinsOwned_(players);   // 🎨 number looks each player may use (item line + GeoScout Journey chapters)
+  if (gameId === 'geoscout' || gameId === 'number-board' || gameId === 'eyes-brain') out.numberSkins = numberSkinsOwned_(players);   // 🎨 number looks each player may use (item line + GeoScout Journey chapters)
   if (gameId === 'wisdeck') { out.wisCards = wisCardRows_(); out.wisDaily = wisDaily_(); const all = activePlayers_(listProfilesFull()); out.wdBack = {}; all.forEach(p => { try { out.wdBack[p.Name] = itemsFor_(p.Name, all).owned.wdback || 0; } catch (e) { out.wdBack[p.Name] = 0; } }); }   // 🃏 sheet-tab cards + 📅 today's family board + 🂠 card backs owned
   if (gameId === 'wisdeck') { out.progressCount = {}; out.progressJack = {}; players.forEach(p => { out.progressCount[p.Name] = levelProgressFor_(p.Name, 'wiscount'); out.progressJack[p.Name] = levelProgressFor_(p.Name, 'wisjack'); }); }   // 🃏 WisDeck page shows all three boards   // 👀🧠 🎯 today's family number + 🏅 brain levels + 🔢 keypad skins owned   // ⬛ field journal + line trails owned   // 👻💣 battle unlocks (+ bomb skins, round 4)
   if (gameId === 'alignext') { out.progressOmni = {}; players.forEach(p => { out.progressOmni[p.Name] = levelProgressFor_(p.Name, 'omnifile'); }); }   // 🔴 Alignext page shows both boards (Drop + ❌⭕ Omnifile)
@@ -1290,7 +1290,7 @@ function getLevelGameData(gameId, player) {
   { const st = out.settings; out.avatars = {}; players.forEach(p => { out.avatars[p.Name] = parseAvatar_(st['Avatar_' + p.Name]); }); }   // 🧑 every level game gets every player's avatar (plan 11w: an avatar in every game)
   if (gameId === 'word-board') out.meanings = wordMeaningRows_();   // 📖 the Word Meanings tab (looked-up words + grown-up fixes) wins over the built-in list
   if (gameId === 'georead') out.meanings = wordMeaningRows_();   // 🔤 GeoRead word cards: the Word Meanings tab wins over the built-in list
-  if (gameId === 'georead' || gameId === 'word-board') out.letterSkins = letterSkinsOwned_(players);   // 🎨 extra letter looks each player may use (item line + Alphabet Road chapters)
+  if (gameId === 'georead' || gameId === 'word-board' || gameId === 'eyes-brain') out.letterSkins = letterSkinsOwned_(players);   // 🎨 extra letter looks each player may use (item line + Alphabet Road chapters)
   if (gameId === 'georead') { const st = out.settings; out.journey = {}; players.forEach(p => { try { out.journey[p.Name] = JSON.parse(st['GeoJourney_' + p.Name] || '{}') || {}; } catch (e) { out.journey[p.Name] = {}; } }); }   // 🗺️ Alphabet Road progress
   if (gameId === 'double-up') { const f = featRows_(); out.challenge = {}; players.forEach(p => { const tile = f.filter(r => r.name === p.Name && r.game === 'double-up' && r.stat === 'chTile').reduce((m, r) => Math.max(m, Number(r.value) || 0), 0), score = f.filter(r => r.name === p.Name && r.game === 'double-up' && r.stat === 'chScore').reduce((m, r) => Math.max(m, Number(r.value) || 0), 0); if (tile || score) out.challenge[p.Name] = { tile: tile, score: score }; }); }   // 🏔️ Challenge bests (feats)
   if (gameId === 'brawl-buddies') { out.progressAdv = {}; players.forEach(p => { out.progressAdv[p.Name] = levelProgressFor_(p.Name, 'brawenture'); }); }   // 🗺️ Brawenture board (tales cleared → next tale opens)
@@ -4111,7 +4111,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+af-4+mg-1) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+af-4+mg-1+ebr-6) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
