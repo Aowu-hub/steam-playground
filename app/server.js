@@ -1932,11 +1932,23 @@ const FEAT_DEFS = {
     drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
     remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
     votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
     stories: { name: 'Stories written', icon: '📝', kind: 'sum', tiers: [3, 20, 80] },
     bpPages: { name: 'Blueprint pages stamped', icon: '🏅', kind: 'sum', tiers: [1, 5, 15] },
     bpDaily: { name: 'Blueprints of the Day', icon: '📅', kind: 'sum', tiers: [3, 20, 80] },
     bpCopied: { name: 'Family copied your blueprints', icon: '👪', kind: 'sum', tiers: [1, 10, 40] },
     bpShared: { name: 'Family blueprints shared', icon: '📐', kind: 'sum', tiers: [1, 5, 20] },
+    repairs: { name: 'Things repaired', icon: '🔧', kind: 'sum', tiers: [1, 10, 40] },
+    tests: { name: 'Things tested', icon: '🧲', kind: 'sum', tiers: [3, 20, 80] },
+    breaks: { name: 'Broken in a test', icon: '💥', kind: 'sum', hidden: true },
     drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
     remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
     votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
@@ -2423,6 +2435,7 @@ const TITLE_DEFS = [
   { id: 'af_master', name: 'Master Maker', icon: '🏭', hint: 'Make 25 things in Artifactory', rule: f => featVal_(f, 'artifactory', 'made') >= 25 },
   { id: 'af_gem', name: 'Gem Cutter', icon: '💎', hint: 'Cut 10 gems at the 💎 stone station', rule: f => featVal_(f, 'artifactory', 'gems') >= 10 },
   { id: 'af_lathe', name: 'Lathe Legend', icon: '🌀', hint: 'Get 3 ⭐ on 10 lathe blueprints', rule: f => featVal_(f, 'artifactory', 'latheStars') >= 10 },
+  { id: 'af_fixit', name: 'Fix-it Hero', icon: '🔧', hint: 'Repair 10 broken things in Artifactory', rule: f => featVal_(f, 'artifactory', 'repairs') >= 10 },
   { id: 'bp_reader', name: 'Blueprint Reader', icon: '📘', hint: 'Stamp 5 pages of the 📘 Blueprint Book (all 12 with ⭐)', rule: f => featVal_(f, 'artifactory', 'bpPages') >= 5 },
   { id: 'bp_scholar', name: 'Blueprint Scholar', icon: '🎓', hint: 'Stamp 15 pages of the 📘 Blueprint Book', rule: f => featVal_(f, 'artifactory', 'bpPages') >= 15 },
   { id: 'bp_grand', name: 'Grand Master Maker', icon: '👑', hint: 'Stamp 40 pages of the 📘 Blueprint Book', rule: f => featVal_(f, 'artifactory', 'bpPages') >= 40 },
@@ -4148,7 +4161,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -4499,10 +4512,12 @@ const ART_MATS_ = {
   clay: ['🏺', 'Clay', 'craft'], fabric: ['🧶', 'Fabric', 'craft'], leather: ['👜', 'Leather-look', 'craft'], glass: ['🫙', 'Glass', 'craft'], filament: ['🧵', 'Plastic filament', 'craft'],
   led: ['💡', 'LEDs', 'parts'], battery: ['🔋', 'Batteries', 'parts'], paint: ['🎨', 'Paint', 'finish'], varnish: ['✨', 'Varnish', 'finish'], dye: ['🧪', 'Dyes', 'finish'],
   flower: ['🌸', 'Flowers', 'nature'], sand: ['⏳', 'Sand', 'nature'],
+  zinc: ['🔘', 'Zinc', 'metal'], carbon: ['⚫', 'Charcoal', 'nature'], cobalt: ['🔵', 'Cobalt', 'nature'], alum: ['🧂', 'Alum', 'craft'],
+  brass: ['🎺', 'Brass', 'metal'], steel: ['🔩', 'Steel', 'metal'], sglass: ['🔷', 'Blue glass', 'craft'], fdye: ['🌈', 'Fixed dye', 'finish'],   // 🧪 bp-5 lab
 };
 const ART_STARTER_ = { oak: 6, bamboo: 4, teak: 2, copper: 4, tin: 2, silver: 3, gold: 3, iron: 2, granite: 3, jade: 2, crystal: 2, ruby: 1, amethyst: 1, paint: 6, varnish: 3, clay: 3, fabric: 2, sand: 2 };
 // daily delivery: 3 picks, common things more often
-const ART_DAILY_ = ['oak', 'oak', 'bamboo', 'bamboo', 'teak', 'copper', 'copper', 'tin', 'iron', 'silver', 'gold', 'granite', 'granite', 'jade', 'crystal', 'ruby', 'sapphire', 'amethyst', 'paint', 'paint', 'varnish', 'clay', 'fabric', 'sand', 'led', 'battery', 'flower', 'dye'];
+const ART_DAILY_ = ['oak', 'oak', 'bamboo', 'bamboo', 'teak', 'copper', 'copper', 'tin', 'iron', 'silver', 'gold', 'granite', 'granite', 'jade', 'crystal', 'ruby', 'sapphire', 'amethyst', 'paint', 'paint', 'varnish', 'clay', 'fabric', 'sand', 'led', 'battery', 'flower', 'dye', 'zinc', 'carbon', 'cobalt', 'alum'];
 const ART_BAG_MAX_ = 999;
 
 /* ---------- what each station makes ---------- */
@@ -4554,12 +4569,13 @@ const ART_KINDS_ = {
 };
 const ART_STATIONS_ = { lathe: ['🌀', 'Lathe'], finish: ['🎨', 'Finish bench'], stone: ['💎', 'Stone polishing'], planer: ['🪚', 'Planer + sander'], weld: ['🔥', 'Welding'], forge: ['⚒️', 'Forge'], pottery: ['🏺', 'Pottery wheel'], sew: ['🧵', 'Sewing + loom'], light: ['🔌', 'Light-up bench'], whittle: ['🔪', 'Whittling'], print: ['🖨️', '3D printing'], nature: ['🌿', 'Nature crafts'], lab: ['🧪', 'Material lab'] };
 // what each round-2 station takes (the player picks one; the kind says how many)
-const ART_STATION_MATS_ = { whittle: ['oak', 'bamboo', 'teak'], print: ['filament'], nature: ['bamboo', 'flower'], planer: ['oak', 'bamboo', 'teak'], weld: ['iron', 'copper', 'tin', 'bronze', 'silver', 'gold'], forge: ['iron', 'copper', 'tin', 'bronze', 'silver', 'gold'], pottery: ['clay'], sew: ['fabric', 'leather'] };
+const ART_STATION_MATS_ = { whittle: ['oak', 'bamboo', 'teak'], print: ['filament'], nature: ['bamboo', 'flower'], planer: ['oak', 'bamboo', 'teak'], weld: ['iron', 'copper', 'tin', 'bronze', 'silver', 'gold', 'brass', 'steel'], forge: ['iron', 'copper', 'tin', 'bronze', 'silver', 'gold', 'brass', 'steel'], pottery: ['clay'], sew: ['fabric', 'leather'] };
 // round 2 opening gift (once per bag): materials for the new machines
 const ART_GIFT2_ = { iron: 3, copper: 2, clay: 6, fabric: 4, led: 3, battery: 3, glass: 2, dye: 2 };
 const ART_GIFT3_ = { filament: 5, flower: 5, sand: 3, bamboo: 3, oak: 2 };   // af-3 opening gift: HandCraft Room
 // 🧪 material lab recipes (keep in step with Artifactory.html AF.LAB)
-const ART_LAB_ = { bronze: { in: { copper: 2, tin: 1 }, out: { bronze: 2 } }, glass: { in: { sand: 2 }, out: { glass: 1 } }, dye: { in: { flower: 1 }, out: { dye: 2 } }, paint: { in: { dye: 1 }, out: { paint: 2 } } };
+const ART_LAB_ = { bronze: { in: { copper: 2, tin: 1 }, out: { bronze: 2 } }, glass: { in: { sand: 2 }, out: { glass: 1 } }, dye: { in: { flower: 1 }, out: { dye: 2 } }, paint: { in: { dye: 1 }, out: { paint: 2 } },
+  brass: { in: { copper: 2, zinc: 1 }, out: { brass: 2 } }, steel: { in: { iron: 2, carbon: 1 }, out: { steel: 2 } }, sglass: { in: { sand: 2, cobalt: 1 }, out: { sglass: 1 } }, fdye: { in: { dye: 1, alum: 1 }, out: { fdye: 2 } } };   // 🧪 bp-5
 const ART_LATHE_MATS_ = ['oak', 'bamboo', 'teak', 'copper', 'tin', 'silver', 'gold', 'granite', 'jade'];
 const ART_STONES_ = ['granite', 'jade', 'crystal', 'ruby', 'sapphire', 'amethyst'];
 const ART_SETTINGS_ = ['copper', 'tin', 'iron', 'bronze', 'silver', 'gold'];
@@ -4660,6 +4676,9 @@ function cleanArtLook_(kind, look) {
   if (ART_MATS_[look.m]) out.m = String(look.m);
   if (Array.isArray(look.p)) { const p = look.p.slice(0, 24).map(x => artInt_(x, 0, 20)); if (p.length >= 6) out.p = p; }
   if (Array.isArray(look.pi)) { const pi = look.pi.slice(0, 16).map(x => artInt_(x, 0, 20)); if (pi.length === 16 && pi.some(v => v > 0)) out.pi = pi; }   // 🌀 hollow inside (bp-1)
+  if (ART_TESTS_[look.br]) out.br = String(look.br);   // 💥 broken by a test (bp-5)
+  if (look.kg) out.kg = 1;   // ✨ kintsugi gold seams
+  if (look.rp) out.rp = artInt_(look.rp, 0, 99);   // 🔧 times repaired
   if (/^[0-9a-f]{64}$/.test(String(look.fg || ''))) out.fg = String(look.fg);   // ⚒️ the forged shape, 16×16 (bp-2)
   if (look.tc != null) out.tc = artInt_(look.tc, 0, 3);   // 🌈 temper colour
   if (Array.isArray(look.tw) && look.tw.length === 2) out.tw = look.tw.map(x => artInt_(x, 0, 15));   // 🌪️ twisted part
@@ -4695,7 +4714,7 @@ function cleanCraftWear_(cw) {
 function artWear_(name, cw) {
   const clean = cleanCraftWear_(cw); if (!clean) return null;
   const mine = artsOf_(name), out = {};
-  Object.keys(clean).forEach(slot => { const a = mine.find(x => x.id === clean[slot].id); if (a && ART_KINDS_[a.kind][1] === slot) out[slot] = Object.assign(cleanArtLook_(a.kind, a.look), { id: a.id }); });
+  Object.keys(clean).forEach(slot => { const a = mine.find(x => x.id === clean[slot].id); if (a && !a.look.br && ART_KINDS_[a.kind][1] === slot) out[slot] = Object.assign(cleanArtLook_(a.kind, a.look), { id: a.id }); });
   return Object.keys(out).length ? out : null;
 }
 
@@ -4709,6 +4728,8 @@ function artBag_(st, name) {
   out._g2 = 1;
   if (!b._g3) { artAdd_(out, ART_GIFT3_); }
   out._g3 = 1;
+  if (!b._g5) { artAdd_(out, ART_GIFT5_); }   // 🧪 bp-5 lab gift
+  out._g5 = 1;
   if (b._dd === today_()) out._dn = artInt_(b._dn, 0, 999), out._dd = String(b._dd);   // game drops today (R4)
   if (b._wd === today_()) out._wn = artInt_(b._wn, 0, 99), out._wd = String(b._wd);   // 📝 story bonuses today (bp-1)
   return out;
@@ -4794,6 +4815,8 @@ function artCraft(name, req) {
     if ((K[6] || ART_STATION_MATS_[station]).indexOf(req.mat) === -1) throw new Error('Pick what to make it from.');
     cost[req.mat] = K[2];
   }
+  const need = ART_BP_NEED_[String(req.bp || '')];   // 🧪 bp-5
+  if (need && req.blueprint) { if (station === 'forge' || station === 'weld') { if (req.mat !== need) throw new Error('This blueprint is made of ' + ART_MATS_[need][1] + ' — make it in the 🧪 Material lab.'); } else if (station === 'light') { delete cost.glass; cost[need] = 1; } else cost[need] = (cost[need] || 0) + 1; }
   const live = activePlayers_(listProfilesFull()).map(p => p.Name);
   const team = (Array.isArray(req.team) ? req.team : []).map(String).filter((n, i, a) => n !== name && live.indexOf(n) !== -1 && a.indexOf(n) === i).slice(0, 3);   // 🤝 team project
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
@@ -5093,7 +5116,7 @@ function artShowList_(players) { const live = players.map(p => p.Name); return a
 const ART_SKIN_KINDS_ = ['piece', 'figure', 'trophy', 'board', 'frame', 'stand', 'gem', 'medal', 'badge', 'sign', 'pshape', 'pspin', 'scarf', 'flag', 'cape', 'bag', 'basket', 'hat', 'lantern', 'ball', 'vase', 'bowl', 'robot', 'yoyo', 'petbowl'];
 function artSkinList_(players) {
   const live = players.map(p => p.Name), MAT = { oak: '#C08A4E', bamboo: '#CDB45A', teak: '#8A5530', iron: '#7D8590', copper: '#C8743A', tin: '#C3CAD3', bronze: '#B07A32', silver: '#D8DEE6', gold: '#F2C230', granite: '#8E8A86', jade: '#3FAE7A', crystal: '#BFE8FF', ruby: '#D3264A', sapphire: '#2457C9', amethyst: '#8E4FD0', clay: '#C46B42', fabric: '#E86A9A', leather: '#8B5A2B', glass: '#A8E0E8', filament: '#5BC0EB', flower: '#FF8FB1' };
-  return artRows_().filter(a => ART_SKIN_KINDS_.indexOf(a.kind) !== -1 && live.indexOf(a.maker) !== -1).slice(-80).reverse().map(a => {
+  return artRows_().filter(a => ART_SKIN_KINDS_.indexOf(a.kind) !== -1 && live.indexOf(a.maker) !== -1 && !a.look.br).slice(-80).reverse().map(a => {
     const lk = a.look || {}, col = ART_HEX_.test(lk.c || '') ? lk.c : MAT[lk.m] || MAT[lk.g] || '#C08A4E';
     return { id: a.id, k: a.kind, n: a.name, by: a.maker, m: lk.m || lk.g || '', col: col, c2: ART_HEX_.test(lk.c2 || '') ? lk.c2 : '', look: lk };
   });
@@ -5212,7 +5235,61 @@ function artFamRemove(name, famId) {
     const left = list.filter(x => x !== f); saveSetting('ArtFamBP', JSON.stringify(left)); return { fam: left };
   } finally { lock.releaseLock(); }
 }
-// (bp-4) END OF ArtifactoryCode.gs
+
+/* ================= 🧪 lab upgrade needs · 🧲 quick tests · 🔧 repair + kintsugi (bp-5) ================= */
+const ART_BP_NEED_ = {medal_12: 'brass', key_12: 'steel', charm_12: 'brass', badge_12: 'steel', robot_12: 'steel', sign_12: 'steel', lantern_11: 'sglass', lantern_12: 'sglass', scarf_12: 'fdye', cape_12: 'fdye', bag_12: 'fdye', flag_12: 'fdye'};   // Master blueprints that need a 🧪 lab material (= ArtBlueprints.html BP_NEED)
+const ART_GIFT5_ = { zinc: 4, carbon: 4, cobalt: 2, alum: 2 };   // bp-5 opening gift: what the new lab recipes need
+const ART_TOUGH_ = { wood: 55, metal: 85, stone: 35, clay: 15, glass: 8, fabric: 95, plastic: 45, nature: 40 };
+const ART_TESTS_ = {
+  drop: { name: 'Drop test', lim: 45, q: 5, broke: 'It cracked when it hit the floor.', ok: 'Bounce! It survived the drop.',
+    lesson: 'Brittle things (clay, glass, stone) crack when they land; tough things (metal, wood, cloth) bend or bounce.' },
+  bend: { name: 'Bend test', lim: 40, q: 99, broke: 'Snap! It could not bend.', ok: 'It bent a little and sprang back.',
+    lesson: 'Flexible materials bend and spring back (that is called elasticity); brittle ones snap instead.' },
+  load: { name: 'Load test', lim: 35, q: 4, broke: 'Crunch — too heavy for it.', ok: 'It held the heavy book!',
+    lesson: 'Engineers test copies with weight so the real thing is safe — the strongest shapes spread the load.' }
+};
+const ART_REPAIR_ = { wood: ['🧴', 'Glue + clamp', 'Wood glue soaks into the fibres; the clamp holds the pieces while it dries.'], metal: ['🔥', 'Re-weld', 'Welding melts both sides of the break back into one piece.'],
+  stone: ['🧴', 'Stone glue', 'Stone glue is two parts that harden together like new rock.'], clay: ['🏺', 'Kintsugi (gold)', 'Kintsugi is the Japanese art of mending with gold — the crack becomes the most beautiful part.'],
+  glass: ['✨', 'Kintsugi (gold)', 'Kintsugi is the Japanese art of mending with gold — the crack becomes the most beautiful part.'], fabric: ['🪡', 'Re-stitch', 'New stitches pull the torn edges back together.'],
+  plastic: ['🧴', 'Plastic weld', 'Warm plastic melts back together, just like on the 3D printer.'], nature: ['🧴', 'Glue + wrap', 'Natural things are mended with glue and a tight wrap.'] };
+function artGroup_(a) {
+  const L = a.look || {}, m = L.m || L.g || Object.keys(a.mats || {})[0] || 'oak';
+  if (m === 'clay') return 'clay'; if (m === 'glass' || m === 'sglass') return 'glass'; if (m === 'fabric' || m === 'leather') return 'fabric'; if (m === 'filament') return 'plastic';
+  const c = ART_MATS_[m] ? ART_MATS_[m][2] : 'wood'; return ART_TOUGH_[c] != null ? c : 'wood';
+}
+// 🧲 a quick test (the full Physics Room comes in 🔬 Sciencetory): the same thing always gives the same result — material toughness + how well it was made
+function artTest(name, id, test) {
+  checkArtPlayer_(name); const T = ART_TESTS_[test]; if (!T) throw new Error('Pick a test.');
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const a = artRows_().find(x => x.id === String(id));
+    if (!a || a.owners.indexOf(name) === -1) throw new Error('You can only test your own things.');
+    if (a.look.br) throw new Error('It is broken — repair it first.');
+    const grp = artGroup_(a), q = artInt_(a.look.q == null ? 80 : a.look.q, 0, 100), score = ART_TOUGH_[grp] + q / T.q, broke = score < T.lim;
+    if (broke) { a.look.br = test; writeArt_(a); }
+    var res = { item: publicArt_(a), broke: broke, test: test, group: grp, text: broke ? T.broke : T.ok, lesson: T.lesson + (broke ? ' Engineers break test copies on purpose so the real thing is safe — now fix it!' : '') };
+  } finally { lock.releaseLock(); }
+  safeRecordFeats_(name, 'artifactory', res.broke ? { tests: 1, breaks: 1 } : { tests: 1 });
+  return res;
+}
+// 🔧 repair: uses about ⅓ of what it took to make, gives a 🔧 Repaired mark (+ gold kintsugi seams on clay and glass) and a lesson — broken is never lost
+function artRepair(name, id) {
+  checkArtPlayer_(name);
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const a = artRows_().find(x => x.id === String(id));
+    if (!a || a.owners.indexOf(name) === -1) throw new Error('You can only repair your own things.');
+    if (!a.look.br) throw new Error('It is not broken.');
+    const cost = {}; Object.keys(a.mats || {}).forEach(m => { if (ART_MATS_[m]) cost[m] = Math.max(1, Math.ceil(Number(a.mats[m]) / 3)); });
+    const bag = artTake_(artBag_(getSettings(), name), cost), grp = artGroup_(a), how = ART_REPAIR_[grp] || ART_REPAIR_.wood;
+    delete a.look.br; a.look.rp = Math.min(99, (a.look.rp || 0) + 1); if (grp === 'clay' || grp === 'glass') a.look.kg = 1;
+    writeArt_(a); artSaveBag_(name, bag);
+    var res = { item: publicArt_(a), bag: bag, cost: cost, way: how[0] + ' ' + how[1], lesson: how[2], kintsugi: !!a.look.kg };
+  } finally { lock.releaseLock(); }
+  safeRecordFeats_(name, 'artifactory', { repairs: 1 });
+  return res;
+}
+// (bp-5) END OF ArtifactoryCode.gs
 
 ;
 /* ===== on the device only: the grown-up PIN arrives hashed from the family Sheet (OfflineSync.gs) ===== */
@@ -5346,7 +5423,9 @@ return {"include": typeof include === 'function' ? include : undefined,
 "getArtStrip": typeof getArtStrip === 'function' ? getArtStrip : undefined,
 "artDescribe": typeof artDescribe === 'function' ? artDescribe : undefined,
 "artFamSave": typeof artFamSave === 'function' ? artFamSave : undefined,
-"artFamRemove": typeof artFamRemove === 'function' ? artFamRemove : undefined};
+"artFamRemove": typeof artFamRemove === 'function' ? artFamRemove : undefined,
+"artTest": typeof artTest === 'function' ? artTest : undefined,
+"artRepair": typeof artRepair === 'function' ? artRepair : undefined};
 } };
 
 const VER = self.STEAM_GS.ver;
