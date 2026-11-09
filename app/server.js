@@ -1914,6 +1914,15 @@ const FEAT_DEFS = {
     lathe: { name: 'Turned on the lathe', icon: '🌀', kind: 'sum', tiers: [3, 20, 80] },
     finish: { name: 'Finishes (paint, varnish, engrave)', icon: '🎨', kind: 'sum', tiers: [3, 20, 80] },
     stone: { name: 'Stones polished', icon: '🪨', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
     stories: { name: 'Stories written', icon: '📝', kind: 'sum', tiers: [3, 20, 80] },
     drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
     remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
@@ -4122,7 +4131,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -4633,6 +4642,9 @@ function cleanArtLook_(kind, look) {
   if (ART_MATS_[look.m]) out.m = String(look.m);
   if (Array.isArray(look.p)) { const p = look.p.slice(0, 24).map(x => artInt_(x, 0, 20)); if (p.length >= 6) out.p = p; }
   if (Array.isArray(look.pi)) { const pi = look.pi.slice(0, 16).map(x => artInt_(x, 0, 20)); if (pi.length === 16 && pi.some(v => v > 0)) out.pi = pi; }   // 🌀 hollow inside (bp-1)
+  if (/^[0-9a-f]{64}$/.test(String(look.fg || ''))) out.fg = String(look.fg);   // ⚒️ the forged shape, 16×16 (bp-2)
+  if (look.tc != null) out.tc = artInt_(look.tc, 0, 3);   // 🌈 temper colour
+  if (Array.isArray(look.tw) && look.tw.length === 2) out.tw = look.tw.map(x => artInt_(x, 0, 15));   // 🌪️ twisted part
   if (ART_HEX_.test(String(look.c || ''))) out.c = String(look.c);
   if (look.v) out.v = 1;
   if (Array.isArray(look.s)) { const s = look.s.slice(0, 3).map(x => artInt_(x, 0, 7)); if (s.length) out.s = s; }
@@ -5113,7 +5125,7 @@ function artDescribe(name, id, desc) {
   if (Object.keys(res.descGot).length) safeRecordFeats_(name, 'artifactory', { stories: 1 });
   return res;
 }
-// (bp-1) END OF ArtifactoryCode.gs
+// (bp-2) END OF ArtifactoryCode.gs
 
 ;
 /* ===== on the device only: the grown-up PIN arrives hashed from the family Sheet (OfflineSync.gs) ===== */

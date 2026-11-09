@@ -138,6 +138,12 @@
   .af-meter .bar{height:9px;border-radius:6px;background:rgba(255,255,255,.18);overflow:hidden;margin-top:4px;} .af-meter .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#FFC845,#22C3A1);transition:width .2s;}
   .af-row{display:flex;gap:6px;flex-wrap:wrap;} .af-row .af-btn{flex:1 1 auto;min-width:0;padding:8px 8px;font-size:.86rem;}
   .af-tools{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;}
+  .af-fg-tools .af-tool{display:inline-flex;flex-direction:column;align-items:center;line-height:1.05;min-width:44px;} .af-fg-tools .af-tool small{font-size:.58rem;opacity:.85;font-weight:700;}
+  @media (max-width:520px){ .af-hud{gap:4px;padding:4px 6px;} .af-hud .pill{min-width:32px;padding:3px 6px;} .af-hud #h-title{flex-shrink:2;} .af-hud #h-step{flex:0 1 auto;min-width:44px;overflow:hidden;text-overflow:ellipsis;display:block;line-height:26px;} }
+  @media (max-width:520px){ .af-fg-tools .af-tool{min-width:38px;min-height:36px;padding:2px 4px;} .af-fg-tools .af-tool small{display:none;} }
+  .af-fg-amt{font-size:.74rem;font-weight:700;color:#fff;text-align:center;background:rgba(255,255,255,.1);border-radius:10px;padding:3px 6px;} .af-fg-amt b{color:#FFC845;}
+  .af-fg-temper .bar{position:relative;display:flex;border-radius:10px;overflow:hidden;height:30px;} .af-fg-temper .bar span{flex:1;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:800;color:#fff;text-shadow:0 1px 2px #0008;}
+  .af-fg-temper .bar i{position:absolute;top:0;bottom:0;width:4px;margin-left:-2px;background:#fff;box-shadow:0 0 6px #000;}
   .af-tool{border:3px solid transparent;border-radius:12px;min-width:40px;min-height:40px;background:rgba(255,255,255,.14);color:#fff;font-weight:800;cursor:pointer;font-size:.86rem;padding:3px 7px;position:relative;transform:translateZ(0);}
   .af-tool.on{border-color:#FFC845;background:rgba(255,200,69,.25);} .af-tool.done{opacity:.55;} .af-tool .sw{display:inline-block;width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,.6);vertical-align:middle;}
   .af-tool input{width:100%;}
@@ -518,7 +524,78 @@ const AF = (function(){
   function labHit(v, zone){ const mid = (zone[0] + zone[1]) / 2, half = (zone[1] - zone[0]) / 2, d = Math.abs(v - mid); return d <= half ? 1 : d <= half * 2 ? 0.5 : 0; }
   // 🌿 resin flower charm: pour until the level sits between the two lines
   function resinQ(level, lo, hi){ if(level >= lo && level <= hi) return 1; const d = level < lo ? lo - level : level - hi; return clampN(1 - d / 0.15, 0, 1); }
-  return {latheErrIn, WHITTLE, whittleStroke, whittleErr, PSHAPES, shapeR, shapeOutline, outlineFromPts, printErr, LAB, labHit, resinQ,
+  /* ---- ⚒️ real forge (bp-2): the metal is a 32×32 grid of thickness; every hit only MOVES metal, so the amount never changes ---- */
+  const FGN = 32, FGC = 2 / FGN, FG_HMIN = 0.18, FG_HMAX = 1.25;
+  const FG_STOCK = {block: [0.25, 0.25, 1.0], bar: [0.13, 0.34, 0.9], rod: [0.07, 0.4, 1.0], disc: [0.3, 0.3, 0.7]};   // half-width, half-height, thickness
+  function fgNew(stock){ const s = FG_STOCK[stock] || FG_STOCK.block, h = new Array(FGN * FGN).fill(0);
+    for(let j = 0; j < FGN; j++) for(let i = 0; i < FGN; i++){ const x = fgX(i), y = fgX(j); if(stock === 'disc' ? Math.hypot(x / s[0], y / s[1]) <= 1 : Math.abs(x) < s[0] && Math.abs(y) < s[1]) h[j * FGN + i] = s[2]; } return h; }
+  function fgX(i){ return -1 + (i + 0.5) * FGC; }
+  function fgCell(x){ return Math.floor((x + 1) / FGC); }
+  function fgVol(h){ let v = 0; for(let k = 0; k < h.length; k++) v += h[k]; return v; }
+  function fgArea(h){ let n = 0; for(let k = 0; k < h.length; k++) if(h[k] > 0.015) n++; return n; }
+  function fgMid(h, px, py, rr){ let sx = 0, sy = 0, v = 0; for(let j = 0; j < FGN; j++) for(let i = 0; i < FGN; i++){ if(rr && Math.hypot(fgX(i) - px, fgX(j) - py) > rr) continue; const a = h[j * FGN + i]; sx += a * fgX(i); sy += a * fgX(j); v += a; } return v ? [sx / v, sy / v] : [0, 0]; }
+  function fgPut(h, d, i, j, a){ if(i < 0 || j < 0 || i >= FGN || j >= FGN) return false; d[j * FGN + i] += a; return true; }
+  function fgApply(h, d){ for(let k = 0; k < h.length; k++){ h[k] += d[k]; if(h[k] < 1e-12) h[k] = 0; } return h; }
+  function fgOverflow(h){   // too thick? the extra spills to the thinnest neighbour (metal never vanishes)
+    for(let pass = 0; pass < 3; pass++) for(let j = 0; j < FGN; j++) for(let i = 0; i < FGN; i++){ const k = j * FGN + i; if(h[k] <= FG_HMAX) continue;
+      let best = -1, bh = 9; [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([a, b]) => { const ii = i + a, jj = j + b; if(ii < 0 || jj < 0 || ii >= FGN || jj >= FGN) return; const v = h[jj * FGN + ii], w = v > 0.015 ? v : v + 5; if(w < bh){ bh = w; best = jj * FGN + ii; } });   // spill into metal first (an upset end gets fatter, not longer)
+      if(best >= 0){ const x = h[k] - FG_HMAX; h[k] -= x; h[best] += x; } } return h; }
+  // every hammer move = the metal FLOWS: each cell's metal slides to a new spot (shared by the 4 cells round it), so the amount stays exactly the same
+  function fgWarp(h, fn){ const d = new Array(h.length).fill(0);
+    for(let j = 0; j < FGN; j++) for(let i = 0; i < FGN; i++){ const c = j * FGN + i, a = h[c]; if(a <= 0) continue; const q = fn(fgX(i), fgX(j)); if(!q) continue;
+      const fx = (q[0] + 1) / FGC - 0.5, fy = (q[1] + 1) / FGC - 0.5; if(Math.abs(fx - i) < 1e-9 && Math.abs(fy - j) < 1e-9) continue;
+      const i0 = Math.floor(fx), j0 = Math.floor(fy), tx = fx - i0, ty = fy - j0, parts = [[i0, j0, (1 - tx) * (1 - ty)], [i0 + 1, j0, tx * (1 - ty)], [i0, j0 + 1, (1 - tx) * ty], [i0 + 1, j0 + 1, tx * ty]].filter(p => p[2] > 1e-9 && p[0] >= 0 && p[1] >= 0 && p[0] < FGN && p[1] < FGN);
+      const ws = parts.reduce((s, p) => s + p[2], 0); if(ws <= 0) continue; d[c] -= a; parts.forEach(p => { d[p[1] * FGN + p[0]] += a * p[2] / ws; }); }
+    fgApply(h, d); for(let k = 0; k < h.length; k++) if(h[k] > 0 && h[k] < 0.05 && fgRim(h, k)) fgDust(h, k); return fgOverflow(h); }
+  function fgRim(h, k){ const i = k % FGN, j = (k - i) / FGN; return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => { const ii = i + a, jj = j + b; return ii < 0 || jj < 0 || ii >= FGN || jj >= FGN || h[jj * FGN + ii] <= 0; }); }
+  function fgDust(h, k){ const i = k % FGN, j = (k - i) / FGN; let best = -1, bh = 0; [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]].forEach(([a, b]) => { const ii = i + a, jj = j + b; if(ii < 0 || jj < 0 || ii >= FGN || jj >= FGN) return; const v = h[jj * FGN + ii]; if(v > bh){ bh = v; best = jj * FGN + ii; } }); if(best >= 0){ h[best] += h[k]; h[k] = 0; } }
+  function fgZoneT(h, px, py, R){ let s = 0, n = 0; for(let j = 0; j < FGN; j++) for(let i = 0; i < FGN; i++){ const v = h[j * FGN + i]; if(v > 0.02 && Math.hypot(fgX(i) - px, fgX(j) - py) <= R){ s += v; n++; } } return n ? s / n : 0; }
+  // 🔨 flat face: the metal under the hammer gets thinner and flows out in every direction
+  function fgSpread(h, px, py, k, R){ R = R || 0.26; const t = fgZoneT(h, px, py, R); if(t <= FG_HMIN) return h; const A = 0.2 * k * Math.min(1, (t - FG_HMIN) / 0.25);
+    return fgWarp(h, (x, y) => { const dx = x - px, dy = y - py, r = Math.hypot(dx, dy); if(r < 1e-6) return null; const m = r < R ? A * r / R : A * R / r; return [x + dx / r * m, y + dy / r * m]; }); }
+  // 🔄 on its side: squeezes the width, the metal goes along the bar (ax 'v' = longer up/down, 'h' = longer left/right) — drawing out
+  function fgDraw(h, px, py, k, ax, R){ R = R || 0.24; const t = fgZoneT(h, px, py, R); if(t <= FG_HMIN * 0.8) return h; const V = ax !== 'h', A = 0.2 * k * Math.min(1, (t - FG_HMIN * 0.8) / 0.25);
+    return fgWarp(h, (x, y) => { const across = V ? x - px : y - py, along = V ? y - py : x - px; if(Math.abs(across) > 0.9) return null;
+      const st = Math.abs(along) < R ? A * along / R : A * Math.sign(along), w = Math.exp(-Math.pow(along / (R * 1.2), 2)), sq = -across * 1.1 * k * w;
+      return V ? [x + sq, y + st] : [x + st, y + sq]; }); }
+  // ⛏️ cross-pein: pushes the metal ONE way only (from the middle out through the hit spot)
+  function fgPein(h, px, py, k, R){ R = R || 0.14; const t = fgZoneT(h, px, py, R); if(t <= FG_HMIN) return h; const m = fgMid(h, px, py, 0.3); let ux = px - m[0], uy = py - m[1]; const L = Math.hypot(ux, uy) || 1; ux /= L; uy /= L; const A = 0.22 * k * Math.min(1, (t - FG_HMIN) / 0.25);
+    return fgWarp(h, (x, y) => { const dx = x - px, dy = y - py, s = dx * ux + dy * uy, pr = Math.abs(-dx * uy + dy * ux); if(s < -R || pr > R) return null;
+      const w = 1 - Math.pow(pr / R, 2), m = A * w * (s < 0 ? (s + R) / R : 1); return [x + ux * m, y + uy * m]; }); }
+  // ⬇️ hit the END: shorter + thicker (upsetting)
+  function fgUpset(h, px, py, k, R){ R = R || 0.3; const m = fgMid(h); let ux = m[0] - px, uy = m[1] - py; const L = Math.hypot(ux, uy) || 1; ux /= L; uy /= L; const A = 0.36 * k;
+    return fgWarp(h, (x, y) => { const dx = x - px, dy = y - py, s = dx * ux + dy * uy, pr = Math.abs(-dx * uy + dy * ux); if(s > R || pr > 0.6) return null; const mm = A * Math.min(1, (R - s) / R); return [x + ux * mm, y + uy * mm]; }); }
+  // 🔩 punch: a hole, the metal goes to the ring round it
+  function fgPunch(h, px, py, r0){ r0 = r0 || 0.1; const d = new Array(h.length).fill(0);
+    for(let j = 0; j < FGN; j++) for(let i = 0; i < FGN; i++){ const c = j * FGN + i; if(h[c] <= 0.02) continue; const dx = fgX(i) - px, dy = fgX(j) - py, r = Math.hypot(dx, dy); if(r > r0) continue;
+      const L = r || 1, ux = r ? dx / L : 1, uy = r ? dy / L : 0; let ii = i, jj = j; for(let s = 1; s < 6; s++){ ii = i + Math.round(ux * s); jj = j + Math.round(uy * s); if(Math.hypot(fgX(ii) - px, fgX(jj) - py) > r0) break; }
+      if(fgPut(h, d, ii, jj, h[c])) d[c] -= h[c]; }
+    return fgOverflow(fgApply(h, d)); }
+  // 🌀 over the horn: everything past the hit spot (the far side from the middle) bends round it
+  function fgBend(h, px, py, ang){ const m = fgMid(h); let ux = px - m[0], uy = py - m[1]; const L = Math.hypot(ux, uy) || 1; ux /= L; uy /= L; const ca = Math.cos(ang), sa = Math.sin(ang);
+    return fgWarp(h, (x, y) => { const dx = x - px, dy = y - py; if(dx * ux + dy * uy < 0) return null; return [px + dx * ca - dy * sa, py + dx * sa + dy * ca]; }); }
+  const FG_TEMPER = [['Straw', '#E8C872'], ['Bronze', '#B87333'], ['Purple', '#7B4B94'], ['Blue', '#3B6FB6']];
+  // a recipe = the moves a smith makes, e.g. "S:block f:0,0*6 p:0,-.4*3 o:0,-.5 b:0,.2,.3 t:.1,.4 c:2" → the plan
+  function fgRun(recipe){ const parts = String(recipe).trim().split(/\s+/), o = {stock: 'block', h: null, tw: null, tc: -1};
+    parts.forEach(p => { const m = /^([A-Za-z]):([^*]*)(?:\*(\d+))?$/.exec(p); if(!m) return; const op = m[1], a = m[2].split(',').map(Number), n = Number(m[3] || 1);
+      if(op === 'S'){ o.stock = m[2]; o.h = fgNew(o.stock); return; } if(!o.h) o.h = fgNew(o.stock);
+      for(let q = 0; q < n; q++){ if(op === 'f') fgSpread(o.h, a[0], a[1], 0.32); else if(op === 'v') fgDraw(o.h, a[0], a[1], 0.32, 'v'); else if(op === 'h') fgDraw(o.h, a[0], a[1], 0.32, 'h');
+        else if(op === 'p') fgPein(o.h, a[0], a[1], 0.32); else if(op === 'u') fgUpset(o.h, a[0], a[1], 0.32); else if(op === 'o') fgPunch(o.h, a[0], a[1]); else if(op === 'b') fgBend(o.h, a[0], a[1], a[2]); }
+      if(op === 't') o.tw = [a[0], a[1]]; if(op === 'c') o.tc = a[0]; });
+    if(!o.h) o.h = fgNew(o.stock); return o; }
+  function fgMask(h){ return h.map(v => v > 0.015 ? 1 : 0); }
+  function fgShrink(m){ return m.map((v, k) => { if(!v) return 0; const i = k % FGN, j = (k - i) / FGN; return [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([a, b]) => { const ii = i + a, jj = j + b; return ii >= 0 && jj >= 0 && ii < FGN && jj < FGN && m[jj * FGN + ii]; }) ? 1 : 0; }); }
+  function fgGrow(m){ return m.map((v, k) => { if(v) return 1; const i = k % FGN, j = (k - i) / FGN; return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => { const ii = i + a, jj = j + b; return ii >= 0 && jj >= 0 && ii < FGN && jj < FGN && m[jj * FGN + ii]; }) ? 1 : 0; }); }
+  // how far from the plan: only cells clearly inside / clearly outside count (the 1-cell border is free), out of the work there was to do
+  function fgPlan(tmask, stockH){ const inn = fgShrink(tmask), out = fgGrow(tmask), s = fgMask(stockH); let job = 0; for(let k = 0; k < s.length; k++){ if(inn[k] && !s[k]) job++; if(!out[k] && s[k]) job++; } return {mask: tmask, inn, out, job: Math.max(job, 12)}; }
+  function fgMiss(h, P){ let miss = 0; for(let k = 0; k < h.length; k++){ const m = h[k] > 0.015; if(P.inn[k] && !m) miss++; else if(!P.out[k] && m) miss++; } return miss; }
+  function fgErr(h, P, extra){ extra = extra || {}; let e = fgMiss(h, P) / P.job;
+    e += (extra.cracks || 0) * 0.06 + (extra.burn || 0) * 0.05 + (extra.twistBad ? 0.12 : 0) + (extra.temperBad ? 0.12 : 0); return clampN(e, 0, 1); }
+  // a small 16×16 picture of the shape for the saved look (64 hex digits)
+  function fgPack(h){ let s = ''; for(let j = 0; j < 16; j++){ let row = 0; for(let i = 0; i < 16; i++){ const k1 = (j * 2) * FGN + i * 2, a = h[k1] + h[k1 + 1] + h[k1 + FGN] + h[k1 + FGN + 1]; if(a > 0.12) row |= 1 << (15 - i); } s += ('000' + row.toString(16)).slice(-4); } return s; }
+  function fgUnpack(s){ const out = []; for(let j = 0; j < 16; j++){ const row = parseInt(String(s).slice(j * 4, j * 4 + 4), 16) || 0; for(let i = 0; i < 16; i++) out.push(row >> (15 - i) & 1); } return out; }
+  return {fgNew, fgX, fgVol, fgArea, fgMid, fgSpread, fgDraw, fgPein, fgUpset, fgPunch, fgBend, fgRun, fgMask, fgPlan, fgMiss, fgErr, fgPack, fgUnpack, fgZoneT, FGN, FG_HMIN, FG_TEMPER,
+    latheErrIn, WHITTLE, whittleStroke, whittleErr, PSHAPES, shapeR, shapeOutline, outlineFromPts, printErr, LAB, labHit, resinQ,
     DEPTHS, plank, planePass, planeTo, planerErr, planerTarget, SEAM_BAND, seam, seamProject, beadQ, seamErr, FN, FORGE_SHAPES, forgeTarget, forgeErr, forgeHit, POT_DESIGNS, potErr, WEAVES, weavePlan, weaveErr, CIRC, makeCircuit, tapTile, checkCircuit, solveCircuit, circuitErr,
     LEVELS, N, M, LATHE_KINDS, STONE_KINDS, DESIGNS, GRITS, CUTS, CUT_FACETS, COLORS, COLOR_NAMES, STICKERS, rng, prof16, at16, latheErr, starsFor, scoreFor, design, carveTo, wrapPI, facetAcc, stoneQuality, stoneErr, finishErr, blueprint};
 })();
@@ -887,7 +964,7 @@ function enterPlay(st){
 }
 function startStation(){
   const ready = setupReady(); if(!ready.ok){ UI.toast('🔒 ' + ready.why, 'info'); return; }
-  const st = SET.station, go = () => { ({lathe: startLathe, stone: startStone, finish: startFinish, planer: startPlaner, weld: startWeld, forge: startForge, pottery: startPottery, sew: startSew, light: startLight, whittle: startWhittle, print: startPrint, nature: startNature, lab: startLab})[st](); };
+  const st = SET.station, go = () => { ({lathe: startLathe, stone: startStone, finish: startFinish, planer: startPlaner, weld: startWeld, forge: startForge2, pottery: startPottery, sew: startSew, light: startLight, whittle: startWhittle, print: startPrint, nature: startNature, lab: startLab})[st](); };
   safetyFirst(st).then(() => bpGo(st, go));
 }
 function leavePlay(){
@@ -1755,7 +1832,7 @@ function charmDone(){
   if(!G || G.done || G.phase !== 'resin') return; if(G.level2 < 0.2){ banner('Pour the resin first 🫗'); return; }
   G.done = true; G.pouring = false; SND.win(); react('cheer');
   const secs = Math.round((performance.now() - G.t0) / 1000), look = G.look();
-  let bp = null; if(G.blue){ const e = 1 - AF.resinQ(G.level2, G.lo, G.hi), st = AF.starsFor(e, G.level); bp = {level: G.level, stars: st, score: AF.scoreFor(e, G.level, secs), timeSec: secs, acc: Math.round((1 - e) * 100)}; }
+  let bp = null; if(G.blue){ const e = Math.min(1, 1 - AF.resinQ(G.level2, G.lo, G.hi) + bpCharmBad()), st = AF.starsFor(e, G.level); bp = {level: G.level, stars: st, score: AF.scoreFor(e, G.level, secs), timeSec: secs, acc: Math.round((1 - e) * 100)}; }
   waitStep('nature').then(() => itemCard({station: 'nature', kind: 'fcharm', mat: 'flower', look, blueprint: bp, name: S.player + "'s Flower charm"}));
 }
 function drawCharm(){
@@ -1803,7 +1880,7 @@ function over(html){ $('over-card').innerHTML = html; $('over').classList.remove
 function lessonOf(st){ const L = STATIONS[st].lessons || ['Makers measure twice and cut once.']; const n = (Number(ls(store('lesson_' + st))) || 0); ls(store('lesson_' + st), String(n + 1)); return L[n % L.length]; }
 function waitStep(st){
   const S2 = STATIONS[st], ms = 5000 * SPEED;
-  over('<div class="af-wait-ico ui-spin a-gear">' + S2.wait[0] + '</div><h2>' + S2.wait[1] + '</h2><div class="af-prog"><i id="wait-bar"></i></div><div class="af-lesson"><b>💡 In real life</b>' + UI.esc(G && G.bp ? G.bp.fact : lessonOf(st)) + '</div>');
+  over('<div class="af-wait-ico ui-spin a-gear">' + S2.wait[0] + '</div><h2>' + S2.wait[1] + '</h2><div class="af-prog"><i id="wait-bar"></i></div><div class="af-lesson"><b>💡 In real life</b>' + UI.esc(G && G.bp && G.bp.fact ? G.bp.fact : lessonOf(st)) + '</div>');
   return new Promise(res => { const t0 = performance.now(); const tick = () => { const p = ms <= 0 ? 1 : Math.min(1, (performance.now() - t0) / ms); const b = $('wait-bar'); if(b) b.style.width = (p * 100) + '%'; if(p >= 1) return res(); requestAnimationFrame(tick); }; tick(); });
 }
 /* ================= 🥽 safety card (first time at each machine) ================= */
@@ -1986,7 +2063,7 @@ function thingCard(a){
 
 
 /* ================= 📘 BLUEPRINT BOOK · 🧪 practice · 🗣️ avatar talk · 🔄 2.5D view (bp-1) ================= */
-const BP_STATIONS = ['lathe', 'pottery', 'print'];
+const BP_STATIONS = ['lathe', 'pottery', 'print', 'forge', 'stone', 'sew', 'nature', 'finish'];
 const SUITS = {lathe: 'apron', stone: 'apron', finish: 'smock', planer: 'earmuffs', weld: 'weld', forge: 'leather', pottery: 'smock', sew: 'tape', light: 'apron', whittle: 'apron', print: 'apron', lab: 'labcoat', nature: 'apron'};
 const TOOLS = {lathe: '🪛', stone: '💎', finish: '🖌️', planer: '🪚', weld: '🔥', forge: '🔨', pottery: '🤲', sew: '🪡', light: '🔌', whittle: '🔪', print: '🖱️', lab: '🧪', nature: '🌿'};
 const BAD_WORDS = /(f+u+c+k|sh[i1]t|b[i1]tch|a+ss+h|d[i1]ck|pen[i1]s|s+e+x|k[i1]ll|stupid|idiot|hate|ควย|เหี้ย|สัส|มึง)/i;
@@ -2002,6 +2079,7 @@ function bpOpen(e){
 }
 function bpPageDone(kind){ return BP.page(kind).filter(e => !e.ch && bpStars(e.id) > 0).length; }
 function bpLook(e){
+  const l2 = bpLook2(e); if(l2) return l2;
   if(e.kind === 'pshape') return {k: 'pshape', m: 'filament', c: '#5BC0EB', ol: e.ol.map(v => Math.max(1, Math.round(v * 20)))};
   const lk = {k: e.kind, m: e.st === 'lathe' ? (SET.mat || 'oak') : e.st === 'pottery' ? 'clay' : 'filament', p: e.p}; if(e.pi) lk.pi = e.pi; if(e.kind === 'pspin') lk.c = '#5BC0EB'; return lk;
 }
@@ -2010,7 +2088,7 @@ const TRY_THIS = {lathe: ['Make it taller than it is wide — does it still stan
   print: ['Draw a shape with 6 bumps.', 'Stretch a star very tall.', 'Draw a tower with 3 steps.']};
 function tryThis(st){ const L = TRY_THIS[st] || ['Make something nobody has made before!']; return L[Math.floor(Date.now() / 60000) % L.length]; }
 function bpHowHtml(id){
-  const kind = SET.kind; if(SET.mode === 'blue') SET.mode = 'book';
+  const kind = id === 'finish' ? 'paint' : SET.kind; if(SET.mode === 'blue') SET.mode = 'book';
   let h = '<div class="af-box"><h3>3 · How?</h3><div class="af-modes">' + [['free', '🎨 Free make', 'Your own design — keep it'], ['practice', '🧪 Practice', 'Try a skill — free, not kept'], ['book', '📘 Blueprints', '12 plans + 🏆 3 challenges']]
     .map(m => '<button class="af-kind' + (SET.mode === m[0] ? ' on' : '') + '" data-sound="pop" data-mode="' + m[0] + '"><span class="nm">' + m[1] + '</span><span class="sub">' + m[2] + '</span></button>').join('') + '</div>';
   if(SET.mode !== 'book') h += '<p class="af-note">💡 Try this: ' + tryThis(id) + '</p>';
@@ -2031,7 +2109,7 @@ function bpGo(st, go){
   const book = SET.mode === 'book' && BP_STATIONS.indexOf(st) >= 0 ? BP.get(SET.bp) : null, saved = {mode: SET.mode, level: SET.level, pmode: SET.pmode, kind: SET.kind};
   PRACTICE = SET.mode === 'practice';
   if(PRACTICE) SET.mode = 'free';
-  if(book){ SET.mode = 'blue'; SET.level = book.lv; SET.kind = book.kind; if(book.kind === 'pshape') SET.pmode = book.pm === 'adv' ? 'adv' : 'simple'; }
+  if(book){ SET.mode = 'blue'; SET.level = book.lv; if(book.st !== 'finish') SET.kind = book.kind; if(book.kind === 'pshape') SET.pmode = book.pm === 'adv' ? 'adv' : 'simple'; }
   try{ go(); } finally { SET.mode = saved.mode; SET.level = saved.level; SET.pmode = saved.pmode; }
   if(!G) return; G.practice = PRACTICE; G.bp = book;
   if(book) bpApply(book);
@@ -2041,6 +2119,7 @@ function bpGo(st, go){
 function bpApply(e){
   $('h-title').textContent = STATIONS[e.st].icon + ' ' + (e.ch ? '🏆 ' : '📘 #' + e.n + ' ') + e.name;
   const g0 = '📘 <b>' + UI.esc(e.name) + '</b> — 🆕 ' + UI.esc(e.learn);
+  if(bpApply2(e)){ if(e.ch) G.timer = true; return; }
   if(e.st === 'lathe'){ G.target = e.p.slice(); G.tin = e.pi ? e.pi.slice() : null; latheUi(); goal(g0 + (e.pi ? ' · then 🔄 hollow the inside' : '')); G.first = true; if(G.guide) setTimeout(latheHand, 80); }
   else if(e.st === 'pottery'){ G.target = e.p.slice(); potteryMeter(); goal(g0); }
   else if(e.kind === 'pspin'){ G.target = e.p.slice(); printMeter(); goal(g0); }
@@ -2143,11 +2222,163 @@ function openBook(){ renderBook(); showScreen('book'); }
 function renderBook(){
   const groups = BP_STATIONS.map(st => '<div class="af-box"><h3>' + STATIONS[st].icon + ' ' + STATIONS[st].name + ' <small>' + stationLevel(st) + '</small></h3><div class="af-kinds">' +
     BP.ORDER.filter(k => BP.page(k)[0].st === st).map(k => { const d = bpPageDone(k), ch = BP.page(k).filter(e => e.ch && bpStars(e.id)).length;
-      return '<button class="af-kind" data-sound="pop" data-page="' + k + '"><canvas width="160" height="160"></canvas><span class="nm">' + KINDS[k][4] + ' ' + KINDS[k][3] + (d >= 12 ? ' 🏅' : '') + '</span><span class="sub">📘 ' + d + ' / 12 · 🏆 ' + ch + ' / 3</span></button>'; }).join('') + '</div></div>').join('');
-  $('book-body').innerHTML = groups + '<div class="af-box"><h3>🔜 More pages coming</h3><p class="af-note">⚒️ Forge · 💎 Stone · 🧵 Sewing · 🌿 Nature · 🎨 Finish next, then 🪚 Planer · 🔥 Welding · 🔌 Light · 🔪 Whittling. Their ⭐ Blueprint levels still work at each station.</p></div>';
+      return '<button class="af-kind" data-sound="pop" data-page="' + k + '"><canvas width="160" height="160"></canvas><span class="nm">' + bpKL(k) + (d >= 12 ? ' 🏅' : '') + '</span><span class="sub">📘 ' + d + ' / 12 · 🏆 ' + ch + ' / 3</span></button>'; }).join('') + '</div></div>').join('');
+  $('book-body').innerHTML = groups + '<div class="af-box"><h3>🔜 More pages coming</h3><p class="af-note">🪚 Planer · 🔥 Welding · 🔌 Light · 🔪 Whittling (+ new carved figures) next. Their ⭐ Blueprint levels still work at each station.</p></div>';
   $('book-body').querySelectorAll('[data-page]').forEach(b => { const k = b.dataset.page, g = b.querySelector('canvas').getContext('2d'), first = BP.page(k).find(e => !bpStars(e.id) && bpOpen(e).ok) || BP.page(k)[0]; artDraw(g, bpLook(first), 80, 150, 124, 1);
-    b.onclick = () => { SET.kind = k; SET.mode = 'book'; SET.bp = first.id; savePrefs(); openSetup(BP.page(k)[0].st); }; });
+    b.onclick = () => { if(k !== 'paint') SET.kind = k; SET.mode = 'book'; SET.bp = first.id; savePrefs(); openSetup(BP.page(k)[0].st); }; });
 }
+
+/* ---------- ⚒️ REAL FORGE + 📘 blueprints for forge · stone · sew · nature · finish (bp-2) ---------- */
+const FG_TOOLS = [['face', '🔨', 'Hammer'], ['pein', '⛏️', 'Pein'], ['punch', '🔩', 'Punch'], ['horn', '🌀', 'Horn'], ['twist', '🌪️', 'Twist']];
+const FG_SIDES = [['flat', '⬜ Flat'], ['v', '↕️ On its side'], ['h', '↔️ On its side']];
+const FG_STOCK_OF = {medal: 'block', key: 'bar', charm: 'disc'};
+function bpForgePlan(e){ if(!e._fg){ const o = AF.fgRun(e.rc); e._fg = {h: o.h, tw: o.tw, tc: o.tc, stock: o.stock, pack: AF.fgPack(o.h)}; } return e._fg; }
+function startForge2(){
+  const stock = FG_STOCK_OF[SET.kind] || 'block', h = AF.fgNew(stock);
+  G = {kind: SET.kind, mat: smat('forge'), blue: false, level: 0, guide: true, first: true, stock, h, v0: AF.fgVol(h), a0: AF.fgArea(h), P: null, T: 0.2, blowing: false, burn: 0, hits: 0, cracks: [], tool: 'face', side: 'flat', bend: 1,
+    tw: null, tc: -1, phase: 'forge', tp: 0, undo: [], hammerT: 0, hammerAt: null, sparks: [], steam: 0, warnT: 0, coolSaid: false};
+  G.look = () => { const lk = {k: G.kind, m: G.mat, q: fgQuality(), fg: AF.fgPack(G.h)}; if(G.tc >= 0) lk.tc = G.tc; if(G.tw) lk.tw = [Math.round((G.tw[0] + 1) * 7.5), Math.round((G.tw[1] + 1) * 7.5)]; return lk; };
+  G.geom = () => { const S = Math.min(W * 0.5, H * 0.46), cx = W * 0.5, cy = H * 0.54; return {S, cx, cy}; };
+  wirePointer({down: p => fgTap(p)});
+  G.step = dt => { if(G.done) return;
+    if(G.phase === 'temper'){ G.tp = Math.min(3.99, G.tp + dt * 0.45); const m = $('fg-tp'); if(m) m.style.left = (G.tp / 4 * 100) + '%'; return; }
+    G.T += (G.blowing ? 0.55 : -0.07) * dt; G.T = Math.max(0.05, Math.min(1.25, G.T)); if(G.T > 1.05){ G.burn += dt; if(!G.warnT){ G.warnT = 3; say(pickLine('forge', 'hot'), 'warn'); banner('🔥 Too hot — it\'s burning!'); } }
+    if(G.T > 0.6) G.coolSaid = false; else if(G.T < 0.58 && G.hits && !G.coolSaid){ G.coolSaid = true; say(pickLine('forge', 'cool'), 'warn'); }
+    G.warnT = Math.max(0, G.warnT - dt); G.hammerT = Math.max(0, G.hammerT - dt * 4); G.sparks = G.sparks.filter(s => (s.life -= dt) > 0); G.sparks.forEach(s => { s.x += s.vx * dt; s.y += s.vy * dt; s.vy += 500 * dt; });
+    const m = $('forge-t'); if(m){ m.style.width = Math.min(100, G.T / 1.1 * 100) + '%'; m.style.background = forgeColor(G.T); } };
+  G.draw = drawForge2;
+  enterPlay('forge'); setStep(KINDS[G.kind][4] + ' ' + KINDS[G.kind][3]); fgGoal(); fgUi();
+  if(G.guide) setTimeout(() => { if(G && G.first){ const bb = $('forge-bellows'); if(!bb) return; const r = bb.getBoundingClientRect(), s = $('stage').getBoundingClientRect(); pointHand(Math.min(r.left - s.left + 30, W - 20), Math.min(r.top - s.top, H - 30)); } }, 80);
+}
+function fgQuality(){ if(G.P) return Math.round(Math.max(20, (1 - fgErrNow()) * 100)); return Math.max(30, Math.round(100 - G.cracks.length * 8 - G.burn * 10)); }
+function fgErrNow(){ const e = G.bp, pl = e ? bpForgePlan(e) : null;
+  const twistBad = !!(pl && pl.tw && !(G.tw && Math.min(G.tw[1], pl.tw[1]) - Math.max(G.tw[0], pl.tw[0]) > (pl.tw[1] - pl.tw[0]) * 0.4));
+  return AF.fgErr(G.h, G.P, {cracks: G.cracks.length, burn: G.burn, twistBad, temperBad: !!(pl && pl.tc >= 0 && G.phase === 'done' && G.tc !== pl.tc)}); }
+function fgGoal(){
+  if(G.phase === 'temper'){ goal('🌈 The colour is running — tap <b>✋ Stop</b> at <b>' + (G.bp && bpForgePlan(G.bp).tc >= 0 ? AF.FG_TEMPER[bpForgePlan(G.bp).tc][0] : 'the colour you like') + '</b>'); return; }
+  const tip = {face: G.side === 'flat' ? 'tap to spread · tap past an end = shorter + thicker' : 'tap: slimmer + longer ' + (G.side === 'v' ? '↕️' : '↔️'), pein: 'tap near an edge: it pushes out',
+    punch: 'tap: a hole', horn: 'tap: the far part bends ' + (G.bend > 0 ? '↻' : '↺'), twist: 'tap the bar to twist it'}[G.tool];
+  goal((G.bp ? '📘 <b>' + UI.esc(G.bp.name) + '</b> — 🆕 ' + UI.esc(G.bp.learn) + '<br>' : '') + '🔥 <b style="color:#E2541A">Orange</b> hot → ' + FG_TOOLS.find(t => t[0] === G.tool)[1] + ' ' + tip);
+}
+function fgUi(){
+  if(!G || G.st !== 'forge') return;
+  if(G.phase === 'temper'){ ctl('<div class="af-fg-temper"><div class="bar">' + AF.FG_TEMPER.map(t => '<span style="background:' + t[1] + '">' + t[0] + '</span>').join('') + '<i id="fg-tp"></i></div></div><div class="af-row"><button class="af-btn amber" data-sound="pop" id="fg-stop" onclick="fgStopTemper()">✋ Stop</button></div>'); return; }
+  const vol = Math.round(AF.fgVol(G.h) / G.v0 * 100), area = Math.round(AF.fgArea(G.h) / G.a0 * 100), thick = Math.round(100 * G.a0 / Math.max(1, AF.fgArea(G.h)));
+  ctl('<div class="af-meter">🌡️ Heat <div class="bar"><i id="forge-t"></i></div></div>' +
+    '<div class="af-fg-amt" id="fg-amt" title="Metal is never lost — it only moves">⚖️ Metal <b>' + vol + '%</b> · 📏 Area <b>' + area + '%</b> · 📐 Thick <b>' + thick + '%</b></div>' +
+    '<div class="af-tools af-fg-tools">' + FG_TOOLS.map(t => '<button class="af-tool' + (G.tool === t[0] ? ' on' : '') + '" data-sound="pop" data-fgt="' + t[0] + '" title="' + t[2] + '">' + t[1] + '<small>' + t[2] + '</small></button>').join('') + '</div>' +
+    '<div class="af-row">' + (G.tool === 'face' ? '<button class="af-btn soft" data-sound="pop" id="fg-side" onclick="fgTurn()">🔄 ' + FG_SIDES.find(s => s[0] === G.side)[1] + '</button>' : G.tool === 'horn' ? '<button class="af-btn soft" data-sound="pop" id="fg-bend" onclick="G.bend=-G.bend;fgUi();fgGoal()">' + (G.bend > 0 ? '↻ Bend right' : '↺ Bend left') + '</button>' : '') +
+    '<button class="af-btn soft" data-sound="pop" onclick="fgUndo()"' + (G.undo.length ? '' : ' disabled') + '>↩️ Undo</button></div>' +
+    '<div class="af-row"><button class="af-btn amber" data-sound="none" id="forge-bellows">🔥 Bellows (hold)</button><button class="af-btn ok" data-sound="none" id="forge-done" onclick="fgQuench()">💧 Quench</button></div>');
+  $('ctl').querySelectorAll('[data-fgt]').forEach(b => b.onclick = () => { G.tool = b.dataset.fgt; if(G.tool !== 'face') G.side = 'flat'; fgUi(); fgGoal(); });
+  const bb = $('forge-bellows'), on = e => { e.preventDefault(); G.blowing = true; SND.spin(); if(G.first){ G.first = false; pointHand(); } }, off = () => { if(G) G.blowing = false; };
+  bb.addEventListener('pointerdown', on); ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => bb.addEventListener(ev, off));
+  const m = $('forge-t'); if(m){ m.style.width = Math.min(100, G.T / 1.1 * 100) + '%'; m.style.background = forgeColor(G.T); }
+}
+function fgTurn(){ const i = FG_SIDES.findIndex(s => s[0] === G.side); G.side = FG_SIDES[(i + 1) % 3][0]; say(G.side === 'flat' ? 'Flat again: hits make it wider and thinner.' : 'On its side: hits squeeze it slimmer — and it grows longer!', 'tip'); fgUi(); fgGoal(); }
+function fgUndo(){ if(!G.undo.length) return; const u = G.undo.pop(); G.h = u.h; G.tw = u.tw; fgUi(); fgAcc(); }
+function fgAcc(){ if(G.P) setAcc('🎯 ' + Math.round((1 - Math.min(1, AF.fgMiss(G.h, G.P) / G.P.job)) * 100) + '%'); const a = $('fg-amt'); if(a){ const vol = Math.round(AF.fgVol(G.h) / G.v0 * 100), area = Math.round(AF.fgArea(G.h) / G.a0 * 100), thick = Math.round(100 * G.a0 / Math.max(1, AF.fgArea(G.h))); a.innerHTML = '⚖️ Metal <b>' + vol + '%</b> · 📏 Area <b>' + area + '%</b> · 📐 Thick <b>' + thick + '%</b>'; } }
+function fgToGrid(p){ const Gm = G.geom(); return [(p.x - Gm.cx) / Gm.S, (p.y - Gm.cy) / Gm.S]; }
+function fgNear(x, y, r){ for(let j = 0; j < AF.FGN; j++) for(let i = 0; i < AF.FGN; i++) if(G.h[j * AF.FGN + i] > 0.015 && Math.hypot(AF.fgX(i) - x, AF.fgX(j) - y) <= r) return true; return false; }
+function fgTap(p){
+  if(!G || G.done || G.phase !== 'forge') return; const [x, y] = fgToGrid(p); if(Math.abs(x) > 1.05 || Math.abs(y) > 1.05) return;
+  const on = fgNear(x, y, 0.05), near = fgNear(x, y, 0.2); if(!near) return;
+  G.hammerT = 1; G.hammerAt = p; if(G.first){ G.first = false; pointHand(); }
+  if(G.T < 0.45){ if(on){ G.cracks.push([x, y]); tone(1800, 0.08, 'square', 0.1); banner('💥 Crack! Cold metal cracks — heat it first'); say(pickLine('forge', 'crack'), 'warn'); react('shrug'); } else { tone(1800, 0.05, 'square', 0.06); banner('🥶 Too cold — pump the bellows!'); } return; }
+  const k = G.T > 0.8 && G.T <= 1.02 ? 0.32 : 0.2;
+  G.undo.push({h: G.h.slice(), tw: G.tw ? G.tw.slice() : null}); if(G.undo.length > 12) G.undo.shift();
+  const t0 = AF.fgZoneT(G.h, x, y, 0.24);
+  if(G.tool === 'face'){ if(G.side !== 'flat') AF.fgDraw(G.h, x, y, k, G.side); else if(on){ if(t0 <= AF.FG_HMIN + 0.02 && !G.warnT){ G.warnT = 3; say(pickLine('forge', 'thin'), 'warn'); } AF.fgSpread(G.h, x, y, k); } else AF.fgUpset(G.h, x, y, k); }
+  else if(G.tool === 'pein') AF.fgPein(G.h, x, y, k);
+  else if(G.tool === 'punch'){ if(!on){ G.undo.pop(); return; } AF.fgPunch(G.h, x, y); }
+  else if(G.tool === 'horn') AF.fgBend(G.h, x, y, 0.35 * G.bend);
+  else if(G.tool === 'twist'){ if(!on){ G.undo.pop(); return; } G.tw = G.tw ? [Math.min(G.tw[0], y - 0.12), Math.max(G.tw[1], y + 0.12)] : [y - 0.12, y + 0.12]; }
+  G.T -= 0.03; G.hits++; tone(G.tool === 'punch' ? 520 : 260, 0.08, 'square', 0.18, 120);
+  if(FX) for(let i = 0; i < 10; i++) G.sparks.push({x: p.x, y: p.y, vx: (Math.random() - 0.5) * 340, vy: -Math.random() * 300, life: 0.6});
+  fgAcc(); if(G.undo.length === 1) fgUi();
+  if(G.P && G.hits % 6 === 0 && !G.warnT){ const e = AF.fgMiss(G.h, G.P) / G.P.job; if(e < 0.25){ G.warnT = 4; say(pickLine('forge', 'near'), 'tip'); } }
+}
+function fgQuench(){
+  if(!G || G.done || G.phase !== 'forge') return; if(G.hits < 3){ banner('Hammer it into shape first ⚒️'); return; }
+  G.blowing = false; G.steam = 1; tone(900, 0.6, 'sawtooth', 0.05, 200); say(pickLine('forge', 'quench'), 'tip');
+  const pl = G.bp ? bpForgePlan(G.bp) : null;
+  if(pl && pl.tc >= 0){ G.phase = 'temper'; G.tp = 0; fgGoal(); fgUi(); return; }
+  fgFinish();
+}
+function fgStopTemper(){ if(!G || G.phase !== 'temper') return; G.tc = Math.floor(G.tp); SND.pop(); banner('🌈 ' + AF.FG_TEMPER[G.tc][0] + '!', 900); fgFinish(); }
+function fgFinish(){
+  G.phase = 'done'; G.done = true; pointHand(); SND.win(); react('cheer');
+  const secs = Math.round((performance.now() - G.t0) / 1000), look = G.look();
+  let bp = null; if(G.P){ const e = fgErrNow(), st = AF.starsFor(e, G.level); bp = {level: G.level, stars: st, score: AF.scoreFor(e, G.level, secs), timeSec: secs, acc: Math.round((1 - e) * 100)}; }
+  waitStep('forge').then(() => itemCard({station: 'forge', kind: G.kind, mat: G.mat, look, blueprint: bp, name: S.player + "'s " + MATS[G.mat][1] + ' ' + KINDS[G.kind][3]}));
+}
+function drawForge2(){
+  const g = CX, Gm = G.geom(), t = G.t, N = AF.FGN, cs = Gm.S * 2 / N;
+  const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#1F1A2E'); bg.addColorStop(1, '#3A2A2A'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+  const fire = 0.4 + Math.min(1, G.T) * 0.6, fg = g.createRadialGradient(Gm.cx, H, 10, Gm.cx, H, H * 0.6); fg.addColorStop(0, 'rgba(255,140,40,' + fire * 0.7 + ')'); fg.addColorStop(1, 'rgba(255,80,20,0)'); g.fillStyle = fg; g.fillRect(0, 0, W, H);
+  // the anvil face (top view)
+  const A = Gm.S * 0.95; g.fillStyle = '#3B4556'; rrect(g, Gm.cx - A - 6, Gm.cy - A - 6, A * 2 + 12, A * 2 + 12, 14); g.fill(); const ag = g.createLinearGradient(0, Gm.cy - A, 0, Gm.cy + A); ag.addColorStop(0, '#5A6678'); ag.addColorStop(1, '#465163'); g.fillStyle = ag; rrect(g, Gm.cx - A, Gm.cy - A, A * 2, A * 2, 10); g.fill();
+  if(Gm.cx + A + Gm.S * 0.3 < W){ g.fillStyle = '#3B4556'; g.beginPath(); g.moveTo(Gm.cx + A + 6, Gm.cy - Gm.S * 0.2); g.lineTo(Gm.cx + A + Gm.S * 0.3, Gm.cy); g.lineTo(Gm.cx + A + 6, Gm.cy + Gm.S * 0.2); g.fill(); }   // the horn
+  // the gold plan outline
+  if(G.P){ g.save(); g.setLineDash([6, 5]); g.lineDashOffset = -t * 20; g.strokeStyle = '#FFC845'; g.lineWidth = 2.5; g.beginPath(); const M = G.P.mask;
+    for(let j = 0; j < N; j++) for(let i = 0; i < N; i++){ if(!M[j * N + i]) continue; const x = Gm.cx - Gm.S + i * cs, y = Gm.cy - Gm.S + j * cs;
+      if(j === 0 || !M[(j - 1) * N + i]){ g.moveTo(x, y); g.lineTo(x + cs, y); } if(j === N - 1 || !M[(j + 1) * N + i]){ g.moveTo(x, y + cs); g.lineTo(x + cs, y + cs); }
+      if(i === 0 || !M[j * N + i - 1]){ g.moveTo(x, y); g.lineTo(x, y + cs); } if(i === N - 1 || !M[j * N + i + 1]){ g.moveTo(x + cs, y); g.lineTo(x + cs, y + cs); } }
+    g.stroke(); g.restore(); }
+  // the metal: brighter = hotter, darker = thicker
+  const c = G.phase !== 'forge' ? (G.tc >= 0 ? AF.FG_TEMPER[G.tc][1] : (ART_MAT[G.mat] || '#999')) : forgeColor(G.T), pl = G.phase === 'temper' ? AF.FG_TEMPER[Math.floor(G.tp)][1] : c;
+  const body = new Path2D(); for(let j = 0; j < N; j++) for(let i = 0; i < N; i++){ if(G.h[j * N + i] <= 0.015) continue; const x = Gm.cx - Gm.S + (i + 0.5) * cs, y = Gm.cy - Gm.S + (j + 0.5) * cs; body.moveTo(x + cs * 0.74, y); body.arc(x, y, cs * 0.74, 0, 7); }
+  g.save(); g.translate(0, 3); g.fillStyle = 'rgba(0,0,0,0.35)'; g.fill(body); g.restore();
+  const mg = g.createLinearGradient(Gm.cx - Gm.S, Gm.cy - Gm.S, Gm.cx + Gm.S, Gm.cy + Gm.S); mg.addColorStop(0, shade(pl, 1.3)); mg.addColorStop(1, shade(pl, 0.85)); g.fillStyle = mg; g.fill(body);
+  g.save(); g.clip(body); for(let j = 0; j < N; j++) for(let i = 0; i < N; i++){ const v = G.h[j * N + i]; if(v <= 0.015) continue; g.fillStyle = 'rgba(0,0,0,' + Math.min(0.35, v * 0.28) + ')'; const x0 = Math.round(Gm.cx - Gm.S + i * cs), y0 = Math.round(Gm.cy - Gm.S + j * cs); g.fillRect(x0, y0, Math.round(Gm.cx - Gm.S + (i + 1) * cs) - x0, Math.round(Gm.cy - Gm.S + (j + 1) * cs) - y0); } g.restore();
+  if(G.tw){ g.save(); g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 2; const y0 = Gm.cy + G.tw[0] * Gm.S, y1 = Gm.cy + G.tw[1] * Gm.S; for(let y = y0; y < y1; y += 7){ g.beginPath(); g.moveTo(Gm.cx - Gm.S * 0.4, y); g.lineTo(Gm.cx + Gm.S * 0.4, y + 6); g.stroke(); } g.restore(); }
+  G.cracks.forEach(([x, y]) => { const px = Gm.cx + x * Gm.S, py = Gm.cy + y * Gm.S; g.strokeStyle = '#111'; g.lineWidth = 2; g.beginPath(); g.moveTo(px - 8, py - 6); g.lineTo(px - 2, py + 1); g.lineTo(px + 3, py - 4); g.lineTo(px + 9, py + 5); g.stroke(); });
+  // 🌱 guided: dots where metal is missing (blue) or too much (red)
+  if(G.P && G.guide && G.phase === 'forge'){ for(let k = 0; k < N * N; k++){ const m = G.h[k] > 0.015, miss = G.P.inn[k] && !m, extra = !G.P.out[k] && m; if(!miss && !extra) continue; if((k + Math.floor(t * 2)) % 3) continue;
+    const i = k % N, j = (k - i) / N; g.fillStyle = miss ? 'rgba(90,180,255,0.75)' : 'rgba(255,90,90,0.8)'; g.beginPath(); g.arc(Gm.cx - Gm.S + (i + 0.5) * cs, Gm.cy - Gm.S + (j + 0.5) * cs, Math.max(2, cs * 0.25), 0, 7); g.fill(); } }
+  // 👀 side view: how thick each part is (left → right)
+  const sw = Math.min(170, W * 0.3), sx = 10, sy = H - 10, sh = 24, scs = sw / N;
+  if(W >= 300){ g.fillStyle = 'rgba(0,0,0,0.25)'; rrect(g, sx - 6, sy - sh - 14, sw + 12, sh + 18, 6); g.fill(); g.font = '700 10px Nunito, sans-serif'; g.fillStyle = 'rgba(255,255,255,0.7)'; g.textAlign = 'left'; g.fillText('side view: how thick', sx, sy - sh - 3);
+    g.fillStyle = pl; for(let i = 0; i < N; i++){ let mx = 0; for(let j = 0; j < N; j++) mx = Math.max(mx, G.h[j * N + i]); if(mx > 0.015){ const bh = Math.max(1.5, Math.min(1, mx / 1.25) * sh); g.fillRect(sx + i * scs, sy - bh, scs + 0.5, bh); } } }
+  if(G.hammerT > 0 && G.hammerAt){ g.save(); g.translate(G.hammerAt.x + 10, G.hammerAt.y - 10 - G.hammerT * 30); g.rotate(-0.5 + G.hammerT * 0.8); g.fillStyle = '#8B5A2B'; g.fillRect(-4, -4, 8, 60); g.fillStyle = '#475569'; if(G.tool === 'pein'){ g.beginPath(); g.moveTo(-22, -16); g.lineTo(22, -16); g.lineTo(4, 6); g.lineTo(-4, 6); g.fill(); } else { rrect(g, -22, -16, 44, 22, 5); g.fill(); } g.restore(); }
+  G.sparks.forEach(s => { g.fillStyle = 'rgba(255,200,90,' + Math.min(1, s.life * 2) + ')'; g.fillRect(s.x, s.y, 3, 3); });
+  if(G.steam > 0){ G.steam = Math.max(0, G.steam - 0.004); g.fillStyle = 'rgba(255,255,255,0.3)'; for(let i = 0; i < 6; i++){ g.beginPath(); g.arc(Gm.cx + Math.sin(t * 3 + i) * 40, Gm.cy - (t * 60 + i * 30) % 160, 18, 0, 7); g.fill(); } }
+}
+// 📘 blueprint hooks for the bp-2 stations (called from bpApply)
+function bpApply2(e){
+  const g0 = '📘 <b>' + UI.esc(e.name) + '</b> — 🆕 ' + UI.esc(e.learn);
+  if(e.st === 'forge'){ const pl = bpForgePlan(e); G.h = AF.fgNew(pl.stock); G.v0 = AF.fgVol(G.h); G.a0 = AF.fgArea(G.h); G.P = AF.fgPlan(AF.fgMask(pl.h), G.h); G.level = e.lv; G.guide = AF.LEVELS[e.lv].guide; G.blue = true; fgGoal(); fgUi(); fgAcc(); return true; }
+  if(e.st === 'stone'){ G.cut = e.cut; G.needCut = e.cut; G.facets = AF.CUT_FACETS[e.cut]; G.accs = []; G.facet = 0; goal(g0 + ' · cut: <b>' + AF.CUTS[e.cut] + '</b>'); stoneUi(); return true; }
+  if(e.st === 'sew' || (e.st === 'nature' && e.wv)){ G.plan = [e.name, e.wv]; if(e.ca != null){ G.ca = FAB_COLS[e.ca]; G.cb = FAB_COLS[e.cb]; } sewGoal(); sewUi(); return true; }
+  if(e.kind === 'fcharm'){ G.fc = e.fc; charmUi(); goal(g0 + ' · 🌸 ' + e.fn + ' flower' + (e.fn > 1 ? 's' : '') + ' <span class="sw" style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' + e.fc + '"></span>'); return true; }
+  if(e.st === 'finish'){ G.col = AF.COLORS[e.color]; finishGoal(); finishUi(); return true; }
+  return false;
+}
+function bpCharmBad(){ const e = G && G.bp; return e && e.fn ? Math.min(0.5, Math.abs(G.fl.length - e.fn) * 0.25) + (G.fc !== e.fc ? 0.15 : 0) : 0; }
+function bpLook2(e){
+  if(e.st === 'forge'){ const pl = bpForgePlan(e), lk = {k: e.kind, m: 'iron', q: 100, fg: pl.pack}; if(pl.tc >= 0) lk.tc = pl.tc; return lk; }
+  if(e.st === 'stone') return {k: e.kind, g: SET.stone || 'crystal', m: KINDS[e.kind][2] ? (SET.setting || 'silver') : undefined, cut: e.cut, q: 100};
+  if(e.kind === 'fcharm'){ const fl = [[10, 10], [6, 13], [14, 7]].slice(0, e.fn); return {k: 'fcharm', m: 'flower', c: e.fc, fl, q: 100}; }
+  if(e.st === 'sew') return {k: e.kind, m: 'fabric', c: FAB_COLS[e.ca || 0], c2: FAB_COLS[e.cb == null ? 1 : e.cb], wv: e.wv};
+  if(e.st === 'nature') return {k: e.kind, m: 'bamboo', c: '#CDB45A', c2: '#8A6A2E', wv: e.wv};
+  if(e.st === 'finish'){ const lk = {k: 'cup', m: 'oak', p: [15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15], c: AF.COLORS[e.color]}; if(e.stickers.length) lk.s = e.stickers.slice(); if(e.varnish) lk.v = 1; if(e.engrave) lk.e = 'NAME'; return lk; }
+  return null;
+}
+function bpKL(k){ return k === 'paint' ? '🎨 Paint jobs' : KINDS[k][4] + ' ' + KINDS[k][3]; }
+Object.assign(TALK, {
+  forge: {start: ['🔥 Forge temperature is a blacksmith\'s lifeline — orange is perfect.', 'Hot metal moves, cold metal cracks.', 'Metal is never lost — it only moves somewhere else.'],
+    cool: ['⚠️ It\'s cooling — it\'s going to crack, back in the fire!', 'Red is getting dark — pump the bellows!', 'Cold metal cracks — heat it up first!'],
+    crack: ['Ouch — a crack! Cold metal can\'t bend, it breaks.', 'That\'s why smiths keep the metal hot.'], hot: ['Too hot — white hot metal burns away!', 'Easy on the bellows — orange, not white!'],
+    thin: ['It\'s already thin here — hit a thicker part.', 'Too thin to spread more — it would tear.'], near: ['Nearly there — small taps now!', 'Look at the gold line — you\'re close!'],
+    quench: ['Ssss! Quenching makes steel hard.', 'Water cools it fast — that sets the shape.']},
+  stone: {start: ['Rub slowly — fast rubbing scratches.', 'Start rough, finish fine.', 'Watch the glowing edge before you cut.']},
+  sew: {start: ['Over, under, over, under — that\'s weaving!', 'Lift the threads that should show colour A.', 'Check each row before you pass the shuttle.']},
+  nature: {start: ['Bamboo is strong and bendy.', 'Weave it tight so it holds its shape.', 'Pour the resin slowly.']},
+  finish: {start: ['Thin coats dry better than thick ones.', 'Paint every bit — check the edges!', 'Varnish goes on last, over dry paint.']}
+});
+Object.assign(TRY_THIS, {forge: ['🔄 Turn it on its side and see it grow longer!', 'Try to make a ring: punch a big hole.', 'Bend a hook over the 🌀 horn.', 'Watch ⚖️ Metal — does it ever change?'],
+  stone: ['Rub as slowly as you can — no scratches?', 'Try the heart cut — the hardest one!'], sew: ['Weave your initial in the 6×6 grid!', 'Make a pattern nobody has made.'],
+  nature: ['Weave a pattern that looks like a smile.', 'One flower or three — which looks best?'], finish: ['Pick two colours that look like a sunset.', 'Engrave your name on something you love.']});
 
 /* ================= ✨ REMIX · 🎭 DESIGN SHOW · 🎮 crafted skins for the games (af-4) ================= */
 // every crafted thing this player has → localStorage sp_artskins, read by the skin pickers (♟️ pieces, 🔢 number + 🔤 letter tiles, 💣 bombs, 🎱 balls, 🐍 snakes)
@@ -2247,4 +2478,4 @@ function msNow(){ return SET.station; }
 </script>
 </body>
 </html>
-<!-- (bp-1) END OF Artifactory.html -->
+<!-- (bp-2) END OF Artifactory.html -->
