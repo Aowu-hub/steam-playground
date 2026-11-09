@@ -25,11 +25,11 @@
     --terracotta:#C97B5D; --sage:#8FA37E; --dusty-blue:#6E93A8; --mustard:#D9A94D;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  html{height:100%;background:var(--bg);}
+  html{height:100%;background:var(--bg);overflow:hidden;}   /* 📏 ws-5 ONE SCREEN: the page itself never scrolls */
   body{
     margin:0;font-family:var(--font-body,'Nunito',sans-serif);color:var(--ink);
     background-color:var(--bg);background-image:var(--bg-art);background-attachment:fixed;
-    min-height:100%;min-height:100dvh;
+    height:100%;height:100dvh;overflow:hidden;   /* 📏 ws-5: exactly the screen; the paddings below sit INSIDE it */
     padding-top:env(safe-area-inset-top);padding-bottom:var(--safe-b, 18px);
     padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);
   }
@@ -39,7 +39,7 @@
   /* ---------- ONE-SCREEN LAYOUT (every size): header · scrolling middle · Let's Play ---------- */
   .wrap{
     max-width:1120px;margin:0 auto;padding:18px 20px 14px;
-    height:100vh;height:100dvh;display:flex;flex-direction:column;gap:14px;
+    height:100%;display:flex;flex-direction:column;gap:14px;   /* 📏 ws-5: the body's inside, not 100dvh + paddings */
   }
   .scroll-mid{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
     display:grid;grid-template-columns:1.3fr 1fr;grid-template-rows:auto auto auto 1fr;grid-template-areas:"news news" "players top" "treasure top" "recent top";
@@ -233,7 +233,12 @@
   .recent-empty{text-align:center;color:var(--ink-soft);font-weight:800;font-size:0.85rem;padding:10px 0;}
 
   /* ---------- LET'S PLAY ---------- */
-  .play-cta{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .play-cta{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;padding:0 58px;min-width:0;}
+  .play-cta .play-btn{max-width:100%;}
+  .play-cta .play-btn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  @media (max-width:560px){ .play-cta{padding:0 50px;} .play-cta .play-btn{padding-left:18px;padding-right:18px;} }
+  .off-chip:not(.show){bottom:calc(var(--play-h, 96px) + 6px) !important;}   /* 📲 offline status chip sits above Let's Play */
+  .ui-toast{bottom:calc(var(--play-h, 96px) + 10px) !important;}   /* 📣 pop-ups never sit on Let's Play */
   .play-btn{
     font-family:var(--font-display,'Fredoka',sans-serif);font-weight:700;font-size:1.45rem;border:none;border-radius:24px;
     padding:16px 56px;cursor:pointer;box-shadow:0 8px 0 rgba(0,0,0,0.16);color:var(--on-accent,#fff);
@@ -332,7 +337,7 @@
     .desktop-nav .links button:hover{background:var(--panel);color:var(--ink);}
     .desktop-nav .links button.admin{color:var(--terracotta);}
     body{padding-top:52px;}
-    .wrap{height:calc(100vh - 52px);height:calc(100dvh - 52px);}
+    .wrap{height:100%;}
   }
 
   /* ---------- TABLET / PHONE ---------- */
@@ -659,6 +664,22 @@ function paintFace(cv, name){
 function startWelcomeScreen(){ try { WelcomeShow.start(); } catch(e){ const w = document.getElementById('welcome-loading'); if(w) w.classList.add('hidden'); } }
 function markWelcomeLoaded(){ try { WelcomeShow.ready(); } catch(e){ const w = document.getElementById('welcome-loading'); if(w) w.classList.add('hidden'); } }
 function welcomeStep(k){ try { WelcomeShow.step(k); } catch(e){} }
+(function playBarHeight(){   // 📏 ws-5: distance from the screen bottom to the top of the Let's Play bar → --play-h
+  const set = () => { const c = document.querySelector('.play-cta'); if(!c) return; const r = c.getBoundingClientRect(); if(r.height) document.documentElement.style.setProperty('--play-h', Math.round(innerHeight - r.top) + 'px'); };
+  addEventListener('resize', set); addEventListener('load', set); document.addEventListener('DOMContentLoaded', set);
+  try { new ResizeObserver(set).observe(document.documentElement); } catch(e){}
+  // the label ("▶ Let's Play, Aowu!") shrinks only when it doesn't fit (long names, wide look fonts on phones)
+  let fitting = false;
+  const fit = () => { const btn = document.getElementById('play-btn'); if(!btn || fitting) return; fitting = true;
+    btn.style.fontSize = ''; let fs = parseFloat(getComputedStyle(btn).fontSize), n = 0;
+    while(btn.scrollWidth > btn.clientWidth + 1 && fs > 12 && n++ < 30){ fs -= 1; btn.style.fontSize = fs + 'px'; }
+    fitting = false; set(); };
+  const watch = () => { const btn = document.getElementById('play-btn'); if(!btn) return;
+    new MutationObserver(fit).observe(btn, {childList: true, characterData: true, subtree: true});
+    new MutationObserver(() => setTimeout(fit, 60)).observe(document.documentElement, {attributes: true, attributeFilter: ['data-theme']});
+    addEventListener('resize', fit); if(document.fonts && document.fonts.ready) document.fonts.ready.then(fit); fit(); };
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watch); else watch();
+})();
 window.miniShowAvatar = () => (selectedPlayer ? avatarOf(selectedPlayer) : null);   // ⚡ ws-3 mini show: your avatar runs to the Gameroom
 
 /* ---------- BOOT: one server call + instant paint from the last visit ---------- */
@@ -1105,4 +1126,4 @@ loadDashboard();
 </script>
 </body>
 </html>
-<!-- (r24+emoji+news-1+ebr-4+wd-5+modes-2+ws-3+af-4) END OF Landing.html -->
+<!-- (r24+emoji+news-1+ebr-4+wd-5+modes-2+af-4+ws-5) END OF Landing.html -->
