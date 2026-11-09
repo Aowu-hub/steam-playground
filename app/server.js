@@ -1914,6 +1914,10 @@ const FEAT_DEFS = {
     lathe: { name: 'Turned on the lathe', icon: '🌀', kind: 'sum', tiers: [3, 20, 80] },
     finish: { name: 'Finishes (paint, varnish, engrave)', icon: '🎨', kind: 'sum', tiers: [3, 20, 80] },
     stone: { name: 'Stones polished', icon: '🪨', kind: 'sum', tiers: [3, 20, 80] },
+    stories: { name: 'Stories written', icon: '📝', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
     drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
     remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
     votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
@@ -4118,7 +4122,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+af-4+mg-1+ebr-6+gro-1+off-8) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -4485,6 +4489,9 @@ const ART_KINDS_ = {
   piece: ['lathe', 'hand', 1, 'Chess piece', '♟️', 'A game piece — game skins come later'],
   trophy: ['lathe', 'hand', 3, 'Trophy', '🏆', 'Hold it high!'],
   ball: ['lathe', 'hand', 2, 'Ball', '⚽', 'Hold it — or play catch'],
+  tbowl: ['lathe', '', 2, 'Turned bowl', '🥣', 'A wooden bowl, hollowed on the lathe'],
+  box: ['lathe', '', 2, 'Lidded box', '🫙', 'A round box with a lid for your treasures'],
+  goblet: ['lathe', 'hand', 2, 'Goblet', '🍷', 'A cup on a stem — raise a toast!'],
   gem: ['stone', '', 0, 'Gem', '💎', 'A loose gem — set it later or keep it'],
   ring: ['stone', 'ring', 1, 'Ring', '💍', 'Wear it on your finger'],
   necklace: ['stone', 'neck', 1, 'Necklace', '📿', 'Wear it round your neck'],
@@ -4534,7 +4541,7 @@ const ART_WEAR_SLOTS_ = ['head', 'neck', 'wrist', 'ring', 'hand', 'back'];
 
 /* ---------- tab: Artifacts ---------- */
 const ART_TAB = 'Artifacts';
-const ART_COL = { id: 0, maker: 1, station: 2, kind: 3, name: 4, look: 5, mats: 6, tools: 7, owners: 8, team: 9, made: 10, stars: 11, from: 12, show: 13, votes: 14, deleted: 15 };
+const ART_COL = { id: 0, maker: 1, station: 2, kind: 3, name: 4, look: 5, mats: 6, tools: 7, owners: 8, team: 9, made: 10, stars: 11, from: 12, show: 13, votes: 14, deleted: 15, desc: 16 };
 const ART_HEADERS = [
   ['Item ID', 'itemId', 'Made by the app. Do not edit.'],
   ['Maker', 'maker', 'Who made it (Profiles name)'],
@@ -4552,6 +4559,7 @@ const ART_HEADERS = [
   ['In the show', 'inShow', 'yes = in the Design Show'],
   ['Votes', 'votes', 'JSON {voter: stars 1-3}'],
   ['Deleted', 'deleted', 'yes = the maker removed it'],
+  ['Story', 'desc', 'What the maker wrote about it (optional, bp-1)'],
 ];
 const ART_WIDTH = ART_HEADERS.length;
 function artSheet_() {
@@ -4575,7 +4583,7 @@ function styleArtifactsSheet() {
     head.setNotes([ART_HEADERS.map(h => h[2])]);
     sh.setRowHeight(1, 46); sh.setFrozenRows(1); sh.setFrozenColumns(2);
     sh.getRange(2, 1, sh.getMaxRows() - 1, ART_WIDTH).setNumberFormat('@').setFontSize(10).setVerticalAlignment('middle').setWrap(false);
-    [150, 110, 80, 80, 150, 240, 160, 140, 160, 120, 130, 60, 120, 70, 160, 70].forEach((w, i) => sh.setColumnWidth(i + 1, w));
+    [150, 110, 80, 80, 150, 240, 160, 140, 160, 120, 130, 60, 120, 70, 160, 70, 260].forEach((w, i) => sh.setColumnWidth(i + 1, w));
     sh.getRange(2, 1, sh.getMaxRows() - 1, 1).setFontFamily('Roboto Mono').setFontColor('#757575');
     sh.getBandings().forEach(b => b.remove());
     sh.getRange(1, 1, sh.getMaxRows(), ART_WIDTH).applyRowBanding().setHeaderRowColor('#7C3AED').setFirstRowColor('#FFFFFF').setSecondRowColor('#F3EEFF');
@@ -4597,20 +4605,21 @@ function artRows_() {
       row: i + 2, id: String(r[C.id]).trim(), maker: String(r[C.maker]), station: String(r[C.station]), kind: String(r[C.kind]), name: String(r[C.name]),
       look: j(r[C.look], {}), mats: j(r[C.mats], {}), tools: j(r[C.tools], []), owners: j(r[C.owners], []), team: j(r[C.team], []), made: String(r[C.made]),
       stars: Number(r[C.stars]) || 0, from: String(r[C.from] || ''), show: String(r[C.show]).toLowerCase() === 'yes', votes: j(r[C.votes], {}),
-      deleted: String(r[C.deleted]).toLowerCase() === 'yes' })).filter(a => a.id && !a.deleted && ART_KINDS_[a.kind]);
+      deleted: String(r[C.deleted]).toLowerCase() === 'yes', desc: String(r[C.desc] || '') })).filter(a => a.id && !a.deleted && ART_KINDS_[a.kind]);
   }
   ARTS_MEMO_ = { ss: ss_(), rows: rows };
   return rows;
 }
 function writeArt_(a) {
   const sh = artSheet_(), row = [a.id, a.maker, a.station, a.kind, a.name, JSON.stringify(a.look || {}), JSON.stringify(a.mats || {}), JSON.stringify(a.tools || []), JSON.stringify(a.owners || []),
-    JSON.stringify(a.team || []), a.made, String(a.stars || 0), a.from || '', a.show ? 'yes' : '', JSON.stringify(a.votes || {}), a.deleted ? 'yes' : ''];
+    JSON.stringify(a.team || []), a.made, String(a.stars || 0), a.from || '', a.show ? 'yes' : '', JSON.stringify(a.votes || {}), a.deleted ? 'yes' : '', a.desc || ''];
+  try { if (!sh.getRange(1, ART_WIDTH, 1, 1).getValues()[0][0]) { const h = ART_HEADERS[ART_WIDTH - 1]; sh.getRange(1, ART_WIDTH, 1, 1).setValues([['🔒 ' + h[0] + '\n' + h[1]]]); } } catch (e) {}   // 📝 the Story column (bp-1) on an older tab
   if (a.row) sh.getRange(a.row, 1, 1, ART_WIDTH).setValues([row]);
   else { const r = sh.getLastRow() + 1; sh.getRange(r, 1, 1, ART_WIDTH).setNumberFormat('@').setValues([row]); a.row = r; }
   ARTS_MEMO_ = null;
 }
 function publicArt_(a) {
-  return { id: a.id, maker: a.maker, station: a.station, kind: a.kind, name: a.name, look: a.look, mats: a.mats, tools: a.tools, owners: a.owners, team: a.team, made: a.made, stars: a.stars, from: a.from, show: a.show, votes: a.show ? a.votes || {} : {} };
+  return { id: a.id, maker: a.maker, station: a.station, kind: a.kind, name: a.name, look: a.look, mats: a.mats, tools: a.tools, owners: a.owners, team: a.team, made: a.made, stars: a.stars, from: a.from, desc: a.desc || '', show: a.show, votes: a.show ? a.votes || {} : {} };
 }
 function artsOf_(name) { return artRows_().filter(a => a.owners.indexOf(name) !== -1); }
 
@@ -4623,6 +4632,7 @@ function cleanArtLook_(kind, look) {
   const out = { k: kind };
   if (ART_MATS_[look.m]) out.m = String(look.m);
   if (Array.isArray(look.p)) { const p = look.p.slice(0, 24).map(x => artInt_(x, 0, 20)); if (p.length >= 6) out.p = p; }
+  if (Array.isArray(look.pi)) { const pi = look.pi.slice(0, 16).map(x => artInt_(x, 0, 20)); if (pi.length === 16 && pi.some(v => v > 0)) out.pi = pi; }   // 🌀 hollow inside (bp-1)
   if (ART_HEX_.test(String(look.c || ''))) out.c = String(look.c);
   if (look.v) out.v = 1;
   if (Array.isArray(look.s)) { const s = look.s.slice(0, 3).map(x => artInt_(x, 0, 7)); if (s.length) out.s = s; }
@@ -4670,6 +4680,7 @@ function artBag_(st, name) {
   if (!b._g3) { artAdd_(out, ART_GIFT3_); }
   out._g3 = 1;
   if (b._dd === today_()) out._dn = artInt_(b._dn, 0, 999), out._dd = String(b._dd);   // game drops today (R4)
+  if (b._wd === today_()) out._wn = artInt_(b._wn, 0, 99), out._wd = String(b._wd);   // 📝 story bonuses today (bp-1)
   return out;
 }
 function artSaveBag_(name, bag) { saveSetting('Bag_' + name, JSON.stringify(bag)); return bag; }
@@ -4707,6 +4718,9 @@ function getArtifactoryData(player) {
   out.mats = ART_MATS_; out.kinds = ART_KINDS_;
   out.show = artShowList_(players);   // 🎭 Design Show (af-4)
   out.dropsLeft = me ? ART_DROP_CAP_ - (out.bag._dd === today_() ? out.bag._dn || 0 : 0) : 0;
+  out.bp = me ? jsonSetting_(st, 'ArtBP_' + me, {}) : {};   // 📘 best ⭐ per blueprint (bp-1)
+  out.chal = jsonSetting_(st, 'ArtChal', {});              // 🏆 family top 5 per challenge
+  out.descLeft = me ? ART_DESC_CAP_ - (out.bag._wd === today_() ? out.bag._wn || 0 : 0) : 0;
   return out;
 }
 function checkArtPlayer_(name) { checkPlayer_(name); }
@@ -4762,13 +4776,16 @@ function artCraft(name, req) {
     var bp = req.blueprint && typeof req.blueprint === 'object' ? req.blueprint : null;
     var stars = bp ? artInt_(bp.stars, 0, 3) : 0;
     const title = String(req.name || '').replace(/[<>"`\\]/g, '').trim().slice(0, 28) || (name + "'s " + ART_KINDS_[kind][3]);
+    const desc = artCleanDesc_(req.desc), descGot = artDescReward_(bag, desc);   // 📝 writing a story about it gives a little material back
     const a = { id: 'a' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36), maker: name, station: station, kind: kind, name: title, look: look, mats: cost,
-      tools: [station], owners: [name].concat(team), team: team, made: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'), stars: stars, from: '', show: false, votes: {} };
+      tools: [station], owners: [name].concat(team), team: team, made: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'), stars: stars, from: '', show: false, votes: {}, desc: desc };
     writeArt_(a); artSaveBag_(name, bag);
+    var bpInfo = bp && ART_BP_ID_.test(String(req.bp || '')) ? artSaveBP_(name, String(req.bp), stars, artInt_(bp.score, 0, 100000), artInt_(bp.timeSec, 0, 36000)) : null;
     var stats = { made: 1, games: 1 }; stats[station] = 1; if (team.length) stats.team = 1;
     if (kind === 'gem' || station === 'stone') stats.gems = 1;
     if (station === 'light') stats.glows = 1;
-    var res = { item: publicArt_(a), bag: bag }, theme = ART_STATIONS_[station][0] + ' ' + ART_STATIONS_[station][1] + ' · ' + ART_KINDS_[kind][3];
+    var res = { item: publicArt_(a), bag: bag, descGot: descGot }, theme = ART_STATIONS_[station][0] + ' ' + ART_STATIONS_[station][1] + ' · ' + ART_KINDS_[kind][3] + (bpInfo ? ' · ' + bpInfo.label : '');
+    if (bpInfo) { res.bp = bpInfo.bp; res.chal = bpInfo.chal; }
     if (bp) { stats.blueprints = 1; if (stars === 3) { stats.perfect = 1; if (station === 'lathe') stats.latheStars = 1; if (station === 'stone') stats.stoneStars = 1; } }
   } finally { lock.releaseLock(); }
   team.forEach(n => safeRecordFeats_(n, 'artifactory', { team: 1 }));
@@ -5056,7 +5073,47 @@ function getArtStrip(player) {
     last: mine.slice(-3).reverse().map(a => ({ id: a.id, name: a.name, kind: a.kind, look: a.look })), shelf: Object.keys(artShelfOf_(st).m).length,
     skins: artSkinList_(players) };
 }
-// (af-4) END OF ArtifactoryCode.gs
+
+/* ================= 📘 Blueprint Book · 📝 stories (bp-1) ================= */
+// the blueprint data lives in ArtBlueprints.html (page); the server keeps only best ⭐ per id (Settings ArtBP_<Name>) and the family top 5 per 🏆 challenge (Settings ArtChal)
+const ART_BP_ID_ = /^(ch_)?[a-z]{2,10}_\d{1,2}$/;
+const ART_DESC_CAP_ = 5;
+function artSaveBP_(name, id, stars, score, secs) {
+  const st = getSettings(), bp = jsonSetting_(st, 'ArtBP_' + name, {});
+  if (!(bp[id] >= stars)) { bp[id] = stars; saveSetting('ArtBP_' + name, JSON.stringify(bp)); }
+  const out = { bp: bp, label: (id.indexOf('ch_') === 0 ? '🏆 ' : '📘 #') + id.replace(/^ch_/, '').replace(/^[a-z]+_/, '') };
+  if (id.indexOf('ch_') === 0 && stars > 0) {
+    const ch = jsonSetting_(st, 'ArtChal', {}), list = (ch[id] || []).filter(r => r.n !== name || r.s > score);
+    if (!list.some(r => r.n === name)) list.push({ n: name, s: score, t: secs, st: stars });
+    ch[id] = list.sort((a, b) => b.s - a.s).slice(0, 5); saveSetting('ArtChal', JSON.stringify(ch)); out.chal = ch;
+  }
+  return out;
+}
+function artCleanDesc_(d) { return String(d || '').replace(/[<>"`\\]/g, '').replace(/\s+/g, ' ').trim().slice(0, 200); }
+function artWords_(d) { return d ? d.split(' ').filter(w => /[A-Za-z฀-๿0-9]{2,}/.test(w)).length : 0; }
+// 10+ words = 1 random material, 25+ = 2 · at most ART_DESC_CAP_ rewards a day (counted in the bag, no log)
+function artDescReward_(bag, desc) {
+  const w = artWords_(desc), n = w >= 25 ? 2 : w >= 10 ? 1 : 0; if (!n) return {};
+  const day = today_(); if (bag._wd !== day) { bag._wd = day; bag._wn = 0; }
+  if ((bag._wn || 0) >= ART_DESC_CAP_) return {};
+  const got = {}; for (let i = 0; i < n; i++) { const m = ART_DROP_POOL_[Math.floor(Math.random() * ART_DROP_POOL_.length)]; got[m] = (got[m] || 0) + 1; }
+  artAdd_(bag, got); bag._wn = (bag._wn || 0) + 1; return got;
+}
+// 📝 write (or change) the story of something you made later; the reward only comes the first time a story is written
+function artDescribe(name, id, desc) {
+  checkArtPlayer_(name);
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const a = artRows_().find(x => x.id === String(id));
+    if (!a || a.maker !== name) throw new Error('Only the maker can write its story.');
+    const d = artCleanDesc_(desc), bag = artBag_(getSettings(), name), got = a.desc ? {} : artDescReward_(bag, d);
+    a.desc = d; writeArt_(a); if (Object.keys(got).length) artSaveBag_(name, bag);
+    var res = { item: publicArt_(a), bag: bag, descGot: got };
+  } finally { lock.releaseLock(); }
+  if (Object.keys(res.descGot).length) safeRecordFeats_(name, 'artifactory', { stories: 1 });
+  return res;
+}
+// (bp-1) END OF ArtifactoryCode.gs
 
 ;
 /* ===== on the device only: the grown-up PIN arrives hashed from the family Sheet (OfflineSync.gs) ===== */
@@ -5187,7 +5244,8 @@ return {"include": typeof include === 'function' ? include : undefined,
 "artGameDrop": typeof artGameDrop === 'function' ? artGameDrop : undefined,
 "artShowSet": typeof artShowSet === 'function' ? artShowSet : undefined,
 "artVote": typeof artVote === 'function' ? artVote : undefined,
-"getArtStrip": typeof getArtStrip === 'function' ? getArtStrip : undefined};
+"getArtStrip": typeof getArtStrip === 'function' ? getArtStrip : undefined,
+"artDescribe": typeof artDescribe === 'function' ? artDescribe : undefined};
 } };
 
 const VER = self.STEAM_GS.ver;
