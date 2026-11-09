@@ -13,13 +13,15 @@ self.STEAM_GS = { ver: self.STEAM_VER, make: function (SpreadsheetApp, HtmlServi
 /**
  * STEAM Playground — Data Center + Router
  * Bind this script to: Games Data Center
- * (the family Sheet)
+ * the family Sheet (its ID is in Script Properties → SHEET_ID)
  *
  * SETUP: run setupDataCenter() once from the Apps Script editor
  * (select it in the function dropdown, click Run, approve permissions).
  * It's safe to run again later — it won't duplicate rows.
  */
 
+// 🔒 off-8: the Sheet ID is kept in Script Properties, never in the code
+// (Apps Script → ⚙️ Project Settings → Script properties → SHEET_ID = the long ID from the Sheet's address).
 const SHEET_ID = 'on-this-device';
 
 // Opening the spreadsheet is the slowest step of every server call, so it
@@ -27,7 +29,10 @@ const SHEET_ID = 'on-this-device';
 // fresh execution, so this memo never goes stale between calls).
 let SS_MEMO_ = null;
 function ss_() {
-  if (!SS_MEMO_) SS_MEMO_ = SpreadsheetApp.openById(SHEET_ID);
+  if (!SS_MEMO_) {
+    if (!SHEET_ID) throw new Error('🔧 Setup needed: add the Script property SHEET_ID (Apps Script → ⚙️ Project Settings → Script properties).');
+    SS_MEMO_ = SpreadsheetApp.openById(SHEET_ID);
+  }
   return SS_MEMO_;
 }
 
@@ -4113,7 +4118,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+af-4+mg-1+ebr-6+gro-1) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+af-4+mg-1+ebr-6+gro-1+off-8) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
