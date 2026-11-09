@@ -444,8 +444,8 @@ const AF = (function(){
   const rotM = m => ((m << 1) | (m >> 3)) & 15;
   const DIRS = [[1, 0, -1], [2, 1, 0], [4, 0, 1], [8, -1, 0]];   // bit, dx, dy
   const OPP = {1: 4, 2: 8, 4: 1, 8: 2};
-  function makeCircuit(level, seed){
-    const R = rng(seed * 13 + level * 7 + 5), [w, h, nLed, sw] = CIRC[Math.max(0, Math.min(5, level))];
+  function makeCircuit(level, seed, spec){
+    const R = rng(seed * 13 + level * 7 + 5), [w, h, nLed, sw] = spec ? [spec[0], spec[1], spec[2], !!spec[3]] : CIRC[Math.max(0, Math.min(5, level))];
     const x0 = Math.floor(R() * Math.max(1, w - 2)), y0 = Math.floor(R() * Math.max(1, h - 2)), x1 = Math.min(w - 1, x0 + 2 + Math.floor(R() * (w - x0 - 2))), y1 = Math.min(h - 1, y0 + 1 + Math.floor(R() * (h - y0 - 1)));
     const loop = []; for(let x = x0; x <= x1; x++) loop.push([x, y0]); for(let y = y0 + 1; y <= y1; y++) loop.push([x1, y]); for(let x = x1 - 1; x >= x0; x--) loop.push([x, y1]); for(let y = y1 - 1; y > y0; y--) loop.push([x0, y]);
     const tiles = []; for(let i = 0; i < w * h; i++) tiles.push({k: 'empty', m: 0, sol: 0});
@@ -459,7 +459,7 @@ const AF = (function(){
     if(sw && straight.length){ const c = loop[pick()]; tiles[c[1] * w + c[0]].k = 'sw'; }
     // distractor wires from Junior up; then turn every movable tile away from the answer
     let minTaps = 0;
-    tiles.forEach((t, i) => { if(t.k === 'empty' && level >= 1 && R() < 0.75){ t.k = 'wire'; t.m = t.sol = R() < 0.5 ? 5 : 3; t.extra = true; }
+    tiles.forEach((t, i) => { if(t.k === 'empty' && (spec ? spec[4] : level >= 1) && R() < 0.75){ t.k = 'wire'; t.m = t.sol = R() < 0.5 ? 5 : 3; t.extra = true; }
       if(t.k === 'wire' || t.k === 'led'){ const turns = 1 + Math.floor(R() * 3); for(let r = 0; r < turns; r++) t.m = rotM(t.m); }
       if(t.k === 'sw'){ t.on = false; } });
     tiles.forEach(t => { if(t.extra || t.k === 'empty' || t.k === 'bat') return; if(t.k === 'sw'){ minTaps++; return; } let m = t.m, n = 0; while(m !== t.sol && n < 4){ m = rotM(m); n++; } if(t.sol === 5 || t.sol === 10) n = n % 2; minTaps += n; });
@@ -692,6 +692,7 @@ const KINDS = {cup: ['lathe', 'hand', 2, 'Cup', '🥤', 'Hold it — or put it o
   scarf: ['sew', 'neck', 1, 'Scarf', '🧣', 'Wear it round your neck'], cape: ['sew', 'back', 2, 'Cape', '🦸', 'Wear it on your back'], bag: ['sew', 'hand', 2, 'Bag', '👜', 'Carry it'], flag: ['sew', 'hand', 1, 'Flag', '🚩', 'Wave it'],
   lantern: ['light', 'hand', 1, 'Lantern', '🏮', 'A glowing light to hold'],
   spoon: ['whittle', 'hand', 1, 'Spoon', '🥄', 'Stir your cocoa with it'], whistle: ['whittle', 'hand', 1, 'Whistle', '🎶', 'Blow it — tweet!'], figure: ['whittle', 'hand', 1, 'Carved figure', '🗿', 'A little wooden friend'],
+  owl: ['whittle', 'hand', 1, 'Owl', '🦉', 'A wise little owl'], fish: ['whittle', 'hand', 1, 'Fish', '🐟', 'A fish that never needs water'], cat: ['whittle', 'hand', 1, 'Cat', '🐱', 'A cat that sits still'], boat: ['whittle', 'hand', 1, 'Boat', '⛵', 'A little sailing boat'], bear: ['whittle', 'hand', 1, 'Bear', '🐻', 'A friendly bear'], turtle: ['whittle', 'hand', 1, 'Turtle', '🐢', 'A slow and steady turtle'],
   pshape: ['print', 'hand', 1, '3D-printed shape', '🔷', 'Any shape you draw, printed'], pspin: ['print', 'hand', 2, '3D-printed tower', '🗼', 'A spun shape, printed layer by layer'],
   basket: ['nature', 'hand', 2, 'Basket', '🧺', 'Carry your treasures', ['bamboo']], hat: ['nature', 'head', 2, 'Bamboo hat', '👒', 'Wear it in the sun', ['bamboo']], fcharm: ['nature', 'neck', 2, 'Flower charm', '🌸', 'Flowers pressed in clear resin', ['flower']]};
 const LATHE_MATS = ['oak', 'bamboo', 'teak', 'copper', 'tin', 'silver', 'gold', 'granite', 'jade'];
@@ -1315,7 +1316,7 @@ function startPlaner(){
         if(p.y > Gm.y0 - G.h[0] * Gm.S - 40 && p.y < Gm.y0 + 10){ if(sp > 3.4 && now - G.scrT > 450 && d > 8){ G.scrT = now; G.scratches++; SND.scratch(); banner('Too fast — scratch! 🐢'); react('shrug'); }
           else { G.polish[G.grit] = Math.min(100, G.polish[G.grit] + d / (Gm.R - Gm.L) * 55); if(now - G.rubT > 90){ G.rubT = now; SND.rub(); } if(G.polish[G.grit] >= 100){ SND.pop(); if(G.grit < 2){ G.grit++; banner('✨ Grit ' + [80, 120, 240][G.grit] + ' — smoother!'); react('clap'); } else { banner('✨ Silky smooth!'); } planerUi(); } } }
         G.last = {x: p.x, y: p.y, t: now}; planerMeter(); } },
-    up: () => { if(G.phase === 'plane' && G.sweep){ const s = G.sweep; G.sweep = null; if(Math.abs(s.b - s.a) >= 0.04){ const rem = AF.planePass(G.h, Math.max(0, s.a), Math.min(1, s.b), AF.DEPTHS[G.depth]); G.passes++;
+    up: () => { if(G.phase === 'plane' && G.sweep){ const s = G.sweep; G.sweep = null; if(Math.abs(s.b - s.a) >= 0.04){ bpGrainCheck(s.a, s.b); const rem = AF.planePass(G.h, Math.max(0, s.a), Math.min(1, s.b), AF.DEPTHS[G.depth]); G.passes++;
         if(rem > 0){ SND.scrape(1); if(FX) for(let i = 0; i < 14; i++) G.chips.push({x: G.geom().L + (Math.min(s.a, s.b) + Math.random() * Math.abs(s.b - s.a)) * (G.geom().R - G.geom().L), y: G.geom().y0 - Math.max(...G.h) * G.geom().S, vx: (Math.random() - 0.5) * 160, vy: -80 - Math.random() * 140, life: 1.1, a: 0}); }
         if(G.flat()){ banner('📏 Flat!'); react('clap'); } } else banner('↔️ Push the planer all the way along'); planerUi(); } G.last = null; }
   });
@@ -1342,7 +1343,7 @@ function planerSand(){ if(!G.flat() && !G.blue){ banner('Still bumpy — a few m
 function planerDone(){
   if(!G || G.done) return; G.done = true; pointHand(); SND.win(); react('cheer');
   const secs = Math.round((performance.now() - G.t0) / 1000), look = G.look(); look.q = Math.max(20, Math.round(G.polish.reduce((a, b) => a + b, 0) / 3) - G.scratches * 8);
-  let bp = null; if(G.blue){ const e = Math.min(1, AF.planerErr(G.h, G.T) * 0.85 + (1 - G.polish.reduce((a, b) => a + b, 0) / 300) * 0.15 + G.scratches * 0.03), st = AF.starsFor(e, G.level); bp = {level: G.level, stars: st, score: AF.scoreFor(e, G.level, secs), timeSec: secs, acc: Math.round((1 - e) * 100)}; }
+  let bp = null; if(G.blue){ const e = Math.min(1, AF.planerErr(G.h, G.T) * 0.85 + (1 - G.polish.reduce((a, b) => a + b, 0) / 300) * 0.15 + G.scratches * 0.03 + (G.tear || 0) * 0.05), st = AF.starsFor(e, G.level); bp = {level: G.level, stars: st, score: AF.scoreFor(e, G.level, secs), timeSec: secs, acc: Math.round((1 - e) * 100)}; }
   waitStep('planer').then(() => itemCard({station: 'planer', kind: G.kind, mat: G.mat, look, blueprint: bp, name: S.player + "'s " + MATS[G.mat][1] + ' ' + KINDS[G.kind][3]}));
 }
 function drawPlaner(){
@@ -1622,7 +1623,7 @@ function lightCheck(){
 function lightDone(){
   if(!G || G.done) return; G.done = true; pointHand();
   const secs = Math.round((performance.now() - G.t0) / 1000), look = G.look();
-  let bp = null; if(G.blue){ const e = AF.circuitErr(G.taps, G.c.minTaps), st = AF.starsFor(e, G.level); bp = {level: G.level, stars: st, score: AF.scoreFor(e, G.level, secs), timeSec: secs, acc: Math.round((1 - e) * 100)}; }
+  let bp = null; if(G.blue){ const e = Math.min(1, AF.circuitErr(G.taps, G.c.minTaps) + bpLightBad()), st = AF.starsFor(e, G.level); bp = {level: G.level, stars: st, score: AF.scoreFor(e, G.level, secs), timeSec: secs, acc: Math.round((1 - e) * 100)}; }
   waitStep('light').then(() => itemCard({station: 'light', kind: G.kind, item: G.item, lc: G.lc, look, blueprint: bp, name: G.item ? G.item.name : S.player + "'s Lantern"}));
 }
 function drawLight(){
@@ -2063,7 +2064,7 @@ function thingCard(a){
 
 
 /* ================= 📘 BLUEPRINT BOOK · 🧪 practice · 🗣️ avatar talk · 🔄 2.5D view (bp-1) ================= */
-const BP_STATIONS = ['lathe', 'pottery', 'print', 'forge', 'stone', 'sew', 'nature', 'finish'];
+const BP_STATIONS = ['lathe', 'pottery', 'print', 'forge', 'stone', 'sew', 'nature', 'finish', 'planer', 'weld', 'light', 'whittle'];
 const SUITS = {lathe: 'apron', stone: 'apron', finish: 'smock', planer: 'earmuffs', weld: 'weld', forge: 'leather', pottery: 'smock', sew: 'tape', light: 'apron', whittle: 'apron', print: 'apron', lab: 'labcoat', nature: 'apron'};
 const TOOLS = {lathe: '🪛', stone: '💎', finish: '🖌️', planer: '🪚', weld: '🔥', forge: '🔨', pottery: '🤲', sew: '🪡', light: '🔌', whittle: '🔪', print: '🖱️', lab: '🧪', nature: '🌿'};
 const BAD_WORDS = /(f+u+c+k|sh[i1]t|b[i1]tch|a+ss+h|d[i1]ck|pen[i1]s|s+e+x|k[i1]ll|stupid|idiot|hate|ควย|เหี้ย|สัส|มึง)/i;
@@ -2079,7 +2080,7 @@ function bpOpen(e){
 }
 function bpPageDone(kind){ return BP.page(kind).filter(e => !e.ch && bpStars(e.id) > 0).length; }
 function bpLook(e){
-  const l2 = bpLook2(e); if(l2) return l2;
+  const l2 = bpLook2(e) || bpLook3(e); if(l2) return l2;
   if(e.kind === 'pshape') return {k: 'pshape', m: 'filament', c: '#5BC0EB', ol: e.ol.map(v => Math.max(1, Math.round(v * 20)))};
   const lk = {k: e.kind, m: e.st === 'lathe' ? (SET.mat || 'oak') : e.st === 'pottery' ? 'clay' : 'filament', p: e.p}; if(e.pi) lk.pi = e.pi; if(e.kind === 'pspin') lk.c = '#5BC0EB'; return lk;
 }
@@ -2109,6 +2110,7 @@ function bpGo(st, go){
   const book = SET.mode === 'book' && BP_STATIONS.indexOf(st) >= 0 ? BP.get(SET.bp) : null, saved = {mode: SET.mode, level: SET.level, pmode: SET.pmode, kind: SET.kind};
   PRACTICE = SET.mode === 'practice';
   if(PRACTICE) SET.mode = 'free';
+  if(book && book.st === 'light') SET.item = 'new-lantern';
   if(book){ SET.mode = 'blue'; SET.level = book.lv; if(book.st !== 'finish') SET.kind = book.kind; if(book.kind === 'pshape') SET.pmode = book.pm === 'adv' ? 'adv' : 'simple'; }
   try{ go(); } finally { SET.mode = saved.mode; SET.level = saved.level; SET.pmode = saved.pmode; }
   if(!G) return; G.practice = PRACTICE; G.bp = book;
@@ -2119,7 +2121,7 @@ function bpGo(st, go){
 function bpApply(e){
   $('h-title').textContent = STATIONS[e.st].icon + ' ' + (e.ch ? '🏆 ' : '📘 #' + e.n + ' ') + e.name;
   const g0 = '📘 <b>' + UI.esc(e.name) + '</b> — 🆕 ' + UI.esc(e.learn);
-  if(bpApply2(e)){ if(e.ch) G.timer = true; return; }
+  if(bpApply2(e) || bpApply3(e)){ if(e.ch) G.timer = true; return; }
   if(e.st === 'lathe'){ G.target = e.p.slice(); G.tin = e.pi ? e.pi.slice() : null; latheUi(); goal(g0 + (e.pi ? ' · then 🔄 hollow the inside' : '')); G.first = true; if(G.guide) setTimeout(latheHand, 80); }
   else if(e.st === 'pottery'){ G.target = e.p.slice(); potteryMeter(); goal(g0); }
   else if(e.kind === 'pspin'){ G.target = e.p.slice(); printMeter(); goal(g0); }
@@ -2223,7 +2225,7 @@ function renderBook(){
   const groups = BP_STATIONS.map(st => '<div class="af-box"><h3>' + STATIONS[st].icon + ' ' + STATIONS[st].name + ' <small>' + stationLevel(st) + '</small></h3><div class="af-kinds">' +
     BP.ORDER.filter(k => BP.page(k)[0].st === st).map(k => { const d = bpPageDone(k), ch = BP.page(k).filter(e => e.ch && bpStars(e.id)).length;
       return '<button class="af-kind" data-sound="pop" data-page="' + k + '"><canvas width="160" height="160"></canvas><span class="nm">' + bpKL(k) + (d >= 12 ? ' 🏅' : '') + '</span><span class="sub">📘 ' + d + ' / 12 · 🏆 ' + ch + ' / 3</span></button>'; }).join('') + '</div></div>').join('');
-  $('book-body').innerHTML = groups + '<div class="af-box"><h3>🔜 More pages coming</h3><p class="af-note">🪚 Planer · 🔥 Welding · 🔌 Light · 🔪 Whittling (+ new carved figures) next. Their ⭐ Blueprint levels still work at each station.</p></div>';
+  $('book-body').innerHTML = groups + '<div class="af-box"><h3>🔜 Coming next</h3><p class="af-note">📅 Blueprint of the Day · 🏅 page stamps · 👪 family blueprints.</p></div>';
   $('book-body').querySelectorAll('[data-page]').forEach(b => { const k = b.dataset.page, g = b.querySelector('canvas').getContext('2d'), first = BP.page(k).find(e => !bpStars(e.id) && bpOpen(e).ok) || BP.page(k)[0]; artDraw(g, bpLook(first), 80, 150, 124, 1);
     b.onclick = () => { if(k !== 'paint') SET.kind = k; SET.mode = 'book'; SET.bp = first.id; savePrefs(); openSetup(BP.page(k)[0].st); }; });
 }
@@ -2380,6 +2382,63 @@ Object.assign(TRY_THIS, {forge: ['🔄 Turn it on its side and see it grow longe
   stone: ['Rub as slowly as you can — no scratches?', 'Try the heart cut — the hardest one!'], sew: ['Weave your initial in the 6×6 grid!', 'Make a pattern nobody has made.'],
   nature: ['Weave a pattern that looks like a smile.', 'One flower or three — which looks best?'], finish: ['Pick two colours that look like a sunset.', 'Engrave your name on something you love.']});
 
+/* ---------- 📘 blueprints for 🪚 planer · 🔥 weld · 🔌 light · 🔪 whittle + new carved figures (bp-3) ---------- */
+// 🔥 seam paths for weld blueprints (x, y in 0-1 of the stage), always resampled to 61 even points
+function bpSeamPts(spec){
+  const [name, a0, b0] = String(spec).split(/[:,]/), a = Number(a0), b = Number(b0); let poly = [];
+  const fn = (f, n) => { const o = []; for(let i = 0; i <= (n || 60); i++){ const u = i / (n || 60); o.push(f(u)); } return o; };
+  if(name === 'line') poly = [[0.12, 0.5], [0.88, 0.5]];
+  else if(name === 'slope') poly = [[0.12, 0.5 + a], [0.88, 0.5 - a]];
+  else if(name === 'wave') poly = fn(u => [0.12 + u * 0.76, 0.5 + a * Math.sin(u * Math.PI * 2 * b)]);
+  else if(name === 'zig'){ for(let i = 0; i <= a * 2; i++) poly.push([0.12 + i / (a * 2) * 0.76, 0.5 + (i % 2 ? b : -b)]); }
+  else if(name === 'L') poly = [[0.2, 0.2], [0.2, 0.75], [0.85, 0.75]];
+  else if(name === 'step') poly = [[0.12, 0.35], [0.5, 0.35], [0.5, 0.65], [0.88, 0.65]];
+  else if(name === 'arc') poly = fn(u => [0.15 + u * 0.7, 0.68 - a * Math.sin(u * Math.PI)]);
+  else if(name === 'u') poly = [[0.22, 0.22]].concat(fn(u => [0.5 - 0.28 * Math.cos(u * Math.PI), 0.6 + 0.2 * Math.sin(u * Math.PI)], 30), [[0.78, 0.22]]);
+  else if(name === 'arm') poly = [[0.12, 0.3], [0.42, 0.3], [0.58, 0.62], [0.88, 0.62]];
+  else if(name === 'circle') poly = fn(u => { const t = -Math.PI / 2 - 0.5 - u * (Math.PI * 2 - 1); return [0.5 + 0.3 * Math.cos(t), 0.5 + 0.32 * Math.sin(t)]; });
+  else poly = [[0.12, 0.5], [0.88, 0.5]];
+  const L = [0]; for(let i = 1; i < poly.length; i++) L.push(L[i - 1] + Math.hypot(poly[i][0] - poly[i - 1][0], poly[i][1] - poly[i - 1][1]));
+  const out = []; let j = 0; for(let i = 0; i <= 60; i++){ const d = L[L.length - 1] * i / 60; while(j < L.length - 2 && L[j + 1] < d) j++; const f = (d - L[j]) / Math.max(1e-9, L[j + 1] - L[j]); out.push({x: poly[j][0] + (poly[j + 1][0] - poly[j][0]) * f, y: poly[j][1] + (poly[j + 1][1] - poly[j][1]) * f}); }
+  return out;
+}
+function bpApply3(e){
+  const g0 = '📘 <b>' + UI.esc(e.name) + '</b> — 🆕 ' + UI.esc(e.learn);
+  if(e.st === 'planer'){ G.h = AF.plank(e.n * 17 + (e.ch ? 101 : 0) + e.kind.length); G.T = e.T; G.grain = e.grain; G.undo = []; G.tear = 0; const d0 = drawPlaner; G.draw = () => { d0(); drawGrain(); }; planerGoal(); planerUi(); goal(g0 + (e.grain ? ' · 🪵 grain runs ' + (e.grain > 0 ? '→' : '←') : '')); return true; }
+  if(e.st === 'weld'){ G.seam.pts = bpSeamPts(e.seam); G.seam.bins = new Array(30).fill(null); G.seam.dots = []; G.seam.prog = 0; goal(g0 + ' · 🔥 start at the <b>▶ glowing dot</b>, follow the dotted seam'); seamMeter(); if(G.onResize) G.onResize(); return true; }
+  if(e.st === 'light'){ G.c = AF.makeCircuit(e.lv, e.seed, e.circ); G.taps = 0; G.closed = false; G.lc = LED_COLS[e.lc]; SET.lc = G.lc; G.wantLc = G.lc; G.level = e.lv;
+    goal(g0 + ' · 💡 colour <span class="sw" style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' + G.lc + '"></span>'); $('ctl').querySelectorAll('[data-lc]').forEach(x => x.classList.toggle('on', LED_COLS[Number(x.dataset.lc)] === G.lc)); setAcc('👆 0'); if(G.guide) lightHint(); return true; }
+  if(e.st === 'whittle'){ G.segs = e.segs.map(s => s.slice()); G.best = G.segs.map(() => 0); G.passes = G.segs.map(() => []); G.band = [0.08, 0.07, 0.06, 0.055, 0.05, 0.045][e.lv]; whittleUi(); goal(g0 + ' · 🔪 ' + G.segs.length + ' cuts, away from the hand ✋'); if(G.onResize) G.onResize(); return true; }
+  return false;
+}
+function bpLightBad(){ return G && G.wantLc && G.lc !== G.wantLc ? 0.15 : 0; }
+function bpLook3(e){
+  if(e.st === 'planer') return {k: e.kind, m: SET.mat && ST_MATS.planer.indexOf(SET.mat) >= 0 ? SET.mat : 'oak', th: Math.round((e.T || 0.7) * 20), q: 100};
+  if(e.st === 'weld') return {k: e.kind, m: 'iron', q: 100, e: e.kind === 'sign' ? 'MAKER' : undefined};
+  if(e.st === 'light') return {k: 'lantern', gl: 1, lc: LED_COLS[e.lc]};
+  if(e.st === 'whittle') return {k: e.kind, m: 'oak', q: 100};
+  return null;
+}
+// 🪵 grain arrows on the planer board (plane WITH them; against = tear-out)
+function drawGrain(){
+  if(!G || !G.grain || G.phase !== 'plane') return; const Gm = G.geom(), g = CX, y = Gm.y0 + 16, t = G.t;
+  g.save(); g.strokeStyle = 'rgba(255,220,150,0.75)'; g.fillStyle = 'rgba(255,220,150,0.85)'; g.lineWidth = 2;
+  for(let i = 0; i < 4; i++){ const x0 = Gm.L + (Gm.R - Gm.L) * (0.12 + i * 0.22), x1 = x0 + (Gm.R - Gm.L) * 0.14 * G.grain, sh = ((t * 0.4) % 1) * 6 * G.grain;
+    g.beginPath(); g.moveTo(x0 + sh, y); g.lineTo(x1 + sh, y); g.stroke(); g.beginPath(); g.moveTo(x1 + sh + 7 * G.grain, y); g.lineTo(x1 + sh, y - 5); g.lineTo(x1 + sh, y + 5); g.fill(); }
+  g.font = '800 11px Nunito, sans-serif'; g.textAlign = 'left'; g.fillText('🪵 grain', Gm.L, y + 16); g.restore();
+}
+function bpGrainCheck(a, b){ if(!G.grain || Math.sign(b - a) === G.grain) return; G.tear = (G.tear || 0) + 1; G.scratches++; SND.scratch(); banner('🪵 Against the grain — it tore!'); say(pickLine('planer', 'tear'), 'warn'); react('shrug'); }
+Object.assign(TALK, {
+  planer: {start: ['Push the planer all the way along.', '🪶 Fine passes near the line, 💪 Deep ones far away.', 'Look at the grain before you plane.'], tear: ['Ouch — against the grain it tears! Go the other way.', 'Follow the grain arrows — like stroking a cat the right way.']},
+  weld: {start: ['Mask down — the arc is very bright!', 'Steady speed makes a neat bead.', 'Start at the glowing dot and follow the seam.']},
+  light: {start: ['Electricity needs a full loop to flow.', 'Turn the wires so they join up.', 'LEDs only shine one way round.']},
+  whittle: {start: ['Always carve AWAY from your hand!', 'Small shavings are safer than big ones.', 'Two shavings on every cut.']}
+});
+Object.assign(TRY_THIS, {planer: ['Plane it as thin as you dare!', 'Try planing against the grain — what happens?'], weld: ['Weld the whole seam without stopping.', 'Try a slow weld, then a fast one — compare.'],
+  light: ['Find the fewest taps.', 'Try every LED colour.'], whittle: ['Carve a figure for your desk.', 'Try the new animals: owl, fish, cat, boat, bear, turtle!']});
+// 🔪 the 6 new figures in free make use their "whole figure" cuts; the hand holds them at the top
+['owl', 'fish', 'cat', 'boat', 'bear', 'turtle'].forEach(k => { if(!AF.WHITTLE[k]) AF.WHITTLE[k] = BP.page(k)[5].segs.map(s => s.slice()); WHITTLE_HAND[k] = BP.page(k)[0].hand; });
+
 /* ================= ✨ REMIX · 🎭 DESIGN SHOW · 🎮 crafted skins for the games (af-4) ================= */
 // every crafted thing this player has → localStorage sp_artskins, read by the skin pickers (♟️ pieces, 🔢 number + 🔤 letter tiles, 💣 bombs, 🎱 balls, 🐍 snakes)
 function shareArtSkins(){ try{ const d = JSON.parse(localStorage.getItem('sp_artskins') || '{}'), mine = {}; S.arts.forEach(a => { mine[a.id] = 1; });
@@ -2478,4 +2537,4 @@ function msNow(){ return SET.station; }
 </script>
 </body>
 </html>
-<!-- (bp-2) END OF Artifactory.html -->
+<!-- (bp-3) END OF Artifactory.html -->

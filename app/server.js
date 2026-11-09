@@ -1923,6 +1923,9 @@ const FEAT_DEFS = {
     drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
     remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
     votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
     stories: { name: 'Stories written', icon: '📝', kind: 'sum', tiers: [3, 20, 80] },
     drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
     remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
@@ -4131,7 +4134,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -4528,6 +4531,7 @@ const ART_KINDS_ = {
   spoon: ['whittle', 'hand', 1, 'Spoon', '🥄', 'Stir your cocoa with it'],
   whistle: ['whittle', 'hand', 1, 'Whistle', '🎶', 'Blow it — tweet!'],
   figure: ['whittle', 'hand', 1, 'Carved figure', '🗿', 'A little wooden friend'],
+  owl: ['whittle', 'hand', 1, 'Owl', '🦉', 'A wise little owl'], fish: ['whittle', 'hand', 1, 'Fish', '🐟', 'A fish that never needs water'], cat: ['whittle', 'hand', 1, 'Cat', '🐱', 'A cat that sits still'], boat: ['whittle', 'hand', 1, 'Boat', '⛵', 'A little sailing boat'], bear: ['whittle', 'hand', 1, 'Bear', '🐻', 'A friendly bear'], turtle: ['whittle', 'hand', 1, 'Turtle', '🐢', 'A slow and steady turtle'],   // 🔪 bp-3 carved figures
   pshape: ['print', 'hand', 1, '3D-printed shape', '🔷', 'Any shape you draw, printed'],
   pspin: ['print', 'hand', 2, '3D-printed tower', '🗼', 'A spun shape, printed layer by layer'],
   basket: ['nature', 'hand', 2, 'Basket', '🧺', 'Carry your treasures', ['bamboo']],
@@ -5125,7 +5129,7 @@ function artDescribe(name, id, desc) {
   if (Object.keys(res.descGot).length) safeRecordFeats_(name, 'artifactory', { stories: 1 });
   return res;
 }
-// (bp-2) END OF ArtifactoryCode.gs
+// (bp-3) END OF ArtifactoryCode.gs
 
 ;
 /* ===== on the device only: the grown-up PIN arrives hashed from the family Sheet (OfflineSync.gs) ===== */
