@@ -397,6 +397,7 @@
     .lobby .float, .art::before, .hero, .deco, .timer-bar.warning{animation:none;}
     .game-card, .mini, .pill{transition:none;}
   }
+.ui-guide-card .ug-line.mg-head{background:transparent;padding:4px 4px 0;font-size:.95rem;}   /* 🗂️ mg-1 group header in the "+N" sheet */
 </style>
 <script src="inc/UiKit.js"></script>
 <script src="inc/Themes.js"></script>
@@ -747,7 +748,13 @@ function sizeArt(card){ const a = card.querySelector('.art'); if(a && artRO) art
 /* ✨ MODE SPOTLIGHT (modes-2): chips under a game's name open it straight in that mode; the strip at the top shows modes this player hasn't tried */
 let MODES = {list: [], tried: []};
 const MODE_CHIPS_MAX = 4;
-function modesOf(g){ return MODES.list.filter(m => m.game === g.GameID); }
+function modesOf(g){ return MODES.list.filter(m => m.game === g.GameID).map((m, i) => [m, i]).sort((a, b) => mgOrd(a[0], a[1]) - mgOrd(b[0], b[1])).map(x => x[0]); }   // 🗂️ mg-1 group order (the start page's boxes)
+function mgOrd(m, i){ return m.group ? m.group.n * 1000 + m.group.i : 900000 + i; }
+// 🗂️ mg-1: one line per group — "🎯 Pose ท่าโพส — 🎯 Classic · ⏱️ Speed 60 s" (games with 2+ groups only)
+function modeGroupLines(g){
+  const out = [], by = {}; modesOf(g).forEach(m => { if(!m.group) return; if(!by[m.group.k]){ by[m.group.k] = {grp: m.group, ms: []}; out.push(by[m.group.k]); } by[m.group.k].ms.push(m); });
+  return out.length < 2 ? [] : out.map(x => [x.grp.icon, '**' + x.grp.en + '** ' + x.grp.th + ' — ' + x.ms.map(m => m.icon + ' ' + modeShort(m)).join(' · ')]);
+}
 function modeFresh(m){ return !!CURRENT_PLAYER && MODES.tried.indexOf(m.key) < 0; }
 function modeShort(m){ const n = String(m.name || ''), gn = String(m.gname || ''); const t = gn && n.indexOf(gn + ' ') === 0 ? n.slice(gn.length + 1) : n; return t.replace(/^for 2$/, '2 players') || n; }
 function modeChips(g){
@@ -765,11 +772,12 @@ function openMode(m){
 }
 // "+N": every way to play this game, as one sheet with a button per mode
 function showModes(g){
-  const ms = modesOf(g);
-  UI.guide([{icon: g.Icon, title: 'Ways to play ' + nameOf(g), lines: ms.map(m => [m.icon, '**' + m.name + '** — ' + m.pitch + (modeFresh(m) ? ' ✨' : '')])}], {doneText: '▶ Play ' + nameOf(g)});
+  const ms = modesOf(g), grouped = modeGroupLines(g).length > 0, rows = [];   // 🗂️ mg-1: a header line per group, then its modes
+  ms.forEach((m, i) => { if(grouped && m.group && (!i || !ms[i - 1].group || ms[i - 1].group.k !== m.group.k)) rows.push({line: [m.group.icon, '**' + m.group.en + '** · ' + m.group.th]}); rows.push({m, line: [m.icon, '**' + m.name + '** — ' + m.pitch + (modeFresh(m) ? ' ✨' : '')]}); });
+  UI.guide([{icon: g.Icon, title: 'Ways to play ' + nameOf(g), lines: rows.map(r => r.line)}], {doneText: '▶ Play ' + nameOf(g)});
   const box = document.querySelector('.ui-guide'), next = box && box.querySelector('.ug-next');
   if(next) next.onclick = () => { box.querySelector('.ug-x').click(); openGame(g); };
-  if(box) box.querySelectorAll('.ug-line').forEach((li, i) => { const m = ms[i]; if(!m) return; li.style.cursor = 'pointer'; li.setAttribute('role', 'button'); li.onclick = () => { box.querySelector('.ug-x').click(); openMode(m); }; });
+  if(box) box.querySelectorAll('.ug-line').forEach((li, i) => { const m = rows[i] && rows[i].m; if(!m){ if(rows[i]) li.classList.add('mg-head'); return; } li.style.cursor = 'pointer'; li.setAttribute('role', 'button'); li.onclick = () => { box.querySelector('.ug-x').click(); openMode(m); }; });
 }
 document.addEventListener('keydown', e => { const c = e.target && e.target.closest && e.target.closest('.mchip'); if(c && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); e.stopPropagation(); const card = c.closest('.game-card'), g = allGames.find(x => modesOf(x).some(m => m.key === c.dataset.mode)) || (card && allGames.find(x => card.querySelector('[data-help="' + x.GameID + '"]'))); if(g) chipTap(c, g); } }, true);
 // ✨ strip: up to 12 untried modes (order changes every day), 1–4 cards showing, moves on every 5 s, no scroll bar
@@ -866,6 +874,7 @@ function bigCard(g){
 function showHelp(g){
   const page = UI.gameHelp(g.GameID, nameOf(g), g.Icon, isMulti(g)) || {icon: g.Icon, title: nameOf(g), body: g.Description || ''};
   if(isMulti(g) && page.lines) page.lines[page.lines.length - 1][1] = 'Also for **' + (maxPlayers(g) > 2 ? '2–' + maxPlayers(g) : '2') + ' players** on one screen.';
+  const mgl = modeGroupLines(g); if(mgl.length) page.lines = (page.lines || (page.body ? [['📝', page.body]] : [])).concat(mgl), delete page.body;   // 🗂️ mg-1 the game's mode groups
   UI.guide([page], {doneText: '▶ Play ' + nameOf(g)});
   const b = document.querySelector('.ui-guide .ug-next');
   if(b) b.onclick = () => { document.querySelector('.ui-guide .ug-x').click(); openGame(g); };
@@ -1049,4 +1058,4 @@ loadGameroom();
 </script>
 </body>
 </html>
-<!-- (11m+11j+11i+11x-1+11y-1+sb-4+pp-4+ebr-3+r34+wd-1+bc-3+r35b+modes-2+gr-1+gs-2+af-1) END OF Gameroom.html -->
+<!-- (11m+11j+11i+11x-1+11y-1+sb-4+pp-4+ebr-3+r34+wd-1+bc-3+r35b+modes-2+gr-1+gs-2+af-1+mg-1) END OF Gameroom.html -->

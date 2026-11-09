@@ -676,10 +676,30 @@ const MODES_ = [
   { game: 'pose-party', id: 'yoga', icon: '🧘', name: 'Yoga & Stretch', pitch: 'Slow stretches — hold them still', route: 'poseparty', tried: null },
 ];
 const MODES_NEW_DAYS_ = 7;
+// 🗂️ mg-1 Mode groups — the same boxes (and order) as each game's start page. A mode not listed here has no group (2-mode games stay flat).
+const MODE_GROUPS_ = {
+  'wisdeck': [{k: 'quiz', icon: '🧠', en: 'Quiz games', th: 'เกมตอบคำถาม', modes: ['quiz', 'buzz', 'daily']}, {k: 'num', icon: '🔢', en: 'Number games', th: 'เกมตัวเลข', modes: ['count', 'jack']}, {k: 'learn', icon: '📚', en: 'Learn + store', th: 'อ่าน · เรียน · เก็บการ์ด', modes: ['learn']}],
+  'snakeast': [{k: 'arcade', icon: '🐍', en: 'Arcade', th: 'อาร์เคด', modes: ['feast', 'endless', 'gate']}, {k: 'land', icon: '🏰', en: 'Land battle', th: 'ยึดพื้นที่', modes: ['castle']}, {k: 'story', icon: '📜', en: 'Story', th: 'เนื้อเรื่อง', modes: ['tale']}],
+  'soul-bopper': [{k: 'battle', icon: '⚔️', en: 'Battle', th: 'ต่อสู้', modes: ['battle', 'hold']}, {k: 'party', icon: '💩', en: 'Party', th: 'ปาร์ตี้', modes: ['classic']}, {k: 'story', icon: '🗺️', en: 'Story', th: 'ผจญภัย', modes: ['stage']}],
+  'polyplot': [{k: 'boxes', icon: '⬜', en: 'Boxes', th: 'ปิดกล่อง', modes: ['classic', 'hunt']}, {k: 'fort', icon: '🏰', en: 'Fortiplot', th: 'สร้างป้อม', modes: ['fort', 'coop']}],
+  'alignext': [{k: 'drop', icon: '🔴', en: 'Drop', th: 'หยอดเหรียญ', modes: ['drop']}, {k: 'omni', icon: '❌⭕', en: 'Omnifile', th: 'วางได้ทุกช่อง', modes: ['omni', 'stack']}],
+  'beat-corner': [{k: 'songs', icon: '🎤', en: 'Songs', th: 'เพลง', modes: ['corner']}, {k: 'inst', icon: '🎹', en: 'Instruments', th: 'เครื่องดนตรี', modes: ['piano', 'drums']}, {k: 'together', icon: '🎸', en: 'Together', th: 'เล่นด้วยกัน', modes: ['band']}, {k: 'make', icon: '✏️', en: 'Make', th: 'แต่งเพลง', modes: ['maker']}],
+  'eyes-brain': [{k: 'remember', icon: '🔢', en: 'Ways to remember', th: 'วิธีจำ', modes: ['classic', 'backwards', 'colour', 'letters', 'listen', 'word', 'shapes']}, {k: 'challenge', icon: '🏔️', en: 'Challenge', th: 'ท้าทาย', modes: ['challenge', 'daily']}, {k: 'party', icon: '👥', en: 'Party', th: 'เล่นกันหลายคน', modes: ['chain']}],
+  'sla-brall': [{k: 'sports', icon: '🏓', en: 'Sports', th: 'กีฬา', modes: ['slashot', 'slapoof', 'slaball', 'slapong', 'slawall']}, {k: 'cup', icon: '🏆', en: 'Cup', th: 'ทัวร์นาเมนต์', modes: ['cup']}],
+  'brawl-buddies': [{k: 'battle', icon: '🥊', en: 'Battle', th: 'ต่อสู้', modes: ['battle']}, {k: 'adv', icon: '🗺️', en: 'Brawenture', th: 'ผจญภัย', modes: ['brawenture']}],
+  'georead': [{k: 'sounds', icon: '🔊', en: 'Sounds', th: 'เสียง', modes: ['phonics', 'rhyme', 'say']}, {k: 'words', icon: '🧱', en: 'Words', th: 'คำ', modes: ['build', 'sight', 'case', 'trace']}, {k: 'reading', icon: '📖', en: 'Reading', th: 'อ่าน', modes: ['story', 'types']}, {k: 'journey', icon: '🗺️', en: 'Journey', th: 'ผจญภัย', modes: ['journey']}],
+  'pose-party': [{k: 'pose', icon: '🎯', en: 'Pose', th: 'ท่าโพส', modes: ['classic', 'speed', 'copy']}, {k: 'move', icon: '💃', en: 'Move', th: 'ขยับตัว', modes: ['dance', 'statue', 'freeze']}, {k: 'together', icon: '🧑‍🤝‍🧑', en: 'Together', th: 'เล่นด้วยกัน', modes: ['group', 'mirror', 'letters']}, {k: 'calm', icon: '🧘', en: 'Calm', th: 'ยืดเหยียด', modes: ['yoga']}]
+};
+// {k, icon, en, th, n (box order), i (place in the box)} or null
+function modeGroupOf_(m) {
+  const gs = MODE_GROUPS_[m.game] || [];
+  for (let n = 0; n < gs.length; n++) { const i = gs[n].modes.indexOf(m.id); if (i >= 0) return { k: gs[n].k, icon: gs[n].icon, en: gs[n].en, th: gs[n].th, n: n, i: i }; }
+  return null;
+}
 function modeKey_(m) { return m.game + ':' + m.id; }
 function modeLink_(m) { return m.route + '&mode=' + m.id; }
 function modeGameName_(id) { const g = BUILT_IN_GAMES.find(x => x.GameID === id); return g ? g.GameName : id; }
-function modePublic_(m) { return { game: m.game, gname: modeGameName_(m.game), id: m.id, key: modeKey_(m), name: m.name, icon: m.icon, pitch: m.pitch, route: m.route, link: modeLink_(m), added: m.added || '' }; }
+function modePublic_(m) { return { game: m.game, gname: modeGameName_(m.game), id: m.id, key: modeKey_(m), name: m.name, icon: m.icon, pitch: m.pitch, route: m.route, link: modeLink_(m), added: m.added || '', group: modeGroupOf_(m) }; }   // 🗂️ mg-1 group
 // Which modes each player has played: {name: {'game:id': true}} — Scores, Feats and Settings are read once (memos).
 function modesTriedAll_(names, st) {
   st = st || getSettings();
@@ -4091,7 +4111,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+af-4) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+af-4+mg-1) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
