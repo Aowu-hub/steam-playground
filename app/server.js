@@ -1926,7 +1926,17 @@ const FEAT_DEFS = {
     drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
     remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
     votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
     stories: { name: 'Stories written', icon: '📝', kind: 'sum', tiers: [3, 20, 80] },
+    bpPages: { name: 'Blueprint pages stamped', icon: '🏅', kind: 'sum', tiers: [1, 5, 15] },
+    bpDaily: { name: 'Blueprints of the Day', icon: '📅', kind: 'sum', tiers: [3, 20, 80] },
+    bpCopied: { name: 'Family copied your blueprints', icon: '👪', kind: 'sum', tiers: [1, 10, 40] },
+    bpShared: { name: 'Family blueprints shared', icon: '📐', kind: 'sum', tiers: [1, 5, 20] },
     drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
     remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
     votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
@@ -2413,6 +2423,10 @@ const TITLE_DEFS = [
   { id: 'af_master', name: 'Master Maker', icon: '🏭', hint: 'Make 25 things in Artifactory', rule: f => featVal_(f, 'artifactory', 'made') >= 25 },
   { id: 'af_gem', name: 'Gem Cutter', icon: '💎', hint: 'Cut 10 gems at the 💎 stone station', rule: f => featVal_(f, 'artifactory', 'gems') >= 10 },
   { id: 'af_lathe', name: 'Lathe Legend', icon: '🌀', hint: 'Get 3 ⭐ on 10 lathe blueprints', rule: f => featVal_(f, 'artifactory', 'latheStars') >= 10 },
+  { id: 'bp_reader', name: 'Blueprint Reader', icon: '📘', hint: 'Stamp 5 pages of the 📘 Blueprint Book (all 12 with ⭐)', rule: f => featVal_(f, 'artifactory', 'bpPages') >= 5 },
+  { id: 'bp_scholar', name: 'Blueprint Scholar', icon: '🎓', hint: 'Stamp 15 pages of the 📘 Blueprint Book', rule: f => featVal_(f, 'artifactory', 'bpPages') >= 15 },
+  { id: 'bp_grand', name: 'Grand Master Maker', icon: '👑', hint: 'Stamp 40 pages of the 📘 Blueprint Book', rule: f => featVal_(f, 'artifactory', 'bpPages') >= 40 },
+  { id: 'bp_daily', name: 'Daily Maker', icon: '📅', hint: 'Get ⭐ on 30 Blueprints of the Day', rule: f => featVal_(f, 'artifactory', 'bpDaily') >= 30 },
   { id: 'af_remix', name: 'Remix Royalty', icon: '✨', hint: 'Remix 10 things in Artifactory', rule: f => featVal_(f, 'artifactory', 'remixes') >= 10 },
   { id: 'gr_sound', name: 'Sound Explorer', icon: '🔊', hint: 'Find 30 letter sounds in GeoRead', rule: f => featVal_(f, 'georead', 'sounds') >= 30 },
   { id: 'gr_wizard', name: 'Word Wizard', icon: '🧙', hint: 'Blend or build 100 words in GeoRead', rule: f => featVal_(f, 'georead', 'blends') + featVal_(f, 'georead', 'built') >= 100 },
@@ -4134,7 +4148,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -4737,6 +4751,9 @@ function getArtifactoryData(player) {
   out.bp = me ? jsonSetting_(st, 'ArtBP_' + me, {}) : {};   // 📘 best ⭐ per blueprint (bp-1)
   out.chal = jsonSetting_(st, 'ArtChal', {});              // 🏆 family top 5 per challenge
   out.descLeft = me ? ART_DESC_CAP_ - (out.bag._wd === today_() ? out.bag._wn || 0 : 0) : 0;
+  const dl = me ? jsonSetting_(st, 'ArtDaily_' + me, {}) : {};   // 📅 🏅 👪 (bp-4)
+  out.daily = { id: artDailyId_(), done: dl.d === today_(), streak: dl.d === today_() || dl.d === artYesterday_() ? dl.s || 0 : 0, best: dl.best || 0 };
+  out.fam = jsonSetting_(st, 'ArtFamBP', []);
   return out;
 }
 function checkArtPlayer_(name) { checkPlayer_(name); }
@@ -4801,10 +4818,12 @@ function artCraft(name, req) {
     if (kind === 'gem' || station === 'stone') stats.gems = 1;
     if (station === 'light') stats.glows = 1;
     var res = { item: publicArt_(a), bag: bag, descGot: descGot }, theme = ART_STATIONS_[station][0] + ' ' + ART_STATIONS_[station][1] + ' · ' + ART_KINDS_[kind][3] + (bpInfo ? ' · ' + bpInfo.label : '');
-    if (bpInfo) { res.bp = bpInfo.bp; res.chal = bpInfo.chal; }
+    if (bpInfo) { res.bp = bpInfo.bp; res.chal = bpInfo.chal; res.daily = bpInfo.daily; res.stamp = bpInfo.stamp; if (bpInfo.bag) res.bag = bpInfo.bag; if (bpInfo.fam) res.fam = bpInfo.fam; }
+    if (bpInfo && bpInfo.daily) stats.bpDaily = 1; if (bpInfo && bpInfo.stamp) stats.bpPages = 1;
     if (bp) { stats.blueprints = 1; if (stars === 3) { stats.perfect = 1; if (station === 'lathe') stats.latheStars = 1; if (station === 'stone') stats.stoneStars = 1; } }
   } finally { lock.releaseLock(); }
   team.forEach(n => safeRecordFeats_(n, 'artifactory', { team: 1 }));
+  if (bpInfo && bpInfo.famMaker) safeRecordFeats_(bpInfo.famMaker, 'artifactory', { bpCopied: 1 });   // 👪 the maker gets ⭐ when someone copies their blueprint
   return artAfter_(name, res, bp, stars, stats, theme);   // the Archive save takes the lock itself, so it runs after ours is released
 }
 function artAfter_(name, res, bp, stars, stats, theme) {
@@ -5087,7 +5106,7 @@ function getArtStrip(player) {
   const total = Object.keys(bag).filter(m => ART_MATS_[m]).reduce((s, m) => s + bag[m], 0);
   return { made: mine.filter(a => a.maker === player).length, total: total, dailyReady: bag._d !== today_(), dropsLeft: ART_DROP_CAP_ - (bag._dd === today_() ? bag._dn || 0 : 0),
     last: mine.slice(-3).reverse().map(a => ({ id: a.id, name: a.name, kind: a.kind, look: a.look })), shelf: Object.keys(artShelfOf_(st).m).length,
-    skins: artSkinList_(players) };
+    skins: artSkinList_(players), daily: artDailyId_() };
 }
 
 /* ================= 📘 Blueprint Book · 📝 stories (bp-1) ================= */
@@ -5103,7 +5122,7 @@ function artSaveBP_(name, id, stars, score, secs) {
     if (!list.some(r => r.n === name)) list.push({ n: name, s: score, t: secs, st: stars });
     ch[id] = list.sort((a, b) => b.s - a.s).slice(0, 5); saveSetting('ArtChal', JSON.stringify(ch)); out.chal = ch;
   }
-  return out;
+  return artBpExtras_(name, id, stars, bp, out);   // 📅 🏅 👪 (bp-4)
 }
 function artCleanDesc_(d) { return String(d || '').replace(/[<>"`\\]/g, '').replace(/\s+/g, ' ').trim().slice(0, 200); }
 function artWords_(d) { return d ? d.split(' ').filter(w => /[A-Za-z฀-๿0-9]{2,}/.test(w)).length : 0; }
@@ -5129,7 +5148,71 @@ function artDescribe(name, id, desc) {
   if (Object.keys(res.descGot).length) safeRecordFeats_(name, 'artifactory', { stories: 1 });
   return res;
 }
-// (bp-3) END OF ArtifactoryCode.gs
+
+/* ================= 📅 Blueprint of the Day · 🏅 page stamps · 👪 family blueprints (bp-4) ================= */
+const ART_BP_PAGES_ = ["cup", "bangle", "pen", "yoyo", "piece", "trophy", "ball", "tbowl", "box", "goblet", "bowl", "vase", "petbowl", "pshape", "pspin", "medal", "key", "charm", "gem", "ring", "necklace", "crown", "tag", "scarf", "cape", "bag", "flag", "basket", "hat", "fcharm", "paint", "board", "frame", "stand", "badge", "robot", "sign", "lantern", "spoon", "whistle", "figure", "owl", "fish", "cat", "boat", "bear", "turtle"];   // = the book's pages in order (ArtBlueprints.html BP.ORDER — the harness checks they match)
+const ART_FAM_MAX_ = 20, ART_FAM_ST_ = ['lathe', 'pottery', 'print', 'forge', 'sew', 'nature', 'stone'];
+// the same blueprint for the whole family on a day: #1–#9 of any page except 🎨 paint jobs (those need a thing to paint) — the page uses the same picker (bpDailyId)
+function artDailyId_(day) {
+  day = String(day || today_()); let h = 2166136261;
+  for (let i = 0; i < day.length; i++) { h ^= day.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  const pages = ART_BP_PAGES_.filter(k => k !== 'paint');
+  return pages[h % pages.length] + '_' + (1 + Math.floor(h / pages.length) % 9);
+}
+function artYesterday_() { return Utilities.formatDate(new Date(Date.now() - 864e5), Session.getScriptTimeZone(), 'yyyy-MM-dd'); }
+function artRandMats_(n) { const got = {}; for (let i = 0; i < n; i++) { const m = ART_DROP_POOL_[Math.floor(Math.random() * ART_DROP_POOL_.length)]; got[m] = (got[m] || 0) + 1; } return got; }
+// called by artSaveBP_ after a blueprint gets stars: 📅 daily bonus + streak, 🏅 page stamp + pack, 👪 family credit for the maker
+function artBpExtras_(name, id, stars, bp, out) {
+  if (!(stars > 0)) return out;
+  const st = getSettings(); let bag = null; const give = got => { bag = bag || artBag_(st, name); artAdd_(bag, got); };
+  if (id === artDailyId_()) {
+    const d = jsonSetting_(st, 'ArtDaily_' + name, {}), day = today_();
+    if (d.d !== day) { d.s = d.d === artYesterday_() ? (d.s || 0) + 1 : 1; d.d = day; d.n = (d.n || 0) + 1; d.best = Math.max(d.best || 0, d.s); saveSetting('ArtDaily_' + name, JSON.stringify(d));
+      const got = artRandMats_(2); give(got); out.daily = { got: got, streak: d.s, best: d.best }; }
+  }
+  const m = /^([a-z]+)_(\d+)$/.exec(id);
+  if (m && m[1] !== 'fam') {
+    const kind = m[1]; bp._s = Array.isArray(bp._s) ? bp._s : [];
+    let full = true; for (let n = 1; n <= 12; n++) if (!(bp[kind + '_' + n] > 0)) { full = false; break; }
+    if (full && bp._s.indexOf(kind) === -1) { bp._s.push(kind); saveSetting('ArtBP_' + name, JSON.stringify(bp)); const got = artRandMats_(5); give(got); out.stamp = { kind: kind, got: got, pages: bp._s.length }; }
+  }
+  if (m && m[1] === 'fam') {
+    const list = jsonSetting_(st, 'ArtFamBP', []), f = list.find(x => x.id === id);
+    if (f && f.maker !== name && !(f.got || {})[name]) { f.got = f.got || {}; f.got[name] = stars; saveSetting('ArtFamBP', JSON.stringify(list)); out.famMaker = f.maker; out.fam = list; }
+  }
+  if (bag) { artSaveBag_(name, bag); out.bag = bag; }
+  return out;
+}
+function artFamOk_(a) { const L = a.look || {}; return ART_FAM_ST_.indexOf(a.station) !== -1 && !!(L.p || L.ol || L.fg || L.wv || (a.station === 'stone' && L.cut != null)); }
+// 👪 save something you made as a family blueprint (its look becomes the plan others copy)
+function artFamSave(name, id, title) {
+  checkArtPlayer_(name);
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const a = artRows_().find(x => x.id === String(id));
+    if (!a || a.maker !== name) throw new Error('Only the maker can share its blueprint.');
+    if (!artFamOk_(a)) throw new Error('This one has no shape plan to copy — try a turned, potted, printed, forged, woven or cut thing.');
+    const list = jsonSetting_(getSettings(), 'ArtFamBP', []);
+    if (list.some(f => f.src === a.id)) throw new Error('It is already a family blueprint.');
+    if (list.filter(f => f.maker === name).length >= ART_FAM_MAX_) throw new Error('You already shared ' + ART_FAM_MAX_ + ' — remove one first.');
+    let n = 1; while (list.some(f => f.n === n) && n < 99) n++;
+    const f = { id: 'fam_' + n, n: n, maker: name, kind: a.kind, st: a.station, name: String(title || a.name).replace(/[<>"`\\]/g, '').trim().slice(0, 28) || a.name, look: a.look, src: a.id, made: today_(), got: {} };
+    list.push(f); saveSetting('ArtFamBP', JSON.stringify(list));
+    var res = { fam: list, added: f.id };
+  } finally { lock.releaseLock(); }
+  safeRecordFeats_(name, 'artifactory', { bpShared: 1 });
+  return res;
+}
+function artFamRemove(name, famId) {
+  checkArtPlayer_(name);
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const list = jsonSetting_(getSettings(), 'ArtFamBP', []), f = list.find(x => x.id === String(famId));
+    if (!f || f.maker !== name) throw new Error('Only the maker can remove it.');
+    const left = list.filter(x => x !== f); saveSetting('ArtFamBP', JSON.stringify(left)); return { fam: left };
+  } finally { lock.releaseLock(); }
+}
+// (bp-4) END OF ArtifactoryCode.gs
 
 ;
 /* ===== on the device only: the grown-up PIN arrives hashed from the family Sheet (OfflineSync.gs) ===== */
@@ -5261,7 +5344,9 @@ return {"include": typeof include === 'function' ? include : undefined,
 "artShowSet": typeof artShowSet === 'function' ? artShowSet : undefined,
 "artVote": typeof artVote === 'function' ? artVote : undefined,
 "getArtStrip": typeof getArtStrip === 'function' ? getArtStrip : undefined,
-"artDescribe": typeof artDescribe === 'function' ? artDescribe : undefined};
+"artDescribe": typeof artDescribe === 'function' ? artDescribe : undefined,
+"artFamSave": typeof artFamSave === 'function' ? artFamSave : undefined,
+"artFamRemove": typeof artFamRemove === 'function' ? artFamRemove : undefined};
 } };
 
 const VER = self.STEAM_GS.ver;

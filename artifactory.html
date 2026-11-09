@@ -138,6 +138,9 @@
   .af-meter .bar{height:9px;border-radius:6px;background:rgba(255,255,255,.18);overflow:hidden;margin-top:4px;} .af-meter .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#FFC845,#22C3A1);transition:width .2s;}
   .af-row{display:flex;gap:6px;flex-wrap:wrap;} .af-row .af-btn{flex:1 1 auto;min-width:0;padding:8px 8px;font-size:.86rem;}
   .af-tools{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;}
+  .af-bp-top{display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;} .af-bp-daily{display:flex;gap:10px;align-items:center;flex:1 1 300px;background:linear-gradient(135deg,#FFF4D6,#FFE2B8);border-radius:14px;padding:8px 10px;}
+  .af-bp-daily canvas{width:84px;height:84px;flex:0 0 auto;} .af-bp-daily .tx{display:flex;flex-direction:column;gap:3px;min-width:0;} .af-bp-daily .tx .af-btn{align-self:flex-start;}
+  .af-bp-stamps{flex:1 1 220px;display:flex;flex-direction:column;justify-content:center;gap:4px;background:rgba(124,58,237,.08);border-radius:14px;padding:8px 12px;} .af-bp-top .sub{font-size:.78rem;opacity:.8;}
   .af-fg-tools .af-tool{display:inline-flex;flex-direction:column;align-items:center;line-height:1.05;min-width:44px;} .af-fg-tools .af-tool small{font-size:.58rem;opacity:.85;font-weight:700;}
   @media (max-width:520px){ .af-hud{gap:4px;padding:4px 6px;} .af-hud .pill{min-width:32px;padding:3px 6px;} .af-hud #h-title{flex-shrink:2;} .af-hud #h-step{flex:0 1 auto;min-width:44px;overflow:hidden;text-overflow:ellipsis;display:block;line-height:26px;} }
   @media (max-width:520px){ .af-fg-tools .af-tool{min-width:38px;min-height:36px;padding:2px 4px;} .af-fg-tools .af-tool small{display:none;} }
@@ -766,7 +769,7 @@ function choosePlayer(name){
 }
 function take(d, name){
   S.players = d.players || S.players; S.progress = d.progress || {}; S.settings = d.settings || S.settings; S.avatars = d.avatars || {};
-  S.bag = d.bag || {}; S.arts = d.arts || []; S.items = d.items || {lines: [], owned: {}}; S.outfits = d.outfits || []; S.hasPin = !!d.hasPin; S.dailyReady = !!d.dailyReady; S.shelf = d.shelf || {m: {}, req: []}; S.show = d.show || []; S.bp = d.bp || {}; S.chal = d.chal || {}; S.descLeft = d.descLeft == null ? 5 : d.descLeft; S.dropsLeft = d.dropsLeft == null ? 30 : d.dropsLeft; shareArtSkins();
+  S.bag = d.bag || {}; S.arts = d.arts || []; S.items = d.items || {lines: [], owned: {}}; S.outfits = d.outfits || []; S.hasPin = !!d.hasPin; S.dailyReady = !!d.dailyReady; S.shelf = d.shelf || {m: {}, req: []}; S.show = d.show || []; S.bp = d.bp || {}; S.chal = d.chal || {}; S.descLeft = d.descLeft == null ? 5 : d.descLeft; S.daily = d.daily || {}; S.fam = d.fam || []; bpFamSync(); S.dropsLeft = d.dropsLeft == null ? 30 : d.dropsLeft; shareArtSkins();
   S.creations = d.creations || []; S.giftsLeft = d.giftsLeft || 0; S.loadedFor = name || d.player || '';
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
@@ -1931,8 +1934,9 @@ function keepItem(o){
     SND.win(); confetti([KINDS[o.kind][4], '✨', '⭐', '🛠️'], 30); if(G) G.done = true;
     const K = KINDS[o.kind], wear = K[1];
     if(r.bp) S.bp = r.bp; if(r.chal) S.chal = r.chal; let bpMsg = '';
-    if(o.bpId && o.blueprint && o.blueprint.stars){ const e = BP.get(o.bpId), nx = e && !e.ch ? BP.get(e.kind + '_' + (e.n + 1)) : null; if(nx){ SET.bp = nx.id; savePrefs(); const op = bpOpen(nx); bpMsg = op.ok ? '<br>📘 #' + nx.n + ' ' + UI.esc(nx.name) + ' is open!' : '<br>📘 Next: #' + nx.n + ' — ' + UI.esc(op.why); } }
+    if(o.bpId && o.blueprint && o.blueprint.stars){ const e = BP.get(o.bpId), nx = e && !e.ch && !e.fam ? BP.get(e.kind + '_' + (e.n + 1)) : null; if(nx){ SET.bp = nx.id; savePrefs(); const op = bpOpen(nx); bpMsg = op.ok ? '<br>📘 #' + nx.n + ' ' + UI.esc(nx.name) + ' is open!' : '<br>📘 Next: #' + nx.n + ' — ' + UI.esc(op.why); } }
     if(r.descGot && Object.keys(r.descGot).length){ S.descLeft = Math.max(0, (S.descLeft || 0) - 1); bpMsg += '<br>📝 Story bonus: ' + Object.keys(r.descGot).map(m => MATS[m][0] + ' ×' + r.descGot[m]).join(' '); }
+    bpMsg += bpKeepMsg(r);
     if(dsc) dsc.disabled = true;
     $('card-note').innerHTML = '✅ Saved on your 🧰 Maker shelf!' + bpMsg + (r.level && r.level.newBadge ? '<br>🏅 New badge: ' + UI.esc(r.level.newBadge) : '') + featText(r.feats);
     $('card-btns').innerHTML = '<button class="af-btn soft" data-sound="pop" onclick="backToMenu()">◀ Back</button>' + (wear ? '<button class="af-btn" data-sound="none" onclick="tryOnNew(\'' + r.item.id + '\')">🪞 Try it on</button>' : '') + '<button class="af-btn amber" data-sound="pop" onclick="againStation()">🔁 Make another</button>';
@@ -2046,7 +2050,7 @@ function openThings(){
 const SKIN_GAMES = {piece: '♟️ Chess · ❌⭕ Alignext', figure: '♟️ Chess · ❌⭕ Alignext', trophy: '♟️ Chess · ❌⭕ Alignext', board: '🔢 GeoScout · ➗ Algebros', frame: '🔢 GeoScout · ➗ Algebros', stand: '🔢 GeoScout · ➗ Algebros', gem: '🔢 GeoScout · 🎱 Pinball', medal: '🔢 GeoScout · ➗ Algebros', badge: '🔢 GeoScout · ➗ Algebros', sign: '🔤 GeoRead · 🔢 GeoScout',
   pshape: '🔤 GeoRead letters · 🐍 Snakize', pspin: '🔤 GeoRead letters · 🐍 Snakize', scarf: '🔤 GeoRead letters · 🐍 Snakize', flag: '🔤 GeoRead letters · 🐍 Snakize', cape: '🔤 GeoRead letters · 🐍 Snakize', bag: '🔤 GeoRead letters · 🐍 Snakize', basket: '🔤 GeoRead letters · 🐍 Snakize', hat: '🔤 GeoRead letters · 🐍 Snakize',
   ball: '🎱 Pinball · 👻 Soul Bopper', yoyo: '🎱 Pinball · 👻 Soul Bopper', lantern: '👻 Soul Bopper bombs', vase: '👻 Soul Bopper bombs', bowl: '🎱 Pinball · 👻 Soul Bopper', robot: '👻 Soul Bopper bombs', petbowl: '👻 Soul Bopper bombs'};
-function thingMore(a){ return storyHtml(a) + thingMore0(a); }
+function thingMore(a){ return storyHtml(a) + famHtml(a) + thingMore0(a); }
 function thingMore0(a){ const others = S.players.map(p => p.Name).filter(n => n !== S.player && (a.owners || []).indexOf(n) < 0);
   let h = (SKIN_GAMES[a.kind] ? '<p class="af-note">🎮 Also a game skin in ' + SKIN_GAMES[a.kind] + ' — for the whole family</p>' : '') +
     '<div class="btns"><button class="af-btn" data-sound="none" id="btn-remix" onclick="remixThing(\'' + a.id + '\')">✨ Remix</button>' + (a.maker === S.player ? '<button class="af-btn soft" data-sound="none" id="btn-inshow" onclick="toggleShow(\'' + a.id + '\')">' + (a.show ? '🎭 In the show ✓' : '🎭 Enter the show') + '</button>' : '') + '</div>';
@@ -2073,6 +2077,7 @@ BP.build(AF.shapeOutline);
 function bpStars(id){ return Number((S.bp || {})[id]) || 0; }
 function bpOpen(e){
   if(!e) return {ok: false, why: 'Pick a blueprint'};
+  if(e.fam || e.id === bpDailyId()) return {ok: true};   // 👪 family + 📅 today's blueprint are open to everyone
   const cnt = stationCount(e.st);
   if(cnt < e.mile) return {ok: false, why: (e.mile >= 25 ? '🏅 Master' : e.mile >= 12 ? '🥇 Expert' : '🥈 Crafter') + ': make ' + e.mile + ' things at the ' + STATIONS[e.st].name.toLowerCase() + ' (' + cnt + ' so far)'};
   if(!e.ch && e.n > 1 && !bpStars(e.kind + '_' + (e.n - 1))) return {ok: false, why: 'Get ⭐ on #' + (e.n - 1) + ' first'};
@@ -2094,13 +2099,13 @@ function bpHowHtml(id){
     .map(m => '<button class="af-kind' + (SET.mode === m[0] ? ' on' : '') + '" data-sound="pop" data-mode="' + m[0] + '"><span class="nm">' + m[1] + '</span><span class="sub">' + m[2] + '</span></button>').join('') + '</div>';
   if(SET.mode !== 'book') h += '<p class="af-note">💡 Try this: ' + tryThis(id) + '</p>';
   else if(BP.has(kind)){ const pg = BP.page(kind); if(!BP.get(SET.bp) || BP.get(SET.bp).kind !== kind) SET.bp = (pg.find(e => bpOpen(e).ok && !bpStars(e.id) && !e.ch) || pg[0]).id;
-    h += '<p class="af-note">📘 ' + bpPageDone(kind) + ' / 12 done · ' + stationLevel(id) + '</p><div class="af-bp-grid">' + pg.map(e => { const o = bpOpen(e), st = bpStars(e.id);
-      return '<button class="af-bp' + (SET.bp === e.id ? ' on' : '') + (o.ok ? '' : ' lock') + (e.ch ? ' ch' : '') + '" data-sound="pop" data-bp="' + e.id + '"><span class="n">' + (e.ch ? '🏆' : '#' + e.n) + '</span><canvas width="120" height="120"></canvas><span class="nm">' + UI.esc(e.name) + '</span><span class="st">' + (o.ok ? '⭐'.repeat(st) + '<i>' + '☆'.repeat(3 - st) + '</i>' : '🔒') + '</span></button>'; }).join('') + '</div>' + bpDetailHtml(BP.get(SET.bp)); }
+    h += '<p class="af-note">📘 ' + bpPageDone(kind) + ' / 12 done' + (((S.bp || {})._s || []).indexOf(kind) >= 0 ? ' · 🏅 stamped' : '') + ' · ' + stationLevel(id) + '</p><div class="af-bp-grid">' + pg.map(e => { const o = bpOpen(e), st = bpStars(e.id);
+      return '<button class="af-bp' + (SET.bp === e.id ? ' on' : '') + (o.ok ? '' : ' lock') + (e.ch ? ' ch' : '') + '" data-sound="pop" data-bp="' + e.id + '"><span class="n">' + (e.ch ? '🏆' : '#' + e.n) + (e.id === bpDailyId() ? ' 📅' : '') + '</span><canvas width="120" height="120"></canvas><span class="nm">' + UI.esc(e.name) + '</span><span class="st">' + (o.ok ? '⭐'.repeat(st) + '<i>' + '☆'.repeat(3 - st) + '</i>' : '🔒') + '</span></button>'; }).join('') + '</div>' + bpDetailHtml(BP.get(SET.bp)); }
   return h + '</div>';
 }
 function bpDetailHtml(e){
   if(!e) return ''; const o = bpOpen(e), top = e.ch ? ((S.chal || {})[e.id] || []).slice(0, 3).map((r, i) => ['🥇', '🥈', '🥉'][i] + ' ' + UI.esc(r.n) + ' ' + Number(r.s).toLocaleString()).join(' · ') : '';
-  return '<div class="af-bp-info" id="bp-info"><b>' + (e.ch ? '🏆 ' : '#' + e.n + ' ') + UI.esc(e.name) + '</b> · ' + AF.LEVELS[e.lv].emoji + ' ' + AF.LEVELS[e.lv].name + '<div>🆕 Learn: ' + UI.esc(e.learn) + '</div><div class="f">💡 ' + UI.esc(e.fact) + '</div>' +
+  return '<div class="af-bp-info" id="bp-info"><b>' + (e.ch ? '🏆 ' : e.fam ? '' : '#' + e.n + ' ') + UI.esc(e.name) + '</b> · ' + AF.LEVELS[e.lv].emoji + ' ' + AF.LEVELS[e.lv].name + '<div>🆕 Learn: ' + UI.esc(e.learn) + '</div><div class="f">💡 ' + UI.esc(e.fact) + '</div>' +
     (e.ch ? '<div>⏱️ Timed · family best: ' + (top || 'nobody yet — be the first!') + '</div>' : '') + (o.ok ? '' : '<div class="why">🔒 ' + o.why + '</div>') + '</div>';
 }
 function wireBpGrid(box){ box.querySelectorAll('[data-bp]').forEach(b => { const e = BP.get(b.dataset.bp), g = b.querySelector('canvas').getContext('2d'); g.clearRect(0, 0, 120, 120); artDraw(g, bpLook(e), 60, 112, 96, 1);
@@ -2119,7 +2124,7 @@ function bpGo(st, go){
   setTimeout(() => sayStart(st), 400);
 }
 function bpApply(e){
-  $('h-title').textContent = STATIONS[e.st].icon + ' ' + (e.ch ? '🏆 ' : '📘 #' + e.n + ' ') + e.name;
+  $('h-title').textContent = STATIONS[e.st].icon + ' ' + (e.ch ? '🏆 ' : e.fam ? '' : '📘 #' + e.n + ' ') + e.name;
   const g0 = '📘 <b>' + UI.esc(e.name) + '</b> — 🆕 ' + UI.esc(e.learn);
   if(bpApply2(e) || bpApply3(e)){ if(e.ch) G.timer = true; return; }
   if(e.st === 'lathe'){ G.target = e.p.slice(); G.tin = e.pi ? e.pi.slice() : null; latheUi(); goal(g0 + (e.pi ? ' · then 🔄 hollow the inside' : '')); G.first = true; if(G.guide) setTimeout(latheHand, 80); }
@@ -2225,9 +2230,10 @@ function renderBook(){
   const groups = BP_STATIONS.map(st => '<div class="af-box"><h3>' + STATIONS[st].icon + ' ' + STATIONS[st].name + ' <small>' + stationLevel(st) + '</small></h3><div class="af-kinds">' +
     BP.ORDER.filter(k => BP.page(k)[0].st === st).map(k => { const d = bpPageDone(k), ch = BP.page(k).filter(e => e.ch && bpStars(e.id)).length;
       return '<button class="af-kind" data-sound="pop" data-page="' + k + '"><canvas width="160" height="160"></canvas><span class="nm">' + bpKL(k) + (d >= 12 ? ' 🏅' : '') + '</span><span class="sub">📘 ' + d + ' / 12 · 🏆 ' + ch + ' / 3</span></button>'; }).join('') + '</div></div>').join('');
-  $('book-body').innerHTML = groups + '<div class="af-box"><h3>🔜 Coming next</h3><p class="af-note">📅 Blueprint of the Day · 🏅 page stamps · 👪 family blueprints.</p></div>';
+  $('book-body').innerHTML = bpBookTop() + groups + bpFamBox();
   $('book-body').querySelectorAll('[data-page]').forEach(b => { const k = b.dataset.page, g = b.querySelector('canvas').getContext('2d'), first = BP.page(k).find(e => !bpStars(e.id) && bpOpen(e).ok) || BP.page(k)[0]; artDraw(g, bpLook(first), 80, 150, 124, 1);
     b.onclick = () => { if(k !== 'paint') SET.kind = k; SET.mode = 'book'; SET.bp = first.id; savePrefs(); openSetup(BP.page(k)[0].st); }; });
+  bpWireBook();
 }
 
 /* ---------- ⚒️ REAL FORGE + 📘 blueprints for forge · stone · sew · nature · finish (bp-2) ---------- */
@@ -2439,6 +2445,60 @@ Object.assign(TRY_THIS, {planer: ['Plane it as thin as you dare!', 'Try planing 
 // 🔪 the 6 new figures in free make use their "whole figure" cuts; the hand holds them at the top
 ['owl', 'fish', 'cat', 'boat', 'bear', 'turtle'].forEach(k => { if(!AF.WHITTLE[k]) AF.WHITTLE[k] = BP.page(k)[5].segs.map(s => s.slice()); WHITTLE_HAND[k] = BP.page(k)[0].hand; });
 
+/* ---------- 📅 Blueprint of the Day · 🏅 page stamps · 👪 family blueprints (bp-4) ---------- */
+function bpDailyId(){ return (S.daily && S.daily.id) || ''; }
+function bpMatsTxt(g){ return Object.keys(g || {}).map(m => (MATS[m] ? MATS[m][0] : m) + ' ×' + g[m]).join(' '); }
+function bpFamOk(a){ const L = a.look || {}; return ['lathe', 'pottery', 'print', 'forge', 'sew', 'nature', 'stone'].indexOf(a.station) >= 0 && !!(L.p || L.ol || L.fg || L.wv || (a.station === 'stone' && L.cut != null)); }
+// 👪 a family blueprint = the maker's own look as the plan (same play code as the book's blueprints)
+function bpFamEntry(f){
+  const L = f.look || {}, K = KINDS[f.kind], e = {id: f.id, kind: f.kind, st: f.st, n: 0, ch: false, fam: true, maker: f.maker, src: f.src, got: f.got || {}, name: '👪 ' + f.name,
+    learn: 'Copy ' + f.maker + '\'s ' + K[3].toLowerCase(), fact: 'A family blueprint by ' + f.maker + ' — when you get ⭐, ' + f.maker + ' gets ⭐ too!', lv: 1, mile: 0};
+  if(f.st === 'lathe'){ e.p = L.p; if(L.pi) e.pi = L.pi; }
+  else if(f.st === 'pottery' || f.kind === 'pspin') e.p = L.p;
+  else if(f.kind === 'pshape'){ e.pm = 'adv'; e.ol = (L.ol || []).map(v => Math.max(0.05, v / 20)); }
+  else if(f.st === 'forge'){ const bits = AF.fgUnpack(L.fg), h = new Array(AF.FGN * AF.FGN).fill(0);
+    bits.forEach((b, k) => { if(!b) return; const i = k % 16, j = (k - i) / 16; [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(([a, c]) => { h[(j * 2 + c) * AF.FGN + i * 2 + a] = 0.3; }); });
+    e._fg = {h, tw: null, tc: L.tc != null ? L.tc : -1, stock: FG_STOCK_OF[f.kind] || 'block', pack: L.fg}; }
+  else if(f.st === 'stone') e.cut = L.cut || 0;
+  else if(L.wv){ e.wv = L.wv; const a = FAB_COLS.indexOf(L.c), b = FAB_COLS.indexOf(L.c2); if(a >= 0 && b >= 0 && a !== b){ e.ca = a; e.cb = b; } }
+  return e;
+}
+function bpFamSync(){ Object.keys(BP.all).filter(k => k.indexOf('fam_') === 0).forEach(k => { delete BP.all[k]; }); (S.fam || []).forEach(f => { if(KINDS[f.kind]) BP.all[f.id] = bpFamEntry(f); }); }
+function bpGoTo(e){ if(!e) return; if(e.st !== 'finish') SET.kind = e.kind; SET.mode = 'book'; SET.bp = e.id; savePrefs(); openSetup(e.st); }
+// 📘 the book's top: today's blueprint + stamps, and the 👪 family shelf at the end
+function bpBookTop(){
+  const e = BP.get(bpDailyId()), stamps = ((S.bp || {})._s || []).length, dl = S.daily || {};
+  return '<div class="af-box af-bp-top">' + (e ? '<div class="af-bp-daily"><canvas id="bp-daily-cv" width="120" height="120"></canvas><div class="tx"><b>📅 Blueprint of the Day</b><span>' + UI.esc(bpKL(e.kind)) + ' · #' + e.n + ' ' + UI.esc(e.name) + '</span>' +
+    '<span class="sub">' + (dl.done ? '✅ Done today' : '⭐ it today for 🎁 2 bonus materials') + (dl.streak ? ' · 🔥 ' + dl.streak + '-day streak' : '') + '</span><button class="af-btn amber" data-sound="pop" id="bp-daily-go">' + (dl.done ? '▶ Play again' : '▶ Try it') + '</button></div></div>' : '') +
+    '<div class="af-bp-stamps"><b>🏅 ' + stamps + ' / ' + BP.ORDER.length + ' pages stamped</b><span class="sub">All 12 of a page with ⭐ = a stamp + 🎁 5 materials · titles at 5 · 15 · 40 stamps</span></div></div>';
+}
+function bpFamBox(){
+  const L = (S.fam || []).filter(f => KINDS[f.kind]);
+  return '<div class="af-box"><h3>👪 Family blueprints <small>' + L.length + '</small></h3>' + (L.length ? '<div class="af-kinds">' + L.map(f => { const st = bpStars(f.id), n = Object.keys(f.got || {}).length;
+    return '<button class="af-kind" data-sound="pop" data-fam="' + f.id + '"><canvas width="160" height="160"></canvas><span class="nm">' + UI.esc(f.name) + '</span><span class="sub">by ' + UI.esc(f.maker) + ' · ' + (f.maker === S.player ? '👪 ' + n + ' copied' : st ? '⭐'.repeat(st) : 'copy it!') + '</span></button>'; }).join('') + '</div>'
+    : '<p class="af-note">Nothing yet — open something you made on your 🧰 Maker shelf and tap <b>👪 Share as a family blueprint</b>.</p>') + '</div>';
+}
+function bpWireBook(){
+  const e = BP.get(bpDailyId()), cv = $('bp-daily-cv'); if(e && cv) artDraw(cv.getContext('2d'), bpLook(e), 60, 112, 92, 1);
+  const go = $('bp-daily-go'); if(go) go.onclick = () => bpGoTo(e);
+  $('book-body').querySelectorAll('[data-fam]').forEach(b => { const f = (S.fam || []).find(x => x.id === b.dataset.fam); if(!f) return; artDraw(b.querySelector('canvas').getContext('2d'), f.look, 80, 150, 124, 1); b.onclick = () => bpGoTo(BP.get(f.id)); });
+}
+// 🧰 thing card: share as a family blueprint (or take it back)
+function famHtml(a){
+  if(a.maker !== S.player || !bpFamOk(a)) return ''; const f = (S.fam || []).find(x => x.src === a.id);
+  return '<div class="btns">' + (f ? '<span class="af-note">👪 Family blueprint ✓ · ' + Object.keys(f.got || {}).length + ' copied</span><button class="af-btn soft" data-sound="none" id="btn-famrm" onclick="famRemove(\'' + f.id + '\',\'' + a.id + '\')">✖ Stop sharing</button>'
+    : '<button class="af-btn soft" data-sound="none" id="btn-famshare" onclick="famShare(\'' + a.id + '\')">👪 Share as a family blueprint</button>') + '</div>';
+}
+function famShare(id){ const a = S.arts.find(x => x.id === id); if(!a) return;
+  UI.call('artFamSave', [S.player, id, a.name], {btn: $('btn-famshare'), kind: 'craft', text: 'Sharing'}).then(r => { S.fam = r.fam; bpFamSync(); SND.pop(); UI.toast('👪 Shared! The family can copy it in the 📘 Blueprint Book', 'ok'); thingCard(a); }).catch(e => UI.toast((e && e.message) || 'Could not share', 'err')); }
+function famRemove(fid, id){ const a = S.arts.find(x => x.id === id);
+  UI.call('artFamRemove', [S.player, fid], {btn: $('btn-famrm'), kind: 'craft', text: 'Removing'}).then(r => { S.fam = r.fam; bpFamSync(); UI.toast('Not shared any more', 'ok'); if(a) thingCard(a); }).catch(e => UI.toast((e && e.message) || 'Could not remove', 'err')); }
+function bpKeepMsg(r){ let m = '';
+  if(r.daily){ S.daily = Object.assign({}, S.daily, {done: true, streak: r.daily.streak, best: r.daily.best}); m += '<br>📅 Blueprint of the Day! ' + bpMatsTxt(r.daily.got) + ' · 🔥 ' + r.daily.streak + '-day streak'; }
+  if(r.stamp) m += '<br>🏅 Page stamp: ' + UI.esc(bpKL(r.stamp.kind)) + '! ' + bpMatsTxt(r.stamp.got) + ' (' + r.stamp.pages + ' stamped)';
+  if(r.fam){ S.fam = r.fam; bpFamSync(); m += '<br>👪 The maker gets a ⭐ too!'; }
+  return m; }
+
 /* ================= ✨ REMIX · 🎭 DESIGN SHOW · 🎮 crafted skins for the games (af-4) ================= */
 // every crafted thing this player has → localStorage sp_artskins, read by the skin pickers (♟️ pieces, 🔢 number + 🔤 letter tiles, 💣 bombs, 🎱 balls, 🐍 snakes)
 function shareArtSkins(){ try{ const d = JSON.parse(localStorage.getItem('sp_artskins') || '{}'), mine = {}; S.arts.forEach(a => { mine[a.id] = 1; });
@@ -2537,4 +2597,4 @@ function msNow(){ return SET.station; }
 </script>
 </body>
 </html>
-<!-- (bp-3) END OF Artifactory.html -->
+<!-- (bp-4) END OF Artifactory.html -->
