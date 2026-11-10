@@ -265,6 +265,7 @@
 <script src="inc/UiKit.js"></script>
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
+<script src="inc/ComicKit.js"></script>
 </head>
 <body ontouchstart="">
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button>
@@ -305,6 +306,7 @@
         <button class="chip" id="pw-chip" data-sound="tap">⚡ Power-ups: on</button>
         <button class="chip" id="view-chip" data-sound="tap">📷 View: Auto</button>
         <button class="chip" id="help-chip" data-sound="tap">🎯 Aim help: on</button>
+        <button class="chip" id="comic-chip" data-sound="tap" title="Comic moments: slow-mo panels, Sla… callouts and comic strips">💬 Comics: On</button>
         <button class="chip" data-sound="pop" onclick="openRacket()">🎨 My racket</button>
         <button class="chip" data-sound="pop" onclick="openKeys()">⌨️ Keys</button>
       </div>
@@ -506,7 +508,7 @@ var SB = (function () {
     return M;
   }
   function mkSide() { return { slow: 0, shrink: 0, legendNext: 0, nextShot: null, elemental: 0 }; }
-  function mkStats() { return { rally: 0, smash: 0, aces: 0, perfect: 0, powers: 0, legend: 0, points: 0, hits: 0, goals: 0, splorf: 0 }; }
+  function mkStats() { return { rally: 0, smash: 0, aces: 0, perfect: 0, powers: 0, legend: 0, points: 0, hits: 0, goals: 0, splorf: 0, jumps: 0, jumpPerfect: 0, dives: 0, diveSaves: 0 }; }
 
   function dirOf(side) { return side === 0 ? 1 : -1; }     // side 0 is at x<0 and hits toward +x
   function courtW(M, side) { return M.sp.Wh * (M.side[side].shrink > 0 ? 0.68 : 1); }
@@ -690,7 +692,7 @@ var SB = (function () {
   function canHit(M, p, b) {
     var sp = M.sp;
     if (b.held != null || !b.live) return false;
-    if (sp.squash) return b.owner !== p.side && (b.fb || 0) < 2 && (b.wallHit || (b.fb || 0) > 0 || b.owner < 0) && b.z <= 2.7 && b.z >= -0.05;   // 🧱 your turn = the other team hit it last + it touched a wall (or the floor) first
+    if (sp.squash) return b.owner !== p.side && (b.fb || 0) < 2 && (b.wallHit || (b.fb || 0) > 0 || b.owner < 0) && b.z <= 3.9 && b.z >= -0.05;   // 🧱 your turn = the other team hit it last + it touched a wall (or the floor) first
     if (b.owner === p.side) return false;
     var onSide = p.side === 0 ? b.x < 0 : b.x > 0;
     if (!onSide) return false;
@@ -699,7 +701,7 @@ var SB = (function () {
     if (sp.mustBounce && b.b[p.side] < 1) return false;
     if (sp.serveLock && b.serve && b.b[p.side] < 1) return false;
     if (sp.twoBounce && b.hits < 2 && b.b[p.side] < 1) return false;
-    if (b.z > 2.7 || b.z < -0.05) return false;
+    if (b.z > 3.9 || b.z < -0.05) return false;   // sb2-3: high balls are for a 🦘 jump smash
     if (b.wallFault) return false;
     return true;
   }
@@ -727,7 +729,7 @@ var SB = (function () {
   }
   var SQUASH_VZ = { normal: 3.4, smash: 0.9, drop: 2.3, lob: 7.2, slice: 2.4 };
   function hitSquash(M, p, b) {
-    var sp = M.sp, r = M.rnd, picked = wantShot(M, p), shot = picked || 'normal';
+    var sp = M.sp, r = M.rnd, J = M._jump, picked = J === 'v' ? 'smash' : J === 'h' ? 'lob' : wantShot(M, p), shot = picked || 'normal';
     var perfect = !!(picked && p.human && M.t - p.queuedT < 0.22), weak = !!(M.lv.timing && p.human && !picked);
     if (p.robot && r() < M.lv.smart * 0.5) perfect = true;
     if (b.kind === 'legend') {
@@ -735,14 +737,16 @@ var SB = (function () {
       if (!lok) { b.legendMiss = p.i; p.swing = 1; p.swingShot = 'normal'; M.events.push({ k: 'legendmiss', p: p.i }); return false; }
     }
     var S = SHOTS[shot], V = (p.human ? sp.V * (0.86 + 0.14 * Math.min(1, M.level / 3)) : sp.V * M.lv.vMul) * (perfect ? 1.12 : 1) * (weak ? 0.86 : 1);
-    var dir = squashDir(M, p), hs = V * S.speed * 0.8, vz = SQUASH_VZ[shot] || 3.4;
+    if (J === 'v') V *= perfect ? 1.3 : 1.16;
+    var dir = J === 'h' ? { x: 1, y: (r() - 0.5) * 0.5 } : squashDir(M, p), hs = V * S.speed * 0.8, vz = SQUASH_VZ[shot] || 3.4;
     if (shot === 'lob') hs = Math.min(hs, V * 0.5);
     var nx = M.side[p.side].nextShot;
     b.kind = null; b.ghost = false; b.braked = false; b.legendMiss = null;
     if (nx) { M.side[p.side].nextShot = null; b.kind = nx; if (nx === 'legend') { hs = V * 1.6; vz = 2; } if (nx === 'ghost') b.ghost = true; M.events.push({ k: 'special', kind: nx, side: p.side, p: p.i }); }
     vz += b.z < 0.5 ? 0.6 : 0;
     var apex = b.z + vz * vz / (2 * G); if (vz > 0 && apex > sp.wallH - 0.5) vz = Math.sqrt(Math.max(0, 2 * G * (sp.wallH - 0.5 - b.z)));   // never over the red line by itself
-    b.vx = dir.x * hs; b.vy = dir.y * hs; b.vz = vz; b.top = S.top * 0.3; b.side = 0;
+    var jFail = J === 'v' && r() < jumpFail(M, p, perfect); if (jFail) vz = 9.5;   // 🦘 too wild: over the red line
+    b.vx = dir.x * hs; b.vy = dir.y * hs; b.vz = vz; b.top = S.top * 0.3; b.side = 0; b.jr = null; b.diveMiss = null;
     b.owner = p.side; b.by = p.i; b.b = [0, 0]; b.fb = 0; b.hits++; b.serve = false; b.t0 = M.t; b.wallHit = false; b.wallFault = false;
     if (M.side[p.side].elemental > 0) { b.elem = pickElement(M); M.side[p.side].elemental--; } else b.elem = null;
     p.swing = 1; p.swingShot = shot; p.queued = null; p.hits++;
@@ -752,14 +756,30 @@ var SB = (function () {
     if (shot === 'smash') M.stats[p.side].smash++;
     if (perfect) M.stats[p.side].perfect++;
     if (p.side !== M.lastServeSide) M.receiverTouched = true;
-    M.events.push({ k: 'hit', p: p.i, side: p.side, shot: shot, perfect: perfect, weak: weak, rally: M.rally });
+    M.events.push({ k: 'hit', p: p.i, side: p.side, shot: shot, perfect: perfect, weak: weak, rally: M.rally, jump: J || null });
+    if (J) jumpEvent(M, p, J, !jFail, perfect);
     checkOrb(M);
     return true;
   }
+  // 🦘🤸 sb2-3 jumps: ONE shot button does both — a ball high above you = vertical jump SMASH, a ball just out of reach to the side = DIVE save (always a lob).
+  // People: you jump / dive when you pressed a shot button just before (0.55 s). Robots: from Intermediate, a roll per ball. Fail % grows with the level (10 % Basic → 25 % Hardcore), less on a PERFECT.
+  var JUMP_AIR = 0.55, JUMP_STAND = 0.85, DIVE_T = 0.8;
+  function wantJump(M, p, b, kind) {
+    if (p.robot || p.auto) {
+      if (p.robot && M.level < 2) return false;
+      if (M.t - (p.lastJump || -99) < 30) return false;   // a robot jumps / dives at most every 30 s — rare = special
+      b.jr = b.jr || {}; var key = p.i + kind;
+      if (b.jr[key] == null) b.jr[key] = M.rnd() < (kind === 'v' ? 0.06 + 0.14 * M.lv.smart : 0.05 + 0.12 * M.lv.smart);
+      if (b.jr[key]) p.lastJump = M.t;
+      return b.jr[key];
+    }
+    return !!(p.queued && M.t - p.queuedT < 0.55);
+  }
+  function jumpFail(M, p, perfect) { return (0.1 + 0.03 * M.level) * (perfect ? 0.45 : 1); }
   function hitBall(M, p, b, perfectWindow) {
     if (M.sp.squash) return hitSquash(M, p, b);
-    var sp = M.sp, d = dirOf(p.side), r = M.rnd, oside = 1 - p.side;
-    var picked = wantShot(M, p), shot = picked || 'normal';
+    var sp = M.sp, d = dirOf(p.side), r = M.rnd, oside = 1 - p.side, J = M._jump;
+    var picked = J === 'v' ? 'smash' : J === 'h' ? 'lob' : wantShot(M, p), shot = picked || 'normal';
     if (shot === 'smash' && b.z < 1.15 && sp.kind !== 'puck') shot = 'normal';
     var timing = M.lv.timing && p.human;
     var perfect = false, weak = false;
@@ -775,6 +795,7 @@ var SB = (function () {
     if (p.human) V = sp.V * (0.86 + 0.14 * Math.min(1, M.level / 3));
     if (perfect) V *= 1.12;
     if (weak) V *= 0.86;
+    if (J === 'v') V *= perfect ? 1.3 : 1.16;   // 🦘 extreme smash
     // spin from how you move into the ball
     var ms = moveSpeed(M, p) || 1;
     var fwd = clamp((p.vx * d) / ms, -1, 1), lat = clamp(p.vy / ms, -1, 1);
@@ -790,7 +811,7 @@ var SB = (function () {
       aimY = (r() < 0.5 + 0.4 * M.lv.smart ? away : (r() - 0.5) * lw * 1.4) + (r() - 0.5) * M.lv.err * 2.2;
     } else {
       // 🎯 sb2-1: the player AIMS with the stick / keys held at the hit — sideways = left / right, forward / back = deep / short
-      var off = clamp((b.y - p.y) / reachOf(M, p), -1, 1), am = humanAim(M, p);
+      var off = clamp((b.y - p.y) / reachOf(M, p), -1, 1), am = J === 'h' ? { f: 0, l: (r() - 0.5) * 0.8 } : humanAim(M, p);   // 🤸 a dive can't aim
       aimY = am.l * lw * 0.78 - off * lw * 0.15 + (r() - 0.5) * (weak ? 1.4 : 0.4);
       var aimF = am.f;
     }
@@ -818,6 +839,9 @@ var SB = (function () {
     if (shot === 'lob') { spd = Math.min(spd, V * 0.55); }
     aimBall(M, b, tx, aimY, spd, top, side);
     if (shot === 'lob' && !sp.drag) { b.vz += 2.2; b.vx *= 0.88; b.vy *= 0.88; }
+    var jFail = J === 'v' && r() < jumpFail(M, p, perfect);
+    if (jFail) { if (r() < 0.5) aimBall(M, b, d * (ll + 2.4), aimY, spd * 1.05, top, 0); else aimBall(M, b, tx, (aimY >= 0 ? 1 : -1) * (lw + 1.8), spd, top, 0); }   // 🦘 too wild: long or wide = out
+    b.jr = null; b.diveMiss = null;
     b.owner = p.side; b.by = p.i; b.b = [0, 0]; b.hits++; b.serve = false; b.t0 = M.t; b.wallHit = false; b.wallFault = false;
     if (M.side[p.side].elemental > 0) { b.elem = pickElement(M); M.side[p.side].elemental--; } else b.elem = null;
     if (p.magnet > 0 && b.magnetSide !== p.side) { /* magnet works on balls coming TO the holder */ }
@@ -828,9 +852,14 @@ var SB = (function () {
     if (shot === 'smash') M.stats[p.side].smash++;
     if (perfect) M.stats[p.side].perfect++;
     if (p.side !== M.lastServeSide) M.receiverTouched = true;
-    M.events.push({ k: 'hit', p: p.i, side: p.side, shot: shot, perfect: perfect, weak: weak, rally: M.rally });
+    M.events.push({ k: 'hit', p: p.i, side: p.side, shot: shot, perfect: perfect, weak: weak, rally: M.rally, jump: J || null });
+    if (J) jumpEvent(M, p, J, !jFail, perfect);
     checkOrb(M);
     return true;
+  }
+  function jumpEvent(M, p, kind, ok, perfect) {
+    var S = M.stats[p.side]; if (kind === 'v' && ok && perfect) S.jumpPerfect++; if (kind === 'h' && ok) S.diveSaves++;
+    M.events.push({ k: 'jump', kind: kind, p: p.i, side: p.side, ok: ok, perfect: !!perfect, rally: M.rally });
   }
 
   function hitPuck(M, p, b, shot, perfect) { return false; } // puck uses collisions (see stepPuck)
@@ -965,6 +994,7 @@ var SB = (function () {
       if (p.big > 0) p.big -= dt; if (p.mirror > 0) p.mirror -= dt; if (p.stun > 0) p.stun -= dt;
       if (p.swing > 0) p.swing = Math.max(0, p.swing - dt * 3.2);
       if (p.cheer > 0) p.cheer -= dt; if (p.sad > 0) p.sad -= dt;
+      if (p.air > 0) p.air -= dt; if (p.stand > 0) p.stand -= dt; if (p.diveT > 0) p.diveT -= dt;   // 🦘🤸 sb2-3
     });
     if (M.score.done) { movePlayers(M, dt, true); return; }
     if (M.state === 'point') {
@@ -1009,7 +1039,7 @@ var SB = (function () {
         ix = p.input.x; iy = p.input.y;                       // world directions (the page turns screen keys into world)
         if (p.mirror > 0) iy = -iy;
       }
-      if (p.stun > 0) { ix = 0; iy = 0; }
+      if (p.stun > 0 || p.stand > 0) { ix = 0; iy = 0; }   // 🦘🤸 stand still after a jump / getting up after a dive
       var len = Math.sqrt(ix * ix + iy * iy); if (len > 1) { ix /= len; iy /= len; }
       var tvx = ix * sp, tvy = iy * sp;
       var pt = patchAt(M, p.x, p.y);
@@ -1109,9 +1139,15 @@ var SB = (function () {
       if (!b.live || b.held != null) return;
       if (!canHit(M, p, b)) return;
       if (b.legendMiss === p.i) return;
-      var pp = paddlePos(M, p), dx = b.x - pp.x, dy = b.y - pp.y, R = reachOf(M, p);
-      if (dx * dx + dy * dy > R * R) return;
-      if (b.z > 2.5) return;
+      var pp = paddlePos(M, p), dx = b.x - pp.x, dy = b.y - pp.y, R = reachOf(M, p), d2 = dx * dx + dy * dy, jump = null;
+      if (p.air > 0 || p.diveT > 0 || b.diveMiss === p.i) return;   // in the air / on the floor
+      if (b.z > 2.5) {   // 🦘 high ball right above you
+        if (sp.kind === 'puck' || d2 > R * R * 1.15 || b.z > 3.9 || !b.real || !wantJump(M, p, b, 'v')) return;
+        jump = 'v';
+      } else if (d2 > R * R) {   // 🤸 just out of reach to the side
+        if (sp.kind === 'puck' || sp.table || d2 > R * R * 4.4 || b.z > 1.8 || b.z < 0.08 || !b.real || !wantJump(M, p, b, 'h')) return;
+        jump = 'h';
+      }
       // robot sometimes misses (by level)
       if (p.robot && !b.robotRolled) {
         b.robotRolled = true;
@@ -1125,7 +1161,14 @@ var SB = (function () {
         return;
       }
       if (!b.real) { b.live = false; M.fx.push({ k: 'poof', x: b.x, y: b.y, z: b.z, t: 0, life: 0.6 }); p.swing = 1; return; }
-      if (hitBall(M, p, b)) { b.robotRolled = false; b.robotMiss = null; }
+      if (jump === 'h') {   // 🤸 the dive: lunge at the ball, then lie on the floor + get up
+        var dd = Math.sqrt(d2) || 1; p.diveDx = dx / dd; p.diveDy = dy / dd; p.vx = p.diveDx * 8.5; p.vy = p.diveDy * 8.5; p.diveT = DIVE_T; p.stand = DIVE_T; M.stats[p.side].dives++;
+        var dPerf = p.human && !p.auto && M.t - p.queuedT < 0.22, missP = p.human && !p.auto ? (dPerf ? 0.05 : 0.15) : 0.22 - 0.12 * M.lv.smart;
+        if (M.rnd() < missP) { b.diveMiss = p.i; p.swing = 1; p.swingShot = 'lob'; M.events.push({ k: 'jump', kind: 'h', p: p.i, side: p.side, ok: false, perfect: false, rally: M.rally }); return; }
+      }
+      if (jump === 'v') { p.air = JUMP_AIR; p.stand = JUMP_STAND; M.stats[p.side].jumps++; }
+      M._jump = jump; var hitOk = hitBall(M, p, b); M._jump = null;
+      if (hitOk) { b.robotRolled = false; b.robotMiss = null; }
     });
     if (!b.live || M.state !== 'play') return;
     // ground
@@ -1479,7 +1522,7 @@ var SB = (function () {
     newMatch: newMatch, step: step, DT: DT, pressShot: pressShot, usePower: usePower, takeEvents: takeEvents, pointText: pointText,
     simulate: simulate, courtW: courtW, courtL: courtL, goalHalf: goalHalf, limits: limits, dirOf: dirOf, paddlePos: paddlePos,
     reachOf: reachOf, doServe: doServe, patchAt: patchAt, mkRng: mkRng, homeOf: homeOf, G: G,
-    humanAim: humanAim, aimPreview: aimPreview, landingOf: landingOf, fwdOf: fwdOf, flyShuttle: flyShuttle, squashDir: squashDir
+    humanAim: humanAim, aimPreview: aimPreview, jumpFail: jumpFail, JUMP_AIR: JUMP_AIR, DIVE_T: DIVE_T, landingOf: landingOf, fwdOf: fwdOf, flyShuttle: flyShuttle, squashDir: squashDir
   };
 })();
 // ENGINE END
@@ -1629,6 +1672,7 @@ function openSetup(lvl){
   vc(); hc();
   $('view-chip').onclick = () => { const o = ['auto', 'behind', 'top']; SET.view = o[(o.indexOf(SET.view || 'auto') + 1) % 3]; savePrefs(); vc(); buildThemes(); UI.toast(SET.view === 'auto' ? '📷 Behind you when you play alone · from above for 2+ players' : SET.view === 'behind' ? '📷 Always from behind you' : '📷 Always from above'); };
   $('help-chip').onclick = () => { SET.help = SET.help === false; savePrefs(); hc(); };
+  Comic.chip($('comic-chip'), S.player);   // 💥 sb2-3: per player per device (sp_comics:<Name>), default ON
   $('go-btn').onclick = () => startMatch();
   showScreen('setup');
 }
@@ -1998,7 +2042,8 @@ function startMatch(cfg){
   humans.forEach(p => { const s = seats[p.i]; p.seat = cfg ? s.seat : SET.mode === 'robot' ? -1 : s.seat; });   // -1 = alone: every key set drives you
   G = {M, sp, mode: cfg ? 'cup' : SET.mode, cup: cfg, level, theme, ball: SET.ball, trails: M.players.map(p => p.human ? trailOf(p.name) : -1), feathers: M.players.map(p => p.human ? featherOf(p.name) : -1), th: new Map(), t0: performance.now(), last: 0, acc: 0, paused: false, over: false, raf: 0,
     held: new Set(), seats, fx: [], bounces: [], deco: makeDeco(SET.theme), lastServeHint: '', pointers: new Map(), startAt: performance.now(), anim: 0,
-    view: viewFor(M), help: SET.help !== false, aimTold: false};
+    view: viewFor(M), help: SET.help !== false, aimTold: false,
+    comics: !!FX && M.players.some(p => p.human && Comic.enabled(p.name)), plog: newPlog(), mlog: [], nextStrip: 2 + Math.floor(Math.random() * 3), lastImpact: -99, camY: 0};
   $('hud-level').textContent = cfg ? '🏆 ' + cfg.round : sp.icon + ' ' + sp.name + ' · ' + LEVEL_UI[level].emoji + ' ' + SB.LEVELS[level].name;
   $('sb-ln').textContent = teamName(0); $('sb-rn').textContent = teamName(1);
   showScreen('play'); resize(); buildPads(); hud();
@@ -2073,10 +2118,11 @@ function behindView(W0, H0, sp, box, cs){
   }
   const C = cam(best.ch, best.db, best.look), f = fit(C), F = f.F * 0.98, raw = C.raw, ca = C.ca, sa = C.sa, ch = C.ch, camX = C.camX;
   const ox = box.l + W / 2 - (f.u0 + f.u1) / 2 * F, oy = box.t + H / 2 - (f.v0 + f.v1) / 2 * F;
-  const P = (x, y, z) => { const q = raw(x, y, z); return [ox + q[0] * F, oy + q[1] * F]; };
-  const inv = (px, py) => { const Bv = (py - oy) / F * -1, dx = ch * (ca + Bv * sa) / Math.max(1e-4, sa - Bv * ca), dep = dx * ca + ch * sa, xs = camX + dx; return {x: xs * sx, y: (px - ox) / F * dep * sx}; };
+  let fol = 0;   // 📷 sb2-3 camera follow: a sideways shift of the camera (world y), set every frame by V.follow(y)
+  const P = (x, y, z) => { const q = raw(x, y - fol, z); return [ox + q[0] * F, oy + q[1] * F]; };
+  const inv = (px, py) => { const Bv = (py - oy) / F * -1, dx = ch * (ca + Bv * sa) / Math.max(1e-4, sa - Bv * ca), dep = dx * ca + ch * sa, xs = camX + dx; return {x: xs * sx, y: (px - ox) / F * dep * sx + fol}; };
   const sc = (x, y, z) => F / raw(x, y, z)[2];
-  return {mode: 'behind', camSide: cs, W: W0, H: H0, s: sc(0, 0, 0), portrait: H0 > W0 * 1.05, tilt: sa, P, inv, sc, F,
+  return {mode: 'behind', camSide: cs, W: W0, H: H0, s: sc(0, 0, 0), portrait: H0 > W0 * 1.05, tilt: sa, P, inv, sc, F, follow: y => { fol = y; },
     depth: (x, y) => -x * sx, k2w: (dx, dy) => ({x: -dy * sx, y: dx * sx})};
 }
 const CAM_CACHE = new Map();
@@ -2128,7 +2174,8 @@ window.addEventListener('resize', () => { if(G){ resize(); buildPads(); } });
 function frame(now){
   if(!G) return;
   const dt = Math.min(0.05, Math.max(0, (now - G.last) / 1000)); G.last = now;
-  if(!G.paused && !G.over){
+  if(V && V.follow){ const me = G.M.players.find(p => p.human && p.side === V.camSide) || G.M.players.find(p => p.side === V.camSide); if(me){ G.camY += (me.y * 0.32 - G.camY) * Math.min(1, dt * 3); V.follow(G.camY); } }   // 📷 sb2-3 camera follows you sideways
+  if(!G.paused && !G.over && !Comic.busy()){   // 💥 the game waits while a comic panel / strip shows
     readInputs();
     G.acc += dt; let n = 0;
     while(G.acc >= SB.DT && n < 12){ SB.step(G.M, SB.DT); G.acc -= SB.DT; n++; }
@@ -2230,13 +2277,16 @@ function handleEvents(list){
   const M = G.M;
   list.forEach(e => {
     if(e.k === 'hit'){ UISound.play(e.shot === 'smash' ? 'whoosh' : 'pop'); const p = M.players[e.p]; if(e.perfect && p.human){ bigWord('PERFECT!'); } if(e.shot === 'smash' && p.human) floatAt(p, '💥 SMASH', 0.9);
-      if(e.rally === 10 || e.rally === 20 || e.rally === 30) banner('🔁 ' + e.rally + '-hit rally!', 'gold'); }
-    else if(e.k === 'serve'){ UISound.play('tap'); }
+      if(e.rally === 10 || e.rally === 20 || e.rally === 30) banner('🔁 ' + e.rally + '-hit rally!', 'gold');
+      logHit(e); }
+    else if(e.k === 'serve'){ UISound.play('tap'); G.plog = newPlog(); }
+    else if(e.k === 'jump') onJump(e);
     else if(e.k === 'point'){ const win = M.players.filter(p => p.side === e.side), human = win.some(p => p.human), lost = M.players.some(p => p.human && p.side !== e.side);
       UISound.play(human || !lost ? 'success' : 'bump');
       banner((e.why === 'ace' ? '🎾 ' : e.why === 'goal' || e.why === 'legend' ? '🥅 ' : '') + teamName(e.side) + ' ' + (G.sp.scoring === 'goals' ? 'scores' : 'wins the point') + (WHY[e.why] ? ' — ' + WHY[e.why] : ''), human ? 'good' : 'bad');
-      if(e.why === 'goal' || e.why === 'legend' || e.why === 'ace') bigWord(e.why === 'ace' ? 'ACE!' : e.why === 'legend' ? '⭐ GOAL!' : 'GOAL!'); }
-    else if(e.k === 'game'){ setTimeout(() => banner('🏆 Game to ' + teamName(e.side) + '!', 'gold'), 900); }
+      if(e.why === 'goal' || e.why === 'legend' || e.why === 'ace') bigWord(e.why === 'ace' ? 'ACE!' : e.why === 'legend' ? '⭐ GOAL!' : 'GOAL!');
+      comicPoint(e); }
+    else if(e.k === 'game'){ setTimeout(() => banner('🏆 Game to ' + teamName(e.side) + '!', 'gold'), 900); if(G.stripNext) comicStripNow(); }
     else if(e.k === 'orb'){ UISound.play('unlock'); banner(['⚪ Power orb!', '🔵 Rare power orb!', '🟡 LEGENDARY orb!'][e.tier] + ' Hit the ball through it!', 'gold'); }
     else if(e.k === 'gotpower'){ const p = M.players[e.p], P = SB.POWERS[e.power]; UISound.play('unlock'); banner(P.icon + ' ' + p.name + ' got ' + P.name + (p.human ? ' — press ' + keyName(keySetsOf(p)[0].power) + ' or ⚡' : ''), 'gold'); }
     else if(e.k === 'power'){ const p = M.players[e.p], P = SB.POWERS[e.power]; UISound.play('whoosh'); bigWord(P.icon + ' ' + P.name); if(FX) say(P.name); }
@@ -2248,7 +2298,8 @@ function handleEvents(list){
     else if(e.k === 'zap'){ floatAt(M.players[e.p], '⚡ zapped!', 0.7); UISound.play('bump'); }
     else if(e.k === 'buddywall'){ banner('🧱 Buddy Wall saved it!', 'good'); UISound.play('bump'); }
     else if(e.k === 'split'){ bigWord('✂️ Which one is real?'); }
-    else if(e.k === 'special'){ if(e.kind === 'legend' || e.kind === 'mirage') bigWord('⭐ LEGENDARY SHOT!'); }
+    else if(e.k === 'special'){ if(e.kind === 'legend' || e.kind === 'mirage'){ bigWord('⭐ LEGENDARY SHOT!'); comicImpact(M.players[e.p], 'Sla… LEGEND!!!', 'power', 'smash', 'Legendary shot!'); } G.plog.power = true; }
+    else if(e.k === 'power'){ G.plog.power = true; }
     else if(e.k === 'unstick'){ banner('🏒 Puck back to the middle', ''); }
   });
 }
@@ -2256,6 +2307,67 @@ let bannerTimer = 0;
 function banner(text, kind){ const b = $('banner'); b.textContent = text; b.className = 'banner on' + (kind ? ' ' + kind : ''); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('on'), 2000); }
 function bigWord(text){ if(!FX) return; const host = $('bigword-host'); host.innerHTML = ''; const d = document.createElement('div'); d.className = 'big-word'; d.textContent = text; host.appendChild(d); setTimeout(() => d.remove(), 950); }
 function floatAt(p, text, life){ G.fx.push({k: 'txt', x: p.x, y: p.y, z: 2.4, txt: text, t: 0, life: life || 0.8}); }
+
+/* ---------- 💥 comics (sb2-3) — ComicKit: impact panels, Sla… callouts, strips. Off (💬 chip) = small callouts only ---------- */
+function newPlog(){ return {rally: 0, jump: false, jumpPerfect: false, jumpBy: -1, dive: false, diveBy: -1, diveMiss: false, diveMissBy: -1, power: false, smash: false, drop: false, lastHit: -1, lastShot: '', lastJump: null}; }
+function logHit(e){ const L = G.plog; L.rally = e.rally; L.lastHit = e.p; L.lastShot = e.shot; L.lastJump = e.jump || null; if(e.shot === 'smash') L.smash = true; if(e.shot === 'drop') L.drop = true;
+  if(e.rally === 15) comicImpact(G.M.players[e.p], 'Sla… 15 HITS!', 'rally', 'smash', '🔁 What a rally!'); }
+function sla(p, text){ if(!FX) return; Comic.callout(text, {small: !G.comics, say: G.comics}); }
+function comicImpact(p, words, design, pose, sub){
+  if(!p) return false; const M = G.M; if(!G.comics || M.t - G.lastImpact < 10){ sla(p, words); return false; }   // Off / too soon → just the callout
+  G.lastImpact = M.t; Comic.impact({who: {name: p.name, av: p.av}, words, design, pose, sub, ms: 1100, ball: comicBall}); return true;
+}
+function onJump(e){
+  const M = G.M, p = M.players[e.p], L = G.plog;
+  if(e.kind === 'v'){ if(e.ok){ L.jump = true; L.jumpBy = e.p; if(e.perfect) L.jumpPerfect = true; } UISound.play(e.ok ? 'whoosh' : 'bump');
+    if(e.ok && e.perfect) comicImpact(p, 'Sla… SMASH!!!', 'jump', 'jump', '🦘 Jump smash!'); else sla(p, e.ok ? 'Sla… JUMP!' : 'Sla… oops!'); }
+  else { if(e.ok){ L.dive = true; L.diveBy = e.p; } else { L.diveMiss = true; L.diveMissBy = e.p; } UISound.play('drop');
+    if(e.ok) comicImpact(p, 'Sla… DIVE!', 'dive', 'dive', '🤸 Dive save!'); else sla(p, 'Sla… so close!'); }
+  G.mlog.push({k: e.kind, ok: e.ok, perfect: e.perfect, p: e.p, t: M.t});
+}
+function comicBall(g, x, y, r, t){ const sp = G.sp; if(sp.kind === 'shuttle'){ BallSkins.shuttle(g, G.ball, G.feathers ? G.feathers[0] : -1, x, y, r * 1.2, t, Math.PI * 0.9); return; }
+  if(G.ball >= 0 && sp.kind !== 'puck') BallSkins.draw(g, G.ball, x, y, r, t); else { g.save(); drawSportBall(g, sp, x, y, r, t, 0); g.restore(); } }
+function momentOf(e){   // what happened in this point → Comic.pick
+  const L = G.plog, M = G.M, sc = M.score, lastP = M.players[L.lastHit], ten = G.sp.scoring === 'tennis';
+  const close = ten ? sc.pts[0] >= 3 && sc.pts[1] >= 3 : Math.abs(sc.pts[0] - sc.pts[1]) <= 1 && Math.max(sc.pts[0], sc.pts[1]) >= M.target - 2;
+  return {dive: L.dive && L.lastJump === 'h' && lastP && lastP.side === e.side, diveMiss: L.diveMiss, jump: L.jump, jumpPerfect: L.jumpPerfect, power: L.power, ace: e.why === 'ace', glitch: !!(lastP && lastP.robot && lastP.side !== e.side && /out|net|wide|own/.test(e.why || '')),
+    rally: L.rally, close, drop: L.lastShot === 'drop' && lastP && lastP.side === e.side, smash: L.smash};
+}
+function comicPoint(e){
+  const M = G.M, L = G.plog, lastP = M.players[L.lastHit];
+  if(L.dive && L.lastJump === 'h' && lastP && lastP.side === e.side) sla(lastP, 'Sla… DIVE… WINNER!!');
+  else if(e.why === 'ace') sla(lastP, 'Sla… ACE!'); else if(e.why === 'goal' || e.why === 'legend') sla(lastP, 'Sla… GOAL!!');
+  else if(L.lastShot === 'drop' && lastP && lastP.side === e.side) sla(lastP, 'Sla… plop.');
+  G.lastPoint = {e, m: momentOf(e), plog: Object.assign({}, L)};
+  if(L.rally >= 8 || L.dive || L.jumpPerfect) G.mlog.push({k: 'point', rally: L.rally, side: e.side, m: G.lastPoint.m, t: M.t});
+  if(!G.comics || M.score.done) return;
+  if(G.sp.scoring === 'tennis'){ G.stripNext = true; setTimeout(() => { G.stripNext = false; }, 50); return; }   // tennis-style: a strip on each GAME-winning point (the 'game' event follows)
+  if(--G.nextStrip <= 0){ G.nextStrip = 2 + Math.floor(Math.random() * 3); comicStripNow(); }   // point sports: every 2–4 points
+}
+function comicStripNow(){ const LP = G.lastPoint; if(!LP || !G.comics) return; const design = Comic.pick(LP.m), panels = stripPanels(design, LP); G.stripNext = false;
+  setTimeout(() => { if(G && !G.over) Comic.strip(design, {panels}); }, 650); }
+function heroOf(LP, design){ const M = G.M, L = LP.plog, by = i => M.players[i];
+  const i = design === 'dive' ? L.diveBy : design === 'divemiss' ? L.diveMissBy : design === 'jump' ? L.jumpBy : design === 'glitch' ? L.lastHit : L.lastHit;
+  return by(i >= 0 ? i : 0) || M.players.find(p => p.side === LP.e.side) || M.players[0]; }
+function stripPanels(design, LP){
+  const M = G.M, hero = heroOf(LP, design), who = q => ({name: q.name, av: q.av}), opp = M.players.find(q => q.side !== hero.side) || hero, won = hero.side === LP.e.side;
+  const W = Comic.DESIGNS[design].words, n = LP.plog.rally;
+  const P1 = {who: who(hero), pose: 'ready', cap: hero.name + (n > 1 ? ' · rally ' + n : ''), words: W[0]};
+  const P2 = {who: who(hero), pose: design === 'dive' || design === 'divemiss' ? 'dive' : design === 'glitch' ? 'glitch' : design === 'slowmo' ? 'ready' : 'smash', ball: comicBall, words: W[1], cap: Comic.DESIGNS[design].name};
+  const P3 = {who: who(won ? hero : opp), pose: won ? 'cheer' : 'sad', words: won ? W[2] : 'Point ' + teamName(LP.e.side) + '!', cap: SB.pointText(M, 0) + ' – ' + SB.pointText(M, 1)};
+  return [P1, P2, P3];
+}
+function winnerPanels(win){   // the 4-panel match strip: start · the best moment of the match · match point · the winner
+  const M = G.M, ws = M.players.filter(p => p.side === win), ls2 = M.players.filter(p => p.side !== win), A = ws[0], B = ls2[0] || ws[0], who = q => ({name: q.name, av: q.av});
+  const best = G.mlog.filter(x => x.k === 'h' && x.ok)[0] || G.mlog.filter(x => x.k === 'v' && x.ok && x.perfect)[0] || G.mlog.filter(x => x.k === 'point').sort((a, b) => b.rally - a.rally)[0];
+  const bp = best ? M.players[best.p != null ? best.p : (M.players.find(q => q.side === best.side) || A).i] || A : A;
+  const bw = !best ? 'What a match!' : best.k === 'h' ? 'Sla… DIVE!' : best.k === 'v' ? 'Sla… SMASH!!!' : 'Sla… ' + best.rally + ' HITS!';
+  const scoreLine = G.sp.scoring === 'tennis' ? M.score.games[0] + ' – ' + M.score.games[1] : M.score.pts[0] + ' – ' + M.score.pts[1];
+  return [{who: who(A), who2: who(B), pose: 'ready', pose2: 'ready', cap: G.sp.icon + ' ' + G.sp.name, words: 'Game on!'},
+    {who: who(bp), pose: best && best.k === 'h' ? 'dive' : 'smash', ball: comicBall, cap: 'The big moment', words: bw},
+    {who: who(A), pose: 'smash', ball: comicBall, cap: 'Match point', words: 'MATCH POINT!'},
+    {who: who(A), who2: who(B), pose: 'cheer', pose2: 'sad', cap: scoreLine, words: 'SLA-BRALL!!!'}];
+}
 
 /* ---------- HUD ---------- */
 function hud(){
@@ -2479,10 +2591,14 @@ function drawPlayer(g, V, M, p, t){
   let gest = null;
   if(p.cheer > 0) gest = {g: gestOf('cheer'), t: 1.4 - p.cheer}; else if(p.sad > 0 && M.state !== 'play') gest = {g: gestOf('shrug'), t: 1.4 - p.sad};
   if(p.stun > 0) pose.rot = Math.sin(t * 30) * 0.15;
-  drawAvatar(g, {name: p.name, av: p.av, dir, walkT: walking ? t : 0, gest}, back[0], back[1], k, {t, pose: gest ? undefined : pose});
+  // 🦘 sb2-3 jump: up in the air, arms up · 🤸 dive: thrown sideways onto the floor, then getting up
+  let jumpH = 0; if(p.air > 0){ const u = 1 - p.air / SB.JUMP_AIR; jumpH = Math.sin(Math.PI * Math.min(1, u)) * ks * 0.95 / k; Object.assign(pose, {armL: 2.3, legL: 0.45, legR: -0.35}); }
+  if(p.diveT > 0){ const u = 1 - p.diveT / SB.DIVE_T, amt = u < 0.55 ? 1.35 * Math.min(1, u / 0.12) : 1.35 * Math.max(0, 1 - (u - 0.55) / 0.45), q = V.P(p.x + (p.diveDx || 0), p.y + (p.diveDy || 1), 0), sgn = q[0] >= feet[0] ? 1 : -1; pose.rot = sgn * amt * dir; pose.armL = 1.6; }
+  const fromBack = !gest && ((V.mode === 'behind' && p.side === V.camSide) || V.mode === 'iso');   // 🔙 we see the backs of the people on the camera side
+  drawAvatar(g, {name: p.name, av: p.av, dir, walkT: walking && !(p.stand > 0) ? t : 0, gest, jumpH, fromBack}, back[0], back[1], k, {t, pose: gest ? undefined : pose});
   // name tag + power
   // small name tag (sb2-1: never bigger than 13 px — the near player was a giant label in the old portrait view)
-  const tag = [back[0], back[1] - k * 92], fs = Math.round(Math.max(9, Math.min(13, ks * 0.3))); g.font = '800 ' + fs + 'px Nunito, sans-serif'; g.textAlign = 'center'; g.fillStyle = 'rgba(0,0,0,0.45)';
+  const tag = [back[0], back[1] - k * (92 + jumpH)], fs = Math.round(Math.max(9, Math.min(13, ks * 0.3))); g.font = '800 ' + fs + 'px Nunito, sans-serif'; g.textAlign = 'center'; g.fillStyle = 'rgba(0,0,0,0.45)';
   const label = (p.robot ? '🤖 ' : '') + p.name; const w = g.measureText(label).width + 10; g.fillRect(tag[0] - w / 2, tag[1] - fs, w, fs * 1.35); g.fillStyle = '#fff'; g.fillText(label, tag[0], tag[1]);
   if(p.power){ drawEmo(g, SB.POWERS[p.power].icon, tag[0] + w / 2 + fs * 0.9, tag[1] - fs * 0.35, fs * 1.4); }
   if(p.mirror > 0) drawEmo(g, '🪞', tag[0] - w / 2 - fs * 0.9, tag[1] - fs * 0.35, fs * 1.3);
@@ -2501,6 +2617,7 @@ function finishMatch(){
   if(FX && !G.cup){ if(myWin) confetti(['🏓', '🎾', '⭐', '🏆', '🎉'], 30); }
   if(!G.cup) UISound.play(myWin ? 'success' : 'error');
   if(G.cup){ cupFinish(win, secs, scoreFor); return; }
+  const strip4 = G.comics ? winnerPanels(win) : null; if(strip4) setTimeout(() => Comic.strip('winner', {panels: strip4, title: '🏆 ' + sp.name + ' · ' + teamName(win)}), 450);
   const head = G.mode === 'robot' ? (myWin ? '<div class="big">🏆</div><h2 class="cheer">You beat the robot!</h2>' : '<div class="big">🤖</div><h2>The robot wins this time</h2>')
     : '<div class="big">👑</div><h2 class="cheer">' + UI.esc(teamName(win)) + ' win' + (M.players.filter(p => p.side === win).length > 1 ? '' : 's') + '!</h2>';
   const tip = myWin ? '' : '<div class="note">💡 ' + pickOne(['Watch the shadow — it shows where the ball will land.', 'Move INTO the ball for topspin: it dips and is hard to return.', 'Try a 🌈 lob when the robot runs to the net.', 'Hit the ball through the power orb, then use your power at the right moment!', 'A 🪶 drop shot is great when the robot stays far back.']) + '</div>';
@@ -2511,6 +2628,7 @@ function finishMatch(){
     '<div class="stats"><span>🏆 ' + myScore.toLocaleString() + '</span><span>🔁 best rally ' + Math.max(st[0].rally, st[1].rally) + '</span><span>💥 ' + st[0].smash + ' smashes</span><span>🎾 ' + st[0].aces + ' aces</span><span>✨ ' + st[0].perfect + ' perfect</span><span>⏱ ' + fmt(secs * 1000) + '</span></div>' +
     tip + '<div class="save-note" id="save-note">' + (humans.length ? '💾 Saving…' : '') + '</div>' +
     '<div class="res-btns"><button class="btn" data-sound="pop" onclick="startMatch()">🔁 Play again</button><button class="btn soft" data-sound="none" onclick="backToMenu()">◀ Back</button><button class="btn soft" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button></div>');
+  if(strip4){ const card = $('result-card'), at = card.querySelector('.stats'); if(at) card.insertBefore(Comic.stripEl('winner', {panels: strip4, title: '🏆 ' + sp.name}), at); }
   // save: level result for the players who played the robot; feats for every person
   NOTES.length = 0;
   humans.forEach((p, seat) => {
@@ -2590,4 +2708,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2) END OF SlaBrall.html -->
+<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3) END OF SlaBrall.html -->
