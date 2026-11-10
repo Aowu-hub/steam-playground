@@ -413,11 +413,12 @@ var SB = (function () {
 
   // ---------- shots ----------
   var SHOTS = {
+    // st-1 one depth table for every net sport (share of the other half): smash mid→end, slice mid near the net, lob end court, drop just over the net
     normal: { depth: 0.68, speed: 1.0,  top: 0.15, label: 'Normal' },
-    smash:  { depth: 0.78, speed: 1.75, top: 0.7,  label: '💥 Smash' },
-    drop:   { depth: 0.2,  speed: 0.55, top: -0.55, label: '🪶 Drop' },
-    lob:    { depth: 0.9,  speed: 0.5,  top: 0.25, label: '🌈 Lob', lob: true },
-    slice:  { depth: 0.6,  speed: 0.82, top: -0.85, label: '🔪 Slice' }
+    smash:  { depth: 0.66, speed: 1.75, top: 0.35, label: '💥 Smash', straight: true },
+    drop:   { depth: 0.14, speed: 0.55, top: -0.55, label: '🪶 Drop' },
+    lob:    { depth: 0.93, speed: 0.5,  top: 0.25, label: '🌈 Lob', lob: true },
+    slice:  { depth: 0.36, speed: 0.82, top: -0.85, label: '🔪 Slice' }
   };
 
   // ---------- powers (14) ----------
@@ -637,10 +638,13 @@ var SB = (function () {
   }
   function aimShuttle(M, b, tx, ty, speed) {
     var dx = tx - b.x, dy = ty - b.y, d = Math.sqrt(dx * dx + dy * dy) || 1, ux = dx / d, uy = dy / d, best = null;
-    for (var s = speed * 0.45; s <= speed * 1.7; s *= 1.12) for (var el = -0.65; el <= 1.4; el += 0.07) {
+    var sMax = b.shotKind === 'lob' ? Math.max(speed * 2.4, 32) : speed * 2.4;   // st-1 a 🌈 clear to the back needs a really big hit
+    for (var s = speed * 0.45; s <= sMax; s *= 1.1) for (var el = -0.65; el <= 1.4; el += 0.07) {
       var vh = s * Math.cos(el), vz = s * Math.sin(el), res = flyShuttle(M, b.x, b.y, b.z, ux * vh, uy * vh, vz);
       if (!res.netOk) continue;
-      var err = Math.sqrt((res.x - tx) * (res.x - tx) + (res.y - ty) * (res.y - ty)) + Math.abs(s - speed) * 0.06;
+      var err = Math.sqrt((res.x - tx) * (res.x - tx) + (res.y - ty) * (res.y - ty)) + Math.abs(s - speed) * 0.06, kind = b.shotKind;
+      // st-1 shape: 💥 smash = straight / down (no arc) · 🌈 lob = high · 🔪 slice = flat · 🪶 drop = a soft little arc
+      if (kind === 'smash') err += Math.max(0, el + 0.05) * 6; else if (kind === 'lob') err += Math.max(0, 0.5 - el) * 2; else if (kind === 'slice') err += Math.max(0, el - 0.25) * 3; else if (kind === 'drop') err += Math.max(0, el - 0.7) * 2;
       if (!best || err < best.err) best = { err: err, vx: ux * vh, vy: uy * vh, vz: vz, T: res.t };
     }
     if (!best) best = { vx: ux * speed * 0.4, vy: uy * speed * 0.4, vz: speed * 0.8, T: 1.5 };
@@ -654,6 +658,7 @@ var SB = (function () {
     var dx = tx - b.x, dy = ty - b.y, dist = Math.sqrt(dx * dx + dy * dy);
     var T = Math.max(0.35, dist / Math.max(2, speed));
     var ge = G * (1 + 0.45 * top), ay = side * SIDE_ACC;
+    if (b.shotKind === 'smash' && b.z > 0.5) { var Tf = Math.sqrt(2 * b.z / ge) * 1.05; if (dist / Tf <= speed * 1.6) T = Math.min(T, Math.max(0.3, Tf)); }   // st-1 💥 a smash flies straight (down), no arc
     for (var k = 0; k < 40; k++) {
       var vx = dx / T, vy = (dy - 0.5 * ay * T * T) / T, vz = (0 - b.z + 0.5 * ge * T * T) / T;
       var ok = true;
@@ -820,8 +825,8 @@ var SB = (function () {
       if (nextSpecial === 'split') { b.splitPending = true; }
       M.events.push({ k: 'special', kind: nextSpecial, side: p.side, p: p.i });
     }
-    if (shot === 'lob') { spd = Math.min(spd, V * 0.55); }
-    aimBall(M, b, tx, aimY, spd, top, side);
+    if (shot === 'lob' && !sp.drag) { spd = Math.min(spd, V * 0.55); }   // st-1: a shuttle lob needs a big hit to fly deep (the air brakes it)
+    b.shotKind = shot; aimBall(M, b, tx, aimY, spd, top, side);
     if (shot === 'lob' && !sp.drag) { b.vz += 2.2; b.vx *= 0.88; b.vy *= 0.88; }
     var jFail = J === 'v' && r() < jumpFail(M, p, perfect);
     if (jFail) { if (r() < 0.5) aimBall(M, b, d * (ll + 2.4), aimY, spd * 1.05, top, 0); else aimBall(M, b, tx, (aimY >= 0 ? 1 : -1) * (lw + 1.8), spd, top, 0); }   // 🦘 too wild: long or wide = out
@@ -2230,7 +2235,7 @@ const WHY = {floor: 'it touched the floor', net: 'into the net', out: 'out!', ow
 function handleEvents(list){
   const M = G.M;
   list.forEach(e => {
-    if(e.k === 'hit'){ UISound.play(e.shot === 'smash' ? 'whoosh' : 'pop'); const p = M.players[e.p]; if(e.perfect && p.human){ bigWord('PERFECT!'); } if(e.shot === 'smash' && p.human) floatAt(p, '💥 SMASH', 0.9);
+    if(e.k === 'hit'){ UISound.play(e.shot === 'smash' ? 'whoosh' : 'pop'); const p = M.players[e.p]; if(e.perfect && p.human && !FX){ bigWord('PERFECT!'); } if(e.shot === 'smash' && p.human && !FX) floatAt(p, '💥 SMASH', 0.9);   // st-1: with effects on, the Sla… callouts say it
       if(e.rally === 10 || e.rally === 20 || e.rally === 30) banner('🔁 ' + e.rally + '-hit rally!', 'gold');
       logHit(e); }
     else if(e.k === 'serve'){ UISound.play('tap'); G.plog = newPlog(); }
@@ -2264,7 +2269,9 @@ function floatAt(p, text, life){ G.fx.push({k: 'txt', x: p.x, y: p.y, z: 2.4, tx
 
 /* ---------- 💥 comics (sb2-3) — ComicKit: impact panels, Sla… callouts, strips. Off (💬 chip) = small callouts only ---------- */
 function newPlog(){ return {rally: 0, jump: false, jumpPerfect: false, jumpBy: -1, dive: false, diveBy: -1, diveMiss: false, diveMissBy: -1, power: false, smash: false, drop: false, lastHit: -1, lastShot: '', lastJump: null}; }
-function logHit(e){ const L = G.plog; L.rally = e.rally; L.lastHit = e.p; L.lastShot = e.shot; L.lastJump = e.jump || null; if(e.shot === 'smash') L.smash = true; if(e.shot === 'drop') L.drop = true;
+const SLA_SHOT = {smash: 'Sla… SMASH!', lob: 'Sla… LOB!', drop: 'Sla… plop.', slice: 'Sla… SLICE!'};   // st-1
+function logHit(e){ const hp = G.M.players[e.p]; if(hp && hp.human && !hp.auto && !e.jump){ const w = e.perfect ? 'Sla… PERFECT!' : SLA_SHOT[e.shot]; if(w && performance.now() - (G.lastSla || 0) > 1200){ G.lastSla = performance.now(); sla(hp, w); } }
+  const L = G.plog; L.rally = e.rally; L.lastHit = e.p; L.lastShot = e.shot; L.lastJump = e.jump || null; if(e.shot === 'smash') L.smash = true; if(e.shot === 'drop') L.drop = true;
   if(e.rally === 15) comicImpact(G.M.players[e.p], 'Sla… 15 HITS!', 'rally', 'smash', '🔁 What a rally!'); }
 function sla(p, text){ if(!FX) return; Comic.callout(text, {small: !G.comics, say: G.comics}); }
 function comicImpact(p, words, design, pose, sub){
@@ -2662,4 +2669,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1) END OF SlaBrall.html -->
+<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1) END OF SlaBrall.html -->
