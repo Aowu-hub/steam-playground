@@ -1904,27 +1904,40 @@ function makeView(W0, H0, sp, box, mode, camSide){
   return mode === 'behind' ? behindView(W0, H0, sp, box, camSide ? 1 : 0) : topView(W0, H0, sp, box);
 }
 function behindView(W0, H0, sp, box, cs){
-  const W = W0 - box.l - box.r, H = H0 - box.t - box.b, L = sp.Lh, Wd = sp.Wh, puck = sp.kind === 'puck', tab = !!sp.table;
-  // camera: behind the near baseline, up high; pitch looks a little past the net. SlaShot (air hockey) sits higher = lighter tilt.
-  // a tall screen (phone upright) gets a higher, steeper camera so the court fills the height; a wide one a lower, flatter one
-  const tall = Math.max(0, Math.min(1, (H / W - 0.9) / 0.9));
-  const ch = (puck ? L * 1.35 + 1.2 : tab ? L * 1.1 + 1.6 : L * 0.62 + 1.6) * (1 + 0.55 * tall), db = (puck ? L * 0.5 + 0.6 : tab ? L * 0.9 + 0.8 : L * 0.3 + 1.2) * (1 - 0.45 * tall);
-  const camX = -L - db, a = Math.atan2(ch, db + L * (puck ? 0.95 : 1.12)), ca = Math.cos(a), sa = Math.sin(a), sx = cs ? -1 : 1;
-  const raw = (x, y, z) => { const dx = x * sx - camX, dz = (z || 0) - ch, dep = Math.max(0.3, dx * ca - dz * sa), v = dx * sa + dz * ca; return [y * sx / dep, -v / dep, dep]; };
-  // fit: the court + a margin, heads at the far end, the near player's head
-  const mx = puck ? 0.8 : tab ? 1.6 : 2.0 - tall, my = (puck ? 0.6 : tab ? 1.6 : 2.2) * (1 - 0.6 * tall), pts = [];
-  [[-L - mx, -Wd - my, 0], [-L - mx, Wd + my, 0], [L + mx, -Wd - my, 0], [L + mx, Wd + my, 0], [L + mx * 0.5, 0, 2.6], [-L, 0, 2.2]].forEach(q => pts.push(raw(q[0] * sx, q[1], q[2])));
-  const u0 = Math.min(...pts.map(q => q[0])), u1 = Math.max(...pts.map(q => q[0])), v0 = Math.min(...pts.map(q => q[1])), v1 = Math.max(...pts.map(q => q[1]));
-  const F = Math.min(W / (u1 - u0), H / (v1 - v0)) * 0.98, ox = box.l + W / 2 - (u0 + u1) / 2 * F, oy = box.t + H / 2 - (v0 + v1) / 2 * F;
+  const W = W0 - box.l - box.r, H = H0 - box.t - box.b, L = sp.Lh, Wd = sp.Wh, puck = sp.kind === 'puck', tab = !!sp.table, sx = cs ? -1 : 1;
+  // sb2-1b "bigger court": the camera is SEARCHED for this screen — the biggest court that still looks 3D (far end 50–66 % of the near end) with heads inside
+  const m = tab ? 0.5 : puck ? 0.4 : 1, mxN = m * 1.4, mxF = m * 0.5, my = m * 0.6, hd = tab ? 1.5 : 2.4, base = tab ? 1.2 : 1;
+  const cam = (ch, db, look) => { const camX = -L - db, a = Math.atan2(ch, db + L * look), ca = Math.cos(a), sa = Math.sin(a);
+    const raw = (x, y, z) => { const dx = x * sx - camX, dz = (z || 0) - ch, dep = Math.max(0.3, dx * ca - dz * sa), v = dx * sa + dz * ca; return [y * sx / dep, -v / dep, dep]; };
+    return {ch, camX, ca, sa, raw}; };
+  const fit = c => { const pts = [[-L - mxN, -Wd - my, 0], [-L - mxN, Wd + my, 0], [L + mxF, -Wd - my, 0], [L + mxF, Wd + my, 0], [L + mxF, 0, hd], [-L, 0, hd]].map(q => c.raw(q[0] * sx, q[1], q[2]));
+    const u0 = Math.min(...pts.map(q => q[0])), u1 = Math.max(...pts.map(q => q[0])), v0 = Math.min(...pts.map(q => q[1])), v1 = Math.max(...pts.map(q => q[1]));
+    return {F: Math.min(W / (u1 - u0), H / (v1 - v0)), u0, u1, v0, v1}; };
+  const key = [W, H, L, Wd, tab, puck].map(v => typeof v === 'number' ? Math.round(v) : v).join('|');
+  let best = CAM_CACHE.get(key);
+  if(!best){
+    for(let chk = 0.3; chk <= 3.01; chk += 0.15) for(let dbk = 0; dbk <= 3.01; dbk += 0.15) for(const look of [0.7, 0.95, 1.2]){
+      const c = cam(L * chk + base, L * dbk + 0.6, look), near = c.raw(-L * sx, 0, 0)[2], far = c.raw(L * sx, 0, 0)[2], ratio = near / far;
+      if(ratio < 0.5 || ratio > 0.66) continue;
+      const f = fit(c), q = [[-L, -Wd], [L, -Wd], [L, Wd], [-L, Wd]].map(([x, y]) => c.raw(x * sx, y, 0)).map(p => [p[0] * f.F, p[1] * f.F]);
+      let A = 0; for(let i = 0; i < 4; i++){ const a = q[i], b = q[(i + 1) % 4]; A += a[0] * b[1] - b[0] * a[1]; }
+      if(!best || Math.abs(A) > best.A) best = {A: Math.abs(A), ch: c.ch, db: L * dbk + 0.6, look};
+    }
+    if(!best) best = {ch: L * 0.9 + base, db: L * 0.4 + 0.6, look: 1};
+    CAM_CACHE.set(key, best);
+  }
+  const C = cam(best.ch, best.db, best.look), f = fit(C), F = f.F * 0.98, raw = C.raw, ca = C.ca, sa = C.sa, ch = C.ch, camX = C.camX;
+  const ox = box.l + W / 2 - (f.u0 + f.u1) / 2 * F, oy = box.t + H / 2 - (f.v0 + f.v1) / 2 * F;
   const P = (x, y, z) => { const q = raw(x, y, z); return [ox + q[0] * F, oy + q[1] * F]; };
   const inv = (px, py) => { const Bv = (py - oy) / F * -1, dx = ch * (ca + Bv * sa) / Math.max(1e-4, sa - Bv * ca), dep = dx * ca + ch * sa, xs = camX + dx; return {x: xs * sx, y: (px - ox) / F * dep * sx}; };
   const sc = (x, y, z) => F / raw(x, y, z)[2];
   return {mode: 'behind', camSide: cs, W: W0, H: H0, s: sc(0, 0, 0), portrait: H0 > W0 * 1.05, tilt: sa, P, inv, sc, F,
     depth: (x, y) => -x * sx, k2w: (dx, dy) => ({x: -dy * sx, y: dx * sx})};
 }
+const CAM_CACHE = new Map();
 function topView(W0, H0, sp, box){
   const W = W0 - box.l - box.r, H = H0 - box.t - box.b, portrait = H > W * 1.05, puck = sp.kind === 'puck', tab = !!sp.table;
-  const padL = puck ? 1.0 : tab ? 2.6 : 2.4, padW = puck ? 0.6 : tab ? 1.4 : 1.6, L = sp.Lh + padL, Wd = sp.Wh + padW, tilt = 0.86, zk = 0.42, head = 2.6 * zk;
+  const padL = puck ? 0.7 : tab ? 1.7 : 1.4, padW = puck ? 0.4 : tab ? 1.0 : 1.0,   /* sb2-1b: smaller margins = bigger court */ L = sp.Lh + padL, Wd = sp.Wh + padW, tilt = 0.86, zk = 0.42, head = 2.6 * zk;
   let s, cx = box.l + W / 2, cy;
   if(portrait){ s = Math.min(W / (2 * Wd), H / (2 * L * tilt + head)); cy = box.t + H / 2 + s * head / 2; }
   else { s = Math.min(W / (2 * L), H / (2 * Wd * tilt + head)); cy = box.t + H / 2 + s * head / 2; }
@@ -2404,4 +2417,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1) END OF SlaBrall.html -->
+<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b) END OF SlaBrall.html -->
