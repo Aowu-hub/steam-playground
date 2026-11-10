@@ -2814,7 +2814,7 @@ const AVATAR_OPTS = { skin: 6, hair: 7, hairColor: 18, hl: 6, hlColor: 18, outfi
 const AVATAR_EXTRA = { skin: 'skins', hair: 'hairstyles', outfit: 'fashion', outfitColor: 'colours' };
 const HEX_ = /^#[0-9a-f]{6}$/i;   // indexes past the base range come from these lines
 const ROOM_KEYS = ['jungle', 'house', 'space', 'fantasy', 'concert'];
-const EQUIP_SLOTS = ['costume', 'hand', 'back', 'pet', 'ride', 'trail', 'neck'];
+const EQUIP_SLOTS = ['costume', 'hand', 'back', 'pet', 'ride', 'trail', 'neck', 'joy'];   // 🕹️ sk-1: 'joy' = the joystick skin you wear in every game
 
 /* ---------- ITEM LINES ----------
    A line is a set of looks (steps) for one slot. Every "way" the player completes adds one step
@@ -2937,6 +2937,14 @@ const ITEM_LINES = [
   // 🪶 SlaBam shuttle feathers (sb2-2): own n steps = feathers 0..n-1, painted by BallSkins.feather (the cork = the ball skin). Picked per device: sp_feather:<Name>.
   { id: 'feather', name: 'Shuttle feathers', icon: '🪶', slot: 'feather', game: 'sla-brall', soon: 'Used in 🏸 SlaBam — your feather flies behind the cork (the cork is your ball skin)', steps: ['Goose white', 'Rainbow', 'Peacock', 'Phoenix', 'Ice crystal', 'Neon', 'Leaf', 'Candy stripe', 'Galaxy', 'Golden'],
     ways: [W_.feat('sla-brall', 'win_slabam', 1, 'Win a SlaBam match'), W_.feat('sla-brall', 'win_slabam', 3, 'Win 3 SlaBam matches'), W_.feat('sla-brall', 'smash', 15, 'Hit 15 SlaBrall smashes'), W_.feat('sla-brall', 'win_slabam', 6, 'Win 6 SlaBam matches'), W_.feat('sla-brall', 'perfect', 30, 'Hit 30 PERFECT shots in SlaBrall'), W_.feat('sla-brall', 'win_slabam', 10, 'Win 10 SlaBam matches'), W_.feat('sla-brall', 'rally', 25, 'Keep a 25-hit SlaBrall rally'), W_.feat('sla-brall', 'win_slabam', 15, 'Win 15 SlaBam matches'), W_.feat('sla-brall', 'cups', 2, 'Win 2 SlaBrall tournaments'), W_.feat('sla-brall', 'win_slabam', 25, 'Win 25 SlaBam matches')] },
+  // 🕹️ sk-1 Joystick skins (looks only): ONE master list for every joystick + its buttons (UiKit JoySkins), in 3 lines of 8 (house rule ≤ 10 steps): 🍬 Sweet (common) · 🐸 Wild (rare + epic) · 👑 Legend (epic + legend).
+  // Wear one in 🎒 Wardrobe (avatar eq.joy = {id: line, v}). 🎁 pickups (grantJoySkin — Brawl floor capsules etc., 1 per game per day) add a step to the first line that isn't full.
+  { id: 'joyskin', name: 'Sweet joysticks', icon: '🕹️', slot: 'joy', game: 'any', soon: 'Your 🕹️ joystick + buttons in every game with a stick — wear it in 🎒 Wardrobe', steps: ['Bubblegum', 'Mint chip', 'Ocean', 'Lemon', 'Grape', 'Donut', 'Soccer', 'Paw'],
+    ways: [W_.days(1), W_.total(2), W_.miles(10), W_.feat('sla-brall', 'matches', 3, 'Play 3 SlaBrall matches'), W_.days(3), W_.badges(3), W_.total(8), W_.miles(40)] },
+  { id: 'joyskin2', name: 'Wild joysticks', icon: '🐸', slot: 'joy', game: 'any', soon: 'Your 🕹️ joystick + buttons in every game with a stick — wear it in 🎒 Wardrobe', steps: ['Frog', 'Watermelon', 'Cookie', 'Planet', 'Robot eye', 'Star', 'Flower', 'Lava'],
+    ways: [W_.feat('sla-brall', 'wins', 5, 'Win 5 SlaBrall matches'), W_.days(7), W_.titles(1), W_.extreme(1), W_.badges(12), W_.miles(120), W_.feat('sla-brall', 'smash', 50, 'Hit 50 SlaBrall smashes'), W_.hardcore(1)] },
+  { id: 'joyskin3', name: 'Legend joysticks', icon: '👑', slot: 'joy', game: 'any', soon: 'Your 🕹️ joystick + buttons in every game with a stick — wear it in 🎒 Wardrobe', steps: ['Ice', 'Gem', 'Rainbow', 'Galaxy', 'Dragon eye', 'Golden crown', 'Neon pulse', 'Phoenix'],
+    ways: [W_.days(14), W_.miles(200), W_.badges(20), W_.titles(3), W_.extreme(3), W_.feat('sla-brall', 'cups', 1, 'Win a SlaBrall tournament'), W_.hardcore(3), W_.days(30)] },
   // ☄️ SlaBrall ball trails (round 2): own n steps = trails 0..n-1, painted by BallSkins.trail. Picked per device: sp_balltrail:<Name>.
   { id: 'balltrail', name: 'Ball trails', icon: '☄️', slot: 'balltrail', game: 'sla-brall', soon: 'Used in 🏓 SlaBrall — your trail follows the ball after you hit it', steps: ['Sparkles', 'Bubbles', 'Hearts', 'Stars', 'Fire', 'Frost', 'Rainbow', 'Leaves', 'Lightning', 'Galaxy'],
     ways: [W_.feat('sla-brall', 'matches', 1, 'Play a SlaBrall match'), W_.feat('sla-brall', 'wins', 3, 'Win 3 SlaBrall matches'), W_.feat('sla-brall', 'cupMatches', 1, 'Play a SlaBrall tournament match'), W_.feat('sla-brall', 'perfect', 20, 'Hit 20 PERFECT shots in SlaBrall'), W_.feat('sla-brall', 'smash', 25, 'Hit 25 SlaBrall smashes'), W_.feat('sla-brall', 'aces', 10, 'Serve 10 aces in SlaBrall'), W_.feat('sla-brall', 'cups', 1, 'Win a SlaBrall tournament'), W_.feat('sla-brall', 'powers', 20, 'Use 20 SlaBrall powers'), W_.feat('sla-brall', 'rally', 30, 'Keep a 30-hit SlaBrall rally'), W_.feat('sla-brall', 'cups', 3, 'Win 3 SlaBrall tournaments')] },
@@ -3592,6 +3600,26 @@ function getDailyData(player) {
   const players = activePlayers_(listProfilesFull());
   const p = players.find(x => x.Name === player);
   return { date: today_(), picks: dailyFor_(p ? p.Name : '', players), player: p ? p.Name : '', avatar: p ? parseAvatar_(getSettings()['Avatar_' + p.Name]) : null };
+}
+// 🕹️ sk-1 a 🎁 joystick-skin pickup in a game (e.g. a Brawl floor capsule): +1 step on the first joystick line that isn't full, at most 1 per game per day (3 a day in all).
+function grantJoySkin(name, game) {
+  const players = activePlayers_(listProfilesFull());
+  if (!name || !players.some(p => p.Name === name)) throw new Error('Pick a player first.');
+  game = String(game || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 30) || 'game';
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    WARDROBE_MEMO_ = null;
+    const date = today_(), mine = wardrobeRows_().filter(r => r.name === name && r.source.indexOf('pickup:') === 0 && r.source.slice(-10) === date);
+    const own0 = itemsFor_(name, players).owned, l = ['joyskin', 'joyskin2', 'joyskin3'].map(itemLine_).find(x => (own0[x.id] || 0) < x.steps.length);
+    if (!l) return { got: false, full: true, have: 24, why: 'You have every joystick skin ⭐' };
+    const have0 = own0[l.id] || 0;
+    if (mine.some(r => r.source === 'pickup:' + game + ':' + date) || mine.length >= 3) return { got: false, have: have0, why: 'One joystick capsule per game per day — come back tomorrow!' };
+    const sh = wardrobeSheet_(), stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'), source = 'pickup:' + game + ':' + date;
+    sh.getRange(Math.max(1, sh.getLastRow()) + 1, 1, 1, WARDROBE_WIDTH).setNumberFormat('@').setValues([[name + '|' + source, name, l.id, '1', source, stamp]]);
+    WARDROBE_MEMO_ = null;
+    const have = itemsFor_(name, players).owned[l.id] || 0, off = { joyskin: 0, joyskin2: 8, joyskin3: 16 }[l.id];
+    return { got: have > have0, line: l.id, have: have, v: off + have - 1, step: l.steps[have - 1], full: have >= l.steps.length };   // v = index in JoySkins.LIST
+  } finally { lock.releaseLock(); }
 }
 // Claim one: the goal must be done today and not claimed yet → +1 evolution step on that line.
 function claimDaily(name, slot) {
@@ -5374,6 +5402,7 @@ return {"include": typeof include === 'function' ? include : undefined,
 "voteCreation": typeof voteCreation === 'function' ? voteCreation : undefined,
 "giveCreation": typeof giveCreation === 'function' ? giveCreation : undefined,
 "getDailyData": typeof getDailyData === 'function' ? getDailyData : undefined,
+"grantJoySkin": typeof grantJoySkin === 'function' ? grantJoySkin : undefined,
 "claimDaily": typeof claimDaily === 'function' ? claimDaily : undefined,
 "verifyPlayerPin": typeof verifyPlayerPin === 'function' ? verifyPlayerPin : undefined,
 "setPlayerPin": typeof setPlayerPin === 'function' ? setPlayerPin : undefined,
