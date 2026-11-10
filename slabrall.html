@@ -312,6 +312,8 @@
       <div class="balls" id="ball-list"></div>
       <div class="note" style="margin:8px 0 4px">☄️ Ball trail — follows the ball after YOU hit it</div>
       <div class="balls" id="trail-list"></div>
+      <div id="feather-wrap"><div class="note" style="margin:8px 0 4px">🪶 Shuttle feather — 🏸 SlaBam only (your ball skin is the cork)</div>
+      <div class="balls" id="feather-list"></div></div>
     </div>
     <div class="go-row"><button class="btn soft" onclick="showScreen('menu')">◀ Back</button><button class="btn" id="go-btn" data-sound="pop">🏓 Play!</button></div>
   </div>
@@ -402,10 +404,16 @@ var SB = (function () {
       scoring: 'tennis', targets: [2, 2, 3, 3, 4, 3], V: 13, reach: 1.45, about: 'Tennis! Serve, one bounce allowed. Points go 15 · 30 · 40 · game.' },
     slapong: { id: 'slapong', name: 'SlaPong', icon: '🏓', kind: 'ball', Lh: 6.5, Wh: 3.7, net: 0.5, table: true, mustBounce: true, pongServe: true,
       scoring: 'pong', targets: [7, 7, 11, 11, 11, 11], V: 8.6, reach: 1.3, standMin: -2.6, about: 'Ping-pong! The serve bounces on your side first. Every ball must bounce once on the table. Serve swaps every 2 points.' },
-    slawall: { id: 'slawall', name: 'SlaWall', icon: '🧱', kind: 'ball', Lh: 9, Wh: 4.8, net: 0.85, walls: true, wallH: 3.2, serveLock: true,
-      scoring: 'tennis', targets: [2, 2, 3, 3, 4, 3], V: 11.5, reach: 1.4, about: 'Padel! After the ball bounces it may hit the glass walls and still be played. Hit a wall before the floor = out.' }
+    // 🏸 sb2-2 badminton: no bounce at all, the shuttle has air drag (fast hit, slow drop)
+    slabam: { id: 'slabam', name: 'SlaBam', icon: '🏸', kind: 'shuttle', Lh: 6.7, Wh: 3.05, net: 1.55, noBounce: true, drag: 0.2, shortLine: 1.98,
+      scoring: 'rally', targets: [7, 7, 11, 11, 15, 11], V: 18, reach: 1.6, serve: 'under', noPowers: ['broken', 'splorf', 'wall'],
+      about: 'Badminton! Fast hit, slow drop: the shuttle shoots off the racket, then floats down. It must never touch the floor on your side.' },
+    // 🧱 sb2-2 squash room (was padel): one shared floor, 4 walls, no net — players take turns
+    slawall: { id: 'slawall', name: 'SlaWall', icon: '🧱', kind: 'ball', Lh: 5, Wh: 3.2, squash: true, walls: true, wallH: 4.6,
+      scoring: 'rally', targets: [7, 7, 9, 11, 11, 11], V: 12, reach: 1.45, noPowers: ['wall', 'smallgoal', 'broken', 'splorf', 'mirage', 'split'],
+      about: 'Squash room! No net — hit the ball at ANY wall. It may bounce on the floor once, then it is the other player\'s turn. Two bounces = point.' }
   };
-  var SPORT_ORDER = ['slashot', 'slapoof', 'slaball', 'slapong', 'slawall'];
+  var SPORT_ORDER = ['slashot', 'slapoof', 'slaball', 'slapong', 'slabam', 'slawall'];
 
   // ---------- levels (robot) ----------
   var LEVELS = [
@@ -505,8 +513,11 @@ var SB = (function () {
   function courtL(M, side) { return M.sp.Lh * (M.side[side].shrink > 0 ? 0.8 : 1); }
   function goalHalf(M, side) { return M.sp.goal * (M.side[side].shrink > 0 ? 0.6 : 1); }
 
+  function fwdOf(M, p) { return M.sp.squash ? 1 : dirOf(p.side); }   // sb2-2: in the squash room everyone faces the front wall (+x)
   function homeOf(M, p) {
     var sp = M.sp, s = -dirOf(p.side);
+    if (sp.noBounce) return { x: s * sp.Lh * 0.5, y: p.lane * sp.Wh * 0.5 };   // 🏸 mid-court
+    if (sp.squash) return { x: p.lane < 0 ? -sp.Lh * 0.5 : p.lane > 0 ? -sp.Lh * 0.05 : -sp.Lh * 0.3, y: (p.side === 0 ? -1 : 1) * sp.Wh * 0.4 };
     if (sp.kind === 'puck') return { x: s * sp.Lh * 0.72, y: p.lane * sp.Wh * 0.45 };
     var depth = sp.table ? sp.Lh + 1.0 : sp.Lh * 0.92;
     if (sp.twoBounce || sp.walls) depth = sp.Lh * 0.82;
@@ -521,6 +532,7 @@ var SB = (function () {
       var r = sp.malletR;
       return { x0: s < 0 ? -sp.Lh + r : 0.35 + r, x1: s < 0 ? -0.35 - r : sp.Lh - r, y0: -sp.Wh + r, y1: sp.Wh - r };
     }
+    if (sp.squash) return { x0: -sp.Lh + 0.4, x1: sp.Lh - 0.6, y0: -sp.Wh + 0.35, y1: sp.Wh - 0.35 };
     var near = sp.table ? sp.Lh + (sp.standMin || 0.5) : 0.6;
     var far = sp.table ? sp.Lh + 3.6 : sp.Lh + (sp.walls ? 0.2 : 3.0);
     var wy = sp.Wh + (sp.walls ? -0.2 : (sp.table ? 2.6 : 2.2));
@@ -553,7 +565,7 @@ var SB = (function () {
     M.players.forEach(function (p) { p.swing = 0; });
     resetPositions(M);
     var server = serverOf(M);
-    var b = mkBall(M, server.x + dirOf(s) * 0.5, server.y, sp.table ? 0.55 : 1.0);
+    var b = mkBall(M, server.x + fwdOf(M, server) * 0.5, server.y, sp.table ? 0.55 : 1.0);
     b.held = server.i; b.owner = -1;
     M.balls.push(b);
     M.server = server.i;
@@ -584,7 +596,13 @@ var SB = (function () {
     var r = M.rnd, lw = courtW(M, 1 - p.side);
     var ty = clamp((-p.y * 0.6) + (r() - 0.5) * lw * 0.9, -lw * 0.75, lw * 0.75);
     var V = sp.V * M.lv.vMul * (p.robot ? 1 : 0.95);
-    if (sp.pongServe) {
+    if (sp.squash) {
+      // 🧱 serve at the FRONT wall, to the other player's half; it comes back to them
+      var fy = -sgn(p.y || 0.01) * sp.Wh * (0.15 + r() * 0.3), fz = 2.1 + r() * 0.7;
+      b.x = p.x + 0.4; b.z = 1.0; b.fb = 0;
+      var sdx = sp.Lh - b.x, sdy = fy - b.y, sdd = Math.sqrt(sdx * sdx + sdy * sdy), sT = sdd / (V * 0.75);
+      b.vx = sdx / sT; b.vy = sdy / sT; b.vz = (fz - b.z + 0.5 * G * sT * sT) / sT; b.top = 0; b.side = 0;
+    } else if (sp.pongServe) {
       // first bounce on own side, then over the net: search a speed that works
       var z0 = b.z, best = null;
       for (var vx = V * 0.55; vx <= V * 1.2 && !best; vx += V * 0.05) {
@@ -620,8 +638,32 @@ var SB = (function () {
   }
 
   // compute a velocity so the ball lands at (tx,ty) — clears the net
+  // 🏸 sb2-2 shuttle flight (gravity + air drag) — used by the aim search, predictions and the page
+  function flyShuttle(M, x, y, z, vx, vy, vz, maxT) {
+    var sp = M.sp, h = 1 / 60, t = 0, netOk = true, k = sp.drag;
+    while (t < (maxT || 6)) {
+      vz -= G * h; var v = Math.sqrt(vx * vx + vy * vy + vz * vz), f = 1 / (1 + k * v * h); vx *= f; vy *= f; vz *= f;
+      var ox = x; x += vx * h; y += vy * h; z += vz * h; t += h;
+      if ((ox < 0) !== (x < 0) && z < sp.net + 0.15) netOk = false;
+      if (z <= 0) break;
+    }
+    return { x: x, y: y, t: t, netOk: netOk };
+  }
+  function aimShuttle(M, b, tx, ty, speed) {
+    var dx = tx - b.x, dy = ty - b.y, d = Math.sqrt(dx * dx + dy * dy) || 1, ux = dx / d, uy = dy / d, best = null;
+    for (var s = speed * 0.45; s <= speed * 1.7; s *= 1.12) for (var el = -0.65; el <= 1.4; el += 0.07) {
+      var vh = s * Math.cos(el), vz = s * Math.sin(el), res = flyShuttle(M, b.x, b.y, b.z, ux * vh, uy * vh, vz);
+      if (!res.netOk) continue;
+      var err = Math.sqrt((res.x - tx) * (res.x - tx) + (res.y - ty) * (res.y - ty)) + Math.abs(s - speed) * 0.06;
+      if (!best || err < best.err) best = { err: err, vx: ux * vh, vy: uy * vh, vz: vz, T: res.t };
+    }
+    if (!best) best = { vx: ux * speed * 0.4, vy: uy * speed * 0.4, vz: speed * 0.8, T: 1.5 };
+    b.vx = best.vx; b.vy = best.vy; b.vz = best.vz; b.top = 0; b.side = 0; b.flight = best.T;
+    return best.T;
+  }
   function aimBall(M, b, tx, ty, speed, top, side) {
     var sp = M.sp;
+    if (sp.drag) return aimShuttle(M, b, tx, ty, speed);
     b.top = top; b.side = side;
     var dx = tx - b.x, dy = ty - b.y, dist = Math.sqrt(dx * dx + dy * dy);
     var T = Math.max(0.35, dist / Math.max(2, speed));
@@ -648,6 +690,7 @@ var SB = (function () {
   function canHit(M, p, b) {
     var sp = M.sp;
     if (b.held != null || !b.live) return false;
+    if (sp.squash) return b.owner !== p.side && (b.fb || 0) < 2 && (b.wallHit || (b.fb || 0) > 0 || b.owner < 0) && b.z <= 2.7 && b.z >= -0.05;   // 🧱 your turn = the other team hit it last + it touched a wall (or the floor) first
     if (b.owner === p.side) return false;
     var onSide = p.side === 0 ? b.x < 0 : b.x > 0;
     if (!onSide) return false;
@@ -662,7 +705,7 @@ var SB = (function () {
   }
   function paddlePos(M, p) {
     // paddle sits a little toward the net and toward the racket hand
-    var d = dirOf(p.side);
+    var d = fwdOf(M, p);
     return { x: p.x + d * 0.35, y: p.y };
   }
 
@@ -672,7 +715,49 @@ var SB = (function () {
     return null;
   }
 
+  // 🧱 sb2-2 squash: the stick / keys at the hit = the DIRECTION the ball flies (any wall); robots aim at the front wall, sometimes a side wall
+  function squashDir(M, p) {
+    var sp = M.sp, r = M.rnd;
+    if (p.human && !p.auto) { var ix = p.input.x || 0, iy = p.input.y || 0, m = Math.sqrt(ix * ix + iy * iy); if (m > 0.3) return { x: ix / m, y: iy / m }; }
+    var opp = M.players.filter(function (q) { return q.side !== p.side; })[0], tx = sp.Lh, ty;
+    if (p.robot && r() < 0.12 + 0.25 * M.lv.smart) { ty = (r() < 0.5 ? -1 : 1) * sp.Wh; tx = p.x + (sp.Lh - p.x) * (0.45 + 0.4 * r()); }
+    else ty = (opp ? -sgn(opp.y || 0.01) : (r() < 0.5 ? -1 : 1)) * sp.Wh * (0.2 + 0.6 * r()) + (p.robot ? (r() - 0.5) * M.lv.err * 1.5 : 0);
+    var dx = tx - p.x, dy = ty - p.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+    return { x: dx / d, y: dy / d };
+  }
+  var SQUASH_VZ = { normal: 3.4, smash: 0.9, drop: 2.3, lob: 7.2, slice: 2.4 };
+  function hitSquash(M, p, b) {
+    var sp = M.sp, r = M.rnd, picked = wantShot(M, p), shot = picked || 'normal';
+    var perfect = !!(picked && p.human && M.t - p.queuedT < 0.22), weak = !!(M.lv.timing && p.human && !picked);
+    if (p.robot && r() < M.lv.smart * 0.5) perfect = true;
+    if (b.kind === 'legend') {
+      var lok = p.human ? perfect : (r() < (M.level >= 5 ? 0.55 : M.level >= 3 ? 0.35 : 0.2));
+      if (!lok) { b.legendMiss = p.i; p.swing = 1; p.swingShot = 'normal'; M.events.push({ k: 'legendmiss', p: p.i }); return false; }
+    }
+    var S = SHOTS[shot], V = (p.human ? sp.V * (0.86 + 0.14 * Math.min(1, M.level / 3)) : sp.V * M.lv.vMul) * (perfect ? 1.12 : 1) * (weak ? 0.86 : 1);
+    var dir = squashDir(M, p), hs = V * S.speed * 0.8, vz = SQUASH_VZ[shot] || 3.4;
+    if (shot === 'lob') hs = Math.min(hs, V * 0.5);
+    var nx = M.side[p.side].nextShot;
+    b.kind = null; b.ghost = false; b.braked = false; b.legendMiss = null;
+    if (nx) { M.side[p.side].nextShot = null; b.kind = nx; if (nx === 'legend') { hs = V * 1.6; vz = 2; } if (nx === 'ghost') b.ghost = true; M.events.push({ k: 'special', kind: nx, side: p.side, p: p.i }); }
+    vz += b.z < 0.5 ? 0.6 : 0;
+    var apex = b.z + vz * vz / (2 * G); if (vz > 0 && apex > sp.wallH - 0.5) vz = Math.sqrt(Math.max(0, 2 * G * (sp.wallH - 0.5 - b.z)));   // never over the red line by itself
+    b.vx = dir.x * hs; b.vy = dir.y * hs; b.vz = vz; b.top = S.top * 0.3; b.side = 0;
+    b.owner = p.side; b.by = p.i; b.b = [0, 0]; b.fb = 0; b.hits++; b.serve = false; b.t0 = M.t; b.wallHit = false; b.wallFault = false;
+    if (M.side[p.side].elemental > 0) { b.elem = pickElement(M); M.side[p.side].elemental--; } else b.elem = null;
+    p.swing = 1; p.swingShot = shot; p.queued = null; p.hits++;
+    M.rally++; M.stats[p.side].hits++;
+    if (M.rally > M.stats[p.side].rally) M.stats[p.side].rally = M.rally;
+    if (M.rally > M.stats[1 - p.side].rally) M.stats[1 - p.side].rally = M.rally;
+    if (shot === 'smash') M.stats[p.side].smash++;
+    if (perfect) M.stats[p.side].perfect++;
+    if (p.side !== M.lastServeSide) M.receiverTouched = true;
+    M.events.push({ k: 'hit', p: p.i, side: p.side, shot: shot, perfect: perfect, weak: weak, rally: M.rally });
+    checkOrb(M);
+    return true;
+  }
   function hitBall(M, p, b, perfectWindow) {
+    if (M.sp.squash) return hitSquash(M, p, b);
     var sp = M.sp, d = dirOf(p.side), r = M.rnd, oside = 1 - p.side;
     var picked = wantShot(M, p), shot = picked || 'normal';
     if (shot === 'smash' && b.z < 1.15 && sp.kind !== 'puck') shot = 'normal';
@@ -732,7 +817,7 @@ var SB = (function () {
     }
     if (shot === 'lob') { spd = Math.min(spd, V * 0.55); }
     aimBall(M, b, tx, aimY, spd, top, side);
-    if (shot === 'lob') { b.vz += 2.2; b.vx *= 0.88; b.vy *= 0.88; }
+    if (shot === 'lob' && !sp.drag) { b.vz += 2.2; b.vx *= 0.88; b.vy *= 0.88; }
     b.owner = p.side; b.by = p.i; b.b = [0, 0]; b.hits++; b.serve = false; b.t0 = M.t; b.wallHit = false; b.wallFault = false;
     if (M.side[p.side].elemental > 0) { b.elem = pickElement(M); M.side[p.side].elemental--; } else b.elem = null;
     if (p.magnet > 0 && b.magnetSide !== p.side) { /* magnet works on balls coming TO the holder */ }
@@ -769,8 +854,9 @@ var SB = (function () {
   }
   function rollPower(M, tier) {
     var gentle = M.level <= 1;
-    var pool = POWER_KEYS.filter(function (k) { return POWERS[k].tier === tier && (!gentle || POWERS[k].gentle); });
-    if (!pool.length) pool = POWER_KEYS.filter(function (k) { return POWERS[k].gentle; });
+    var no = M.sp.noPowers || [];
+    var pool = POWER_KEYS.filter(function (k) { return POWERS[k].tier === tier && (!gentle || POWERS[k].gentle) && no.indexOf(k) < 0; });
+    if (!pool.length) pool = POWER_KEYS.filter(function (k) { return POWERS[k].gentle && no.indexOf(k) < 0; });
     return pool[Math.floor(M.rnd() * pool.length)];
   }
   function grantOrb(M, side) {
@@ -894,7 +980,7 @@ var SB = (function () {
       var b = M.balls[0], p = b && M.players[b.held];
       if (p) {
         // ball stays at the server's hand
-        b.x = p.x + dirOf(p.side) * 0.5; b.y = p.y; b.z = M.sp.table ? 0.55 : 1.0 + Math.sin(M.t * 5) * 0.12;
+        b.x = p.x + fwdOf(M, p) * 0.5; b.y = p.y; b.z = M.sp.table ? 0.55 : 1.0 + Math.sin(M.t * 5) * 0.12;
         if ((p.robot || p.auto) && M.stateT > 0.9 + M.rnd() * 0.2) doServe(M, 'normal');
         if (p.human && p.queued && M.t - p.queuedT < 0.6) { doServe(M, p.queued); p.queued = null; }
         if (p.human && M.stateT > (M.autoServe || 99)) doServe(M, 'normal');
@@ -947,20 +1033,21 @@ var SB = (function () {
   function stepBall(M, b, dt) {
     if (!b.live || b.held != null) return;
     var sp = M.sp;
-    var onSide = b.x < 0 ? 0 : 1;
+    var onSide = sp.squash ? (b.owner >= 0 ? 1 - b.owner : 0) : (b.x < 0 ? 0 : 1);
     var k = M.side[onSide].slow > 0 ? 0.5 : 1;
     var h = dt * k;
     var ge = G * (1 + 0.45 * b.top);
     if (b.kind === 'splorf' && b.b[0] + b.b[1] === 0) ge = G * 2.3;
     // magnet: ball bends toward the holder's paddle
     M.players.forEach(function (p) {
-      if (p.magnet > 0 && b.owner !== p.side && ((p.side === 0) === (b.x < 0))) b.vy += clamp(p.y - b.y, -2, 2) * 2.4 * h;
+      if (p.magnet > 0 && b.owner !== p.side && (sp.squash || (p.side === 0) === (b.x < 0))) b.vy += clamp(p.y - b.y, -2, 2) * 2.4 * h;
     });
     // wind patch
     var wp = patchAt(M, b.x, b.y);
     if (wp && wp.el === 'wind') b.vy += wp.dir * 6 * h;
     var ox = b.x;
     b.vz -= ge * h; b.vy += b.side * SIDE_ACC * h;
+    if (sp.drag) { var bv = Math.sqrt(b.vx * b.vx + b.vy * b.vy + b.vz * b.vz), bf = 1 / (1 + sp.drag * bv * h); b.vx *= bf; b.vy *= bf; b.vz *= bf; }   // 🏸 air drag
     b.x += b.vx * h; b.y += b.vy * h; b.z += b.vz * h;
     // mirage: brake hard after it crosses the net
     if (b.kind === 'mirage' && !b.braked && Math.abs(b.x) > 1.6 && (b.x > 0) === (b.vx > 0)) {
@@ -991,8 +1078,16 @@ var SB = (function () {
         return;
       }
     }
+    // 🧱 squash room walls: bounce off any wall below the red line; above it = out
+    if (sp.squash) {
+      var hitW = false;
+      if (Math.abs(b.y) > sp.Wh) { if (b.z < sp.wallH) { b.y = sgn(b.y) * sp.Wh; b.vy *= -0.8; b.vx *= 0.94; hitW = true; } else { if (b.real) pointTo(M, b.owner >= 0 ? 1 - b.owner : 0, 'out'); else b.live = false; return; } }
+      if (Math.abs(b.x) > sp.Lh) { if (b.z < sp.wallH) { b.x = sgn(b.x) * sp.Lh; b.vx *= b.x > 0 ? -0.85 : -0.7; b.vy *= 0.94; hitW = true; } else { if (b.real) pointTo(M, b.owner >= 0 ? 1 - b.owner : 0, 'out'); else b.live = false; return; } }
+      if (b.z > sp.wallH + 1.2) { b.vz = Math.min(b.vz, 0); b.z = sp.wallH + 1.2; }   // ceiling
+      if (hitW) { b.wallHit = true; M.fx.push({ k: 'wallhit', x: b.x, y: b.y, z: b.z, t: 0, life: 0.45 }); M.events.push({ k: 'wallhit' }); }
+    }
     // walls (padel)
-    if (sp.walls) {
+    else if (sp.walls) {
       var Wh = sp.Wh, Lh = sp.Lh;
       if (Math.abs(b.y) > Wh && b.z < sp.wallH) { b.y = sgn(b.y) * Wh; b.vy *= -0.75; wallTouch(M, b); }
       if (Math.abs(b.x) > Lh && b.z < sp.wallH) { b.x = sgn(b.x) * Lh; b.vx *= -0.72; wallTouch(M, b); }
@@ -1000,7 +1095,7 @@ var SB = (function () {
     }
     // buddy wall
     var bs = b.x < 0 ? 0 : 1;
-    if (b.owner !== bs && Math.abs(b.x) > sp.Lh + 0.3 && b.z < 2.2) {
+    if (!sp.squash && b.owner !== bs && Math.abs(b.x) > sp.Lh + 0.3 && b.z < 2.2) {
       var holder = M.players.filter(function (p) { return p.side === bs && p.wallBuddy > 0; })[0];
       if (holder) {
         holder.wallBuddy = 0; b.x = sgn(b.x) * (sp.Lh + 0.3);
@@ -1050,7 +1145,7 @@ var SB = (function () {
       else { b.vx *= clamp(spinK, 0.55, 1.35); b.vy *= 0.92; }
       if (b.top < -0.5) b.vz *= 0.8;
       b.top *= 0.4; b.side *= 0.5;
-      if (b.elem && b.real && b.owner >= 0 && (b.x < 0) !== (b.owner === 0)) {
+      if (b.elem && b.real && b.owner >= 0 && (sp.squash || (b.x < 0) !== (b.owner === 0))) {
         var el = b.elem; b.elem = null;
         M.patches.push({ x: b.x, y: b.y, r: 1.25, el: el, t: 6, dir: M.rnd() < 0.5 ? -1 : 1, side: b.x < 0 ? 0 : 1 });
         M.events.push({ k: 'patch', el: el });
@@ -1080,6 +1175,13 @@ var SB = (function () {
     var sp = M.sp, side = b.x < 0 ? 0 : 1, own = b.owner;
     if (!b.real) { b.live = false; M.fx.push({ k: 'poof', x: b.x, y: b.y, z: 0, t: 0, life: 0.6 }); return; }
     M.fx.push({ k: 'bounce', x: b.x, y: b.y, t: 0, life: 0.5 });
+    // 🧱 squash: one floor bounce is fine, the 2nd = point to the hitter · 🏸 badminton: ANY floor touch ends the rally
+    if (sp.squash) { if (own < 0) return; b.fb = (b.fb || 0) + 1; if (b.fb >= 2) pointTo(M, own, b.hits <= 1 && !M.receiverTouched ? 'ace' : 'twice'); return; }
+    if (sp.noBounce && own >= 0) {
+      var nIn = Math.abs(b.x) <= courtL(M, side) + 0.05 && Math.abs(b.y) <= courtW(M, side) + 0.05;
+      if (side === own) { pointTo(M, 1 - own, 'own'); return; }
+      pointTo(M, nIn ? own : side, nIn ? (b.hits <= 1 && !M.receiverTouched ? 'ace' : 'floor') : 'out'); return;
+    }
     var inX = Math.abs(b.x) <= courtL(M, side) + 0.05, inY = Math.abs(b.y) <= courtW(M, side) + 0.05;
     var inside = inX && inY;
     if (b.pongServeBounce) {
@@ -1200,23 +1302,26 @@ var SB = (function () {
   // ---------- robots ----------
   function predictBall(M, b, p, maxT) {
     // simulate the ball forward (no rules) and find the first spot this player may hit it
-    var sp = M.sp, c = { x: b.x, y: b.y, z: b.z, vx: b.vx, vy: b.vy, vz: b.vz, top: b.top, side: b.side, bn: b.b[p.side], pong: b.pongServeBounce };
+    var sp = M.sp, c = { x: b.x, y: b.y, z: b.z, vx: b.vx, vy: b.vy, vz: b.vz, top: b.top, side: b.side, bn: sp.squash ? (b.fb || 0) : b.b[p.side], pong: b.pongServeBounce, w: !sp.squash || b.wallHit || (b.fb || 0) > 0 || b.owner < 0 };
     var h = 1 / 60, t = 0, best = null, first = null;
     var mustB = sp.mustBounce || (sp.serveLock && b.serve) || (sp.twoBounce && b.hits < 2);
     while (t < maxT) {
       var ge = G * (1 + 0.45 * c.top);
-      c.vz -= ge * h; c.vy += c.side * SIDE_ACC * h; c.x += c.vx * h; c.y += c.vy * h; c.z += c.vz * h; t += h;
-      if (sp.walls) { if (Math.abs(c.y) > sp.Wh) { c.y = sgn(c.y) * sp.Wh; c.vy *= -0.75; } if (Math.abs(c.x) > sp.Lh) { c.x = sgn(c.x) * sp.Lh; c.vx *= -0.72; } }
+      c.vz -= ge * h; c.vy += c.side * SIDE_ACC * h;
+      if (sp.drag) { var cv = Math.sqrt(c.vx * c.vx + c.vy * c.vy + c.vz * c.vz), cf = 1 / (1 + sp.drag * cv * h); c.vx *= cf; c.vy *= cf; c.vz *= cf; }
+      c.x += c.vx * h; c.y += c.vy * h; c.z += c.vz * h; t += h;
+      if (sp.walls) { if (Math.abs(c.y) > sp.Wh) { c.y = sgn(c.y) * sp.Wh; c.vy *= sp.squash ? -0.8 : -0.75; c.w = true; } if (Math.abs(c.x) > sp.Lh) { c.x = sgn(c.x) * sp.Lh; c.vx *= sp.squash ? (c.x > 0 ? -0.85 : -0.7) : -0.72; c.w = true; } }
       if (c.z <= 0 && c.vz < 0) {
+        if (sp.noBounce) break; c.w = true;
         c.z = 0; c.vz = -c.vz * (sp.table ? 0.86 : 0.72); c.vx *= clamp(1 + 0.22 * c.top, 0.55, 1.35); c.top *= 0.4;
-        if (c.pong) c.pong = false; else if ((c.x < 0) === (p.side === 0)) c.bn++;
+        if (c.pong) c.pong = false; else if (sp.squash || (c.x < 0) === (p.side === 0)) c.bn++;
         if (c.bn >= 2) break;
       }
-      var mine = (c.x < 0) === (p.side === 0);
-      if (!mine || c.pong) continue;
+      var mine = sp.squash || (c.x < 0) === (p.side === 0);
+      if (!mine || c.pong || !c.w) continue;
       if (mustB && c.bn < 1) continue;
       if (c.z > 2.2) continue;
-      var L = limits(M, p), px = clamp(c.x - dirOf(p.side) * 0.35, L.x0, L.x1), py = clamp(c.y, L.y0, L.y1);
+      var L = limits(M, p), px = clamp(c.x - fwdOf(M, p) * 0.35, L.x0, L.x1), py = clamp(c.y, L.y0, L.y1);
       if (sp.kitchen && c.bn === 0 && Math.abs(px) < sp.kitchen + 0.2) continue;
       var dist = Math.sqrt((px - p.x) * (px - p.x) + (py - p.y) * (py - p.y));
       var need = dist / moveSpeed(M, p) + M.lv.react * 0.5;
@@ -1326,6 +1431,12 @@ var SB = (function () {
   // where a hit by this player with this shot would land right now (no randomness) — the aim guide
   function aimPreview(M, p, shot) {
     var sp = M.sp; if (sp.kind === 'puck') return null;
+    if (sp.squash) {   // 🧱 where the ball will hit the first wall in the aimed direction
+      var dq = squashDir(M, p), tt = 99;
+      if (dq.x > 0.01) tt = Math.min(tt, (sp.Lh - p.x) / dq.x); if (dq.x < -0.01) tt = Math.min(tt, (-sp.Lh - p.x) / dq.x);
+      if (dq.y > 0.01) tt = Math.min(tt, (sp.Wh - p.y) / dq.y); if (dq.y < -0.01) tt = Math.min(tt, (-sp.Wh - p.y) / dq.y);
+      return { x: p.x + dq.x * tt, y: p.y + dq.y * tt, wall: true };
+    }
     var S = SHOTS[shot || 'normal'] || SHOTS.normal, oside = 1 - p.side, d = dirOf(p.side), lw = courtW(M, oside), ll = courtL(M, oside), am = humanAim(M, p);
     var depth = clamp(S.depth * (1 + 0.3 * am.f), 0.2, 0.97);
     if (sp.twoBounce && shot === 'drop') depth = (sp.kitchen * 0.75) / ll;
@@ -1338,7 +1449,10 @@ var SB = (function () {
     var sp = M.sp, c = { x: b.x, y: b.y, z: b.z, vx: b.vx, vy: b.vy, vz: b.vz, top: b.top, side: b.side }, h = 1 / 60, t = 0;
     maxT = maxT || 3;
     while (t < maxT) {
-      c.vz -= G * (1 + 0.45 * c.top) * h; c.vy += c.side * SIDE_ACC * h; c.x += c.vx * h; c.y += c.vy * h; c.z += c.vz * h; t += h;
+      c.vz -= G * (1 + 0.45 * c.top) * h; c.vy += c.side * SIDE_ACC * h;
+      if (sp.drag) { var lv = Math.sqrt(c.vx * c.vx + c.vy * c.vy + c.vz * c.vz), lf = 1 / (1 + sp.drag * lv * h); c.vx *= lf; c.vy *= lf; c.vz *= lf; }
+      c.x += c.vx * h; c.y += c.vy * h; c.z += c.vz * h; t += h;
+      if (sp.squash && c.z < sp.wallH) { if (Math.abs(c.y) > sp.Wh) { c.y = sgn(c.y) * sp.Wh; c.vy *= -0.8; } if (Math.abs(c.x) > sp.Lh) { c.x = sgn(c.x) * sp.Lh; c.vx *= c.x > 0 ? -0.85 : -0.7; } }
       if (c.z <= 0 && c.vz < 0) return { x: c.x, y: c.y, t: t };
     }
     return null;
@@ -1365,7 +1479,7 @@ var SB = (function () {
     newMatch: newMatch, step: step, DT: DT, pressShot: pressShot, usePower: usePower, takeEvents: takeEvents, pointText: pointText,
     simulate: simulate, courtW: courtW, courtL: courtL, goalHalf: goalHalf, limits: limits, dirOf: dirOf, paddlePos: paddlePos,
     reachOf: reachOf, doServe: doServe, patchAt: patchAt, mkRng: mkRng, homeOf: homeOf, G: G,
-    humanAim: humanAim, aimPreview: aimPreview, landingOf: landingOf
+    humanAim: humanAim, aimPreview: aimPreview, landingOf: landingOf, fwdOf: fwdOf, flyShuttle: flyShuttle, squashDir: squashDir
   };
 })();
 // ENGINE END
@@ -1433,7 +1547,7 @@ function myAvatar(name){ const a = S.avatars[name]; return a ? fixAv(a) : defaul
 function racketOf(name){
   let d = null; try{ d = JSON.parse(ls('sp_racket:' + name) || 'null'); }catch(e){}
   if(!d){ try{ d = JSON.parse((S.settings || {})['Racket_' + name] || 'null'); }catch(e){} }
-  const sp = SB.SPORTS[SET.sport], fallback = sp.id === 'slashot' ? 3 : sp.id === 'slapong' ? 1 : sp.id === 'slapoof' ? 0 : 2;
+  const sp = SB.SPORTS[SET.sport], fallback = sp.id === 'slashot' ? 3 : sp.id === 'slapong' ? 1 : sp.id === 'slapoof' ? 0 : 2;   // 🏸 SlaBam / 🧱 SlaWall use a long racket (2)
   if(!d || !Number.isFinite(Number(d.v))) return racketDesign(fallback, {});
   const owned = ownedRackets(name); if(d.v >= owned && d.v > 3) d.v = fallback;   // the 4 basic sport rackets are free; the rest come from the 🏓 item line
   return racketDesign(d.v, d);
@@ -1475,8 +1589,8 @@ function renderMenu(){
   $('pow-list').innerHTML = SB.POWER_KEYS.map(k => { const P = SB.POWERS[k]; return '<div>' + P.icon + ' <b>' + P.name + '</b> <small>(' + TIER_NAME[P.tier] + ')</small><br>' + UI.esc(P.about) + '</div>'; }).join('');
 }
 // 🃏 mc-1 mode cards: what kind of game (type) + its rule (sub)
-const SPORT_TYPE = {slashot: 'A table hockey game', slapoof: 'A pickleball game', slaball: 'A tennis game', slapong: 'A ping-pong game', slawall: 'A padel game'};
-const SPORT_TAG = {slashot: 'Score goals · first to 5 or 7 wins', slapoof: 'Bounce once each side · no volleys in the 🥒 kitchen', slaball: 'One bounce · 15 · 30 · 40 · game', slapong: 'Every ball bounces once on the table', slawall: 'Tennis with glass walls — play the ball off the wall after it bounces'};
+const SPORT_TYPE = {slashot: 'A table hockey game', slapoof: 'A pickleball game', slaball: 'A tennis game', slapong: 'A ping-pong game', slabam: 'A badminton game', slawall: 'A squash game'};
+const SPORT_TAG = {slashot: 'Score goals · first to 5 or 7 wins', slapoof: 'Bounce once each side · no volleys in the 🥒 kitchen', slaball: 'One bounce · 15 · 30 · 40 · game', slapong: 'Every ball bounces once on the table', slabam: 'Fast hit, slow drop · never let it touch the floor', slawall: 'No net · hit ANY wall · one bounce, then their turn'};
 /* 🗂️ MODE GROUPS (mg-1) */
 const MODE_GROUPS = [
   {k: 'sports', icon: '🏓', en: 'Sports', th: 'กีฬา', c: '#2F7BEA'},
@@ -1505,7 +1619,7 @@ function openSetup(lvl){
   if(LEVEL_UI[lvl].hardcore) SET.mode = 'robot';
   $('setup-logo').textContent = sp.icon; $('setup-title').textContent = sp.name + ' · ' + L.name;
   $('setup-sub').textContent = sp.about + ' ' + targetText(sp, lvl);
-  buildModes(); buildSeats(); buildThemes(); buildBalls(); buildTrails();
+  buildModes(); buildSeats(); buildThemes(); buildBalls(); buildTrails(); buildFeathers();
   $('pw-chip').textContent = '⚡ Power-ups: ' + (SET.powers ? 'on' : 'off'); $('pw-chip').classList.toggle('on', SET.powers);
   $('pw-chip').onclick = () => { SET.powers = !SET.powers; savePrefs(); $('pw-chip').textContent = '⚡ Power-ups: ' + (SET.powers ? 'on' : 'off'); $('pw-chip').classList.toggle('on', SET.powers); };
   // 📷 sb2-1 view: Auto (behind for 1 person, top for 2+) → Behind → Top · 🎯 aim help (Basic → Intermediate)
@@ -1770,6 +1884,22 @@ function champLoop(){
   cupRaf = requestAnimationFrame(tick);
 }
 
+// 🪶 shuttle feathers (sb2-2): owned count from the server (Collection line "feather"), pick per person per device; the feather of whoever hit it last
+function ownedFeathers(name){ return Math.min(BallSkins.featherCount, Number((S.feathers || {})[name || S.player]) || 0); }
+function featherOf(name){ if(!name || name === 'Guest') return -1; const have = ownedFeathers(name), raw = ls('sp_feather:' + name); if(raw == null || raw === '') return have > 0 ? 0 : -1; const v = Number(raw); return Number.isFinite(v) && v >= 0 && v < have ? v : -1; }
+function featherFor(b){ const p = b && b.by != null && b.by >= 0 ? G.M.players[b.by] : G.M.players.find(q => q.human); return p && G.feathers ? G.feathers[p.i] : -1; }
+function buildFeathers(){
+  const box = $('feather-list'); if(!box) return; const have = ownedFeathers(), cur = featherOf(S.player); box.innerHTML = '';
+  for(let v = -1; v < BallSkins.featherCount; v++){
+    const b = document.createElement('button'), lock = v >= have; b.className = 'ballc trl' + (cur === v ? ' on' : '') + (lock ? ' lock' : ''); b.dataset.v = v; b.setAttribute('data-sound', lock ? 'none' : 'tap');
+    const c = document.createElement('canvas'); c.width = 128; c.height = 88; b.appendChild(c); b.insertAdjacentHTML('beforeend', (lock ? '🔒 ' : '') + (v < 0 ? 'Classic white' : UI.esc(BallSkins.FEATHERS[v])));
+    BallSkins.drawFeatherPreview(c.getContext('2d'), v, 128, 88, 1.2);
+    b.onclick = () => { if(lock){ UISound.play('error'); UI.toast('Win 🏸 SlaBam matches to unlock more feathers — see 📖 Collection'); return; } ls('sp_feather:' + S.player, String(v)); box.querySelectorAll('.ballc').forEach(x => x.classList.toggle('on', x === b)); };
+    box.appendChild(b);
+  }
+  const wrap = $('feather-wrap'); if(wrap) wrap.style.display = SET.sport === 'slabam' ? '' : 'none';
+}
+
 // ☄️ ball trails (round 2): owned count from the server (Collection line "balltrail"), pick per person per device
 function ownedTrails(name){ return Math.min(BallSkins.trailCount, Number((S.ballTrails || {})[name || S.player]) || 0); }
 function trailOf(name){ if(!name || name === 'Guest') return -1; const have = ownedTrails(name), raw = ls('sp_balltrail:' + name); if(raw == null || raw === '') return have > 0 ? 0 : -1; const v = Number(raw); return Number.isFinite(v) && v >= 0 && v < have ? v : -1; }
@@ -1866,7 +1996,7 @@ function startMatch(cfg){
   M.autoServe = 5;
   const humans = M.players.filter(p => p.human);
   humans.forEach(p => { const s = seats[p.i]; p.seat = cfg ? s.seat : SET.mode === 'robot' ? -1 : s.seat; });   // -1 = alone: every key set drives you
-  G = {M, sp, mode: cfg ? 'cup' : SET.mode, cup: cfg, level, theme, ball: SET.ball, trails: M.players.map(p => p.human ? trailOf(p.name) : -1), th: new Map(), t0: performance.now(), last: 0, acc: 0, paused: false, over: false, raf: 0,
+  G = {M, sp, mode: cfg ? 'cup' : SET.mode, cup: cfg, level, theme, ball: SET.ball, trails: M.players.map(p => p.human ? trailOf(p.name) : -1), feathers: M.players.map(p => p.human ? featherOf(p.name) : -1), th: new Map(), t0: performance.now(), last: 0, acc: 0, paused: false, over: false, raf: 0,
     held: new Set(), seats, fx: [], bounces: [], deco: makeDeco(SET.theme), lastServeHint: '', pointers: new Map(), startAt: performance.now(), anim: 0,
     view: viewFor(M), help: SET.help !== false, aimTold: false};
   $('hud-level').textContent = cfg ? '🏆 ' + cfg.round : sp.icon + ' ' + sp.name + ' · ' + LEVEL_UI[level].emoji + ' ' + SB.LEVELS[level].name;
@@ -1901,7 +2031,20 @@ function sideView(W0, H0, sp, box){   // ⚽ the old 2.5D side view — kept for
 function makeView(W0, H0, sp, box, mode, camSide){
   box = box || {l: 0, r: 0, t: 0, b: 0};
   if(mode === 'side') return sideView(W0, H0, sp, box);
+  if(mode === 'iso') return isoView(W0, H0, sp, box);
   return mode === 'behind' ? behindView(W0, H0, sp, box, camSide ? 1 : 0) : topView(W0, H0, sp, box);
+}
+// 🧱 sb2-2 isometric room: the front wall (x = +L) is the upper-right wall, the left side wall (y = +W) the upper-left one; nearer = lower on screen
+function isoView(W0, H0, sp, box){
+  const W = W0 - box.l - box.r, H = H0 - box.t - box.b, c = 0.866, k = 0.5, zk = 0.95, L = sp.Lh, Wd = sp.Wh, h = sp.wallH || 3;
+  const raw = (x, y, z) => [(x - y) * c, -(x + y) * k - (z || 0) * zk];
+  const pts = [[-L - 0.5, -Wd - 0.5, 0], [L + 0.4, -Wd - 0.5, 0], [-L - 0.5, Wd + 0.4, 0], [L, Wd, h + 0.3], [L, -Wd, h + 0.3], [-L, Wd, h + 0.3], [-L - 0.3, -Wd - 0.3, 2.4]].map(q => raw(q[0], q[1], q[2]));
+  const u0 = Math.min(...pts.map(q => q[0])), u1 = Math.max(...pts.map(q => q[0])), v0 = Math.min(...pts.map(q => q[1])), v1 = Math.max(...pts.map(q => q[1]));
+  const s = Math.min(W / (u1 - u0), H / (v1 - v0)) * 0.98, ox = box.l + W / 2 - (u0 + u1) / 2 * s, oy = box.t + H / 2 - (v0 + v1) / 2 * s;
+  const P = (x, y, z) => { const q = raw(x, y, z); return [ox + q[0] * s, oy + q[1] * s]; };
+  const inv = (px, py) => { const u = (px - ox) / (s * c), v = -(py - oy) / (s * k); return {x: (u + v) / 2, y: (v - u) / 2}; };
+  const k2w = (dx, dy) => { const a = dx / c, b = -dy / k, wx = (a + b) / 2, wy = (b - a) / 2, m = Math.hypot(wx, wy), n = Math.hypot(dx, dy); return m > 1e-6 ? {x: wx / m * n, y: wy / m * n} : {x: 0, y: 0}; };
+  return {mode: 'iso', W: W0, H: H0, s, portrait: H0 > W0 * 1.05, tilt: k, zk, P, inv, sc: () => s, depth: (x, y) => -(x + y), k2w};
 }
 function behindView(W0, H0, sp, box, cs){
   const W = W0 - box.l - box.r, H = H0 - box.t - box.b, L = sp.Lh, Wd = sp.Wh, puck = sp.kind === 'puck', tab = !!sp.table, sx = cs ? -1 : 1;
@@ -1913,16 +2056,18 @@ function behindView(W0, H0, sp, box, cs){
   const fit = c => { const pts = [[-L - mxN, -Wd - my, 0], [-L - mxN, Wd + my, 0], [L + mxF, -Wd - my, 0], [L + mxF, Wd + my, 0], [L + mxF, 0, hd], [-L, 0, hd]].map(q => c.raw(q[0] * sx, q[1], q[2]));
     const u0 = Math.min(...pts.map(q => q[0])), u1 = Math.max(...pts.map(q => q[0])), v0 = Math.min(...pts.map(q => q[1])), v1 = Math.max(...pts.map(q => q[1]));
     return {F: Math.min(W / (u1 - u0), H / (v1 - v0)), u0, u1, v0, v1}; };
-  const key = [W, H, L, Wd, tab, puck].map(v => typeof v === 'number' ? Math.round(v) : v).join('|');
+  const key = [W, H, L, Wd, tab, puck, sp.net || 0].map(v => typeof v === 'number' ? Math.round(v) : v).join('|');
   let best = CAM_CACHE.get(key);
   if(!best){
-    for(let chk = 0.3; chk <= 3.01; chk += 0.15) for(let dbk = 0; dbk <= 3.01; dbk += 0.15) for(const look of [0.7, 0.95, 1.2]){
+    // sb2-2: a tall net (🏸 1.55 m) must not hide the far half — its top stays below the middle of the far half on screen
+    for(const netK of [0.5, 0.25, -1]) { if(best) break; for(let chk = 0.3; chk <= 3.01; chk += 0.15) for(let dbk = 0; dbk <= 3.01; dbk += 0.15) for(const look of [0.7, 0.95, 1.2]){
       const c = cam(L * chk + base, L * dbk + 0.6, look), near = c.raw(-L * sx, 0, 0)[2], far = c.raw(L * sx, 0, 0)[2], ratio = near / far;
       if(ratio < 0.5 || ratio > 0.66) continue;
+      if(sp.net && !tab && netK >= 0 && c.raw(0, 0, sp.net)[1] < c.raw(L * netK * sx, 0, 0)[1]) continue;
       const f = fit(c), q = [[-L, -Wd], [L, -Wd], [L, Wd], [-L, Wd]].map(([x, y]) => c.raw(x * sx, y, 0)).map(p => [p[0] * f.F, p[1] * f.F]);
       let A = 0; for(let i = 0; i < 4; i++){ const a = q[i], b = q[(i + 1) % 4]; A += a[0] * b[1] - b[0] * a[1]; }
       if(!best || Math.abs(A) > best.A) best = {A: Math.abs(A), ch: c.ch, db: L * dbk + 0.6, look};
-    }
+    } }
     if(!best) best = {ch: L * 0.9 + base, db: L * 0.4 + 0.6, look: 1};
     CAM_CACHE.set(key, best);
   }
@@ -1949,6 +2094,7 @@ function topView(W0, H0, sp, box){
 // 📷 which view: Auto = behind for 1 person, top for 2+ people (and for robot-only matches); the setup chip can force one
 function viewFor(M){
   const hs = M.players.filter(p => p.human), want = SET.view || 'auto';
+  if(M.sp.squash && want !== 'top' && want !== 'behind') return {mode: 'iso', cs: 0};   // 🧱 sb2-2: the squash room in 2.5D, the same for everyone
   if(want === 'top' || (want === 'auto' && hs.length !== 1) || !hs.length) return {mode: 'top', cs: 0};
   return {mode: 'behind', cs: hs[0].side};
 }
@@ -2079,7 +2225,7 @@ function buildPads(){
 }
 
 /* ---------- events → sounds, words, fx ---------- */
-const WHY = {net: 'into the net', out: 'out!', own: 'on their own side', twice: 'bounced twice', past: 'got past', ace: 'ACE!', kitchen: 'kitchen volley!', wall: 'hit the glass first', serve: 'serve fault', goal: 'GOAL!', legend: 'LEGENDARY GOAL!', stuck: 'too long a rally', hardcore: ''};
+const WHY = {floor: 'it touched the floor', net: 'into the net', out: 'out!', own: 'on their own side', twice: 'bounced twice', past: 'got past', ace: 'ACE!', kitchen: 'kitchen volley!', wall: 'hit the glass first', serve: 'serve fault', goal: 'GOAL!', legend: 'LEGENDARY GOAL!', stuck: 'too long a rally', hardcore: ''};
 function handleEvents(list){
   const M = G.M;
   list.forEach(e => {
@@ -2147,11 +2293,12 @@ function drawScene(g, V, M, theme, t, opt){
   poly(g, [P(-ext, -wy), P(ext, -wy), P(ext, wy), P(-ext, wy)], T.ground);
   if(!opt.preview) decoAround(g, V, M, T, t);
   // court
-  if(sp.kind === 'puck') drawRink(g, V, M, T); else if(sp.table) drawTable(g, V, M, T); else drawCourt(g, V, M, T);
+  if(sp.kind === 'puck') drawRink(g, V, M, T); else if(sp.table) drawTable(g, V, M, T); else if(sp.squash) drawRoom(g, V, M, T); else drawCourt(g, V, M, T);
   // element patches
   M.patches.forEach(q => { const E = SB.ELEMENTS[q.el], c = P(q.x, q.y, 0); g.save(); g.globalAlpha = Math.min(0.7, q.t / 2); g.fillStyle = E.col; ell(g, V, q.x, q.y, q.r); g.fill(); g.globalAlpha = 1; drawEmo(g, E.icon, c[0] + Math.sin(t * 3 + q.x) * 4, c[1], V.sc(q.x, q.y, 0) * 0.9); g.restore(); });
   // bounce marks + splats
   M.fx.forEach(f => { const c = P(f.x, f.y, 0), k = V.sc(f.x, f.y, 0); if(f.k === 'bounce'){ g.strokeStyle = 'rgba(255,255,255,' + (0.6 * (1 - f.t / f.life)) + ')'; g.lineWidth = 2; ell(g, V, f.x, f.y, 0.2 + f.t); g.stroke(); }
+    if(f.k === 'wallhit'){ const w = P(f.x, f.y, f.z), a = 1 - f.t / f.life; g.save(); g.strokeStyle = 'rgba(255,255,255,' + a + ')'; g.lineWidth = 3; g.beginPath(); g.arc(w[0], w[1], 6 + f.t * 40, 0, 7); g.stroke(); g.restore(); }
     if(f.k === 'splat'){ g.fillStyle = 'rgba(80,200,255,' + (0.7 * (1 - f.t / f.life)) + ')'; for(let i = 0; i < 7; i++){ const a = i * 0.9; g.beginPath(); g.arc(c[0] + Math.cos(a) * k * (0.4 + f.t), c[1] + Math.sin(a) * k * 0.3 * (0.4 + f.t), k * 0.16, 0, 7); g.fill(); } } });
   // orb shadow
   if(M.orb){ const o = M.orb; g.fillStyle = 'rgba(0,0,0,0.25)'; ell(g, V, o.x, o.y, 0.5); g.fill(); }
@@ -2179,7 +2326,7 @@ function drawGuides(g, V, M, t, opt){
   if(!G || opt.preview || !G.help || G.level >= 3 || M.sp.kind === 'puck' || M.state !== 'play') return;
   const b = M.balls.find(x => x.live && x.real && x.held == null); if(!b) return;
   M.players.forEach(p => { if(!p.human || b.owner === p.side) return;
-    const land = SB.landingOf(M, b), mine = land && ((land.x < 0) === (p.side === 0));
+    const land = SB.landingOf(M, b), mine = land && (M.sp.squash || (land.x < 0) === (p.side === 0));
     if(mine){ const pulse = 0.5 + 0.5 * Math.sin(t * 7); g.save(); g.strokeStyle = 'rgba(255,255,255,' + (0.55 + 0.35 * pulse) + ')'; g.lineWidth = 2.5; g.setLineDash([6, 5]); ell(g, V, land.x, land.y, 0.45 + 0.08 * pulse); g.stroke(); g.setLineDash([]);
       g.fillStyle = 'rgba(255,255,255,0.18)'; ell(g, V, land.x, land.y, 0.22); g.fill(); g.restore(); }
     if(G.level <= 1){ const tg = SB.aimPreview(M, p, p.queued || 'normal'); if(!tg) return;
@@ -2217,6 +2364,20 @@ function drawCourt(g, V, M, T){
   [s0, s1].forEach((S, side) => { if(S.shrink > 0){ const l = SB.courtL(M, side), w = SB.courtW(M, side), d = side === 0 ? -1 : 1; poly(g, courtPts(V, 0, -w, d * l, w, 0), 'rgba(255,200,69,0.18)', '#FFC845', 3); } });
   if(sp.walls) drawGlass(g, V, M, T, false);
 }
+// 🧱 sb2-2 squash room: floor + lines, the far walls solid (red out-line on top, red tin at the front wall), the near walls are see-through glass (drawGlass)
+function drawRoom(g, V, M, T){
+  const sp = M.sp, L = sp.Lh, W = sp.Wh, h = sp.wallH, P = V.P;
+  poly(g, courtPts(V, -L - 0.6, -W - 0.6, L + 0.6, W + 0.6, 0), T.court2);
+  poly(g, courtPts(V, -L, -W, L, W, 0), T.court);
+  const ln = (a, b) => line(g, V.P(a[0], a[1], 0), V.P(b[0], b[1], 0), T.line, 2);
+  const short = -L * 0.1; ln([short, -W], [short, W]); ln([short, 0], [-L, 0]);
+  [[-1], [1]].forEach(([sd]) => { const bx = short - 1.6; ln([bx, sd * W], [bx, sd * (W - 1.6)]); ln([bx, sd * (W - 1.6)], [short, sd * (W - 1.6)]); });
+  const walls = [[[L, -W], [L, W]], [[-L, W], [L, W]], [[-L, -W], [-L, W]], [[-L, -W], [L, -W]]];
+  walls.forEach(([a, b]) => { const d = V.depth((a[0] + b[0]) / 2, (a[1] + b[1]) / 2); if(d > Math.min(L, W) * 0.3) return;   // the near walls come later as glass
+    poly(g, [P(a[0], a[1], 0), P(b[0], b[1], 0), P(b[0], b[1], h), P(a[0], a[1], h)], T.wall || 'rgba(235,240,248,0.92)', 'rgba(0,0,0,0.18)', 1.5);
+    line(g, P(a[0], a[1], h), P(b[0], b[1], h), '#E63946', 3);
+    if(a[0] === L && b[0] === L){ poly(g, [P(L, -W, 0), P(L, W, 0), P(L, W, 0.45), P(L, -W, 0.45)], 'rgba(230,57,70,0.75)'); line(g, P(L, -W, 1.8), P(L, W, 1.8), 'rgba(230,57,70,0.6)', 2); } });
+}
 function drawGlass(g, V, M, T, front){
   const sp = M.sp, L = sp.Lh, W = sp.Wh, h = sp.wallH, P = V.P;
   const walls = [[[-L, -W], [L, -W]], [[-L, W], [L, W]], [[-L, -W], [-L, W]], [[L, -W], [L, W]]];
@@ -2252,8 +2413,15 @@ function drawRink(g, V, M, T){
   // low boards
   poly(g, [P(-L, -W, 0), P(L, -W, 0), P(L, -W, 0.45), P(-L, -W, 0.45)], 'rgba(255,255,255,0.25)', 'rgba(255,255,255,0.6)', 1.5);
 }
-function drawSportBall(g, sp, x, y, r, t){
+function drawSportBall(g, sp, x, y, r, t, ang){
   g.save(); g.translate(x, y);
+  if(sp.kind === 'shuttle'){   // 🏸 cork in front, feather skirt trailing behind (ang = flight direction on screen)
+    g.rotate((ang == null ? -Math.PI / 2 : ang) + Math.PI);
+    g.fillStyle = 'rgba(255,255,255,0.95)'; g.strokeStyle = 'rgba(120,130,150,0.9)'; g.lineWidth = Math.max(1, r * 0.1);
+    g.beginPath(); g.moveTo(r * 0.3, -r * 0.55); g.lineTo(r * 2.5, -r * 1.15); g.lineTo(r * 2.5, r * 1.15); g.lineTo(r * 0.3, r * 0.55); g.closePath(); g.fill(); g.stroke();
+    for(let i = -2; i <= 2; i++){ g.beginPath(); g.moveTo(r * 0.4, i * r * 0.2); g.lineTo(r * 2.45, i * r * 0.5); g.stroke(); }
+    g.fillStyle = '#F4F4F4'; g.beginPath(); g.arc(0, 0, r * 0.7, 0, 7); g.fill(); g.fillStyle = '#E63946'; g.fillRect(r * 0.25, -r * 0.62, r * 0.18, r * 1.24);
+    g.restore(); return; }
   if(sp.kind === 'puck'){ g.fillStyle = '#111'; g.beginPath(); g.ellipse(0, r * 0.2, r, r * 0.55, 0, 0, 7); g.fill(); g.fillStyle = '#333'; g.beginPath(); g.ellipse(0, 0, r, r * 0.55, 0, 0, 7); g.fill(); g.strokeStyle = '#E63946'; g.lineWidth = r * 0.12; g.beginPath(); g.ellipse(0, 0, r * 0.6, r * 0.32, 0, 0, 7); g.stroke(); g.restore(); return; }
   const col = sp.id === 'slaball' || sp.id === 'slawall' ? ['#F2FF7A', '#C6E000'] : sp.id === 'slapoof' ? ['#FFF27A', '#F2C200'] : ['#FFFFFF', '#E0E0E0'];
   const f = g.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r); f.addColorStop(0, col[0]); f.addColorStop(1, col[1]); g.fillStyle = f; g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill();
@@ -2282,7 +2450,9 @@ function drawBall(g, V, M, b, t, opt){
     if(gold){ g.save(); g.shadowColor = '#FFC845'; g.shadowBlur = 22; g.fillStyle = 'rgba(255,200,69,0.6)'; g.beginPath(); g.arc(c[0], c[1], r * 1.6, 0, 7); g.fill(); g.restore(); }
     if(b.elem){ drawEmo(g, SB.ELEMENTS[b.elem].icon, c[0] + Math.cos(t * 8) * r * 1.6, c[1] + Math.sin(t * 8) * r * 1.6, r * 1.3); }
     const skin = G ? G.ball : -1;
-    if(skin >= 0 && sp.kind !== 'puck') BallSkins.draw(g, skin, c[0], c[1], r, t); else drawSportBall(g, sp, c[0], c[1], r, t);
+    let ang = null; if(sp.kind === 'shuttle'){ const sp2 = Math.hypot(b.vx, b.vy, b.vz); if(sp2 > 0.5){ const q = V.P(b.x + b.vx * 0.05, b.y + b.vy * 0.05, b.z + b.vz * 0.05); ang = Math.atan2(q[1] - c[1], q[0] - c[0]); } }
+    if(sp.kind === 'shuttle') BallSkins.shuttle(g, skin, G ? featherFor(b) : -1, c[0], c[1], r, t, ang);   // 🏸 your ball skin = the cork, your 🪶 feather behind
+    else if(skin >= 0 && sp.kind !== 'puck') BallSkins.draw(g, skin, c[0], c[1], r, t); else drawSportBall(g, sp, c[0], c[1], r, t, ang);
     if(skin >= 0 && sp.kind === 'puck'){ g.save(); g.globalAlpha = 0.9; BallSkins.draw(g, skin, c[0], c[1] - r * 0.1, r * 0.55, t); g.restore(); }
   } else { g.strokeStyle = 'rgba(255,255,255,0.18)'; g.setLineDash([3, 4]); g.beginPath(); g.arc(c[0], c[1], r, 0, 7); g.stroke(); g.setLineDash([]); }
 }
@@ -2297,6 +2467,8 @@ function drawPlayer(g, V, M, p, t){
   // ring in team colour + a mallet for SlaShot
   const ring = V.P(p.x, p.y, 0), col = p.side === 0 ? '#FF7A1A' : '#18B8A6';
   g.strokeStyle = col; g.lineWidth = 3; g.globalAlpha = 0.85; ell(g, V, p.x, p.y, 0.55); g.stroke(); g.globalAlpha = 1;
+  // 🧱 squash: whose turn — a pulsing gold ring + "Your turn!" over people
+  if(sp.squash && M.state === 'play'){ const bl = M.balls.find(b => b.live && b.real && b.held == null); if(bl && bl.owner >= 0 && bl.owner !== p.side){ const pu = 0.5 + 0.5 * Math.sin((G ? G.anim : 0) * 8); g.save(); g.strokeStyle = 'rgba(255,200,69,' + (0.6 + 0.4 * pu) + ')'; g.lineWidth = 4; ell(g, V, p.x, p.y, 0.8 + 0.1 * pu); g.stroke(); g.restore(); p._turn = true; } else p._turn = false; }
   if(p.big > 0){ const R = SB.reachOf(M, p); g.strokeStyle = 'rgba(255,200,69,0.8)'; g.setLineDash([5, 4]); ell(g, V, p.x, p.y, R); g.stroke(); g.setLineDash([]); }
   if(p.wallBuddy > 0){ const x = p.side === 0 ? -sp.Lh - 0.3 : sp.Lh + 0.3; poly(g, [V.P(x, -sp.Wh, 0), V.P(x, sp.Wh, 0), V.P(x, sp.Wh, 1.4), V.P(x, -sp.Wh, 1.4)], 'rgba(255,180,90,0.35)', '#FF9F1C', 2); }
   if(sp.kind === 'puck'){ const e = gEll(V, p.x, p.y, SB.reachOf(M, p)), m = [e[0], e[1]], R = e[2], ry = e[3] / e[2]; g.fillStyle = col; g.beginPath(); g.ellipse(m[0], m[1] + e[3] * 0.18, R, e[3], 0, 0, 7); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.ellipse(m[0], m[1], R * 0.82, e[3] * 0.82, 0, 0, 7); g.fill(); g.fillStyle = col; g.beginPath(); g.ellipse(m[0], m[1] - e[3] * 0.3, R * 0.38, e[3] * 0.38 + 2, 0, 0, 7); g.fill(); }
@@ -2310,10 +2482,11 @@ function drawPlayer(g, V, M, p, t){
   drawAvatar(g, {name: p.name, av: p.av, dir, walkT: walking ? t : 0, gest}, back[0], back[1], k, {t, pose: gest ? undefined : pose});
   // name tag + power
   // small name tag (sb2-1: never bigger than 13 px — the near player was a giant label in the old portrait view)
-  const tag = V.P(p.x, p.y, (sp.table ? 1.8 : 2.95)), fs = Math.round(Math.max(9, Math.min(13, ks * 0.3))); g.font = '800 ' + fs + 'px Nunito, sans-serif'; g.textAlign = 'center'; g.fillStyle = 'rgba(0,0,0,0.45)';
+  const tag = [back[0], back[1] - k * 92], fs = Math.round(Math.max(9, Math.min(13, ks * 0.3))); g.font = '800 ' + fs + 'px Nunito, sans-serif'; g.textAlign = 'center'; g.fillStyle = 'rgba(0,0,0,0.45)';
   const label = (p.robot ? '🤖 ' : '') + p.name; const w = g.measureText(label).width + 10; g.fillRect(tag[0] - w / 2, tag[1] - fs, w, fs * 1.35); g.fillStyle = '#fff'; g.fillText(label, tag[0], tag[1]);
   if(p.power){ drawEmo(g, SB.POWERS[p.power].icon, tag[0] + w / 2 + fs * 0.9, tag[1] - fs * 0.35, fs * 1.4); }
   if(p.mirror > 0) drawEmo(g, '🪞', tag[0] - w / 2 - fs * 0.9, tag[1] - fs * 0.35, fs * 1.3);
+  if(p._turn && p.human && sp.squash){ g.font = '900 ' + (fs + 1) + 'px Nunito, sans-serif'; g.fillStyle = '#FFC845'; g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 3; g.strokeText('Your turn!', tag[0], tag[1] - fs * 1.5); g.fillText('Your turn!', tag[0], tag[1] - fs * 1.5); }
 }
 function gestOf(k){ return GESTURES.find(x => x.k === k) || GESTURES[0]; }
 
@@ -2388,7 +2561,7 @@ function boot(){
   UI.loading('sla-brall');
   google.script.run.withSuccessHandler(d => {
       UI.loaded();
-      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {}; S.ballSkins = d.ballSkins || {}; S.racketsOwned = d.rackets || {}; S.ballTrails = d.ballTrails || {};
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {}; S.ballSkins = d.ballSkins || {}; S.racketsOwned = d.rackets || {}; S.ballTrails = d.ballTrails || {}; S.feathers = d.feathers || {};
       UISound.applySettings(S.settings);
       const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
       lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
@@ -2417,4 +2590,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b) END OF SlaBrall.html -->
+<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2) END OF SlaBrall.html -->

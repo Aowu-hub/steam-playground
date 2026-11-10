@@ -658,7 +658,8 @@ const MODES_ = [
   { game: 'sla-brall', id: 'slapoof', icon: '🥒', name: 'SlaPoof', pitch: 'Pickleball — mind the kitchen!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaPoof ·', feat: [['sla-brall', 'win_slapoof']] } },
   { game: 'sla-brall', id: 'slaball', icon: '🎾', name: 'SlaBall', pitch: 'Tennis: 15, 30, 40, game!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaBall ·', feat: [['sla-brall', 'win_slaball']] } },
   { game: 'sla-brall', id: 'slapong', icon: '🏓', name: 'SlaPong', pitch: 'Ping-pong on a table!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaPong ·', feat: [['sla-brall', 'win_slapong']] } },
-  { game: 'sla-brall', id: 'slawall', icon: '🧱', name: 'SlaWall', pitch: 'Padel — bounce off the walls!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaWall ·', feat: [['sla-brall', 'win_slawall']] } },
+  { game: 'sla-brall', id: 'slabam', icon: '🏸', name: 'SlaBam', pitch: 'Badminton — fast hit, slow drop!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaBam ·', feat: [['sla-brall', 'win_slabam']] }, added: '2026-11-10' },
+  { game: 'sla-brall', id: 'slawall', icon: '🧱', name: 'SlaWall', pitch: 'Squash room — bounce off ANY wall!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaWall ·', feat: [['sla-brall', 'win_slawall']] } },
   { game: 'sla-brall', id: 'cup', icon: '🏆', name: 'Tournament', pitch: 'Win the trophy in a cup!', route: 'slabrall', tried: { feat: [['sla-brall', 'cupMatches'], ['sla-brall', 'cups']] } },
   { game: 'turbo', id: 'ghost', icon: '👻', name: 'Ghost race', pitch: 'Race the family\'s best rides!', route: 'turbo', tried: null },
   { game: 'turbo', id: 'duo', icon: '👥', name: '2-player race', pitch: 'Race a friend, split screen!', route: 'turbo', tried: null },
@@ -690,7 +691,7 @@ const MODE_GROUPS_ = {
   'alignext': [{k: 'drop', icon: '🔴', en: 'Drop', th: 'หยอดเหรียญ', modes: ['drop']}, {k: 'omni', icon: '❌⭕', en: 'Omnifile', th: 'วางได้ทุกช่อง', modes: ['omni', 'stack']}],
   'beat-corner': [{k: 'songs', icon: '🎤', en: 'Songs', th: 'เพลง', modes: ['corner']}, {k: 'inst', icon: '🎹', en: 'Instruments', th: 'เครื่องดนตรี', modes: ['piano', 'drums']}, {k: 'together', icon: '🎸', en: 'Together', th: 'เล่นด้วยกัน', modes: ['band']}, {k: 'make', icon: '✏️', en: 'Make', th: 'แต่งเพลง', modes: ['maker']}],
   'eyes-brain': [{k: 'remember', icon: '🔢', en: 'Ways to remember', th: 'วิธีจำ', modes: ['classic', 'backwards', 'colour', 'letters', 'listen', 'word', 'shapes']}, {k: 'challenge', icon: '🏔️', en: 'Challenge', th: 'ท้าทาย', modes: ['challenge', 'daily']}, {k: 'party', icon: '👥', en: 'Party', th: 'เล่นกันหลายคน', modes: ['chain']}],
-  'sla-brall': [{k: 'sports', icon: '🏓', en: 'Sports', th: 'กีฬา', modes: ['slashot', 'slapoof', 'slaball', 'slapong', 'slawall']}, {k: 'cup', icon: '🏆', en: 'Cup', th: 'ทัวร์นาเมนต์', modes: ['cup']}],
+  'sla-brall': [{k: 'sports', icon: '🏓', en: 'Sports', th: 'กีฬา', modes: ['slashot', 'slapoof', 'slaball', 'slapong', 'slabam', 'slawall']}, {k: 'cup', icon: '🏆', en: 'Cup', th: 'ทัวร์นาเมนต์', modes: ['cup']}],
   'brawl-buddies': [{k: 'battle', icon: '🥊', en: 'Battle', th: 'ต่อสู้', modes: ['battle']}, {k: 'adv', icon: '🗺️', en: 'Brawenture', th: 'ผจญภัย', modes: ['brawenture']}],
   'georead': [{k: 'sounds', icon: '🔊', en: 'Sounds', th: 'เสียง', modes: ['phonics', 'rhyme', 'say']}, {k: 'words', icon: '🧱', en: 'Words', th: 'คำ', modes: ['build', 'sight', 'case', 'trace']}, {k: 'reading', icon: '📖', en: 'Reading', th: 'อ่าน', modes: ['story', 'types']}, {k: 'journey', icon: '🗺️', en: 'Journey', th: 'ผจญภัย', modes: ['journey']}],
   'pose-party': [{k: 'pose', icon: '🎯', en: 'Pose', th: 'ท่าโพส', modes: ['classic', 'speed', 'copy']}, {k: 'move', icon: '💃', en: 'Move', th: 'ขยับตัว', modes: ['dance', 'statue', 'freeze']}, {k: 'together', icon: '🧑‍🤝‍🧑', en: 'Together', th: 'เล่นด้วยกัน', modes: ['group', 'mirror', 'letters']}, {k: 'calm', icon: '🧘', en: 'Calm', th: 'ยืดเหยียด', modes: ['yoga']}]
@@ -1000,7 +1001,7 @@ const BUILT_IN_GAMES = [
   { GameID: 'beat-corner', GameName: 'BeatCorner', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Music / Rhythm',
     Status: 'Live', PageRoute: 'beatcorner', Icon: '🎵', Description: 'Hit the beats when they reach the corner buttons — 6 levels × 10 songs, holds, slides, pop-up buttons and spinning spirals; plus 🎹 Piano, 🥁 Drums and 🎸 Band' },
   { GameID: 'sla-brall', GameName: 'SlaBrall', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Sport / Physics (spin, bounce, angles)',
-    Status: 'Live', PageRoute: 'slabrall', Icon: '🏓', Description: '5 racket sports in one: SlaShot table hockey, SlaPoof pickleball, SlaBall tennis, SlaPong ping-pong, SlaWall padel — beat the robot, play 2 players or 2 vs 2, spin shots and 14 power-ups' },
+    Status: 'Live', PageRoute: 'slabrall', Icon: '🏓', Description: '6 racket sports in one: SlaShot table hockey, SlaPoof pickleball, SlaBall tennis, SlaPong ping-pong, SlaBam badminton, SlaWall squash — beat the robot, play 2 players or 2 vs 2, spin shots and 14 power-ups' },
   { GameID: 'pose-party', GameName: 'Pose Party', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Movement / Body awareness (angles, balance)',
     Status: 'Live', PageRoute: 'poseparty', Icon: '📷', Description: 'Copy the poses with your whole body — the camera checks how close you are! Classic levels, 60-second Speed and Copy Me' },
   { GameID: 'brawl-buddies', GameName: 'Brawl Buddies', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Reflex / Timing (high, low, combos)',
@@ -1302,7 +1303,7 @@ function getLevelGameData(gameId, player) {
   if (gameId === 'double-up') { const f = featRows_(); out.challenge = {}; players.forEach(p => { const tile = f.filter(r => r.name === p.Name && r.game === 'double-up' && r.stat === 'chTile').reduce((m, r) => Math.max(m, Number(r.value) || 0), 0), score = f.filter(r => r.name === p.Name && r.game === 'double-up' && r.stat === 'chScore').reduce((m, r) => Math.max(m, Number(r.value) || 0), 0); if (tile || score) out.challenge[p.Name] = { tile: tile, score: score }; }); }   // 🏔️ Challenge bests (feats)
   if (gameId === 'brawl-buddies') { out.progressAdv = {}; players.forEach(p => { out.progressAdv[p.Name] = levelProgressFor_(p.Name, 'brawenture'); }); }   // 🗺️ Brawenture board (tales cleared → next tale opens)
   if (gameId === 'brawl-buddies') { const all = activePlayers_(listProfilesFull()); out.gear = {}; all.forEach(p => { const o = itemsFor_(p.Name, all).owned; if (o.brawlgear > 0) out.gear[p.Name] = o.brawlgear - 1; }); }   // 🥊 best Brawl gear owned (step index), drawn in fights
-  if (gameId === 'pinball' || gameId === 'sla-brall') { const all = activePlayers_(listProfilesFull()); out.ballSkins = {}; out.rackets = {}; out.ballTrails = {}; all.forEach(p => { const o = itemsFor_(p.Name, all).owned; out.ballSkins[p.Name] = o.ballskin || 0; out.rackets[p.Name] = o.racket || 0; out.ballTrails[p.Name] = o.balltrail || 0; }); }   // ⚾ one ball-skin list for Pinball + SlaBrall; 🏓 rackets owned
+  if (gameId === 'pinball' || gameId === 'sla-brall') { const all = activePlayers_(listProfilesFull()); out.ballSkins = {}; out.rackets = {}; out.ballTrails = {}; out.feathers = {}; all.forEach(p => { const o = itemsFor_(p.Name, all).owned; out.ballSkins[p.Name] = o.ballskin || 0; out.rackets[p.Name] = o.racket || 0; out.ballTrails[p.Name] = o.balltrail || 0; out.feathers[p.Name] = o.feather || 0; }); }   // ⚾ one ball-skin list for Pinball + SlaBrall; 🏓 rackets owned
   return out;
 }
 // 👀🧠 Eyes Brain Riot (11k round 4): 🎯 daily family number — the same 8 digits for everyone today (made on the page from the date),
@@ -2347,6 +2348,7 @@ const FEAT_DEFS = {
     win_slaball: { name: 'SlaBall wins', icon: '🎾', kind: 'sum', hidden: true },
     win_slapong: { name: 'SlaPong wins', icon: '🏓', kind: 'sum', hidden: true },
     win_slawall: { name: 'SlaWall wins', icon: '🧱', kind: 'sum', hidden: true },
+    win_slabam: { name: 'SlaBam wins', icon: '🏸', kind: 'sum', hidden: true },
     cups: { name: 'Tournament Champion', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },   // 🏆 round 2: tournaments won
     cupMatches: { name: 'Tournament matches', icon: '🎟️', kind: 'sum', hidden: true },
   },
@@ -2932,6 +2934,9 @@ const ITEM_LINES = [
     ways: [W_.miles(15), W_.titles(2), W_.miles(65), W_.extreme(1), W_.days(13), W_.titles(4), W_.miles(120), W_.extreme(3), W_.miles(190), W_.hardcore(3)] },
   { id: 'trails', name: 'Trails', icon: '💫', slot: 'trail', game: 'any', steps: ['Sparkles', 'Bubbles', 'Hearts', 'Stars', 'Comet', 'Rainbow'],
     ways: [W_.time('maze', 40, 'a Maze level'), W_.score('stacking-sim', 1200, 'Stack It!'), W_.score('robot-adventure', 700, 'Code the Robot'), W_.score('checkers', 700, 'Checkers'), W_.score('chess', 700, 'Chess'), W_.score('pinball', 80000, 'Pinball')] },
+  // 🪶 SlaBam shuttle feathers (sb2-2): own n steps = feathers 0..n-1, painted by BallSkins.feather (the cork = the ball skin). Picked per device: sp_feather:<Name>.
+  { id: 'feather', name: 'Shuttle feathers', icon: '🪶', slot: 'feather', game: 'sla-brall', soon: 'Used in 🏸 SlaBam — your feather flies behind the cork (the cork is your ball skin)', steps: ['Goose white', 'Rainbow', 'Peacock', 'Phoenix', 'Ice crystal', 'Neon', 'Leaf', 'Candy stripe', 'Galaxy', 'Golden'],
+    ways: [W_.feat('sla-brall', 'win_slabam', 1, 'Win a SlaBam match'), W_.feat('sla-brall', 'win_slabam', 3, 'Win 3 SlaBam matches'), W_.feat('sla-brall', 'smash', 15, 'Hit 15 SlaBrall smashes'), W_.feat('sla-brall', 'win_slabam', 6, 'Win 6 SlaBam matches'), W_.feat('sla-brall', 'perfect', 30, 'Hit 30 PERFECT shots in SlaBrall'), W_.feat('sla-brall', 'win_slabam', 10, 'Win 10 SlaBam matches'), W_.feat('sla-brall', 'rally', 25, 'Keep a 25-hit SlaBrall rally'), W_.feat('sla-brall', 'win_slabam', 15, 'Win 15 SlaBam matches'), W_.feat('sla-brall', 'cups', 2, 'Win 2 SlaBrall tournaments'), W_.feat('sla-brall', 'win_slabam', 25, 'Win 25 SlaBam matches')] },
   // ☄️ SlaBrall ball trails (round 2): own n steps = trails 0..n-1, painted by BallSkins.trail. Picked per device: sp_balltrail:<Name>.
   { id: 'balltrail', name: 'Ball trails', icon: '☄️', slot: 'balltrail', game: 'sla-brall', soon: 'Used in 🏓 SlaBrall — your trail follows the ball after you hit it', steps: ['Sparkles', 'Bubbles', 'Hearts', 'Stars', 'Fire', 'Frost', 'Rainbow', 'Leaves', 'Lightning', 'Galaxy'],
     ways: [W_.feat('sla-brall', 'matches', 1, 'Play a SlaBrall match'), W_.feat('sla-brall', 'wins', 3, 'Win 3 SlaBrall matches'), W_.feat('sla-brall', 'cupMatches', 1, 'Play a SlaBrall tournament match'), W_.feat('sla-brall', 'perfect', 20, 'Hit 20 PERFECT shots in SlaBrall'), W_.feat('sla-brall', 'smash', 25, 'Hit 25 SlaBrall smashes'), W_.feat('sla-brall', 'aces', 10, 'Serve 10 aces in SlaBrall'), W_.feat('sla-brall', 'cups', 1, 'Win a SlaBrall tournament'), W_.feat('sla-brall', 'powers', 20, 'Use 20 SlaBrall powers'), W_.feat('sla-brall', 'rally', 30, 'Keep a 30-hit SlaBrall rally'), W_.feat('sla-brall', 'cups', 3, 'Win 3 SlaBrall tournaments')] },
@@ -4161,7 +4166,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
