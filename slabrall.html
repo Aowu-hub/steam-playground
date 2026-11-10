@@ -307,7 +307,7 @@
         <button class="chip" id="view-chip" data-sound="tap">📷 View: Auto</button>
         <button class="chip" id="help-chip" data-sound="tap">🎯 Aim help: on</button>
         <button class="chip" id="comic-chip" data-sound="tap" title="Comic moments: slow-mo panels, Sla… callouts and comic strips">💬 Comics: On</button>
-        <button class="chip" data-sound="pop" onclick="openRacket()">🎨 My racket</button>
+        <button class="chip" data-sound="pop" onclick="openRacket()">🏏 My Batstick</button>
         <button class="chip" data-sound="pop" onclick="openKeys()">⌨️ Keys</button>
       </div>
       <div class="note" style="margin:10px 0 4px">⚾ Ball skin (same list as 🎯 Pinball)</div>
@@ -363,22 +363,6 @@
   </div>
 </section>
 <div class="result hidden" id="result"><div class="result-card" id="result-card"></div></div>
-
-<div class="sheet hidden" id="racket-sheet"><div class="sheet-card">
-  <h2>🎨 My racket</h2>
-  <div class="rk-wrap">
-    <div class="rk-prev"><canvas id="rk-cv" width="360" height="420"></canvas><div class="note" id="rk-name"></div></div>
-    <div>
-      <div class="rk-row"><b>Type <span class="note" id="rk-type-note"></span></b><div class="chips" id="rk-type"></div></div>
-      <div class="rk-row"><b>Main colour</b><div class="sw-row" id="rk-c1"></div></div>
-      <div class="rk-row"><b>Second colour</b><div class="sw-row" id="rk-c2"></div></div>
-      <div class="rk-row"><b>Grip</b><div class="sw-row" id="rk-grip"></div></div>
-      <div class="rk-row"><b>Pattern</b><div class="chips" id="rk-pat"></div></div>
-      <div class="rk-row"><b>Sticker</b><div class="chips" id="rk-stk"></div></div>
-    </div>
-  </div>
-  <div class="go-row" style="margin-top:8px"><button class="btn soft" data-sound="none" onclick="resetRacket()">↺ Default</button><button class="btn soft" data-sound="none" onclick="closeRacket()">Close</button><button class="btn" id="rk-save" onclick="saveRacketDesign()">💾 Save my racket</button></div>
-</div></div>
 
 <div class="sheet hidden" id="keys-sheet"><div class="sheet-card">
   <h2>⌨️ Keys on this device</h2>
@@ -1592,7 +1576,7 @@ function racketOf(name){
   if(!d){ try{ d = JSON.parse((S.settings || {})['Racket_' + name] || 'null'); }catch(e){} }
   const sp = SB.SPORTS[SET.sport], fallback = sp.id === 'slashot' ? 3 : sp.id === 'slapong' ? 1 : sp.id === 'slapoof' ? 0 : 2;   // 🏸 SlaBam / 🧱 SlaWall use a long racket (2)
   if(!d || !Number.isFinite(Number(d.v))) return racketDesign(fallback, {});
-  const owned = ownedRackets(name); if(d.v >= owned && d.v > 3) d.v = fallback;   // the 4 basic sport rackets are free; the rest come from the 🏓 item line
+  if(!BatStick.owns(Number(d.v), ownedRackets(name), ownedBats(name))) d.v = fallback;   // the 4 basic sport rackets are free; the rest: 🏓 Rackets line (0–9) + 🏏 Batsticks line (10–17)
   return racketDesign(d.v, d);
 }
 function ownedRackets(name){ return Math.max(4, Number(((S.settings || {})._rackets || {})[name]) || Number((S.racketsOwned || {})[name]) || 0); }
@@ -1960,49 +1944,12 @@ function buildTrails(){
   }
 }
 
-/* ================= 🎨 RACKET DESIGNER (optional — players never have to open it) ================= */
-let RK = null;
+/* ================= 🏏 BATSTICK (bs-1) — your racket is your Batstick: the shared designer in AvatarKit (A shape · B sticker · C colours · D pattern) ================= */
+function ownedBats(name){ return Number((S.batsOwned || {})[name || S.player]) || 0; }
 function openRacket(){
-  RK = Object.assign({}, racketOf(S.player));
-  const owned = ownedRackets(S.player), mk = (id, list, key, swatch) => {
-    const box = $(id); box.innerHTML = '';
-    list.forEach((val, i) => { const b = document.createElement('button'); b.setAttribute('data-sound', 'tap');
-      if(swatch){ b.className = 'sw'; b.style.background = val; b.dataset.v = val; b.title = val; }
-      else { b.className = 'chip'; b.dataset.v = String(key === 'v' ? i : key === 'stk' ? val : i); b.textContent = key === 'v' ? (i < owned ? '' : '🔒 ') + val.n : key === 'pat' ? val : (val || '— none'); if(key === 'v' && i >= owned) b.classList.add('lock'); }
-      b.onclick = () => {
-        if(key === 'v' && i >= owned){ UISound.play('error'); UI.toast('🔒 Unlock it in the 🏓 Racket line — see 📖 Collection'); return; }
-        const v = key === 'v' || key === 'pat' ? Number(b.dataset.v) : b.dataset.v;
-        if(key === 'v'){ const T = RACKET_TYPES[v]; RK = Object.assign(RK, {v, c1: T.c1, c2: T.c2, grip: T.grip}); syncRacket(true); return; }
-        RK[key] = v; syncRacket(false); };
-      box.appendChild(b); });
-  };
-  mk('rk-type', RACKET_TYPES, 'v'); mk('rk-c1', RACKET_COLS, 'c1', true); mk('rk-c2', RACKET_COLS, 'c2', true); mk('rk-grip', RACKET_COLS.concat(['#3B2A1E', '#5A3A22']), 'grip', true);
-  mk('rk-pat', RACKET_PATTERNS, 'pat'); mk('rk-stk', RACKET_STICKERS, 'stk');
-  $('rk-type-note').textContent = '(' + owned + ' of ' + RACKET_TYPES.length + ' unlocked)';
-  $('racket-sheet').classList.remove('hidden'); syncRacket(false); rkAnim();
-}
-function syncRacket(colours){
-  const mark = (id, key) => $(id).querySelectorAll('[data-v]').forEach(b => b.classList.toggle('on', String(RK[key]) === b.dataset.v || (key === 'stk' && !RK.stk && b.dataset.v === '')));
-  mark('rk-type', 'v'); mark('rk-c1', 'c1'); mark('rk-c2', 'c2'); mark('rk-grip', 'grip'); mark('rk-pat', 'pat'); mark('rk-stk', 'stk');
-  $('rk-name').textContent = RACKET_TYPES[RK.v].n;
-}
-let rkRaf = 0;
-function rkAnim(){
-  cancelAnimationFrame(rkRaf); const c = $('rk-cv'), x = c.getContext('2d'), t0 = performance.now();
-  const tick = now => { if($('racket-sheet').classList.contains('hidden')) return; const t = (now - t0) / 1000, sw = Math.max(0, Math.sin(t * 2.2)) ;
-    x.clearRect(0, 0, c.width, c.height); const av = myAvatar(S.player); av.eq = Object.assign({}, av.eq || {}, {hand: {id: 'racket', v: RK.v, o: RK}});
-    drawAvatar(x, {name: S.player, av, dir: 1, walkT: 0}, c.width / 2 - 20, c.height - 26, c.height / 150, {t, pose: {armR: 0.4 + sw * 2.0, holdRot: -0.9 * sw}});
-    x.save(); x.translate(c.width - 70, 120); drawRacket(x, RK.v, RK, 2.4, t); x.restore();
-    rkRaf = requestAnimationFrame(tick); };
-  rkRaf = requestAnimationFrame(tick);
-}
-function resetRacket(){ const T = RACKET_TYPES[RK.v]; RK = racketDesign(RK.v, {}); syncRacket(true); }
-function closeRacket(){ $('racket-sheet').classList.add('hidden'); cancelAnimationFrame(rkRaf); }
-function saveRacketDesign(){
-  const d = racketDesign(RK.v, RK), btn = $('rk-save'); ls('sp_racket:' + S.player, JSON.stringify(d));
-  UI.busy(btn, 'sla-brall', 'Saving');
-  google.script.run.withSuccessHandler(() => { UI.idle(btn); S.settings['Racket_' + S.player] = JSON.stringify(d); UI.toast('🎨 Racket saved!', 'ok'); closeRacket(); buildSeats(); })
-    .withFailureHandler(() => { UI.idle(btn); UI.toast('Saved on this device — will sync next time', 'err'); closeRacket(); buildSeats(); }).saveRacket(S.player, d);
+  BatStick.open({name: S.player, design: racketOf(S.player), ownedRacket: ownedRackets(S.player), ownedBat: ownedBats(S.player), av: myAvatar(S.player), title: 'My Batstick',
+    onSave: d => { S.settings['Racket_' + S.player] = JSON.stringify(d); buildSeats();
+      google.script.run.withSuccessHandler(() => UI.toast('🏏 Batstick saved!', 'ok')).withFailureHandler(() => UI.toast('Saved on this device — will sync next time', 'err')).saveBatstick(S.player, d); }});
 }
 
 /* ================= ⌨️ KEYS (per seat, per device) ================= */
@@ -2680,7 +2627,7 @@ function boot(){
   UI.loading('sla-brall');
   google.script.run.withSuccessHandler(d => {
       UI.loaded();
-      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {}; S.ballSkins = d.ballSkins || {}; S.racketsOwned = d.rackets || {}; S.ballTrails = d.ballTrails || {}; S.feathers = d.feathers || {};
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {}; S.ballSkins = d.ballSkins || {}; S.racketsOwned = d.rackets || {}; S.batsOwned = d.bats || {}; S.ballTrails = d.ballTrails || {}; S.feathers = d.feathers || {};
       UISound.applySettings(S.settings);
       const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
       lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
@@ -2709,4 +2656,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1) END OF SlaBrall.html -->
+<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1) END OF SlaBrall.html -->

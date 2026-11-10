@@ -1302,8 +1302,9 @@ function getLevelGameData(gameId, player) {
   if (gameId === 'georead') { const st = out.settings; out.journey = {}; players.forEach(p => { try { out.journey[p.Name] = JSON.parse(st['GeoJourney_' + p.Name] || '{}') || {}; } catch (e) { out.journey[p.Name] = {}; } }); }   // 🗺️ Alphabet Road progress
   if (gameId === 'double-up') { const f = featRows_(); out.challenge = {}; players.forEach(p => { const tile = f.filter(r => r.name === p.Name && r.game === 'double-up' && r.stat === 'chTile').reduce((m, r) => Math.max(m, Number(r.value) || 0), 0), score = f.filter(r => r.name === p.Name && r.game === 'double-up' && r.stat === 'chScore').reduce((m, r) => Math.max(m, Number(r.value) || 0), 0); if (tile || score) out.challenge[p.Name] = { tile: tile, score: score }; }); }   // 🏔️ Challenge bests (feats)
   if (gameId === 'brawl-buddies') { out.progressAdv = {}; players.forEach(p => { out.progressAdv[p.Name] = levelProgressFor_(p.Name, 'brawenture'); }); }   // 🗺️ Brawenture board (tales cleared → next tale opens)
+  if (gameId === 'brawl-buddies') { out.batDesigns = {}; players.forEach(p => { try { const d = JSON.parse(out.settings['Racket_' + p.Name] || 'null'); if (d) out.batDesigns[p.Name] = d; } catch (e) {} }); }   // 🏏 bs-1 a melee pickup = YOUR Batstick
   if (gameId === 'brawl-buddies') { const all = activePlayers_(listProfilesFull()); out.gear = {}; all.forEach(p => { const o = itemsFor_(p.Name, all).owned; if (o.brawlgear > 0) out.gear[p.Name] = o.brawlgear - 1; }); }   // 🥊 best Brawl gear owned (step index), drawn in fights
-  if (gameId === 'pinball' || gameId === 'sla-brall') { const all = activePlayers_(listProfilesFull()); out.ballSkins = {}; out.rackets = {}; out.ballTrails = {}; out.feathers = {}; all.forEach(p => { const o = itemsFor_(p.Name, all).owned; out.ballSkins[p.Name] = o.ballskin || 0; out.rackets[p.Name] = o.racket || 0; out.ballTrails[p.Name] = o.balltrail || 0; out.feathers[p.Name] = o.feather || 0; }); }   // ⚾ one ball-skin list for Pinball + SlaBrall; 🏓 rackets owned
+  if (gameId === 'pinball' || gameId === 'sla-brall') { const all = activePlayers_(listProfilesFull()); out.ballSkins = {}; out.rackets = {}; out.ballTrails = {}; out.feathers = {}; all.forEach(p => { const o = itemsFor_(p.Name, all).owned; out.ballSkins[p.Name] = o.ballskin || 0; out.rackets[p.Name] = o.racket || 0; out.bats = out.bats || {}; out.bats[p.Name] = o.batstick || 0; out.ballTrails[p.Name] = o.balltrail || 0; out.feathers[p.Name] = o.feather || 0; }); }   // ⚾ one ball-skin list for Pinball + SlaBrall; 🏓 rackets owned
   return out;
 }
 // 👀🧠 Eyes Brain Riot (11k round 4): 🎯 daily family number — the same 8 digits for everyone today (made on the page from the date),
@@ -2945,6 +2946,9 @@ const ITEM_LINES = [
     ways: [W_.feat('sla-brall', 'wins', 5, 'Win 5 SlaBrall matches'), W_.days(7), W_.titles(1), W_.extreme(1), W_.badges(12), W_.miles(120), W_.feat('sla-brall', 'smash', 50, 'Hit 50 SlaBrall smashes'), W_.hardcore(1)] },
   { id: 'joyskin3', name: 'Legend joysticks', icon: '👑', slot: 'joy', game: 'any', soon: 'Your 🕹️ joystick + buttons in every game with a stick — wear it in 🎒 Wardrobe', steps: ['Ice', 'Gem', 'Rainbow', 'Galaxy', 'Dragon eye', 'Golden crown', 'Neon pulse', 'Phoenix'],
     ways: [W_.days(14), W_.miles(200), W_.badges(20), W_.titles(3), W_.extreme(3), W_.feat('sla-brall', 'cups', 1, 'Win a SlaBrall tournament'), W_.hardcore(3), W_.days(30)] },
+  // 🏏 bs-1 Batsticks (Batstickskin shapes 11–18 after the 10 rackets): design them in 🏏 My Batstick (shape · sticker · colours · pattern) — used as your SlaBrall racket, your Brawl melee pickup and in your hand.
+  { id: 'batstick', name: 'Batsticks', icon: '🏏', slot: 'hand', game: 'any', soon: 'Your 🏏 Batstick in every game you swing in — design it in 🎒 Wardrobe or SlaBrall', steps: ['Baseball bat', 'Cricket bat', 'Foam bat', 'Lollipop bat', 'Candy cane', 'Glow stick', 'Bamboo stick', 'Dino bone club'],
+    ways: [W_.feat('sla-brall', 'matches', 2, 'Play 2 SlaBrall matches'), W_.days(2), W_.feat('sla-brall', 'smash', 15, 'Hit 15 SlaBrall smashes'), W_.total(5), W_.feat('sla-brall', 'wins', 3, 'Win 3 SlaBrall matches'), W_.badges(6), W_.miles(80), W_.feat('sla-brall', 'perfect', 40, 'Hit 40 PERFECT shots in SlaBrall')] },
   // ☄️ SlaBrall ball trails (round 2): own n steps = trails 0..n-1, painted by BallSkins.trail. Picked per device: sp_balltrail:<Name>.
   { id: 'balltrail', name: 'Ball trails', icon: '☄️', slot: 'balltrail', game: 'sla-brall', soon: 'Used in 🏓 SlaBrall — your trail follows the ball after you hit it', steps: ['Sparkles', 'Bubbles', 'Hearts', 'Stars', 'Fire', 'Frost', 'Rainbow', 'Leaves', 'Lightning', 'Galaxy'],
     ways: [W_.feat('sla-brall', 'matches', 1, 'Play a SlaBrall match'), W_.feat('sla-brall', 'wins', 3, 'Win 3 SlaBrall matches'), W_.feat('sla-brall', 'cupMatches', 1, 'Play a SlaBrall tournament match'), W_.feat('sla-brall', 'perfect', 20, 'Hit 20 PERFECT shots in SlaBrall'), W_.feat('sla-brall', 'smash', 25, 'Hit 25 SlaBrall smashes'), W_.feat('sla-brall', 'aces', 10, 'Serve 10 aces in SlaBrall'), W_.feat('sla-brall', 'cups', 1, 'Win a SlaBrall tournament'), W_.feat('sla-brall', 'powers', 20, 'Use 20 SlaBrall powers'), W_.feat('sla-brall', 'rally', 30, 'Keep a 30-hit SlaBrall rally'), W_.feat('sla-brall', 'cups', 3, 'Win 3 SlaBrall tournaments')] },
@@ -4180,10 +4184,12 @@ function saveGeoJourney(name, ch, stars, stats) {
 function saveRacket(name, d) {
   if (!name || !d) return { ok: false };
   const hex = c => (typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c)) ? c : '';
-  const clean = { v: Math.max(0, Math.min(9, Math.floor(Number(d.v)) || 0)), c1: hex(d.c1), c2: hex(d.c2), grip: hex(d.grip), pat: Math.max(0, Math.min(5, Math.floor(Number(d.pat)) || 0)), stk: String(d.stk || '').slice(0, 4) };
+  const clean = { v: Math.max(0, Math.min(17, Math.floor(Number(d.v)) || 0)), c1: hex(d.c1), c2: hex(d.c2), grip: hex(d.grip), pat: Math.max(0, Math.min(9, Math.floor(Number(d.pat)) || 0)), stk: String(d.stk || '').slice(0, 4) };   // 🏏 bs-1: 18 shapes · 10 patterns
   saveSetting('Racket_' + name, JSON.stringify(clean));
   return { ok: true, design: clean };
 }
+// 🏏 bs-1 Batstickskin: the same design, any game (SlaBrall racket · Brawl melee pickups · the Room Wardrobe designer)
+function saveBatstick(name, d) { return saveRacket(name, d); }
 function saveWordJournal(name, words) {
   if (!name || !Array.isArray(words) || !words.length) return { ok: false };
   const key = 'Words_' + name; let list = []; try { list = JSON.parse(getSettings()[key] || '[]') || []; } catch (e) { list = []; }
@@ -4194,7 +4200,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -5429,6 +5435,7 @@ return {"include": typeof include === 'function' ? include : undefined,
 "saveSnaketale": typeof saveSnaketale === 'function' ? saveSnaketale : undefined,
 "saveGeoJourney": typeof saveGeoJourney === 'function' ? saveGeoJourney : undefined,
 "saveRacket": typeof saveRacket === 'function' ? saveRacket : undefined,
+"saveBatstick": typeof saveBatstick === 'function' ? saveBatstick : undefined,
 "saveWordJournal": typeof saveWordJournal === 'function' ? saveWordJournal : undefined,
 "startPoseSession": typeof startPoseSession === 'function' ? startPoseSession : undefined,
 "doPost": typeof doPost === 'function' ? doPost : undefined,
