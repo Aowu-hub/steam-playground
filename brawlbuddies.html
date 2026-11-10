@@ -305,7 +305,8 @@
   .aclash .cdmg{font:700 1rem 'Fredoka',sans-serif;margin-top:4px;color:#FFE08A;} .aclash .cres{font:700 1.1rem 'Fredoka',sans-serif;margin:8px 0 2px;}
   .ahint{position:absolute;left:50%;top:14%;transform:translateX(-50%);z-index:14;background:#FFF8D6;color:#4A3B00;border:2px solid #FFC845;border-radius:16px;padding:6px 14px;font-weight:800;font-size:0.85rem;max-width:min(90%,560px);text-align:center;box-shadow:0 6px 18px rgba(0,0,0,0.25);pointer-events:none;animation:hintin .3s;}
   @keyframes hintin{from{opacity:0;transform:translate(-50%,8px);}}
-  @media (max-width:560px){ .hchip{flex-basis:160px;padding-right:6px;} .hchip .hpn{display:none;} .hav{width:32px;height:32px;} .hav canvas{width:26px !important;height:26px !important;} .hav .dring{width:32px;height:32px;} .ck{min-width:30px;height:36px;font-size:0.95rem;} }</style>
+  @media (max-width:560px){ .hchip{flex-basis:160px;padding-right:6px;} .hchip .hpn{display:none;} .hav{width:32px;height:32px;} .hav canvas{width:26px !important;height:26px !important;} .hav .dring{width:32px;height:32px;} .ck{min-width:30px;height:36px;font-size:0.95rem;} }  .comics-slot:empty,.comic-strip-slot:empty{display:none;} .comics-slot{display:flex;justify-content:center;margin:8px 0;} .comic-strip-slot{margin:8px auto;max-width:100%;}   /* 💥 ck-room */
+</style>
 <script src="inc/UiKit.js"></script>
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
@@ -324,6 +325,7 @@
   <div class="modes" id="mode-list"></div>   <!-- 🗂️ mg-1: 🥊 Battle · 🗺️ Brawenture -->
   <div class="section-head">Pick a level — 🤖 a random family member in a robot helmet; the helmet evolves and gets tougher</div>
   <div class="levels" id="level-list"></div>
+  <div class="comics-slot" id="comics-slot-menu"></div>   <!-- 💥 room for the 💬 Comics On / Off chip (Comics chat) -->
   <details class="rules" id="how"><summary>📖 How to play</summary>
     <ul>
       <li>Bonk your buddy until their ❤️ bar is empty — <b>Bonked out!</b> No real hurting, just cartoon stars. ⭐</li>
@@ -373,6 +375,7 @@
     <div class="box"><h3>📖 Tales</h3><div class="tales" id="tale-list"></div></div>
     <div class="box"><h3>🎚️ Difficulty</h3><div class="chips" id="diff-row"></div><div class="note" id="diff-note" style="margin-top:6px"></div></div>
     <div class="box"><h3>🦸 Heroes</h3><div class="hero-seats" id="hero-seats"></div><div class="note" id="hero-note" style="margin-top:8px"></div></div>
+    <div class="comics-slot" id="comics-slot-adv"></div>   <!-- 💥 room for the 💬 Comics On / Off chip (Comics chat) -->
     <div class="go-row"><button class="btn soft" onclick="showScreen('menu')">◀ Back</button><button class="btn" id="adv-go" data-sound="pop" onclick="advGo()">🗺️ Start the tale!</button></div>
   </div>
 </section>
@@ -2274,6 +2277,7 @@ function startMatch(){
   M.sq.forEach(tm => tm.forEach((f, j) => { const robo = !f.human && ROBO_NAMES.indexOf(f.name) >= 0; f.robo = robo; const raw = f.human ? myAvatar(f.name === 'Guest' ? 'Guest' : f.name) : robo ? robotAvatar(SET.level) : helmetReady(myAvatar(f.name)); f.avW = raw; f.avF = fightAv(raw);
     const worn = raw.eq && raw.eq.hand && raw.eq.hand.id === 'brawlgear' ? raw.eq.hand.v : null; f.gear = !f.human ? null : worn != null ? worn : S.gear[f.name] != null ? S.gear[f.name] : null; }));   // 🥊 Brawl gear: worn step, else best owned
   const raw = [myAvatar(S.player), duo ? myAvatar(p2 === 'Guest' ? 'Guest' : p2) : M.sq[1][0].avW];
+  GameComic._reset('brawl');   // 💥 ck-room: fresh log per match
   G = {M, mode: SET.mode, level: SET.level, theme: SET.theme, held: new Set(), tbHold: {}, tbBlk: {}, fx: [], raf: 0, last: 0, acc: 0, paused: false, over: false, endT: 0, shown: false,
     avs: raw.map(fightAv), winAvs: raw, cam: {cx: 0, w: 9}, shake: 0, hitstop: 0, t: 0, startAt: performance.now(), pads: [null, null], dance: null, hpShow: [1, 1]};
   M.sq.forEach((tm, i) => tm.forEach(p => { p.seatKeys = duo ? [KEYS[i]] : (i === 0 ? [KEYS[0], KEYS[1]] : []); }));
@@ -2318,7 +2322,7 @@ function ctlEl(pi, parts){
   d.innerHTML = parts.split('+').map(x => x === 'pad' ? pad : btn).join('');
   d.querySelectorAll('.tpad').forEach(el => bindPad(el, pi));
   d.querySelectorAll('.tb').forEach(b => {
-    b.addEventListener('pointerdown', e => { e.preventDefault(); if(!G || G.paused || G.over) return; b.classList.add('down'); setTimeout(() => b.classList.remove('down'), 140);
+    b.addEventListener('pointerdown', e => { e.preventDefault(); if(!G || G.paused || G.over || G.hold) return; b.classList.add('down'); setTimeout(() => b.classList.remove('down'), 140);
       if(navigator.vibrate) try{ navigator.vibrate(8); }catch(err){}
       if(b.dataset.a === 'bonk'){ G.tbHold[pi] = true; try{ b.setPointerCapture(e.pointerId); }catch(err){} }   // 🔨 hold Bonk = charge a guard breaker
       if(b.dataset.a === 'block'){ G.tbBlk[pi] = true; try{ b.setPointerCapture(e.pointerId); }catch(err){} return; }   // 🛡️ hold = block
@@ -2356,7 +2360,7 @@ window.addEventListener('resize', () => { if(G && !$('scr-play').classList.conta
 function frame(now){
   if(!G) return;
   const dt = Math.min(0.05, Math.max(0, (now - G.last) / 1000)); G.last = now;
-  if(!G.paused){
+  if(!G.paused && !G.hold){
     if(!G.M.done){
       readInputs();
       if(G.hitstop > 0) G.hitstop -= dt;
@@ -2385,7 +2389,7 @@ document.addEventListener('keydown', e => {
   if(e.code === 'Escape'){ togglePause(); return; }
   if(e.repeat) return;
   G.held.add(e.code);
-  if(G.paused || G.M.done) return;
+  if(G.paused || G.hold || G.M.done) return;
   G.M.f.forEach(p => { if(!p.human) return; p.seatKeys.forEach(K => { ['jump', 'boop', 'bonk', 'power', 'dodge'].forEach(a => { if(K[a] === e.code) BB.press(G.M, p.i, a); }); }); });
 });
 document.addEventListener('keyup', e => { if(G) G.held.delete(e.code); if(HELD_TEST.has(e.code)){ HELD_TEST.delete(e.code); renderHeld(); } });
@@ -2408,6 +2412,7 @@ function boing(freq, len, type, vol){
     g.gain.setValueAtTime(vol || 0.18, t); g.gain.exponentialRampToValueAtTime(0.001, t + len); o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + len + 0.02); }catch(e){}
 }
 function handleEvents(list){
+  GameComic._feed('brawl', list);   // 💥 ck-room: log + listeners
   const M = G.M, T = THEMES[G.theme];
   list.forEach(e => {
     if(e.k === 'hit'){
@@ -2884,7 +2889,7 @@ function finishMatch(){
     (vsRobot && myWin ? '<div class="rating">' + [1, 2, 3].map(i => '<span class="st' + (i <= stars ? '' : ' off') + '" style="animation-delay:' + (i * 0.15) + 's">⭐</span>').join('') + '</div>' : '') +
     '<div class="stats"><span>🏆 ' + score.toLocaleString() + '</span><span>👊 ' + me.hits + ' bonks</span><span>🔥 best combo ' + me.bestCombo + '</span><span>🌟 ' + me.juggle + ' bounces</span><span>🚀 ' + me.uppers + ' uppercuts</span><span>🛡️ ' + me.blocks + ' blocks</span><span>⏱ ' + fmtS(secs) + '</span></div>' +
     (!vsRobot ? '<div class="stats"><span>' + UI.esc(M.f[1].name) + ': 👊 ' + st[1].hits + ' · 🔥 ' + st[1].bestCombo + ' · 🌟 ' + st[1].juggle + '</span></div>' : '') +
-    tip + '<div class="save-note" id="save-note">' + (humans.some(p => p.name !== 'Guest') ? '💾 Saving…' : '') + '</div>' +
+    tip + '<div class="comic-strip-slot" id="comic-strip-slot"></div>' + '<div class="save-note" id="save-note">' + (humans.some(p => p.name !== 'Guest') ? '💾 Saving…' : '') + '</div>' +
     '<div class="res-btns"><button class="btn" data-sound="pop" onclick="startMatch()">🔁 Again</button><button class="btn soft" data-sound="none" onclick="backToMenu()">◀ Back</button><button class="btn soft" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button></div>');
   NOTES.length = 0;
   humans.forEach((p, seat) => {
@@ -2944,6 +2949,25 @@ function boot(){
     .getLevelGameData(GAME_ID, CURRENT_PLAYER);
 }
 boot();
+
+/* 💥 ck-room — ROOM FOR COMICS (the 💥 Comics chat wires ComicKit here; this game draws no comics itself)
+   GameComic.mode()            → 'brawl' | 'adv' | ''  (which loop is live)
+   GameComic.hold(on)          → quietly freeze / unfreeze the live loop (no pause card; key presses ignored while held; drawing goes on)
+   GameComic.listen(fn)        → fn(mode, event, state) for every engine event (Brawl: BB.takeEvents · Brawenture: BV.takeEvents); returns an unlisten fn
+   GameComic.log()             → this match / tale's events [{t, k, …event}] (last 600) — strips come from what really happened
+   GameComic.area()            → the play-area element (#stage / #adv-stage) · slots: #comics-slot-menu, #comics-slot-adv (setup), #comic-strip-slot (result card) */
+const GameComic = {
+  _fns: [], _log: [], _mode: '',
+  mode(){ return typeof AV !== 'undefined' && AV && !AV.over ? 'adv' : (typeof G !== 'undefined' && G && !G.over ? 'brawl' : ''); },
+  hold(on){ const m = this.mode(); if(m === 'adv'){ AV.hold = !!on; if(!on) AV.last = performance.now(); return true; } if(m === 'brawl'){ G.hold = !!on; if(!on) G.last = performance.now(); return true; } return false; },
+  listen(fn){ this._fns.push(fn); return () => { this._fns = this._fns.filter(f => f !== fn); }; },
+  log(){ return this._log.slice(); },
+  area(){ return this.mode() === 'adv' ? $('adv-stage') : $('stage'); },
+  _reset(mode){ this._log = []; this._mode = mode; },
+  _feed(mode, list){ if(!list || !list.length) return; const st = mode === 'adv' ? (AV && AV.M) : (G && G.M), t = st ? Math.round((st.t || 0) * 100) / 100 : 0;
+    list.forEach(e => { this._log.push(Object.assign({t, mode}, e)); this._fns.forEach(f => { try{ f(mode, e, st); }catch(err){} }); }); if(this._log.length > 600) this._log.splice(0, this._log.length - 600); }
+};
+window.GameComic = GameComic;
 
 /* ================= 🗺️ BRAWENTURE — adventure mode (engine BV above; draws with the Brawl Buddies fighter painter) ================= */
 let ADV = {tale: 0, diff: 'normal', seat2: 'bot', p2: '', seat3: 'off', p3: '', seat4: 'off', p4: '', macro: true}, AV = null;
@@ -3024,6 +3048,7 @@ function startAdv(heroes, captive, opts){
   const M = BV.newRun(Object.assign({tale: ADV.tale, diff: ADV.diff, seed: (Date.now() & 0xffffff) ^ 0x51, heroes, captive, view: advViewW()}, opts || {}));
   M.heroes.forEach((h, k) => advHeroAv(h, k));
   const capAv = myAvatar(captive || 'Buddy'), prisAv = M.prisoner ? fightAv(myAvatar(M.prisoner)) : null;
+  GameComic._reset('adv');   // 💥 ck-room: fresh log per tale
   AV = {M, t: 0, acc: 0, last: 0, raf: 0, paused: true, held: new Set(), pads: [null, null], gp: {}, tbBlk: {}, tbG: {}, hint: {t: 0, lvl: 0, k: ''}, ghost: {}, fx: [], vis: {}, foeAvs: {}, capAv: fightAv(capAv), prisAv, capName: captive, shake: 0, over: false, story: true, trans: 0, faceKey: '', startAt: performance.now()};
   window.NO_FEEDBACK_BUTTON = true; showScreen('advplay'); layoutAdv(); M.view = advViewW(); M.cam = M.view / 2; M.heroes.forEach(h => { h.tap = h.human && AV.touch; }); advHudBuild();
   advStory();
@@ -3077,7 +3102,7 @@ function advCtl(pi, side, both, only){
   d.innerHTML = only === 'pad' ? pad : only === 'btn' ? btn : (side === 'l' ? pad + btn : btn + pad);
   d.querySelectorAll('.tpad').forEach(el => advBindPad(el, pi));
   d.querySelectorAll('.tb').forEach(b => { const a = b.dataset.a;
-    b.addEventListener('pointerdown', e => { e.preventDefault(); if(!AV || AV.paused || AV.over) return; b.classList.add('down'); setTimeout(() => b.classList.remove('down'), 140); if(navigator.vibrate) try{ navigator.vibrate(8); }catch(err){}
+    b.addEventListener('pointerdown', e => { e.preventDefault(); if(!AV || AV.paused || AV.over || AV.hold) return; b.classList.add('down'); setTimeout(() => b.classList.remove('down'), 140); if(navigator.vibrate) try{ navigator.vibrate(8); }catch(err){}
       if(a === 'block' || a === 'bonk'){ (a === 'block' ? AV.tbBlk : AV.tbG)[pi] = true; try{ b.setPointerCapture(e.pointerId); }catch(err){} }   // 🛡️ hold = block · 💥 hold = 🔨 breaker
       if(a === 'block') return;
       BV.press(AV.M, advHumanIdx(pi), a); });
@@ -3111,7 +3136,7 @@ document.addEventListener('keydown', e => {
   if(e.code === 'Escape'){ pauseAdv(); return; }
   if(e.code === 'Enter' && AV.story){ const b = $('story-go'); if(b) b.click(); return; }
   if(e.repeat) return; AV.held.add(e.code);
-  if(AV.paused || AV.over) return;
+  if(AV.paused || AV.over || AV.hold) return;
   if(AV.M.clash){ AV.M.heroes.forEach((h, i) => { if(!h.human) return; advSeatKeys(i).forEach(K => { CLASH_MAP.forEach(([key, sym]) => { if(K[key] === e.code) BV.clashKey(AV.M, i, sym); }); }); }); return; }
   AV.M.heroes.forEach((h, i) => { if(!h.human) return; advSeatKeys(i).forEach(K => { [['boop', 'boop'], ['bonk', 'bonk'], ['power', 'power'], ['dodge', 'jump']].forEach(([key, act]) => { if(K[key] === e.code) BV.press(AV.M, i, act); }); }); });
 });
@@ -3138,7 +3163,7 @@ function advInputs(){
 function advFrame(now){
   if(!AV) return;
   const dt = Math.min(0.05, Math.max(0, (now - AV.last) / 1000)); AV.last = now;
-  if(!AV.paused && !AV.over){
+  if(!AV.paused && !AV.over && !AV.hold){
     advInputs(); AV.acc += dt;
     while(AV.acc >= BV.DT){ AV.acc -= BV.DT; BV.step(AV.M, BV.DT); advEvents(BV.takeEvents(AV.M)); if(AV.over) break; }
     AV.t += dt; advStepFx(dt);
@@ -3157,6 +3182,7 @@ const ADV_PUZ = {steps: '👣 Follow the footprints across the sandbox — watch
   wedding: '💍 The wedding! Walk up to the arch…', barricade: '🧱 Hold the barricade until the shelter opens — 💥 bonk it to fix it!', outbreak: '👾 Defend the town gate! 10 waves are coming…', crank: '⚙️ Bonk the wheel fast to lower the drawbridge — crank together!', levers: '🕹️ Watch the lights, then pull the levers in the same order!',
   torches: '🔥 Light the torches in the order the banner shows!', armour: '🗝️ Smash the suits of armour to find the jail key!'};
 function advEvents(list){
+  GameComic._feed('adv', list);   // 💥 ck-room
   const M = AV.M;
   list.forEach(e => {
     if(ADV_PROG.indexOf(e.k) >= 0 && AV.hint){ AV.hint.t = 0; AV.hint.lvl = 0; }
@@ -3279,7 +3305,7 @@ function advEnd(win){
       : '<div class="big">💫</div><h2>Out of comebacks…</h2><div class="note">' + (M.tale.noCaptive ? 'The monsters broke through the gate.' : UI.esc(M.tale.villain) + ' still ' + (/&/.test(M.tale.villain) ? 'have ' : 'has ') + UI.esc(M.captive) + '.') + ' Try again — or pick an easier difficulty!</div>') +
       '<div class="note" style="margin:8px 0">' + D.icon + ' ' + D.name + ' · ⏱️ ' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0') + ' · 😈 ' + M.kos + ' bonked · 🧸 ' + M.found + ' / 3 · ❤️ ' + M.livesUsed + ' comeback' + (M.livesUsed === 1 ? '' : 's') + ' · 🏆 ' + M.score.toLocaleString() + '</div>' +
       (win && stars < 3 ? '<div class="note">⭐⭐⭐ = ' + (M.tale.noCaptive ? 'save the town' : 'rescue') + ' without a single comeback.</div>' : '') +
-      '<div class="note" id="save-note">' + (NOTES.filter(Boolean).join('<br>') || (M.heroes.some(h => h.human && h.name !== 'Guest') ? '⏳ Saving…' : '')) + '</div><div class="go-row" style="margin-top:10px"><button class="btn soft" data-sound="none" onclick="advToMenu()">🗺️ Tales</button><button class="btn" data-sound="pop" onclick="advAgain()">🔁 Play again</button></div>');
+      '<div class="comic-strip-slot" id="comic-strip-slot"></div><div class="note" id="save-note">' + (NOTES.filter(Boolean).join('<br>') || (M.heroes.some(h => h.human && h.name !== 'Guest') ? '⏳ Saving…' : '')) + '</div><div class="go-row" style="margin-top:10px"><button class="btn soft" data-sound="none" onclick="advToMenu()">🗺️ Tales</button><button class="btn" data-sound="pop" onclick="advAgain()">🔁 Play again</button></div>');
   }, win ? 600 : 900);
 }
 // 💾 every human hero gets the run on the 🗺️ Brawenture board (level = tale, Theme = difficulty) + feats; a lost run saves feats only
@@ -3796,4 +3822,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11i-I+back-1+r35+modes-3+mg-1) END OF BrawlBuddies.html -->
+<!-- (11i-I+back-1+r35+modes-3+mg-1+ck-room) END OF BrawlBuddies.html -->
