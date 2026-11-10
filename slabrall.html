@@ -492,7 +492,7 @@ var SB = (function () {
     return M;
   }
   function mkSide() { return { slow: 0, shrink: 0, legendNext: 0, nextShot: null, elemental: 0 }; }
-  function mkStats() { return { rally: 0, smash: 0, aces: 0, perfect: 0, powers: 0, legend: 0, points: 0, hits: 0, goals: 0, splorf: 0, jumps: 0, jumpPerfect: 0, dives: 0, diveSaves: 0 }; }
+  function mkStats() { return { rally: 0, smash: 0, aces: 0, perfect: 0, powers: 0, legend: 0, points: 0, hits: 0, goals: 0, splorf: 0, jumps: 0, jumpHits: 0, jumpPerfect: 0, dives: 0, diveSaves: 0 }; }
 
   function dirOf(side) { return side === 0 ? 1 : -1; }     // side 0 is at x<0 and hits toward +x
   function courtW(M, side) { return M.sp.Wh * (M.side[side].shrink > 0 ? 0.68 : 1); }
@@ -535,7 +535,7 @@ var SB = (function () {
   }
   function reachOf(M, p) {
     var r = M.sp.kind === 'puck' ? M.sp.malletR : (M.sp.reach || 1.4);
-    return p.big > 0 ? r * 1.6 : r;
+    return (p.big > 0 ? r * 1.6 : r) * (p.lunge > 0 ? 1.9 : 1);   // 🏒 le-1 a SlaShot dive stretches the mallet
   }
 
   // ---------- balls ----------
@@ -842,7 +842,7 @@ var SB = (function () {
     return true;
   }
   function jumpEvent(M, p, kind, ok, perfect) {
-    var S = M.stats[p.side]; if (kind === 'v' && ok && perfect) S.jumpPerfect++; if (kind === 'h' && ok) S.diveSaves++;
+    var S = M.stats[p.side]; if (kind === 'v' && ok) S.jumpHits++; if (kind === 'v' && ok && perfect) S.jumpPerfect++; if (kind === 'h' && ok) S.diveSaves++;
     M.events.push({ k: 'jump', kind: kind, p: p.i, side: p.side, ok: ok, perfect: !!perfect, rally: M.rally });
   }
 
@@ -979,6 +979,7 @@ var SB = (function () {
       if (p.swing > 0) p.swing = Math.max(0, p.swing - dt * 3.2);
       if (p.cheer > 0) p.cheer -= dt; if (p.sad > 0) p.sad -= dt;
       if (p.air > 0) p.air -= dt; if (p.stand > 0) p.stand -= dt; if (p.diveT > 0) p.diveT -= dt;   // 🦘🤸 sb2-3
+      if (p.lunge > 0){ p.lunge -= dt; if (p.lunge <= 0 && !p.lungeHit) M.events.push({ k: 'jump', kind: 'h', p: p.i, side: p.side, ok: false, perfect: false, rally: M.rally }); }   // 🏒 le-1 a lunge that missed
     });
     if (M.score.done) { movePlayers(M, dt, true); return; }
     if (M.state === 'point') {
@@ -1264,6 +1265,10 @@ var SB = (function () {
           var p = M.players[i];
           if (b.z > 0.35) continue;
           var mr = reachOf(M, p), dx = b.x - p.x, dy = b.y - p.y, d = Math.sqrt(dx * dx + dy * dy);
+          // 🏒 le-1 SlaShot dive: the puck is racing at your goal just out of reach → press a shot button (robots: rare) → the mallet lunges (long reach), then you get up
+          if (b.real && !(p.lunge > 0) && !(p.diveT > 0) && b.owner !== p.side && ((p.side === 0) === (b.x < 0)) && b.vx * dirOf(p.side) < -1 && d >= mr + R && d < (mr + R) * 2.2 && wantJump(M, p, b, 'h')) {
+            p.lunge = 0.22; p.lungeHit = false; p.diveT = DIVE_T * 0.75; p.stand = DIVE_T * 0.75; p.diveDx = dx / d; p.diveDy = dy / d; M.stats[p.side].dives++; mr = reachOf(M, p);
+          }
           if (d < mr + R && d > 0.0001) {
             var nx = dx / d, ny = dy / d;
             if (!b.real) { b.live = false; M.fx.push({ k: 'poof', x: b.x, y: b.y, z: 0, t: 0, life: 0.6 }); return; }
@@ -1276,7 +1281,8 @@ var SB = (function () {
             if (vn < 0) {
               b.vx -= 1.9 * vn * nx; b.vy -= 1.9 * vn * ny;
               b.vx += p.vx * 0.55; b.vy += p.vy * 0.55;
-              puckShot(M, p, b);
+              puckShot(M, p, b); b.jr = null;
+              if (p.lunge > 0 && !p.lungeHit) { p.lungeHit = true; jumpEvent(M, p, 'h', true, false); }   // 🏒 le-1 the lunge reached it
             }
           }
         }
@@ -1888,7 +1894,7 @@ function cupFinish(win, secs, scoreFor){
   NOTES.length = 0;
   humans.forEach((p, seat) => {
     if(p.name === 'Guest') return; const s = st[p.side], won = p.side === win;
-    const stats = {wins: won ? 1 : 0, rally: s.rally, smash: s.smash, aces: s.aces, perfect: s.perfect, powers: s.powers, legend: s.legend, goals: s.goals, matches: 1, cupMatches: 1};
+    const stats = {wins: won ? 1 : 0, rally: s.rally, smash: s.smash, aces: s.aces, perfect: s.perfect, powers: s.powers, legend: s.legend, goals: s.goals, jumpHits: s.jumpHits, jumpPerfect: s.jumpPerfect, diveSaves: s.diveSaves, matches: 1, cupMatches: 1};
     stats['win_' + sp.id] = won ? 1 : 0; if(final && won) stats.cups = 1;
     saveFeatsOnly(p.name, stats, seat);
   });
@@ -2581,7 +2587,7 @@ function finishMatch(){
   NOTES.length = 0;
   humans.forEach((p, seat) => {
     const s = st[p.side], won = p.side === win;
-    const stats = {wins: won ? 1 : 0, rally: s.rally, smash: s.smash, aces: s.aces, perfect: s.perfect, powers: s.powers, legend: s.legend, goals: s.goals, matches: 1};
+    const stats = {wins: won ? 1 : 0, rally: s.rally, smash: s.smash, aces: s.aces, perfect: s.perfect, powers: s.powers, legend: s.legend, goals: s.goals, jumpHits: s.jumpHits, jumpPerfect: s.jumpPerfect, diveSaves: s.diveSaves, matches: 1};
     stats['win_' + sp.id] = won ? 1 : 0;
     if(p.name === 'Guest') return;
     if(vsRobot) saveWin(p.name, G.level, {score: scoreFor(p.side), stars: won ? stars : 0, cleared: won, timeSec: secs, theme: sp.name + ' · ' + THEMES[G.theme].name, stats}, seat);
@@ -2656,4 +2662,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1) END OF SlaBrall.html -->
+<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1) END OF SlaBrall.html -->

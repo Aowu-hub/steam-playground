@@ -2351,6 +2351,9 @@ const FEAT_DEFS = {
     win_slawall: { name: 'SlaWall wins', icon: '🧱', kind: 'sum', hidden: true },
     win_slabam: { name: 'SlaBam wins', icon: '🏸', kind: 'sum', hidden: true },
     cups: { name: 'Tournament Champion', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },   // 🏆 round 2: tournaments won
+    jumpHits: { name: 'Jump Smasher', icon: '🦘', kind: 'sum', tiers: [5, 50, 200] },   // le-1 🦘 jump smashes that went in
+    jumpPerfect: { name: 'Perfect jump smashes', icon: '🦘', kind: 'sum', hidden: true },
+    diveSaves: { name: 'Diving Hero', icon: '🤸', kind: 'sum', tiers: [3, 30, 100] },   // le-1 🤸 dive saves
     cupMatches: { name: 'Tournament matches', icon: '🎟️', kind: 'sum', hidden: true },
   },
   'beat-corner': {
@@ -2503,6 +2506,9 @@ const TITLE_DEFS = [
   { id: 'sb_rally', name: 'Rally Machine', icon: '🔁', hint: 'Keep a 25-hit rally going in SlaBrall', rule: f => featVal_(f, 'sla-brall', 'rally') >= 25 },
   { id: 'sb_smash', name: 'Smash Captain', icon: '💥', hint: 'Hit 100 smashes in SlaBrall', rule: f => featVal_(f, 'sla-brall', 'smash') >= 100 },
   { id: 'sb_allcourt', name: 'All-Court Ace', icon: '🏓', hint: 'Win a match in all 5 SlaBrall sports', rule: f => ['slashot', 'slapoof', 'slaball', 'slapong', 'slawall'].every(k => featVal_(f, 'sla-brall', 'win_' + k) >= 1) },
+  { id: 'sb_allcourt6', name: 'All-Court Legend', icon: '🏸', hint: 'Win a match in all 6 SlaBrall sports (with 🏸 SlaBam + the 🧱 squash room)', rule: f => ['slashot', 'slapoof', 'slaball', 'slapong', 'slabam', 'slawall'].every(k => featVal_(f, 'sla-brall', 'win_' + k) >= 1) },   // le-1 (the 5-sport All-Court Ace stays, nobody loses it)
+  { id: 'sb_skysmash', name: 'Sky Smasher', icon: '🦘', hint: 'Hit 10 PERFECT jump smashes in SlaBrall', rule: f => featVal_(f, 'sla-brall', 'jumpPerfect') >= 10 },
+  { id: 'sb_dive', name: 'Dive Master', icon: '🤸', hint: 'Make 10 dive saves in SlaBrall', rule: f => featVal_(f, 'sla-brall', 'diveSaves') >= 10 },
   { id: 'sb_golden', name: 'Golden Racket', icon: '⭐', hint: 'Score 5 points with a Legendary Shot', rule: f => featVal_(f, 'sla-brall', 'legend') >= 5 },
   { id: 'sb_champ', name: 'SlaBrall Champion', icon: '🏆', hint: 'Win a SlaBrall tournament', rule: f => featVal_(f, 'sla-brall', 'cups') >= 1 },
   { id: 'sb_cups', name: 'Cup Collector', icon: '🥇', hint: 'Win 5 SlaBrall tournaments', rule: f => featVal_(f, 'sla-brall', 'cups') >= 5 },
@@ -4200,7 +4206,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
