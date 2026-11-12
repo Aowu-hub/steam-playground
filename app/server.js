@@ -4129,6 +4129,10 @@ function checkWord(word) {
 // r31: run ONCE from the Apps Script editor (▶ Run → authorizeWordLookup) so the app may ask the online dictionary.
 // Without this OK every word outside the ~3,000 built-in meanings shows "ask a grown-up", and new words can't be checked.
 function authorizeWordLookup() {
+  // (dict-1) Google's tick-box permission screen (2025): if "Connect to an external service" was left unticked, Google never asks
+  // again by itself and dictFetch_ just reports the error. requireScopes stops this run and opens the screen for that one box.
+  if (typeof ScriptApp !== 'undefined' && typeof ScriptApp.requireScopes === 'function')
+    ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, ['https://www.googleapis.com/auth/script.external_request']);
   const f = dictFetch_('HELLO');
   Logger.log(f.err ? '❌ Still blocked: ' + f.err : '✅ The dictionary works: HELLO = ' + f.m);
   return f;
@@ -4206,7 +4210,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
