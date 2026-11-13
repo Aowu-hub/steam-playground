@@ -811,6 +811,7 @@ function newsFor_(players, now) {
     const days = birthdayIn_(st['Birthday_' + p.Name], now);
     if (days >= 0 && days <= 7) out.push({ kind: 'birthday', player: p.Name, days: days, date: String(st['Birthday_' + p.Name]) });
   });
+  comicNews_().forEach(n => out.push(n));   // 🏅 ck-1b Comic of the day
   return out;
 }
 // 🏁 Milestones: who just reached the 💀 Hardcore finish line (first clear in the last 14 days),
@@ -3666,6 +3667,121 @@ function pinHash_(name, pin) {
   return Utilities.base64Encode(bytes);
 }
 function hasPlayerPin_(name) { return !!getSettings()['PlayerPIN_' + name]; }
+/* ===== 💥 ck-1b 📚 Comic Book: one row per comic (a page recipe, names only, ~2 KB) · 👍 votes · 🏅 Comic of the day ===== */
+// Pages come from 🎨 Make my comic (Collection, needs the player's PIN) and later from games (Comic.save, no PIN, max 20 a day per player).
+const COMICS_TAB = 'Comics';
+const COMICS_HEADERS = [
+  ['Id', 'id', 'c + time + random (never reused)'],
+  ['Player', 'player', 'whose book it goes in'],
+  ['Game', 'game', 'game id, or "maker" = 🎨 Make my comic'],
+  ['Title', 'title', 'cover title'],
+  ['Page', 'page', 'JSON page recipe (layout, panels, words) — player NAMES only, pictures are drawn from today\'s avatars'],
+  ['Votes', 'votes', 'JSON ["Name|yyyy-MM-dd", …] — one 👍 per player per day'],
+  ['Made', 'made', 'yyyy-MM-dd HH:mm'],
+  ['Deleted', 'deleted', '"yes" = removed by the maker (kept for history)']
+];
+const COMICS_WIDTH = COMICS_HEADERS.length, COMIC_MAX_CHARS_ = 6000, COMIC_DAY_LIMIT_ = 20;
+function comicsSheet_(create) {
+  let sh = ss_().getSheetByName(COMICS_TAB);
+  if (!sh && create) { sh = ss_().insertSheet(COMICS_TAB); sh.getRange(1, 1, 1, COMICS_WIDTH).setValues([COMICS_HEADERS.map(h => h[0] + '\n' + h[1])]); styleComicsSheet(); }
+  return sh;
+}
+// Look of the Comics tab (sheet standard). Safe to re-run from the editor.
+function styleComicsSheet() {
+  const sh = ss_().getSheetByName(COMICS_TAB); if (!sh) return;
+  try {
+    const head = sh.getRange(1, 1, 1, COMICS_WIDTH);
+    head.setValues([COMICS_HEADERS.map(h => '🔒 ' + h[0] + '\n' + h[1])]).setBackground('#E63946').setFontColor('#FFFFFF').setFontWeight('bold').setHorizontalAlignment('center').setVerticalAlignment('middle').setWrap(true);
+    head.setNotes([COMICS_HEADERS.map(h => h[2])]);
+    sh.setRowHeight(1, 46); sh.setFrozenRows(1); sh.setFrozenColumns(2);
+    sh.getRange(2, 1, Math.max(1, sh.getMaxRows() - 1), COMICS_WIDTH).setNumberFormat('@').setFontSize(10).setVerticalAlignment('middle');
+    [150, 110, 100, 160, 420, 200, 130, 80].forEach((w, i) => sh.setColumnWidth(i + 1, w));
+    sh.getRange(2, 1, Math.max(1, sh.getMaxRows() - 1), 1).setFontFamily('Roboto Mono').setFontColor('#757575');
+  } catch (e) {}
+}
+function comicRows_() {
+  const sh = comicsSheet_(false); if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, COMICS_WIDTH).getValues().map((r, i) => ({ row: i + 2, id: String(r[0]), player: String(r[1]), game: String(r[2]), title: String(r[3]), page: String(r[4]), votes: String(r[5] || '[]'), made: String(r[6]), deleted: String(r[7]) === 'yes' }));
+}
+// a page recipe from the browser → a safe, small JSON (only known fields, short texts, names instead of avatars)
+function cleanComicPage_(p) {
+  if (!p || typeof p !== 'object' || !Array.isArray(p.panels)) throw new Error('That comic page is empty.');
+  const key = v => /^[a-z0-9][a-z0-9._-]{0,40}$/i.test(String(v || '')) ? String(v) : '', txt = (v, n) => String(v == null ? '' : v).replace(/[<>]/g, '').slice(0, n || 120);
+  const who = v => (v === 0 || v === 1 || v === 2 || v === 3) ? v : undefined;
+  const out = { layout: key(p.layout) || 'slash3', mood: key(p.mood), title: txt(p.title, 60), key: key(p.key), variant: Math.max(0, Math.min(9, Number(p.variant) || 0)),
+    players: (Array.isArray(p.players) ? p.players : []).slice(0, 4).map(x => txt(x && typeof x === 'object' ? x.name : x, 30)), panels: [] };
+  if (Array.isArray(p.crowd)) out.crowd = p.crowd.slice(0, 3).map(x => txt(x && typeof x === 'object' ? x.name : x, 30));
+  p.panels.slice(0, 5).forEach(q => {
+    if (!q || typeof q !== 'object') return; const P = {};
+    if (who(q.who) !== undefined) P.who = q.who; if (who(q.who2) !== undefined) P.who2 = q.who2;
+    ['act', 'act2', 'pose', 'face', 'face2', 'cam', 'mood'].forEach(f => { if (key(q[f])) P[f] = key(q[f]); });
+    ['lines', 'tricks', 'marks'].forEach(f => { if (Array.isArray(q[f])) P[f] = q[f].map(key).filter(Boolean).slice(0, 4); });
+    if (q.sfx && q.sfx.text) P.sfx = { text: txt(q.sfx.text, 24), style: key(q.sfx.style) || 'impact' };
+    if (q.bub && q.bub.text) P.bub = { text: txt(q.bub.text, 120), kind: key(q.bub.kind) || 'speech' };
+    if (q.cap) P.cap = txt(q.cap, 80); if (q.sign) P.sign = txt(q.sign, 30);
+    if (q.sepia) P.sepia = true; if (q.crowd) P.crowd = true; if (q.dir === -1) P.dir = -1;
+    out.panels.push(P);
+  });
+  if (!out.panels.length) throw new Error('That comic page is empty.');
+  const s = JSON.stringify(out); if (s.length > COMIC_MAX_CHARS_) throw new Error('That comic is too long.'); return s;
+}
+// 💾 save a comic into a player's book. game = 'maker' (needs the PIN) or the game id that made it.
+function saveComic(name, page, pin, game) {
+  if (!name || !activePlayers_(listProfilesFull()).some(p => p.Name === name)) throw new Error('Pick a player first.');
+  game = String(game || 'maker').replace(/[^a-z0-9_-]/gi, '').slice(0, 30) || 'maker';
+  if (game === 'maker') checkPlayerPin_(name, pin);
+  const json = cleanComicPage_(page), lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const rows = comicRows_(), today = today_();
+    if (rows.filter(r => r.player === name && r.made.slice(0, 10) === today && !r.deleted).length >= COMIC_DAY_LIMIT_) throw new Error('The book is full for today — come back tomorrow!');
+    const id = 'c' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36), title = (JSON.parse(json).title || '').slice(0, 60);
+    comicsSheet_(true).appendRow([id, name, game, title, json, '[]', Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'), '']);
+    return { id: id, issue: rows.filter(r => r.player === name && !r.deleted).length + 1 };
+  } finally { lock.releaseLock(); }
+}
+function comicVotes_(r) { try { const v = JSON.parse(r.votes || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+// 🏅 Comic of the day: most 👍 given today; no votes yet → the newest comic made today; none today → null
+function comicOfDay_(rows, date) {
+  const live = rows.filter(r => !r.deleted); if (!live.length) return null;
+  const today = (r) => comicVotes_(r).filter(v => String(v).split('|')[1] === date).length;
+  const voted = live.filter(r => today(r) > 0).sort((a, b) => today(b) - today(a) || (a.made < b.made ? 1 : -1));
+  if (voted.length) return voted[0];
+  const made = live.filter(r => r.made.slice(0, 10) === date).sort((a, b) => a.made < b.made ? 1 : -1);
+  return made[0] || null;
+}
+function comicOut_(r, issues) { let page = null; try { page = JSON.parse(r.page); } catch (e) {} return { id: r.id, player: r.player, game: r.game, title: r.title, page: page, votes: comicVotes_(r).length, today: comicVotes_(r).filter(v => String(v).split('|')[1] === today_()).length, voters: comicVotes_(r).map(v => String(v).split('|')[0]), made: r.made, issue: issues[r.id] || 0 }; }
+// 📚 everyone's books (newest first, last 300) + who voted today + the Comic of the day
+function getComicBook() {
+  const rows = comicRows_(), issues = {}, n = {};
+  rows.filter(r => !r.deleted).forEach(r => { n[r.player] = (n[r.player] || 0) + 1; issues[r.id] = n[r.player]; });
+  const date = today_(), cotd = comicOfDay_(rows, date), votedToday = {};
+  rows.forEach(r => comicVotes_(r).forEach(v => { const [who, d] = String(v).split('|'); if (d === date) votedToday[who] = r.id; }));
+  return { comics: rows.filter(r => !r.deleted).slice(-300).reverse().map(r => comicOut_(r, issues)), cotd: cotd ? cotd.id : '', votedToday: votedToday, today: date };
+}
+// 👍 one vote per player per day (not on your own comic); voting again the same day moves your 👍
+function voteComic(name, id, pin) {
+  checkPlayerPin_(name, pin);
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    const rows = comicRows_(), r = rows.find(x => x.id === String(id) && !x.deleted); if (!r) throw new Error('That comic is gone.');
+    if (r.player === name) throw new Error('OWN: Ask the family to vote for yours!');
+    const date = today_(), sh = comicsSheet_(false), tag = name + '|' + date;
+    rows.forEach(x => { const v = comicVotes_(x); if (v.indexOf(tag) >= 0 && x.id !== r.id) sh.getRange(x.row, 6).setValue(JSON.stringify(v.filter(t => t !== tag))); });
+    const v = comicVotes_(r); if (v.indexOf(tag) < 0) v.push(tag); sh.getRange(r.row, 6).setValue(JSON.stringify(v));
+    return getComicBook();
+  } finally { lock.releaseLock(); }
+}
+// 🗑️ the maker can take one of their own comics out of the book
+function deleteComic(name, id, pin) {
+  checkPlayerPin_(name, pin);
+  const r = comicRows_().find(x => x.id === String(id) && !x.deleted); if (!r || r.player !== name) throw new Error('Only the owner can remove it.');
+  comicsSheet_(false).getRange(r.row, 8).setValue('yes'); return getComicBook();
+}
+// Dashboard 📣 news: the Comic of the day
+function comicNews_() {
+  try { const rows = comicRows_(), c = comicOfDay_(rows, today_()); if (!c) return []; const issues = {}, n = {}; rows.filter(r => !r.deleted).forEach(r => { n[r.player] = (n[r.player] || 0) + 1; issues[r.id] = n[r.player]; });
+    const o = comicOut_(c, issues); return [{ kind: 'comic', id: o.id, player: o.player, title: o.title, game: o.game, votes: o.today, issue: o.issue, page: o.page, at: o.made, route: 'collection' }]; } catch (e) { return []; }
+}
 function checkPlayerPin_(name, pin) {
   const saved = getSettings()['PlayerPIN_' + name];
   if (!saved) throw new Error('NOPIN: Choose a PIN first.');
@@ -4222,7 +4338,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -5433,6 +5549,11 @@ return {"include": typeof include === 'function' ? include : undefined,
 "getDailyData": typeof getDailyData === 'function' ? getDailyData : undefined,
 "grantJoySkin": typeof grantJoySkin === 'function' ? grantJoySkin : undefined,
 "claimDaily": typeof claimDaily === 'function' ? claimDaily : undefined,
+"styleComicsSheet": typeof styleComicsSheet === 'function' ? styleComicsSheet : undefined,
+"saveComic": typeof saveComic === 'function' ? saveComic : undefined,
+"getComicBook": typeof getComicBook === 'function' ? getComicBook : undefined,
+"voteComic": typeof voteComic === 'function' ? voteComic : undefined,
+"deleteComic": typeof deleteComic === 'function' ? deleteComic : undefined,
 "verifyPlayerPin": typeof verifyPlayerPin === 'function' ? verifyPlayerPin : undefined,
 "setPlayerPin": typeof setPlayerPin === 'function' ? setPlayerPin : undefined,
 "resetPlayerPin": typeof resetPlayerPin === 'function' ? resetPlayerPin : undefined,

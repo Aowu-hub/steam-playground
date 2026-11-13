@@ -20,6 +20,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <link href="fonts/fonts.css" rel="stylesheet">
 <style>
+  .news canvas.comicthumb{width:84px;height:64px;flex:0 0 auto;border:2px solid #16161D;border-radius:4px;background:#fff;margin-left:auto;}   /* ck-1b 🏅 */
+  .news.comic .tag{background:linear-gradient(135deg,#F2B705,#E63946);} .news.acts .tag{background:linear-gradient(135deg,#8338EC,#FF4D8D);}   /* ck-1b: tags of the 🏅 / 🎭 cards */
   :root{
     --bg:#FBF6EF; --panel:#FBE9DA; --ink:#37474F; --ink-soft:#5B6B70; --card:#FFFFFF;
     --terracotta:#C97B5D; --sage:#8FA37E; --dusty-blue:#6E93A8; --mustard:#D9A94D;
@@ -385,6 +387,7 @@
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/ComicKit.js"></script>
 <script src="inc/WelcomeShow.js"></script>
 </head>
 <!-- ontouchstart="" is a deliberate no-op: iOS only shows :active press
@@ -984,9 +987,10 @@ function actCards(){
   const names = L.slice(0, 4).map(o => (Acting.SIG.names || {})[o.k] || o.k.replace(/^[a-z0-9]+\./, '').replace(/-/g, ' '));
   return [{kind: 'acts', id: 'collection', at: L[0].added, count: L.length, names, icon: '🎭', route: 'collection'}];
 }
-function newsTag(k){ if(k === 'acts') return '🎭 NEW ACTS'; return {mode: '🎯 TRY A MODE', modenew: '🆕 NEW MODE', new: '🆕 NEW', record: '🏆 RECORD', try: '💡 TRY IT', milestone: '🏁 MILESTONE', close: '⚔️ CLOSE CALL', jam: '🚦 JAM', mail: '📬 MAIL', birthday: '🎂 BIRTHDAY'}[k] || '📣'; }
+function newsTag(k){ if(k === 'acts') return '🎭 NEW ACTS'; if(k === 'comic') return '🏅 COMIC OF THE DAY'; return {mode: '🎯 TRY A MODE', modenew: '🆕 NEW MODE', new: '🆕 NEW', record: '🏆 RECORD', try: '💡 TRY IT', milestone: '🏁 MILESTONE', close: '⚔️ CLOSE CALL', jam: '🚦 JAM', mail: '📬 MAIL', birthday: '🎂 BIRTHDAY'}[k] || '📣'; }
 function newsRes(n, v){ return n.byScore ? Number(v).toLocaleString() + ' pts' : '⏱ ' + fmtSec(v || 0); }
 function newsBody(n){
+  if(n.kind === 'comic') return '<b>' + UI.esc(n.player) + '\'s comic #' + n.issue + ': ' + UI.esc(n.title || 'Untitled') + (n.votes ? ' — ' + n.votes + ' 👍' : '') + '</b><small>📚 Comic of the day · tap to read it in the Comic Book' + (n.votes ? '' : ' and give it your 👍') + '</small>';   // ck-1b 🏅
   if(n.kind === 'acts') return '<b>' + n.count + ' new avatar act' + (n.count > 1 ? 's' : '') + ' to try!</b><small>' + UI.esc(n.names.join(' · ')) + (n.count > n.names.length ? ' …' : '') + ' — see them in 📖 Collection → 🎭 Acts shelf, pick one as your 🎭 signature act in 🎒 Wardrobe</small>';   // as-2 🎭
   const lv = n.level === 5 ? '💀 Hardcore' : '🌋 Extreme', res = n.byScore ? Number(n.score).toLocaleString() + ' pts' : n.timeSec ? '⏱ ' + fmtSec(n.timeSec) : '⭐'.repeat(n.stars || 0);
   const prev = n.prev ? (n.byScore ? Number(n.prev.score).toLocaleString() + ' pts' : '⏱ ' + fmtSec(n.prev.timeSec || 0)) : '';
@@ -1034,7 +1038,7 @@ function refreshModeNews(){
 }
 function renderNews(list){
   const panel = document.getElementById('news-panel'), box = document.getElementById('news-list');
-  const order = {birthday: 0, mail: 1, record: 2, milestone: 3, close: 4, jam: 5, new: 6, modenew: 6.5, acts: 6.8, try: 7, mode: 7.5};
+  const order = {birthday: 0, mail: 1, record: 2, milestone: 3, close: 4, jam: 5, new: 6, modenew: 6.5, acts: 6.8, comic: 2.5, try: 7, mode: 7.5};   // ck-1b 🏅 Comic of the day
   list = list.concat(modeCards(list)).concat(actCards());   // as-2 🎭 new shared acts (7 days)   // ✨ modes-2: 🎯 Try a mode (2 a day) + 🆕 new modes
   list = list.filter(n => order[n.kind] != null).sort((a, b) => (order[a.kind] - order[b.kind]) || ((a.days || 0) - (b.days || 0)));
   const today = list.filter(n => n.kind === 'birthday' && n.days === 0);
@@ -1043,13 +1047,16 @@ function renderNews(list){
   if(!list.length && !today.length){ panel.classList.add('hidden'); stopNewsAnim(); return; }
   let seen = []; try{ seen = JSON.parse(localStorage.getItem('sp_news_seen') || '[]'); }catch(e){}
   const unseen = list.concat(today).filter(n => seen.indexOf(newsKey(n)) < 0);
-  box.innerHTML = list.map(n => '<button class="news ' + n.kind + (n.done ? ' done' : '') + (unseen.indexOf(n) >= 0 ? ' unseen' : '') + '" data-sound="nav"><span class="tag">' + newsTag(n.kind) + '</span><span class="ni">' + UI.esc(newsIcon(n)) + '</span><span class="nt">' + newsBody(n) + '</span>' + (n.kind === 'milestone' ? '<canvas class="track" aria-hidden="true"></canvas>' : '') + '</button>').join('');
+  box.innerHTML = list.map(n => '<button class="news ' + n.kind + (n.done ? ' done' : '') + (unseen.indexOf(n) >= 0 ? ' unseen' : '') + '" data-sound="nav"><span class="tag">' + newsTag(n.kind) + '</span><span class="ni">' + UI.esc(newsIcon(n)) + '</span><span class="nt">' + newsBody(n) + '</span>' + (n.kind === 'milestone' ? '<canvas class="track" aria-hidden="true"></canvas>' : '') + (n.kind === 'comic' ? '<canvas class="comicthumb" aria-hidden="true"></canvas>' : '') + '</button>').join('');
   box.querySelectorAll('.news').forEach((b, k) => b.onclick = () => {
     const n = list[k];
     if(n.kind === 'mail'){ selectedPlayer = n.player; UI.go(WEBAPP_URL + '?page=room&game=my&player=' + encodeURIComponent(n.player), 'myroom'); return; }
     if(n.kind === 'birthday'){ UI.toast('🎂 ' + n.player + (n.days ? "'s birthday is on " + bdayText(n.date) : ' — happy birthday!') + ' 🎈'); return; }
+    if(n.kind === 'comic'){ UI.go(WEBAPP_URL + '?page=collection&game=' + encodeURIComponent('comic:' + n.id) + (selectedPlayer ? '&player=' + encodeURIComponent(selectedPlayer) : ''), 'collection'); return; }   // ck-1b 🏅 opens the reader
     if(n.route) UI.go(WEBAPP_URL + '?page=' + n.route + (selectedPlayer ? '&player=' + encodeURIComponent(selectedPlayer) : ''), n.id);
   });
+  box.querySelectorAll('.news').forEach((b, k) => { const n = list[k], cv = b.querySelector('canvas.comicthumb'); if(!cv || !window.Comic || !Comic.render || !n.page) return;   // ck-1b 🏅 a small picture of the comic
+    try { Comic.render(cv, Comic.cover(Comic.expand(n.page, avatarOf)), {w: 84, h: 64, t: 0.5, still: true}); } catch(e){} });
   document.getElementById('news-sub').textContent = unseen.length ? unseen.length + ' new for you' : '';
   panel.classList.remove('hidden');
   box.style.minHeight = list.some(n => n.kind === 'milestone') ? '150px' : '';   // same height every turn (no page jump)
@@ -1157,4 +1164,4 @@ loadDashboard();
 </script>
 </body>
 </html>
-<!-- (r24+emoji+news-1+ebr-4+wd-5+modes-2+af-4+ws-5+as-2) END OF Landing.html -->
+<!-- (r24+emoji+news-1+ebr-4+wd-5+modes-2+af-4+ws-5+as-2+ck-1b) END OF Landing.html -->
