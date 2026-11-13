@@ -105,6 +105,7 @@
   .result{position:fixed;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(30,15,20,0.6);overflow-y:auto;}
   .result{flex-direction:column;justify-content:flex-start;} .result::after{content:'';flex:0 0 var(--safe-b, 18px);}   /* bottom headroom: buttons stay above the phone's swipe-up bar */
   .result-card{margin:auto;background:var(--card);color:var(--ink);border-radius:26px;padding:24px 22px;max-width:390px;width:100%;text-align:center;box-shadow:0 18px 50px rgba(0,0,0,0.35);display:flex;flex-direction:column;gap:10px;align-items:center;}
+  .result-card .res-av{width:128px;height:140px;display:block;margin:0 auto -2px;}
   .result-card .big{font-size:3.4rem;} .result-card h2{font-size:1.55rem;}
   .result-card h2.cheer{background:linear-gradient(90deg,#FF7A1A,#2EC4B6,#6B3BE0);-webkit-background-clip:text;background-clip:text;color:transparent;}
   .rating .st{font-size:2rem;display:inline-block;animation:star-pop .5s cubic-bezier(.2,1.8,.4,1) both;} .rating .st.off{filter:grayscale(1);opacity:.25;}
@@ -864,6 +865,7 @@ function drawMe(g, t){
   if(sec && sec.type === 'under') g.globalAlpha = 0.45;
   const lk = G.look || LOOK;
   drawRide(g, G.T.ride, 0, Ln / 2, W, Ln, COLORS[lk.col], {decal: DECALS[lk.decal][0], t, name: G.who || S.player, braking: p.held.down, boost: p.boost > 0, me: true});
+  drvDraw(g, G.who || S.player, W, Ln, G.T.ride);   /* 🧑 p6f: your avatar in the seat */
   g.restore();
   if(p.stars > 0){ for(let i = 0; i < 5; i++){ const a = t * 7 + i * 1.257; emo(g, i % 2 ? '⭐' : '💫', x + Math.cos(a) * W * 0.8, y - Ln * 1.05 + Math.sin(a) * W * 0.25, k * 0.8, Math.min(1, p.stars)); } }
 }
@@ -1394,6 +1396,35 @@ function boot(){
     }).withFailureHandler(() => { UI.loaded(); UI.toast('Could not load players — check the connection', 'err'); renderPlayers(); showScreen('player'); })
     .getLevelGameData(GAME_ID, CURRENT_PLAYER);
 }
+/* ================= 🧑 YOUR AVATAR DRIVES (p6f — ✨ P6 / 11w round 2) =================
+   The driver's head + shoulders = your own avatar, cut from cached AvatarActing pictures (made in idle time when a race starts),
+   drawn with ONE drawImage in drawMe — the race loop never runs the avatar painter. Its face follows the game's own cheerSay moments. */
+const DRV = {pics: {}, mood: {}, until: {}};
+const DRV_ACTS = {idle: 'idle', happy: 'cheer', oops: 'shock', win: 'victory'};
+function drvWho(name){ return {name, av: myAvatar(name)}; }
+function drvWarm(name){
+  if(!window.Acting || typeof drawAvatar !== 'function' || !name || DRV.pics[name]) return; DRV.pics[name] = {};
+  const ric = window.requestIdleCallback ? (f => requestIdleCallback(f, {timeout: 800})) : (f => setTimeout(f, 60));
+  Object.keys(DRV_ACTS).forEach(m => ric(() => { try{ let a = DRV_ACTS[m]; if(!Acting.has('acts', a) && !Acting.has('poses', a)) a = 'idle';
+    DRV.pics[name][m] = Acting.frames(drvWho(name), a, {w: 72, h: 84, n: 1, dpr: 2})[0]; }catch(e){} }));
+}
+function drvMood(name, m, sec){ if(!name) return; DRV.mood[name] = m; DRV.until[name] = performance.now() + (sec || 1.4) * 1000; }
+function drvDraw(g, name, W, Ln, ride){
+  const set = DRV.pics[name]; if(!set){ drvWarm(name); return; } let m = DRV.mood[name] || 'idle'; if(m !== 'win' && performance.now() > (DRV.until[name] || 0)) m = 'idle';
+  const pic = set[m] || set.idle; if(!pic) return;
+  const s = W * (ride === 'horse' || ride === 'bike' || ride === 'dragon' ? 0.78 : 0.66), cy = (ride === 'rocket' || ride === 'shuttle' ? 0.12 : 0.05) * Ln;
+  const sh = pic.height * 0.5;   // the top half of the picture = head + shoulders
+  g.drawImage(pic, pic.width * 0.12, 0, pic.width * 0.76, sh, -s / 2, cy - s * 0.66, s, s * (sh / (pic.width * 0.76)));
+}
+const drvBase = {startGame, cheerSay, showResult};
+startGame = function(){ const r = drvBase.startGame.apply(this, arguments); drvWarm(S.player); return r; };
+cheerSay = function(kind, why){ const r = drvBase.cheerSay.apply(this, arguments); if(G){ const who = G.who || S.player; drvMood(who, kind === 'miss' ? 'oops' : kind === 'start' ? 'idle' : kind === 'close' ? 'happy' : 'happy', kind === 'goal' ? 2 : 1.4); } return r; };
+showResult = function(html){ const r = drvBase.showResult.apply(this, arguments);
+  const big = document.querySelector('#result-card > .big'); if(big && window.UI && UI.buddy && window.Acting){ const won = !!document.querySelector('#result-card h2.cheer');
+    const c = document.createElement('canvas'); c.className = 'res-av'; c.id = 'res-av'; c.setAttribute('aria-hidden', 'true'); big.replaceWith(c); UI.buddy(c, drvWho(S.player), {hold: won ? 'win' : 'lose'});
+    drvMood(S.player, won ? 'win' : 'oops', 4); }
+  return r; };
+/* ================= 🧑 YOUR AVATAR DRIVES END (p6f) ================= */
 boot();
 /* ✨ MODE SPOTLIGHT (modes-3): ?mode=<id> opens this game straight in that mode after the player pick · "✨ Also try" on the start page · started modes → UI.modeTried */
 const MS_GAME = 'turbo';
@@ -1415,4 +1446,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11o+r33+modes-3+p1c+cs-2a) END OF Turbo.html -->
+<!-- (11o+r33+modes-3+p1c+cs-2a+p6f) END OF Turbo.html -->
