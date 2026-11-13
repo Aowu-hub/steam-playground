@@ -77,12 +77,9 @@
   .rules{background:var(--card);border-radius:18px;padding:8px 14px;margin-top:16px;}
   .rules summary{cursor:pointer;font-family:'Fredoka',sans-serif;font-weight:700;padding:6px 0;}
   .rules li{margin:5px 0;font-size:0.9rem;}
-  .btn{font-family:'Fredoka',sans-serif;font-weight:600;font-size:0.95rem;border:none;border-radius:14px;cursor:pointer;padding:11px 16px;color:#fff;background:linear-gradient(135deg,#4CB963,#2EC4B6);box-shadow:0 4px 0 rgba(0,0,0,0.12);}
-  .btn:active{transform:translateY(3px);} .btn.soft{background:var(--panel);color:var(--ink);}
   @media (max-width:640px){ .levels{grid-template-columns:repeat(2,1fr);} .themes{grid-template-columns:repeat(2,1fr);} .title h1{font-size:1.6rem;} }
   /* ---------- play ---------- */
   #scr-play{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);color:#fff;}
-  .hud{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;padding:calc(8px + env(safe-area-inset-top)) 10px 6px;position:relative;z-index:5;}
   .pill{background:rgba(0,0,0,0.3);border:none;color:#fff;border-radius:14px;padding:6px 10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.9rem;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
   button.pill{cursor:pointer;} button.pill:active{transform:translateY(2px);}
   .pill.lvl-pill{background:linear-gradient(135deg,#4CB963,#2EC4B6);} .pill.score{font-size:1.1rem;min-width:90px;justify-content:center;}
@@ -121,6 +118,7 @@
   .stats{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;} .stats span{background:var(--panel);border-radius:10px;padding:4px 10px;font-weight:800;font-size:0.82rem;}
   .save-note{font-weight:800;font-size:0.85rem;color:var(--ink-soft);}
   .new-badge,.title-new,.feat-new{display:inline-block;background:linear-gradient(135deg,#FFC845,#FF9F1C);color:#3A2500;border-radius:10px;padding:4px 10px;font-weight:800;margin:2px;}
+  .res-btns > #b-menu, .res-btns > #tg-x, .res-btns > #btn-levels, .res-btns > #btn-hc-levels{order:-1;} .res-btns > #b-next, .res-btns > #btn-next{order:2;}   /* 🔘 p1c: exit left, main action right */
   .res-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
   .confetti{position:fixed;top:-40px;z-index:390;font-size:1.6rem;pointer-events:none;animation:fall linear forwards;}
   @keyframes fall{to{transform:translateY(110vh) rotate(540deg);}}
@@ -132,7 +130,7 @@
 <script src="inc/AvatarActing.js"></script>
 </head>
 <body ontouchstart="">
-<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button>
+<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
 
 <section class="screen hidden" id="scr-player">
   <div class="title"><div class="logo">🐸</div><h1>Dodgy Hopper</h1><p>Who's hopping?</p></div>
@@ -158,21 +156,10 @@
 <section class="screen hidden" id="scr-theme">
   <div class="title"><div class="logo" id="theme-logo">🗺️</div><h1 id="theme-title">Pick a world</h1><p>Every game builds new roads and rivers</p></div>
   <div class="themes" id="theme-list"></div>
-  <div style="text-align:center;margin-top:18px;"><button class="btn soft" onclick="showScreen('menu')">◀ Back</button></div>
 </section>
 
 <section class="hidden" id="scr-play">
-  <div class="hud">
-    <button class="pill" data-sound="none" onclick="leavePlay()" title="Back">◀</button>
-    <span class="pill lvl-pill" id="hud-level"></span>
-    <span class="pill score" id="hud-score">0</span>
-    <span class="pill" id="hud-rows">🚩 0</span>
-    <span class="pill" id="hud-lives">❤️</span>
-    <span class="pill" id="hud-coins">🪙 0</span>
-    <span class="pill" id="hud-time">⏱ 0:00</span>
-    <span class="pill hidden" id="hud-left"></span>
-    <button class="pill" id="d3-btn" data-sound="pop" onclick="toggle3d()" title="3D view or flat view">🗺️ 2D</button>
-  </div>
+  <div class="hud" id="gbar"></div>   <!-- 🎛️ p1c: UI.gameBar fills this -->
   <div class="stage" id="stage">
     <canvas id="cv"></canvas>
     <div class="banner" id="banner"></div>
@@ -191,7 +178,7 @@
 <div class="sheet hidden" id="keysheet"><div class="sheet-card">
   <h3>⌨️ Your keys</h3><p style="font-size:0.82rem;font-weight:700;color:var(--ink-soft);margin:4px 0 8px">Tap a key, then press the new one. Arrow keys always hop.</p>
   <div id="key-rows"></div>
-  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn soft" data-sound="pop" onclick="resetKeys()">↺ Reset</button><button class="btn" data-sound="pop" onclick="closeKeys()">Done</button></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn soft sp-btn sp-secondary" data-sound="pop" onclick="resetKeys()">↺ Reset</button><button class="btn sp-btn sp-primary" data-sound="pop" onclick="closeKeys()">Done</button></div>
 </div></div>
 <div class="result hidden" id="result"><div class="result-card" id="result-card"></div></div>
 
@@ -202,6 +189,14 @@ UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});   // loader + me
 const SESSION_START = Number(''+__SP("sessionStart")+'') || null;
 const DURATION_MIN = Number(''+__SP("durationMin")+'') || null;
 const GAME_ID = 'hopper';
+// 🎛️ p1c: the shared top bar (UiKit UI.gameBar) — ◀ where you came from · 🎚️ Levels · 🏠 | 🐸 Dodgy Hopper · level | numbers | game buttons ⏸ ❓ ⚙️
+const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '🐸', name: 'Dodgy Hopper', levelId: 'hud-level',
+  levels: () => leavePlay(), playing: () => !!(G && !G.over), onLeave: () => { try{ speechSynthesis.cancel(); }catch(e){} },
+  pause: {pause: () => { if(G && !G.paused && !G.over){ G.paused = true; G.pausedAt = performance.now(); G.barPz = 1; } }, resume: () => { if(G && G.barPz){ G.barPz = 0; G.pausedTotal += performance.now() - G.pausedAt; G.paused = false; G.last = performance.now(); } }}, pauseButton: true,
+  onFit: () => { if(G && typeof layout === 'function') layout(); },
+  extras: [{id: 'd3-btn', icon: '🗺️ 2D', label: '3D view or flat view', onClick: () => toggle3d(), keep: true}]});
+var NAV_INNER = {theme: ['◀ Dodgy Hopper', () => showScreen('menu')]};   // 🧭 inner screens: their top button goes to the main screen
+UI.navBar(document.getElementById('back-btn'), {onclick: false});
 const $ = id => document.getElementById(id);
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[rnd(a.length)];
@@ -291,7 +286,7 @@ function myAvatar(name){ const a = S.avatars[name || S.player]; return a ? fixAv
 /* ================= MENUS ================= */
 function showScreen(name){
   ['player', 'menu', 'theme', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
-  $('back-btn').classList.toggle('hidden', name === 'play'); window.scrollTo(0, 0);
+  $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   /* 🧭 p1c */ window.scrollTo(0, 0);
 }
 function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
 function canPlay(i){ const p = progressOf(S.player); if(i === 5) return p.unlocked >= 5; if(i === 4) return p.unlocked >= 4; return i <= Math.max(p.unlocked, AGE_START[S.age] || 0); }
@@ -397,7 +392,7 @@ function startGame(lvl){
     a: {name: S.player, av: myAvatar(), dir: 1, walkT: 0, gest: null, stance: 'stand', jumpH: 0, land: 0},
     fx: [], drops: [], shake: 0, queue: [], pet: null, nextDrop: 6, hitCool: 0, gestures: 0, key: theme, X: WORLD_FX[theme], conf: null, confImm: 0, confs: 0, pw: [], enraged: false, rumble: 0, chaseFx: 0};
   for(let r = 0; r < VIEW_ROWS + 6; r++) rowAt(r);
-  $('hud-level').textContent = L.emoji + ' ' + L.name + ' · ' + T.icon; $('scr-play').style.background = T.bg;
+  BAR.level(L.emoji + ' ' + L.name + ' · ' + T.icon, L.hardcore ? 'hc' : ''); $('scr-play').style.background = T.bg;
   showScreen('play'); layout(); hudTick(true);
   showBanner(L.hardcore ? '💀 Hardcore — 1 life, no flags, points ×3! Hop to row ' + L.goal + '!' : T.icon + ' ' + T.name + ' — hop to row ' + L.goal + '!'); say('Hop to row ' + L.goal + '!');
   G.last = performance.now(); rafId = requestAnimationFrame(loop);
@@ -709,12 +704,12 @@ function previewTheme(c, key){
 let hudTimer = 0;
 function hudTick(force){
   const now = performance.now(); if(!force && now - hudTimer < 120) return; hudTimer = now;
-  $('hud-score').textContent = '🏆 ' + G.score.toLocaleString();
-  $('hud-rows').textContent = '🚩 ' + G.maxRow + (G.cleared ? ' ✓' : ' / ' + G.L.goal);
-  $('hud-lives').textContent = '❤️'.repeat(Math.max(0, G.lives)) + '🤍'.repeat(Math.max(0, G.L.lives - G.lives)); $('hud-lives').classList.toggle('warn', G.lives === 1);
-  $('hud-coins').textContent = '🪙 ' + G.coins + (G.gems ? ' · 💎 ' + G.gems : '');
-  $('hud-time').textContent = '⏱ ' + fmt(performance.now() - G.t0 - G.pausedTotal);
-  if(lockHandle){ const left = lockHandle.remainingMs(), el = $('hud-left'); el.classList.remove('hidden'); el.textContent = '⌛ ' + fmt(left); el.classList.toggle('warn', left < 120000); }
+  BAR.score(G.score.toLocaleString());
+  BAR.count('rows', '🚩', G.maxRow + (G.cleared ? ' ✓' : '/' + G.L.goal), 'Rows hopped / goal');
+  BAR.lives(Math.max(0, G.lives), G.lives === 1);
+  BAR.count('coins', '🪙', G.coins + (G.gems ? ' · 💎' + G.gems : ''), 'Coins (💎 gems)');
+  BAR.time(fmt(performance.now() - G.t0 - G.pausedTotal));
+  if(lockHandle){ const left = lockHandle.remainingMs(); BAR.left(left, left < 120000); }
 }
 // Keys: each player can pick their own (saved on this device). Arrow keys always hop.
 const KACTS = [['up', '⬆️ Hop forward', 'KeyW', 'W'], ['left', '⬅️ Hop left', 'KeyA', 'A'], ['right', '➡️ Hop right', 'KeyD', 'D'], ['down', '⬇️ Hop back', 'KeyS', 'S'], ['gesture', '🎲 Do a move', 'KeyX', 'X']];
@@ -761,7 +756,7 @@ function finishGame(quiet){
       '<div class="score-big">🏆 <span id="score-count">0</span></div>' +
       '<div class="stats"><span>🚩 ' + rows + ' rows</span><span>⏱ ' + fmt(ms) + '</span><span>🪙 ' + G.coins + '</span>' + (G.gems ? '<span>💎 ' + G.gems + '</span>' : '') + (G.checkpoints ? '<span>🏁 ' + G.checkpoints + '</span>' : '') + (G.nearMiss ? '<span>😱 ' + G.nearMiss + ' close calls</span>' : '') + '</div>' +
       '<div class="save-note" id="save-note"><span class="ui-spin a-pop">✅</span> Saving your score…</div>' +
-      '<div class="res-btns">' + (cleared && G.lvl < LEVELS.length - 1 ? '<button class="btn" id="b-next">' + (G.lvl === 4 ? '💀 Try Hardcore ▶' : 'Next level ▶') + '</button>' : '') + '<button class="btn' + (cleared && G.lvl < LEVELS.length - 1 ? ' soft' : '') + '" id="b-again">🔁 Play again</button><button class="btn soft" id="b-menu">◀ Back</button></div>');
+      '<div class="res-btns">' + (cleared && G.lvl < LEVELS.length - 1 ? '<button class="btn sp-btn sp-primary" id="b-next">' + (G.lvl === 4 ? '💀 Try Hardcore ▶' : 'Next level ▶') + '</button>' : '') + '<button class="btn sp-btn ' + (cleared && G.lvl < LEVELS.length - 1 ? 'soft sp-secondary' : 'sp-primary') + '" id="b-again">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🎚️ Levels</button></div>');
     countUp($('score-count'), G.score, 1100);
     const lvl = G.lvl;
     $('b-again').onclick = () => startGame(lvl);
@@ -800,7 +795,7 @@ function showResult(html){ $('result-card').innerHTML = html; $('result').classL
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pick(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
-function goGameroom(){ UI.go(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
+function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }   // 🧭 p1c: ◀ = where you came from (Gameroom if we don't know)
 
 /* ================= BOOT ================= */
 function boot(){
@@ -820,4 +815,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (r9+back-1) END OF Hopper.html -->
+<!-- (r9+back-1+p1c) END OF Hopper.html -->
