@@ -234,6 +234,7 @@ function doGet(e) {
     georead: 'GeoRead',   // 🔤 GeoRead: phonics with letter boxes (plan GeoRead) — keep on its own line
     geoscout: 'GeoScout',   // 🔢 GeoScout: number blocks + balance scale (Geometric · Scale · Count) — keep on its own line
     artifactory: 'Artifactory',   // 🏭 Artifactory: the maker app (server in ArtifactoryCode.gs) — keep on its own line
+    tdstories: 'TDStories',   // 🏰 TD-Stories: tower-defence story books (+ 🧬 SkillKit shared library) — keep on its own line
     workshop: 'Artifactory',   // 🔨 old Workshop address → Artifactory's Furniture Workshop area (af-1)
     room: 'Room',
     collection: 'Collection',
@@ -606,6 +607,7 @@ function safeSeen_(players) {
 //           (+ always the ModesTried_<Name> ledger, written by the game the first time the mode starts — markModeTried).
 //   added = 'yyyy-mm-dd' when the mode came out → a 🆕 Dashboard card for 7 days.
 const MODES_ = [
+  { game: 'tdstories', id: 'draprincess', icon: '🐉', name: 'Dra-Princess Diary', pitch: 'A dragon + princess vs every suitor!', route: 'tdstories', added: '2026-11-14', tried: { board: 'td-draprincess' } },
   { game: 'artifactory', id: 'whittle', icon: '🔪', name: 'Artifactory Whittling', pitch: 'Carve a spoon — always away from you', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'whittle']] } },
   { game: 'artifactory', id: 'print', icon: '🖨️', name: 'Artifactory 3D printing', pitch: 'Draw a shape and print it layer by layer', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'print']] } },
   { game: 'artifactory', id: 'nature', icon: '🌿', name: 'Artifactory Nature crafts', pitch: 'Weave a hat, press flowers in resin', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'nature']] } },
@@ -788,7 +790,7 @@ function modesData_(players) {
 /* ============ 📣 DASHBOARD NEWS ============ */
 // New games (first 14 days), 🌋 Extreme / 💀 Hardcore family records set in the last 7 days, games nobody has tried yet,
 // 🏁 milestones, ⚔️ close calls / 🚦 jams at the top, 📬 mail waiting and 🎂 birthdays (Settings Birthday_<Name> = 'MM-DD').
-const NEW_GAMES_ = [['artifactory', '2026-11-08', 'Make it yourself — real tools, real lessons!'], ['georead', '2026-11-08', 'Hear the letters, bump them into words!'], ['geoscout', '2026-11-08', 'Numbers you can touch!'], ['beat-piano', '2026-11-08', '🎹 Piano + 🥁 Drums + 🎸 Band — new ways to play!'], ['wisdeck', '2026-11-08', 'Learn, quiz, collect!'], ['eyes-brain', '2026-11-07', 'Remember the number!'], ['polyplot', '2026-11-07', 'Close shapes, catch creatures!'], ['soul-bopper', '2026-11-07', 'Bomber maze + ghosts!'], ['snakeast', '2026-11-07', 'Ride your snake!'], ['alignext', '2026-11-07', 'Line them up!'], ['brawl-buddies', '2026-11-07', 'Cartoon bonk battle!'], ['pose-party', '2026-11-07', 'Strike a pose!'], ['sla-brall', '2026-11-06', '5 racket sports!'], ['beat-corner', '2026-11-04', 'Hit the beat!'], ['sweet-swap', '2026-11-03', 'Swap to match 3'], ['word-board', '2026-11-03', 'Crossword words'], ['number-board', '2026-11-03', 'Crossword math']];
+const NEW_GAMES_ = [['tdstories', '2026-11-14', 'Story books: defend the tower!'], ['artifactory', '2026-11-08', 'Make it yourself — real tools, real lessons!'], ['georead', '2026-11-08', 'Hear the letters, bump them into words!'], ['geoscout', '2026-11-08', 'Numbers you can touch!'], ['beat-piano', '2026-11-08', '🎹 Piano + 🥁 Drums + 🎸 Band — new ways to play!'], ['wisdeck', '2026-11-08', 'Learn, quiz, collect!'], ['eyes-brain', '2026-11-07', 'Remember the number!'], ['polyplot', '2026-11-07', 'Close shapes, catch creatures!'], ['soul-bopper', '2026-11-07', 'Bomber maze + ghosts!'], ['snakeast', '2026-11-07', 'Ride your snake!'], ['alignext', '2026-11-07', 'Line them up!'], ['brawl-buddies', '2026-11-07', 'Cartoon bonk battle!'], ['pose-party', '2026-11-07', 'Strike a pose!'], ['sla-brall', '2026-11-06', '5 racket sports!'], ['beat-corner', '2026-11-04', 'Hit the beat!'], ['sweet-swap', '2026-11-03', 'Swap to match 3'], ['word-board', '2026-11-03', 'Crossword words'], ['number-board', '2026-11-03', 'Crossword math']];
 const NEWS_ALIAS_ = { 'beat-piano': { id: 'beat-corner', name: 'BeatCorner 🎹 Piano + 🥁 Drums', icon: '🎹', route: 'beatcorner&game=piano' } };   // news ids that are a new way to play inside an existing game (plan 11-bc)
 function gameNewOrder_() { const seen = {}, out = []; NEW_GAMES_.forEach(x => { if (NEWS_ALIAS_[x[0]] || seen[x[0]]) return; seen[x[0]] = 1; out.push(x[0]); }); return out; }   // 🆕 gro-1: Gameroom newest first
 function safeNews_(players) { try { return newsFor_(players, new Date()); } catch (e) { return []; } }
@@ -979,6 +981,8 @@ function getAdminData() {
 // a row is only added when its GameID is missing. Edit a row in the sheet
 // freely afterwards (name, icon, Status); it is never overwritten.
 const BUILT_IN_GAMES = [
+  { GameID: 'tdstories', GameName: 'TD-Stories', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Strategy + Reading (planning, choosing, story books, castle + dragon facts)',
+    Status: 'Live', PageRoute: 'tdstories', Icon: '🏰', Description: 'Tower-defence story books: 🐉👑 Dra-Princess Diary — a princess and her dragon keep every knight, prince and king away from the tower. Before each wave your heroes level up: pick ONE skill card (5 colours 🔴🔵🟤🟢🟣, Lv 1–3), evolve at tier 5, ULTIMATE at tier 10. Diary pages + 💡 lesson cards between chapters. More books coming!' },
   { GameID: 'artifactory', GameName: 'Artifactory', SkillLevel: 'build · design · every age', STEAMFocus: 'Engineering + Design (how real machines work, materials, symmetry)',
     Status: 'Live', PageRoute: 'artifactory', Icon: '🏭', Description: 'The maker app: turn cups and trophies on the 🌀 lathe, polish and cut 💎 gems, paint and engrave on the 🎨 finish bench, make things for your room — then wear what you made in the 🪞 fitting mirror. Materials from your bag and the family shelf, ⭐ blueprint challenges, a real-life lesson at every machine' },
   { GameID: 'georead', GameName: 'GeoRead', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Reading + Phonics (letter sounds, blending, spelling)',
@@ -1120,6 +1124,11 @@ function saveMazeResult(name, levelIndex, extra) {
 // Same model as the maze: Progress row (GameID, SeriesID 'main'),
 // UnlockedLevel = levels cleared (0-5), Tokens = one badge per level.
 const LEVEL_GAMES = {
+  // 🏰 TD-Stories (td-1): one Archive board per BOOK — the Theme column says the chapter ("📖 Ch 1 · The Lonely Tower")
+  'td-draprincess': {
+    badges: ['Diary Basic', 'Diary Junior', 'Diary Intermediate', 'Diary Hard', 'Diary Extreme', 'Diary Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
   // 🏭 Artifactory: ⭐ blueprint challenges — one Archive board, the Theme column says the station ("🌀 Lathe · Cup"); the detail card shows the best per station
   'artifactory': {
     badges: ['Maker Basic', 'Maker Junior', 'Maker Intermediate', 'Maker Hard', 'Maker Extreme', 'Maker Hardcore'],
@@ -1699,7 +1708,7 @@ function recordsFor_(gameId, players) {
 }
 
 // Games shown on the Achievements records board.
-const RECORD_GAMES = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'pose-party', 'brawl-buddies', 'brawenture', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'beat-piano', 'beat-drums', 'geoscout', 'georead', 'artifactory'];
+const RECORD_GAMES = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'pose-party', 'brawl-buddies', 'brawenture', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'beat-piano', 'beat-drums', 'geoscout', 'georead', 'artifactory', 'td-draprincess'];
 // Per level: the fastest finish and the top score among active players.
 function gameRecords_(gameId, players) {
   const names = {};
@@ -1937,6 +1946,17 @@ const FEATS_HEADERS = [
 ];
 const FEATS_WIDTH = FEATS_HEADERS.length;
 const FEAT_DEFS = {
+  'td-draprincess': {   // 🏰 TD-Stories · 🐉👑 Dra-Princess Diary (td-1)
+    games: { name: 'Dra-Princess chapters played', icon: '🎮', kind: 'sum', hidden: true },
+    bonks: { name: 'Suitors bonked away', icon: '💫', kind: 'sum', tiers: [50, 500, 3000] },
+    waves: { name: 'Waves held back', icon: '🌊', kind: 'sum', tiers: [10, 100, 500] },
+    perfect: { name: 'Perfect waves (no ❤️ lost)', icon: '✨', kind: 'sum', tiers: [10, 100, 400] },
+    evolves: { name: 'Hero evolutions', icon: '⭐', kind: 'sum', tiers: [2, 20, 100] },
+    ultimates: { name: 'Ultimates unlocked', icon: '☄️', kind: 'sum', tiers: [1, 10, 50] },
+    combos: { name: 'Combo skills found', icon: '🤝', kind: 'sum', tiers: [1, 10, 40] },
+    casts: { name: 'Skills used', icon: '🪄', kind: 'sum', hidden: true },
+    chapters: { name: 'Diary chapters done', icon: '📔', kind: 'max', tiers: [1, 2, 6] },
+  },
   'artifactory': {
     games: { name: 'Artifactory sessions', icon: '🎮', kind: 'sum', hidden: true },
     made: { name: 'Things made', icon: '🏭', kind: 'sum', tiers: [5, 25, 100] },
@@ -2461,6 +2481,9 @@ const FEAT_DEFS = {
 const TIER_NAMES = ['Bronze', 'Silver', 'Gold'], TIER_ICONS = ['🥉', '🥈', '🥇'];
 // Titles a player can show under their name. f = that player's feats {game: {stat: value}}, x = extra context.
 const TITLE_DEFS = [
+  { id: 'td_swatter', name: 'Suitor Swatter', icon: '💫', hint: 'Bonk 500 suitors away in 🐉👑 Dra-Princess Diary', rule: f => featVal_(f, 'td-draprincess', 'bonks') >= 500 },
+  { id: 'td_tamer', name: 'Dragon Tamer', icon: '🐉', hint: 'Evolve your TD-Stories heroes 10 times', rule: f => featVal_(f, 'td-draprincess', 'evolves') >= 10 },
+  { id: 'td_heart', name: 'Dragon Heart', icon: '❤️‍🔥', hint: 'Unlock an ULTIMATE in TD-Stories', rule: f => featVal_(f, 'td-draprincess', 'ultimates') >= 1 },
   { id: 'af_smith', name: 'Forge Master', icon: '⚒️', hint: 'Forge 20 things at the ⚒️ forge', rule: f => featVal_(f, 'artifactory', 'forge') >= 20 },
   { id: 'af_potter', name: 'Potter', icon: '🏺', hint: 'Fire 20 pots in the kiln', rule: f => featVal_(f, 'artifactory', 'pottery') >= 20 },
   { id: 'af_printer', name: '3D Printer Pro', icon: '🖨️', hint: 'Print 20 things on the 🖨️ 3D printer', rule: f => featVal_(f, 'artifactory', 'print') >= 20 },
@@ -2651,7 +2674,7 @@ function featBadges_(f) {
   return out;
 }
 function titleContext_(name, players) {
-  const cleared = {}, bigGames = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'pose-party', 'brawl-buddies', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'geoscout', 'georead', 'artifactory'];
+  const cleared = {}, bigGames = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'pose-party', 'brawl-buddies', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'geoscout', 'georead', 'artifactory', 'td-draprincess'];
   let allRound = true;
   bigGames.forEach(g => {
     const p = g === 'maze' ? mazeProgressFor_(name) : levelProgressFor_(name, g);
@@ -3568,6 +3591,7 @@ function giveCreation(from, to, id) {
 /* ---------- Daily treasures: 3 items a day (same for the whole family), each with a goal for today ---------- */
 const MINI_IDS_ = ['color-match', 'count-match', 'code-robot', 'trash-pointer'];
 const DAILY_GOALS = [
+  { id: 'tdstory', icon: '🏰', how: 'Win a TD-Stories chapter today (any level)', r: d => d.rows.some(r => r.game === 'td-draprincess' && r.stars > 0) },
   { id: 'gssolve', icon: '🔢', how: 'Solve 8 GeoScout puzzles today', r: d => (d.room.gsSolved || 0) >= 8 },
   { id: 'gsstory', icon: '📖', how: 'Play a GeoScout Journey chapter or win a Tower battle today', r: d => (d.room.gsStory || 0) >= 1 },
   { id: 'grwords', icon: '🔤', how: 'Read or build 6 words in GeoRead today', r: d => (d.room.grWords || 0) >= 6 },
@@ -4359,7 +4383,23 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1) END OF Code.gs
+
+// 🧬 SkillKit saves (td-1, plan "TD-Stories — full plan.md" §6): ONE Settings row per player per game — "SkillTree_<game>_<Name>" =
+// {ch: chapters done (only grows), last: {<hero>: SkillKit tree.save()}, lastForms} — picks + evolve forms, never a log.
+const SKILL_TREE_GAMES_ = ['td-draprincess'];
+function saveSkillTree(name, game, json) {
+  if (SKILL_TREE_GAMES_.indexOf(game) < 0) throw new Error('Unknown game.');
+  if (!activePlayers_(listProfilesFull()).some(p => p.Name === name)) throw new Error('Unknown player.');
+  json = String(json || ''); if (json.length > 6000) throw new Error('Too big.');
+  let d; try { d = JSON.parse(json); } catch (e) { throw new Error('Bad data.'); }
+  if (!d || typeof d !== 'object' || Array.isArray(d)) throw new Error('Bad data.');
+  const key = 'SkillTree_' + game + '_' + name; let old = {};
+  try { old = JSON.parse(getSettings()[key] || '{}') || {}; } catch (e) { old = {}; }
+  d.ch = Math.max(Number(old.ch) || 0, Math.min(6, Number(d.ch) || 0));
+  saveSetting(key, JSON.stringify(d));
+  return { ok: true, ch: d.ch };
+}
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -5602,6 +5642,7 @@ return {"include": typeof include === 'function' ? include : undefined,
 "saveRacket": typeof saveRacket === 'function' ? saveRacket : undefined,
 "saveBatstick": typeof saveBatstick === 'function' ? saveBatstick : undefined,
 "saveWordJournal": typeof saveWordJournal === 'function' ? saveWordJournal : undefined,
+"saveSkillTree": typeof saveSkillTree === 'function' ? saveSkillTree : undefined,
 "startPoseSession": typeof startPoseSession === 'function' ? startPoseSession : undefined,
 "doPost": typeof doPost === 'function' ? doPost : undefined,
 "savePoseCollection": typeof savePoseCollection === 'function' ? savePoseCollection : undefined,

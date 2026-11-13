@@ -1,0 +1,1258 @@
+<!-- TDStories.html -->
+<!DOCTYPE html>
+<html>
+<head>
+<script>window.SP_BUILD={"page":"tdstories","routes":{"home":"index.html","gameroom":"gameroom.html","minigames":"minigames.html","stacking":"stacking.html","setup":"setup.html","achievements":"achievements.html","maze":"maze.html","robot":"robot.html","checkers":"checkers.html","chess":"chess.html","pinball":"pinball.html","hopper":"hopper.html","turbo":"turbo.html","memory":"memory.html","mathquest":"mathquest.html","doubleup":"doubleup.html","blockdrop":"blockdrop.html","popblocks":"popblocks.html","numbergrid":"numbergrid.html","numberboard":"numberboard.html","wordboard":"wordboard.html","sweetswap":"sweetswap.html","beatcorner":"beatcorner.html","slabrall":"slabrall.html","brawlbuddies":"brawlbuddies.html","alignext":"alignext.html","soulbopper":"soulbopper.html","snakize":"snakize.html","polyplot":"polyplot.html","wisdeck":"wisdeck.html","eyesbrain":"eyesbrain.html","georead":"georead.html","geoscout":"geoscout.html","artifactory":"artifactory.html","tdstories":"tdstories.html","workshop":"workshop.html","room":"room.html","collection":"collection.html","poseparty":"poseparty.html"}};</script>
+<script src="app/boot.js"></script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-title" content="STEAM Playground">
+<meta name="theme-color" content="#2CA6DE">
+<title>STEAM Playground</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<script src="app/offline-ui.js" defer></script>
+
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link href="fonts/fonts.css" rel="stylesheet">
+<script src="inc/Themes.js"></script>
+<style>
+  /* 🏰 TD-Stories keeps its own storybook look (each book has its own colours); controls come from UiKit (bar + .sp-btn). */
+  :root{
+    --bg:#FFF4F8; --card:#FFFFFF; --panel:#FFE9F2; --ink:#3A2347; --ink-soft:#7A5C88;
+    --rose:#FF5C9A; --dragon:#22B573; --royal:#7B4FE0; --gold:#FFC845; --parch:#FFF6E3; --danger:#E5484D;
+    --terracotta:#E5487F; --mustard:#FFC845; --dusty-blue:#7A5C88; /* used by UiKit */
+    --game-a:#E5487F; --game-b:#7B4FE0;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html{height:100%;background:var(--bg);}
+  body{margin:0;min-height:100%;min-height:100dvh;background:var(--bg);color:var(--ink);font-family:'Nunito',sans-serif;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);overscroll-behavior:none;}
+  .hidden{display:none !important;}
+  h1,h2,h3{font-family:'Fredoka',sans-serif;margin:0;}
+  button{font-family:inherit;}
+  .top-btn{position:fixed;top:calc(10px + env(safe-area-inset-top));left:calc(10px + env(safe-area-inset-left));z-index:300;
+    border:none;border-radius:14px;background:var(--card);color:var(--ink-soft);cursor:pointer;padding:8px 12px;
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.82rem;box-shadow:0 3px 0 rgba(0,0,0,0.08);}
+  /* ---------- menus ---------- */
+  .screen{max-width:980px;margin:0 auto;padding:62px 18px calc(30px + var(--safe-b,18px));}
+  .title{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;margin-bottom:14px;}
+  .title .logo{font-size:2.7rem;animation:bob 2.2s ease-in-out infinite;}
+  @keyframes bob{50%{transform:translateY(-8px) rotate(-4deg);}}
+  .title h1{font-size:2rem;} .title p{margin:0;color:var(--ink-soft);font-weight:700;}
+  .who{display:inline-flex;align-items:center;gap:8px;margin-top:6px;background:var(--card);border-radius:14px;padding:6px 12px;font-weight:800;font-size:0.85rem;}
+  .who button{border:none;background:none;color:var(--rose);font-weight:800;cursor:pointer;font-size:inherit;text-decoration:underline;padding:0;}
+  .pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;}
+  .pick{background:var(--card);border:3px solid transparent;border-radius:20px;padding:12px 10px;cursor:pointer;position:relative;
+    display:flex;flex-direction:column;align-items:center;gap:4px;box-shadow:0 5px 0 rgba(0,0,0,0.08);color:var(--ink);transition:transform .15s;}
+  .pick:hover{transform:translateY(-3px);} .pick:active{transform:translateY(2px);}
+  .pick canvas{width:96px;height:112px;}
+  .pick .nm{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1.05rem;} .pick .sub{font-size:.78rem;color:var(--ink-soft);font-weight:700;}
+  .empty{text-align:center;color:var(--ink-soft);font-weight:800;padding:20px;}
+  .section-head{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1.1rem;margin:18px 4px 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .section-head .hint{font-family:'Nunito',sans-serif;font-size:.8rem;color:var(--ink-soft);font-weight:700;}
+  /* 📚 the book shelf */
+  .shelf{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(8px,2vw,22px);padding:18px clamp(8px,2vw,22px) 30px;
+    background:linear-gradient(180deg,transparent 0 calc(100% - 26px),#B07A4F calc(100% - 26px),#8B5A33 calc(100% - 8px),#6E4426 100%);border-radius:0 0 12px 12px;}
+  .book{--b1:#FF5C9A;--b2:#7B4FE0;position:relative;aspect-ratio:3/4.1;border:none;border-radius:6px 14px 14px 6px;cursor:pointer;padding:36px 8px 12px 16px;
+    background:linear-gradient(135deg,var(--b1),var(--b2));color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:space-between;text-align:center;
+    box-shadow:inset 8px 0 0 rgba(0,0,0,.18),inset 10px 0 0 rgba(255,255,255,.18),0 8px 0 rgba(0,0,0,.22),0 12px 20px rgba(0,0,0,.18);transform-origin:left bottom;
+    animation:bookIn .55s cubic-bezier(.2,1.4,.4,1) both;transition:transform .2s;}
+  .book:nth-child(2){animation-delay:.08s}.book:nth-child(3){animation-delay:.16s}.book:nth-child(4){animation-delay:.24s}
+  @keyframes bookIn{from{opacity:0;transform:translateY(-40px) rotate(-8deg);}to{opacity:1;transform:none;}}
+  .book:hover{transform:translateY(-8px) rotate(-2deg);}
+  .book .bi{font-size:clamp(1.8rem,7vw,3.6rem);filter:drop-shadow(0 4px 0 rgba(0,0,0,.2));animation:bob 2.6s ease-in-out infinite;}
+  .book .bt{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(.78rem,2.3vw,1.25rem);line-height:1.1;text-shadow:0 2px 0 rgba(0,0,0,.25);}
+  .book .bs{font-size:clamp(.6rem,1.6vw,.82rem);font-weight:800;opacity:.95;line-height:1.2;}
+  .book .bb{margin-top:4px;}
+  .book.soon{filter:saturate(.55) brightness(.92);}
+  .book .rib{position:absolute;top:10px;right:-6px;background:#FFC845;color:#5A3A00;font-weight:800;font-size:clamp(.55rem,1.5vw,.75rem);padding:3px 8px;border-radius:6px 0 0 6px;box-shadow:0 2px 0 rgba(0,0,0,.2);}
+  .book.shake{animation:shake .4s;}
+  @keyframes shake{25%{transform:translateX(-6px) rotate(-2deg)}75%{transform:translateX(6px) rotate(2deg)}}
+  @media (max-width:620px){ .shelf{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:22px;background:none;} .book{max-width:200px;justify-self:center;width:100%;aspect-ratio:3/3.7;} }
+  /* 📖 the book page: chapters + difficulty */
+  .book-head{display:flex;align-items:center;justify-content:center;gap:12px;text-align:center;flex-wrap:wrap;}
+  .book-head .bi{font-size:2.6rem;animation:bob 2.2s ease-in-out infinite;}
+  .chapters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+  @media (max-width:620px){ .chapters{grid-template-columns:repeat(2,minmax(0,1fr));} }
+  .chap{background:var(--parch);border:3px solid transparent;border-radius:16px;padding:10px 10px 8px;cursor:pointer;text-align:left;color:var(--ink);
+    box-shadow:0 4px 0 rgba(0,0,0,.08);display:flex;flex-direction:column;gap:2px;position:relative;transition:transform .15s;}
+  .chap:hover{transform:translateY(-2px);}
+  .chap .cn{font-size:.72rem;font-weight:800;color:var(--rose);} .chap .ct{font-family:'Fredoka',sans-serif;font-weight:700;font-size:.98rem;line-height:1.15;}
+  .chap .cb{font-size:.74rem;font-weight:700;color:var(--ink-soft);}
+  .chap.on{border-color:var(--rose);box-shadow:0 0 0 3px rgba(255,92,154,.25),0 4px 0 rgba(0,0,0,.08);}
+  .chap.on::after{content:'✓';position:absolute;top:6px;right:8px;background:var(--rose);color:#fff;border-radius:50%;width:22px;height:22px;display:grid;place-items:center;font-weight:800;font-size:.8rem;}
+  .chap.locked,.chap.soon{opacity:.6;cursor:default;}
+  .levels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+  @media (max-width:620px){ .levels{grid-template-columns:repeat(2,minmax(0,1fr));} }
+  .lvl{background:var(--card);border:3px solid transparent;border-radius:18px;padding:10px 8px;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--ink);box-shadow:0 5px 0 rgba(0,0,0,.08);transition:transform .15s;}
+  .lvl:hover{transform:translateY(-3px);} .lvl .big{font-size:1.9rem;} .lvl .nm{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1.02rem;}
+  .lvl .sub{font-size:.74rem;font-weight:700;color:var(--ink-soft);text-align:center;line-height:1.2;} .lvl .hp{font-size:.74rem;font-weight:800;}
+  .lvl .num{position:absolute;top:6px;left:9px;font-weight:800;color:var(--ink-soft);font-size:.78rem;} .lvl .badge{position:absolute;top:4px;right:8px;}
+  .lvl.locked{opacity:.55;} .lvl.recommended{border-color:var(--dragon);} .lvl.hardcore{background:linear-gradient(160deg,#2B1B33,#4A1D3A);color:#fff;} .lvl.hardcore .sub{color:#F2C9E0;}
+  .lvl .best{font-size:.74rem;font-weight:800;color:var(--royal);}
+  .buildbox{display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;background:var(--card);border-radius:14px;padding:8px 12px;margin-top:12px;font-weight:800;font-size:.85rem;}
+  /* 📔 diary page */
+  .diary{max-width:640px;margin:0 auto;background:linear-gradient(180deg,#FFFDF5,#FFF3D9);border-radius:10px 18px 18px 10px;padding:20px 22px 18px 34px;position:relative;
+    box-shadow:inset 14px 0 0 #F7D7E6,inset 15px 0 0 #E9B5CB,0 10px 0 rgba(0,0,0,.08),0 14px 30px rgba(120,60,90,.18);animation:pageIn .5s cubic-bezier(.2,1.2,.4,1) both;
+    background-image:repeating-linear-gradient(180deg,transparent 0 29px,rgba(123,79,224,.13) 29px 30px);}
+  @keyframes pageIn{from{opacity:0;transform:perspective(900px) rotateY(-35deg) translateX(-30px);transform-origin:left;}to{opacity:1;transform:none;}}
+  .diary .dh{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1.25rem;color:var(--rose);display:flex;align-items:center;gap:8px;}
+  .diary .dt{font-size:1.02rem;font-weight:700;line-height:30px;margin:6px 0 4px;white-space:pre-line;}
+  .diary canvas{display:block;width:100%;max-width:420px;height:150px;margin:6px auto;}
+  .lesson{max-width:640px;margin:14px auto 0;background:linear-gradient(135deg,#E9F9F0,#E6F0FF);border-radius:18px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;box-shadow:0 4px 0 rgba(0,0,0,.06);
+    animation:pageIn .5s .2s cubic-bezier(.2,1.2,.4,1) both;}
+  .lesson .li{font-size:2rem;} .lesson .lh{font-family:'Fredoka',sans-serif;font-weight:700;color:var(--dragon);} .lesson .lt{font-weight:700;font-size:.92rem;line-height:1.35;}
+  .diary-btns{display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap;}
+  /* ---------- 🎮 play (never scrolls) ---------- */
+  #scr-play{position:fixed;inset:0;display:flex;flex-direction:column;background:linear-gradient(180deg,#FFE8F2,#F3E9FF);overflow:hidden;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);}
+  #scr-play .hud{flex:0 0 auto;}
+  .arena{position:relative;flex:1 1 auto;min-height:0;display:flex;gap:8px;padding:6px 8px var(--safe-b,18px);align-items:center;justify-content:center;}
+  .arena.col{flex-direction:column;justify-content:space-evenly;}
+  .stage{position:relative;flex:0 0 auto;border-radius:18px;overflow:hidden;box-shadow:0 6px 0 rgba(80,40,90,.18),0 0 0 4px #fff;background:#9BD77F;touch-action:none;}
+  #cv{display:block;width:100%;height:100%;}
+  .goal{position:absolute;top:8px;left:calc(50% - 34px);transform:translateX(-50%);background:rgba(255,255,255,.92);border-radius:999px;padding:4px 12px;font-weight:800;font-size:clamp(.66rem,2vmin,.9rem);
+    white-space:nowrap;box-shadow:0 3px 0 rgba(0,0,0,.12);pointer-events:none;transition:opacity .4s;max-width:94%;overflow:hidden;text-overflow:ellipsis;}
+  .banner{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%) scale(.6);opacity:0;pointer-events:none;background:#fff;color:var(--ink);border-radius:20px;
+    padding:10px 18px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(.95rem,3.6vmin,1.6rem);text-align:center;box-shadow:0 6px 0 rgba(0,0,0,.15);transition:all .3s cubic-bezier(.2,1.5,.4,1);max-width:90%;}
+  .banner.on{opacity:1;transform:translate(-50%,-50%) scale(1);}
+  .banner.gold{background:linear-gradient(135deg,#FFF3B0,#FFC845);} .banner.bad{background:linear-gradient(135deg,#FFE0E6,#FFB3C3);}
+  .gobtn{position:absolute;left:50%;bottom:9%;transform:translateX(-50%);z-index:5;animation:goPulse 1.1s ease-in-out infinite;}
+  @keyframes goPulse{50%{transform:translateX(-50%) scale(1.08);}}
+  .hand{position:fixed;z-index:60;font-size:2.2rem;pointer-events:none;transition:left .35s,top .35s;filter:drop-shadow(0 3px 0 rgba(0,0,0,.25));animation:handBob .9s ease-in-out infinite;}
+  @keyframes handBob{50%{margin-top:10px;}}
+  .autobtn{position:absolute;top:6px;right:6px;z-index:4;min-width:40px;height:38px;border:none;border-radius:12px;background:rgba(255,255,255,.88);font-size:.85rem;font-weight:800;font-family:Fredoka,sans-serif;cursor:pointer;box-shadow:0 3px 0 rgba(0,0,0,.15);padding:0 6px;}
+  .autobtn.on{background:#D7F7E4;box-shadow:0 0 0 3px #22A867,0 3px 0 rgba(0,0,0,.15);}
+  #combo-btn{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:4;--skk-bs:54px;}
+  /* hero panel */
+  .panel{flex:0 1 auto;display:flex;gap:8px;min-width:0;}
+  .arena.col .panel{flex-direction:row;width:100%;justify-content:center;}
+  .arena:not(.col) .panel{flex-direction:column;}
+  .hero{background:rgba(255,255,255,.92);border-radius:16px;padding:6px 8px;display:flex;flex-direction:column;gap:5px;box-shadow:0 4px 0 rgba(80,40,90,.12);min-width:0;flex:1 1 0;}
+  .arena:not(.col) .hero{flex:0 0 auto;}
+  .hero .hh{display:flex;align-items:center;gap:6px;min-width:0;}
+  .hero .hf{font-size:var(--hf,1.8rem);line-height:1;flex:0 0 auto;transition:transform .3s;}
+  .hero .hf.evo{animation:evo 1s ease-in-out 2;}
+  @keyframes evo{50%{transform:scale(1.5) rotate(10deg);filter:drop-shadow(0 0 10px gold);}}
+  .hero .hn{min-width:0;flex:1 1 auto;}
+  .hero .hn b{display:block;font-family:'Fredoka',sans-serif;font-size:clamp(.72rem,2.2vmin,.95rem);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hero .hn small{display:block;font-size:.66rem;font-weight:800;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hero .btns{display:flex;gap:var(--bgap,7px);align-items:center;padding-bottom:5px;}
+  .hero .btns .skk-btn{flex:0 0 auto;}
+  .hero .key{font-size:.58rem;color:var(--ink-soft);font-weight:800;}
+  /* result */
+  .result{position:fixed;inset:0;z-index:200;background:rgba(40,20,50,.55);display:flex;flex-direction:column;justify-content:flex-start;align-items:center;padding:12px;overflow:auto;}
+  .result::after{content:'';flex:0 0 var(--safe-b,18px);}
+  .result-card{margin:auto;background:var(--card);border-radius:24px;padding:18px 18px 16px;max-width:460px;width:100%;text-align:center;box-shadow:0 10px 0 rgba(0,0,0,.15);animation:pageIn .5s cubic-bezier(.2,1.2,.4,1) both;}
+  .result-card .rh{font-size:2.6rem;} .result-card h2{font-size:1.5rem;margin:2px 0;} .result-card .rs{font-weight:800;color:var(--ink-soft);}
+  .result-card .stars{font-size:1.9rem;letter-spacing:4px;margin:4px 0;}
+  .result-card .score{font-family:'Fredoka',sans-serif;font-size:1.6rem;font-weight:700;color:var(--royal);}
+  .result-card .builds{display:flex;flex-direction:column;gap:4px;align-items:center;margin:8px 0;font-weight:800;font-size:.85rem;}
+  .result-card canvas{width:120px;height:120px;}
+  .res-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px;}
+  .save-note{font-size:.82rem;font-weight:800;color:var(--ink-soft);margin-top:6px;}
+  .confetti{position:fixed;top:-40px;z-index:250;font-size:1.6rem;pointer-events:none;animation:fall linear forwards;}
+  @keyframes fall{to{transform:translateY(110vh) rotate(540deg);}}
+  .rules{background:var(--card);border-radius:16px;padding:10px 14px;margin-top:14px;font-size:.88rem;}
+  .rules summary{font-family:'Fredoka',sans-serif;font-weight:700;cursor:pointer;}
+  .rules li{margin:4px 0;font-weight:700;}
+  .colkey{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:8px;}
+  .colkey span{background:var(--card);border-radius:999px;padding:3px 9px;font-size:.74rem;font-weight:800;border:2px solid var(--c);}
+</style>
+<script src="inc/UiKit.js"></script>
+<script src="inc/BallSkins.js"></script>
+<script src="inc/AvatarKit.js"></script>
+<script src="inc/AvatarActing.js"></script>
+<script src="inc/SkillKit.js"></script>
+</head>
+<body ontouchstart="">
+<button class="top-btn" id="back-btn" data-sound="none" onclick="goBack()">◀ Back</button>
+
+<section class="screen hidden" id="scr-player">
+  <div class="title"><div class="logo">🏰</div><h1>TD-Stories</h1><p>Who's reading tonight?</p></div>
+  <div class="pick-grid" id="player-list"></div>
+</section>
+
+<section class="screen hidden" id="scr-menu">
+  <div class="title"><div class="logo">🏰</div><h1>TD-Stories</h1><p>Tower-defence story books — pick a book!</p>
+    <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
+  <div class="shelf" id="shelf"></div>
+  <details class="rules"><summary>📖 How TD-Stories works</summary><ul>
+    <li><b>Defend:</b> enemies walk along the paths to your tower. Your heroes stop them — and nobody gets hurt, they just give up and fly away!</li>
+    <li><b>Skills:</b> before every wave each hero levels up: pick ONE card. Tap the round skill buttons to use them.</li>
+    <li><b>Colours:</b> <span style="color:#E5484D">🔴 Attack</span> · <span style="color:#3A86FF">🔵 Helpers</span> · <span style="color:#A0612C">🟤 Traps</span> · <span style="color:#22A867">🟢 Shields</span> · <span style="color:#8B5CF6">🟣 Charms</span> — one skill of each colour, up to Lv 3.</li>
+    <li><b>Evolve:</b> at tier 5 your heroes evolve and you pick a main colour; at tier 10 they get their ULTIMATE.</li>
+  </ul></details>
+</section>
+
+<section class="screen hidden" id="scr-levels">
+  <div class="title"><div class="book-head"><span class="bi" id="book-icon">🐉👑</span><div><h1 id="book-title">Dra-Princess Diary</h1><p id="book-sub">A princess, a dragon, and far too many suitors</p></div></div></div>
+  <div class="section-head">📖 Pick a chapter <span class="hint" id="chap-hint"></span></div>
+  <div class="chapters" id="chapters"></div>
+  <div class="section-head">🎚️ Pick how hard <span class="hint">— tap to read the diary and start</span></div>
+  <div class="levels" id="level-list"></div>
+  <div class="buildbox" id="buildbox"></div>
+  <div class="ui-leaders" id="leaders"></div>
+</section>
+
+<section class="screen hidden" id="scr-diary">
+  <div class="diary" id="diary"></div>
+  <div class="lesson" id="lesson"></div>
+  <div class="diary-btns" id="diary-btns"></div>
+</section>
+
+<section class="hidden" id="scr-play">
+  <div class="hud" id="gbar"></div>
+  <div class="arena" id="arena">
+    <div class="stage" id="stage">
+      <canvas id="cv"></canvas>
+      <div class="goal" id="goal">🏰 Keep the suitors away from the tower!</div>
+      <div class="banner" id="banner"></div>
+      <div id="combo-slot"></div>
+      <button class="autobtn" id="auto-btn" data-sound="tap" title="Auto skills: off" onclick="toggleAuto()">🤖 Auto</button>
+      <button class="sp-btn sp-primary gobtn hidden" id="go-btn" data-sound="pop" onclick="goNow()">▶ Go!</button>
+    </div>
+    <div class="panel" id="panel"></div>
+  </div>
+</section>
+<div class="hand hidden" id="hand">👆</div>
+<div class="result hidden" id="result"><div class="result-card" id="result-card"></div></div>
+<script>
+// ENGINE START — 🏰 TD-Stories engine (pure JS, no DOM; Test Harness/tdstories.js loads SkillKit + this part in node)
+const TD = (function(){
+'use strict';
+const SK = (typeof SkillKit !== 'undefined') ? SkillKit : (typeof window !== 'undefined' ? window.SkillKit : globalThis.SkillKit);
+const W = 16, CX = 8, CY = 8, TOWER_R = 1.15, STEP = 1 / 30;
+function rngOf(seed){ let a = (seed >>> 0) || 1; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/* ---------- 🎚️ difficulty (6 house levels) ---------- */
+const LEVELS = [
+  {name: 'Basic', emoji: '🌱', hp: 0.62, spd: 0.72, hearts: 20, cards: 2, glow: 99, guide: true, mult: 1, bot: 0, assist: 3, blurb: 'Slow suitors, the best card glows'},
+  {name: 'Junior', emoji: '🐣', hp: 0.8, spd: 0.82, hearts: 16, cards: 3, glow: 3, mult: 1, bot: 0.34, assist: 7, blurb: 'Three cards to pick from'},
+  {name: 'Intermediate', emoji: '🌳', hp: 1, spd: 0.92, hearts: 12, cards: 3, glow: 0, mult: 1, bot: 0.5, blurb: 'The suitors level up too'},
+  {name: 'Hard', emoji: '🔥', hp: 1.22, spd: 1.0, hearts: 10, cards: 3, glow: 0, mult: 1, bot: 1, blurb: 'Tough knights, quick feet'},
+  {name: 'Extreme', emoji: '⚡', hp: 1.48, spd: 1.08, hearts: 8, cards: 3, glow: 0, mult: 1, bot: 1, blurb: 'A royal rush'},
+  {name: 'Hardcore', emoji: '💀', hp: 1.75, spd: 1.14, hearts: 5, cards: 3, glow: 0, mult: 3, bot: 1, hardcore: true, blurb: '5 hearts, no hints, ×3 points'},
+];
+
+/* ---------- 🤴 suitors (hope = how long they keep trying; nobody gets hurt) ---------- */
+const SUITORS = {
+  sq: {name: 'Squire', icon: '👦', prop: '🪜', hp: 16, spd: 1.15, pts: 10, w: 1, climb: true, skill: '🪜 Love Ladder — climbs over walls'},
+  kn: {name: 'Knight', icon: '🤺', prop: '💐', hp: 38, spd: 0.8, pts: 20, w: 2, charge: true, skill: '🛡️ Shield Charge — runs past the first trap'},
+  bd: {name: 'Bard', icon: '🧑‍🎤', prop: '🎻', hp: 26, spd: 0.9, pts: 18, w: 1, lull: true, skill: '🎻 Lute Lullaby — the Dragon gets sleepy'},
+  pr: {name: 'Prince', icon: '🤴', prop: '🌹', hp: 46, spd: 0.92, pts: 28, w: 2, serenade: true, bomb: true, skill: '🎵 Serenade slows towers · 💐 Flower Bomb turns a tower off'},
+  cu: {name: 'Cupid Archer', icon: '👼', prop: '🏹', hp: 22, spd: 1.25, pts: 22, w: 1, arrow: true, skill: '💘 Love Arrow — one princess skill waits longer'},
+  boss1: {name: 'Sir Bouquet', icon: '🤺', prop: '💐', hp: 520, spd: 0.42, pts: 400, w: 6, boss: true, size: 1.8, bouquet: true, skill: '💐 Throws bouquets at the Dragon + calls squires'},
+  boss2: {name: 'Sir Shiny', icon: '🤺', prop: '✨', hp: 720, spd: 0.42, pts: 550, w: 6, boss: true, size: 1.9, shine: true, skill: '✨ Shiny armour blocks hits + dazzles the Princess'},
+};
+
+/* ---------- 📖 books + chapters ---------- */
+// group = [type, count, path (-1 = take turns), gap seconds, start second]
+const PATHS = {
+  west: [[-0.6, 4], [3, 4], [3, 11], [5.5, 11], [5.5, 8], [6.75, 8]],
+  east: [[16.6, 12], [13, 12], [13, 5], [10.5, 5], [10.5, 8], [9.25, 8]],
+  south: [[8, 16.6], [8, 14.2], [11.5, 14.2], [11.5, 10.8], [8.6, 10.8], [8, 9.25]],
+  north: [[8, -0.6], [8, 2], [4.6, 2], [4.6, 6.2], [7.2, 6.2], [8, 6.75]],
+};
+const BOOKS = {
+  draprincess: {
+    id: 'draprincess', board: 'td-draprincess', title: 'Dra-Princess Diary', icon: '🐉👑', heroes: ['dragon', 'princess'],
+    chapters: [
+      {n: 1, title: 'The Lonely Tower', boss: 'boss1', paths: ['west', 'east'], scene: 'meadow', waves: [
+        [['sq', 4, -1, 1.7, 0]],
+        [['sq', 6, -1, 1.3, 0]],
+        [['sq', 4, 0, 1.2, 0], ['kn', 2, 1, 2.6, 2]],
+        [['kn', 3, -1, 2, 0], ['sq', 4, -1, 1.1, 3]],
+        [['sq', 8, -1, 0.9, 0], ['bd', 1, 0, 0, 5]],
+        [['kn', 4, -1, 1.6, 0], ['bd', 2, -1, 4, 2]],
+        [['sq', 10, -1, 0.75, 0], ['kn', 3, -1, 2, 4]],
+        [['kn', 6, -1, 1.25, 0], ['bd', 2, -1, 3, 3], ['sq', 6, -1, 0.8, 6]],
+        [['sq', 12, -1, 0.6, 0], ['kn', 5, -1, 1.3, 3], ['bd', 3, -1, 2.5, 5]],
+        [['boss1', 1, 0, 0, 0], ['sq', 8, -1, 1.3, 3], ['kn', 4, 1, 3, 8]],
+      ]},
+      {n: 2, title: 'A Dragon at My Window', boss: 'boss2', paths: ['west', 'east', 'south'], scene: 'sunset', waves: [
+        [['sq', 6, -1, 1.2, 0]],
+        [['kn', 3, -1, 2, 0], ['pr', 1, 2, 0, 4]],
+        [['sq', 8, -1, 0.9, 0], ['cu', 1, 2, 0, 3]],
+        [['kn', 4, -1, 1.5, 0], ['pr', 2, -1, 3, 2]],
+        [['sq', 10, -1, 0.7, 0], ['bd', 2, -1, 3, 2], ['cu', 1, -1, 0, 5]],
+        [['kn', 6, -1, 1.2, 0], ['pr', 2, -1, 3, 3]],
+        [['sq', 12, -1, 0.6, 0], ['cu', 2, -1, 3, 2], ['bd', 2, -1, 3, 4]],
+        [['kn', 8, -1, 1, 0], ['pr', 3, -1, 2.5, 3], ['cu', 1, -1, 0, 6]],
+        [['sq', 14, -1, 0.5, 0], ['kn', 6, -1, 1.1, 2], ['pr', 2, -1, 3, 5], ['cu', 2, -1, 3, 6], ['bd', 2, -1, 3, 7]],
+        [['boss2', 1, 2, 0, 0], ['pr', 3, -1, 2.4, 3], ['kn', 6, -1, 1.4, 6]],
+      ]},
+      {n: 3, title: 'Princes Everywhere', soon: true}, {n: 4, title: 'The Dragon Heart', soon: true}, {n: 5, title: 'Kings Come Knocking', soon: true}, {n: 6, title: 'Happily Ever Dragon', soon: true},
+    ],
+  },
+};
+function buildPath(pts){
+  const seg = []; let len = 0;
+  for(let i = 1; i < pts.length; i++){ const a = pts[i - 1], b = pts[i], l = dist(a[0], a[1], b[0], b[1]); seg.push({a, b, l, s: len}); len += l; }
+  return {pts, seg, len};
+}
+function ptAt(P, d){
+  d = clamp(d, 0, P.len); for(const s of P.seg){ if(d <= s.s + s.l || s === P.seg[P.seg.length - 1]){ const f = s.l ? (d - s.s) / s.l : 0;
+    return {x: s.a[0] + (s.b[0] - s.a[0]) * f, y: s.a[1] + (s.b[1] - s.a[1]) * f, ang: Math.atan2(s.b[1] - s.a[1], s.b[0] - s.a[0])}; } }
+  return {x: CX, y: CY, ang: 0};
+}
+
+/* ---------- 🧬 hero packs (SkillKit engines, our names) ---------- */
+const PACKS = {
+  dragon: SK.pack('td-draprincess:dragon', [
+    {key: 'a_cone', name: 'Fire Breath', icon: '🔥'}, {key: 'a_bounce', name: 'Bounce Fireball', icon: '🔁'}, {key: 'a_tornado', name: 'Fire Tornado', icon: '🌀'}, {key: 'a_meteor', name: 'Sky Fire', icon: '☄️'},
+    {key: 'pa_power', name: 'Hotter Fire', icon: '🌶️'}, {key: 'pa_rate', name: 'Quick Wings', icon: '🪽'}, {key: 'pa_crit', name: 'Lucky Flame', icon: '🍀'}, {key: 'pa_burn', name: 'Ember Scales', icon: '♨️'},
+    {key: 'b_minion', name: 'Baby Dragons', icon: '🐣', desc: '{cnt} baby dragons hop out and block the path ({hp} toughness).'}, {key: 'b_gold', name: 'Hoard Gold', icon: '💰'}, {key: 'b_haste', name: 'Dragon Dash', icon: '💨'},
+    {key: 'pb_gold', name: 'Shiny Hoard', icon: '🪙'}, {key: 'pb_cd', name: 'Warm Up', icon: '⏱️'},
+    {key: 'c_lava', name: 'Lava Floor', icon: '🌋'}, {key: 'c_mine', name: 'Egg Mines', icon: '🥚'}, {key: 'c_pit', name: 'Claw Pit', icon: '🕳️'}, {key: 'pc_big', name: 'Big Claws', icon: '⭕'}, {key: 'pc_more', name: 'More Eggs', icon: '➕'},
+    {key: 'd_armor', name: 'Scale Aura', icon: '🐉'}, {key: 'd_shield', name: 'Wing Shield', icon: '🪽'}, {key: 'pd_regen', name: 'Warm Nest', icon: '🪺'}, {key: 'pd_armor', name: 'Thick Scales', icon: '🧥'},
+    {key: 'e_push', name: 'Wing Gust', icon: '🌪️'}, {key: 'e_sleep', name: 'Sleepy Smoke', icon: '💤'}, {key: 'e_fear', name: 'Roar', icon: '🦁', desc: 'ROAR! They run away for {dur}s.'}, {key: 'e_pull', name: 'Big Inhale', icon: '🧲'}, {key: 'pe_long', name: 'Long Smoke', icon: '⏳'},
+    {key: 'u_meteor', name: 'Heart Meteor', icon: '❤️‍🔥'}, {key: 'u_army', name: 'Baby Dragon Swarm', icon: '🐲'}, {key: 'u_field', name: 'Egg Field', icon: '🥚'}, {key: 'u_fort', name: 'Dragon Hug', icon: '🫂'}, {key: 'u_charm', name: 'Dragon Charm', icon: '💘'},
+    {key: 'x_burst', name: 'Love Flame', icon: '💞'}, {key: 'x_guard', name: 'Wing Hug', icon: '🤝'}, {key: 'x_wall', name: 'Egg + Thorn Party', icon: '🎆'},
+  ]),
+  princess: SK.pack('td-draprincess:princess', [
+    {key: 'a_whip', name: 'Hair Power', icon: '💇‍♀️', desc: 'Her hair grows and whips them off the path: {dmg} hope.'}, {key: 'a_swarm', name: 'Paper Birds', icon: '🕊️', desc: '{cnt} diary paper birds hit for {dmg} hope.'}, {key: 'a_storm', name: 'Rose Petal Storm', icon: '🌹'}, {key: 'a_shot', name: 'Royal Slap', icon: '👋'},
+    {key: 'pa_power', name: 'Strong Hair', icon: '💪'}, {key: 'pa_rate', name: 'Fast Swats', icon: '⏩'},
+    {key: 'b_tower', name: 'Rose Tower', icon: '🗼', desc: 'Builds a tower next to hers that shoots roses for {dur}s.'}, {key: 'b_minion', name: 'Castle Mice', icon: '🐭'}, {key: 'b_flyer', name: 'Dove Friends', icon: '🕊️'}, {key: 'b_wall', name: 'Wardrobe Wall', icon: '👗'}, {key: 'b_decoy', name: 'Tea Party Table', icon: '🫖', desc: 'Suitors stop for tea and cake for {dur}s.'},
+    {key: 'pb_summon', name: 'Royal Friends', icon: '💖'}, {key: 'pb_range', name: 'Tower View', icon: '🔭'}, {key: 'pb_cd', name: 'Busy Princess', icon: '⏱️'},
+    {key: 'c_spikes', name: 'Thorn Garden', icon: '🌹'}, {key: 'c_net', name: 'Hair Net', icon: '🧶'}, {key: 'c_splash', name: 'Moat Splash', icon: '🐸'}, {key: 'pc_more', name: 'More Thorns', icon: '➕'}, {key: 'pc_quick', name: 'Garden Gloves', icon: '🧤'},
+    {key: 'd_reflect', name: 'Mirror of "NO!"', icon: '🪞'}, {key: 'd_shield', name: 'Tower Shield', icon: '🏰'}, {key: 'd_heal', name: 'Heal the Tower', icon: '💚'}, {key: 'd_dome', name: 'Bubble Tower', icon: '🫧'},
+    {key: 'pd_thorns', name: 'Rose Walls', icon: '🌹'}, {key: 'pd_last', name: 'Lucky Locket', icon: '🍀'},
+    {key: 'e_daze', name: 'Heart Flash', icon: '💞', desc: 'Mini hearts flash — suitors stop in a daze for {dur}s.'}, {key: 'e_push', name: 'Bell of Rejection', icon: '🔔'}, {key: 'e_sleep', name: 'Perfume Cloud', icon: '💤'}, {key: 'e_ew', name: 'Ew, NO!', icon: '😝'}, {key: 'e_charm', name: 'Wink', icon: '😉', desc: '{cnt} suitors fall for a FRIEND instead and walk back bonking the others ({dur}s).'},
+    {key: 'pe_slow', name: 'Icy Stare', icon: '🧊'}, {key: 'pe_flee', name: 'Scary Face', icon: '👻'},
+    {key: 'u_meteor', name: 'Rose Meteor', icon: '🌹'}, {key: 'u_army', name: 'Royal Parade', icon: '🎉'}, {key: 'u_field', name: 'Thorn Kingdom', icon: '🌵'}, {key: 'u_fort', name: 'Sage Fortress', icon: '🏯'}, {key: 'u_charm', name: 'Love Storm', icon: '💘'},
+    {key: 'x_burst', name: 'Love Flame', icon: '💞'}, {key: 'x_guard', name: 'Wing Hug', icon: '🤝'}, {key: 'x_wall', name: 'Egg + Thorn Party', icon: '🎆'},
+  ]),
+  suitors: SK.pack('td-draprincess:suitors', [
+    {key: 'en_hope', name: 'Love Letters', icon: '💌'}, {key: 'en_speed', name: 'Running Shoes', icon: '👟'}, {key: 'en_armor', name: 'Shiny Armour', icon: '🛡️'},
+    {key: 'en_heal', name: 'Cheer Up', icon: '💗'}, {key: 'en_rush', name: 'Royal Rush', icon: '🏇'}, {key: 'en_shield', name: 'Bouquet Shields', icon: '💐'},
+    {key: 'en_jam', name: 'Love Song', icon: '🎶'}, {key: 'en_more', name: 'Bring Friends', icon: '👥'}, {key: 'en_trapdodge', name: 'Hop Over', icon: '🦘'},
+  ]),
+};
+const COMBOS = [{key: 'x_burst', cols: ['A', 'E'], name: '💞 Love Flame'}, {key: 'x_guard', cols: ['D', 'B'], name: '🤝 Wing Hug'}, {key: 'x_wall', cols: ['C', 'A'], name: '🎆 Egg + Thorn Party'}];
+const HEROES = {
+  dragon: {name: 'Dragon', icon: '🐉', forms: ['Hatchling', 'Fire Wyrm', 'Heart Dragon'], formIcons: ['🐲', '🐉', '🐉'], dmg: 8, rate: 0.95, range: 6},
+  princess: {name: 'Princess', icon: '👸', forms: ['Princess', 'Dragon-Heart Princess', 'Sage of the Tower'], formIcons: ['👸', '👸', '🧙‍♀️'], dmg: 10, rate: 1.25, range: 2.9},
+};
+
+/* ---------- a new match ---------- */
+function newMatch(o){
+  o = o || {}; const B = BOOKS[o.book || 'draprincess'], C = B.chapters[(o.chapter || 1) - 1], L = LEVELS[clamp(o.level | 0, 0, 5)];
+  const rng = rngOf(o.seed != null ? o.seed : (Date.now() & 0xffffff));
+  const M = {B, C, L, lvl: clamp(o.level | 0, 0, 5), rng, t: 0, wt: 0, wave: -1, state: 'pick', queue: [], paused: false, speed: 1,
+    paths: C.paths.map(k => buildPath(PATHS[k])), enemies: [], towers: [], minions: [], flyers: [], traps: [], zones: [], walls: [], decoys: [], fx: [], ev: [],
+    hearts: L.hearts, heartsMax: L.hearts, shieldHp: 0, shieldT: 0, domeT: 0, armorT: 0, armorV: 0, reflectN: 0, reflectT: 0, hasteT: 0, hasteV: 0, lastUsed: 0,
+    score: 0, spawnQ: [], idN: 1, cd: {dragon: {}, princess: {}}, readyT: {dragon: {}, princess: {}}, jam: {dragon: {}, princess: {}}, auto: {dragon: !!o.auto, princess: !!o.auto},
+    heroes: {dragon: {x: CX + 1.9, y: CY, ang: 0, atk: 0.5, dazeT: 0, sleepy: 0}, princess: {x: CX, y: CY - 0.25, atk: 0.8, dazeT: 0}},
+    stats: {bonks: 0, waves: 0, evolves: 0, ultimates: 0, combos: 0, perfect: 0, casts: 0, hearts: 0}, lostThisWave: 0, enCd: {}, mods: {}};
+  const glowN = L.glow;
+  M.trees = {
+    dragon: SK.tree({pack: PACKS.dragon, hero: 'dragon', forms: HEROES.dragon.forms, cards: L.cards, glow: glowN > 0, rng, combos: COMBOS}),
+    princess: SK.tree({pack: PACKS.princess, hero: 'princess', forms: HEROES.princess.forms, cards: L.cards, glow: glowN > 0, rng, combos: COMBOS}),
+    suitors: SK.tree({pack: PACKS.suitors, hero: 'suitors', forms: ['Suitors', 'Royal Guard', "The King's Army"], cards: 3, rng, bot: true}),
+  };
+  M.trees.dragon.partner = M.trees.princess; M.trees.princess.partner = M.trees.dragon;
+  M.glowLeft = glowN;
+  M.spots = buildSpots(M);
+  M.queue = ['dragon', 'princess'];
+  refreshMods(M);
+  return M;
+}
+function buildSpots(M){
+  const out = [];
+  for(let i = 0; i < 12; i++){ const a = i / 12 * Math.PI * 2, x = CX + Math.cos(a) * 2.5, y = CY + Math.sin(a) * 2.5;
+    let near = 9; M.paths.forEach(P => { for(let d = 0; d <= P.len; d += 0.4){ const p = ptAt(P, d); near = Math.min(near, dist(p.x, p.y, x, y)); } });
+    if(near > 0.75) out.push({x, y, used: false}); }
+  return out;
+}
+function refreshMods(M){ ['dragon', 'princess', 'suitors'].forEach(h => { M.mods[h] = M.trees[h].mods(); }); }
+function ev(M, k, o){ M.ev.push(Object.assign({k, t: M.t}, o || {})); }
+function fx(M, k, o){ M.fx.push(Object.assign({k, t: 0, dur: 0.5}, o)); }
+function takeEvents(M){ const e = M.ev; M.ev = []; return e; }
+
+/* ---------- picks (the game PAUSES: state 'pick' = nothing moves) ---------- */
+function offer(M){
+  if(M.state !== 'pick' || !M.queue.length) return null;
+  const h = M.queue[0], T = M.trees[h];
+  T.glow = M.glowLeft > 0;
+  const o = T.offer(); if(!o){ M.queue.shift(); return offer(M); }
+  return o;
+}
+function take(M, card){
+  const h = M.queue[0], T = M.trees[h]; if(!h || !card) return;
+  const ch = T.take(card);
+  if(card.type === 'evolve'){ M.stats.evolves++; ev(M, 'evolve', {hero: h, form: T.form, col: card.col}); }
+  if(card.type === 'ultimate'){ M.stats.ultimates++; ev(M, 'ultimate', {hero: h, key: card.key}); }
+  if(card.type === 'combo'){ M.stats.combos++; ev(M, 'combo', {hero: h, key: card.key}); }
+  ev(M, 'picked', {hero: h, card: card.key, type: card.type, col: card.col, tier: T.tier});
+  M.queue.shift(); refreshMods(M);
+  if(!M.queue.length){ if(M.glowLeft > 0) M.glowLeft--; M.state = 'break'; M.wt = 0; }
+  return ch;
+}
+function startWave(M){
+  if(M.state !== 'break') return false;
+  M.wave++; M.state = 'wave'; M.wt = 0; M.lostThisWave = 0; M.spawnQ = [];
+  const groups = M.C.waves[M.wave], more = M.mods.suitors.enMore || 0;
+  groups.forEach(g => { const [type, n0, path, gap, at] = g, n = n0 + (SUITORS[type].boss ? 0 : Math.round(more));
+    for(let i = 0; i < n; i++) M.spawnQ.push({type, at: at + i * gap, path: path < 0 ? i % M.paths.length : Math.min(path, M.paths.length - 1)}); });
+  M.spawnQ.sort((a, b) => a.at - b.at);
+  ev(M, 'wave', {n: M.wave + 1, of: M.C.waves.length, boss: groups.some(g => SUITORS[g[0]].boss)});
+  return true;
+}
+function spawn(M, type, pi, d){
+  const S = SUITORS[type], L = M.L, m = M.mods.suitors, wv = Math.max(0, M.wave);
+  const hp = S.hp * L.hp * (1 + 0.09 * wv) * (1 + (m.enHp || 0)) * (S.boss ? 1 : 1);
+  const e = {id: M.idN++, type, S, pi, d: d || 0, hp, hpMax: hp, spd: S.spd * L.spd * (1 + (m.enSpeed || 0)), x: 0, y: 0, dir: 1,
+    slowT: 0, slowF: 0, stunT: 0, rootT: 0, sleepT: 0, fearT: 0, confT: 0, confDir: 1, charmT: 0, burnT: 0, burnD: 0, stopT: 0, shield: 0, shine: 0,
+    charge: S.charge ? 1 : 0, skT: 3 + M.rng() * 3, bombed: false, boss: !!S.boss, born: M.t, gone: 0};
+  const p = ptAt(M.paths[pi], e.d); e.x = p.x; e.y = p.y; M.enemies.push(e);
+  if(e.boss) ev(M, 'boss', {type, name: S.name});
+  return e;
+}
+
+/* ---------- 🎯 helpers ---------- */
+function live(M){ return M.enemies.filter(e => !e.gone && e.charmT <= 0); }
+function heroPos(M, h){ const H = M.heroes[h]; return {x: H.x, y: H.y}; }
+function progress(M, e){ return e.d / M.paths[e.pi].len; }
+function bestPoint(M, ox, oy, range, r){
+  const L = live(M).filter(e => dist(e.x, e.y, ox, oy) <= range); if(!L.length) return null;
+  let best = null, bs = -1;
+  L.forEach(c => { let s = 0; L.forEach(e => { if(dist(e.x, e.y, c.x, c.y) <= r) s += 1 + progress(M, e); }); if(s > bs){ bs = s; best = c; } });
+  return best ? {x: best.x, y: best.y, e: best} : null;
+}
+function closest(M, ox, oy, range){ let best = null, bd = 1e9; live(M).forEach(e => { const d = dist(e.x, e.y, ox, oy); if(d <= range && (1 - progress(M, e)) * 4 + d < bd){ bd = (1 - progress(M, e)) * 4 + d; best = e; } }); return best; }
+function busiestPath(M){ const c = M.paths.map(() => 0); live(M).forEach(e => { c[e.pi] += 1 + progress(M, e); }); let i = 0; c.forEach((v, j) => { if(v > c[i]) i = j; }); if(!live(M).length){ const q = M.spawnQ[0]; if(q) i = q.path; } return i; }
+function heroMods(M, h){ return M.mods[h] || {}; }
+function hit(M, e, dmg, src){
+  if(!e || e.gone || e.charmT > 0) return;
+  const hm = src && src.hero ? heroMods(M, src.hero) : {};
+  if(src && src.hero){ dmg *= 1 + (hm.dmgMul || 0); if(src.col && hm['col' + src.col]) dmg *= 1 + hm['col' + src.col]; if(hm.crit && M.rng() < hm.crit){ dmg *= 2; fx(M, 'crit', {x: e.x, y: e.y, dur: 0.6}); } }
+  if(e.shine > 0){ e.shine--; fx(M, 'ting', {x: e.x, y: e.y, dur: 0.4}); return; }
+  dmg *= 1 - Math.min(0.6, M.mods.suitors.enArmor || 0);
+  if(e.shield > 0){ const a = Math.min(e.shield, dmg); e.shield -= a; dmg -= a; }
+  e.hp -= dmg; if(e.sleepT > 0) e.sleepT = 0;
+  if(src && src.hero){ if(hm.burnHit){ e.burnT = Math.max(e.burnT, 2); e.burnD = Math.max(e.burnD, hm.burnHit); } if(hm.slowHit){ e.slowT = Math.max(e.slowT, 1); e.slowF = Math.max(e.slowF, hm.slowHit); }
+    if(hm.fearHit && !e.boss && M.rng() < hm.fearHit) e.fearT = Math.max(e.fearT, 0.8); }
+  if(e.hp <= 0) bonk(M, e, src);
+}
+function bonk(M, e, src){
+  if(e.gone) return; e.gone = 1; e.goneT = 0; e.flyA = (M.rng() * 2 - 1) * Math.PI; M.stats.bonks++;
+  const pts = Math.round(e.S.pts * M.L.mult * (1 + (heroMods(M, 'dragon').goldMul || 0) + (heroMods(M, 'princess').goldMul || 0)));
+  M.score += pts; ev(M, 'bonk', {type: e.type, x: e.x, y: e.y, pts, boss: e.boss, by: src && src.hero});
+}
+function durOf(M, h, v, col){ const m = heroMods(M, h); return v * (1 + (m.durMul || 0) * (col === 'E' ? 1 : 0.5)) * (1 + (col && m['col' + col] || 0)); }
+
+/* ---------- 🪄 casting a SkillKit engine (one executor for every engine shape) ---------- */
+function skillOf(M, h, key){ const T = M.trees[h], e = T.pack.get(key); if(!e) return null; const lv = (T.ult === key || T.combo === key) ? 1 : (T.skills[key] || 0); if(!lv) return null; return {e, lv, n: SK.num(e, lv)}; }
+function cdOf(M, h, key){ const s = skillOf(M, h, key); if(!s) return 0; const m = heroMods(M, h); let cd = s.e.cd * (1 - Math.min(0.5, m.cdMul || 0)); if(s.e.shape === 'trap') cd *= 1 - Math.min(0.5, m.trapCd || 0); return cd; }
+function ready(M, h, key){ return (M.cd[h][key] || 0) <= 0; }
+function canAim(M, h, key){
+  const s = skillOf(M, h, key); if(!s) return false; const sh = s.e.shape, L = live(M);
+  if(sh === 'heal' || s.e.fx === 'heal') return M.hearts < M.heartsMax;
+  if(sh === 'gold') return true;
+  if(sh === 'shield' || sh === 'dome' || sh === 'reflect') return L.some(e => progress(M, e) > 0.55) || M.hearts < M.heartsMax * 0.5;
+  if(sh === 'trap') return L.length > 0 || M.spawnQ.length > 0;
+  // aimed skills wait until somebody is in reach (the button glows only when it can really hit)
+  const m = heroMods(M, h), rg = (m.rangeMul || 0) + 1, o = h === 'dragon' ? heroPos(M, h) : {x: CX, y: CY}, n = s.n;
+  const reach = sh === 'shot' || sh === 'bounce' || sh === 'chain' ? (n.range || 5) * rg + 2 : sh === 'cone' ? n.len * rg + 1 : sh === 'whip' || sh === 'beam' ? (n.len || 6) * rg + 1 : sh === 'splash' || sh === 'meteor' ? (n.r >= 50 ? 99 : 7 * rg) : 99;
+  const from = sh === 'whip' || sh === 'beam' ? {x: CX, y: CY} : o;
+  return L.some(e => dist(e.x, e.y, from.x, from.y) <= reach);
+}
+function cast(M, h, key, opt){
+  opt = opt || {};
+  if(M.state !== 'wave' || M.paused) return false;
+  const s = skillOf(M, h, key); if(!s || !ready(M, h, key)) return false;
+  if(!opt.force && !canAim(M, h, key)) return false;
+  const {e, n} = s, hp = heroPos(M, h), m = heroMods(M, h), rng = (m.rangeMul || 0) + 1, src = {hero: h, col: e.col, key};
+  const D = v => durOf(M, h, v, e.col), sumMul = 1 + (m.summonMul || 0);
+  let done = true;
+  const origin = h === 'dragon' ? hp : {x: CX, y: CY};
+  switch(e.shape){
+    case 'shot': { const t = closest(M, origin.x, origin.y, (n.range || 5) * rng + 2); if(!t){ done = false; break; }
+      if(e.fx === 'slowpush'){ t.slowT = D(n.dur); t.slowF = Math.max(t.slowF, n.slow); if(!t.boss) t.d = Math.max(0, t.d - n.push); fx(M, 'ew', {x: t.x, y: t.y, dur: 0.8}); }
+      else { fx(M, 'bolt', {x: origin.x, y: origin.y, x2: t.x, y2: t.y, dur: 0.3, col: e.col}); hit(M, t, n.dmg, src); }
+      break; }
+    case 'cone': { const t = bestPoint(M, origin.x, origin.y, n.len * rng + 1, 1.2); if(!t){ done = false; break; } const ang = Math.atan2(t.y - origin.y, t.x - origin.x);
+      live(M).forEach(x => { const dd = dist(x.x, x.y, origin.x, origin.y), a = Math.atan2(x.y - origin.y, x.x - origin.x); let da = Math.abs(a - ang); if(da > Math.PI) da = 2 * Math.PI - da;
+        if(dd <= n.len * rng + 0.6 && da <= n.w * 0.6){ hit(M, x, n.dmg, src); if(n.dot){ x.burnT = D(n.dur); x.burnD = Math.max(x.burnD, n.dot); } } });
+      fx(M, 'cone', {x: origin.x, y: origin.y, ang, len: n.len * rng, w: n.w, dur: 0.6, col: e.col}); break; }
+    case 'bounce': case 'chain': { let t = closest(M, origin.x, origin.y, (n.range || 5) * rng + 2); if(!t){ done = false; break; } let px = origin.x, py = origin.y; const hitSet = new Set();
+      for(let i = 0; i < Math.round(n.cnt) && t; i++){ fx(M, e.shape === 'chain' ? 'zap' : 'bolt', {x: px, y: py, x2: t.x, y2: t.y, dur: 0.3 + i * 0.06, col: e.col}); hit(M, t, n.dmg, src); hitSet.add(t.id); px = t.x; py = t.y;
+        t = live(M).filter(x => !hitSet.has(x.id) && dist(x.x, x.y, px, py) < 3.2).sort((a, b) => dist(a.x, a.y, px, py) - dist(b.x, b.y, px, py))[0]; }
+      break; }
+    case 'splash': case 'meteor': { const big = n.r >= 50; const t = big ? {x: CX, y: CY} : bestPoint(M, origin.x, origin.y, 7 * rng, n.r); if(!t){ done = false; break; }
+      M.zones.push({k: 'meteor', x: t.x, y: t.y, r: n.r, delay: e.shape === 'meteor' ? 0.9 : 0.05, dmg: n.dmg, stun: e.fx === 'dmgstun' ? D(n.dur) : 0, src, t: 0, dur: 1.2, big}); break; }
+    case 'whip': case 'beam': { const t = bestPoint(M, CX, CY, (n.len || 6) * rng + 1, 1); if(!t){ done = false; break; } const ang = Math.atan2(t.y - CY, t.x - CX), len = (n.len || 6) * rng + 0.8, w = n.w || 0.7;
+      live(M).forEach(x => { const dx = x.x - CX, dy = x.y - CY, along = dx * Math.cos(ang) + dy * Math.sin(ang), side = Math.abs(-dx * Math.sin(ang) + dy * Math.cos(ang));
+        if(along > 0 && along <= len && side <= w){ hit(M, x, n.dmg, src); if(n.push && !x.boss && !x.gone) x.d = Math.max(0, x.d - n.push); } });
+      fx(M, e.shape, {x: CX, y: CY, ang, len, w, dur: 0.55, col: e.col}); break; }
+    case 'swarm': { const L = live(M); if(!L.length){ done = false; break; } for(let i = 0; i < Math.round(n.cnt); i++){ const t = L[Math.floor(M.rng() * L.length)]; fx(M, 'bird', {x: CX, y: CY - 1, x2: t.x, y2: t.y, dur: 0.5 + i * 0.05, col: e.col}); hit(M, t, n.dmg, src); } break; }
+    case 'storm': { const t = bestPoint(M, CX, CY, 7 * rng, n.r); if(!t){ done = false; break; } M.zones.push({k: 'storm', x: t.x, y: t.y, r: n.r, dps: n.dmg, src, t: 0, dur: D(n.dur)}); break; }
+    case 'tornado': { const pi = busiestPath(M), P = M.paths[pi]; M.zones.push({k: 'tornado', pi, d: P.len - 0.5, spd: 2.2, x: 0, y: 0, r: n.r, dps: n.dmg, src, t: 0, dur: D(n.dur)}); break; }
+    case 'tower': { const spot = M.spots.filter(s => !s.used).sort((a, b) => spotScore(M, b) - spotScore(M, a))[0]; if(!spot){ done = false; break; } spot.used = true;
+      M.towers.push({x: spot.x, y: spot.y, spot, dmg: n.dmg * sumMul, rate: n.rate, range: n.range * rng, t: 0, dur: D(n.dur), atk: 0.4, offT: 0, src}); fx(M, 'build', {x: spot.x, y: spot.y, dur: 0.7}); break; }
+    case 'minion': { const all = e.kind === 'ultimate'; const ps = all ? M.paths.map((_, i) => i) : [busiestPath(M)];
+      ps.forEach(pi => { const P = M.paths[pi]; for(let i = 0; i < Math.round(n.cnt / (all ? M.paths.length : 1)) || (i === 0 && all); i++) M.minions.push({pi, d: P.len - 0.3 - i * 0.5, hp: n.hp * sumMul, hpMax: n.hp * sumMul, dmg: n.dmg * sumMul, t: 0, dur: D(n.dur), x: 0, y: 0, icon: e.icon, src, fight: 0}); });
+      fx(M, 'poof', {x: CX, y: CY, dur: 0.6}); break; }
+    case 'flyer': { for(let i = 0; i < Math.round(n.cnt); i++) M.flyers.push({x: CX, y: CY - 0.5, t: 0, dur: D(n.dur), dmg: n.dmg * sumMul, rate: n.rate, atk: 0.2 + i * 0.15, icon: e.icon, src}); break; }
+    case 'gold': { M.score += Math.round(n.gold * M.L.mult); heal(M, n.heal); fx(M, 'coins', {x: CX, y: CY, dur: 1}); ev(M, 'gold', {pts: Math.round(n.gold * M.L.mult)}); break; }
+    case 'haste': M.hasteT = D(n.dur); M.hasteV = n.v; fx(M, 'haste', {x: CX, y: CY, dur: 0.8}); break;
+    case 'decoy': { const pi = busiestPath(M), P = M.paths[pi], front = frontD(M, pi); const d = clamp(front + 1.2, 1, P.len - 2), p = ptAt(P, d); M.decoys.push({pi, d, x: p.x, y: p.y, r: n.r, t: 0, dur: D(n.dur) + 2}); fx(M, 'poof', {x: p.x, y: p.y, dur: 0.6}); break; }
+    case 'wall': { const pi = busiestPath(M), P = M.paths[pi], d = clamp(Math.max(frontD(M, pi) + 0.8, P.len - 3.2), 1, P.len - 1.2), p = ptAt(P, d); M.walls.push({pi, d, x: p.x, y: p.y, ang: p.ang, hp: n.hp, hpMax: n.hp, t: 0, dur: D(n.dur), icon: e.icon}); fx(M, 'build', {x: p.x, y: p.y, dur: 0.7}); break; }
+    case 'trap': { const every = !!n.every, ps = every ? M.paths.map((_, i) => i) : [busiestPath(M)], r = n.r * (1 + (m.trapRadius || 0));
+      ps.forEach(pi => { const P = M.paths[pi], spots = every ? [P.len * 0.35, P.len * 0.7] : [clamp(frontD(M, pi) + 1.6, 1.2, P.len - 1.6)];
+        spots.forEach(d => { const p = ptAt(P, d); M.traps.push({pi, d, x: p.x, y: p.y, r, fx: e.fx, n, charges: Math.round((n.charges || 1) + (m.trapCharges || 0)), life: D(n.life || n.dur || 20), t: 0, icon: e.icon, src, col: e.col}); }); });
+      break; }
+    case 'shield': if(e.fx === 'armor'){ M.armorT = D(n.dur); M.armorV = n.v; } else { M.shieldHp = Math.max(M.shieldHp, Math.round(n.hp)); M.shieldT = D(n.dur); } fx(M, 'shield', {x: CX, y: CY, dur: 0.8}); break;
+    case 'heal': heal(M, n.heal); break;
+    case 'reflect': M.reflectN = Math.round(n.cnt); M.reflectT = D(n.dur); M.reflectPush = n.push; fx(M, 'mirror', {x: CX, y: CY, dur: 0.8}); break;
+    case 'dome': M.domeT = D(n.dur); if(n.heal) heal(M, n.heal); fx(M, 'dome', {x: CX, y: CY, dur: 0.8}); break;
+    case 'daze': case 'sleep': case 'slow': case 'fear': case 'confuse': case 'pull': case 'push': {
+      const area = e.shape === 'push' ? {x: CX, y: CY} : bestPoint(M, CX, CY, 7.5 * rng, n.r); if(!area){ done = false; break; }
+      const R = n.r * (e.shape === 'push' ? rng : 1);
+      live(M).filter(x => dist(x.x, x.y, area.x, area.y) <= R).forEach(x => {
+        const bossCut = x.boss ? 0.4 : 1;
+        if(e.shape === 'daze') x.stunT = Math.max(x.stunT, D(n.dur) * bossCut);
+        if(e.shape === 'sleep') x.sleepT = Math.max(x.sleepT, D(n.dur) * bossCut);
+        if(e.shape === 'slow'){ x.slowT = Math.max(x.slowT, D(n.dur)); x.slowF = Math.max(x.slowF, n.slow); }
+        if(e.shape === 'fear' && !x.boss) x.fearT = Math.max(x.fearT, D(n.dur));
+        if(e.shape === 'confuse' && !x.boss) x.confT = Math.max(x.confT, D(n.dur));
+        if(e.shape === 'push' && !x.boss) x.d = Math.max(0, x.d - n.push * (1 - progress(M, x) * 0.3));
+        if(e.shape === 'pull'){ x.pullX = area.x; x.pullY = area.y; x.rootT = Math.max(x.rootT, D(n.dur) * bossCut); }
+      });
+      fx(M, e.shape, {x: area.x, y: area.y, r: R, dur: 0.8, col: e.col}); break; }
+    case 'charm': { const L = live(M).filter(x => !x.boss).sort((a, b) => progress(M, b) - progress(M, a)); if(!L.length){ done = false; break; }
+      L.slice(0, Math.round(n.cnt)).forEach(x => { x.charmT = D(n.dur); fx(M, 'heart', {x: x.x, y: x.y, dur: 0.9}); }); break; }
+    default: done = false;
+  }
+  if(!done) return false;
+  M.cd[h][key] = cdOf(M, h, key) + (M.jam[h][key] || 0); M.jam[h][key] = 0; M.stats.casts++;
+  ev(M, 'cast', {hero: h, key, col: e.col, kind: e.kind, name: e.name, icon: e.icon});
+  return true;
+}
+function spotScore(M, s){ let v = 0; live(M).forEach(e => { const d = dist(e.x, e.y, s.x, s.y); if(d < 4) v += 4 - d; }); return v + M.rng() * 0.1; }
+function frontD(M, pi){ let f = 0; live(M).forEach(e => { if(e.pi === pi) f = Math.max(f, e.d); }); return f; }
+function heal(M, n){ const before = M.hearts; M.hearts = Math.min(M.heartsMax, M.hearts + Math.round(n)); if(M.hearts > before){ fx(M, 'heal', {x: CX, y: CY, dur: 1}); ev(M, 'heal', {n: M.hearts - before}); } }
+
+/* ---------- ⏱️ the loop ---------- */
+function step(M, dt){
+  if(M.paused || M.state === 'pick' || M.state === 'won' || M.state === 'lost') return;
+  dt = Math.min(0.1, dt) * (M.speed || 1);
+  while(dt > 1e-6){ const s = Math.min(STEP, dt); tick(M, s); dt -= s; if(M.state !== 'wave' && M.state !== 'break') break; }
+}
+function tick(M, dt){
+  M.t += dt; M.wt += dt;
+  M.fx = M.fx.filter(f => (f.t += dt) < f.dur);
+  if(M.state === 'break'){ if(M.wt >= (M.breakLen != null ? M.breakLen : 2.6)) startWave(M); return; }
+  // 🦸 heroes
+  const hd = M.heroes.dragon, hpz = M.heroes.princess, haste = M.hasteT > 0 ? 1 + M.hasteV : 1;
+  if(M.hasteT > 0) M.hasteT -= dt;
+  hd.ang += dt * 0.55; const L0 = live(M); let tx = 0, ty = 0; L0.forEach(e => { tx += e.x - CX; ty += e.y - CY; });
+  const want = L0.length ? Math.atan2(ty, tx) : hd.ang; let da = want - hd.ang; while(da > Math.PI) da -= 2 * Math.PI; while(da < -Math.PI) da += 2 * Math.PI; hd.ang += da * Math.min(1, dt * 0.8);
+  hd.x = CX + Math.cos(hd.ang) * 1.9; hd.y = CY + Math.sin(hd.ang) * 1.9;
+  hd.sleepy = L0.some(e => e.S.lull && dist(e.x, e.y, CX, CY) < 3.6) ? 1 : 0;
+  if(hd.dazeT > 0) hd.dazeT -= dt; if(hpz.dazeT > 0) hpz.dazeT -= dt;
+  const dm = heroMods(M, 'dragon'), pm = heroMods(M, 'princess');
+  hd.atk -= dt * haste * (1 + (dm.rateMul || 0)) * (hd.sleepy ? 0.55 : 1);
+  if(hd.atk <= 0 && hd.dazeT <= 0){ const t = closest(M, hd.x, hd.y, HEROES.dragon.range * (1 + (dm.rangeMul || 0))); if(t){ hd.atk = HEROES.dragon.rate; fx(M, 'fireball', {x: hd.x, y: hd.y, x2: t.x, y2: t.y, dur: 0.28}); hit(M, t, HEROES.dragon.dmg, {hero: 'dragon', col: 'A'}); } else hd.atk = 0.1; }
+  hpz.atk -= dt * haste * (1 + (pm.rateMul || 0));
+  if(hpz.atk <= 0 && hpz.dazeT <= 0){ const t = closest(M, CX, CY, HEROES.princess.range * (1 + (pm.rangeMul || 0))); if(t){ hpz.atk = HEROES.princess.rate; fx(M, 'swat', {x: CX, y: CY, x2: t.x, y2: t.y, dur: 0.35}); hit(M, t, HEROES.princess.dmg, {hero: 'princess', col: 'A'}); if(!t.gone && !t.boss) t.d = Math.max(0, t.d - 0.35); } else hpz.atk = 0.1; }
+  // ⏳ cooldowns (haste speeds them up) + auto-cast
+  ['dragon', 'princess'].forEach(h => { Object.keys(M.cd[h]).forEach(k => { if(M.cd[h][k] > 0) M.cd[h][k] -= dt * haste; });
+    M.trees[h].buttons().forEach(b => { const rd = ready(M, h, b.key) && canAim(M, h, b.key); M.readyT[h][b.key] = rd ? (M.readyT[h][b.key] || 0) + dt : 0;
+      // 🤖 auto skills (⚙️ switch) · 🌱 Basic / 🐣 Junior helper: a skill that waited ready for a while goes off by itself (nothing is wasted)
+      if(rd && autoWants(M, h, b) && (M.auto[h] || (M.L.assist && M.readyT[h][b.key] >= M.L.assist))) cast(M, h, b.key); }); });
+  // 🛡️ home timers
+  if(M.shieldT > 0){ M.shieldT -= dt; if(M.shieldT <= 0) M.shieldHp = 0; } if(M.domeT > 0) M.domeT -= dt; if(M.armorT > 0) M.armorT -= dt; if(M.reflectT > 0){ M.reflectT -= dt; if(M.reflectT <= 0) M.reflectN = 0; }
+  // 🚶 spawns
+  while(M.spawnQ.length && M.spawnQ[0].at <= M.wt){ const q = M.spawnQ.shift(); spawn(M, q.type, q.path); }
+  // 🤖 suitor-side skills (bot tree actives)
+  enemySkills(M, dt);
+  // 🤴 suitors move
+  M.enemies.forEach(e => moveEnemy(M, e, dt));
+  // 🗼 towers, 🐭 helpers, 🕊️ flyers, 🪤 traps, 🌪️ zones, 🧱 walls, 🫖 tea
+  M.towers.forEach(T => { T.t += dt; if(T.offT > 0){ T.offT -= dt; return; } const slow = live(M).some(e => e.S.serenade && dist(e.x, e.y, T.x, T.y) < 2.6) ? 0.5 : 1; T.slowed = slow < 1;
+    T.atk -= dt * haste * slow; if(T.atk <= 0){ const t = closest(M, T.x, T.y, T.range); if(t){ T.atk = 1 / T.rate; fx(M, 'rose', {x: T.x, y: T.y, x2: t.x, y2: t.y, dur: 0.3}); hit(M, t, T.dmg, T.src); } else T.atk = 0.1; } });
+  M.towers = M.towers.filter(T => { if(T.t >= T.dur){ T.spot.used = false; fx(M, 'poof', {x: T.x, y: T.y, dur: 0.5}); return false; } return true; });
+  M.minions.forEach(m => moveMinion(M, m, dt)); M.minions = M.minions.filter(m => m.hp > 0 && m.t < m.dur);
+  M.flyers.forEach(f => { f.t += dt; const t = closest(M, f.x, f.y, 9); if(t){ const d = dist(f.x, f.y, t.x, t.y); if(d > 0.4){ f.x += (t.x - f.x) / d * 3.2 * dt; f.y += (t.y - f.y) / d * 3.2 * dt; } f.atk -= dt; if(f.atk <= 0 && d < 0.9){ f.atk = 1 / f.rate; hit(M, t, f.dmg, f.src); } } });
+  M.flyers = M.flyers.filter(f => f.t < f.dur);
+  M.traps.forEach(T => { T.t += dt; if(T.fx === 'lava'){ live(M).forEach(e => { if(dist(e.x, e.y, T.x, T.y) <= T.r){ hit(M, e, T.n.dot * dt, T.src); e.slowT = Math.max(e.slowT, 0.3); e.slowF = Math.max(e.slowF, T.n.slow); } }); return; }
+    live(M).forEach(e => { if(T.charges <= 0 || (T.seen && T.seen[e.id]) || dist(e.x, e.y, T.x, T.y) > T.r) return; (T.seen || (T.seen = {}))[e.id] = 1;   /* each suitor sets a trap off once */
+      if(e.charge > 0){ e.charge = 0; fx(M, 'charge', {x: e.x, y: e.y, dur: 0.8}); ev(M, 'suitorSkill', {type: e.type, skill: 'charge'}); return; }
+      if(M.mods.suitors.enDodge && M.rng() < M.mods.suitors.enDodge){ fx(M, 'hop', {x: e.x, y: e.y, dur: 0.6}); return; }
+      T.charges--; fx(M, 'trap', {x: T.x, y: T.y, dur: 0.5, icon: T.icon});
+      if(T.fx === 'dmg') hit(M, e, T.n.dmg, T.src);
+      if(T.fx === 'root') e.rootT = Math.max(e.rootT, T.n.dur * (e.boss ? 0.4 : 1));
+      if(T.fx === 'stun') e.stunT = Math.max(e.stunT, T.n.dur * (e.boss ? 0.4 : 1));
+      if(T.fx === 'push' && !e.boss) e.d = Math.max(0, e.d - T.n.push);
+      if(T.fx === 'mine'){ T.charges = 0; live(M).forEach(x => { if(dist(x.x, x.y, T.x, T.y) <= T.r) hit(M, x, T.n.dmg, T.src); }); fx(M, 'boom', {x: T.x, y: T.y, r: T.r, dur: 0.6}); }
+    }); });
+  M.traps = M.traps.filter(T => (T.fx === 'lava' ? T.t < T.life : T.charges > 0 && T.t < T.life));
+  M.zones.forEach(Z => { Z.t += dt;
+    if(Z.k === 'tornado'){ Z.d -= Z.spd * dt; const p = ptAt(M.paths[Z.pi], Z.d); Z.x = p.x; Z.y = p.y; }
+    if(Z.k === 'meteor'){ if(!Z.hitDone && Z.t >= Z.delay){ Z.hitDone = 1; live(M).forEach(x => { if(Z.big || dist(x.x, x.y, Z.x, Z.y) <= Z.r){ hit(M, x, Z.dmg, Z.src); if(Z.stun && !x.gone) x.stunT = Math.max(x.stunT, Z.stun); } }); ev(M, 'boom', {x: Z.x, y: Z.y, big: Z.big}); } return; }
+    live(M).forEach(x => { if(dist(x.x, x.y, Z.x, Z.y) <= Z.r) hit(M, x, Z.dps * dt, Z.src); }); });
+  M.zones = M.zones.filter(Z => Z.t < Z.dur && !(Z.k === 'tornado' && Z.d <= 0));
+  M.walls.forEach(w => { w.t += dt; }); M.walls = M.walls.filter(w => w.hp > 0 && w.t < w.dur);
+  M.decoys.forEach(d => { d.t += dt; }); M.decoys = M.decoys.filter(d => d.t < d.dur);
+  // 💫 bonked suitors fly off
+  M.enemies.forEach(e => { if(e.gone) e.goneT += dt; });
+  M.enemies = M.enemies.filter(e => !e.gone || e.goneT < 1.3);
+  if(M.hearts <= 0){ const ls = heroMods(M, 'princess').lastStand || heroMods(M, 'dragon').lastStand; if(ls && !M.lastUsed){ M.lastUsed = 1; M.hearts = Math.round(ls); ev(M, 'lastStand', {}); } else { M.hearts = 0; M.state = 'lost'; ev(M, 'lost', {wave: M.wave + 1}); return; } }
+  // 🏁 wave over?
+  if(!M.spawnQ.length && !M.enemies.some(e => !e.gone && e.charmT <= 0)){ endWave(M); }
+}
+function autoWants(M, h, b){
+  const e = b.e; if(e.kind === 'ultimate' || e.kind === 'combo') return live(M).length >= 4 || live(M).some(x => x.boss) || M.hearts <= M.heartsMax * 0.4;
+  return true;
+}
+function endWave(M){
+  M.enemies.forEach(e => { if(e.charmT > 0){ e.gone = 1; e.goneT = 0.5; } });
+  M.stats.waves++; if(!M.lostThisWave) M.stats.perfect++;
+  const wb = Math.round((40 + 15 * (M.wave + 1)) * M.L.mult); M.score += wb;
+  const rg = (heroMods(M, 'dragon').regen || 0) + (heroMods(M, 'princess').regen || 0); if(rg) heal(M, rg);
+  ev(M, 'waveDone', {n: M.wave + 1, bonus: wb, perfect: !M.lostThisWave});
+  if(M.wave >= M.C.waves.length - 1){ M.state = 'won'; M.score += Math.round(M.hearts * 25 * M.L.mult); ev(M, 'won', {hearts: M.hearts}); return; }
+  // 🤖 the suitors' tree levels up too (fair bot)
+  const T = M.trees.suitors; if(M.L.bot && M.rng() < M.L.bot + 0.0001 && T.tier < 10){ const o = T.offer(); const c = o && o.cards.length ? T.botPick(o) : null; if(c){ T.take(c); ev(M, 'suitorsUp', {key: c.key, name: c.name, icon: c.icon, tier: T.tier}); } }
+  M.towers.forEach(t => { t.t = Math.min(t.t, t.dur - 0.01); });
+  M.state = 'pick'; M.queue = ['dragon', 'princess'].filter(h => M.trees[h].tier < 10); refreshMods(M);
+  if(!M.queue.length){ M.state = 'break'; M.wt = 0; }
+}
+function enemySkills(M, dt){
+  const T = M.trees.suitors, L = live(M);
+  COLS_EN.forEach(c => { const key = T.active[c]; if(!key) return; const e = T.pack.get(key), n = SK.num(e, T.skills[key]);
+    M.enCd[key] = (M.enCd[key] == null ? e.cd * 0.6 : M.enCd[key]) - dt; if(M.enCd[key] > 0 || L.length < 3) return; M.enCd[key] = e.cd;
+    if(e.fx === 'enHeal') L.forEach(x => { x.hp = Math.min(x.hpMax, x.hp + x.hpMax * n.v); });
+    if(e.fx === 'enRush') L.forEach(x => { x.rushT = n.dur; x.rushV = n.v; });
+    if(e.fx === 'enShield') L.forEach(x => { x.shield = Math.max(x.shield, n.hp); });
+    if(e.fx === 'enJam'){ const h = M.rng() < 0.5 ? 'dragon' : 'princess', bs = M.trees[h].buttons().filter(b => !b.ult && !b.combo); if(bs.length){ const b = bs[Math.floor(M.rng() * bs.length)]; M.cd[h][b.key] = (M.cd[h][b.key] || 0) + n.v; ev(M, 'jam', {hero: h, key: b.key}); } }
+    ev(M, 'suitorCast', {key, name: e.name, icon: e.icon});
+  });
+}
+const COLS_EN = ['A', 'B', 'C', 'D', 'E'];
+function moveEnemy(M, e, dt){
+  if(e.gone){ return; }
+  const P = M.paths[e.pi];
+  ['slowT', 'stunT', 'rootT', 'sleepT', 'fearT', 'confT', 'charmT', 'burnT', 'stopT', 'rushT'].forEach(k => { if(e[k] > 0) e[k] -= dt; });
+  if(e.slowT <= 0) e.slowF = 0;
+  if(e.burnT > 0) hit(M, e, e.burnD * dt, {col: 'A'}); if(e.gone) return;
+  // suitor skills
+  e.skT -= dt;
+  if(e.S.arrow && e.skT <= 0 && e.charmT <= 0){ e.skT = 8; const bs = M.trees.princess.buttons().filter(b => !b.ult && !b.combo); if(bs.length){ const b = bs[Math.floor(M.rng() * bs.length)]; M.cd.princess[b.key] = (M.cd.princess[b.key] || 0) + 4; fx(M, 'arrow', {x: e.x, y: e.y, x2: CX, y2: CY, dur: 0.6}); ev(M, 'suitorSkill', {type: e.type, skill: 'arrow', key: b.key}); } }
+  if(e.S.bomb && !e.bombed && e.charmT <= 0){ const t = M.towers.find(T => dist(T.x, T.y, e.x, e.y) < 3 && T.offT <= 0); if(t){ e.bombed = true; t.offT = 5; fx(M, 'flowerbomb', {x: t.x, y: t.y, dur: 1}); ev(M, 'suitorSkill', {type: e.type, skill: 'bomb'}); } }
+  if(e.S.bouquet && e.skT <= 0){ e.skT = 6; M.heroes.dragon.dazeT = 2; fx(M, 'bouquet', {x: e.x, y: e.y, x2: M.heroes.dragon.x, y2: M.heroes.dragon.y, dur: 0.7}); ev(M, 'suitorSkill', {type: e.type, skill: 'bouquet'});
+    if((e.calls = (e.calls || 0) + 1) % 2 === 0) for(let i = 0; i < 2; i++) spawn(M, 'sq', e.pi, Math.max(0, e.d - 0.6 - i * 0.6)); }
+  if(e.S.shine && e.skT <= 0){ e.skT = 7; e.shine = 3; M.heroes.princess.dazeT = 2; fx(M, 'shine', {x: e.x, y: e.y, dur: 1}); ev(M, 'suitorSkill', {type: e.type, skill: 'shine'}); }
+  // where to go
+  let v = e.spd * (e.rushT > 0 ? 1 + (e.rushV || 0) : 1) * (1 - e.slowF);
+  if(e.stunT > 0 || e.rootT > 0 || e.sleepT > 0 || e.stopT > 0) v = 0;
+  if(e.pullX != null && e.rootT > 0){ e.x += (e.pullX - e.x) * Math.min(1, dt * 3); e.y += (e.pullY - e.y) * Math.min(1, dt * 3); return; } else e.pullX = null;
+  let dir = 1;
+  if(e.charmT > 0){ dir = -1; v = Math.max(v, e.spd * 0.9); L_charmHit(M, e, dt); }
+  else if(e.fearT > 0){ dir = -1; v = Math.max(v * 0.9, e.spd * 0.8); }
+  else if(e.confT > 0){ if((e.confFlip = (e.confFlip || 0) - dt) <= 0){ e.confFlip = 0.7; e.confDir = M.rng() < 0.55 ? -1 : 1; } dir = e.confDir; v *= 0.6; }
+  // 🫖 tea break + 🧱 walls + 🐭 helpers block the path
+  if(dir > 0 && v > 0){
+    if(M.decoys.some(d => d.pi === e.pi && Math.abs(d.d - e.d) <= d.r) && !e.boss){ v = 0; e.tea = 1; } else e.tea = 0;
+    const w = M.walls.find(w => w.pi === e.pi && w.d > e.d - 0.05 && w.d - e.d < 0.45);
+    if(w && !(e.S.climb)){ v = 0; w.hp -= (e.boss ? 25 : 8) * dt; e.atWall = 1; } else e.atWall = 0;
+    if(w && e.S.climb && !e.climbed){ e.climbed = 1; fx(M, 'ladder', {x: e.x, y: e.y, dur: 0.8}); ev(M, 'suitorSkill', {type: e.type, skill: 'ladder'}); }
+    const m = M.minions.find(m => m.pi === e.pi && m.d >= e.d - 0.1 && m.d - e.d < 0.55);
+    if(m){ v = 0; m.hp -= (e.boss ? 30 : 7) * dt; m.fight = 1; }
+  }
+  e.d += dir * v * dt; if(e.d < 0){ e.d = 0; if(e.charmT > 0 || e.fearT > 0){ if(e.charmT > 0){ e.gone = 1; e.goneT = 0.4; M.stats.bonks++; M.score += Math.round(e.S.pts * M.L.mult * 0.6); ev(M, 'bonk', {type: e.type, x: e.x, y: e.y, pts: 0, home: true}); return; } } }
+  const p = ptAt(P, e.d); e.x = p.x; e.y = p.y; e.ang = p.ang;
+  if(e.d >= P.len && e.charmT <= 0) reachTower(M, e);
+}
+function L_charmHit(M, e, dt){ live(M).forEach(x => { if(x !== e && x.pi === e.pi && Math.abs(x.d - e.d) < 0.6){ hit(M, x, 9 * dt, {hero: 'princess', col: 'E'}); } }); }
+function reachTower(M, e){
+  const back = (n) => { e.d = Math.max(0, e.d - n); e.stunT = Math.max(e.stunT, 0.6); };
+  if(M.domeT > 0){ back(e.boss ? 1.2 : 2.5); fx(M, 'bounce', {x: e.x, y: e.y, dur: 0.6}); return; }
+  if(M.reflectN > 0 && !e.boss){ M.reflectN--; back(M.reflectPush || 4); fx(M, 'mirror', {x: e.x, y: e.y, dur: 0.6}); ev(M, 'reflect', {}); return; }
+  const th = (heroMods(M, 'dragon').thorns || 0) + (heroMods(M, 'princess').thorns || 0); if(th){ hit(M, e, th, {hero: 'princess', col: 'D'}); if(e.gone) return; }
+  if(M.shieldHp > 0 && !e.boss){ M.shieldHp--; fx(M, 'shield', {x: e.x, y: e.y, dur: 0.5}); bonk(M, e, {hero: 'princess'}); return; }
+  const armor = Math.min(0.7, (heroMods(M, 'dragon').armor || 0) + (heroMods(M, 'princess').armor || 0) + (M.armorT > 0 ? M.armorV : 0));
+  const dmg = Math.max(1, Math.round(e.S.w * (1 - armor)));
+  M.hearts -= dmg; M.lostThisWave += dmg; M.stats.hearts += dmg;
+  e.gone = 1; e.goneT = 0; e.kiss = 1; ev(M, 'heart', {n: dmg, type: e.type, x: e.x, y: e.y, boss: e.boss, left: M.hearts});
+  if(e.boss && M.hearts > 0){ /* the boss knocks and leaves: still a big hit */ }
+}
+function moveMinion(M, m, dt){
+  m.t += dt; const P = M.paths[m.pi]; m.fight = 0;
+  const foe = live(M).find(e => e.pi === m.pi && e.d <= m.d + 0.1 && m.d - e.d < 0.6);
+  if(foe){ m.fight = 1; m.atk = (m.atk || 0) - dt; if(m.atk <= 0){ m.atk = 0.5; hit(M, foe, m.dmg, m.src); } }
+  else m.d = Math.max(0.5, m.d - 1.3 * dt);
+  const p = ptAt(P, m.d); m.x = p.x; m.y = p.y;
+}
+
+/* ---------- 🤖 whole chapters for tests / tuning ---------- */
+function simulate(o){
+  o = o || {}; const M = newMatch(Object.assign({auto: true}, o)); M.breakLen = 0.2; let guard = 0;
+  while(M.state !== 'won' && M.state !== 'lost' && guard++ < 200000){
+    if(M.state === 'pick'){ const of = offer(M); if(!of) { M.queue.shift(); if(!M.queue.length){ M.state = 'break'; M.wt = 0; } continue; } take(M, o.pick ? o.pick(M, of) : M.trees[M.queue[0]].botPick(of)); continue; }
+    step(M, STEP); takeEvents(M);
+  }
+  return {won: M.state === 'won', wave: M.wave + 1, hearts: M.hearts, score: M.score, stats: M.stats, M};
+}
+return {W, CX, CY, TOWER_R, LEVELS, SUITORS, BOOKS, PATHS, PACKS, COMBOS, HEROES, buildPath, ptAt, newMatch, offer, take, startWave, step, cast, ready, canAim, cdOf, skillOf, takeEvents, simulate, live, rngOf, STEP};
+})();
+// ENGINE END
+</script>
+<script>
+const WEBAPP_URL = ''+__SP("webAppUrl")+'';
+const CURRENT_PLAYER = ''+__SP("player")+''; window.SP_PAGE = 'tdstories';
+UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});   // loader + menus in the player's look before the server answers
+const SESSION_START = Number(''+__SP("sessionStart")+'') || null;
+const DURATION_MIN = Number(''+__SP("durationMin")+'') || null;
+const MODE_LINK = ''+__SP("mode")+'';   // ✨ ?mode=draprincess opens that book once, after the player pick
+const GAME_ID = 'tdstories';
+// 🏰 own loader + how-to (UiKit is the ✨ polish lane — registered here at runtime; the 2-line UiKit anchor is asked under Open questions)
+if(UI.KINDS && !UI.KINDS.tdstories) UI.KINDS.tdstories = ['🏰', 'Opening the story books', 'bob'];
+if(UI.GAME_HELP && !UI.GAME_HELP.tdstories) UI.GAME_HELP.tdstories = ['Story books where you defend a tower: keep the enemies away until the last wave.',
+  'Before each wave every hero levels up — pick ONE skill card. Tap the round coloured buttons to use skills (they also go off by themselves on easy levels).',
+  'One skill of each colour 🔴🔵🟤🟢🟣, up to Lv 3. Tier 5 = ⭐ evolve, tier 10 = ⭐ ULTIMATE!'];
+window.FX = window.FX == null ? 1 : window.FX;   // tests set 0: no long animations
+// 🎛️ the shared top bar (UiKit UI.gameBar): ◀ where you came from · 🎚️ Levels · 🏠 | 🏰 TD-Stories · level | ❤️ · 🔁 wave · ⭐ | ⏸ ❓ ⏩ ⚙️
+const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '🏰', name: 'TD-Stories', levelId: 'hud-level',
+  levels: () => leavePlay(), playing: () => !!(G && G.state !== 'won' && G.state !== 'lost'), onLeave: () => stopLoop(),
+  pause: {pause: () => { if(G && !G.paused){ G.paused = true; G.barPz = 1; } }, resume: () => { if(G && G.barPz){ G.barPz = 0; G.paused = false; last = 0; } }}, pauseButton: true,
+  onFit: () => layout(), scoreMin: '6ch',
+  extras: [{id: 'speed-btn', icon: '⏩', label: 'Speed ×2', onClick: () => toggleSpeed(), keep: true}]});
+var NAV_INNER = {levels: ['◀ TD-Stories', () => openShelf()], diary: ['◀ Dra-Princess Diary', () => openBook(S.book)]};
+UI.navBar(document.getElementById('back-btn'), {onclick: false});
+const $ = id => document.getElementById(id);
+const COLS = SkillKit.COLS, COLORS = SkillKit.COLORS;
+const AGE_START = {'4-5': 0, '6-7': 1, '8-9': 2, '10+': 3};
+const LEVELS = TD.LEVELS;
+
+/* ================= 📚 the books (page side: covers, diary pages, lesson cards) ================= */
+const SHELF = [
+  {id: 'draprincess', title: 'Dra-Princess Diary', icon: '🐉👑', sub: 'A princess, a dragon and far too many suitors', b1: '#FF5C9A', b2: '#7B4FE0'},
+  {id: 'farmer', title: 'Farmer Delusion', icon: '👨‍🌾🍄', sub: 'Trick the money collector with a mushroom maze', b1: '#7CC25A', b2: '#C27A2E', soon: true},
+  {id: 'coral', title: 'Coral Keeper', icon: '🐙🪸', sub: 'A little octopus guards the last reef', b1: '#2EC4E6', b2: '#2F5BD8', soon: true},
+  {id: 'night', title: 'Night Market Guardian', icon: '🐱🏮', sub: 'A street cat vs. hungry snack ghosts', b1: '#FF9F43', b2: '#5B2A86', soon: true},
+];
+const DIARY = {
+  draprincess: {
+    1: {intro: 'Dear Diary,\nAnother knight came today with ANOTHER bouquet. 💐 I do not want a knight.\nThen a little dragon landed on my window. He sneezed sparks and made me laugh. 🐉✨\nNow the knights are coming back… with squires and BARDS. Help!',
+        outro: 'Dear Diary,\nSir Bouquet slipped on his own flowers and rolled into the pond! 💦\nThe little dragon is called Ember now. He is not so little any more…',
+        lessons: [['🏰', 'Round towers', 'Many castle towers were ROUND. A round wall has no corners, so it is stronger and harder to climb.'],
+                  ['🌊', 'Moats', 'A moat is a ditch full of water around a castle. Visitors had to cross a bridge — and the bridge could be pulled up!']]},
+    2: {intro: 'Dear Diary,\nEmber sleeps under my window every night. 🌙\nNow PRINCES come too, singing terrible songs. 🎻 And a cupid keeps shooting love arrows at my books!\nThe dragon says: "Leave it to me." 🔥',
+        outro: 'Dear Diary,\nSir Shiny polished his armour SO much that he dazzled himself and walked into the moat. ✨💦\nEmber gave me one of his warm scales. I think… I love this dragon. ❤️\n(To be continued — chapter 3 is coming soon!)',
+        lessons: [['🐉', 'Dragons around the world', 'Dragon stories are told everywhere. In China dragons bring rain and good luck; in old European tales they guard treasure.'],
+                  ['🦎', 'A real dragon', 'Komodo dragons are real lizards from Indonesia — the biggest lizards on Earth, as long as a sofa!']]},
+  },
+};
+const SCENES = {meadow: {g1: '#A8E07F', g2: '#7CC95E', path: '#F3D9A4', edge: '#D9B26F', deco: ['🌸', '🌼', '🌷', '🌳', '🍄']},
+                sunset: {g1: '#9FD27A', g2: '#6FB35A', path: '#F2CFA0', edge: '#D3A065', deco: ['🌻', '🌹', '🌳', '🪨', '🌾'], tint: 'rgba(255,140,90,.16)'}};
+
+/* ================= STATE ================= */
+let S = {players: [], progress: {}, settings: {}, avatars: {}, player: '', age: '', book: 'draprincess', chapter: 1, level: 0};
+let G = null, lockHandle = null, raf = 0, last = 0, FT = [], BG = null, VIEW = {s: 20, px: 320, dpr: 1}, guideUsed = 0, pickOpen = false, HAND = null, autoOn = false, speedOn = false;
+function myAvatar(name){ const a = S.avatars[name || S.player]; return a ? fixAv(a) : defaultAvatar(name || S.player || 'reader'); }
+function saveRow(name){ try{ return JSON.parse(S.settings['SkillTree_td-' + S.book + '_' + (name || S.player)] || '{}') || {}; }catch(e){ return {}; } }
+function chaptersDone(name){ const r = saveRow(name), p = progressOf(name || S.player); return Math.max(Number(r.ch) || 0, 0) || (p.unlocked > 0 && !r.ch ? 1 : 0); }
+function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
+function canPlay(i){ const p = progressOf(S.player); if(i === 5) return p.unlocked >= 5; if(i === 4) return p.unlocked >= 4; return i <= Math.max(p.unlocked, AGE_START[S.age] || 0); }
+function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
+function goBack(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }   // 🧭 ◀ = where you came from (Gameroom if we don't know)
+
+/* ================= MENUS ================= */
+function showScreen(name){
+  ['player', 'menu', 'levels', 'diary', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
+  $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);
+  if(name !== 'play') hideHand();
+  window.scrollTo(0, 0);
+}
+function renderPlayers(){
+  const box = $('player-list'); box.innerHTML = '';
+  if(!S.players.length){ box.innerHTML = '<div class="empty">No players yet — add one on the Dashboard first.</div>'; return; }
+  S.players.forEach(p => { const b = document.createElement('button'); b.className = 'pick'; b.setAttribute('data-sound', 'pop');
+    const c = document.createElement('canvas'); c.width = 144; c.height = 168; b.appendChild(c);
+    b.insertAdjacentHTML('beforeend', '<div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age ? p.Age + ' yrs' : '') + '</div>');
+    drawPreviewCanvas(c, myAvatar(p.Name), {name: p.Name, t: 1});
+    b.onclick = () => choosePlayer(p.Name); box.appendChild(b); });
+}
+function choosePlayer(name){
+  UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
+  const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
+  $('who-name').textContent = name;
+  try{ autoOn = localStorage.getItem('sp_td_auto:' + name) === '1'; }catch(e){}
+  const id = UI.modeLink ? UI.modeLink(MODE_LINK) : '';
+  if(id === 'draprincess') openBook('draprincess'); else openShelf();
+}
+function changePlayer(){ renderPlayers(); showScreen('player'); }
+function openShelf(){
+  const box = $('shelf'); box.innerHTML = '';
+  SHELF.forEach(b => { const el = document.createElement('button'); el.className = 'book' + (b.soon ? ' soon' : ''); el.dataset.book = b.id; el.setAttribute('data-sound', b.soon ? 'none' : 'pop');
+    el.style.setProperty('--b1', b.b1); el.style.setProperty('--b2', b.b2);
+    const done = b.soon ? 0 : chaptersDone();
+    el.innerHTML = (b.soon ? '<span class="rib">🔜 Coming soon</span>' : (done ? '<span class="rib">📖 ' + done + ' / 6</span>' : '<span class="rib">✨ NEW</span>')) +
+      '<span class="bi">' + b.icon + '</span><span class="bt">' + UI.esc(b.title) + '</span><span class="bs">' + UI.esc(b.sub) + '</span>' +
+      (!b.soon && saveRow().last ? '<span class="bb">' + SkillKit.barHtml(lastBar()) + '</span>' : '');
+    el.onclick = () => { if(b.soon){ UISound.play('error'); el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); UI.toast('📖 ' + b.title + ' is still being written — Dra-Princess Diary first!'); return; } openBook(b.id); };
+    box.appendChild(el); });
+  showScreen('menu');
+}
+function lastBar(){ const r = saveRow(); if(!r.last) return []; return String((r.last.dragon || {}).p || '').split(',').concat(String((r.last.princess || {}).p || '').split(',')).map(x => x.split(':')[0]).filter(c => COLS.includes(c)); }
+function openBook(id){
+  S.book = id; const B = TD.BOOKS[id], cover = SHELF.find(b => b.id === id);
+  $('book-icon').textContent = cover.icon; $('book-title').textContent = cover.title; $('book-sub').textContent = cover.sub;
+  NAV_INNER.diary[0] = '◀ ' + cover.title;
+  const done = chaptersDone();
+  if(S.chapter > done + 1 || TD.BOOKS[id].chapters[S.chapter - 1].soon) S.chapter = Math.min(done + 1, 2);
+  const cb = $('chapters'); cb.innerHTML = '';
+  B.chapters.forEach(C => { const locked = !C.soon && C.n > done + 1, el = document.createElement('button');
+    el.className = 'chap' + (C.soon ? ' soon' : locked ? ' locked' : '') + (C.n === S.chapter ? ' on' : ''); el.dataset.ch = C.n; el.setAttribute('data-sound', C.soon || locked ? 'none' : 'tap');
+    el.innerHTML = '<span class="cn">Chapter ' + C.n + (C.n <= done ? ' · ✅' : '') + '</span><span class="ct">' + UI.esc(C.title) + '</span><span class="cb">' +
+      (C.soon ? '🔜 next round' : locked ? '🔒 finish chapter ' + (C.n - 1) + ' first' : '👑 Boss: ' + UI.esc(TD.SUITORS[C.boss].name) + ' · ' + C.paths.length + ' paths') + '</span>';
+    el.onclick = () => { if(C.soon){ UI.toast('🔜 Chapter ' + C.n + ' comes in the next round!'); return; } if(locked){ UISound.play('error'); UI.toast('🔒 Finish chapter ' + (C.n - 1) + ' first'); return; }
+      S.chapter = C.n; cb.querySelectorAll('.chap').forEach(x => x.classList.toggle('on', Number(x.dataset.ch) === C.n)); renderLevels(); };
+    cb.appendChild(el); });
+  $('chap-hint').textContent = '— ' + done + ' of 6 done';
+  renderLevels();
+  const r = saveRow(), bb = $('buildbox');
+  bb.innerHTML = r.last ? '🧬 Your last build: ' + SkillKit.barHtml(lastBar(), {big: true}) + ' <span style="color:var(--ink-soft)">' + UI.esc(r.lastForms || '') + '</span>' :
+    '🧬 Skill colours: ' + COLS.map(c => '<span style="color:' + COLORS[c].hex + '">' + COLORS[c].dot + ' ' + COLORS[c].en + '</span>').join(' · ');
+  if(UI.leaders) UI.leaders($('leaders'), B.board, S.player);
+  showScreen('levels');
+}
+function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best" style="opacity:.6">No score yet</div>'; return '<div class="best">🏆 ' + Number(b.score).toLocaleString() + ' ' + '⭐'.repeat(b.stars || 0) + '</div>'; }
+function renderLevels(){
+  const box = $('level-list'); box.innerHTML = ''; const p = progressOf(S.player), rec = AGE_START[S.age];
+  LEVELS.forEach((L, i) => {
+    const open = canPlay(i), done = p.unlocked > i, b = document.createElement('button');
+    b.className = 'lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (L.hardcore ? ' hardcore' : ''); b.dataset.lvl = i; b.setAttribute('data-sound', open ? 'pop' : 'none');
+    b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">🏅</span>' : open ? '' : '<span class="badge">🔒</span>') +
+      '<div class="big">' + L.emoji + '</div><div class="nm">' + L.name + '</div><div class="hp">❤️ ' + L.hearts + ' · 🃏 ' + L.cards + ' cards</div><div class="sub">' + (L.hardcore && !open ? 'Beat Extreme to open 💀 Hardcore' : L.blurb) + '</div>' + bestHtml(p, i);
+    b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore!' : i === 4 ? 'Win on Hard to unlock Extreme!' : 'Win the level before to unlock it'); return; } S.level = i; openDiary(S.chapter, i, 'intro'); };
+    box.appendChild(b);
+  });
+}
+function openDiary(ch, lvl, when){
+  const D = DIARY[S.book][ch], C = TD.BOOKS[S.book].chapters[ch - 1], ls = D.lessons[when === 'intro' ? 0 : 1];
+  $('diary').innerHTML = '<div class="dh">📔 ' + (when === 'intro' ? 'Chapter ' + ch + ': ' + UI.esc(C.title) : 'The end of chapter ' + ch) + '</div><canvas id="diary-cv" width="840" height="300"></canvas><div class="dt">' + UI.esc(D[when]) + '</div>';
+  $('lesson').innerHTML = '<span class="li">' + ls[0] + '</span><div><div class="lh">💡 Did you know? · ' + UI.esc(ls[1]) + '</div><div class="lt">' + UI.esc(ls[2]) + '</div></div>';
+  const nextOpen = when === 'outro' && ch < 2;
+  $('diary-btns').innerHTML = when === 'intro' ? '<button class="sp-btn sp-primary sp-lg" id="diary-go" data-sound="pop">▶ Start chapter ' + ch + '</button>' :
+    '<button class="sp-btn sp-secondary" id="diary-lv" data-sound="tap">🎚️ Levels</button>' + (nextOpen ? '<button class="sp-btn sp-primary sp-lg" id="diary-next" data-sound="pop">Chapter ' + (ch + 1) + ' ▶</button>' : '');
+  if($('diary-go')) $('diary-go').onclick = () => startGame(ch, lvl);
+  if($('diary-lv')) $('diary-lv').onclick = () => openBook(S.book);
+  if($('diary-next')) $('diary-next').onclick = () => { S.chapter = ch + 1; openDiary(ch + 1, lvl, 'intro'); };
+  showScreen('diary'); drawDiaryPicture($('diary-cv'), ch, when);
+}
+// 🖼️ a little picture on every diary page (tower, princess, dragon, suitors — and the reader's avatar)
+function drawDiaryPicture(cv, ch, when){
+  const g = cv.getContext('2d'), W = cv.width, H = cv.height, t = performance.now() / 1000;
+  g.clearRect(0, 0, W, H);
+  const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, ch === 2 ? '#FFC6A8' : '#CDEBFF'); sky.addColorStop(1, '#FFF3D9'); g.fillStyle = sky; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#9AD47C'; g.beginPath(); g.ellipse(W / 2, H + 40, W * 0.7, 110, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#CBBFD8'; g.fillRect(W / 2 - 55, 70, 110, 190); g.fillStyle = '#B3A6C4'; for(let i = 0; i < 5; i++) g.fillRect(W / 2 - 55 + i * 25, 52, 15, 20);
+  g.fillStyle = '#FF7FB0'; g.beginPath(); g.moveTo(W / 2 - 65, 56); g.lineTo(W / 2, 4); g.lineTo(W / 2 + 65, 56); g.fill();
+  g.fillStyle = '#6B4A2F'; g.fillRect(W / 2 - 18, 210, 36, 50);
+  emo(g, '👸', W / 2, 120, 64); emo(g, when === 'outro' ? '🐉' : '🐲', W / 2 + 120, 110 + Math.sin(t * 2) * 6, when === 'outro' ? 92 : 70, 1, true);
+  if(when === 'intro'){ emo(g, '🤺', 120, 230, 60); emo(g, '💐', 152, 236, 34); emo(g, ch === 2 ? '🤴' : '👦', 210, 240, 50); if(ch === 2) emo(g, '👼', 80, 150, 46); }
+  else { emo(g, '💫', 140, 120, 46); emo(g, '🤺', 120, 170, 52, 0.7); emo(g, '❤️', W / 2 + 60, 60, 40); }
+  try{ const c = avatarFrames('wave'); if(c && c.length) g.drawImage(c[Math.floor(t * 6) % c.length], W - 190, 120, 120, 140); }catch(e){}
+}
+
+/* ================= 🎮 PLAY ================= */
+function startGame(ch, lvl){
+  S.chapter = ch; S.level = lvl; stopLoop(); hideResult();
+  G = TD.newMatch({book: S.book, chapter: ch, level: lvl, auto: autoOn});
+  G.breakLen = lvl === 0 ? 4 : 2.6; FT = []; guideUsed = 0; pickOpen = false; speedOn = false; G.speed = 1;
+  if(UI.modeTried) UI.modeTried(S.player, GAME_ID, S.book);
+  const L = LEVELS[lvl]; BAR.level(L.emoji + ' ' + L.name + ' · Ch ' + ch, L.hardcore ? 'hc' : '');
+  paintAuto();
+  $('speed-btn').textContent = '⏩'; $('goal').style.opacity = 1;
+  $('goal').textContent = '🏰 Keep the suitors away from the tower!';
+  showScreen('play'); BAR.fit(); renderPanel(); layout(); hudTick(true);
+  last = 0; raf = requestAnimationFrame(loop);
+  setTimeout(nextPick, FX ? 450 : 0);
+}
+function stopLoop(){ cancelAnimationFrame(raf); raf = 0; }
+function leavePlay(){ stopLoop(); hideHand(); const s = document.querySelector('#scr-play .skk-sheet'); if(s) s.remove(); pickOpen = false; G = null; hideResult(); openBook(S.book); }
+function toggleSpeed(){ if(!G) return; speedOn = !speedOn; G.speed = speedOn ? 2 : 1; $('speed-btn').textContent = speedOn ? '⏩×2' : '⏩'; $('speed-btn').classList.toggle('on', speedOn); UI.toast(speedOn ? '⏩ Double speed' : '▶ Normal speed'); }
+function toggleAuto(){ autoOn = !autoOn; try{ localStorage.setItem('sp_td_auto:' + S.player, autoOn ? '1' : '0'); }catch(e){} if(G){ G.auto.dragon = G.auto.princess = autoOn; }
+  paintAuto(); UI.toast(autoOn ? '🤖 Skills go off by themselves' : '👆 You tap the skills'); }
+function paintAuto(){ const b = $('auto-btn'); if(!b) return; b.textContent = autoOn ? '🤖 Auto ✅' : '🤖 Auto'; b.title = 'Auto skills: ' + (autoOn ? 'on' : 'off'); b.classList.toggle('on', autoOn); }
+function goNow(){ if(G && G.state === 'break'){ TD.startWave(G); $('go-btn').classList.add('hidden'); } }
+
+/* ---------- 📐 layout: stage square + hero panel; nothing ever scrolls ---------- */
+function layout(){
+  const sp = $('scr-play'); if(!sp || sp.classList.contains('hidden')) return;
+  const A = $('arena'), st = $('stage'), P = $('panel');
+  const W = A.clientWidth - 16, H = A.clientHeight - 6 - (parseFloat(getComputedStyle(A).paddingBottom) || 18);
+  const big = Math.min(W, H) > 560, bs = big ? 56 : (Math.min(W, H) < 340 ? 40 : 46), gap = big ? 9 : 7;
+  sp.style.setProperty('--skk-bs', bs + 'px'); sp.style.setProperty('--bgap', gap + 'px'); sp.style.setProperty('--hf', big ? '2.2rem' : '1.6rem');
+  const heroW = 6 * bs + 5 * gap + 18;
+  // side panel when the screen is wide enough (the map may give up 20 % for it); else the panel goes under the map
+  const row = W - H >= heroW + 8 || (W > H && W - heroW - 8 >= H * 0.8);
+  let size;
+  A.classList.toggle('col', !row);
+  if(row){ P.style.flexDirection = 'column'; P.style.width = heroW + 'px'; size = Math.min(H, W - heroW - 8, 980); }
+  else { const side = (W - 8) / 2 >= heroW; P.style.flexDirection = side ? 'row' : 'column'; P.style.width = (side ? Math.min(W, Math.max(2 * heroW + 8, Math.min(W, 980))) : Math.min(W, Math.max(heroW, 600))) + 'px';
+    let ph = P.getBoundingClientRect().height || (side ? 120 : 240); size = Math.min(W, H - ph - 8, 980);
+    const spare = H - ph - 8 - size, pw = parseFloat(P.style.width) / (side ? 2 : 1);
+    if(spare > 30 && size >= W - 1){ const bs2 = Math.floor(Math.min(64, (pw - 18 - 5 * gap) / 6, bs + spare / (side ? 2 : 4)));   // 📱 tall phones: spare height → bigger skill buttons
+      if(bs2 > bs){ sp.style.setProperty('--skk-bs', bs2 + 'px'); ph = P.getBoundingClientRect().height; size = Math.min(W, H - ph - 8, 980); } } }
+  size = Math.max(200, Math.floor(size));
+  st.style.width = size + 'px'; st.style.height = size + 'px';
+  const dpr = Math.min(2, window.devicePixelRatio || 1), cv = $('cv');
+  if(VIEW.px !== size || VIEW.dpr !== dpr || !BG || VIEW.ch !== S.chapter){ VIEW = {s: size / TD.W, px: size, dpr, ch: S.chapter}; cv.width = Math.round(size * dpr); cv.height = Math.round(size * dpr); BG = null; }
+  if(pickOpen) placeHandOnGlow();
+}
+window.addEventListener('resize', () => { layout(); });
+
+/* ---------- 🦸 hero panel (5 colour slots + ⭐) ---------- */
+let BTN = [];
+function renderPanel(){
+  if(!G) return; const P = $('panel'); P.innerHTML = ''; BTN = [];
+  ['dragon', 'princess'].forEach((h, hi) => {
+    const T = G.trees[h], H = TD.HEROES[h], box = document.createElement('div'); box.className = 'hero'; box.dataset.h = h;
+    const btns = T.buttons(), act = btns.filter(b => !b.ult && !b.combo), ult = btns.find(b => b.ult);
+    const keys = hi === 0 ? ['1', '2', '3', '4', '5', '6'] : ['Q', 'W', 'E', 'R', 'T', 'Y'];
+    box.innerHTML = '<div class="hh"><span class="hf" id="hf-' + h + '">' + H.formIcons[T.form] + '</span><span class="hn"><b>' + H.icon + ' ' + UI.esc(T.formName()) + '</b><small>Tier ' + T.tier + ' / 10 · ' + SkillKit.barHtml(T.bar()) + '</small></span></div>' +
+      '<div class="btns">' + COLS.map((c, i) => { const b = act.find(x => x.col === c); return b ? SkillKit.buttonHtml(b, {}) : '<button type="button" class="skk-btn empty" style="--c:' + COLORS[c].hex + '" tabindex="-1" title="' + COLORS[c].en + ' slot (empty)">' + '<span style="font-size:.5em;opacity:.7">' + COLORS[c].dot + '</span></button>'; }).join('') +
+      (ult ? SkillKit.buttonHtml(ult, {}) : '<button type="button" class="skk-btn empty ult" tabindex="-1" title="⭐ Ultimate at tier 10"><span style="font-size:.55em">⭐</span></button>') + '</div>';
+    P.appendChild(box);
+    box.querySelectorAll('.skk-btn:not(.empty)').forEach(el => { const key = el.dataset.key; el.onclick = () => tapSkill(h, key, el); BTN.push({el, h, key}); });
+    COLS.concat(['U']).forEach((c, i) => { const el = box.querySelectorAll('.btns .skk-btn')[i]; if(el) el.dataset.hk = keys[i]; });
+  });
+  const cs = $('combo-slot'); cs.innerHTML = '';
+  ['dragon', 'princess'].forEach(h => { const b = G.trees[h].buttons().find(x => x.combo); if(b){ cs.innerHTML = SkillKit.buttonHtml(b, {}).replace('class="skk-btn', 'id="combo-btn" class="skk-btn'); const el = $('combo-btn'); el.onclick = () => tapSkill(h, b.key, el); BTN.push({el, h, key: b.key}); } });
+}
+function tapSkill(h, key, el){
+  if(!G || G.state !== 'wave' || G.paused){ UISound.play('bump'); return; }
+  if(!TD.ready(G, h, key)){ UISound.play('bump'); el.animate([{transform: 'translateX(-4px)'}, {transform: 'translateX(4px)'}, {transform: 'none'}], {duration: 220}); return; }
+  if(!TD.cast(G, h, key)){ UISound.play('bump'); floatText(TD.CX, TD.CY - 2.4, '👀 Nobody to aim at yet', '#7A5C88', 1.1); return; }
+  guideUsed++; UISound.play('whoosh'); hideHand();
+}
+function panelTick(){
+  if(!G) return;
+  BTN.forEach(B => { const cd = TD.cdOf(G, B.h, B.key) || 1, left = Math.max(0, G.cd[B.h][B.key] || 0), rd = left <= 0 && G.state === 'wave';
+    const f = Math.min(1, left / cd).toFixed(3); if(B.el.style.getPropertyValue('--cd') !== f) B.el.style.setProperty('--cd', f);
+    if(B.el.classList.contains('ready') !== rd) B.el.classList.toggle('ready', rd); });
+}
+
+/* ---------- 🃏 picks (the game waits — nothing moves while the cards are open) ---------- */
+function nextPick(){
+  if(!G || G.state !== 'pick'){ afterPicks(); return; }
+  const o = TD.offer(G); if(!o){ afterPicks(); return; }
+  const h = G.queue[0], T = G.trees[h], H = TD.HEROES[h];
+  const title = o.kind === 'evolve' ? '⭐ ' + H.icon + ' ' + H.name + ' is EVOLVING! Pick your main colour' : o.kind === 'ultimate' ? '⭐ ' + H.icon + ' Final form! Here is your ULTIMATE' : H.icon + ' ' + T.formName() + ' levels up! Tier ' + o.tier + ' — pick ONE';
+  const sub = o.kind === 'pick' ? (G.lvl === 0 ? '👆 The glowing card is a good pick' : 'Your build: ') : o.kind === 'evolve' ? 'The main colour shows up more often from now on' : 'Tap it to make it yours!';
+  pickOpen = true;
+  const pr = SkillKit.pickSheet($('arena'), o, {title, sub: sub, fast: !FX});
+  const sh = document.querySelector('#arena .skk-sheet:last-child'); if(sh && o.kind === 'pick' && G.lvl !== 0) sh.querySelector('.h2').innerHTML = T.bar().length ? 'Your build: ' + SkillKit.barHtml(T.bar()) + (T.main ? ' · main ' + COLORS[T.main].dot : '') : '✨ Your very first skill — every colour does something different!';
+  if(LEVELS[G.lvl].guide || (G.glowLeft > 0 && T.glow)) setTimeout(placeHandOnGlow, FX ? 520 : 0);
+  pr.then(card => {
+    pickOpen = false; hideHand(); if(!G) return;
+    TD.take(G, card); UISound.play(card.type === 'evolve' || card.type === 'ultimate' ? 'success' : 'unlock');
+    renderPanel();
+    if(card.type === 'evolve' || card.type === 'ultimate'){ const f = $('hf-' + h); if(f){ f.classList.add('evo'); } banner(card.type === 'evolve' ? '⭐ ' + H.name + ' → ' + T.formName() + '!' : '⭐ ' + T.formName() + '! ULTIMATE ready', 'gold'); if(FX) confetti(['⭐', '✨', COLORS[card.col].dot]); }
+    else floatText(h === 'dragon' ? G.heroes.dragon.x : TD.CX, (h === 'dragon' ? G.heroes.dragon.y : TD.CY) - 1.2, (card.type === 'up' ? '⬆️ ' : '✨ ') + card.name, COLORS[card.col].hex, 1.6);
+    setTimeout(nextPick, FX ? 260 : 0);
+  });
+}
+function afterPicks(){
+  if(!G) return; if(G.state === 'break'){ const n = G.wave + 2, boss = G.C.waves[n - 1].some(g => TD.SUITORS[g[0]].boss);
+    banner(boss ? '👑 BOSS WAVE: ' + TD.SUITORS[G.C.boss].name + '!' : '🌊 Wave ' + n + ' of ' + G.C.waves.length + ' — get ready!', boss ? 'bad' : ''); $('go-btn').classList.remove('hidden');
+    if(LEVELS[G.lvl].guide && G.wave < 0) showHandAt($('go-btn')); }
+}
+
+/* ---------- 👆 the guide hand (🌱 Basic) ---------- */
+function showHandAt(el){ if(!el) return; const r = el.getBoundingClientRect(); if(!r.width) return; const h = $('hand'); h.classList.remove('hidden'); h.style.left = (r.left + r.width * 0.5 - 12) + 'px'; h.style.top = Math.min(innerHeight - 44, r.bottom - 14) + 'px'; HAND = el; }
+function hideHand(){ $('hand').classList.add('hidden'); HAND = null; }
+function placeHandOnGlow(){ const g = document.querySelector('#scr-play .skk-sheet .skk-card.glow'); if(g) showHandAt(g); }
+function guideTick(){
+  if(!G || !LEVELS[G.lvl].guide || pickOpen) return;
+  if(G.state === 'wave' && guideUsed < 3 && TD.live(G).length){ const b = BTN.find(B => B.el.classList.contains('ready')); if(b){ if(HAND !== b.el) showHandAt(b.el); return; } }
+  if(HAND && !(G.state === 'break' && HAND === $('go-btn'))) hideHand();
+}
+
+/* ---------- ⏱️ loop ---------- */
+function loop(now){
+  raf = requestAnimationFrame(loop); if(!G) return;
+  const dt = last ? Math.min(0.1, Math.max(0, (now - last) / 1000)) : 0; last = now;
+  const was = G.state; TD.step(G, dt);
+  if(was === 'break' && G.state === 'wave'){ $('go-btn').classList.add('hidden'); if(HAND === $('go-btn')) hideHand(); }
+  handleEvents(TD.takeEvents(G));
+  FT = FT.filter(f => (f.t += dt) < f.dur);
+  draw(now / 1000); panelTick(); hudTick(); guideTick();
+  if(G && (G.state === 'won' || G.state === 'lost') && !G.ended){ G.ended = 1; setTimeout(() => finish(), FX ? 1300 : 0); }
+}
+function hudTick(force){
+  if(!G) return; BAR.lives(Math.max(0, G.hearts), G.hearts <= Math.max(2, G.heartsMax * 0.25)); BAR.round(Math.max(1, G.wave + 1), G.C.waves.length); BAR.score(G.score.toLocaleString());
+  BAR.count('foes', '🤴', TD.live(G).length + G.spawnQ.length, 'Suitors still coming');
+}
+let lastBonkSnd = 0;
+function handleEvents(list){
+  list.forEach(e => {
+    if(e.k === 'bonk'){ if(e.pts) floatText(e.x, e.y - 0.6, '+' + e.pts, '#FFB020', 0.9); if(e.boss){ banner('💫 BONK! ' + TD.SUITORS[e.type].name + ' gives up!', 'gold'); UISound.play('success'); if(FX) confetti(['💐', '💫', '⭐']); actAvatar('cheer', 2.5); }
+      if(performance.now() - lastBonkSnd > 120){ lastBonkSnd = performance.now(); UISound.play('pop'); } }
+    if(e.k === 'heart'){ UISound.play('bump'); floatText(e.x, e.y - 0.8, '💍 Marry me?!', '#E5484D', 1.2); floatText(TD.CX, TD.CY - 1.6, '−' + e.n + ' ❤️', '#E5484D', 1.1); actAvatar('facepalm', 1.4);
+      if(G.lvl === 0 && !G.toldHeart){ G.toldHeart = 1; banner('💔 A suitor reached the tower — tap a glowing skill to stop them!', 'bad'); } }
+    if(e.k === 'wave'){ banner(e.boss ? '👑 Here comes ' + TD.SUITORS[G.C.boss].name + '!' : '🌊 Wave ' + e.n + '!', e.boss ? 'bad' : ''); if(G.lvl > 0 && e.n > 1) $('goal').style.opacity = 0; }
+    if(e.k === 'waveDone'){ floatText(TD.CX, TD.CY - 2.2, (e.perfect ? '✨ Perfect wave! ' : '✅ Wave done ') + '+' + e.bonus, '#22A867', 1.6); actAvatar('cheer', 1.6); if(G.state === 'pick') setTimeout(nextPick, FX ? 900 : 0); else afterPicks(); }
+    if(e.k === 'suitorsUp'){ floatText(TD.CX, 1.6, '🤴 The suitors learned ' + e.icon + ' ' + e.name + '!', '#7B4FE0', 2.2); }
+    if(e.k === 'suitorCast'){ floatText(TD.CX, 1.4, e.icon + ' ' + e.name + '!', '#7B4FE0', 1.4); }
+    if(e.k === 'suitorSkill'){ const t = {charge: '🛡️ Shield Charge!', ladder: '🪜 Love Ladder!', arrow: '💘 Love Arrow!', bomb: '💐 Flower Bomb!', bouquet: '💐 Bouquet!', shine: '✨ Shiny!'}[e.skill]; if(t) floatText(TD.CX, 2.4, t, '#E5487F', 1.2); }
+    if(e.k === 'cast'){ floatText(e.hero === 'dragon' ? G.heroes.dragon.x : TD.CX, (e.hero === 'dragon' ? G.heroes.dragon.y : TD.CY) - 1, e.icon + ' ' + e.name, COLORS[e.col] ? COLORS[e.col].hex : '#333', 1); }
+    if(e.k === 'boss'){ UISound.play('nav'); }
+    if(e.k === 'lastStand'){ banner('🍀 Second chance!', 'gold'); }
+    if(e.k === 'won'){ banner('🏆 Chapter ' + G.C.n + ' done!', 'gold'); UISound.play('success'); actAvatar('cheer', 4); if(FX) confetti(['💖', '🐉', '👑', '⭐', '🌹'], 40); }
+    if(e.k === 'lost'){ banner('💍 Oh no — wedding bells!', 'bad'); UISound.play('error'); actAvatar('facepalm', 4); }
+  });
+}
+function floatText(x, y, txt, col, dur){ FT.push({x, y, txt, col, t: 0, dur: dur || 1}); if(FT.length > 40) FT.shift(); }
+let bannerT = 0;
+function banner(txt, kind){ const b = $('banner'); b.textContent = txt; b.className = 'banner on' + (kind ? ' ' + kind : ''); clearTimeout(bannerT); bannerT = setTimeout(() => b.classList.remove('on'), kind ? 2400 : 1700); }
+function confetti(list, n){ for(let i = 0; i < (n || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = list[Math.floor(Math.random() * list.length)]; e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
+
+/* ---------- 🧑 the reader's avatar on the tower balcony (Acting pictures, drawn once) ---------- */
+let AVF = {}, AV_ACT = 'wave', AV_T = 0;
+function avatarFrames(act){ if(!window.Acting) return null; const k = S.player + '|' + act; if(AVF[k]) return AVF[k];
+  try{ AVF[k] = Acting.frames({name: S.player, av: myAvatar(S.player)}, act, {w: 60, h: 70, n: 8, loop: 1.2}); }catch(e){ AVF[k] = []; } return AVF[k]; }
+function actAvatar(act, sec){ AV_ACT = act; AV_T = performance.now() + sec * 1000; }
+
+/* ---------- 🎨 drawing (one painter; emoji from the AvatarKit sprite cache — never fillText an emoji per frame) ---------- */
+function drawBG(){
+  const c = document.createElement('canvas'); c.width = $('cv').width; c.height = $('cv').height; const g = c.getContext('2d'), s = VIEW.s, d = VIEW.dpr; g.setTransform(d, 0, 0, d, 0, 0);
+  const SC = SCENES[G.C.scene] || SCENES.meadow, px = VIEW.px;
+  const gr = g.createRadialGradient(px / 2, px / 2, px * 0.1, px / 2, px / 2, px * 0.75); gr.addColorStop(0, SC.g1); gr.addColorStop(1, SC.g2); g.fillStyle = gr; g.fillRect(0, 0, px, px);
+  const R = TD.rngOf(G.C.n * 97);
+  for(let i = 0; i < 26; i++){ const x = R() * 16, y = R() * 16; if(Math.hypot(x - 8, y - 8) < 2.4) continue; let near = 9; G.paths.forEach(P => { for(let q = 0; q <= P.len; q += 0.5){ const p = TD.ptAt(P, q); near = Math.min(near, Math.hypot(p.x - x, p.y - y)); } }); if(near < 0.9) continue;
+    emo(g, SC.deco[Math.floor(R() * SC.deco.length)], x * s, y * s, s * (0.55 + R() * 0.35), 0.9); }
+  g.fillStyle = '#5FB0E6'; g.globalAlpha = 0.55; g.beginPath(); g.arc(8 * s, 8 * s, 1.75 * s, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1;   // 🌊 the moat
+  G.paths.forEach(P => { g.lineCap = 'round'; g.lineJoin = 'round';
+    g.strokeStyle = SC.edge; g.lineWidth = 1.05 * s; g.beginPath(); P.pts.forEach((p, i) => i ? g.lineTo(p[0] * s, p[1] * s) : g.moveTo(p[0] * s, p[1] * s)); g.stroke();
+    g.strokeStyle = SC.path; g.lineWidth = 0.86 * s; g.stroke();
+    g.setLineDash([0.12 * s, 0.38 * s]); g.strokeStyle = 'rgba(160,110,60,.35)'; g.lineWidth = 0.1 * s; g.stroke(); g.setLineDash([]);
+    const st = P.pts[0]; emo(g, '🚩', Math.max(0.5, Math.min(15.5, st[0])) * s, Math.max(0.5, Math.min(15.5, st[1])) * s, s * 0.7); });
+  G.spots.forEach(p => { g.strokeStyle = 'rgba(255,255,255,.45)'; g.lineWidth = 0.06 * s; g.setLineDash([0.12 * s, 0.1 * s]); g.beginPath(); g.arc(p.x * s, p.y * s, 0.38 * s, 0, Math.PI * 2); g.stroke(); g.setLineDash([]); });
+  if(SC.tint){ g.fillStyle = SC.tint; g.fillRect(0, 0, px, px); }
+  // 🏰 the tower (seen from above)
+  const cx = 8 * s, cy = 8 * s, r = TD.TOWER_R * s;
+  g.fillStyle = 'rgba(0,0,0,.18)'; g.beginPath(); g.ellipse(cx + 0.1 * s, cy + 0.18 * s, r * 1.08, r * 1.02, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#B9ADC9'; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#CFC4DD'; for(let i = 0; i < 12; i++){ const a = i / 12 * Math.PI * 2; g.save(); g.translate(cx + Math.cos(a) * r * 0.9, cy + Math.sin(a) * r * 0.9); g.rotate(a); g.fillRect(-0.13 * s, -0.13 * s, 0.26 * s, 0.26 * s); g.restore(); }
+  g.fillStyle = '#FFD6E7'; g.beginPath(); g.arc(cx, cy, r * 0.72, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = '#E9A8C6'; g.lineWidth = 0.05 * s; g.stroke();
+  BG = c;
+}
+function draw(t){
+  const cv = $('cv'), g = cv.getContext('2d'), s = VIEW.s, d = VIEW.dpr; if(!G) return;
+  if(!BG) drawBG();
+  g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(BG, 0, 0); g.setTransform(d, 0, 0, d, 0, 0);
+  const X = v => v * s;
+  // 🪤 traps + hot floors
+  G.traps.forEach(T => { const a = T.fx === 'lava' ? 0.55 + 0.2 * Math.sin(t * 6) : 1;
+    if(T.fx === 'lava'){ const gr = g.createRadialGradient(X(T.x), X(T.y), 0, X(T.x), X(T.y), X(T.r)); gr.addColorStop(0, 'rgba(255,120,40,' + a + ')'); gr.addColorStop(1, 'rgba(255,60,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(X(T.x), X(T.y), X(T.r), 0, Math.PI * 2); g.fill(); }
+    else { g.fillStyle = 'rgba(120,70,30,.18)'; g.beginPath(); g.arc(X(T.x), X(T.y), X(T.r), 0, Math.PI * 2); g.fill(); }
+    emo(g, T.icon, X(T.x), X(T.y), s * 0.62, a); if(T.charges > 1 && T.charges < 20) dots(g, X(T.x), X(T.y) + s * 0.42, T.charges, '#A0612C', s); });
+  // 🌪️ zones
+  G.zones.forEach(Z => { if(Z.k === 'meteor'){ if(Z.t < Z.delay){ g.strokeStyle = 'rgba(229,72,77,.8)'; g.lineWidth = 0.08 * s; g.setLineDash([0.2 * s, 0.15 * s]); g.beginPath(); g.arc(X(Z.x), X(Z.y), X(Z.big ? 7.5 : Z.r) * (1 - Z.t / Z.delay * 0.15), 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+        const fy = (1 - Z.t / Z.delay); emo(g, Z.big ? '❤️‍🔥' : '☄️', X(Z.x) + fy * s * 4, X(Z.y) - fy * s * 6, s * (Z.big ? 2.2 : 1.2)); }
+      else { const p = (Z.t - Z.delay) / 0.4; if(p < 1){ g.fillStyle = 'rgba(255,170,60,' + (0.6 * (1 - p)) + ')'; g.beginPath(); g.arc(X(Z.x), X(Z.y), X(Z.big ? 8 : Z.r) * (0.6 + p * 0.6), 0, Math.PI * 2); g.fill(); } } return; }
+    const pr = Z.k === 'tornado' ? '🌀' : '🌹';
+    g.fillStyle = Z.k === 'tornado' ? 'rgba(255,140,60,.22)' : 'rgba(255,92,154,.18)'; g.beginPath(); g.arc(X(Z.x), X(Z.y), X(Z.r), 0, Math.PI * 2); g.fill();
+    for(let i = 0; i < 5; i++){ const a = t * 3 + i * 1.256; emo(g, i % 2 ? pr : '🌸', X(Z.x + Math.cos(a) * Z.r * 0.6), X(Z.y + Math.sin(a) * Z.r * 0.6), s * 0.45); } });
+  // 🧱 walls · 🫖 tea tables · 🗼 towers
+  G.walls.forEach(w => { emo(g, w.icon, X(w.x), X(w.y), s * 0.9); bar(g, X(w.x), X(w.y) - s * 0.6, s * 0.8, w.hp / w.hpMax, '#22A867'); });
+  G.decoys.forEach(dc => { emo(g, '🫖', X(dc.x) - s * 0.25, X(dc.y), s * 0.6); emo(g, '🍰', X(dc.x) + s * 0.3, X(dc.y) + s * 0.05, s * 0.5); });
+  G.towers.forEach(T => { g.fillStyle = 'rgba(0,0,0,.18)'; g.beginPath(); g.ellipse(X(T.x), X(T.y) + s * 0.3, s * 0.42, s * 0.18, 0, 0, Math.PI * 2); g.fill();
+    emo(g, '🗼', X(T.x), X(T.y), s * 0.95, T.offT > 0 ? 0.45 : 1); if(T.offT > 0) emo(g, '💐', X(T.x) + s * 0.3, X(T.y) - s * 0.3, s * 0.5); if(T.slowed) emo(g, '🎵', X(T.x) - s * 0.35, X(T.y) - s * 0.45, s * 0.4);
+    ring(g, X(T.x), X(T.y) + s * 0.5, s * 0.16, 1 - T.t / T.dur, '#3A86FF'); });
+  // 🤴 suitors (far ones first)
+  G.enemies.slice().sort((a, b) => a.y - b.y).forEach(e => drawSuitor(g, e, t, s));
+  // 🐭 helpers + 🕊️ flyers
+  G.minions.forEach(m => { const hop = Math.abs(Math.sin(t * 9 + m.d)) * s * 0.12; emo(g, m.icon, X(m.x), X(m.y) - hop, s * 0.62); if(m.fight) emo(g, '💥', X(m.x) - s * 0.25, X(m.y) - s * 0.4, s * 0.35); bar(g, X(m.x), X(m.y) - s * 0.5, s * 0.5, m.hp / m.hpMax, '#3A86FF'); });
+  // 🏰 home effects
+  if(G.domeT > 0){ g.fillStyle = 'rgba(140,220,255,.22)'; g.strokeStyle = 'rgba(120,200,255,.8)'; g.lineWidth = 0.08 * s; g.beginPath(); g.arc(X(8), X(8), X(1.9 + 0.05 * Math.sin(t * 5)), 0, Math.PI * 2); g.fill(); g.stroke(); }
+  if(G.shieldHp > 0){ g.strokeStyle = 'rgba(34,168,103,.85)'; g.lineWidth = 0.14 * s; g.beginPath(); g.arc(X(8), X(8), X(1.45), 0, Math.PI * 2); g.stroke(); dots(g, X(8), X(8) + s * 1.75, G.shieldHp, '#22A867', s); }
+  if(G.reflectN > 0) emo(g, '🪞', X(8) + s * 1.3, X(8) - s * 1.2, s * 0.6);
+  if(G.armorT > 0){ g.strokeStyle = 'rgba(34,181,115,.6)'; g.lineWidth = 0.07 * s; g.setLineDash([0.15 * s, 0.1 * s]); g.beginPath(); g.arc(X(8), X(8), X(1.3), t, t + Math.PI * 2); g.stroke(); g.setLineDash([]); }
+  // 👸 princess + 🧑 the reader on the balcony + 🚩 flag
+  const pz = G.heroes.princess, PF = TD.HEROES.princess.formIcons[G.trees.princess.form];
+  if(G.trees.princess.form >= 1){ g.fillStyle = 'rgba(255,92,154,' + (0.18 + 0.1 * Math.sin(t * 3)) + ')'; g.beginPath(); g.arc(X(8), X(8), X(0.95), 0, Math.PI * 2); g.fill(); }
+  emo(g, PF, X(8), X(7.85) - Math.abs(Math.sin(t * 2)) * s * 0.05, s * 1.05); if(pz.dazeT > 0) emo(g, '✨', X(8.4), X(7.3), s * 0.45);
+  const fr = avatarFrames(performance.now() < AV_T ? AV_ACT : 'wave'); if(fr && fr.length){ const im = fr[Math.floor(t * 6.5) % fr.length]; g.drawImage(im, X(8.2), X(7.75), s * 0.85, s * 0.99); }
+  g.strokeStyle = '#6B4A2F'; g.lineWidth = 0.06 * s; g.beginPath(); g.moveTo(X(7.25), X(7.6)); g.lineTo(X(7.25), X(6.6)); g.stroke();
+  g.fillStyle = '#FF5C9A'; g.beginPath(); g.moveTo(X(7.25), X(6.6)); g.quadraticCurveTo(X(7.6), X(6.7 + 0.08 * Math.sin(t * 6)), X(7.85), X(6.8)); g.lineTo(X(7.25), X(7.0)); g.fill();
+  // 🐉 dragon (orbits; bigger as it evolves)
+  const hd = G.heroes.dragon, DT = G.trees.dragon, ds = s * (0.95 + 0.25 * DT.form);
+  g.fillStyle = 'rgba(0,0,0,.16)'; g.beginPath(); g.ellipse(X(hd.x), X(hd.y) + ds * 0.55, ds * 0.4, ds * 0.14, 0, 0, Math.PI * 2); g.fill();
+  if(DT.form >= 2){ g.fillStyle = 'rgba(255,80,120,' + (0.25 + 0.15 * Math.sin(t * 4)) + ')'; g.beginPath(); g.arc(X(hd.x), X(hd.y), ds * 0.75, 0, Math.PI * 2); g.fill(); }
+  emo(g, TD.HEROES.dragon.formIcons[DT.form], X(hd.x), X(hd.y) - Math.sin(t * 4) * s * 0.1, ds, 1, Math.cos(hd.ang + Math.PI / 2) < 0);
+  if(hd.sleepy) emo(g, '💤', X(hd.x) + ds * 0.45, X(hd.y) - ds * 0.55, s * 0.45); if(hd.dazeT > 0) emo(g, '💐', X(hd.x) - ds * 0.4, X(hd.y) - ds * 0.5, s * 0.45);
+  G.flyers.forEach(f => emo(g, f.icon, X(f.x), X(f.y) - Math.sin(t * 10 + f.atk) * s * 0.1, s * 0.55));
+  // ✨ effects
+  G.fx.forEach(f => drawFx(g, f, s, t));
+  // 💬 floating words
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  FT.forEach(f => { const p = f.t / f.dur, a = p < 0.75 ? 1 : 1 - (p - 0.75) / 0.25, fs = Math.max(11, s * 0.5);
+    g.font = '800 ' + fs + 'px Fredoka, Nunito, sans-serif'; g.globalAlpha = a; const x = Math.max(fs * 2, Math.min(VIEW.px - fs * 2, X(f.x))), y = Math.max(fs, X(f.y) - p * s * 0.9);
+    g.lineWidth = fs * 0.22; g.strokeStyle = 'rgba(255,255,255,.95)'; drawTxt(g, f.txt, x, y, fs, f.col); g.globalAlpha = 1; });
+}
+// text with emoji: emoji go through emo() (sprite cache), words through fillText
+function drawTxt(g, txt, x, y, fs, col){
+  const parts = splitEmoji(txt); let w = 0; const ws = parts.map(p => p.e ? fs * 1.05 : g.measureText(p.t).width); w = ws.reduce((a, b) => a + b, 0);
+  let cx = x - w / 2; parts.forEach((p, i) => { if(p.e) emo(g, p.t, cx + ws[i] / 2, y, fs); else { g.textAlign = 'left'; g.strokeText(p.t, cx, y); g.fillStyle = col; g.fillText(p.t, cx, y); } cx += ws[i]; }); g.textAlign = 'center';
+}
+const SPLIT_CACHE = new Map();
+function splitEmoji(txt){ let r = SPLIT_CACHE.get(txt); if(r) return r; r = [];
+  const seg = (window.Intl && Intl.Segmenter) ? Array.from(new Intl.Segmenter(undefined, {granularity: 'grapheme'}).segment(txt), x => x.segment) : Array.from(txt);
+  seg.forEach(ch => { const e = /\p{Extended_Pictographic}/u.test(ch); const lastP = r[r.length - 1]; if(!e && lastP && !lastP.e) lastP.t += ch; else r.push({t: ch, e}); });
+  if(SPLIT_CACHE.size > 300) SPLIT_CACHE.clear(); SPLIT_CACHE.set(txt, r); return r; }
+function dots(g, x, y, n, col, s){ n = Math.min(8, n); for(let i = 0; i < n; i++){ g.fillStyle = col; g.beginPath(); g.arc(x + (i - (n - 1) / 2) * s * 0.16, y, s * 0.055, 0, Math.PI * 2); g.fill(); } }
+function bar(g, x, y, w, f, col){ g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(x - w / 2 - 1, y - 2, w + 2, 5); g.fillStyle = col; g.fillRect(x - w / 2, y - 1, w * Math.max(0, Math.min(1, f)), 3); }
+function ring(g, x, y, r, f, col){ g.strokeStyle = col; g.lineWidth = r * 0.45; g.beginPath(); g.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, f)); g.stroke(); }
+function drawSuitor(g, e, t, s){
+  const S = e.S, sz = s * (S.size || 0.95), X = v => v * s;
+  if(e.gone){ const k = e.goneT; if(e.kiss){ const a = Math.max(0, 1 - k / 0.8); if(a > 0) emo(g, S.icon, X(e.x), X(e.y) - k * s * 0.6, sz * a, a); return; }
+    const x = X(e.x) + Math.cos(e.flyA) * k * s * 7, y = X(e.y) - k * s * 5 + k * k * s * 3; g.save(); g.translate(x, y); g.rotate(k * 12); emo(g, S.icon, 0, 0, sz * (1 - k * 0.3)); g.restore();
+    if(k < 0.55){ emo(g, '💫', X(e.x), X(e.y) - sz * 0.6, sz * 0.6); } return; }
+  const walk = (e.stunT > 0 || e.rootT > 0 || e.sleepT > 0 || e.tea || e.atWall) ? 0 : Math.sin(t * 10 + e.id) * s * 0.06;
+  g.fillStyle = 'rgba(0,0,0,.2)'; g.beginPath(); g.ellipse(X(e.x), X(e.y) + sz * 0.42, sz * 0.36, sz * 0.12, 0, 0, Math.PI * 2); g.fill();
+  if(e.charmT > 0){ g.fillStyle = 'rgba(255,92,154,.3)'; g.beginPath(); g.arc(X(e.x), X(e.y), sz * 0.55, 0, Math.PI * 2); g.fill(); }
+  if(e.shine > 0 || e.shield > 0){ g.strokeStyle = e.shine > 0 ? 'rgba(255,240,140,.95)' : 'rgba(150,200,255,.9)'; g.lineWidth = s * 0.08; g.beginPath(); g.arc(X(e.x), X(e.y), sz * 0.55, 0, Math.PI * 2); g.stroke(); }
+  const flip = Math.cos(e.ang || 0) < 0 ? (e.charmT > 0 || e.fearT > 0 ? false : true) : (e.charmT > 0 || e.fearT > 0);
+  emo(g, S.icon, X(e.x), X(e.y) + walk, sz, 1, flip);
+  emo(g, S.prop, X(e.x) + (flip ? -1 : 1) * sz * 0.36, X(e.y) + sz * 0.1 + walk, sz * 0.5, 1, flip);
+  bar(g, X(e.x), X(e.y) - sz * 0.62, sz * 0.8, e.hp / e.hpMax, e.boss ? '#E5484D' : '#FF5C9A');
+  const st = e.charmT > 0 ? '😍' : e.sleepT > 0 ? '💤' : e.stunT > 0 ? '💞' : e.rootT > 0 ? '🕸️' : e.fearT > 0 ? '😱' : e.confT > 0 ? '❓' : e.tea ? '☕' : e.slowT > 0 ? '🐌' : e.burnT > 0 ? '🔥' : '';
+  if(st) emo(g, st, X(e.x) + sz * 0.4, X(e.y) - sz * 0.75, s * 0.42);
+  if(e.charmT > 0) emo(g, '💗', X(e.x) + Math.sin(t * 6) * sz * 0.4, X(e.y) - sz * 0.9, s * 0.3);
+}
+function drawFx(g, f, s, t){
+  const p = Math.min(1, f.t / f.dur), X = v => v * s;
+  const lerp = (a, b) => a + (b - a) * Math.min(1, p * 1.6);
+  switch(f.k){
+    case 'fireball': case 'bolt': case 'rose': case 'bird': case 'bouquet': case 'arrow': {
+      const x = lerp(X(f.x), X(f.x2)), y = lerp(X(f.y), X(f.y2));
+      if(f.k === 'fireball' || f.k === 'bolt'){ const gr = g.createRadialGradient(x, y, 0, x, y, s * 0.3); gr.addColorStop(0, '#FFF6B0'); gr.addColorStop(0.5, f.k === 'bolt' ? (SkillKit.COLORS[f.col] || {hex: '#FF8A3D'}).hex : '#FF8A3D'); gr.addColorStop(1, 'rgba(255,80,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, s * 0.3, 0, Math.PI * 2); g.fill(); }
+      else emo(g, {rose: '🌹', bird: '🕊️', bouquet: '💐', arrow: '💘'}[f.k], x, y, s * 0.5); break; }
+    case 'swat': { g.strokeStyle = '#C98A2E'; g.lineWidth = s * 0.12 * (1 - p); g.lineCap = 'round'; g.beginPath(); g.moveTo(X(f.x), X(f.y)); g.quadraticCurveTo(X((f.x + f.x2) / 2 + 0.6), X((f.y + f.y2) / 2 - 0.6), X(f.x2), X(f.y2)); g.stroke(); if(p > 0.3) emo(g, '💥', X(f.x2), X(f.y2), s * 0.45 * (1 - p)); break; }
+    case 'cone': { g.save(); g.translate(X(f.x), X(f.y)); g.rotate(f.ang); const gr = g.createLinearGradient(0, 0, X(f.len), 0); gr.addColorStop(0, 'rgba(255,240,140,.9)'); gr.addColorStop(1, 'rgba(255,90,30,0)'); g.fillStyle = gr; g.globalAlpha = 1 - p * 0.7;
+      g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, X(f.len) * (0.4 + p * 0.6), -f.w * 0.6, f.w * 0.6); g.closePath(); g.fill(); g.restore(); g.globalAlpha = 1; break; }
+    case 'whip': case 'beam': { g.save(); g.translate(X(f.x), X(f.y)); g.rotate(f.ang); g.globalAlpha = 1 - p; g.strokeStyle = f.k === 'whip' ? '#C98A2E' : '#FFE45C'; g.lineWidth = X(f.w) * (f.k === 'whip' ? 0.5 : 0.9); g.lineCap = 'round';
+      g.beginPath(); g.moveTo(X(0.8), 0); for(let i = 1; i <= 12; i++){ const q = i / 12; g.lineTo(X(f.len) * q * Math.min(1, p * 3), Math.sin(q * 9 + t * 20) * (f.k === 'whip' ? s * 0.25 : 0)); } g.stroke(); g.restore(); g.globalAlpha = 1; break; }
+    case 'zap': { g.strokeStyle = '#8EC8FF'; g.lineWidth = s * 0.08; g.globalAlpha = 1 - p; g.beginPath(); g.moveTo(X(f.x), X(f.y)); for(let i = 1; i < 6; i++){ const q = i / 6; g.lineTo(X(f.x + (f.x2 - f.x) * q) + (Math.random() - 0.5) * s * 0.4, X(f.y + (f.y2 - f.y) * q) + (Math.random() - 0.5) * s * 0.4); } g.lineTo(X(f.x2), X(f.y2)); g.stroke(); g.globalAlpha = 1; break; }
+    case 'boom': case 'push': case 'daze': case 'sleep': case 'slow': case 'fear': case 'confuse': case 'pull': case 'haste': case 'shield': case 'dome': case 'heal': case 'mirror': {
+      const col = {boom: '255,140,40', push: '255,200,60', daze: '255,92,154', sleep: '160,140,255', slow: '90,170,255', fear: '120,80,200', confuse: '200,120,255', pull: '120,80,220', haste: '255,220,60', shield: '34,168,103', dome: '120,200,255', heal: '34,168,103', mirror: '200,230,255'}[f.k];
+      const R = X(f.r || 1.6) * (f.k === 'pull' ? 1 - p * 0.7 : 0.4 + p * 0.7); g.strokeStyle = 'rgba(' + col + ',' + (1 - p) + ')'; g.lineWidth = s * 0.14; g.beginPath(); g.arc(X(f.x), X(f.y), R, 0, Math.PI * 2); g.stroke();
+      const ic = {daze: '💞', sleep: '💤', fear: '😱', confuse: '❓', heal: '💚', mirror: '🪞', haste: '⚡', push: '🔔', pull: '🧲'}[f.k]; if(ic) for(let i = 0; i < 6; i++){ const a = i / 6 * Math.PI * 2 + t * 2; emo(g, ic, X(f.x) + Math.cos(a) * R, X(f.y) + Math.sin(a) * R, s * 0.4, 1 - p); } break; }
+    case 'heart': emo(g, '💗', X(f.x), X(f.y) - p * s, s * 0.6, 1 - p); break;
+    case 'coins': for(let i = 0; i < 8; i++){ const a = i / 8 * Math.PI * 2; emo(g, '🪙', X(f.x) + Math.cos(a) * p * s * 1.6, X(f.y) + Math.sin(a) * p * s * 1.6 - p * s, s * 0.45, 1 - p); } break;
+    case 'crit': emo(g, '💥', X(f.x), X(f.y) - s * 0.4, s * 0.7 * (1 + p), 1 - p); break;
+    case 'ting': emo(g, '✨', X(f.x), X(f.y) - s * 0.3, s * 0.5, 1 - p); break;
+    case 'trap': emo(g, f.icon || '💥', X(f.x), X(f.y) - p * s * 0.4, s * 0.8 * (1 + p * 0.5), 1 - p); break;
+    case 'poof': case 'build': emo(g, f.k === 'build' ? '✨' : '💨', X(f.x), X(f.y) - p * s * 0.5, s * (0.6 + p * 0.6), 1 - p); break;
+    case 'flowerbomb': emo(g, '💐', X(f.x), X(f.y) - s * (1 - p), s * 0.7, 1 - p * 0.5); break;
+    case 'shine': emo(g, '✨', X(f.x), X(f.y), s * (1 + p * 2), 1 - p); break;
+    case 'charge': emo(g, '🛡️', X(f.x), X(f.y) - s * 0.6, s * 0.6, 1 - p); break;
+    case 'hop': emo(g, '🦘', X(f.x), X(f.y) - s * 0.6, s * 0.5, 1 - p); break;
+    case 'ladder': emo(g, '🪜', X(f.x), X(f.y) - s * 0.6, s * 0.6, 1 - p); break;
+    case 'ew': emo(g, '😝', X(f.x), X(f.y) - s * 0.7, s * 0.6, 1 - p); break;
+    case 'bounce': emo(g, '🫧', X(f.x), X(f.y), s * 0.7, 1 - p); break;
+  }
+}
+
+/* ---------- 🏁 the end of a chapter ---------- */
+function finish(){
+  if(!G) return; stopLoop(); hideHand(); const won = G.state === 'won', L = LEVELS[G.lvl], ch = G.C.n, lvl = G.lvl;
+  const stars = won ? (G.hearts >= G.heartsMax * 0.75 ? 3 : G.hearts >= G.heartsMax * 0.4 ? 2 : 1) : 0;
+  const stats = {games: 1, bonks: G.stats.bonks, waves: G.stats.waves, evolves: G.stats.evolves, ultimates: G.stats.ultimates, combos: G.stats.combos, perfect: G.stats.perfect, casts: G.stats.casts};
+  if(won) stats.chapters = ch;
+  const theme = '📖 Ch ' + ch + ' · ' + G.C.title;
+  const extra = {score: G.score, stars, cleared: won, theme, stats, timeSec: Math.round(G.t)};
+  const dT = G.trees.dragon, pT = G.trees.princess;
+  const row = saveRow(); row.ch = Math.max(Number(row.ch) || 0, won ? ch : 0); row.last = {dragon: dT.save(), princess: pT.save()}; row.lastForms = dT.formName() + ' + ' + pT.formName();
+  S.settings['SkillTree_td-' + S.book + '_' + S.player] = JSON.stringify(row);
+  if(won) saveWin(lvl, extra); else saveWin(lvl, extra);
+  saveTree(row);
+  const head = won ? '<div class="rh">🏆</div><h2>Chapter ' + ch + ' done!</h2><div class="rs">' + UI.esc(G.C.title) + ' · ' + L.emoji + ' ' + L.name + '</div><div class="stars">' + '⭐'.repeat(stars) + '☆'.repeat(3 - stars) + '</div>' :
+    '<div class="rh">💍</div><h2>Oh no — wedding bells!</h2><div class="rs">The suitors got into the tower on wave ' + (G.wave + 1) + '. The Princess is being carried off to a wedding…<br>🐉 Next round: the <b>Jailbreak</b> chapter — the Dragon breaks out and shouts "I OBJECT!!"</div>';
+  showResult(head + '<canvas id="res-cv" width="240" height="240"></canvas><div class="score">⭐ <span id="score-count">0</span></div>' +
+    '<div class="builds"><span>🐉 ' + UI.esc(dT.formName()) + ' ' + SkillKit.barHtml(dT.bar(), {star: !!dT.ult}) + '</span><span>👸 ' + UI.esc(pT.formName()) + ' ' + SkillKit.barHtml(pT.bar(), {star: !!pT.ult}) + '</span>' +
+    '<span style="color:var(--ink-soft)">💫 ' + G.stats.bonks + ' bonked · ❤️ ' + G.hearts + ' left · 🌊 ' + G.stats.waves + ' waves</span></div>' +
+    '<div class="save-note" id="save-note"><span class="ui-spin a-pop">✅</span> Saving your score…</div>' +
+    '<div class="res-btns"><button class="sp-btn sp-secondary" id="b-menu">🎚️ Levels</button><button class="sp-btn ' + (won ? 'sp-secondary' : 'sp-primary') + '" id="b-again">🔁 Play again</button>' +
+    (won ? '<button class="sp-btn sp-primary" id="b-diary">📔 Read the diary ▶</button>' : '') + '</div>');
+  countUp($('score-count'), G.score, 1100);
+  try{ const c = $('res-cv'), g = c.getContext('2d'), fr = avatarFrames(won ? 'cheer' : 'facepalm'); let i = 0; const tick = () => { if(!$('res-cv')) return; g.clearRect(0, 0, 240, 240);
+    emo(g, won ? TD.HEROES.dragon.formIcons[dT.form] : '🐉', 60, 150, 70, 1, true); emo(g, won ? TD.HEROES.princess.formIcons[pT.form] : '👰', 180, 150, 66);
+    if(fr && fr.length) g.drawImage(fr[i++ % fr.length], 85, 70, 70, 82); if(!won) emo(g, '💍', 120, 50, 40); else emo(g, '💖', 120, 40, 40); setTimeout(() => requestAnimationFrame(tick), 150); }; tick(); }catch(e){}
+  $('b-again').onclick = () => startGame(ch, lvl);
+  $('b-menu').onclick = () => { hideResult(); G = null; openBook(S.book); };
+  if($('b-diary')) $('b-diary').onclick = () => { hideResult(); G = null; openDiary(ch, lvl, 'outro'); };
+}
+function countUp(el, to, ms){ if(!el) return; const t0 = performance.now(); (function tick(now){ const p = Math.max(0, Math.min(1, (now - t0) / ms)); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))).toLocaleString(); if(p < 1) requestAnimationFrame(tick); })(t0); }
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+function hideResult(){ $('result').classList.add('hidden'); }
+const PENDING_KEY = 'sp_tdstories_pending';
+function readPending(){ try{ return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); }catch(e){ return []; } }
+function writePending(list){ try{ localStorage.setItem(PENDING_KEY, JSON.stringify(list.slice(-20))); }catch(e){} }
+function boardId(){ return TD.BOOKS[S.book].board; }
+function flushPending(){ const list = readPending(); if(!list.length) return; writePending([]); list.forEach(w => google.script.run.withFailureHandler(() => writePending(readPending().concat([w]))).saveLevelResult(w.board || 'td-draprincess', w.name, w.lvl, w.extra)); }
+function saveWin(lvlIdx, extra, tries){
+  tries = tries || 0; const name = S.player, board = boardId();
+  const p = S.progress[name] || (S.progress[name] = {unlocked: 0, tokens: [], best: []});
+  if(extra.cleared) p.unlocked = Math.max(p.unlocked, lvlIdx + 1);
+  google.script.run.withSuccessHandler(res => {
+      const best = (p.best || []).slice(); if(res.best) best[lvlIdx] = res.best;
+      S.progress[name] = {unlocked: res.unlocked, tokens: res.tokens, best}; flushPending();
+      const n2 = $('save-note'); if(n2) n2.innerHTML = saveText(res);
+    }).withFailureHandler(err => {
+      if(tries < 1){ setTimeout(() => saveWin(lvlIdx, extra, tries + 1), 1200); return; }
+      writePending(readPending().concat([{board, name, lvl: lvlIdx, extra}]));
+      const n2 = $('save-note'); if(n2) n2.innerHTML = '⚠️ Could not save yet — it will be sent again next time.';
+    }).saveLevelResult(board, name, lvlIdx, extra);
+}
+function saveTree(row){ try{ google.script.run.withFailureHandler(() => {}).saveSkillTree(S.player, boardId(), JSON.stringify(row)); }catch(e){} }
+function saveText(res){
+  let h = res.newBadge ? '🏅 New badge: ' + UI.esc(res.newBadge) : res.newHighScore && !res.firstTime ? '🎉 New high score!' : res.best && res.best.score ? 'Your best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Score saved';
+  const fe = res.feats; if(fe){ (fe.newTitles || []).forEach(t => { h += '<br>🏷️ New title: ' + t.icon + ' ' + UI.esc(t.name); }); (fe.newBadges || []).forEach(b => { h += '<br>' + b.medal + ' ' + b.icon + ' ' + UI.esc(b.name) + ' · ' + b.tierName; }); }
+  return h;
+}
+
+/* ---------- ⌨️ keys: 1–6 Dragon · Q W E R T Y Princess · C combo · Space = start the wave ---------- */
+document.addEventListener('keydown', e => {
+  if(!G || $('scr-play').classList.contains('hidden') || e.repeat) return;
+  if(pickOpen){ const n = Number(e.key); if(n >= 1 && n <= 4){ const b = document.querySelectorAll('#scr-play .skk-sheet .skk-card')[n - 1]; if(b){ b.click(); e.preventDefault(); } } return; }
+  if(e.code === 'Space' || e.key === 'Enter'){ if(G.state === 'break'){ goNow(); e.preventDefault(); } return; }
+  const k = e.key.toUpperCase(); if(k === 'C'){ const b = $('combo-btn'); if(b) b.click(); return; }
+  const el = document.querySelector('#panel .skk-btn[data-hk="' + k + '"]'); if(el && !el.classList.contains('empty')){ el.click(); e.preventDefault(); }
+});
+function pauseGame(){ if(G) G.paused = true; }
+
+/* ================= BOOT ================= */
+function boot(){
+  UI.loading('tdstories');
+  google.script.run.withSuccessHandler(d => {
+      UI.loaded();
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {};
+      UISound.applySettings(S.settings);
+      const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
+      lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
+      flushPending();
+      if(CURRENT_PLAYER && S.players.some(p => p.Name === CURRENT_PLAYER)) choosePlayer(CURRENT_PLAYER); else { renderPlayers(); showScreen('player'); }
+    }).withFailureHandler(() => { UI.loaded(); UI.toast('Could not load players — check the connection', 'err'); renderPlayers(); showScreen('player'); })
+    .getLevelGameData('td-draprincess', CURRENT_PLAYER);
+}
+window.TD = TD;
+boot();
+</script>
+</body>
+</html>
+<!-- (td-1) END OF TDStories.html -->
