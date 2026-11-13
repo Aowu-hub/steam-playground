@@ -42,8 +42,25 @@ function ss_() {
 // Keep each list on ONE line — the test harness (gasmock.js) and the 📲 offline builder (build.js) read these two lines from this file.
 const INCLUDE_ALSO_ = {AvatarKit: ['AvatarActing']};
 const INCLUDE_GROUPS_ = {avatar: ['BallSkins', 'AvatarKit']};
+// 📦 size-1 (2026-11-13): big DATA files are NOT in this project (Apps Script refuses to save a project over ≈ 10.45 MB).
+// They are published to the family site as data/<Name>.<hash>.js|css by GitHub (steam-source tools/remote.mjs) and include()
+// writes a <script src> / <link> to them instead (+ a jsDelivr copy if the site doesn't answer). Pages don't change.
+// On Drive the files stay in the main folder like before; steam-source keeps them in remote/. Keep the list on ONE line.
+const REMOTE_INCLUDES_ = {WisArt1: 'js:4b4a774012', WisArt2: 'js:b36f063830', WisArt3: 'js:76e938e34a', WisArt4: 'js:ffdc9f7bf4', WisCards: 'js:d0555d254f', WisCards2: 'js:15d0f6d094', WisCards3: 'js:a650820410', WordExtra: 'js:83d16141bb', WordMeanings: 'js:34eed0f5c2', FlagFont: 'css:d4e84f0db9', WordList: 'js:6acb75dfdf'};   // 📦 size-1: written by tools/remote.mjs — ONE line
+const REMOTE_BASE_ = 'https://aowu-hub.github.io/steam-playground/data/', REMOTE_CDN_ = 'https://cdn.jsdelivr.net/gh/aowu-hub/steam-playground@main/data/';
+function remoteFile_(n) { const v = String(REMOTE_INCLUDES_[n] || ''), i = v.indexOf(':'); return i > 0 ? n + '.' + v.slice(i + 1) + '.' + v.slice(0, i) : ''; }
+function remoteTag_(n) {
+  const f = remoteFile_(n), a = REMOTE_BASE_ + f, b = REMOTE_CDN_ + f;
+  if (/\.css$/.test(f)) return '<link rel="stylesheet" href="' + a + '" onerror="this.onerror=null;this.href=\'' + b + '\'">';
+  return '<script charset="utf-8" src="' + a + '"></script>\n<script>if(!(window.SP_DATA||{})[' + JSON.stringify(n) + '])document.write(\'<script charset="utf-8" src="' + b + '"><\\/script>\');</script>';
+}
+// on-demand data (WisStock, WisDeck pictures): the file's code when it is in the project (📲 offline app), else {src, alt} for the page to load
+function remoteBody_(n) {
+  try { return HtmlService.createHtmlOutputFromFile(n).getContent().replace(/^[\s\S]*?<script>/, '').replace(/<\/script>[\s\S]*$/, ''); }
+  catch (e) { const f = remoteFile_(n); return f ? { src: REMOTE_BASE_ + f, alt: REMOTE_CDN_ + f } : ''; }
+}
 function include(name) {
-  return [name].concat(INCLUDE_ALSO_[name] || []).map(n => HtmlService.createHtmlOutputFromFile(n).getContent()).join('\n');
+  return [name].concat(INCLUDE_ALSO_[name] || []).map(n => REMOTE_INCLUDES_[n] ? remoteTag_(n) : HtmlService.createHtmlOutputFromFile(n).getContent()).join('\n');
 }
 function includeGroup(group) { return (INCLUDE_GROUPS_[group] || []).map(include).join('\n'); }
 
@@ -2712,14 +2729,13 @@ function wisDaily_() {
 }
 function safeWisDaily_() { try { return wisDaily_(); } catch (e) { return null; } }
 // 📖 WisStock on the Collection page: the card files are sent only when someone opens it (keeps Collection fast)
-function getWisCardsData() {
-  const body = n => HtmlService.createHtmlOutputFromFile(n).getContent().replace(/^[\s\S]*?<script>/, '').replace(/<\/script>[\s\S]*$/, '');
-  return { a: body('WisCards'), b: body('WisCards2'), c: body('WisCards3'), rows: wisCardRows_() };
+function getWisCardsData() {   // 📦 size-1: each part = its code (offline app) or {src, alt} (online) — the page runs both with UI.loadData
+  return { a: remoteBody_('WisCards'), b: remoteBody_('WisCards2'), c: remoteBody_('WisCards3'), rows: wisCardRows_() };
 }
 // 🎨 WisDeck drawn pictures, one part at a time ('' when there is no part i) — the page shows emoji until they arrive (wd-13)
 function getWisArt(i) {
   const n = 'WisArt' + Math.max(1, Math.floor(Number(i) || 1));
-  try { return HtmlService.createHtmlOutputFromFile(n).getContent().replace(/^[\s\S]*?<script>/, '').replace(/<\/script>[\s\S]*$/, ''); } catch (e) { return ''; }
+  return remoteBody_(n);   // 📦 size-1: code (offline app) or {src, alt} (online); '' when there is no part i
 }
 function saveWisDaily(name, rec) {
   if (!name || !activePlayers_(listProfilesFull()).some(p => p.Name === name)) throw new Error('Pick a player first.');
@@ -4342,7 +4358,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
