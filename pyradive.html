@@ -309,7 +309,20 @@ var PD = (function () {
       roles: [['drive'], ['dunk'], ['dink'], ['dunk'], ['drive'], ['drive']],
       base: function (L, W) { return [[L * 0.78, 0.3 * W], [1.4, 0.3 * W], [1.4, 0], [1.4, -0.3 * W], [L * 0.78, -0.3 * W], [L * 0.66, 0]]; } }
   };
-  var MODE_ORDER = ['beach', 'small', 'full'];
+  /* 🦶 PyraStrike (pd-2b, sepak takraw ตะกร้อ): feet, knees, head — never hands. Low net, narrow court, a woven rattan ball.
+     One player may use 1, 2 or all 3 touches (no double-touch fault); the serve is a kick off a teammate's toss (the feed). */
+  MODES.strikesolo = { id: 'strikesolo', sport: 'strike', name: 'Strike 1v1', icon: '🦶', n: 1, L: 6.7, W: 6.1, net: 1.52,
+    roles: [['drive', 'dink', 'dunk']], base: function (L, W) { return [[L * 0.5, 0]]; } };
+  MODES.strikeduo = { id: 'strikeduo', sport: 'strike', name: 'Strike Duo 2v2', icon: '🦵', n: 2, L: 6.7, W: 6.1, net: 1.52,
+    roles: [['drive', 'dink'], ['dunk']], base: function (L, W) { return [[L * 0.62, -0.18 * W], [1.6, 0.2 * W]]; } };
+  MODES.strikeregu = { id: 'strikeregu', sport: 'strike', name: 'Strike Regu 3v3', icon: '🧶', n: 3, L: 6.7, W: 6.1, net: 1.52,
+    roles: [['drive'], ['dink'], ['dunk']], base: function (L, W) { return [[L * 0.66, 0], [1.4, 0.26 * W], [1.4, -0.26 * W]]; } };
+  var MODE_ORDER = ['beach', 'small', 'full', 'strikesolo', 'strikeduo', 'strikeregu'];
+  // takraw names for the same moves (auto body part by height): dig = 🦶 toe save · bump = 🦵 thigh trap · set = 🙆 head set · dink = 🦶 heel tip · dunk = 🌀 roll spike / 🚲 bicycle · block = 🧱 back block · serve = 🦶 kick serve
+  var STRIKE_NAME = { drive: 'Kick Serve', bump: 'Trap', dig: 'Toe Save', dive: 'Dive', set: 'Head Set', dink: 'Heel Tip', dunk: 'Roll Spike', bicycle: 'Bicycle', block: 'Back Block', pinch: 'Tip Serve', jumpserve: 'Power Kick' };
+  var STRIKE_PART = { dig: 'foot', bump: 'thigh', dive: 'foot', set: 'head', dink: 'heel', dunk: 'foot', drive: 'foot', block: 'back' };
+  function isStrike(M) { return M.sp.sport === 'strike'; }
+  function actName(M, act) { return (isStrike(M) ? STRIKE_NAME[act] : null) || ACT_NAME[act] || act; }
   var ROLE_ICON = { drive: '🚀', dink: '🪶', dunk: '💥' };
   var ROLE_NAME = { drive: 'Drive', dink: 'Dink', dunk: 'Dunk' };
 
@@ -341,7 +354,7 @@ var PD = (function () {
   var FILL = { serve: 4, ace: 12, bump: 2, set: 4, assist: 8, dunk: 5, kill: 12, dink: 3, dinkKill: 10, save: 8, block: 6, stuff: 10, rally: 3, lose: 2 };
   var PYRA_COST = 50, METER_MAX = 100;
   var ACT_NAME = { jumpserve: 'Jump Serve', pinch: 'Pinch Serve', drive: 'Drive', bump: 'Bump', dig: 'Dig', dive: 'Dive', set: 'Set', dink: 'Dink', dunk: 'Dunk', block: 'Block' };
-  function pyraName(act) { return 'Pyra…' + (ACT_NAME[act] || act); }
+  function pyraName(act, M) { return 'Pyra…' + (M ? actName(M, act) : ACT_NAME[act] || act); }
   /* 🔥🔥 Spirit Dive (pd-2a, plan §6–7): a FULL flame + 🔥 arms a Spirit Dive — the next Dunk / Block / Drive (serve) / Dink / Save
      calls a creature (2 per slot in R2, 5 in R4) and costs the whole flame. Bumps + sets on the way keep it armed. */
   var SPIRIT_COST = 100;
@@ -352,13 +365,13 @@ var PD = (function () {
     dink: [{ k: 'kitsune', name: 'Kitsune', icon: '🦊', col: '#FF8A3D' }, { k: 'kinnaree', name: 'Kinnaree', icon: '🧚', col: '#E6A3FF' }],
     save: [{ k: 'naga', name: 'Naga', icon: '🐍', col: '#2FBF71' }, { k: 'makara', name: 'Makara', icon: '🐊', col: '#2F7BEA' }]
   };
-  var SPIRIT_MOVE = { dunk: 'Dunk', block: 'Block', drive: 'Drive', dink: 'Dink', save: 'Save' };
+  var SPIRIT_MOVE = { dunk: 'Dunk', block: 'Block', drive: 'Drive', dink: 'Dink', save: 'Save' }, SPIRIT_MOVE_STRIKE = { dunk: 'Spike', block: 'Block', drive: 'Kick', dink: 'Tip', save: 'Save' };
   function slotOf(act) { return act === 'dunk' ? 'dunk' : act === 'drive' ? 'drive' : act === 'dink' ? 'dink' : act === 'block' ? 'block' : act === 'dig' || act === 'dive' ? 'save' : null; }
   function spiritGo(M, p, act) {   // → the creature, or null when this move has no Spirit slot / nothing armed
     var slot = slotOf(act); if (!slot || !p.spiritArm || p.meter < SPIRIT_COST) return null;
     var list = SPIRITS[slot], c = list[Math.floor(M.rnd() * list.length)];
     p.meter -= SPIRIT_COST; p.spiritArm = false; p.pyraArm = false; p.st.spirits = (p.st.spirits || 0) + 1;
-    var sp = { slot: slot, k: c.k, name: c.name, icon: c.icon, col: c.col, full: 'Spirit Dive : ' + c.name + ' ' + SPIRIT_MOVE[slot] };
+    var sp = { slot: slot, k: c.k, name: c.name, icon: c.icon, col: c.col, full: 'Spirit Dive : ' + c.name + ' ' + (isStrike(M) ? SPIRIT_MOVE_STRIKE : SPIRIT_MOVE)[slot] };
     ev(M, 'spirit', { p: p.id, team: p.team, act: act, slot: slot, creature: c.k, cname: c.name, icon: c.icon, name: sp.full });
     return sp;
   }
@@ -424,13 +437,17 @@ var PD = (function () {
     M.phase = 'serve'; M.phaseT = 0; M.serveTeam = team; M.side = team; M.n = 0; M.lastP = null; M.lastAct = null; M.lastTeam = null; M.lastBlock = false;
     M.recv = [null, null]; M.cp = [null, null]; M.spiker = [null, null]; M.setter = [null, null]; M.rally = 0; M.serveFresh = false;
     M.players.forEach(function (p) { var b = baseOf(M, p); p.x = b.x; p.y = b.y; p.z = 0; p.vz = 0; p.dive = null; p.block = 0; p.want = null; p.state = 'ready'; p.act = null; p.charge = -1; p.recover = 0; });
-    M.players.forEach(function (q) { q.jumpServe = null; });
+    M.players.forEach(function (q) { q.jumpServe = null; q.feed = null; });
     var s = serverOf(M, team), sp = serveSpot(M, team); s.x = sp.x; s.y = sp.y;
     var b = M.ball; b.held = s.id; b.pyra = null; b.spirit = null; b.spiritSlot = null; b.vx = b.vy = b.vz = 0; b.trail = []; placeHeld(M);
     M.serveWait = (M.level === 0 ? 1.6 : 0.9) + M.rnd() * 0.8;
     ev(M, 'serveReady', { team: team, p: s.id });
   }
-  function placeHeld(M) { var b = M.ball, p = byId(M, b.held); if (!p) return; b.x = p.x + 0.35 * p.dir; b.y = p.y; b.z = p.jumpServe ? p.z + 2.7 + 0.6 * Math.max(0, p.vz) / JUMPV : 1.1 + (p.charge >= 0 ? 0.6 : 0); }   // 🦘 jump serve: the ball is tossed above the head
+  function placeHeld(M) { var b = M.ball, p = byId(M, b.held); if (!p) return;
+    if (p.feed) {   // 🦶 the feed: a teammate (or you, in 1v1) tosses the ball up to your kicking foot
+      var f = clamp((M.t - p.feed.t0) / FEED_T, 0, 1), fd = byId(M, p.feed.by) || p, kx = p.x - 0.45 * sgn(p.team), sx = fd === p ? p.x - 0.2 * sgn(p.team) : fd.x, sy = fd === p ? p.y : fd.y;
+      b.x = sx + (kx - sx) * f; b.y = sy + (p.y - sy) * f; b.z = 1.0 + 0.3 * f + 1.5 * Math.sin(Math.PI * f); return; }
+    b.x = p.x + 0.35 * p.dir; b.y = p.y; b.z = p.jumpServe ? p.z + 2.7 + 0.6 * Math.max(0, p.vz) / JUMPV : 1.1 + (p.charge >= 0 ? 0.6 : 0); }   // 🦘 jump serve: the ball is tossed above the head
 
   // ---------- ball flight maths ----------
   // aim from (b) to (tx, ty, tz) with the top of the arc at height apex
@@ -472,7 +489,7 @@ var PD = (function () {
     var zc = nn === 3 ? 2.7 : nn === 2 ? 2.0 : 1.0, cpr = predict(M, zc), cp = cpr.at;
     if (cpr.at.z > zc + 0.6) cp = cpr.land;
     var out = !inCourt(M, land.x, land.y, -0.25);
-    var cands = teamOf(M, T).filter(function (p) { return !(M.lastTeam === T && M.lastP === p.id && !M.lastBlock && T === M.side); });
+    var cands = teamOf(M, T).filter(function (p) { return !(M.lastTeam === T && M.lastP === p.id && !M.lastBlock && T === M.side) || (isStrike(M) && teamOf(M, T).length === 1); });
     if (!cands.length) return;
     var who = null, person = cands.filter(isPerson)[0];
     var dist = function (p) { return hyp(p.x - cp.x, p.y - cp.y); };
@@ -495,7 +512,8 @@ var PD = (function () {
   function humanTeam(M) { var h = M.players.filter(isPerson)[0]; return h ? h.team : -1; }
   function botMiss(M, p) { var m = M.lv.bot.miss * (p.team === humanTeam(M) ? 0.5 : 1); if (M.ball.pyra && M.lastTeam !== p.team) m += 0.25; if (M.ball.spirit && M.lastTeam !== p.team) m += 0.5; return m; }
   function planSpiker(M, T, setterId) {
-    var c = teamOf(M, T).filter(function (p) { return p.id !== setterId; }), person = c.filter(isPerson)[0];
+    var c = teamOf(M, T).filter(function (p) { return p.id !== setterId; }); if (!c.length) c = teamOf(M, T);   // 🦶 1v1: you set yourself
+    var person = c.filter(isPerson)[0];
     if (person && M.lv.assist.setToYou) return person;
     var d = c.filter(function (p) { return has(p, 'dunk'); });
     if (person && d.indexOf(person) >= 0) return person;
@@ -548,15 +566,16 @@ var PD = (function () {
     var b = M.ball, T = p.team, opp = 1 - T, nn = nextNOf(M, T), hz = b.z - p.z, lv = M.lv, person = isPerson(p);
     // faults: same player twice in a row · a 4th touch
     if (M.side === T && M.lastP === p.id && !M.lastBlock && M.lastTeam === T) {
-      if (lv.dbl) return fault(M, T, 'double', p.id);
+      if (lv.dbl && !isStrike(M)) return fault(M, T, 'double', p.id);   // 🦶 takraw: one player may touch it again
     }
     var forceOver = false;
     if (nn > 3) { if (lv.four) return fault(M, T, 'four', p.id); forceOver = true; }
     var act;
     if (key === 'dink') act = 'dink';
-    else if (key === 'drive') act = hz >= 1.5 && (p.z > 0.15 || hz >= 1.75) ? 'dunk' : 'drive';
+    else if (key === 'drive') act = hz >= (isStrike(M) ? 1.2 : 1.5) && (p.z > 0.15 || hz >= (isStrike(M) ? 1.45 : 1.75)) ? 'dunk' : 'drive';
     else act = p.dive ? 'dive' : hz < 0.75 ? 'dig' : hz < 1.75 ? 'bump' : 'set';
     if (key === 'touch' && (nn >= 3 || forceOver)) forceOver = true;
+    M.lastStyle = act === 'dunk' && isStrike(M) && ((p.z > 0.5 && hz >= 2.1) || (p.pyraArm && p.meter >= PYRA_COST)) ? 'bicycle' : act === 'dunk' && isStrike(M) ? 'roll' : null;   // 🚲 high ball / flame = bicycle kick
     var pyra = false, spirit = spiritGo(M, p, act);
     if (spirit) pyra = true;   // a Spirit move is a Pyra move and more (exact, unblockable, hard to reach)
     else if (p.pyraArm && p.meter >= PYRA_COST && !p.spiritArm) { pyra = true; p.meter -= PYRA_COST; p.pyraArm = false; p.st.pyras++; }
@@ -593,15 +612,15 @@ var PD = (function () {
     M.lastP = p.id; M.lastAct = act; M.lastTeam = T; M.lastBlock = false;
     if (M.serveFresh && T !== M.serveTeam) M.serveFresh = false;
     M.rally++; M.rallyMax = Math.max(M.rallyMax, M.rally);
-    p.act = act; p.actT = 0; p.want = null; p.st.touches++;
+    p.act = act; p.actT = 0; p.want = null; p.st.touches++; p.style = M.lastStyle;
     var stK = { drive: 'drives', bump: 'bumps', dig: 'digs', dive: 'dives', set: 'sets', dink: 'dinks', dunk: 'dunks' }[act]; if (stK) p.st[stK]++;
     if (act === 'dig' || act === 'dive') fill(M, p, FILL.save);
     else if (act === 'set') fill(M, p, FILL.set);
     else if (act === 'dunk') fill(M, p, FILL.dunk);
     else if (act === 'dink') fill(M, p, FILL.dink);
     else if (act === 'bump') fill(M, p, FILL.bump);
-    ev(M, act, { p: p.id, team: T, n: M.n, pyra: pyra, part: act === 'set' || act === 'dink' || act === 'dunk' ? 'hands' : 'arms', q: Math.round(q * 100) / 100, over: forceOver, auto: !!opt.auto });
-    if (pyra && !spirit) ev(M, 'pyra', { p: p.id, team: T, act: act, name: pyraName(act) });
+    ev(M, act, { p: p.id, team: T, n: M.n, pyra: pyra, part: isStrike(M) ? STRIKE_PART[act] || 'foot' : act === 'set' || act === 'dink' || act === 'dunk' ? 'hands' : 'arms', style: M.lastStyle, name: actName(M, M.lastStyle === 'bicycle' ? 'bicycle' : act), q: Math.round(q * 100) / 100, over: forceOver, auto: !!opt.auto });
+    if (pyra && !spirit) ev(M, 'pyra', { p: p.id, team: T, act: act, name: pyraName(M.lastStyle === 'bicycle' && act === 'dunk' ? 'bicycle' : act, M) });
     if (act === 'dig' || act === 'dive') ev(M, 'save', { p: p.id, team: T, act: act, spirit: spirit ? spirit.k : null });
     if (M.rally > 0 && M.rally % 5 === 0) { M.players.forEach(function (q2) { fill(M, q2, FILL.rally); }); ev(M, 'rally', { n: M.rally }); if (M.rally >= 10) ev(M, 'longRally', { n: M.rally }); }
     if (act === 'dunk' || act === 'dink' || act === 'drive' || forceOver) M.attack = { p: p.id, team: T, act: act, t: M.t }; else M.attack = null;
@@ -620,20 +639,23 @@ var PD = (function () {
      (fast + steep, a bit wilder) · 'pinch' = 🪶 L: a soft lob that drops just over the net into a corner */
   function serve(M, p, power, pyra, kind) {
     var b = M.ball, T = p.team, opp = 1 - T, a = aimOf(M, p), person = isPerson(p), lv = M.lv;
-    kind = kind || 'float'; power = clamp(power, 0, 1);
+    kind = kind || 'float'; if (isStrike(M) && kind === 'float') kind = 'kick'; power = clamp(power, 0, 1); p.feed = null;
     var spirit = spiritGo(M, p, 'drive');
     if (spirit) pyra = true;
     else if (p.pyraArm && p.meter >= PYRA_COST && !p.spiritArm) { pyra = true; p.meter -= PYRA_COST; p.pyraArm = false; p.st.pyras++; }
     var u = M.L * (0.4 + 0.5 * power + 0.08 * a.f), v = a.s * 0.36 * M.W, e = errPt(M, p, kind === 'jump' ? (person ? 0.55 : 0.45) : kind === 'pinch' ? 0.9 : person ? 0.8 : 0.6, pyra);
     if (!person) { u = M.L * (0.45 + 0.4 * M.rnd() * (0.4 + lv.bot.smart)); v = (M.rnd() * 2 - 1) * 0.32 * M.W; if (M.level === 0) { var h = M.players.filter(function (q) { return isPerson(q) && q.team === opp; })[0]; if (h) { u = clamp(uOf(opp, h.x), 2, M.L - 1); v = h.y; } } }
     if (kind === 'jump') { u = M.L * (person ? 0.74 + 0.16 * a.f : 0.62 + 0.28 * M.rnd()); }
+    if (kind === 'kick' && person) u = M.L * (0.5 + 0.3 * power + 0.12 * a.f);
     if (kind === 'pinch') { u = 1.1 + 0.35 * (person ? a.f + 1 : M.rnd() * 2); v = (person && Math.abs(a.s) > 0.2 ? Math.sign(a.s) : M.rnd() < 0.5 ? -1 : 1) * 0.36 * M.W; }
     var t = keepIn(M, opp, u + e.x, v + e.y, person);
     if (kind === 'pinch') t.u = Math.max(t.u, 0.7);
     if (spirit) { var gs = emptiest(M, T); t = { u: clamp(kind === 'pinch' ? Math.min(gs.u, 2.2) : gs.u + 1, 0.9, M.L - 0.6), v: gs.v }; }
-    if (person && !lv.aim && kind === 'float' && power > 0.92) t.u = M.L * (0.9 + power * 0.18);   // too much power on a high level: long!
+    if (person && !lv.aim && (kind === 'float' || kind === 'kick') && power > 0.92) t.u = M.L * (0.9 + power * 0.18);   // too much power on a high level: long!
     b.held = null; b.x = p.x + 0.3 * p.dir;
-    if (kind === 'jump') { b.z = Math.max(3.0, p.z + 2.7); shoot(M, b, t.u * sgn(opp), t.v, BALL_R, (11 + 2.5 * power) * lv.spd * (pyra ? 1.3 : 1), 0.2); }
+    if (isStrike(M) && kind === 'jump') { b.z = 1.5; shoot(M, b, t.u * sgn(opp), t.v, BALL_R, (10.5 + 2.2 * power) * lv.spd * (pyra ? 1.3 : 1), 0.22); }   // 🦶 power kick
+    else if (kind === 'kick') { b.z = 1.3; shoot(M, b, t.u * sgn(opp), t.v, BALL_R, (7.6 + 3.4 * power) * lv.spd * (pyra ? 1.35 : 1), 0.3); }   // 🦶 kick serve
+    else if (kind === 'jump') { b.z = Math.max(3.0, p.z + 2.7); shoot(M, b, t.u * sgn(opp), t.v, BALL_R, (11 + 2.5 * power) * lv.spd * (pyra ? 1.3 : 1), 0.2); }
     else if (kind === 'pinch') { b.z = 1.6; shoot(M, b, t.u * sgn(opp), t.v, BALL_R, (4.6 + 0.8 * power) * lv.spd * (pyra ? 1.2 : 1), 0.5); }
     else { b.z = 2.2; shoot(M, b, t.u * sgn(opp), t.v, BALL_R, (6.5 + 4 * power) * lv.spd * (pyra ? 1.35 : 1), 0.35); }
     p.jumpServe = null;
@@ -643,7 +665,7 @@ var PD = (function () {
     fill(M, p, FILL.serve);
     if (kind === 'jump') p.st.jumpServes++; if (kind === 'pinch') p.st.pinches++;
     ev(M, 'serve', { p: p.id, team: T, power: Math.round(power * 100) / 100, pyra: !!pyra, kind: kind });
-    if (pyra && !spirit) ev(M, 'pyra', { p: p.id, team: T, act: 'drive', serve: kind, name: pyraName(kind === 'jump' ? 'jumpserve' : kind === 'pinch' ? 'pinch' : 'drive') });
+    if (pyra && !spirit) ev(M, 'pyra', { p: p.id, team: T, act: 'drive', serve: kind, name: pyraName(kind === 'jump' ? 'jumpserve' : kind === 'pinch' ? 'pinch' : 'drive', M) });
     assign(M);
   }
 
@@ -715,7 +737,8 @@ var PD = (function () {
       return true;
     }
     if (M.phase === 'serve') {
-      if (M.ball.held !== p.id || p.jumpServe || (key !== 'drive' && key !== 'touch' && key !== 'jump' && key !== 'dink')) return false;
+      if (M.ball.held !== p.id || p.jumpServe || p.feed || (key !== 'drive' && key !== 'touch' && key !== 'jump' && key !== 'dink')) return false;
+      if (isStrike(M)) return feedServe(M, p, key === 'jump' ? 0.85 : M.lv.assist.autoPower ? 0.6 : 0.72, key === 'dink' ? 'pinch' : key === 'jump' ? 'jump' : 'kick');
       if (key === 'jump') return jumpServe(M, p, M.lv.assist.autoPower ? 0.6 : p.charge >= 0 ? clamp(p.charge / 0.9, 0.3, 1) : 0.75);
       if (key === 'dink') { serve(M, p, 0.5, false, 'pinch'); return true; }
       if (M.lv.assist.autoPower || key === 'touch') { serve(M, p, M.level === 0 ? 0.55 : 0.62); return true; }
@@ -750,6 +773,15 @@ var PD = (function () {
     return true;
   }
 
+  // 🦶 PyraStrike serve: the feed toss first, the kick comes when the ball reaches your foot (step → serve phase)
+  var FEED_T = 0.6;
+  function feedServe(M, p, power, kind) {
+    if (p.feed) return false;
+    var mates = teamOf(M, p.team).filter(function (q) { return q.id !== p.id; }).sort(function (a, c) { return hyp(a.x - p.x, a.y - p.y) - hyp(c.x - p.x, c.y - p.y); });
+    p.feed = { t0: M.t, power: clamp(power, 0, 1), kind: kind || 'kick', by: mates.length ? mates[0].id : p.id }; p.charge = -1;
+    ev(M, 'serveToss', { p: p.id, team: p.team, kind: p.feed.kind, by: p.feed.by });
+    return true;
+  }
   // 🦘 jump serve: toss + jump now, the hit comes at the top of the jump (step → serve phase)
   function jumpServe(M, p, power) {
     if (p.jumpServe || p.z > 0) return false;
@@ -760,8 +792,10 @@ var PD = (function () {
   // robots pick a serve: Basic = float only · Junior = some pinch · Intermediate+ = jump + pinch too
   function botServe(M, p) {
     var r = M.rnd(), L = M.level, pw = 0.45 + M.rnd() * 0.4 * (0.5 + M.lv.bot.smart);
-    if (L >= 2 && r < 0.18 + 0.05 * L) return jumpServe(M, p, pw);
-    if (L >= 1 && r < (L >= 2 ? 0.45 : 0.2) + 0.04 * L) return serve(M, p, pw, false, 'pinch');
+    var k = L >= 2 && r < 0.18 + 0.05 * L ? 'jump' : L >= 1 && r < (L >= 2 ? 0.45 : 0.2) + 0.04 * L ? 'pinch' : 'float';
+    if (isStrike(M)) return feedServe(M, p, pw, k === 'float' ? 'kick' : k);
+    if (k === 'jump') return jumpServe(M, p, pw);
+    if (k === 'pinch') return serve(M, p, pw, false, 'pinch');
     return serve(M, p, pw);
   }
 
@@ -769,7 +803,7 @@ var PD = (function () {
   function aiThink(M, p, dt) {
     var T = p.team, lv = M.lv, b = M.ball, tgt = null, run = lv.bot.move * Math.max(0.85, lv.spd) * (p.team === humanTeam(M) ? 1.1 : 1);
     if (M.phase === 'serve') {
-      if (b.held === p.id) { if (M.phaseT > M.serveWait && !p.jumpServe) botServe(M, p); return null; }
+      if (b.held === p.id) { if (M.phaseT > M.serveWait && !p.jumpServe && !p.feed) botServe(M, p); return null; }
       return baseOf(M, p);
     }
     if (M.phase !== 'rally') return baseOf(M, p);
@@ -861,6 +895,7 @@ var PD = (function () {
       placeHeld(M);
       var srv = byId(M, b.held);
       if (srv && isPerson(srv) && srv.charge >= 1.4 && !srv.jumpServe) serve(M, srv, 1);
+      if (srv && srv.feed && M.t - srv.feed.t0 >= FEED_T) serve(M, srv, srv.feed.power, false, srv.feed.kind);   // 🦶 kick it off the feed
       if (srv && srv.jumpServe && srv.z > 0.1 && srv.vz <= 0.4) serve(M, srv, srv.jumpServe.power, false, 'jump');   // top of the jump: smash
       if (srv && srv.jumpServe && srv.z <= 0 && srv.vz <= 0 && M.phase === 'serve') serve(M, srv, srv.jumpServe.power * 0.8, false, 'jump');   // safety: landed before the hit
       return;
@@ -905,7 +940,7 @@ var PD = (function () {
         M.n = 0; M.lastP = blk.id; M.lastTeam = to; M.lastAct = 'block'; M.lastBlock = true; M.attack = null; M.serveFresh = false;
         blk.st.blocks++; fill(M, blk, FILL.block); blk.act = 'block'; blk.actT = 0;
         ev(M, 'block', { p: blk.id, team: to, stuff: stuff, pyra: pyraB || !!spB, spirit: spB ? spB.k : null });
-        if (pyraB) ev(M, 'pyra', { p: blk.id, team: to, act: 'block', name: pyraName('block') });
+        if (pyraB) ev(M, 'pyra', { p: blk.id, team: to, act: 'block', name: pyraName('block', M) });
         assign(M); return;
       }
       if (b.z < M.netH + BALL_R && Math.abs(b.y) <= M.W / 2 + 0.45 && !(b.spirit && b.spiritSlot !== 'block')) {   // the creature carries a Spirit ball over the net
@@ -967,9 +1002,9 @@ var PD = (function () {
     return { M: M, winner: M.winner, score: M.teams.map(function (t) { return t.score; }), sets: M.teams.map(function (t) { return t.sets; }), t: M.t, events: ev2 };
   }
 
-  return { DT: DT, MODES: MODES, MODE_ORDER: MODE_ORDER, LEVELS: LEVELS, FILL: FILL, PYRA_COST: PYRA_COST, METER_MAX: METER_MAX, ROLE_ICON: ROLE_ICON, ROLE_NAME: ROLE_NAME, ACT_NAME: ACT_NAME,
+  return { DT: DT, MODES: MODES, MODE_ORDER: MODE_ORDER, LEVELS: LEVELS, FILL: FILL, PYRA_COST: PYRA_COST, METER_MAX: METER_MAX, ROLE_ICON: ROLE_ICON, ROLE_NAME: ROLE_NAME, STRIKE_NAME: STRIKE_NAME, actName: actName, isStrike: isStrike, ACT_NAME: ACT_NAME,
     pyraName: pyraName, SPIRITS: SPIRITS, SPIRIT_COST: SPIRIT_COST, spiritGo: spiritGo, slotOf: slotOf, newMatch: newMatch, step: step, tick: tick, input: input, press: press, release: release, takeEvents: takeEvents, simulate: simulate,
-    canReach: canReach, doTouch: doTouch, serve: serve, jumpServe: jumpServe, botServe: botServe, startServe: startServe, predict: predict, assign: assign, nextNOf: nextNOf, fill: fill, isPerson: isPerson, uOf: uOf, sgn: sgn, baseOf: baseOf, guideFor: guideFor,
+    canReach: canReach, doTouch: doTouch, serve: serve, feedServe: feedServe, jumpServe: jumpServe, botServe: botServe, startServe: startServe, predict: predict, assign: assign, nextNOf: nextNOf, fill: fill, isPerson: isPerson, uOf: uOf, sgn: sgn, baseOf: baseOf, guideFor: guideFor,
     BALL_R: BALL_R, SPIRIT: null };   // 🔥🔥 SPIRIT = R2 hook: Spirit Dive supers (full meter) plug in here
 })();
 if (typeof module !== 'undefined') module.exports = PD;
@@ -987,6 +1022,7 @@ const GAME_ID = 'pyraspike';   // 🏐 PyraSpike board (R2 adds 'pyrastrike', R3
 if(UI.KINDS){ UI.KINDS.pyraspike = UI.KINDS.pyraspike || ['🔥', 'Lighting the Pyra flame', 'bump']; UI.KINDS.pyradive = UI.KINDS.pyradive || UI.KINDS.pyraspike; }
 if(UI.GAME_HELP && !UI.GAME_HELP.pyraspike) UI.GAME_HELP.pyraspike = ['Volleyball with your avatar! Each side gets 3 touches: 🤚 bump it up, 🪶 set it high, 💥 dunk it over the net. The ball landing in their court = your point.',
   'W A S D move · J 🤚 touch · K 💥 drive / dunk (hold on a serve) · L 🪶 dink · Space ⬆️ jump / block · Shift 🤸 dive · F 🔥 Pyra. On a tablet: the stick + the round buttons.',
+  '🦶 PyraStrike = sepak takraw (ตะกร้อ): feet, knees and head only — 🦵 Trap (J), 🙆 head set, 💥 roll spike / 🚲 bicycle (K), 🦶 heel tip (L). One player may use all 3 touches. Serve: your buddy tosses, you kick.',
   '🔥🔥 A FULL flame + 🔥 = a SPIRIT DIVE: your next Dunk, Dink, Serve, Block or Save calls a creature (🐉 Dragon, 🦁 Singha, 🗿 Golem, 🐘 Gajasiha, 🐦‍🔥 Phoenix, 🦢 Hongsa, 🦊 Kitsune, 🧚 Kinnaree, 🐍 Naga, 🐊 Makara) — almost nobody can stop it.',
   'Serve 3 ways: 💥 K = float serve (hold for power) · ⬆️ Space = 🦘 jump serve (fast + steep) · 🪶 L = 🤏 pinch serve (drops just over the net).',
   'Good touches fill your 🔥 flame. Half full → tap 🔥 and your next move is a Pyra… move!'];
@@ -1012,14 +1048,17 @@ const LEVEL_UI = [
 ];
 const AGE_START = {'4-5': 0, '6-7': 0, '8-9': 1, '10+': 2};
 /* 🗂️ MODE GROUPS (mg-1) — fixed order; R2 adds 🦶 PyraStrike, R3 ⚡ PyraSpark, R4 🎯 Training · 🎪 Fun · 🏆 Cups */
-const MODE_GROUPS = [{k: 'beach', icon: '🏖️', en: 'Beach', th: 'ชายหาด', c: '#F2A33A'}, {k: 'indoor', icon: '🏐', en: 'Indoor', th: 'ในร่ม', c: '#FF6B1A'}];   // R1: two 🏐 PyraSpike boxes by court type; R2 folds them into one 🏐 PyraSpike box next to 🦶 PyraStrike
+const MODE_GROUPS = [{k: 'spike', icon: '🏐', en: 'PyraSpike', th: 'วอลเลย์บอล', c: '#FF6B1A'}, {k: 'strike', icon: '🦶', en: 'PyraStrike', th: 'ตะกร้อ', c: '#2FBF71'}];   // pd-2b: one box per sport (R3 adds ⚡ PyraSpark)   // R1: two 🏐 PyraSpike boxes by court type; R2 folds them into one 🏐 PyraSpike box next to 🦶 PyraStrike
 const MODE_CARDS = {
   beach: {type: 'A beach volleyball game', sub: '2 a side on the sand · you dunk, your buddy sets'},
   small: {type: 'A small-court volleyball game', sub: '3 a side · one 🚀 Driver, one 🪶 Dinker, one 💥 Dunker'},
-  full: {type: 'A full volleyball game', sub: '6 a side in the big arena · front row blocks'}
+  full: {type: 'A full volleyball game', sub: '6 a side in the big arena · front row blocks'},
+  strikesolo: {type: 'A sepak takraw game (feet only!)', sub: '1 a side · trap, head it up, spike it — all yourself'},
+  strikeduo: {type: 'A 2-a-side sepak takraw game', sub: 'Kick, knee, head — never hands · roll spike over the low net'},
+  strikeregu: {type: 'A team (regu) sepak takraw game', sub: '3 a side · 🚀 kicker, 🪶 feeder, 💥 striker · bicycle kicks!'}
 };
-window.MODE_TYPE = {beach: MODE_CARDS.beach.type, small: MODE_CARDS.small.type, full: MODE_CARDS.full.type};
-function mgList(){ return PD.MODE_ORDER.map(k => ({k, g: k === 'beach' ? 'beach' : 'indoor', icon: PD.MODES[k].icon, name: PD.MODES[k].name, type: MODE_CARDS[k].type, sub: MODE_CARDS[k].sub, next: '👇 then pick a level'})); }
+window.MODE_TYPE = {}; for(const k in MODE_CARDS) window.MODE_TYPE[k] = MODE_CARDS[k].type;
+function mgList(){ return PD.MODE_ORDER.map(k => ({k, g: PD.MODES[k].sport, icon: PD.MODES[k].icon, name: PD.MODES[k].name, type: MODE_CARDS[k].type, sub: MODE_CARDS[k].sub, next: '👇 then pick a level'})); }
 /* 🗂️ END MODE GROUPS */
 const ARENAS = [{k: 'classic', icon: '🏟️', name: 'Classic arena'}, {k: 'jungle', icon: '🦖', name: 'Jungle beach', soon: true}, {k: 'coral', icon: '🐙', name: 'Coral court', soon: true}, {k: 'neon', icon: '🪩', name: 'Neon arena', soon: true}];
 const ACTIONS = [['up', '⬆️ Up'], ['down', '⬇️ Down'], ['left', '⬅️ Left'], ['right', '➡️ Right'], ['touch', '🤚 Touch'], ['drive', '💥 Drive / Dunk'], ['dink', '🪶 Dink'], ['jump', '⬆️ Jump / Block'], ['dive', '🤸 Dive'], ['pyra', '🔥 Pyra']];
@@ -1027,10 +1066,15 @@ const DEFAULT_KEYS = [
   {up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', touch: 'KeyJ', drive: 'KeyK', dink: 'KeyL', jump: 'Space', dive: 'ShiftLeft', pyra: 'KeyF'},
   {up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', touch: 'Numpad1', drive: 'Numpad2', dink: 'Numpad3', jump: 'Numpad0', dive: 'NumpadDecimal', pyra: 'NumpadAdd'}
 ];
-const BTN = [['pyra', '🔥', 'Pyra'], ['jump', '⬆️', 'Jump'], ['dink', '🪶', 'Dink'], ['dive', '🤸', 'Dive'], ['touch', '🤚', 'Touch'], ['drive', '💥', 'Dunk']];
+const BTN_SPIKE = [['pyra', '🔥', 'Pyra'], ['jump', '⬆️', 'Jump'], ['dink', '🪶', 'Dink'], ['dive', '🤸', 'Dive'], ['touch', '🤚', 'Touch'], ['drive', '💥', 'Dunk']];
+const BTN_STRIKE = [['pyra', '🔥', 'Pyra'], ['jump', '⬆️', 'Jump'], ['dink', '🦶', 'Tip'], ['dive', '🤸', 'Dive'], ['touch', '🦵', 'Trap'], ['drive', '💥', 'Spike']];   // 🦶 PyraStrike: no hands
+let BTN = BTN_SPIKE;
 const TEAM_COL = ['#FF6B1A', '#2F7BEA'];
 const WORDS = {bump: '🤚 Bump', set: '🙌 Set!', dig: '🛡️ Dig!', dive: '🤸 Dive!', dunk: '💥 DUNK!', dink: '🪶 Dink', drive: '🚀 Drive!'};
+const WORDS_STRIKE = {bump: '🦵 Trap', set: '🙆 Head set!', dig: '🦶 Toe save!', dive: '🤸 Dive!', dunk: '🌀 ROLL SPIKE!', bicycle: '🚲 BICYCLE!', dink: '🦶 Heel tip', drive: '🦶 Kick!'};
+function wordOf(M, e){ return PD.isStrike(M) ? (e.style === 'bicycle' ? WORDS_STRIKE.bicycle : WORDS_STRIKE[e.k]) : WORDS[e.k]; }
 const WHY = {four: '4 touches! Only 3 a side', double: 'Double touch! The same player twice', net: 'Touched the net!', out: 'Out!', drop: 'It dropped!', in: 'In!', kill: 'Kill!', ace: 'Ace!', stuff: 'Stuff block!'};
+const GOAL_STRIKE = {serve: ['🦶 Your serve! Tap 💥 — your buddy tosses, you kick', 'K'], bump: ['🦵 Trap it up with your thigh!', 'J'], set: ['🙆 Head it up high!', 'J'], dig: ['🦶 Toe save! Get a foot under it', 'J'], dunk: ['💥 Jump and ROLL SPIKE it over!', 'K']};
 const GOAL = {serve: ['🚀 Your serve! Tap 💥', 'K'], serveAll: ['🚀 Serve:'], bump: ['🤚 Bump it up to your setter!', 'J'], set: ['🙌 Set it up high!', 'J'], dig: ['🛡️ Dig! Save the low ball', 'J'], dunk: ['💥 Jump and DUNK it over the net!', 'K']};
 
 /* ================= STATE ================= */
@@ -1127,9 +1171,11 @@ function openSetup(lvl){
 }
 function buildWho(){
   const hc = !!LEVEL_UI[SET.level].hardcore, row = $('who-row'), none = !others().length;
-  const list = [['robot', '🤖 Me + robots'], ['team', '🤝 2 players, same team'], ['duo', '⚔️ 2 players, against each other']];
-  row.innerHTML = list.map(([k, n]) => '<button class="chip' + (SET.who === k ? ' on' : '') + ((hc || none) && k !== 'robot' ? ' lock' : '') + '" data-k="' + k + '" data-sound="tap">' + n + '</button>').join('');
+  const solo = PD.MODES[SET.mode].n === 1; if(solo && SET.who === 'team') SET.who = 'robot';   // 🦶 1v1: one seat a side
+  const list = [['robot', solo ? '🤖 Me vs a robot' : '🤖 Me + robots'], ['team', '🤝 2 players, same team'], ['duo', '⚔️ 2 players, against each other']];
+  row.innerHTML = list.map(([k, n]) => '<button class="chip' + (SET.who === k ? ' on' : '') + ((hc || none || (solo && k === 'team')) && k !== 'robot' ? ' lock' : '') + '" data-k="' + k + '" data-sound="tap">' + n + '</button>').join('');
   row.querySelectorAll('.chip').forEach(b => b.onclick = () => { const k = b.dataset.k;
+    if(k === 'team' && PD.MODES[SET.mode].n === 1){ UISound.play('error'); UI.toast('🦶 1v1 has one player a side — pick ⚔️ against each other'); return; }
     if(k !== 'robot' && (hc || none)){ UISound.play('error'); UI.toast(hc ? '💀 Hardcore is you against the robots' : 'Add a second player on the Dashboard first'); return; }
     SET.who = k; savePrefs(); row.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); buildTeams(); });
 }
@@ -1184,6 +1230,7 @@ function startMatch(){
   const M = PD.newMatch({mode: SET.mode, level: SET.level, seed: (Date.now() % 100000) + 7, teams: cfg});
   G = {M, level: SET.level, mode: SET.mode, who: SET.who, over: false, paused: false, held: false, t0: Date.now(), fx: [], words: [], cam: null, shake: 0, setScores: [], q: 1, ema: 16, last: 0, sticks: new Map(), keysDown: new Set(), seen: {}};
   G.locals = M.players.filter(p => p.human);   // people on this device (P1 = human 1)
+  BTN = PD.isStrike(M) ? BTN_STRIKE : BTN_SPIKE;
   GC_LOG.length = 0;
   if(UI.modeTried) UI.modeTried(S.player, GAME_ID, SET.mode);
   showScreen('play'); BAR.fit();
@@ -1226,11 +1273,13 @@ function handleEvents(list){
     const b = M.ball, p = e.p != null ? M.players[e.p] : null;
     switch(e.k){
       case 'serve': snd('whoosh'); spark(b.x, b.y, b.z, e.pyra ? '#FF6B1A' : '#FFFFFF', e.kind === 'jump' ? 16 : 10);
-        if(e.kind === 'jump'){ floatWord('🦘 Jump serve!', b.x, b.y, b.z, '#FFE14A'); if(FX) G.shake = 0.1; } else if(e.kind === 'pinch') floatWord('🤏 Pinch serve', b.x, b.y, b.z, '#E6D3FF'); break;
+        if(e.kind === 'kick') floatWord('🦶 Kick serve!', b.x, b.y, b.z, '#FFFFFF');
+        else if(e.kind === 'jump'){ floatWord(PD.isStrike(M) ? '🦵 Power kick!' : '🦘 Jump serve!', b.x, b.y, b.z, '#FFE14A'); if(FX) G.shake = 0.1; } else if(e.kind === 'pinch') floatWord(PD.isStrike(M) ? '🦶 Tip serve' : '🤏 Pinch serve', b.x, b.y, b.z, '#E6D3FF'); break;
       case 'serveToss': snd('tap'); break;
       case 'bump': case 'set': case 'dig': case 'dive': case 'dunk': case 'dink': case 'drive':
+        if(p) p.style = e.style || null;
         snd(e.k === 'dunk' || e.k === 'drive' ? 'drop' : 'bump'); spark(b.x, b.y, b.z, e.k === 'dunk' ? '#FFB627' : '#FFFFFF', e.k === 'dunk' ? 16 : 8);
-        if(p) floatWord(WORDS[e.k] + (e.over && e.k !== 'dunk' ? ' over!' : ''), p.x - PD.sgn(p.team) * 0.4, p.y, p.z + 2.2, TEAM_COL[e.team]);   // over the player, so the ball flies clear of the word
+        if(p) floatWord(wordOf(M, e) + (e.over && e.k !== 'dunk' ? ' over!' : ''), p.x - PD.sgn(p.team) * 0.4, p.y, p.z + 2.2, TEAM_COL[e.team]);   // over the player, so the ball flies clear of the word
         if(e.k === 'dunk' && FX){ G.shake = 0.18; }
         if(p && p.human && G.locals.length === 1 && (e.k === 'dig' || e.k === 'dive')) bigWord(e.k === 'dive' ? 'DIVE SAVE!' : 'GREAT DIG!');
         break;
@@ -1371,9 +1420,9 @@ function updateGuideUi(){
   if(!show){ line.classList.add('off'); hand.classList.add('hidden'); G.goalTxt = ''; return; }
   const b = document.querySelector('.actpad[data-p="' + g.p + '"] .sbtn[data-a="' + g.key + '"]') || document.querySelector('.keylegend [data-a="' + g.key + '"]');
   if(b) b.classList.add('glow');
-  const gl = GOAL[g.why] || GOAL.bump, K = KEYS[localSeat(g.p)], kc = keyName(K[g.key]), kb = a => isTouch() ? '' : ' <kbd>' + UI.esc(keyName(K[a])) + '</kbd>';
+  const GL = PD.isStrike(M) ? GOAL_STRIKE : GOAL, gl = GL[g.why] || GL.bump, K = KEYS[localSeat(g.p)], kc = keyName(K[g.key]), kb = a => isTouch() ? '' : ' <kbd>' + UI.esc(keyName(K[a])) + '</kbd>';
   // serve on Junior+: the 3 serve kinds (💥 float · ⬆️ jump serve · 🪶 pinch) — Basic keeps the one-tap line
-  const txt = g.why === 'serve' && M.level > 0 ? '🚀 Serve: 💥 float' + kb('drive') + ' · ⬆️ jump' + kb('jump') + ' · 🪶 pinch' + kb('dink') : gl[0] + (isTouch() ? '' : ' <kbd>' + UI.esc(kc) + '</kbd>');
+  const txt = g.why === 'serve' && M.level > 0 ? (PD.isStrike(M) ? '🦶 Serve: 💥 kick' + kb('drive') + ' · ⬆️ power kick' + kb('jump') + ' · 🦶 tip' + kb('dink') : '🚀 Serve: 💥 float' + kb('drive') + ' · ⬆️ jump' + kb('jump') + ' · 🪶 pinch' + kb('dink')) : gl[0] + (isTouch() ? '' : ' <kbd>' + UI.esc(kc) + '</kbd>');
   if(G.goalTxt !== txt){ G.goalTxt = txt; line.innerHTML = txt; }
   line.classList.remove('off');
   const handOn = isTouch() && guided() && b && b.classList.contains('sbtn') && (g.reach || g.why === 'serve');
@@ -1439,11 +1488,14 @@ function drawScene(g, M, o){
   const t = o.t || 0, L = M.L, Wd = M.W;
   drawArena(g, M, t);
   // floor (free zone) + court
-  const sand = M.sp.sand;
-  poly(g, [P(-L - 4.5, -Wd / 2 - 2.6, 0), P(L + 4.5, -Wd / 2 - 2.6, 0), P(L + 4.5, Wd / 2 + 3.4, 0), P(-L - 4.5, Wd / 2 + 3.4, 0)], sand ? '#E9C98A' : '#2B56B8');
-  poly(g, [P(-L, -Wd / 2, 0), P(0, -Wd / 2, 0), P(0, Wd / 2, 0), P(-L, Wd / 2, 0)], sand ? '#F2D79E' : '#E8813A');
-  poly(g, [P(0, -Wd / 2, 0), P(L, -Wd / 2, 0), P(L, Wd / 2, 0), P(0, Wd / 2, 0)], sand ? '#F0D398' : '#E27832');
-  if(!sand){ g.globalAlpha = 0.12; for(let i = -L; i < L; i += 1.5) poly(g, [P(i, -Wd / 2, 0), P(i + 0.75, -Wd / 2, 0), P(i + 0.75, Wd / 2, 0), P(i, Wd / 2, 0)], '#FFFFFF'); g.globalAlpha = 1; }
+  const sand = M.sp.sand, tk = PD.isStrike(M);   // 🦶 takraw court: green floor, teal court, service circles
+  poly(g, [P(-L - 4.5, -Wd / 2 - 2.6, 0), P(L + 4.5, -Wd / 2 - 2.6, 0), P(L + 4.5, Wd / 2 + 3.4, 0), P(-L - 4.5, Wd / 2 + 3.4, 0)], sand ? '#E9C98A' : tk ? '#1F7A57' : '#2B56B8');
+  poly(g, [P(-L, -Wd / 2, 0), P(0, -Wd / 2, 0), P(0, Wd / 2, 0), P(-L, Wd / 2, 0)], sand ? '#F2D79E' : tk ? '#2FA37A' : '#E8813A');
+  poly(g, [P(0, -Wd / 2, 0), P(L, -Wd / 2, 0), P(L, Wd / 2, 0), P(0, Wd / 2, 0)], sand ? '#F0D398' : tk ? '#2C9B73' : '#E27832');
+  if(tk){ g.strokeStyle = '#FFFFFF'; g.lineWidth = Math.max(1.5, V.k * 0.06);
+    [-1, 1].forEach(sd => { const cu = (L - 2.45) * sd; g.beginPath(); for(let i = 0; i <= 24; i++){ const a = i / 24 * Math.PI * 2, q = P(cu + Math.cos(a) * 0.3, Math.sin(a) * 0.3, 0); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); } g.stroke();
+      [-1, 1].forEach(sy => { g.beginPath(); for(let i = 0; i <= 12; i++){ const a = i / 12 * Math.PI / 2, q = P(sd * Math.sin(a) * 0.9, sy * (Wd / 2 - Math.cos(a) * 0.9), 0); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); } g.stroke(); }); }); }
+  if(!sand && !tk){ g.globalAlpha = 0.12; for(let i = -L; i < L; i += 1.5) poly(g, [P(i, -Wd / 2, 0), P(i + 0.75, -Wd / 2, 0), P(i + 0.75, Wd / 2, 0), P(i, Wd / 2, 0)], '#FFFFFF'); g.globalAlpha = 1; }
   g.strokeStyle = sand ? '#2F7BEA' : '#FFFFFF'; g.lineWidth = Math.max(1.5, V.k * 0.07); g.lineJoin = 'round';
   line(g, [P(-L, -Wd / 2, 0), P(L, -Wd / 2, 0), P(L, Wd / 2, 0), P(-L, Wd / 2, 0), P(-L, -Wd / 2, 0)]);
   line(g, [P(0, -Wd / 2, 0), P(0, Wd / 2, 0)]);
@@ -1516,6 +1568,23 @@ function drawNet(g, M){
 const GEST = {cheer: 'cheer', oops: 'shrug'};
 function poseOf(M, p, t){
   const a = p.act, at = p.actT;
+  if(PD.isStrike(M)){   // 🦶 takraw: kicks, knees, headers — hands stay down
+    if(p.dive) return {rot: 1.2, armL: 2.4, armR: 2.5, legL: 0.6, legR: -0.1, dy: 12, mouth: 'open'};
+    if(p.block > 0 && p.z > 0) return {rot: -0.35, armL: 0.5, armR: 0.5, legL: 0.5, legR: -0.6, mouth: 'open'};
+    if(M.phase === 'serve' && M.ball.held === p.id) return p.feed ? {armL: 0.8, armR: 0.6, legR: -0.6 - Math.min(1.2, (M.t - p.feed.t0) * 2), mouth: 'open'} : {armL: 0.5, armR: 0.5, legR: -0.3};
+    if(a && at < 0.4){
+      const k = Math.min(1, Math.round(at / 0.22 * 4) / 4);
+      if(a === 'bump') return {legR: -1.3, armL: 0.9, armR: 0.9, dy: 2};
+      if(a === 'dig') return {legR: -1.6, legL: 0.25, armL: 1.2, armR: 1.2, dy: 6};
+      if(a === 'set') return {armL: 0.8, armR: 0.8, rot: -0.18, dy: -2, mouth: 'open'};
+      if(a === 'dink') return {legR: 1.1, armL: 1.0, armR: 0.4};
+      if(a === 'dunk') return p.style === 'bicycle' ? {rot: -1.5 * Math.max(0.5, k), dy: -32, legR: -2.6, legL: -0.8, armL: 2.2, armR: 2.2, mouth: 'open'} : {legR: -2.7, legL: 0.4, armL: 1.6, armR: 1.4, rot: 0.35, mouth: 'open'};
+      if(a === 'drive' || a === 'serve') return {legR: -2.0 + 0.6 * k, armL: 1.0, armR: 0.6, mouth: 'open'};
+      if(a === 'block') return {rot: -0.35, armL: 0.5, armR: 0.5};
+    }
+    if(M.phase === 'rally' && p.z === 0 && !p.walkT) return {armL: 0.5, armR: 0.5, legL: 0.2, legR: -0.2, dy: 3};
+    return null;
+  }
   if(p.dive) return {rot: 1.2, armL: 2.4, armR: 2.5, legL: 0.6, legR: -0.1, dy: 12, mouth: 'open'};
   if(p.block > 0 && p.z > 0) return {armL: 3.05, armR: 3.05, mouth: 'open'};
   if(M.phase === 'serve' && M.ball.held === p.id) return p.jumpServe ? {armR: 3.05, armL: 2.6, legL: 0.35, legR: -0.35, mouth: 'open'} : p.charge >= 0 ? {armR: 3.0, armL: 2.2, mouth: 'open'} : {armL: 1.3, armR: 0.5};
@@ -1607,6 +1676,18 @@ function drawPlayer(g, M, p, t, o){
     const nm = p.human ? p.name : p.name.slice(0, 9); g.strokeText(nm, fx, top - sz * 0.95); g.fillStyle = p.human ? '#FFE9A8' : '#E6ECFF'; g.fillText(nm, fx, top - sz * 0.95); }
 }
 let BALL_SPR = {};
+function takrawSprite(px){   // 🦶 a woven rattan ball: golden ring weave with round holes
+  px = Math.max(8, Math.round(px / 2) * 2); const key = 't' + px; if(BALL_SPR[key]) return BALL_SPR[key];
+  const c = document.createElement('canvas'), r = px / 2; c.width = c.height = px + 4; const g = c.getContext('2d'); g.translate(r + 2, r + 2);
+  const gr = g.createRadialGradient(-r * 0.3, -r * 0.35, 1, 0, 0, r); gr.addColorStop(0, '#FFE6A3'); gr.addColorStop(0.6, '#D9A441'); gr.addColorStop(1, '#9C6A1C');
+  g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill();
+  g.save(); g.beginPath(); g.arc(0, 0, r, 0, 7); g.clip(); g.fillStyle = 'rgba(70,40,5,0.75)';
+  [[0, 0], [0.55, 0], [-0.55, 0], [0.28, 0.48], [-0.28, 0.48], [0.28, -0.48], [-0.28, -0.48]].forEach(([u, v]) => { g.beginPath(); g.arc(u * r, v * r, r * 0.17, 0, 7); g.fill(); });
+  g.strokeStyle = 'rgba(255,240,200,0.55)'; g.lineWidth = Math.max(1, px * 0.05);
+  for(let i = 0; i < 3; i++){ g.beginPath(); g.ellipse(0, 0, r * 0.95, r * 0.42, i * Math.PI / 3, 0, 7); g.stroke(); }
+  g.restore(); g.strokeStyle = 'rgba(60,35,5,0.5)'; g.lineWidth = Math.max(1, px * 0.06); g.beginPath(); g.arc(0, 0, r, 0, 7); g.stroke();
+  return (BALL_SPR[key] = c);
+}
 function ballSprite(px){
   px = Math.max(8, Math.round(px / 2) * 2); if(BALL_SPR[px]) return BALL_SPR[px];
   const c = document.createElement('canvas'), r = px / 2; c.width = c.height = px + 4; const g = c.getContext('2d'); g.translate(r + 2, r + 2);
@@ -1629,7 +1710,7 @@ function drawBall(g, M, t){
       else if(fast){ g.globalAlpha = f * 0.25; g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(tx, ty, r * f * 0.8, 0, 7); g.fill(); } });
     g.globalAlpha = 1;
   }
-  const spr = ballSprite(r * 2), ang = (b.x * 3 + b.z * 2) % (Math.PI * 2);
+  const spr = PD.isStrike(M) ? takrawSprite(r * 2) : ballSprite(r * 2), ang = (b.x * 3 + b.z * 2) % (Math.PI * 2);
   g.fillStyle = 'rgba(255,255,255,0.28)'; g.beginPath(); g.arc(x, y, r * 1.45, 0, 7); g.fill();   // a soft halo so the ball never hides in a crowd
   g.save(); g.translate(x, y); g.rotate(ang); g.drawImage(spr, -spr.width / 2, -spr.height / 2); g.restore();
   if(b.spirit && M.phase === 'rally'){ const c = spiritOf(b.spirit); if(c){   // 🔥🔥 the creature rides the ball
@@ -1756,4 +1837,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pd-2a) END OF PyraDive.html -->
+<!-- (pd-2b) END OF PyraDive.html -->
