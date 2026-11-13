@@ -2957,6 +2957,9 @@ const ITEM_LINES = [
     ways: [W_.feat('sla-brall', 'wins', 5, 'Win 5 SlaBrall matches'), W_.days(7), W_.titles(1), W_.extreme(1), W_.badges(12), W_.miles(120), W_.feat('sla-brall', 'smash', 50, 'Hit 50 SlaBrall smashes'), W_.hardcore(1)] },
   { id: 'joyskin3', name: 'Legend joysticks', icon: '👑', slot: 'joy', game: 'any', soon: 'Your 🕹️ joystick + buttons in every game with a stick — wear it in 🎒 Wardrobe', steps: ['Ice', 'Gem', 'Rainbow', 'Galaxy', 'Dragon eye', 'Golden crown', 'Neon pulse', 'Phoenix'],
     ways: [W_.days(14), W_.miles(200), W_.badges(20), W_.titles(3), W_.extreme(3), W_.feat('sla-brall', 'cups', 1, 'Win a SlaBrall tournament'), W_.hardcore(3), W_.days(30)] },
+  // 🎭 as-2 Signature acts (AvatarActing core-sig): pick ONE in 🎒 Wardrobe → avatar field `sig`; steps = SIG_ACTS_.line in the same order
+  { id: 'sigact', name: 'Signature acts', icon: '🎭', slot: 'sigact', game: 'any', soon: 'Your 🎭 signature move — on the 👋 tiles, in the Family Room and on result cards. Pick it in 🎒 Wardrobe', steps: ['Superstar', 'Power up', 'Heart burst', 'Genius', 'Ninja', 'Rock star', 'Giant hero', 'Flower twirl', 'Moonwalk', 'Robot'],
+    ways: [W_.days(2), W_.total(3), W_.badges(2), W_.miles(15), W_.titles(1), W_.days(5), W_.total(12), W_.miles(40), W_.hardcore(1), W_.days(10)] },
   // 🏏 bs-1 Batsticks (Batstickskin shapes 11–18 after the 10 rackets): design them in 🏏 My Batstick (shape · sticker · colours · pattern) — used as your SlaBrall racket, your Brawl melee pickup and in your hand.
   { id: 'batstick', name: 'Batsticks', icon: '🏏', slot: 'hand', game: 'any', soon: 'Your 🏏 Batstick in every game you swing in — design it in 🎒 Wardrobe or SlaBrall', steps: ['Baseball bat', 'Cricket bat', 'Foam bat', 'Lollipop bat', 'Candy cane', 'Glow stick', 'Bamboo stick', 'Dino bone club'],
     ways: [W_.feat('sla-brall', 'matches', 2, 'Play 2 SlaBrall matches'), W_.days(2), W_.feat('sla-brall', 'smash', 15, 'Hit 15 SlaBrall smashes'), W_.total(5), W_.feat('sla-brall', 'wins', 3, 'Win 3 SlaBrall matches'), W_.badges(6), W_.miles(80), W_.feat('sla-brall', 'perfect', 40, 'Hit 40 PERFECT shots in SlaBrall')] },
@@ -3691,6 +3694,9 @@ function parseAvatar_(txt) {
   try { const a = JSON.parse(txt || ''); return cleanAvatar_(a); } catch (e) { return null; }
 }
 // owned (optional) = {lineId: steps}: when given, locked options are dropped.
+// 🎭 as-2 Signature acts: free for everyone + the 'sigact' line (same keys + order as AvatarActing core-sig)
+const SIG_ACTS_ = { free: ['victory', 'cheer', 'wave', 'flex'], line: ['sig.superstar', 'sig.power-up', 'sig.heart-burst', 'sig.genius', 'sig.ninja', 'sig.rockstar', 'sig.giant-hero', 'sig.flower-twirl', 'sig.moonwalk', 'sig.robot'] };
+function cleanSig_(k, owned) { k = String(k || ''); if (SIG_ACTS_.free.indexOf(k) >= 0) return k; const i = SIG_ACTS_.line.indexOf(k); if (i < 0) return ''; return !owned || (owned.sigact || 0) > i ? k : ''; }
 function cleanAvatar_(a, owned) {
   if (!a || typeof a !== 'object') return null;
   const out = {};
@@ -3714,6 +3720,7 @@ function cleanAvatar_(a, owned) {
   });
   if (Object.keys(eq).length) out.eq = eq;
   if (HEX_.test(a.accC)) out.accC = a.accC;
+  const sig = cleanSig_(a.sig, owned); if (sig) out.sig = sig;   // 🎭 as-2
   if (a.cw && typeof cleanCraftWear_ === 'function') { const cw = cleanCraftWear_(a.cw); if (cw) out.cw = cw; }   // 🏭 crafted wear (ArtifactoryCode.gs, af-1)
   return out;
 }
@@ -4215,7 +4222,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */

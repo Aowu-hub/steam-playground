@@ -222,7 +222,7 @@
   .dotnew{display:inline-block;background:var(--gold);color:#3A2500;border-radius:9px;padding:1px 7px;font-size:0.72rem;font-weight:800;}
   .opt.locked{opacity:.55;filter:grayscale(.6);font-size:0.8rem;}
   #ed-opts{max-height:min(56vh,520px);overflow:auto;padding-right:4px;}
-  .w-slot{margin-bottom:12px;} .w-slot > b{display:flex;align-items:center;gap:8px;font-family:'Fredoka',sans-serif;font-size:0.95rem;margin-bottom:5px;}
+  .w-slot{margin-bottom:12px;} .w-sigs .w-sig-sub{font-family:inherit;font-weight:700;font-size:0.68rem;opacity:0.7;} .w-slot > b{display:flex;align-items:center;gap:8px;font-family:'Fredoka',sans-serif;font-size:0.95rem;margin-bottom:5px;}
   .w-off{border:none;background:#FFE3E8;color:#B0213F;border-radius:9px;padding:3px 9px;font-weight:800;font-size:0.72rem;cursor:pointer;}
   .w-line{background:var(--panel);border-radius:14px;padding:8px 10px;margin-bottom:6px;}
   .w-line.none{opacity:.75;}
@@ -581,6 +581,7 @@ function stepAlong(e, dt, speed){
 const STANCE_SPEED = {stand: 2.4, crouch: 1.3, lie: 0.75};
 function speedOf(a){ return STANCE_SPEED[a.stance] || WALK_SPEED; }
 function updateAvatar(a, dt){
+  if(a.act){ a.act.t += dt; if(a.act.t >= a.act.d || (a.path && a.path.length) || a.jump || (a.isMe && keysDown.size)) a.act = null; }   // as-2 🎭 acts
   if(a.gest){ a.gest.t += dt; if(a.gest.t >= a.gest.g.d){ const sl = a.gest.g.f(1, a.gest.t).slide; a.gest = null; } }
   if(a.jump){ a.jump.t += dt; const d = 0.62; if(a.jump.t >= d){ a.jump = null; a.jumpH = 0; a.land = 0.14; } else a.jumpH = Math.sin(Math.PI * a.jump.t / d) * 32; }
   a.land = Math.max(0, (a.land || 0) - dt);
@@ -610,26 +611,55 @@ function updateAvatar(a, dt){
   const tc = trailChars(eqOf(fixAv(a.av), 'trail'));
   if(tc && moving && Math.random() < dt * 9) R.fx.push({ch: pick(tc), x: a.x + rand(-0.15, 0.15), y: a.y + rand(-0.15, 0.15), z: rand(6, 30), t: 0, life: 0.9, dz: 18, size: 12});
   a.stillT = moving || a.gest ? 0 : (a.stillT || 0) + dt;
-  if(a.npc && !a.gest && !a.path.length){
+  if(a.npc && !a.act) meetTick(a);
+  if(a.npc && !a.gest && !a.act && !a.path.length){
     a.next -= dt;
     if(a.next <= 0){
       const danceRoom = R.def.dance;
       const r = Math.random();
       if(!danceRoom && r < 0.08){ a.stance = 'lie'; a.stanceUntil = R.t + rand(4, 8); }
       else if(r < 0.16){ doJump(a); }
+      else if(window.Acting && Math.random() < (danceRoom ? 0.35 : 0.3)) startAct(a, Math.random() < 0.12 ? Acting.sig(fixAv(a.av)) : Acting.pick(danceRoom ? 'room-dance' : (Math.random() < 0.5 ? 'room-happy' : 'room-idle'), {who: a.name}));   // as-2 🎭 shared acts (+ their own signature act)
       else if(Math.random() < (danceRoom ? 0.6 : 0.4)) startGesture(a, danceRoom && Math.random() < 0.6 ? pick(GESTURES.filter(g => ['dance', 'robot', 'cheer', 'starjump', 'moonwalk', 'clap', 'sing', 'guitar'].includes(g.k))) : pick(GESTURES));
       else { const t = randomFreeTile([a.x, a.y], 4), p = findPath([a.x, a.y], t); if(p) a.path = p; }
       a.next = rand(2.5, 6);
     }
   }
 }
-function startGesture(a, g){ a.stance = 'stand'; a.stanceUntil = 0; a.gest = {g: g || pick(GESTURES), t: 0}; a.path = []; }
+function startGesture(a, g){ a.stance = 'stand'; a.stanceUntil = 0; a.act = null; a.gest = {g: g || pick(GESTURES), t: 0}; a.path = []; }
+/* ---------- as-2 🎭 Acting in the Family Room: shared acts, 🎭 signature acts, meet-and-greet (AvatarActing pools) ---------- */
+function startAct(a, k, d){
+  if(!a || !window.Acting || !(Acting.has('acts', k) || Acting.has('poses', k))) return startGesture(a);
+  const A = Acting.act(k), gs = A && A.gest && GESTURES.find(q => q.k === A.gest);
+  a.stance = 'stand'; a.stanceUntil = 0; a.gest = null; a.path = []; a.act = {k, t: 0, d: d || (gs ? gs.d : 2.4)};
+}
+function doSig(a){ if(!a) return; const k = window.Acting ? Acting.sig(fixAv(a.av)) : ''; if(!k) return randomGesture(a); startAct(a, k, 3);
+  if(a.isMe){ STATS.gestures++; UISound.play('success'); showBanner('🎭 ' + a.name + ': ' + ((Acting.SIG.names || {})[k] || k) + '!' + (fixAv(a.av).sig ? '' : ' — pick your own in 🎒 Wardrobe')); } }
+// two people meet: the family member waves back, high-fives or hugs (each pair at most every 25 s)
+const MEET = {};
+function meetTick(a){
+  const m = me(); if(!m || m === a || !window.Acting || a.gest || a.path.length || a.jump) return;
+  if(Math.hypot(a.x - m.x, a.y - m.y) > 1.25) return;
+  const key = a.name, now = R.t; if(MEET[key] && now - MEET[key] < 25) return; MEET[key] = now;
+  const r = Math.random(), k = r < 0.5 ? 'wave' : r < 0.8 ? 'high-five' : 'hug-pair';
+  a.dir = m.x - m.y > a.x - a.y ? 1 : -1; startAct(a, k, 2.2);
+  const busy = m.gest || m.act || m.jump || (m.path && m.path.length) || keysDown.size;
+  if(!busy && k !== 'wave'){ m.dir = -a.dir; startAct(m, k, 2.2); }
+  R.fx.push({ch: k === 'hug-pair' ? '💖' : k === 'high-five' ? '✋' : '👋', x: (a.x + m.x) / 2, y: (a.y + m.y) / 2, z: 34, t: 0, life: 1.2, dz: 30, size: 16});
+  showBanner((k === 'hug-pair' ? '🤗 ' + a.name + ' gives you a hug!' : k === 'high-five' ? '✋ High five with ' + a.name + '!' : '👋 ' + a.name + ' waves back!'));
+}
+// draw a person: acts (and the old gestures, now with faces) go through Acting.draw, everything else stays drawAvatar
+function drawRoomAv(g, a, x, y, k){
+  const ak = !window.Acting ? null : a.act ? a.act.k : (a.gest && !a.jump && Acting.has('acts', 'gest.' + a.gest.g.k) ? 'gest.' + a.gest.g.k : null);
+  if(!ak){ drawAvatar(g, a, x, y, k); return; }
+  try { Acting.draw(g, a, x, y, k, ak, {t: a.act ? a.act.t : a.gest.t, dir: a.dir, ride: 'keep', keep: true, seed: a.name}); } catch(e){ drawAvatar(g, a, x, y, k); }
+}
 // Actions (keys, phone buttons, or the family doing them on their own)
 function doJump(a){ if(!a || a.jump) return; a.gest = null; a.stance = 'stand'; a.stanceUntil = 0; a.jump = {t: 0}; if(a.isMe){ UISound.play('whoosh'); STATS.jumps++; } }
 function setStance(a, st){ if(!a) return; a.gest = null; a.stanceUntil = 0; a.stance = a.stance === st ? 'stand' : st; if(a.isMe){ UISound.play('pop'); showBanner(a.stance === 'crouch' ? '🧎 Crouching — you move on 4 legs' : a.stance === 'lie' ? '🛌 Lying down — you belly-crawl' : '🧍 Standing up'); updateActBar(); } }
 function doAction(act){
   const m = me(); if(!m) return; Music.unlock(); hideTip();
-  if(act === 'jump') doJump(m); else if(act === 'crouch') setStance(m, 'crouch'); else if(act === 'lie') setStance(m, 'lie'); else if(act === 'gesture'){ randomGesture(m); updateActBar(); } else if(act === 'swing') doSwing(m); else if(act === 'push') doPush(m); else if(act === 'use') doUse(m); else if(act === 'beast') doBeast(m);
+  if(act === 'jump') doJump(m); else if(act === 'crouch') setStance(m, 'crouch'); else if(act === 'lie') setStance(m, 'lie'); else if(act === 'gesture'){ randomGesture(m); updateActBar(); } else if(act === 'swing') doSwing(m); else if(act === 'push') doPush(m); else if(act === 'use') doUse(m); else if(act === 'beast') doBeast(m); else if(act === 'sig') doSig(m);
 }
 function randomGesture(a){ if(!a) return; const g = pick(GESTURES); startGesture(a, g); if(a.pet && !a.pet.trick && Math.random() < 0.6) startPetTrick(a, pick(['jump', 'spin', 'wiggle'])); if(a.isMe){ STATS.gestures++; showBanner('🎲 ' + a.name + ': ' + g.n + '!'); } }
 /* ---------- 🐾 pet tricks (worn pets follow their avatar): random tricks, tap for a trick, feed me / cry when hungry ---------- */
@@ -972,7 +1002,7 @@ function draw(){
     const c = iso(it.x + it.w / 2, it.y + it.d / 2); g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(c[0], c[1], it.w * 18 * k, it.d * 9 * k, 0, 0, 7); g.fill();
     g.save(); g.translate(0, -(16 + Math.sin(R.t * 8) * 2) * k); g.globalAlpha = 0.92; if(it.k === 'rug') poly(g, [iso(it.x + 0.15, it.y + 0.15), iso(it.x + it.w - 0.15, it.y + 0.15), iso(it.x + it.w - 0.15, it.y + it.d - 0.15), iso(it.x + 0.15, it.y + it.d - 0.15)], it.c); else drawFurniture(g, it); g.restore(); }}); });
   R.pets.forEach(p => things.push({d: p.type === 'dj' ? -2.9 : p.type === 'window' ? -5 : p.x + p.y + (p.z > 30 ? 0.3 : 0), f: () => drawPet(g, p, k)}));
-  R.avatars.forEach(a => things.push({d: a.x + a.y, f: () => { const [sx, sy] = iso(a.x, a.y); drawAvatar(g, a, sx, sy, k * AVS); }}));
+  R.avatars.forEach(a => things.push({d: a.x + a.y, f: () => { const [sx, sy] = iso(a.x, a.y); drawRoomAv(g, a, sx, sy, k * AVS); }}));
   R.avatars.forEach(a => { if(!a.pet) return; const pe = eqOf(fixAv(a.av), 'pet'); if(!pe){ a.pet = null; return; } things.push({d: a.pet.x + a.pet.y, f: () => { const [px, py] = iso(a.pet.x, a.pet.y); drawPetItem(g, pe, px, py, k * AVS, R.t, a.name, a.pet.dir, a.pet.trick); }}); });
   if(isMyKey(R.key)) drawMyRoomExtras(things, g, k);
   things.sort((a, b) => a.d - b.d).forEach(th => th.f());
@@ -1007,6 +1037,7 @@ const ACTIONS = [
   {k: 'crouch', icon: '🧎', name: 'Crouch · move on 4 legs', def: {code: 'KeyC', label: 'C'}},
   {k: 'lie', icon: '🛌', name: 'Lie down · belly crawl', def: {code: 'KeyZ', label: 'Z'}},
   {k: 'gesture', icon: '🎲', name: 'Random move (' + GESTURES.length + ' kinds)', def: {code: 'KeyX', label: 'X'}},
+  {k: 'sig', icon: '🎭', name: 'My signature act (pick it in 🎒 Wardrobe)', def: {code: 'KeyR', label: 'R'}},   // as-2 🎭
   {k: 'swing', icon: '⚔️', name: 'Sword swing (10 kinds) · hold to throw', def: {code: 'KeyV', label: 'V'}},
   {k: 'push', icon: '🫸', name: 'Power Push', def: {code: 'KeyF', label: 'F'}},
   {k: 'use', icon: '✋', name: 'Use what you hold', def: {code: 'KeyB', label: 'B'}},
@@ -1804,7 +1835,7 @@ function renderMyColours(){
 }
 function renderWardrobe(){
   const eq = edAv.eq || (edAv.eq = {});
-  let h = '';
+  let h = sigWardrobe();   // as-2 🎭
   SLOT_INFO.forEach(([slot, icon, label]) => {
     const lines = items().lines.filter(l => l.slot === slot); if(!lines.length) return;
     if(slot === 'hand') h += '<div class="w-bat"><button class="btn soft" data-sound="pop" onclick="openBatstick()">🏏 Design my Batstick</button><small>shape · sticker · colours · pattern — the same stick in SlaBrall and Brawl</small></div>';   // bs-1
@@ -1824,6 +1855,8 @@ function renderWardrobe(){
   box.querySelectorAll('canvas.w-pv').forEach(c => paintWardTile(c, lineOf(c.dataset.pl), Number(c.dataset.pv)));
   $('ed-opts').querySelectorAll('[data-line]').forEach(b => b.onclick = () => { const l = lineOf(b.dataset.line); const cur = eq[l.slot]; eq[l.slot] = {id: l.id, v: Number(b.dataset.v), o: cur && cur.id === l.id ? cur.o : {}}; renderEditor(); });
   $('ed-opts').querySelectorAll('[data-off]').forEach(b => b.onclick = () => { delete eq[b.dataset.off]; renderEditor(); });
+  box.querySelectorAll('canvas.w-sg').forEach(c => paintSigTile(c, c.dataset.sig));
+  box.querySelectorAll('[data-sig]').forEach(b => { if(b.tagName === 'BUTTON') b.onclick = () => { edAv.sig = b.dataset.sig; edSigPlay = {k: b.dataset.sig, t0: performance.now()}; renderEditor(); }; });
   $('ed-opts').querySelectorAll('[data-part]').forEach(b => b.onclick = () => { const e = eq.hand; e.o = Object.assign({}, e.o, {[b.dataset.part]: Number(b.dataset.i)}); renderEditor(); });
 }
 // 🐾 Ride-ons: owned by Adventure miles (not in order — specials can come early), so the tiles use owned.rides.
@@ -1840,7 +1873,28 @@ function rideWardrobe(l, eq){
       : '<span class="w-step lock" title="🔒 ' + UI.esc(l.ways[v]) + '"><canvas class="w-pv" width="120" height="132" data-pl="' + l.id + '" data-pv="' + v + '"></canvas><i class="w-lk">🔒</i><span>' + r.icon + ' ' + r.miles + ' mi</span></span>').join('') + '</div>' +
     '<div class="w-next">' + (next ? 'Next: ' + UI.esc(l.ways[next.i]) : '⭐ All ' + l.rides.length + ' ride-ons unlocked!') + ' · miles come from every level you pass (+ stars), mini-game stages, Turbo km, Hopper rows and daily treasures</div></div>';
 }
-function drawPreview(){ drawPreviewCanvas($('ed-cv'), edAv, {name: S.me, owned: items().owned, pose: {eyes: 'happy'}}); }
+function drawPreview(){
+  const cv = $('ed-cv'), P = edSigPlay, el = P ? (performance.now() - P.t0) / 1000 : 9;
+  if(P && el < 3 && window.Acting){ try { const g = cv.getContext('2d'), who = {name: S.me, av: edAv, dir: 1}, f = Acting.fit(who, [P.k], cv.width, cv.height, {ride: 'keep', pad: 8}); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height); Acting.draw(g, who, f.x, f.y, f.k, P.k, {t: el, ride: 'keep'}); return; } catch(e){} }   // as-2 🎭 the big preview plays your signature act
+  drawPreviewCanvas(cv, edAv, {name: S.me, owned: items().owned, pose: {eyes: 'happy'}});
+}
+// as-2 🎭 Signature acts in 🎒 Wardrobe: 4 free + the 'sigact' line; the pick is saved with your look (avatar field sig)
+let edSigPlay = null; const SIG_TILES = new Map();
+function sigWardrobe(){
+  if(!window.Acting || !Acting.sigs) return '';
+  const l = lineOf('sigact'), have = l ? ownedOf('sigact') : 0, cur = Acting.sig(edAv), list = Acting.sigs(have);
+  const isNew = l && have > ((items().seen || {}).sigact || 0);
+  return '<div class="w-slot w-sigs"><b>🎭 My signature act <small class="w-sig-sub">plays on your 👋 tile, in the Family Room (🎭 / R) and when you win</small>' + (isNew ? ' <span class="dotnew">✨ New</span>' : '') + '</b><div class="w-line"><div class="w-steps">' +
+    list.map(o => o.own ? '<button class="w-step' + (o.k === cur ? ' on' : '') + '" data-sound="pop" data-sig="' + o.k + '" title="' + UI.esc(o.n) + '"><canvas class="w-pv w-sg" width="120" height="132" data-sig="' + o.k + '"></canvas><span>' + UI.esc(o.n) + '</span></button>'
+      : '<span class="w-step lock" title="🔒 ' + UI.esc(l ? l.ways[o.step] : '') + '"><canvas class="w-pv w-sg" width="120" height="132" data-sig="' + o.k + '"></canvas><i class="w-lk">🔒</i><span>' + UI.esc(o.n) + '</span></span>').join('') + '</div>' +
+    (l ? (have < l.steps.length ? '<div class="w-next">Next: ' + UI.esc(l.ways[have]) + '</div>' : '<div class="w-next done">⭐ All ' + l.steps.length + ' signature acts unlocked!</div>') : '') + '</div></div>';
+}
+function paintSigTile(c, k){
+  const key = k + '|' + JSON.stringify(edAv); let src = SIG_TILES.get(key);
+  if(!src){ if(SIG_TILES.size > 200) SIG_TILES.clear(); src = document.createElement('canvas'); src.width = c.width; src.height = c.height;
+    try { const who = {name: '', av: edAv, dir: 1}, f = Acting.fit(who, [k], c.width, c.height, {ride: 'keep'}); Acting.draw(src.getContext('2d'), who, f.x, f.y, f.k, k, {t: 0.45, ride: 'keep'}); } catch(e){} SIG_TILES.set(key, src); }
+  const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); g.drawImage(src, 0, 0);
+}
 // Saving your look feels instant: the room shows the new look at once and a small 💾 chip saves it in the
 // background (Apps Script can take a few seconds). If the save fails, the old look comes back.
 function saveEditor(btn){
@@ -2047,4 +2101,4 @@ boot();
 </body>
 </html>
 
-<!-- (11r+af-4) END OF Room.html -->
+<!-- (11r+af-4+as-2) END OF Room.html -->

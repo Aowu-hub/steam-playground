@@ -655,6 +655,27 @@ function paintBody(cv, name){
   try { drawPreviewCanvas(cv, avatarOf(name), {name: '', t: 1.2, pose: {eyes: 'happy'}}); }
   catch(e){ paintFace(cv, name); }
 }
+// as-2 🎭 the 👋 tiles come alive: every few seconds one player does an act (their own 🎭 signature act or a shared idle / happy one)
+let TILE_ACT_T = 0, TILE_ACT_RAF = 0;
+function startTileActs(){
+  clearTimeout(TILE_ACT_T); cancelAnimationFrame(TILE_ACT_RAF);
+  if(!window.Acting || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+  const next = () => { TILE_ACT_T = setTimeout(playTileAct, 3800 + Math.random() * 2600); };
+  const playTileAct = () => {
+    const tiles = Array.from(document.querySelectorAll('.player-tile')).filter(t => t.querySelector('.avatar canvas') && t.offsetParent);
+    if(document.hidden || !tiles.length){ next(); return; }
+    const tile = tiles[Math.floor(Math.random() * tiles.length)], cv = tile.querySelector('.avatar canvas'), name = tile.querySelector('.pname').textContent;
+    const av = avatarOf(name), k = Math.random() < 0.45 ? Acting.sig(av) : Acting.pick(Math.random() < 0.5 ? 'happy' : 'idle', {who: name}), who = {name: '', av, dir: 1};
+    let f; try { f = Acting.fit(who, [k], cv.width, cv.height, {ride: 'keep', pad: 6}); } catch(e){ next(); return; }
+    const g = cv.getContext('2d'), t0 = performance.now();
+    const step = now => { const t = (now - t0) / 1000; if(!cv.isConnected){ next(); return; }
+      if(t > 2.6){ paintBody(cv, name); next(); return; }
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height); try { Acting.draw(g, who, f.x, f.y, f.k, k, {t, ride: 'keep'}); } catch(e){ paintBody(cv, name); next(); return; }
+      TILE_ACT_RAF = requestAnimationFrame(step); };
+    TILE_ACT_RAF = requestAnimationFrame(step);
+  };
+  next();
+}
 function paintFace(cv, name){
   if(!cv) return; const g = cv.getContext('2d'), w = cv.width, k = w / 62;
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, w, w);
@@ -794,6 +815,7 @@ function renderPlayers(){
     tile.onclick = () => { selectedPlayer = p.Name; try { localStorage.setItem('sp_seen:' + p.Name, String(Date.now())); } catch(e){} showLook(); showTitle(); renderPlayers(); updatePlayCta(); };
     grid.appendChild(tile); paintBody(tile.querySelector('.avatar canvas'), p.Name);
   });
+  startTileActs();   // as-2 🎭
   const add = document.createElement('button');
   add.className = 'add-player-tile t-chip';
   add.setAttribute('data-sound', 'pop');
@@ -955,9 +977,17 @@ let lastRecentKey = '';
 /* ---------- 📣 WHAT'S NEW: new games, Extreme / Hardcore records, games to try ---------- */
 let newsShown = false;
 function newsKey(n){ return n.kind + ':' + (n.id || '') + ':' + (n.level == null ? '' : n.level) + ':' + (n.at || '') + ':' + (n.player || '') + ':' + [n.step, n.count, n.days, n.leader, n.chaser, n.players && n.players.join('+')].filter(v => v != null).join(','); }
-function newsTag(k){ return {mode: '🎯 TRY A MODE', modenew: '🆕 NEW MODE', new: '🆕 NEW', record: '🏆 RECORD', try: '💡 TRY IT', milestone: '🏁 MILESTONE', close: '⚔️ CLOSE CALL', jam: '🚦 JAM', mail: '📬 MAIL', birthday: '🎂 BIRTHDAY'}[k] || '📣'; }
+// as-2 🎭 one card when acts were added to the shared kit in the last 7 days (any chat's 🎭 block with a date)
+function actCards(){
+  if(!window.Acting || !Acting.shared) return [];
+  const week = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10), L = Acting.shared({since: week}); if(!L.length) return [];
+  const names = L.slice(0, 4).map(o => (Acting.SIG.names || {})[o.k] || o.k.replace(/^[a-z0-9]+\./, '').replace(/-/g, ' '));
+  return [{kind: 'acts', id: 'collection', at: L[0].added, count: L.length, names, icon: '🎭', route: 'collection'}];
+}
+function newsTag(k){ if(k === 'acts') return '🎭 NEW ACTS'; return {mode: '🎯 TRY A MODE', modenew: '🆕 NEW MODE', new: '🆕 NEW', record: '🏆 RECORD', try: '💡 TRY IT', milestone: '🏁 MILESTONE', close: '⚔️ CLOSE CALL', jam: '🚦 JAM', mail: '📬 MAIL', birthday: '🎂 BIRTHDAY'}[k] || '📣'; }
 function newsRes(n, v){ return n.byScore ? Number(v).toLocaleString() + ' pts' : '⏱ ' + fmtSec(v || 0); }
 function newsBody(n){
+  if(n.kind === 'acts') return '<b>' + n.count + ' new avatar act' + (n.count > 1 ? 's' : '') + ' to try!</b><small>' + UI.esc(n.names.join(' · ')) + (n.count > n.names.length ? ' …' : '') + ' — see them in 📖 Collection → 🎭 Acts shelf, pick one as your 🎭 signature act in 🎒 Wardrobe</small>';   // as-2 🎭
   const lv = n.level === 5 ? '💀 Hardcore' : '🌋 Extreme', res = n.byScore ? Number(n.score).toLocaleString() + ' pts' : n.timeSec ? '⏱ ' + fmtSec(n.timeSec) : '⭐'.repeat(n.stars || 0);
   const prev = n.prev ? (n.byScore ? Number(n.prev.score).toLocaleString() + ' pts' : '⏱ ' + fmtSec(n.prev.timeSec || 0)) : '';
   const lvName = LEVEL_NAMES[n.level] || '';
@@ -1004,8 +1034,8 @@ function refreshModeNews(){
 }
 function renderNews(list){
   const panel = document.getElementById('news-panel'), box = document.getElementById('news-list');
-  const order = {birthday: 0, mail: 1, record: 2, milestone: 3, close: 4, jam: 5, new: 6, modenew: 6.5, try: 7, mode: 7.5};
-  list = list.concat(modeCards(list));   // ✨ modes-2: 🎯 Try a mode (2 a day) + 🆕 new modes
+  const order = {birthday: 0, mail: 1, record: 2, milestone: 3, close: 4, jam: 5, new: 6, modenew: 6.5, acts: 6.8, try: 7, mode: 7.5};
+  list = list.concat(modeCards(list)).concat(actCards());   // as-2 🎭 new shared acts (7 days)   // ✨ modes-2: 🎯 Try a mode (2 a day) + 🆕 new modes
   list = list.filter(n => order[n.kind] != null).sort((a, b) => (order[a.kind] - order[b.kind]) || ((a.days || 0) - (b.days || 0)));
   const today = list.filter(n => n.kind === 'birthday' && n.days === 0);
   renderBirthday(today);
@@ -1127,4 +1157,4 @@ loadDashboard();
 </script>
 </body>
 </html>
-<!-- (r24+emoji+news-1+ebr-4+wd-5+modes-2+af-4+ws-5) END OF Landing.html -->
+<!-- (r24+emoji+news-1+ebr-4+wd-5+modes-2+af-4+ws-5+as-2) END OF Landing.html -->
