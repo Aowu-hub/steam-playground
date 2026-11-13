@@ -688,6 +688,7 @@ const MODES_ = [
   { game: 'pyraspike', id: 'strikesolo', icon: '🦶', name: 'PyraStrike 1v1', pitch: 'Sepak takraw — feet only, all 3 touches yours!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🦶 Strike 1v1', feat: [['pyraspike', 'm_strikesolo']] } },
   { game: 'pyraspike', id: 'strikeduo', icon: '🦵', name: 'PyraStrike Duo 2v2', pitch: 'Trap, head it, ROLL SPIKE!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🦵 Strike Duo 2v2', feat: [['pyraspike', 'm_strikeduo']] } },
   { game: 'pyraspike', id: 'strikeregu', icon: '🧶', name: 'PyraStrike Regu 3v3', pitch: 'Team takraw — bicycle kicks!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🧶 Strike Regu 3v3', feat: [['pyraspike', 'm_strikeregu']] } },
+  { game: 'pyraspike', id: 'hoop', icon: '⭕', name: 'Hoop Takraw', pitch: 'Kick it through the hanging hoop!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '⭕ Hoop Takraw', feat: [['pyraspike', 'm_hoop']] } },
   { game: 'pokadif', id: 'spot', icon: '🖼️', name: 'Find the Difference', pitch: 'Two pictures — poke every change!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '🖼️ Spot' } },
   { game: 'sciencetory', id: 'mechanic', icon: '⚙️', name: 'Sciencetory Mechanic', pitch: 'Test your crafted things!', route: 'sciencetory', added: '2026-11-14', tried: { board: 'sciencetory', themeStart: '⚙️ Mechanic' } },
   { game: 'sla-brall', id: 'slashot', icon: '🏒', name: 'SlaShot', pitch: 'Table hockey — score goals!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaShot ·', feat: [['sla-brall', 'win_slashot']] } },
@@ -733,7 +734,7 @@ const MODE_GROUPS_ = {
   'alignext': [{k: 'drop', icon: '🔴', en: 'Drop', th: 'หยอดเหรียญ', modes: ['drop']}, {k: 'omni', icon: '❌⭕', en: 'Omnifile', th: 'วางได้ทุกช่อง', modes: ['omni', 'stack']}],
   'beat-corner': [{k: 'songs', icon: '🎤', en: 'Songs', th: 'เพลง', modes: ['corner']}, {k: 'inst', icon: '🎹', en: 'Instruments', th: 'เครื่องดนตรี', modes: ['piano', 'drums']}, {k: 'together', icon: '🎸', en: 'Together', th: 'เล่นด้วยกัน', modes: ['band']}, {k: 'make', icon: '✏️', en: 'Make', th: 'แต่งเพลง', modes: ['maker']}],
   'eyes-brain': [{k: 'remember', icon: '🔢', en: 'Ways to remember', th: 'วิธีจำ', modes: ['classic', 'backwards', 'colour', 'letters', 'listen', 'word', 'shapes']}, {k: 'challenge', icon: '🏔️', en: 'Challenge', th: 'ท้าทาย', modes: ['challenge', 'daily']}, {k: 'party', icon: '👥', en: 'Party', th: 'เล่นกันหลายคน', modes: ['chain']}],
-  'pyraspike': [{k: 'spike', icon: '🏐', en: 'PyraSpike', th: 'วอลเลย์บอล', modes: ['beach', 'small', 'full']}, {k: 'strike', icon: '🦶', en: 'PyraStrike', th: 'ตะกร้อ', modes: ['strikesolo', 'strikeduo', 'strikeregu']}],   // 🔥 pd-2b (R3 adds ⚡ PyraSpark)
+  'pyraspike': [{k: 'spike', icon: '🏐', en: 'PyraSpike', th: 'วอลเลย์บอล', modes: ['beach', 'small', 'full']}, {k: 'strike', icon: '🦶', en: 'PyraStrike', th: 'ตะกร้อ', modes: ['strikesolo', 'strikeduo', 'strikeregu', 'hoop']}],   // 🔥 pd-2c (R3 adds ⚡ PyraSpark)
   'sla-brall': [{k: 'sports', icon: '🏓', en: 'Sports', th: 'กีฬา', modes: ['slashot', 'slapoof', 'slaball', 'slapong', 'slabam', 'slawall']}, {k: 'cup', icon: '🏆', en: 'Cup', th: 'ทัวร์นาเมนต์', modes: ['cup']}, {k: 'link', icon: '📡', en: 'Own devices', th: 'เล่นหลายเครื่อง', modes: ['lhost', 'ljoin']}],   // 📡 p3a: lk-1b's 🔗 Join friends
   'blasoff': [{k: 'match', icon: '⚽', en: 'Matches', th: 'แข่งฟุตบอล', modes: ['fours', 'sevens']}],   // ⚽ bo-1
   'brawl-buddies': [{k: 'battle', icon: '🥊', en: 'Battle', th: 'ต่อสู้', modes: ['battle']}, {k: 'adv', icon: '🗺️', en: 'Brawenture', th: 'ผจญภัย', modes: ['brawenture']}],
@@ -4521,7 +4522,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */

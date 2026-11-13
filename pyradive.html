@@ -131,6 +131,7 @@
   .banner.on ~ .goal-line{top:52px;}
   .big-word{position:absolute;left:50%;top:36%;z-index:25;transform:translate(-50%,-50%);pointer-events:none;font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(1.6rem,7vw,3.4rem);color:#fff;
     text-shadow:0 4px 0 rgba(0,0,0,0.35),0 0 18px rgba(255,107,26,0.8);white-space:nowrap;animation:bw-in 1s cubic-bezier(.2,1.6,.4,1) both;will-change:transform,opacity;}
+  .hoop-skip{position:absolute;left:50%;top:54px;transform:translateX(-50%);z-index:20;}   /* ⭕ skip the robots' turn */
   .big-word small{display:block;font-size:.42em;letter-spacing:.06em;text-align:center;opacity:.9;}
   /* 🔥🔥 Spirit Dive comic panel (pd-2a) — transform / opacity animation only */
   .spirit-card{position:absolute;left:50%;top:40%;z-index:26;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:.1rem;padding:clamp(.3rem,1.2vh,.55rem) clamp(.8rem,2.4vw,1.4rem) clamp(.35rem,1.4vh,.7rem);
@@ -317,11 +318,15 @@ var PD = (function () {
     roles: [['drive', 'dink'], ['dunk']], base: function (L, W) { return [[L * 0.62, -0.18 * W], [1.6, 0.2 * W]]; } };
   MODES.strikeregu = { id: 'strikeregu', sport: 'strike', name: 'Strike Regu 3v3', icon: '🧶', n: 3, L: 6.7, W: 6.1, net: 1.52,
     roles: [['drive'], ['dink'], ['dunk']], base: function (L, W) { return [[L * 0.66, 0], [1.4, 0.26 * W], [1.4, -0.26 * W]]; } };
-  var MODE_ORDER = ['beach', 'small', 'full', 'strikesolo', 'strikeduo', 'strikeregu'];
+  /* ⭕ Hoop takraw (pd-2c, ตะกร้อลอดห่วง): your team stands in a circle under a hanging hoop and keeps the ball up with feet, knees and
+     head — kick it THROUGH the hoop for points (harder moves score more). Each team gets a timed turn; most points wins. */
+  MODES.hoop = { id: 'hoop', sport: 'hoop', name: 'Hoop Takraw', icon: '⭕', n: 3, L: 3.4, W: 6.4, net: 0,
+    roles: [['dunk'], ['dink'], ['drive']], base: function () { return [[0, 0], [0, 0], [0, 0]]; } };
+  var MODE_ORDER = ['beach', 'small', 'full', 'strikesolo', 'strikeduo', 'strikeregu', 'hoop'];
   // takraw names for the same moves (auto body part by height): dig = 🦶 toe save · bump = 🦵 thigh trap · set = 🙆 head set · dink = 🦶 heel tip · dunk = 🌀 roll spike / 🚲 bicycle · block = 🧱 back block · serve = 🦶 kick serve
   var STRIKE_NAME = { drive: 'Kick Serve', bump: 'Trap', dig: 'Toe Save', dive: 'Dive', set: 'Head Set', dink: 'Heel Tip', dunk: 'Roll Spike', bicycle: 'Bicycle', block: 'Back Block', pinch: 'Tip Serve', jumpserve: 'Power Kick' };
   var STRIKE_PART = { dig: 'foot', bump: 'thigh', dive: 'foot', set: 'head', dink: 'heel', dunk: 'foot', drive: 'foot', block: 'back' };
-  function isStrike(M) { return M.sp.sport === 'strike'; }
+  function isStrike(M) { return M.sp.sport === 'strike' || M.sp.sport === 'hoop'; }   // ⭕ hoop takraw is takraw too (feet, poses, ball)
   function actName(M, act) { return (isStrike(M) ? STRIKE_NAME[act] : null) || ACT_NAME[act] || act; }
   var ROLE_ICON = { drive: '🚀', dink: '🪶', dunk: '💥' };
   var ROLE_NAME = { drive: 'Drive', dink: 'Dink', dunk: 'Dunk' };
@@ -424,7 +429,7 @@ var PD = (function () {
         M.players.push(p); M.teams[t].slots[s] = p.id;
       }
     }
-    startServe(M, 0);
+    if (sp.sport === 'hoop') hoopInit(M); else startServe(M, 0);
     return M;
   }
   function rank(roles) { return roles.indexOf('dunk') >= 0 ? 0 : roles.indexOf('dink') >= 0 ? 1 : 2; }
@@ -736,6 +741,7 @@ var PD = (function () {
       else ev(M, 'pyraLow', { p: p.id, meter: Math.round(p.meter) });
       return true;
     }
+    if (M.sp.sport === 'hoop') return hoopPress(M, p, key);
     if (M.phase === 'serve') {
       if (M.ball.held !== p.id || p.jumpServe || p.feed || (key !== 'drive' && key !== 'touch' && key !== 'jump' && key !== 'dink')) return false;
       if (isStrike(M)) return feedServe(M, p, key === 'jump' ? 0.85 : M.lv.assist.autoPower ? 0.6 : 0.72, key === 'dink' ? 'pinch' : key === 'jump' ? 'jump' : 'kick');
@@ -854,6 +860,7 @@ var PD = (function () {
 
   // ---------- one tick ----------
   function tick(M, dt) {
+    if (M.sp.sport === 'hoop') return hoopTick(M, dt);
     M.t += dt; M.phaseT += dt;
     var b = M.ball, lv = M.lv;
     // players
@@ -978,6 +985,7 @@ var PD = (function () {
 
   // ---------- step (page calls this every frame) ----------
   function step(M, realDt) {
+    if (M.sp.sport === 'hoop') return hoopStep(M, realDt);
     realDt = Math.min(realDt, 0.1); M.realT += realDt;
     if (M.phase === 'over') return;
     var g = guideFor(M), lv = M.lv; M.guide = g;
@@ -994,6 +1002,175 @@ var PD = (function () {
   }
   function takeEvents(M) { var e = M.events; M.events = []; return e; }
 
+  // ===================== ⭕ HOOP TAKRAW engine (pd-2c) =====================
+  var HOOP_Z = 3.0, HOOP_R = 0.4, RING = 2.1, HOOP_T = [75, 70, 60, 60, 50, 45], FEED_UP = 0.7;
+  var HOOP_PTS = { foot: 2, knee: 3, head: 4, heel: 5, bicycle: 8 }, HOOP_NAME = { foot: 'Inside Kick', knee: 'Knee', head: 'Header', heel: 'Back Heel', bicycle: 'Bicycle' };
+  var HOOP_ERR = { foot: 0.8, knee: 0.95, head: 1.05, heel: 1.5, bicycle: 1.3 };
+  function hoopActive(M) { return teamOf(M, M.turn); }
+  function hoopHome(M, p) {   // a seat on the circle (the turn team) or a bench at the side (the other team)
+    var mates = teamOf(M, p.team), i = mates.indexOf(p), n = mates.length;
+    if (p.team !== M.turn) return { x: (RING + 1.6 + i * 1.0) * (p.team === 0 ? -1 : 1), y: -RING - 0.9 + i * 0.5 };   // the bench: a row behind the circle
+    var a = Math.PI / 2 + (i - (n - 1) / 2) * (2 * Math.PI / Math.max(3, n)) * (n < 3 ? 1.6 : 1);   // a person starts nearest the camera
+    return { x: Math.cos(a) * RING, y: Math.sin(a) * RING };
+  }
+  function hoopInit(M) {
+    M.turn = 0; M.serveTeam = 0; M.side = 0; M.timeLeft = HOOP_T[M.level]; M.hoops = [0, 0]; M.drops = [0, 0]; M.combo = 0; M.shot = null; M.target = 0; M.setsTo = 1;
+    M.players.forEach(function (p) { var h = hoopHome(M, p); p.x = h.x; p.y = h.y; p.st.hoops = 0; p.st.hoopPts = 0; p.st.passes = 0; p.dir = p.x > 0 ? -1 : 1; });
+    ev(M, 'hoopTurn', { team: 0, time: M.timeLeft });
+    hoopToss(M, teamOf(M, 0).filter(isPerson)[0] || teamOf(M, 0)[0]);
+  }
+  function hoopToss(M, p) {   // a self-toss to start (and after the ball touched the floor)
+    var b = M.ball; M.phase = 'serve'; M.phaseT = 0; b.held = p.id; b.pyra = null; b.spirit = null; b.vx = b.vy = b.vz = 0; b.trail = [];
+    M.shot = null; M.lastP = null; M.lastTeam = null; M.n = 0; M.recv = [null, null]; M.recv[M.turn] = p.id; M.tosser = p.id;
+    b.x = p.x * 0.85; b.y = p.y * 0.85; b.z = 1.0;
+  }
+  function hoopLaunch(M) {
+    var b = M.ball, p = byId(M, b.held); b.held = null; M.phase = 'rally'; M.phaseT = 0;
+    lob(M, b, p.x * 0.88, p.y * 0.88, 1.15, 2.7); b.hitT = M.t; M.recv[M.turn] = p.id; M.assignT = M.t;
+    ev(M, 'serveToss', { p: p.id, team: p.team, kind: 'hoop' });
+  }
+  function hoopNext(M, p) {   // the teammate a pass goes to: the stick picks the side, robots prefer a person
+    var mates = hoopActive(M).filter(function (q) { return q.id !== p.id; }); if (!mates.length) return p;
+    if (isPerson(p) && hyp(p.input.x, p.input.y) > 0.3) { mates.sort(function (a, c) { return ((a.x - p.x) * p.input.x + (a.y - p.y) * p.input.y < (c.x - p.x) * p.input.x + (c.y - p.y) * p.input.y) ? 1 : -1; }); return mates[0]; }
+    var person = mates.filter(isPerson)[0]; if (person && (M.lv.assist.setToYou || M.rnd() < 0.6)) return person;
+    return mates[Math.floor(M.rnd() * mates.length)];
+  }
+  function hoopStyle(M, p, key) { var hz = M.ball.z - p.z; return key === 'dink' ? 'heel' : key === 'drive' && p.z > 0.3 && hz > 1.4 ? 'bicycle' : hz < 0.8 ? 'foot' : hz < 1.5 ? 'knee' : 'head'; }
+  function hoopReach(M, p) { var b = M.ball, hz = b.z - p.z; return hyp(b.x - p.x, b.y - p.y) <= 0.95 * (isPerson(p) ? M.lv.assist.reach : 1.15) && hz >= 0.25 && hz <= 2.5 && b.vz < 1.5; }
+  function hoopTouch(M, p, key) {
+    var b = M.ball, T = p.team, style = hoopStyle(M, p, key), person = isPerson(p);
+    if (M.lastP === p.id && M.t - b.hitT < 0.3) return null;
+    var q = clamp(1 - hyp(b.x - p.x, b.y - p.y) / 1.2, 0, 1);
+    p.act = key === 'touch' ? (style === 'head' ? 'set' : style === 'foot' ? 'dig' : 'bump') : style === 'heel' ? 'dink' : 'dunk'; p.actT = 0; p.style = style === 'bicycle' ? 'bicycle' : null; p.want = null; p.st.touches++;
+    b.hitT = M.t; M.lastP = p.id; M.lastTeam = T; M.n = Math.min(3, M.n + 1); M.combo++; M.rally++; M.rallyMax = Math.max(M.rallyMax, M.rally);
+    if (key === 'touch') {
+      var to = hoopNext(M, p), e = (person ? 0.3 : M.lv.bot.err * 0.5) * (1.1 - q);
+      lob(M, b, to.x * 0.9 + (M.rnd() * 2 - 1) * e, to.y * 0.9 + (M.rnd() * 2 - 1) * e, 1.2, 3.2 + M.rnd() * 0.5);
+      M.recv[T] = to.id; M.assignT = M.t; M.shot = null; p.st.passes++; fill(M, p, FILL.set);
+      ev(M, 'hpass', { p: p.id, team: T, to: to.id, part: STRIKE_PART[p.act] || 'foot', style: style, name: HOOP_NAME[style], combo: M.combo });
+      return 'pass';
+    }
+    // a shot at the hoop: Spirit (full flame) always goes in, Pyra (half) nearly always
+    var spirit = spiritGo(M, p, 'dunk'), pyra = !!spirit;
+    if (!spirit && p.pyraArm && p.meter >= PYRA_COST && !p.spiritArm) { pyra = true; p.meter -= PYRA_COST; p.pyraArm = false; p.st.pyras++; }
+    var err = (person ? 0.52 + 0.06 * M.level : 0.14 + M.lv.bot.err * 0.3) * (1.2 - 0.5 * q) * HOOP_ERR[style] * (spirit ? 0 : pyra ? 0.2 : 1);
+    var ang = M.rnd() * Math.PI * 2, r = err * Math.sqrt(M.rnd());
+    lob(M, b, Math.cos(ang) * r, Math.sin(ang) * r, HOOP_Z, HOOP_Z + 0.8 + (style === 'head' ? 0.2 : 0));
+    var pts = HOOP_PTS[style] * (spirit ? 3 : pyra ? 2 : 1);
+    M.shot = { p: p.id, team: T, style: style, pts: pts, pyra: pyra, spirit: spirit ? spirit.k : null };
+    b.pyra = pyra ? 'dunk' : null; b.spirit = spirit ? spirit.k : null; b.spiritSlot = spirit ? 'dunk' : null;
+    M.recv = [null, null];
+    ev(M, 'hshot', { p: p.id, team: T, style: style, part: STRIKE_PART[p.act] || 'foot', name: HOOP_NAME[style], pts: pts, pyra: pyra });
+    if (pyra && !spirit) ev(M, 'pyra', { p: p.id, team: T, act: 'hoop', name: 'Pyra…' + HOOP_NAME[style] });
+    return 'shot';
+  }
+  function hoopPress(M, p, key) {
+    if (M.phase === 'over' || p.team !== M.turn) return false;
+    if (key === 'jump') { if (p.z > 0 || M.phase !== 'rally') return false; p.vz = JUMPV; ev(M, 'jump', { p: p.id }); return true; }
+    if (key === 'dive') { if (M.phase !== 'rally' || p.z > 0) return false; p.lunge = 0.3; p.want = { key: 'touch', t: 0.5 }; ev(M, 'diveGo', { p: p.id }); return true; }   // 🤸 a quick lunge to the ball
+    if (key !== 'touch' && key !== 'drive' && key !== 'dink') return false;
+    if (M.phase === 'serve') { if (M.ball.held === p.id && M.phaseT > 0.2) { hoopLaunch(M); return true; } return false; }
+    if (M.phase !== 'rally') return false;
+    p.want = { key: key, t: 0.42 }; return true;
+  }
+  function hoopEndTurn(M) {
+    var T = M.turn; ev(M, 'hoopTurnEnd', { team: T, score: M.teams[T].score, hoops: M.hoops[T] });
+    if (T === 0) {
+      M.turn = 1; M.serveTeam = 1; M.side = 1; M.timeLeft = HOOP_T[M.level]; M.combo = 0; M.phase = 'switch'; M.phaseT = 0; M.ball.held = null; M.ball.vx = M.ball.vy = 0;
+      M.players.forEach(function (p) { p.want = null; });
+      return;
+    }
+    var s0 = M.teams[0].score, s1 = M.teams[1].score, w = s0 > s1 ? 0 : s1 > s0 ? 1 : M.hoops[0] >= M.hoops[1] ? 0 : 1;
+    M.winner = w; M.over = true; M.teams[w].sets = 1;
+    ev(M, 'setWon', { team: w, sets: [M.teams[0].sets, M.teams[1].sets], score: [s0, s1] });
+    ev(M, 'match', { winner: w, sets: [M.teams[0].sets, M.teams[1].sets], score: [s0, s1] });
+    M.phase = 'over';
+  }
+  function hoopTick(M, dt) {
+    var b = M.ball, lv = M.lv, T = M.turn; M.t += dt; M.phaseT += dt;
+    if (M.phase === 'over') return;
+    if (M.phase === 'rally' || M.phase === 'serve') { M.timeLeft -= dt; if (M.timeLeft <= 0 && !M.shot) { M.timeLeft = 0; hoopEndTurn(M); return; } }
+    if (M.phase === 'switch') { if (M.phaseT > 2.4) { ev(M, 'hoopTurn', { team: M.turn, time: M.timeLeft }); hoopToss(M, teamOf(M, M.turn).filter(isPerson)[0] || teamOf(M, M.turn)[0]); } }
+    // people + robots move: the receiver runs under the ball, the others go back to their seat
+    var land = M.phase === 'rally' ? predict(M, 1.15).at : null;
+    M.players.forEach(function (p) {
+      var h = hoopHome(M, p), tx = h.x, ty = h.y, sp = 3.4 * Math.max(0.85, lv.spd);
+      if (p.team === M.turn && M.phase === 'rally' && M.recv[p.team] === p.id && land) { tx = land.x; ty = land.y; var d0 = hyp(tx, ty); if (d0 > RING + 0.6) { tx *= (RING + 0.6) / d0; ty *= (RING + 0.6) / d0; } if (d0 < RING - 1.4) { var k0 = (RING - 1.4) / Math.max(0.01, d0); tx *= k0; ty *= k0; } }
+      var person = isPerson(p), vx = 0, vy = 0;
+      if (person && hyp(p.input.x, p.input.y) > 0.15) { vx = p.input.x * sp; vy = p.input.y * sp; }
+      else if (!person || lv.assist.autoMove || p.team !== M.turn || M.recv[p.team] !== p.id) { var dx = tx - p.x, dy = ty - p.y, d = hyp(dx, dy); if (d > 0.06) { var v = Math.min(sp * (person ? Math.max(0.5, lv.assist.autoMove) : lv.bot.move / 3.4 + 0.2), d / dt); vx = dx / d * v; vy = dy / d * v; } }
+      if (p.lunge > 0) { p.lunge -= dt; var lx = b.x - p.x, ly = b.y - p.y, ld = hyp(lx, ly) || 1; vx = lx / ld * 6; vy = ly / ld * 6; }
+      if (p.z > 0) { vx *= 0.4; vy *= 0.4; }
+      p.x += vx * dt; p.y += vy * dt; p.vx = vx; p.vy = vy;
+      var mv = hyp(vx, vy); p.walkT = mv > 0.4 && p.z === 0 ? p.walkT + dt * Math.min(1.6, mv / 3) : 0;
+      if (Math.abs(vx) > 0.3) p.dir = vx > 0 ? 1 : -1; else if (p.team === M.turn) p.dir = p.x > 0 ? -1 : 1;
+      if (p.z > 0 || p.vz > 0) { p.vz -= PGRAV * dt; p.z += p.vz * dt; if (p.z <= 0) { p.z = 0; p.vz = 0; p.land = 0.12; } }
+      if (p.land > 0) p.land -= dt; if (p.act) p.actT += dt; if (p.want) { p.want.t -= dt; if (p.want.t <= 0) p.want = null; }
+      if (p.gest) { p.gest.t += dt; if (p.gest.t > 1.6) p.gest = null; }
+    });
+    if (M.phase === 'serve') { var tp = byId(M, b.held); if (tp) { b.x = tp.x * 0.85; b.y = tp.y * 0.85; b.z = 1.0; if (M.phaseT > FEED_UP && !isPerson(tp)) hoopLaunch(M); else if (M.phaseT > 2.5) hoopLaunch(M); } return; }
+    if (M.phase === 'reset') { if (M.phaseT > 0.9) { var nx = byId(M, M.nextTosser) || hoopActive(M)[0]; hoopToss(M, nx); } return; }
+    if (M.phase !== 'rally') return;
+    // touches: people when they pressed, robots on their own (react time · a whiff now and then)
+    hoopActive(M).forEach(function (p) {
+      if (M.phase !== 'rally' || !hoopReach(M, p) || M.lastP === p.id && M.t - b.hitT < 0.3) return;
+      if (isPerson(p)) { if (p.want) hoopTouch(M, p, p.want.key); return; }
+      if (M.recv[T] !== p.id || M.t - M.assignT < lv.bot.react) return;
+      if (b.z - p.z > 2.0 && p.z === 0 && M.rnd() < 0.05 * (1 + lv.bot.smart)) { p.vz = JUMPV; return; }   // jump for a bicycle now and then
+      if (p.missFor !== M.rally) { p.missFor = M.rally; p.willMiss = M.rnd() < lv.bot.miss * 0.6; }
+      if (p.willMiss) return;
+      var shoot = M.combo >= 2 && M.rnd() < 0.35 + 0.25 * lv.bot.smart;
+      if (shoot && p.meter >= PYRA_COST && M.rnd() < 0.4) { p.pyraArm = true; p.spiritArm = p.meter >= SPIRIT_COST && M.level >= 1; }
+      hoopTouch(M, p, shoot ? (p.z > 0.3 ? 'drive' : M.rnd() < 0.15 * lv.bot.smart ? 'dink' : 'drive') : 'touch');
+    });
+    // ball flight + the hoop
+    var pz = b.z, px = b.x, py = b.y, g = ballG(M);
+    b.vz -= g * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+    b.trail.push({ x: b.x, y: b.y, z: b.z }); if (b.trail.length > 14) b.trail.shift();
+    if (pz >= HOOP_Z && b.z < HOOP_Z) {
+      var d = hyp(b.x, b.y);
+      if (d < HOOP_R - BALL_R * 0.5 && M.shot) {   // ⭕ through the hoop!
+        var sh = M.shot, sp2 = byId(M, sh.p); M.teams[sh.team].score += sh.pts; M.hoops[sh.team]++; sp2.st.hoops++; sp2.st.hoopPts += sh.pts; fill(M, sp2, FILL.kill);
+        ev(M, 'hoop', { p: sh.p, team: sh.team, style: sh.style, pts: sh.pts, name: HOOP_NAME[sh.style], pyra: sh.pyra, spirit: sh.spirit, score: M.teams[sh.team].score });
+        teamOf(M, sh.team).forEach(function (q) { if (q.id !== sh.p) fill(M, q, FILL.assist * 0.5); });
+        sh.scored = true;
+      } else if (d < HOOP_R + BALL_R * 1.5) {   // 😮 the rim
+        var nx2 = b.x / (d || 1), ny2 = b.y / (d || 1); b.vx = nx2 * 1.6 + b.vx * 0.2; b.vy = ny2 * 1.6 + b.vy * 0.2; b.vz = Math.abs(b.vz) * 0.25; b.z = HOOP_Z + 0.01;
+        ev(M, 'rim', { p: M.shot ? M.shot.p : M.lastP, team: T });
+        if (M.shot) { M.shot.rim = true; }
+        var catcher = hoopActive(M).slice().sort(function (a, c) { return hyp(a.x - b.x * 3, a.y - b.y * 3) - hyp(c.x - b.x * 3, c.y - b.y * 3); })[0]; if (catcher) { M.recv[T] = catcher.id; M.assignT = M.t; }
+      }
+    }
+    if (b.z <= BALL_R) {   // the floor: after a shot = a fresh toss, else a drop (the combo breaks)
+      b.z = BALL_R; b.vx = b.vy = b.vz = 0;
+      var shot = M.shot, last = byId(M, M.lastP);
+      if (!(shot && (shot.scored || !shot.rim)) || !shot) { M.drops[T]++; ev(M, 'drop', { team: T, p: M.lastP }); }
+      else if (!shot.scored) ev(M, 'miss', { p: shot.p, team: T });
+      M.combo = 0; M.rally = 0; M.shot = null; M.phase = 'reset'; M.phaseT = 0;
+      var mates = hoopActive(M), li = last ? mates.indexOf(last) : -1; M.nextTosser = mates[(li + 1 + mates.length) % mates.length].id;
+      if (M.timeLeft <= 0) hoopEndTurn(M);
+    }
+    if (b.vz < 0 && M.phase === 'rally' && M.recv[T] == null) { var near = hoopActive(M).slice().sort(function (a, c) { return hyp(a.x - b.x, a.y - b.y) - hyp(c.x - b.x, c.y - b.y); })[0]; if (near && !M.shot) { M.recv[T] = near.id; M.assignT = M.t; } }
+  }
+  function hoopGuide(M) {
+    var people = hoopActive(M).filter(isPerson); if (!people.length || M.phase === 'over') return null;
+    if (M.phase === 'serve') { var tp = byId(M, M.ball.held); if (tp && isPerson(tp)) return { p: tp.id, key: 'touch', why: 'htoss', reach: true }; return null; }
+    if (M.phase !== 'rally' || M.shot) return null;
+    var h = byId(M, M.recv[M.turn]); if (!h || !isPerson(h)) return null;
+    var key = M.combo >= 2 ? 'drive' : 'touch';
+    return { p: h.id, key: key, why: key === 'drive' ? 'hshoot' : 'hpass', reach: hoopReach(M, h) };
+  }
+  function hoopStep(M, realDt) {
+    realDt = Math.min(realDt, 0.1); M.realT += realDt; if (M.phase === 'over') return;
+    var g = hoopGuide(M), lv = M.lv; M.guide = g;
+    var slow = g && g.reach && g.why !== 'htoss' && lv.assist.slowmo === 1 && !byId(M, g.p).want;   // 🌱 Basic: the ball waits for you
+    if (slow) { M.tscale = 0.08; M.waitReal += realDt; M.waiting = true; if (M.waitReal > 6) { var h = byId(M, g.p); h.want = { key: g.key, t: 0.5 }; ev(M, 'autoHelp', { p: h.id }); M.waitReal = 0; } }
+    else { M.tscale = M.tscale < 1 ? Math.min(1, M.tscale + realDt * 6) : 1; M.waitReal = 0; M.waiting = false; }
+    M.acc += realDt * M.tscale; var n = 0;
+    while (M.acc >= DT && n < 40) { hoopTick(M, DT); M.acc -= DT; n++; if (M.phase === 'over') break; }
+    M.guide = hoopGuide(M);
+  }
+
   // ---------- whole matches in node (robots only, people on autopilot) ----------
   function simulate(cfg, maxSec) {
     cfg = Object.assign({}, cfg); cfg.teams = (cfg.teams || [[], []]).map(function (t) { return t.map(function (w) { return Object.assign({}, w, { auto: true }); }); });
@@ -1004,7 +1181,7 @@ var PD = (function () {
 
   return { DT: DT, MODES: MODES, MODE_ORDER: MODE_ORDER, LEVELS: LEVELS, FILL: FILL, PYRA_COST: PYRA_COST, METER_MAX: METER_MAX, ROLE_ICON: ROLE_ICON, ROLE_NAME: ROLE_NAME, STRIKE_NAME: STRIKE_NAME, actName: actName, isStrike: isStrike, ACT_NAME: ACT_NAME,
     pyraName: pyraName, SPIRITS: SPIRITS, SPIRIT_COST: SPIRIT_COST, spiritGo: spiritGo, slotOf: slotOf, newMatch: newMatch, step: step, tick: tick, input: input, press: press, release: release, takeEvents: takeEvents, simulate: simulate,
-    canReach: canReach, doTouch: doTouch, serve: serve, feedServe: feedServe, jumpServe: jumpServe, botServe: botServe, startServe: startServe, predict: predict, assign: assign, nextNOf: nextNOf, fill: fill, isPerson: isPerson, uOf: uOf, sgn: sgn, baseOf: baseOf, guideFor: guideFor,
+    canReach: canReach, doTouch: doTouch, hoopTouch: hoopTouch, hoopTick: hoopTick, hoopReach: hoopReach, HOOP: { Z: HOOP_Z, R: HOOP_R, RING: RING, PTS: HOOP_PTS, NAME: HOOP_NAME, T: HOOP_T }, serve: serve, feedServe: feedServe, jumpServe: jumpServe, botServe: botServe, startServe: startServe, predict: predict, assign: assign, nextNOf: nextNOf, fill: fill, isPerson: isPerson, uOf: uOf, sgn: sgn, baseOf: baseOf, guideFor: guideFor,
     BALL_R: BALL_R, SPIRIT: null };   // 🔥🔥 SPIRIT = R2 hook: Spirit Dive supers (full meter) plug in here
 })();
 if (typeof module !== 'undefined') module.exports = PD;
@@ -1055,10 +1232,11 @@ const MODE_CARDS = {
   full: {type: 'A full volleyball game', sub: '6 a side in the big arena · front row blocks'},
   strikesolo: {type: 'A sepak takraw game (feet only!)', sub: '1 a side · trap, head it up, spike it — all yourself'},
   strikeduo: {type: 'A 2-a-side sepak takraw game', sub: 'Kick, knee, head — never hands · roll spike over the low net'},
-  strikeregu: {type: 'A team (regu) sepak takraw game', sub: '3 a side · 🚀 kicker, 🪶 feeder, 💥 striker · bicycle kicks!'}
+  strikeregu: {type: 'A team (regu) sepak takraw game', sub: '3 a side · 🚀 kicker, 🪶 feeder, 💥 striker · bicycle kicks!'},
+  hoop: {type: 'Hoop takraw (ตะกร้อลอดห่วง)', sub: 'Keep it up in a circle — kick it THROUGH the hanging hoop · heel + bicycle score most'}
 };
 window.MODE_TYPE = {}; for(const k in MODE_CARDS) window.MODE_TYPE[k] = MODE_CARDS[k].type;
-function mgList(){ return PD.MODE_ORDER.map(k => ({k, g: PD.MODES[k].sport, icon: PD.MODES[k].icon, name: PD.MODES[k].name, type: MODE_CARDS[k].type, sub: MODE_CARDS[k].sub, next: '👇 then pick a level'})); }
+function mgList(){ return PD.MODE_ORDER.map(k => ({k, g: PD.MODES[k].sport === 'hoop' ? 'strike' : PD.MODES[k].sport, icon: PD.MODES[k].icon, name: PD.MODES[k].name, type: MODE_CARDS[k].type, sub: MODE_CARDS[k].sub, next: '👇 then pick a level'})); }
 /* 🗂️ END MODE GROUPS */
 const ARENAS = [{k: 'classic', icon: '🏟️', name: 'Classic arena'}, {k: 'jungle', icon: '🦖', name: 'Jungle beach', soon: true}, {k: 'coral', icon: '🐙', name: 'Coral court', soon: true}, {k: 'neon', icon: '🪩', name: 'Neon arena', soon: true}];
 const ACTIONS = [['up', '⬆️ Up'], ['down', '⬇️ Down'], ['left', '⬅️ Left'], ['right', '➡️ Right'], ['touch', '🤚 Touch'], ['drive', '💥 Drive / Dunk'], ['dink', '🪶 Dink'], ['jump', '⬆️ Jump / Block'], ['dive', '🤸 Dive'], ['pyra', '🔥 Pyra']];
@@ -1068,10 +1246,13 @@ const DEFAULT_KEYS = [
 ];
 const BTN_SPIKE = [['pyra', '🔥', 'Pyra'], ['jump', '⬆️', 'Jump'], ['dink', '🪶', 'Dink'], ['dive', '🤸', 'Dive'], ['touch', '🤚', 'Touch'], ['drive', '💥', 'Dunk']];
 const BTN_STRIKE = [['pyra', '🔥', 'Pyra'], ['jump', '⬆️', 'Jump'], ['dink', '🦶', 'Tip'], ['dive', '🤸', 'Dive'], ['touch', '🦵', 'Trap'], ['drive', '💥', 'Spike']];   // 🦶 PyraStrike: no hands
+const BTN_HOOP = [['pyra', '🔥', 'Pyra'], ['jump', '⬆️', 'Jump'], ['dink', '🦶', 'Heel'], ['dive', '🤸', 'Lunge'], ['touch', '🦵', 'Pass'], ['drive', '⭕', 'Shoot']];   // ⭕ hoop takraw
 let BTN = BTN_SPIKE;
 const TEAM_COL = ['#FF6B1A', '#2F7BEA'];
 const WORDS = {bump: '🤚 Bump', set: '🙌 Set!', dig: '🛡️ Dig!', dive: '🤸 Dive!', dunk: '💥 DUNK!', dink: '🪶 Dink', drive: '🚀 Drive!'};
 const WORDS_STRIKE = {bump: '🦵 Trap', set: '🙆 Head set!', dig: '🦶 Toe save!', dive: '🤸 Dive!', dunk: '🌀 ROLL SPIKE!', bicycle: '🚲 BICYCLE!', dink: '🦶 Heel tip', drive: '🦶 Kick!'};
+function isHoop(M){ return !!(M && M.sp.sport === 'hoop'); }
+const GOAL_HOOP = {htoss: ['⭕ Tap 🦵 to toss the ball up', 'J'], hpass: ['🦵 Keep it up — pass it to a friend!', 'J'], hshoot: ['⭕ Kick it THROUGH the hoop! (or 🦵 pass)', 'K']};
 function wordOf(M, e){ return PD.isStrike(M) ? (e.style === 'bicycle' ? WORDS_STRIKE.bicycle : WORDS_STRIKE[e.k]) : WORDS[e.k]; }
 const WHY = {four: '4 touches! Only 3 a side', double: 'Double touch! The same player twice', net: 'Touched the net!', out: 'Out!', drop: 'It dropped!', in: 'In!', kill: 'Kill!', ace: 'Ace!', stuff: 'Stuff block!'};
 const GOAL_STRIKE = {serve: ['🦶 Your serve! Tap 💥 — your buddy tosses, you kick', 'K'], bump: ['🦵 Trap it up with your thigh!', 'J'], set: ['🙆 Head it up high!', 'J'], dig: ['🦶 Toe save! Get a foot under it', 'J'], dunk: ['💥 Jump and ROLL SPIKE it over!', 'K']};
@@ -1230,7 +1411,7 @@ function startMatch(){
   const M = PD.newMatch({mode: SET.mode, level: SET.level, seed: (Date.now() % 100000) + 7, teams: cfg});
   G = {M, level: SET.level, mode: SET.mode, who: SET.who, over: false, paused: false, held: false, t0: Date.now(), fx: [], words: [], cam: null, shake: 0, setScores: [], q: 1, ema: 16, last: 0, sticks: new Map(), keysDown: new Set(), seen: {}};
   G.locals = M.players.filter(p => p.human);   // people on this device (P1 = human 1)
-  BTN = PD.isStrike(M) ? BTN_STRIKE : BTN_SPIKE;
+  BTN = isHoop(M) ? BTN_HOOP : PD.isStrike(M) ? BTN_STRIKE : BTN_SPIKE;
   GC_LOG.length = 0;
   if(UI.modeTried) UI.modeTried(S.player, GAME_ID, SET.mode);
   showScreen('play'); BAR.fit();
@@ -1310,6 +1491,15 @@ function handleEvents(list){
       case 'rotate': floatWord('🔄 Rotate!', PD.sgn(e.team) * G.M.L * 0.5, 0, 2.6, TEAM_COL[e.team]); break;
       case 'whiff': if(isLocal(e.p)) floatWord('💨', p.x, p.y, 2.2, '#FFFFFF'); break;
       case 'match': finishSoon(); break;
+      // ⭕ hoop takraw
+      case 'hpass': snd('bump'); if(p) floatWord('🦵 ' + e.name + (e.combo >= 3 ? ' ×' + e.combo : ''), p.x, p.y, p.z + 2.2, TEAM_COL[e.team]); break;
+      case 'hshot': snd('drop'); if(p) floatWord('⭕ ' + e.name + '!', p.x, p.y, p.z + 2.3, '#FFE14A'); break;
+      case 'hoop': snd('unlock'); spark(0, 0, PD.HOOP.Z, e.spirit ? '#FF4D8D' : '#FFE14A', 30); bigWord('⭕ HOOP! +' + e.pts, e.pyra ? 'pyra' : '', (p ? p.name + ' · ' : '') + e.name); if(FX) G.shake = 0.12; barScore(); break;
+      case 'rim': snd('bump'); floatWord('😮 Rim!', b.x, b.y, b.z + 0.4, '#FFFFFF'); break;
+      case 'drop': floatWord('💨 Dropped', b.x, b.y, 0.8, '#FF8080'); break;
+      case 'miss': floatWord('Missed', b.x, b.y, 0.8, '#FFFFFF'); break;
+      case 'hoopTurn': banner(teamName(e.team) + (G.locals.some(q => q.team === e.team) ? ' — your turn! ' : '\'s turn · ') + '⏱️ ' + e.time + ' s', 'good', 2200); barScore(); hoopSkipBtn(); break;
+      case 'hoopTurnEnd': banner('⏱️ Time! ' + teamName(e.team) + ': ' + e.score + ' points (' + e.hoops + ' ⭕)', 'gold', 2200); barScore(); break;
     }
   });
 }
@@ -1318,7 +1508,8 @@ function teamName(t){ const M = G.M, ppl = M.players.filter(p => p.team === t &&
 function barScore(){
   if(!G) return; const M = G.M;
   BAR.players([0, 1].map(t => ({k: t, name: teamName(t), av: t === 0 ? '🔥' : M.players.some(p => p.team === 1 && p.human) ? '⚔️' : '🤖', score: M.teams[t].score, on: M.serveTeam === t, col: TEAM_COL[t], bot: !M.players.some(p => p.team === t && p.human)})));
-  if(M.setsTo > 1) BAR.count('sets', '🏐', M.teams[0].sets + '–' + M.teams[1].sets, 'Sets won');
+  if(M.setsTo > 1 && !isHoop(M)) BAR.count('sets', '🏐', M.teams[0].sets + '–' + M.teams[1].sets, 'Sets won');
+  if(isHoop(M)){ BAR.time(Math.ceil(M.timeLeft), M.timeLeft < 10); G.barT = Math.ceil(M.timeLeft); }
   const me = G.locals[0]; if(me) BAR.meter('pyra', '🔥', me.meter / 100, 'Pyra meter', me.meter >= 50);
 }
 function banner(text, cls, ms){ const b = $('banner'); b.textContent = text; b.className = 'banner on ' + (cls || ''); clearTimeout(banner.t); banner.t = setTimeout(() => b.classList.remove('on'), ms || 1500); }
@@ -1336,6 +1527,14 @@ function spiritShow(e){
   host.appendChild(d); setTimeout(() => d.remove(), 1700);
 }
 function spiritOf(k){ for(const slot in PD.SPIRITS){ const c = PD.SPIRITS[slot].find(x => x.k === k); if(c) return c; } return null; }
+/* ⭕ the robots' turn can be skipped (⏭): the rest of their turn is played out at once */
+function hoopSkipBtn(){
+  let b = $('hoop-skip'); const M = G && G.M;
+  const show = M && isHoop(M) && !M.over && !G.locals.some(q => q.team === M.turn);
+  if(!show){ if(b) b.remove(); return; }
+  if(!b){ b = document.createElement('button'); b.id = 'hoop-skip'; b.className = 'sp-btn sp-secondary sp-sm hoop-skip'; b.textContent = '⏭ Skip the robots\' turn'; $('stage').appendChild(b);
+    b.onclick = () => { const M2 = G.M, t0 = M2.turn; let n = 0; while(!M2.over && M2.turn === t0 && n++ < 30 * 200){ PD.step(M2, 1 / 30); handleEvents(PD.takeEvents(M2).filter(e => e.k !== 'hoop' && e.k !== 'spirit' && e.k !== 'pyra' || e.k === 'match')); } barScore(); hoopSkipBtn(); }; }
+}
 function bigWord(text, cls, sub){ if(!FX) return; const host = $('bigword-host'); host.innerHTML = ''; const d = document.createElement('div'); d.className = 'big-word ' + (cls || ''); d.innerHTML = UI.esc(text) + (sub ? '<small>' + UI.esc(sub) + '</small>' : ''); host.appendChild(d); setTimeout(() => d.remove(), 1100); }
 function floatWord(text, x, y, z, col){ if(!G) return; const near = G.words.filter(w => w.t < 0.8 && Math.abs(w.x - x) < 1.6).length; G.words.push({text, x, y, z: z + 0.5 + near * 0.55, col, t: 0}); if(G.words.length > 12) G.words.shift(); }   // above the ball, stacked when they bunch up
 function spark(x, y, z, col, n){ if(!G || !FX) return; for(let i = 0; i < n; i++){ const a = Math.random() * Math.PI * 2, s = 1 + Math.random() * 3; G.fx.push({x, y, z, vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.5, vz: 1 + Math.random() * 3, t: 0, life: 0.4 + Math.random() * 0.3, col}); } if(G.fx.length > 160) G.fx.splice(0, G.fx.length - 160); }
@@ -1407,6 +1606,7 @@ function updatePads(){
     const m = Math.round(p.meter); if(b._m !== m){ b._m = m; b.style.setProperty('--m', m + '%'); }
     b.classList.toggle('ready', p.meter >= PD.PYRA_COST && !p.pyraArm); b.classList.toggle('armed', !!p.pyraArm); b.classList.toggle('full', p.meter >= PD.SPIRIT_COST); b.classList.toggle('spirit', !!p.spiritArm);
   });
+  if(isHoop(G.M) && Math.ceil(G.M.timeLeft) !== G.barT){ G.barT = Math.ceil(G.M.timeLeft); BAR.time(G.barT, G.barT < 10); }
   const me = G.locals[0]; if(me && Math.round(me.meter) !== G.barM){ G.barM = Math.round(me.meter); BAR.meter('pyra', '🔥', me.meter / 100, 'Pyra meter', me.meter >= 50); }
 }
 // 🌱 the next move glows (+ 👆 on Basic and the first Junior touches), one goal line on screen
@@ -1420,7 +1620,7 @@ function updateGuideUi(){
   if(!show){ line.classList.add('off'); hand.classList.add('hidden'); G.goalTxt = ''; return; }
   const b = document.querySelector('.actpad[data-p="' + g.p + '"] .sbtn[data-a="' + g.key + '"]') || document.querySelector('.keylegend [data-a="' + g.key + '"]');
   if(b) b.classList.add('glow');
-  const GL = PD.isStrike(M) ? GOAL_STRIKE : GOAL, gl = GL[g.why] || GL.bump, K = KEYS[localSeat(g.p)], kc = keyName(K[g.key]), kb = a => isTouch() ? '' : ' <kbd>' + UI.esc(keyName(K[a])) + '</kbd>';
+  const GL = isHoop(M) ? GOAL_HOOP : PD.isStrike(M) ? GOAL_STRIKE : GOAL, gl = GL[g.why] || GL.bump, K = KEYS[localSeat(g.p)], kc = keyName(K[g.key]), kb = a => isTouch() ? '' : ' <kbd>' + UI.esc(keyName(K[a])) + '</kbd>';
   // serve on Junior+: the 3 serve kinds (💥 float · ⬆️ jump serve · 🪶 pinch) — Basic keeps the one-tap line
   const txt = g.why === 'serve' && M.level > 0 ? (PD.isStrike(M) ? '🦶 Serve: 💥 kick' + kb('drive') + ' · ⬆️ power kick' + kb('jump') + ' · 🦶 tip' + kb('dink') : '🚀 Serve: 💥 float' + kb('drive') + ' · ⬆️ jump' + kb('jump') + ' · 🪶 pinch' + kb('dink')) : gl[0] + (isTouch() ? '' : ' <kbd>' + UI.esc(kc) + '</kbd>');
   if(G.goalTxt !== txt){ G.goalTxt = txt; line.innerHTML = txt; }
@@ -1490,15 +1690,17 @@ function drawScene(g, M, o){
   // floor (free zone) + court
   const sand = M.sp.sand, tk = PD.isStrike(M);   // 🦶 takraw court: green floor, teal court, service circles
   poly(g, [P(-L - 4.5, -Wd / 2 - 2.6, 0), P(L + 4.5, -Wd / 2 - 2.6, 0), P(L + 4.5, Wd / 2 + 3.4, 0), P(-L - 4.5, Wd / 2 + 3.4, 0)], sand ? '#E9C98A' : tk ? '#1F7A57' : '#2B56B8');
-  poly(g, [P(-L, -Wd / 2, 0), P(0, -Wd / 2, 0), P(0, Wd / 2, 0), P(-L, Wd / 2, 0)], sand ? '#F2D79E' : tk ? '#2FA37A' : '#E8813A');
-  poly(g, [P(0, -Wd / 2, 0), P(L, -Wd / 2, 0), P(L, Wd / 2, 0), P(0, Wd / 2, 0)], sand ? '#F0D398' : tk ? '#2C9B73' : '#E27832');
-  if(tk){ g.strokeStyle = '#FFFFFF'; g.lineWidth = Math.max(1.5, V.k * 0.06);
+  const hp = isHoop(M);
+  if(!hp) poly(g, [P(-L, -Wd / 2, 0), P(0, -Wd / 2, 0), P(0, Wd / 2, 0), P(-L, Wd / 2, 0)], sand ? '#F2D79E' : tk ? '#2FA37A' : '#E8813A');
+  if(!hp) poly(g, [P(0, -Wd / 2, 0), P(L, -Wd / 2, 0), P(L, Wd / 2, 0), P(0, Wd / 2, 0)], sand ? '#F0D398' : tk ? '#2C9B73' : '#E27832');
+  if(hp){ drawHoopFloor(g, M); }
+  else if(tk){ g.strokeStyle = '#FFFFFF'; g.lineWidth = Math.max(1.5, V.k * 0.06);
     [-1, 1].forEach(sd => { const cu = (L - 2.45) * sd; g.beginPath(); for(let i = 0; i <= 24; i++){ const a = i / 24 * Math.PI * 2, q = P(cu + Math.cos(a) * 0.3, Math.sin(a) * 0.3, 0); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); } g.stroke();
       [-1, 1].forEach(sy => { g.beginPath(); for(let i = 0; i <= 12; i++){ const a = i / 12 * Math.PI / 2, q = P(sd * Math.sin(a) * 0.9, sy * (Wd / 2 - Math.cos(a) * 0.9), 0); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); } g.stroke(); }); }); }
   if(!sand && !tk){ g.globalAlpha = 0.12; for(let i = -L; i < L; i += 1.5) poly(g, [P(i, -Wd / 2, 0), P(i + 0.75, -Wd / 2, 0), P(i + 0.75, Wd / 2, 0), P(i, Wd / 2, 0)], '#FFFFFF'); g.globalAlpha = 1; }
   g.strokeStyle = sand ? '#2F7BEA' : '#FFFFFF'; g.lineWidth = Math.max(1.5, V.k * 0.07); g.lineJoin = 'round';
-  line(g, [P(-L, -Wd / 2, 0), P(L, -Wd / 2, 0), P(L, Wd / 2, 0), P(-L, Wd / 2, 0), P(-L, -Wd / 2, 0)]);
-  line(g, [P(0, -Wd / 2, 0), P(0, Wd / 2, 0)]);
+  if(!hp){ line(g, [P(-L, -Wd / 2, 0), P(L, -Wd / 2, 0), P(L, Wd / 2, 0), P(-L, Wd / 2, 0), P(-L, -Wd / 2, 0)]);
+  line(g, [P(0, -Wd / 2, 0), P(0, Wd / 2, 0)]); }
   if(M.sp.n >= 6){ g.globalAlpha = 0.7; line(g, [P(-3, -Wd / 2, 0), P(-3, Wd / 2, 0)]); line(g, [P(3, -Wd / 2, 0), P(3, Wd / 2, 0)]); g.globalAlpha = 1; }
   // 🎯 landing marker (aim help levels): where the ball will come down on YOUR side
   const lm = o.live && SET.marker && M.lv.aim > 0 && M.phase === 'rally' && M.landing && G.locals.some(p => p.team === M.landTeam) && M.lastTeam !== M.landTeam;
@@ -1510,9 +1712,23 @@ function drawScene(g, M, o){
   objs.push({y: b.y + 0.01, f: () => drawBall(g, M, t)});
   objs.sort((a, c) => a.y - c.y);
   let netDone = false;
-  objs.forEach(ob => { if(!netDone && ob.y >= 0){ drawNet(g, M); netDone = true; } ob.f(); });
-  if(!netDone) drawNet(g, M);
-  if(o.live) drawCounters(g, M);
+  const net = isHoop(M) ? () => drawHoop(g, M, t) : () => drawNet(g, M);
+  objs.forEach(ob => { if(!netDone && ob.y >= 0){ net(); netDone = true; } ob.f(); });
+  if(!netDone) net();
+  if(o.live && !isHoop(M)) drawCounters(g, M);
+}
+// ⭕ hoop takraw: the circle on the floor and the hoop hanging from three ropes
+function drawHoopFloor(g, M){
+  const H = PD.HOOP, ring = (r, z) => { const pts = []; for(let i = 0; i <= 36; i++){ const a = i / 36 * Math.PI * 2; pts.push(P(Math.cos(a) * r, Math.sin(a) * r, z)); } return pts; };
+  poly(g, ring(H.RING + 0.9, 0), '#2C9B73'); g.strokeStyle = '#FFFFFF'; g.lineWidth = Math.max(1.5, V.k * 0.06); line(g, ring(H.RING + 0.9, 0)); g.globalAlpha = 0.5; line(g, ring(H.RING, 0)); g.globalAlpha = 1;
+  g.fillStyle = 'rgba(0,0,0,0.18)'; g.beginPath(); ring(H.R, 0).forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.fill();   // the hoop's shadow on the floor
+}
+function drawHoop(g, M, t){
+  const H = PD.HOOP, pts = []; for(let i = 0; i <= 40; i++){ const a = i / 40 * Math.PI * 2; pts.push(P(Math.cos(a) * H.R, Math.sin(a) * H.R, H.Z)); }
+  g.strokeStyle = 'rgba(255,255,255,0.5)'; g.lineWidth = 1.5; [0, 2.1, 4.2].forEach(a => { const q = P(Math.cos(a) * H.R, Math.sin(a) * H.R, H.Z), top = P(0, 0, H.Z + 6); g.beginPath(); g.moveTo(q[0], q[1]); g.lineTo(top[0], top[1]); g.stroke(); });
+  g.strokeStyle = '#7B4A12'; g.lineWidth = Math.max(4, V.k * 0.16); line(g, pts);
+  g.strokeStyle = '#FFB627'; g.lineWidth = Math.max(2, V.k * 0.08); line(g, pts);
+  const glow = M.shot && M.shot.pyra; if(glow){ g.globalAlpha = 0.5 + 0.3 * Math.sin(t * 12); g.strokeStyle = '#FF6B1A'; g.lineWidth = Math.max(6, V.k * 0.3); line(g, pts); g.globalAlpha = 1; }
 }
 function poly(g, pts, fill){ g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.fillStyle = fill; g.fill(); }
 function line(g, pts){ g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); }
@@ -1667,7 +1883,7 @@ function drawPlayer(g, M, p, t, o){
   else g.drawImage(sp.c, fx - sp.ax * sc, fy - lift - sp.foot * sc, sp.W * sc, sp.H * sc);
   // overhead: roles · meter · name
   const top = fy - (p.z * 45 + 96) * kAv, sz = Math.max(9, 13 * kAv * 1.4);
-  p.roles.forEach((r, i) => emo(g, PD.ROLE_ICON[r], fx + (i - (p.roles.length - 1) / 2) * sz * 1.05, top - sz * 0.2, sz));
+  (isHoop(M) ? [] : p.roles).forEach((r, i) => emo(g, PD.ROLE_ICON[r], fx + (i - (p.roles.length - 1) / 2) * sz * 1.05, top - sz * 0.2, sz));
   const bw = Math.max(18, 30 * kAv * 1.3), bh = Math.max(3, 4 * kAv), by = top + sz * 0.5;
   g.fillStyle = 'rgba(0,0,0,0.45)'; g.fillRect(fx - bw / 2, by, bw, bh);
   g.fillStyle = p.meter >= 50 ? '#FFB627' : '#FF6B1A'; g.fillRect(fx - bw / 2, by, bw * Math.min(1, p.meter / 100), bh);
@@ -1744,9 +1960,9 @@ function finishMatch(){
   const people = G.locals, duo = G.who === 'duo';
   const me = people[0], won = M.winner === me.team, margin = sums[me.team] - sums[1 - me.team];
   const stars = won ? 1 + (margin >= 4 ? 1 : 0) + ((M.setsTo > 1 && M.teams[1 - me.team].sets === 0) || margin >= 7 ? 1 : 0) : 0;
-  const statsOf = p => ({games: 1, wins: M.winner === p.team ? 1 : 0, aces: p.st.aces, kills: p.st.kills, assists: p.st.assists, digs: p.st.digs + p.st.dives, dives: p.st.dives, blocks: p.st.blocks, stuffs: p.st.stuffs,
+  const statsOf = p => ({games: 1, wins: M.winner === p.team ? 1 : 0, hoops: p.st.hoops || 0, aces: p.st.aces, kills: p.st.kills, assists: p.st.assists, digs: p.st.digs + p.st.dives, dives: p.st.dives, blocks: p.st.blocks, stuffs: p.st.stuffs,
     sets: p.st.sets, bumps: p.st.bumps, dinks: p.st.dinks, dunks: p.st.dunks, drives: p.st.drives, pyras: p.st.pyras, rally: M.rallyMax, ['m_' + G.mode]: M.winner === p.team ? 1 : 0});
-  const scoreOf = p => Math.round((sums[p.team] * 50 + (M.winner === p.team ? 1000 : 0) + p.st.kills * 40 + p.st.aces * 60 + p.st.stuffs * 60 + (p.st.digs + p.st.dives) * 15 + p.st.pyras * 30 + M.rallyMax * 10) * (1 + G.level * 0.25) * (hc ? 3 : 1));
+  const scoreOf = p => Math.round(((p.st.hoopPts || 0) * 30 + (p.st.passes || 0) * 2 + sums[p.team] * (isHoop(M) ? 10 : 50) + (M.winner === p.team ? 1000 : 0) + p.st.kills * 40 + p.st.aces * 60 + p.st.stuffs * 60 + (p.st.digs + p.st.dives) * 15 + p.st.pyras * 30 + M.rallyMax * 10) * (1 + G.level * 0.25) * (hc ? 3 : 1));
   const score = scoreOf(me), mode = PD.MODES[G.mode];
   NOTES.length = 0;
   const cardTxt = duo ? '⚔️ ' + UI.esc(teamName(M.winner)) + ' wins!' : won ? 'You won!' : 'So close!';
@@ -1755,8 +1971,9 @@ function finishMatch(){
     + '<canvas class="podium" id="res-podium" width="440" height="260"></canvas>'
     + '<div class="note">' + mode.icon + ' ' + mode.name + ' · ' + PD.LEVELS[G.level].name + ' · ' + (G.setScores.length > 1 ? 'sets ' + M.teams[0].sets + '–' + M.teams[1].sets + ' (' + G.setScores.map(s => s.join('–')).join(', ') + ')' : (G.setScores[0] || [0, 0]).join(' – ')) + '</div>';
   if(!duo) h += '<div class="rating">' + [1, 2, 3].map(i => '<span class="st' + (i <= stars ? '' : ' off') + '">⭐</span>').join('') + '</div><div class="score-big">🏆 ' + score.toLocaleString() + '</div>';
-  const pl = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
-  h += '<div class="stats"><span>🚀 ' + pl(st.aces, 'ace') + '</span><span>💥 ' + pl(st.kills, 'kill') + '</span><span>🪶 ' + pl(st.assists, 'assist') + '</span><span>🛡️ ' + pl(st.digs + st.dives, 'save') + '</span><span>🧱 ' + pl(st.stuffs, 'stuff') + '</span><span>🔥 ' + pl(st.pyras, 'Pyra move') + '</span><span>🔁 rally ' + M.rallyMax + '</span></div>';
+  const pl = (n, w, ws) => n + ' ' + (n === 1 ? w : ws || w + 's');
+  if(isHoop(M)) h += '<div class="stats"><span>⭕ ' + pl(st.hoops || 0, 'hoop') + '</span><span>🏆 ' + (st.hoopPts || 0) + ' points</span><span>🦵 ' + pl(st.passes || 0, 'pass', 'passes') + '</span><span>🔥 ' + pl(st.pyras, 'Pyra move') + '</span></div>';
+  else h += '<div class="stats"><span>🚀 ' + pl(st.aces, 'ace') + '</span><span>💥 ' + pl(st.kills, 'kill') + '</span><span>🪶 ' + pl(st.assists, 'assist') + '</span><span>🛡️ ' + pl(st.digs + st.dives, 'save') + '</span><span>🧱 ' + pl(st.stuffs, 'stuff') + '</span><span>🔥 ' + pl(st.pyras, 'Pyra move') + '</span><span>🔁 rally ' + M.rallyMax + '</span></div>';
   if(!won && !duo) h += '<div class="note">💡 ' + pdPick(['Watch the 🎯 ring — be there before the ball comes down.', 'Use all 3 touches: bump → set → dunk.', 'Half a flame? Tap 🔥 before your dunk for a Pyra…Dunk!', 'A 🪶 dink drops softly behind their block.', 'Jump (Space) at the net when they dunk = a block!']) + '</div>';
   h += '<div class="save-note" id="save-note">' + (people.some(p => p.name !== 'Guest') ? '💾 Saving…' : '') + '</div>';
   h += '<div class="res-btns" id="res-btns"><button class="sp-btn sp-secondary" id="res-levels" data-sound="tap">🎚️ Levels</button><button class="sp-btn sp-secondary" id="res-again" data-sound="pop">🔁 Play again</button>'
@@ -1837,4 +2054,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pd-2b) END OF PyraDive.html -->
+<!-- (pd-2c) END OF PyraDive.html -->
