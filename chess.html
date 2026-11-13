@@ -71,6 +71,17 @@
     box-shadow:0 5px 0 rgba(0,0,0,0.12);text-align:left;}
   .duo .big{font-size:2.2rem;} .duo .nm{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1.15rem;} .duo .sub{font-size:0.82rem;font-weight:700;opacity:.9;}
   .duo:active{transform:translateY(4px);box-shadow:0 1px 0 rgba(0,0,0,0.12);}
+  /* 📡 lk-3b own devices */
+  .duo.lx-card{margin-top:10px;background:linear-gradient(135deg,#22C3A6,#3B82F6);}
+  .lx-pick{display:flex;flex-direction:column;gap:12px;max-width:420px;margin:14px auto 0;} .lx-pick .btn{width:100%;font-size:1.1rem;padding:14px;}
+  .lx-flip #pl-me{order:2;} .lx-flip #pl-op{order:1;}   /* the guest: the opponent (white) is the top card, like on the board */
+  .pl{position:relative;} .lx-say{position:absolute;left:50%;bottom:calc(100% - 6px);transform:translateX(-50%) scale(.6);opacity:0;z-index:5;pointer-events:none;white-space:nowrap;
+    background:#fff;color:#2B1B5A;font-weight:800;font-size:.82rem;padding:5px 11px;border-radius:14px;box-shadow:0 3px 10px rgba(0,0,0,.18);transition:transform .25s cubic-bezier(.3,1.6,.5,1),opacity .2s;}
+  .lx-say::after{content:'';position:absolute;left:50%;top:100%;margin-left:-6px;border:6px solid transparent;border-top-color:#fff;}
+  .lx-say.on{opacity:1;transform:translateX(-50%) scale(1);}
+  .pl.lx-you::after{content:'YOU';position:absolute;top:-8px;right:12px;background:#22C3A6;color:#fff;font-size:.62rem;font-weight:900;letter-spacing:.06em;padding:2px 8px;border-radius:8px;box-shadow:0 2px 0 rgba(0,0,0,.12);}
+  .lx-over{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(10,8,30,.55);}
+  .lx-over .result-card{max-width:420px;}
   .rules{background:var(--card);border-radius:18px;padding:8px 14px;margin-top:16px;box-shadow:0 4px 0 rgba(0,0,0,0.05);}
   .rules summary{cursor:pointer;font-family:'Fredoka',sans-serif;font-weight:700;padding:6px 0;}
   .rules ol{margin:6px 0 8px;padding-left:22px;font-weight:700;font-size:0.9rem;line-height:1.5;}
@@ -365,6 +376,7 @@
 <script src="inc/AvatarActing.js"></script>
 <script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-3a: the cheering crowd (CheerSquad.html) -->
 <script src="inc/PieceSkins.js"></script>
+<script src="inc/LinkKit.js"></script>   <!-- 📡 lk-3b: own devices -->
 </head>
 <body ontouchstart="">
 
@@ -386,6 +398,7 @@
   <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the board">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-3a -->
   <div class="section-head">👫 Or play a friend</div>
   <button class="duo" data-sound="pop" onclick="chooseFriend()"><span class="big">👫</span><span><div class="nm">2 players</div><div class="sub">Take turns on this screen</div></span></button>
+  <button class="duo lx-card" id="link-card" data-sound="pop" onclick="lxChoose()"><span class="big">📡</span><span><div class="nm">Own devices</div><div class="sub">Each on their own phone / tablet · same Wi-Fi</div></span></button>   <!-- 📡 lk-3b -->
   <details class="rules" id="rules"><summary>📖 How to play</summary><ol>
     <li>Every piece moves its own way — tap a piece and glowing dots show where it can go (and a tip explains it).</li>
     <li>Move onto an enemy piece to <b>take</b> it.</li>
@@ -401,6 +414,11 @@
   <div class="title"><div class="logo">👫</div><h1>Who is your friend?</h1><p>You play the bottom, your friend plays the top</p></div>
   <div class="pick-grid" id="friend-list"></div>
   </section>
+
+<section class="screen hidden" id="scr-link">   <!-- 📡 lk-3b: own devices lobby (the top ◀ goes back to Chess) -->
+  <div class="title"><div class="logo">📡</div><h1>Own devices</h1><p id="lx-sub">Same Wi-Fi as the host</p></div>
+  <div id="lx-lobby"></div>
+</section>
 
 <section class="screen hidden" id="scr-design">
   <div class="title"><div class="logo" id="design-logo">🎨</div><h1 id="design-title">Pick a board</h1><p id="design-sub">Every design plays the same</p></div>
@@ -446,7 +464,7 @@ const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '�
   pause: {pause: () => { if(typeof pauseGame === 'function') pauseGame(); }, resume: () => { if(typeof resume === 'function') resume(); }},
   onFit: () => { if(G && typeof layout === 'function') layout(); },
   extras: []});
-var NAV_INNER = {friend: ['◀ Chess', () => showScreen('menu')], design: ['◀ Chess', () => showScreen('menu')]};   // 🧭 inner screens: their top button goes to the main screen
+var NAV_INNER = {friend: ['◀ Chess', () => showScreen('menu')], design: ['◀ Chess', () => showScreen('menu')], link: ['◀ Chess', () => lxExit()]};   // 📡 lk-3b: + link   // 🧭 inner screens: their top button goes to the main screen
 UI.navBar(document.getElementById('back-btn'), {onclick: false});
 
 /* ================= LEVELS + DESIGNS ================= */
@@ -680,7 +698,7 @@ function saveDesign(){ try{ localStorage.setItem(designKey(), design); }catch(e)
 /* ================= MENUS ================= */
 function showScreen(name){
   document.body.setAttribute('data-design', design);
-  ['player', 'menu', 'friend', 'design', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
+  ['player', 'menu', 'friend', 'design', 'play', 'link'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));   // 📡 lk-3b: + link
   $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   // 🧭 p1b
   window.scrollTo(0, 0);
 }
@@ -771,9 +789,10 @@ function startGame(opts){
   G = {mode: opts.mode, lvl, L, n, P, ids: P.b.map((p, i) => p ? i + 1 : 0), sel: null, moves: [], last: null, over: false, busy: false,
     t0: performance.now(), pausedAt: 0, pausedTotal: 0, hintUsed: false, keys: [posKey(P)], took: {1: [], '-1': []},
     names: {1: S.player, '-1': opts.mode === 'bot' ? L.bot : opts.friend}, friend: opts.friend, startMat: material(P.b, 1), feats: {castles: 0, promos: 0, enpassant: 0, forks: 0, checks: 0, dchecks: 0}};
+  lxSeat();   // 📡 lk-3b: a linked game → G.lx, names by colour, the board turned to your side
   $('scr-play').setAttribute('data-design', design);
-  BAR.level(opts.mode === 'bot' ? L.emoji + ' ' + L.name + ' · vs ' + L.bot : '👫 ' + S.player + ' vs ' + opts.friend);
-  $('nm-me').textContent = S.player; $('nm-op').textContent = (opts.mode === 'bot' ? '🤖 ' : '') + G.names[-1];
+  BAR.level(opts.mode === 'bot' ? L.emoji + ' ' + L.name + ' · vs ' + L.bot : (G.lx ? '📡 ' : '👫 ') + G.names[1] + ' vs ' + G.names[-1]);
+  $('nm-me').textContent = G.names[1]; $('nm-op').textContent = (opts.mode === 'bot' ? '🤖 ' : '') + G.names[-1];
   $('chip-me').innerHTML = '<span class="gl w">' + GLYPH.k + '︎</span>'; $('chip-op').innerHTML = '<span class="gl bl">' + GLYPH.k + '︎</span>';
   $('btn-hint').classList.toggle('hidden', opts.mode !== 'bot' || !!L.hardcore);   // 💀 Hardcore: no hints
   setTip(null);
@@ -782,24 +801,28 @@ function startGame(opts){
   startTurn();
   clearInterval(tickHandle); tickHandle = setInterval(updateHud, 500); updateHud();
   clearInterval(clockHandle); G.clockLeft = null; clockShow(); if(clockOn()) clockHandle = setInterval(clockTick, 200);
-  say(opts.mode === 'bot' ? (n === 6 ? 'Let\'s play mini chess! You go first.' : 'Let\'s play chess! You go first.') : 'Let\'s play chess! ' + S.player + ' goes first.');
+  say(opts.mode === 'bot' ? (n === 6 ? 'Let\'s play mini chess! You go first.' : 'Let\'s play chess! You go first.') : 'Let\'s play chess! ' + G.names[1] + ' goes first.');
+  if(G.lx) lxNames();
 }
 function material(b, s){ return b.reduce((t, p) => t + (p && sideOf(p) === s ? VAL[p.toLowerCase()] : 0), 0); }
 function newGame(){
   if(!G) return;
+  if(G.lx){ lxNewGame(); return; }   // 📡 lk-3b
   const opts = {mode: G.mode, lvl: G.lvl, friend: G.friend};
   if(G.over || G.keys.length <= 1) return startGame(opts);
   UI.confirm({icon: '🔄', title: 'Start a new game?', body: 'This game will be lost.', okText: 'New game', cancelText: 'Keep playing'}).then(ok => { if(ok) startGame(opts); });
 }
 function leavePlay(){
+  if(G && G.lx){ lxLeavePlay(); return; }   // 📡 lk-3b
   const go = () => { if(window.Cheer) Cheer.unmount(); clearTimeout(botTimer); clearInterval(tickHandle); closePromo(); G = null; renderLevels(); showScreen('menu'); };
   if(!G || G.over || G.keys.length <= 1) return go();
   UI.confirm({icon: '◀', title: 'Leave this game?', body: 'The game will not be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(ok) go(); });
 }
 function resign(){
   if(!G || G.over) return;
-  UI.confirm({icon: '🏳️', title: 'Give up this game?', body: G.mode === 'bot' ? G.L.bot + ' will win this one.' : G.names[-G.P.turn] + ' will win.', okText: 'Give up', cancelText: 'Keep playing', danger: true})
-    .then(ok => { if(ok) endGame(-G.P.turn, 'resign'); });
+  const loser = G.lx ? G.lx.me : G.P.turn;   // 📡 lk-3b: linked = you give up for your own colour, on any turn
+  UI.confirm({icon: '🏳️', title: 'Give up this game?', body: G.mode === 'bot' ? G.L.bot + ' will win this one.' : G.names[-loser] + ' will win.', okText: 'Give up', cancelText: 'Keep playing', danger: true})
+    .then(ok => { if(ok && G && !G.over){ if(G.lx) lxSendEnd(-loser, 'resign'); endGame(-loser, 'resign'); } });
 }
 function elapsed(){ return G ? (G.over ? G.finishMs : performance.now() - G.t0 - G.pausedTotal - (G.pausedAt ? performance.now() - G.pausedAt : 0)) : 0; }
 function updateHud(){
@@ -815,10 +838,10 @@ function buildBoard(){
   bd.style.gridTemplateColumns = 'repeat(' + n + ',1fr)'; bd.style.setProperty('--n', n);
   for(let i = 0; i < n * n; i++){
     const r = (i / n) | 0, c = i % n, sq = document.createElement('div');
-    sq.className = 'sq' + ((r + c) % 2 === 1 ? ' dk' : ''); sq.dataset.i = i;
+    sq.className = 'sq' + ((r + c) % 2 === 1 ? ' dk' : ''); sq.dataset.i = i; if(G.flip) sq.style.order = lxV(i);   // 📡 lk-3b: turned board
     sq.addEventListener('click', () => tapSquare(i));
-    if(c === 0) sq.insertAdjacentHTML('beforeend', '<span class="coord">' + (n - r) + '</span>');
-    if(r === n - 1) sq.insertAdjacentHTML('beforeend', '<span class="coord f">' + 'abcdefgh'[c] + '</span>');
+    if(c === (G.flip ? n - 1 : 0)) sq.insertAdjacentHTML('beforeend', '<span class="coord">' + (n - r) + '</span>');
+    if(r === (G.flip ? 0 : n - 1)) sq.insertAdjacentHTML('beforeend', '<span class="coord f">' + 'abcdefgh'[c] + '</span>');
     bd.appendChild(sq);
   }
   G.P.b.forEach((p, i) => { if(p) bd.appendChild(pieceEl(G.ids[i], p)); });
@@ -834,7 +857,7 @@ function pieceEl(id, p){
   return e;
 }
 function setGlyph(id, p){ const e = $('pc-' + id); if(!e) return; e.querySelector('.disc').innerHTML = pieceHtml(p); e.dataset.t = p.toLowerCase(); e.classList.remove('promo-pop'); void e.offsetWidth; e.classList.add('promo-pop'); }
-function placePiece(e, sq){ const n = G.n; e.style.left = (sq % n) * 100 / n + '%'; e.style.top = ((sq / n) | 0) * 100 / n + '%'; }
+function placePiece(e, sq){ const n = G.n; sq = lxV(sq); e.style.left = (sq % n) * 100 / n + '%'; e.style.top = ((sq / n) | 0) * 100 / n + '%'; }
 function render(){
   const P = G.P;
   P.b.forEach((p, i) => { if(!p) return; const e = $('pc-' + G.ids[i]); if(e) placePiece(e, i); });
@@ -877,7 +900,7 @@ window.addEventListener('resize', layout);
 if(window.ResizeObserver) new ResizeObserver(layout).observe($('stage-wrap'));
 
 /* ---------- turns ---------- */
-function isHumanTurn(){ return G && !G.over && (G.mode === 'duo' || G.P.turn === 1); }
+function isHumanTurn(){ return G && !G.over && (G.lx ? G.P.turn === G.lx.me : (G.mode === 'duo' || G.P.turn === 1)); }   // 📡 lk-3b: linked = only your own colour
 function startTurn(){
   const P = G.P;
   G.moves = legalMoves(P); G.sel = null;
@@ -889,10 +912,11 @@ function startTurn(){
   updatePlayers(); render();
   if(check){
     UISound.play('error');
-    const who = isHumanTurn() ? (G.mode === 'duo' ? G.names[P.turn] + ', your' : 'Your') + ' King is in check! Protect it' : 'Check! ' + G.names[-1] + '\'s King is in danger';
+    const who = isHumanTurn() ? (G.mode === 'duo' && !G.lx ? G.names[P.turn] + ', your' : 'Your') + ' King is in check! Protect it' : 'Check! ' + G.names[P.turn] + '\'s King is in danger';
     showBanner('♚ ' + who, isHumanTurn() ? 'bad' : 'warn');
   }
   if(isHumanTurn()) clockStart();
+  if(G.lx){ lxTurn(); return; }   // 📡 lk-3b: no bot — the other device moves (or 🤖 for a dropped player)
   if(!isHumanTurn()){
     $('pl-op').classList.add('thinking'); if(window.Cheer) Cheer.hush(true);   /* 🤫 cs-3a */ $('pl-op').querySelector('.think').textContent = pickLine(LINES.think);
     botTimer = setTimeout(() => {
@@ -911,10 +935,11 @@ function updatePlayers(){
     $('pl-' + k).classList.toggle('turn', !G.over && P.turn === s);
     $('tray-' + k).innerHTML = G.took[s].map(p => pieceHtml(p)).join('');
   });
-  $('turn-msg').textContent = G.over ? 'Game over' : G.mode === 'bot' ? (P.turn === 1 ? '👉 Your turn' : '🤖 ' + G.L.bot + ' is thinking…') : '👉 ' + G.names[P.turn] + '\'s turn';
+  $('turn-msg').textContent = G.over ? 'Game over' : G.lx ? (P.turn === G.lx.me ? '👉 Your turn' : '⏳ ' + G.names[P.turn] + ' is thinking…') : G.mode === 'bot' ? (P.turn === 1 ? '👉 Your turn' : '🤖 ' + G.L.bot + ' is thinking…') : '👉 ' + G.names[P.turn] + '\'s turn';
 }
 function setTip(t){
-  if(!t){ $('tip').innerHTML = G && G.mode === 'duo' ? 'Take turns. Tap a piece to see where it can go.' : 'Tap one of your pieces to see where it can go. Get the bot\'s King stuck — that\'s <b>checkmate</b>!'; return; }
+  if(!t){ if(G && G.lx){ $('tip').innerHTML = 'You play ' + (G.lx.me > 0 ? '⚪ White' : '⚫ Black') + ' — your side is at the bottom. Tap a piece to see where it can go.'; return; }   // 📡 lk-3b
+    $('tip').innerHTML = G && G.mode === 'duo' ? 'Take turns. Tap a piece to see where it can go.' : 'Tap one of your pieces to see where it can go. Get the bot\'s King stuck — that\'s <b>checkmate</b>!'; return; }
   const I = PIECE_INFO[t]; $('tip').innerHTML = '<span class="gl w tipgl">' + GLYPH[t] + '︎</span> <b>' + I.name + '</b> — ' + I.tip;
 }
 function tapSquare(i){
@@ -938,7 +963,7 @@ function tapSquare(i){
 function askPromo(opts){
   const box = $('promo-btns'); box.innerHTML = '';
   opts.forEach(m => { const b = document.createElement('button'); b.className = 'pbtn'; b.setAttribute('data-sound', 'pop');
-    b.innerHTML = '<span class="gl w">' + GLYPH[m.promo] + '︎</span><small>' + PIECE_INFO[m.promo].name + '</small>';
+    b.innerHTML = '<span class="gl ' + (G.P.turn > 0 ? 'w' : 'bl') + '">' + GLYPH[m.promo] + '︎</span><small>' + PIECE_INFO[m.promo].name + '</small>';   // 📡 lk-3b: your colour
     b.onclick = () => { closePromo(); playMove(m); }; box.appendChild(b); });
   $('promo').classList.remove('hidden'); say('Pick a new piece!');
 }
@@ -946,6 +971,7 @@ function closePromo(){ $('promo').classList.add('hidden'); }
 // Animate the move (pieces glide; the knight hops), then apply it.
 function playMove(m){ if(window.Cheer) Cheer.hush(false);   /* 📣 cs-3a: the move is in → the crowd may cheer */
   if(!G || G.over || !m) return;
+  if(G.lx && !m.rm) lxSendMove(m);   // 📡 lk-3b: my move → the other device
   G.busy = true; G.sel = null;
   const P = G.P, mover = $('pc-' + G.ids[m.from]), t = P.b[m.from].toLowerCase();
   const capSq = m.ep ? m.to + (P.turn > 0 ? G.n : -G.n) : (P.b[m.to] ? m.to : -1);
@@ -961,8 +987,9 @@ function commit(m, capSq){
   G.ids[m.from] = 0; G.ids[m.to] = id;
   const captured = capSq >= 0 ? P.b[capSq] : '';
   G.P = makeMove(P, m); G.last = [m.from, m.to]; G.keys.push(posKey(G.P));
-  if(m.promo){ setGlyph(id, G.P.b[m.to]); UISound.play('success'); if(sideOf(mover) > 0) showBanner('✨ Your pawn became a ' + PIECE_INFO[m.promo].name + '!'); else showBanner(G.names[-1] + '\'s pawn became a ' + PIECE_INFO[m.promo].name + '!', 'warn'); }
-  else if(m.castle && sideOf(mover) > 0){ showBanner('🏰 Castling! Your King is safe behind the Rook'); }
+  const mine = sideOf(mover) === (G.lx ? G.lx.me : 1);   // 📡 lk-3b: "your" = the colour on this device
+  if(m.promo){ setGlyph(id, G.P.b[m.to]); UISound.play('success'); if(mine) showBanner('✨ Your pawn became a ' + PIECE_INFO[m.promo].name + '!'); else showBanner(G.names[sideOf(mover)] + '\'s pawn became a ' + PIECE_INFO[m.promo].name + '!', 'warn'); }
+  else if(m.castle && mine){ showBanner('🏰 Castling! Your King is safe behind the Rook'); }
   if(capSq >= 0){ tableRideEnd(); tableReact(sideOf(mover), 'cheer'); tableReact(-sideOf(mover), 'facepalm'); }   // 🧑 table avatars react
   if(m.promo) tablePromo(sideOf(mover), m.to);   // 👑 the avatar jumps onto the new piece and dances
   setTip(null);
@@ -1010,7 +1037,7 @@ function showHint(){
    squash (pancake + dust), pop (bubble pop + drops). Queens and Rooks get a power-up ending:
    meteor (crash + shake), strike (lightning), vortex (black hole), rocket (fireworks),
    tornado. Picked at random, never the same twice in a row; colours follow the board design. */
-function sqCenter(sq){ const n = G.n, cs = $('board').clientWidth / n; return [(sq % n + 0.5) * cs, (((sq / n) | 0) + 0.5) * cs, cs]; }
+function sqCenter(sq){ const n = G.n, cs = $('board').clientWidth / n; sq = lxV(sq); return [(sq % n + 0.5) * cs, (((sq / n) | 0) + 0.5) * cs, cs]; }
 function fxEl(cls, x, y, vars, text, life){ const e = document.createElement('div'); e.className = 'fx ' + cls; e.style.left = x + 'px'; e.style.top = y + 'px'; Object.keys(vars || {}).forEach(k => e.style.setProperty(k, vars[k])); if(text) e.textContent = text; $('board').appendChild(e); setTimeout(() => e.remove(), life || 1400); return e; }
 function burstOf(cls, x, y, cs, count, spread, extra){ for(let k = 0; k < count; k++){ const a = Math.random() * Math.PI * 2, d = cs * (spread[0] + Math.random() * spread[1]); fxEl(cls, x, y, Object.assign({'--dx': Math.cos(a) * d + 'px', '--dy': (Math.sin(a) * d - cs * 0.25) + 'px', '--rot': (Math.random() * 600 - 300) + 'deg'}, typeof extra === 'function' ? extra(k) : extra || {}), null); } }
 function sparks(x, y, cs, list, up){ list.forEach((b, k) => { const a = k / list.length * Math.PI * 2, d = cs * (0.55 + Math.random() * 0.4); fxEl('spark', x, y, {'--dx': Math.cos(a) * d + 'px', '--dy': (Math.sin(a) * d - cs * (up || 0.35)) + 'px', '--rot': (Math.random() * 180 - 90) + 'deg'}, b); }); }
@@ -1184,7 +1211,7 @@ function tableTick(now){
 }
 
 /* ================= ALIVE: talking pieces + big moments ================= */
-function sqXY(sq){ const n = G.n, cs = $('board').clientWidth / n; return [(sq % n + 0.5) * cs, (((sq / n) | 0) + 0.5) * cs, cs]; }
+function sqXY(sq){ const n = G.n, cs = $('board').clientWidth / n; sq = lxV(sq); return [(sq % n + 0.5) * cs, (((sq / n) | 0) + 0.5) * cs, cs]; }
 const bubbles = {};
 // A speech bubble above a square (one per side at a time); optionally spoken with the piece's own voice.
 function bubble(sq, text, side, voice){
@@ -1320,7 +1347,7 @@ function endGame(winner, why){
   G.over = true; G.finishMs = performance.now() - G.t0 - G.pausedTotal; clearTimeout(botTimer);
   const thisGame = G;
   clearTimeout(bannerTimer); $('banner').classList.remove('on'); closePromo();
-  $('pl-op').classList.remove('thinking');
+  $('pl-op').classList.remove('thinking'); if(G.lx) lxThink(0);   // 📡 lk-3b
   updatePlayers(); render(); tableEnd(winner); cheerEnd(winner);   /* 📣 cs-3a */
   document.querySelectorAll('.pc.danger').forEach(e => e.classList.remove('danger'));
   if(winner){
@@ -1336,7 +1363,8 @@ function endGame(winner, why){
       showResult('<div class="big">' + (winner ? '🏆' : '🤝') + '</div><h2 class="cheer">' + (winner ? UI.esc(name) + ' wins!' : 'It\'s a draw!') + '</h2>' +
         '<p style="margin:-4px 0 0;font-weight:800;color:var(--ink-soft)">' + (why === 'resign' ? UI.esc(G.names[-winner]) + ' gave up' : END_WHY[why]) + '</p>' +
         '<div class="stats"><span>⏱ ' + fmt(G.finishMs) + '</span><span>♟️ ' + moves + ' moves</span></div>' +
-        '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">Menu</button></div>');
+        (thisGame.lx ? lxResultBtns() : '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">Menu</button></div>'));
+      if(thisGame.lx){ lxResultWire(); return; }   // 📡 lk-3b
       $('b-again').onclick = () => startGame({mode: 'duo', lvl: 1, friend: G.friend});
       $('b-menu').onclick = () => { hideResult(); G = null; clearInterval(tickHandle); showScreen('menu'); };
     }, winner ? 1500 : 300);
@@ -1475,6 +1503,7 @@ boot();
 const MS_GAME = 'chess';
 function msOpen(id){
   if(id === 'duo') chooseFriend();
+  if(id === 'lhost') lxOpenHost(); if(id === 'ljoin') lxJoin();   // 📡 lk-3b
 }
 function msNow(){ return ''; }
 function msWrap(fn, idOf){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ try{ const id = idOf.apply(this, arguments); if(id && UI.modeTried) UI.modeTried(S.player || CURRENT_PLAYER, MS_GAME, id); }catch(e){} return f.apply(this, arguments); }; }
@@ -1486,7 +1515,193 @@ msAfter('choosePlayer', name => {
   UI.alsoTry({game: MS_GAME, player: name, current: msNow, at: () => document.querySelector('#scr-menu .title'), open: msOpen});
 });
 /* ✨ END MODE SPOTLIGHT */
+
+/* 📡 LINK (lk-3b): ♟️ Chess on 2 own devices (LinkKit). The host's device is the referee: it checks every move and keeps the true game.
+   Each player moves their own colour on their own device (the board turned to their side); a move shows at once here and glides in there.
+   Messages: host → guest chgo (start / full state) · both ways chmove {tn, from, to, promo} · chend (gave up) · guest → host chask (send me the game). */
+const LX = {wired: false, lobby: null, pending: null, cfg: null, autoT: 0, games: 0, thinkT: 0, sayT: 0, side: 0};
+const LX_AUTO_MS = window.LX_AUTO_MS || 20000;
+const LX_TALK = ['Hmm… 🤔', 'I have a plan… 😏', 'Which piece… ♞', 'Don’t rush me! ⏳', 'Ooh, tricky! 🤯', 'Watch my Knight! 🐴', 'Hello everyone! 👋', 'Shh, thinking… 🤫',
+  'Big move coming! 🌟', 'Is that a trap? 🧐', 'Almost ready!', 'My Queen is ready! 👑', 'Guard the King! 🛡️', 'Where to go… 🗺️', 'You’ll see! 😎', 'Tick tock… 🕰️'];
+function lxV(sq){ return G && G.flip ? G.n * G.n - 1 - sq : sq; }   // board square → where it shows on this device
+function lxSeat(){
+  $('scr-play').classList.remove('lx-flip'); ['me', 'op'].forEach(k => $('pl-' + k).classList.remove('lx-you'));
+  if(!LX.pending || G.mode !== 'duo') return;
+  G.lx = LX.pending; LX.pending = null; G.flip = G.lx.me < 0;
+  G.names = {1: G.lx.names[1], '-1': G.lx.names[-1]}; G.friend = G.names[-G.lx.me];
+  $('scr-play').classList.toggle('lx-flip', G.flip);
+}
+function lxNames(){   // a "YOU" tag on your own card (long names stay readable on phones)
+  [[1, 'me'], [-1, 'op']].forEach(([sd, k]) => { $('nm-' + k).textContent = G.names[sd]; $('pl-' + k).classList.toggle('lx-you', sd === G.lx.me); });
+}
+function lxAv(cv, p){ const g = cv.getContext('2d'); g.clearRect(0, 0, cv.width, cv.height); if(typeof drawPreviewCanvas === 'function') drawPreviewCanvas(cv, myAvatar(p.name), {name: p.name, t: 1}); }
+function lxCloseLobby(){ if(LX.lobby && LX.lobby.close) LX.lobby.close(); LX.lobby = null; }
+function lxIdle(){ try{ if(window.Link && Link.status() !== 'idle') Link.leave(); }catch(e){} }
+function lxChoose(){
+  lxWire(); lxCloseLobby(); lxIdle();
+  $('lx-sub').textContent = 'Each player on their own phone, tablet or computer — same Wi-Fi'; showScreen('link');
+  $('lx-lobby').innerHTML = '<div class="lx-pick"><button class="btn sp-btn sp-primary" id="lx-host" data-sound="pop">📡 Host a game</button>' +
+    '<button class="btn sp-btn sp-secondary" id="lx-join" data-sound="pop">🔗 Join a friend</button></div>';
+  $('lx-host').onclick = lxOpenHost; $('lx-join').onclick = () => lxJoin();
+}
+async function lxOpenHost(){
+  lxWire(); lxCloseLobby(); lxIdle();
+  $('lx-sub').textContent = 'Your friend taps 🔗 Join a friend on their own phone or tablet — same Wi-Fi'; showScreen('link');
+  const el = $('lx-lobby'); el.innerHTML = '<div class="lk"><div class="lk-msg"><span class="ui-spin a-bob">📡</span> Opening the room<span class="lk-dots"></span></div></div>';
+  try{ await Link.host({game: 'Chess', name: S.player, seats: 2, page: 'chess', label: '♟️ Chess · 2 players'}); }
+  catch(e){ UISound.play('error'); el.innerHTML = '<div class="lk"><div class="lk-msg bad">😕 ' + UI.esc((e && e.message) || 'Could not open the room') + '</div></div>'; return; }
+  if($('scr-link').classList.contains('hidden')) return;
+  LX.lobby = Link.lobby(el, {title: '♟️ Chess · 2 players', url: WEBAPP_URL + '?page=chess', minPlayers: 2, name: S.player, drawAvatar: lxAv, kind: 'chess', onStart: lxHostGo});
+}
+function lxJoin(code){
+  lxWire(); lxCloseLobby(); lxIdle();
+  $('lx-sub').textContent = 'Same Wi-Fi as the host'; showScreen('link');
+  LX.lobby = Link.lobby($('lx-lobby'), {title: '♟️ Chess', name: S.player, drawAvatar: lxAv, code: code || undefined, onJoined: () => UISound.play('success')});
+}
+function lxExit(){
+  lxIdle(); lxCloseLobby(); clearTimeout(LX.autoT); lxThink(0); LX.cfg = null;
+  const o = document.querySelector('.lx-over'); if(o) o.remove();
+  if(G && G.lx){ if(window.Cheer) Cheer.unmount(); clearTimeout(botTimer); clearInterval(tickHandle); closePromo(); hideResult(); G = null; }
+  $('scr-play').classList.remove('lx-flip'); ['me', 'op'].forEach(k => $('pl-' + k).classList.remove('lx-you'));
+  renderLevels(); showScreen('menu');
+}
+function lxLeavePlay(){
+  if(G.over){ lxExit(); return; }
+  const host = G.lx.role === 'host';
+  UI.confirm({icon: '◀', title: host ? 'End the game for both?' : 'Leave this game?', body: host ? 'You are the host — the game stops on both devices.' : '🤖 The robot plays your moves until you come back.', okText: host ? 'End game' : 'Leave', cancelText: 'Keep playing'})
+    .then(ok => { if(ok) lxExit(); });
+}
+function lxNewGame(){
+  if(G.lx.role !== 'host'){ UI.toast('📡 ' + ((LX.cfg && LX.cfg.host) || 'The host') + ' can start a new game'); return; }
+  if(G.over){ lxHostGo(); return; }
+  UI.confirm({icon: '🔄', title: 'New game for both?', body: 'This game stops on both devices. Colours swap.', okText: 'New game', cancelText: 'Keep playing'}).then(ok => { if(ok) lxHostGo(); });
+}
+// ---- host ----
+function lxHostGo(){
+  const list = Link.players().filter(p => p.name && p.on).sort((a, b) => a.seat - b.seat);
+  const me = list.find(p => p.seat === Link.seat()) || {name: S.player, seat: Link.seat()}, fr = list.find(p => p !== me);
+  if(!fr){ UISound.play('error'); UI.toast('📡 Wait for a friend to join'); return; }
+  const hostSide = LX.games++ % 2 === 0 ? 1 : -1;   // ⚪ White moves first — the colours swap every game
+  const names = {}; names[hostSide] = me.name; names[-hostSide] = fr.name;
+  LX.cfg = {id: Date.now().toString(36), host: me.name, names, guest: fr.seat, hostSide};
+  lxCloseLobby(); hideResult(); const o = document.querySelector('.lx-over'); if(o) o.remove();
+  LX.pending = {role: 'host', me: hostSide, id: LX.cfg.id, names, guest: fr.seat, away: false};
+  startGame({mode: 'duo', lvl: 1, friend: fr.name});   // the true game lives here; G.lx comes from LX.pending
+  lxSendGo();
+}
+function lxState(){ return {id: G.lx.id, P: G.P, ids: G.ids, took: G.took, keys: G.keys, last: G.last, over: G.over, end: G.lx.end || null}; }
+function lxSendGo(){ if(G && G.lx && G.lx.role === 'host' && G.busy){ setTimeout(lxSendGo, 150); return; }   // a move is gliding: send the game once it is in
+  if(G && G.lx && G.lx.role === 'host') Link.send('chgo', {cfg: LX.cfg, st: lxState()}, {sure: true, to: G.lx.guest}); }
+function lxTurn(){
+  const mine = G.P.turn === G.lx.me;
+  lxThink(mine ? 0 : G.P.turn);
+  clearTimeout(LX.autoT);
+  if(G.lx.role === 'host' && !mine && G.lx.away) LX.autoT = setTimeout(lxAuto, LX_AUTO_MS);
+}
+function lxAuto(){   // 🤖 plays for a player whose device dropped out
+  if(!G || !G.lx || G.over || !G.lx.away || G.P.turn === G.lx.me || G.busy) return;
+  showBanner('🤖 Robot moves for ' + G.names[G.P.turn], 'warn');
+  const m = botChoice(G.P, LEVELS[1]); if(m) playMove(m);
+}
+// ---- both devices ----
+function lxSendMove(m){ Link.send('chmove', {id: G.lx.id, tn: G.keys.length, from: m.from, to: m.to, promo: m.promo || ''}, {sure: true, to: G.lx.role === 'host' ? G.lx.guest : undefined}); }
+function lxSendEnd(winner, why){ if(!G || !G.lx) return; G.lx.end = {winner, why}; Link.send('chend', {id: G.lx.id, winner, why}, {sure: true, to: G.lx.role === 'host' ? G.lx.guest : undefined}); }
+function lxGotMove(d, tries){
+  if(!G || !G.lx || !d || d.id !== G.lx.id || G.over) return;
+  if(G.busy && (tries || 0) < 20){ setTimeout(() => lxGotMove(d, (tries || 0) + 1), 150); return; }
+  const m = d.tn === G.keys.length && G.P.turn !== G.lx.me ? legalMoves(G.P).find(x => x.from === d.from && x.to === d.to && (x.promo || '') === (d.promo || '')) : null;
+  if(!m){   // out of step: the host's game is the truth
+    if(G.lx.role === 'host') lxSendGo(); else Link.send('chask', {id: G.lx.id}, {sure: true});
+    return;
+  }
+  clearTimeout(LX.autoT); lxThink(0); closePromo();
+  m.rm = true; playMove(m);
+}
+// ---- guest ----
+function lxGuestStart(d){
+  LX.cfg = d.cfg; lxCloseLobby(); hideResult(); const o = document.querySelector('.lx-over'); if(o) o.remove();
+  LX.pending = {role: 'guest', me: -d.cfg.hostSide, id: d.cfg.id, names: d.cfg.names};
+  startGame({mode: 'duo', lvl: 1, friend: d.cfg.host});
+  lxApply(d.st);
+}
+function lxApply(st){
+  if(!G || !G.lx || !st || st.id !== G.lx.id) return;
+  if(G.busy){ setTimeout(() => lxApply(st), 200); return; }
+  const same = st.keys.length === G.keys.length && st.keys[st.keys.length - 1] === G.keys[G.keys.length - 1];
+  if(!same){
+    G.P = st.P; G.ids = st.ids; G.took = st.took; G.keys = st.keys; G.last = st.last; G.sel = null; closePromo();
+    buildBoard(); layout(); tableStart();
+    if(!st.end) startTurn(); else { updatePlayers(); render(); }
+  }
+  if(st.end && !G.over) endGame(st.end.winner, st.end.why);
+}
+function lxResultBtns(){
+  return G.lx.role === 'host' ? '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again · colours swap</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 End the room</button></div>'
+    : '<div class="note lk-wait">⏳ ' + UI.esc((LX.cfg && LX.cfg.host) || 'The host') + ' can start the next game<span class="lk-dots"></span></div><div class="res-btns"><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 Leave</button></div>';
+}
+function lxResultWire(){ const a = $('b-again'); if(a) a.onclick = () => lxHostGo(); $('b-menu').onclick = () => lxExit(); }
+function lxEnded(msg){
+  if(G){ G.over = true; clearTimeout(LX.autoT); lxThink(0); }
+  hideResult(); closePromo(); const o0 = document.querySelector('.lx-over'); if(o0) o0.remove();   // the message sits on top, alone
+  const o = document.createElement('div'); o.className = 'lx-over';
+  o.innerHTML = '<div class="result-card"><div class="big">📡</div><h2>' + UI.esc(msg) + '</h2><div class="note">Thanks for playing together!</div><div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="none" onclick="lxExit()">◀ Chess</button></div></div>';
+  document.body.appendChild(o);
+}
+// ---- while the other one thinks: their seat avatar plays around and talks to everyone ----
+function lxThink(side){
+  clearInterval(LX.thinkT); clearTimeout(LX.sayT); LX.side = side;
+  document.querySelectorAll('.lx-say').forEach(e => e.remove());
+  ['me', 'op'].forEach(k => $('pl-' + k).classList.remove('thinking'));
+  if(!side || !G) return;
+  const pl = $('pl-' + (side > 0 ? 'me' : 'op')); pl.classList.add('thinking'); pl.querySelector('.think').textContent = '✏️ thinking…';
+  const say = document.createElement('div'); say.className = 'lx-say'; pl.appendChild(say);
+  let i = Math.floor(Math.random() * LX_TALK.length);
+  const line = () => {
+    if(!G || G.over || LX.side !== side) return;
+    i = (i + 1 + Math.floor(Math.random() * 3)) % LX_TALK.length; say.textContent = LX_TALK[i]; say.classList.add('on');
+    LX.sayT = setTimeout(() => say.classList.remove('on'), 2600);
+    const s2 = TB.seats[side], g = tbG(pick(['think', 'wave', 'clap', 'stretch', 'dance', 'dab', 'flex', 'shrug']));
+    if(s2 && !s2.g && g){ s2.g = g; s2.t0 = performance.now(); s2.loop = false; s2.kind = 'idle'; }   // the seat avatar plays while talking
+  };
+  LX.sayT = setTimeout(line, 900); LX.thinkT = setInterval(line, 3600);
+}
+// ---- the cheering crowd: seen from this device's side (wraps the 📣 block from outside) ----
+(function(){
+  const mount = cheerMount, move = cheerMove, end = cheerEnd;
+  cheerMount = function(){ if(!G || !G.lx || G.lx.me > 0) return mount.apply(this, arguments);
+    const nm = G.names, me = S.player; G.names = {1: nm[-1], '-1': nm[1]}; S.player = nm[-1];
+    try{ return mount.apply(this, arguments); } finally { G.names = nm; S.player = me; } };
+  cheerMove = function(m, sd, c, ch){ return move.call(this, m, G && G.lx ? sd * G.lx.me : sd, c, ch); };
+  cheerEnd = function(w){ return end.call(this, G && G.lx && w ? w * G.lx.me : w); };
+})();
+function lxWire(){
+  if(LX.wired || !window.Link) return; LX.wired = true;
+  // guest side
+  Link.on('chgo', d => { if(Link.isHost() || !d || !d.cfg) return; if(G && G.lx && G.lx.id === d.cfg.id){ lxApply(d.st); return; } lxGuestStart(d); });
+  Link.on('hostleft', e => { if(Link.isHost()) return; if(!G && $('scr-link').classList.contains('hidden')) return;
+    UISound.play('bump'); lxEnded(e && e.reason === 'lost' ? '📶 Lost the link to ' + ((LX.cfg && LX.cfg.host) || 'the host') : '👋 ' + ((LX.cfg && LX.cfg.host) || 'The host') + ' ended the game'); });
+  // both
+  Link.on('chmove', d => lxGotMove(d, 0));
+  Link.on('chend', d => { if(!G || !G.lx || !d || d.id !== G.lx.id || G.over) return; G.lx.end = {winner: d.winner, why: d.why}; endGame(d.winner, d.why); });
+  // host side
+  Link.on('chask', d => { if(Link.isHost() && G && G.lx && d && d.id === G.lx.id) lxSendGo(); });
+  Link.on('leave', e => { if(!Link.isHost() || !G || !G.lx || G.over || e.seat !== G.lx.guest) return; G.lx.away = true;
+    showBanner('📶 ' + G.names[-G.lx.me] + ' dropped out — 🤖 the robot moves for them until they come back', 'bad');
+    if(G.P.turn !== G.lx.me){ clearTimeout(LX.autoT); LX.autoT = setTimeout(lxAuto, LX_AUTO_MS); } });
+  const back = e => { if(!Link.isHost() || !G || !G.lx || !LX.cfg || e.seat !== G.lx.guest) return;
+    if(G.lx.away){ G.lx.away = false; clearTimeout(LX.autoT); showBanner('👋 ' + G.names[-G.lx.me] + ' is back!'); UISound.play('success'); }
+    lxSendGo(); };
+  Link.on('rejoin', back); Link.on('join', back);
+  addEventListener('pagehide', () => { try{ if(Link.status() !== 'idle') Link.leave(); }catch(e){} });
+}
+// 🔗 QR / waiting room: ?page=chess&link=<code> → the number pad (the waiting room leaves it empty to type)
+function lxUrlCode(cb){
+  try{ if(window.google && google.script && google.script.url && google.script.url.getLocation){ google.script.url.getLocation(l => cb(((l && l.parameter) || {}).link || '')); return; } }catch(e){}
+  try{ cb(new URLSearchParams(location.search).get('link') || ''); }catch(e){ cb(''); }
+}
+msAfter('choosePlayer', () => lxUrlCode(c => { c = String(c || '').replace(/[^0-9]/g, '').slice(0, 4); if(c.length === 4) lxJoin(c); }));
+/* 📡 END LINK (lk-3b) */
 </script>
 </body>
 </html>
-<!-- (11w-1+11x-3+r32+back-1+modes-3+p1b+cs-3a) END OF Chess.html -->
+<!-- (11w-1+11x-3+r32+back-1+modes-3+p1b+cs-3a+lk-3b) END OF Chess.html -->
