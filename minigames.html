@@ -197,6 +197,12 @@
   .result-card{margin:auto;background:var(--card);border-radius:26px;padding:24px 22px;max-width:380px;width:100%;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;
     box-shadow:0 14px 40px rgba(0,0,0,0.25);animation:popin .35s cubic-bezier(.3,1.6,.5,1);}
   .result-card .big{font-size:3.2rem;}
+  /* 🧑 p6d: your avatar left of the round dots */
+  .g-row{position:relative;display:flex;align-items:center;justify-content:center;} .g-row #g-progress{flex:0 1 auto;min-width:0;}
+  #bd-lg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:48px;height:56px;display:block;pointer-events:none;z-index:2;}   /* never adds height (no-scroll play screen) */
+  @media (orientation:landscape) and (max-height:520px){ #bd-lg{width:34px;height:40px;} }
+  .result-card .res-av{width:128px;height:140px;display:block;margin:0 auto -2px;}
+  .pick canvas{width:72px;height:84px;}
   .result-card h2{font-size:1.55rem;background:linear-gradient(90deg,var(--c1),var(--c2));-webkit-background-clip:text;background-clip:text;color:transparent;}
   .result-card .stars .st{display:inline-block;font-size:1.8rem;animation:star .45s cubic-bezier(.2,1.8,.4,1) both;} .result-card .stars .st.off{opacity:.22;}
   @keyframes star{0%{transform:scale(0) rotate(-90deg);}100%{transform:scale(1);}}
@@ -215,6 +221,9 @@
   @media (prefers-reduced-motion: reduce){ .title .logo,.tile .ti,.cd span,.praise,.result-card,.confetti,.pop,.yay,.shake{animation:none !important;} }
 </style>
 <script src="inc/UiKit.js"></script>
+<script src="inc/BallSkins.js"></script>
+<script src="inc/AvatarKit.js"></script>
+<script src="inc/AvatarActing.js"></script>   <!-- 🧑 p6: BallSkins + AvatarKit + AvatarActing -->
 </head>
 <body ontouchstart="">
 
@@ -247,7 +256,7 @@
     <button class="pill" id="g-stage" data-gb="slot" data-sound="pop" onclick="toggleStageMenu()"></button>
     <span class="pill hidden" id="g-left"></span>
   </div>
-  <div id="g-progress"></div>
+  <div class="g-row"><canvas id="bd-lg" aria-hidden="true"></canvas><div id="g-progress"></div></div>   <!-- 🧑 p6d -->
   <div class="arena" id="arena"></div>
 </section>
 
@@ -262,7 +271,6 @@ const DURATION_MIN = Number(''+__SP("durationMin")+'') || null;
 const OPEN_GAME = ''+__SP("game")+'';
 
 const $ = id => document.getElementById(id);
-const rnd = n => Math.floor(Math.random() * n);
 const pick = a => a[rnd(a.length)];
 function shuffle(a){ a = a.slice(); for(let i = a.length - 1; i > 0; i--){ const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -284,7 +292,7 @@ const GAMES = {
   'code-robot':    {name:'Code the Robot', icon:'🤖', c1:'#8C7CF0', c2:'#5B4BC4', blurb:'Arrows that send the robot to the star'},
   'trash-pointer': {name:'Trash Pointer',  icon:'🗑️', c1:'#7ED957', c2:'#2FA36B', blurb:'Drag rubbish into the right bin'}
 };
-let S = {players: [], progress: {}, settings: {}, player: '', age: ''};
+let S = {players: [], progress: {}, settings: {}, avatars: {}, player: '', age: ''};
 let lockHandle = null;
 let M = null; // the mini game being played: {id, stage, ...}
 
@@ -357,7 +365,8 @@ function renderPlayers(){
   const box = $('player-list'); box.innerHTML = '';
   if(!S.players.length){ box.innerHTML = '<div style="text-align:center;font-weight:700;color:var(--ink-soft)">No players yet — add one on the Dashboard first.</div>'; return; }
   S.players.forEach(p => { const b = document.createElement('button'); b.className = 'pick'; b.setAttribute('data-sound', 'pop');
-    b.innerHTML = '<div class="big">' + UI.esc(p.Name.charAt(0).toUpperCase()) + '</div><div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age || '') + '</div>';
+    if(HAS_AV){ const c = document.createElement('canvas'); c.width = 144; c.height = 168; b.appendChild(c); b.insertAdjacentHTML('beforeend', '<div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age || '') + '</div>'); drawPreviewCanvas(c, myAvatar(p.Name), {name: p.Name, t: 1}); }   /* 🧑 p6 */
+    else b.innerHTML = '<div class="big">' + UI.esc(p.Name.charAt(0).toUpperCase()) + '</div><div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age || '') + '</div>';
     b.onclick = () => choosePlayer(p.Name); box.appendChild(b); });
 }
 function choosePlayer(name){
@@ -807,7 +816,7 @@ function boot(){
   google.script.run
     .withSuccessHandler(d => {
       UI.loaded();
-      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {};
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {};
       UISound.applySettings(S.settings);
       const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
       lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
@@ -818,8 +827,32 @@ function boot(){
     .withFailureHandler(() => { UI.loaded(); UI.toast('Could not load players — check the connection', 'err'); renderPlayers(); showScreen('player'); })
     .getMiniData(CURRENT_PLAYER);
 }
+/* ================= 🧑 YOUR AVATAR (p6d — ✨ P6 / 11w round 2) =================
+   The player's own avatar beside the game: UI.buddy pictures (cached AvatarActing frames, swapped by a small timer) —
+   nothing is painted in the game loop. It reacts to the game's own moments through the wrappers below (no game logic changes). */
+const HAS_AV = typeof drawAvatar === 'function' && typeof GESTURES !== 'undefined';
+function myAvatar(name){ const a = S.avatars && S.avatars[name || S.player]; return a ? fixAv(a) : defaultAvatar(name || S.player || 'player'); }
+const BD_SAY = {};
+const BD = {on: false, who: null, list: []};
+function bdStart(){
+  BD.list.forEach(b => b && b.stop()); BD.list = []; BD.on = false;
+  const els = ['bd-lg'].map(id => document.getElementById(id)).filter(Boolean);
+  if(!HAS_AV || !UI.buddy || !window.Acting){ els.forEach(e => e.classList.add('hidden')); return; }
+  BD.who = {name: S.player, av: myAvatar(S.player)}; BD.list = els.map((e, i) => UI.buddy(e, BD.who, i ? {fps: 6} : {})).filter(Boolean); BD.on = !!BD.list.length;
+}
+function bdReact(mood, ms){ if(!BD.on) return false; let a = false; BD.list.forEach(b => { const x = b.react(mood, ms); if(x) a = x; });  return a; }
+function bdResultBig(){ const big = document.querySelector('#result-card > .big'); if(!big || !BD.on) return; const won = !!document.querySelector('#result-card h2.cheer'); const c = document.createElement('canvas'); c.className = 'res-av'; c.id = 'res-av'; c.setAttribute('aria-hidden', 'true'); big.replaceWith(c); bdResult('res-av', won); }
+function bdResult(id, won){ if(BD.on && document.getElementById(id)) UI.buddy(document.getElementById(id), BD.who, {hold: won ? 'win' : 'lose'}); }
+const bdBase = {openGame, correct, wrong, stageCleared, speedOver, showCard};
+openGame = function(){ const args = arguments;  const r = bdBase.openGame.apply(this, args); bdStart(); return r; };
+correct = function(){ const args = arguments;  const r = bdBase.correct.apply(this, args); if(BD.on && performance.now() - (BD.last || 0) > 2200){ BD.last = performance.now(); bdReact('happy', 1300); } return r; };
+wrong = function(){ const args = arguments;  const r = bdBase.wrong.apply(this, args); bdReact('miss', 1600); return r; };
+stageCleared = function(){ const args = arguments;  const r = bdBase.stageCleared.apply(this, args); bdReact('win', 3000); return r; };
+speedOver = function(){ const args = arguments;  const r = bdBase.speedOver.apply(this, args); bdReact('joy', 2600); return r; };
+showCard = function(){ const args = arguments;  const r = bdBase.showCard.apply(this, args); const big = document.querySelector('#result-card > .big'); if(big && BD.on){ const c = document.createElement('canvas'); c.className = 'res-av'; c.id = 'res-av'; big.replaceWith(c); bdResult('res-av', true); } return r; };
+/* ================= 🧑 YOUR AVATAR END (p6d) ================= */
 boot();
 </script>
 </body>
 </html>
-<!-- (r9+back-1+p1d) END OF steam-playground.html -->
+<!-- (r9+back-1+p1d+p6d) END OF steam-playground.html -->

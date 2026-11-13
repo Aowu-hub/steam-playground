@@ -206,6 +206,10 @@
     display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:0 14px 40px rgba(0,0,0,0.25);animation:pop-in .35s cubic-bezier(.3,1.6,.5,1);}
   @keyframes pop-in{from{transform:scale(.7);opacity:0;}to{transform:scale(1);opacity:1;}}
   .result-card .big{font-size:3.4rem;}
+  /* 🧑 p6b: your avatar */
+  .mission canvas.bd{width:40px;height:46px;flex:none;display:block;margin:-4px -4px -4px -2px;}
+  .result-card .res-av{width:128px;height:140px;display:block;margin:0 auto -2px;}
+  .pick canvas{width:72px;height:84px;}
   .result-card h2{font-size:1.55rem;}
   .result-card h2.cheer{background:linear-gradient(90deg,#4361EE,#7B5CFA,#F15BB5,#2EC4B6);-webkit-background-clip:text;background-clip:text;color:transparent;}
   .result-card .rating .st{display:inline-block;font-size:1.8rem;animation:star-pop .45s cubic-bezier(.2,1.8,.4,1) both;}
@@ -232,6 +236,9 @@
   @media (prefers-reduced-motion: reduce){ .title .logo,.result-card,.confetti,.chip,.praise,.result-card .rating .st{animation:none;} }
 </style>
 <script src="inc/UiKit.js"></script>
+<script src="inc/BallSkins.js"></script>
+<script src="inc/AvatarKit.js"></script>
+<script src="inc/AvatarActing.js"></script>   <!-- 🧑 p6: BallSkins + AvatarKit + AvatarActing -->
 </head>
 <body ontouchstart="">
 
@@ -349,12 +356,10 @@ const PRAISE = ['Brilliant coding', 'Super programmer', 'Amazing', 'Bug fixer', 
 
 /* ================= HELPERS ================= */
 const $ = id => document.getElementById(id);
-const rnd = n => Math.floor(Math.random() * n);
 const pick = a => a[rnd(a.length)];
 const rint = (a, b) => a + rnd(b - a + 1);
 function shuffle(a){ for(let i = a.length - 1; i > 0; i--){ const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
 function fmt(ms){ const s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
 
 /* ================= BOARD RULES (shared by the solver and the game) ================= */
@@ -535,7 +540,7 @@ function buildBoard(lvlIdx, worldKey){
 }
 
 /* ================= STATE ================= */
-let S = {players: [], progress: {}, settings: {}, player: '', age: ''};
+let S = {players: [], progress: {}, settings: {}, avatars: {}, player: '', age: ''};
 let G = null;          // the board being played
 let lockHandle = null;
 let speedFast = false, speedBeforeHC = null;   // Hardcore forces full speed, then gives your choice back
@@ -721,7 +726,7 @@ function hardcoreOver(e){
   const g = G; G.over = true;
   setTimeout(() => {
     if(G !== g) return;
-    showResult('<div class="big">💀</div><h2>' + UI.esc(FAIL_TEXT[e.why] || 'Oops!') + '</h2><p style="margin:0;font-weight:700;color:var(--ink-soft)">💀 Hardcore ends on the first mistake — try again!</p>' +
+    showResult((BD.on ? '<canvas class="res-av" id="res-av" aria-hidden="true"></canvas>' : '<div class="big">💀</div>') + '<h2>' + UI.esc(FAIL_TEXT[e.why] || 'Oops!') + '</h2><p style="margin:0;font-weight:700;color:var(--ink-soft)">💀 Hardcore ends on the first mistake — try again!</p>' +
       '<div class="res-btns"><button class="btn sp-btn sp-primary" id="btn-hc-same">🔁 Same board</button><button class="btn soft sp-btn sp-secondary" id="btn-hc-new">🎲 New board</button><button class="btn soft sp-btn sp-secondary" id="btn-hc-levels">🎚️ Levels</button></div>');
     $('btn-hc-same').onclick = () => { hideResult(); G.over = false; G.failInfo = null; G.badChip = -1; G.fails = 0; G.doneChips = new Set(); resetRobot(true); renderProgram(); updateHud(); };
     $('btn-hc-new').onclick = () => newBoard();
@@ -766,18 +771,16 @@ function resizeStage(){
 window.addEventListener('resize', resizeStage);
 if(window.ResizeObserver) new ResizeObserver(resizeStage).observe($('stage-wrap'));
 function cxy(c){ const n = G.B.n; return [(c % n + 0.5) * CS, (((c / n) | 0) + 0.5) * CS]; }
-// Emoji come from a small picture cache (typing a colour emoji every frame lags, above all on iPhone / iPad) — same idea as AvatarKit emoSprite
-const EMO_CACHE = new Map();
-function emoSprite(ch, px){
+// Emoji come from a small picture cache (typing a colour emoji every frame lags, above all on iPhone / iPad) — same idea as AvatarKit g_emoSprite
+function g_emoSprite(ch, px){
   const q = Math.min(256, Math.max(12, Math.ceil(px / 12) * 12)), key = ch + '|' + q; let c = EMO_CACHE.get(key);
   if(!c){ if(EMO_CACHE.size > 600) EMO_CACHE.clear(); c = document.createElement('canvas'); c.width = c.height = Math.ceil(q * 1.4); const x = c.getContext('2d'); x.fillStyle = '#000'; x.font = q + 'px ' + EMOJI_FONT; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(ch, c.width / 2, c.height / 2 + q * 0.05); c.q = q; EMO_CACHE.set(key, c); }
   return c;
 }
-function emoDraw(g, ch, x, y, size, alpha){ if(!ch || !(size > 0.5)) return; const m = g.getTransform ? g.getTransform() : null, sc = m ? Math.hypot(m.a, m.b) || 1 : 1, sp = emoSprite(ch, size * sc), d = sp.width * size / sp.q; const a0 = g.globalAlpha; g.globalAlpha = alpha == null ? 1 : alpha; g.drawImage(sp, x - d / 2, y - d / 2, d, d); g.globalAlpha = a0; }
-function emo(ch, x, y, size, alpha){ emoDraw(ctx, ch, x, y, size, alpha); }
+function emoDraw(g, ch, x, y, size, alpha){ if(!ch || !(size > 0.5)) return; const m = g.getTransform ? g.getTransform() : null, sc = m ? Math.hypot(m.a, m.b) || 1 : 1, sp = g_emoSprite(ch, size * sc), d = sp.width * size / sp.q; const a0 = g.globalAlpha; g.globalAlpha = alpha == null ? 1 : alpha; g.drawImage(sp, x - d / 2, y - d / 2, d, d); g.globalAlpha = a0; }
+function g_emo(ch, x, y, size, alpha){ emoDraw(ctx, ch, x, y, size, alpha); }
 /* ---------- ART: one painter per thing, used by the board AND the picture key ---------- */
 function emoG(g, ch, x, y, size, alpha){ emoDraw(g, ch, x, y, size, alpha); }
-function rrect(g, x, y, w, h, r){ g.beginPath(); if(g.roundRect) g.roundRect(x, y, w, h, r); else g.rect(x, y, w, h); }
 function numBadge(g, txt, x, y, S, bg, fg){
   const r = S * 0.17; g.fillStyle = bg; g.strokeStyle = '#fff'; g.lineWidth = Math.max(1.5, S * 0.035);
   g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.stroke();
@@ -1040,14 +1043,14 @@ function drawRobot(now){
   } else if(G.failInfo){ extra = G.failInfo.why === 'lava' ? '🔥' : '💫'; alpha = G.failInfo.why === 'lava' ? 0.45 : 1; }
   else if(!REDUCED){ sy = 1 + Math.sin(now / 300) * 0.03; }
   ART.robot(ctx, x, y, CS, dirA, {rot, sx, sy, alpha});
-  if(extra) emo(extra, x + CS * 0.28, y - CS * 0.3, CS * 0.38);
+  if(extra) g_emo(extra, x + CS * 0.28, y - CS * 0.3, CS * 0.38);
   // thought bubble: what the robot needs
   if(G.thinkUntil && now < G.thinkUntil && !A){
     const bx = x + CS * 0.42, by = y - CS * 0.62, r = CS * 0.34, k = Math.min(1, (G.thinkUntil - now) / 300);
     ctx.globalAlpha = k; ctx.fillStyle = '#fff'; ctx.strokeStyle = 'rgba(30,42,85,0.25)'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(x + CS * 0.2, y - CS * 0.3, CS * 0.06, 0, 7); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.arc(bx, by, r, 0, 7); ctx.fill(); ctx.stroke(); ctx.globalAlpha = 1;
-    emo(G.B.need.e, bx, by, r * 1.2, k);
+    g_emo(G.B.need.e, bx, by, r * 1.2, k);
   }
 }
 // little effects
@@ -1059,7 +1062,7 @@ function burst(c, list, count){
 function drawFx(now){
   if(!G.fx || !G.fx.length) return;
   G.fx = G.fx.filter(f => now - f.t0 < f.dur);
-  G.fx.forEach(f => { const p = (now - f.t0) / f.dur, e = 1 - Math.pow(1 - p, 2); emo(f.ch, f.x + f.dx * e * CS, f.y + f.dy * e * CS, CS * 0.36, 1 - p); });
+  G.fx.forEach(f => { const p = (now - f.t0) / f.dur, e = 1 - Math.pow(1 - p, 2); g_emo(f.ch, f.x + f.dx * e * CS, f.y + f.dy * e * CS, CS * 0.36, 1 - p); });
 }
 function loop(now){
   if(!G) return;
@@ -1191,7 +1194,7 @@ function win(){
   setTimeout(() => {
     if(!G || !G.over) return;
     pr.classList.add('hidden');
-    showResult('<div class="big">🤖</div><h2 class="cheer">' + UI.esc(praise) + '!</h2>' +
+    showResult((BD.on ? '<canvas class="res-av" id="res-av" aria-hidden="true"></canvas>' : '<div class="big">🤖</div>') + '<h2 class="cheer">' + UI.esc(praise) + '!</h2>' +
       '<p style="margin:-4px 0 0;font-weight:800;color:var(--ink-soft)">Your code used ' + used + ' block' + (used === 1 ? '' : 's') + (G.limit < 99 ? ' · best is ' + best : '') + '</p>' +
       '<div class="rating">' + starHtml + '</div>' +
       '<div class="score-big">🏆 <span id="score-count">0</span></div>' +
@@ -1263,7 +1266,8 @@ function renderPlayers(){
   const box = $('player-list'); box.innerHTML = '';
   if(!S.players.length){ box.innerHTML = '<div class="empty">No players yet — add one on the Dashboard first.</div>'; return; }
   S.players.forEach(p => { const b = document.createElement('button'); b.className = 'pick'; b.setAttribute('data-sound', 'pop');
-    b.innerHTML = '<div class="big">' + UI.esc(p.Name.charAt(0).toUpperCase()) + '</div><div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age || '') + '</div>';
+    if(HAS_AV){ const c = document.createElement('canvas'); c.width = 144; c.height = 168; b.appendChild(c); b.insertAdjacentHTML('beforeend', '<div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age || '') + '</div>'); drawPreviewCanvas(c, myAvatar(p.Name), {name: p.Name, t: 1}); }   /* 🧑 p6 */
+    else b.innerHTML = '<div class="big">' + UI.esc(p.Name.charAt(0).toUpperCase()) + '</div><div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age || '') + '</div>';
     b.onclick = () => choosePlayer(p.Name); box.appendChild(b); });
 }
 function choosePlayer(name){
@@ -1322,7 +1326,7 @@ function boot(){
   google.script.run
     .withSuccessHandler(d => {
       UI.loaded();
-      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {};
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {};
       UISound.applySettings(S.settings);
       const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
       lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
@@ -1333,8 +1337,32 @@ function boot(){
     .withFailureHandler(() => { UI.loaded(); UI.toast('Could not load players — check the connection', 'err'); renderPlayers(); showScreen('player'); })
     .getLevelGameData(GAME_ID, CURRENT_PLAYER);
 }
+const BD_CV = Object.assign(document.createElement('canvas'), {id: 'bd-lg', className: 'bd'}); BD_CV.setAttribute('aria-hidden', 'true');   // lives in the mission card
+/* ================= 🧑 YOUR AVATAR (p6b — ✨ P6 / 11w round 2) =================
+   The player's own avatar beside the game: UI.buddy pictures (cached AvatarActing frames, swapped by a small timer) —
+   nothing is painted in the game loop. It reacts to the game's own moments through the wrappers below (no game logic changes). */
+const HAS_AV = typeof drawAvatar === 'function' && typeof GESTURES !== 'undefined';
+function myAvatar(name){ const a = S.avatars && S.avatars[name || S.player]; return a ? fixAv(a) : defaultAvatar(name || S.player || 'player'); }
+const BD_SAY = {};
+const BD = {on: false, who: null, list: []};
+function bdStart(){
+  BD.list.forEach(b => b && b.stop()); BD.list = []; BD.on = false;
+  const els = ['bd-lg'].map(id => document.getElementById(id)).filter(Boolean);
+  if(!HAS_AV || !UI.buddy || !window.Acting){ els.forEach(e => e.classList.add('hidden')); return; }
+  BD.who = {name: S.player, av: myAvatar(S.player)}; BD.list = els.map((e, i) => UI.buddy(e, BD.who, i ? {fps: 6} : {})).filter(Boolean); BD.on = !!BD.list.length;
+}
+function bdReact(mood, ms){ if(!BD.on) return false; let a = false; BD.list.forEach(b => { const x = b.react(mood, ms); if(x) a = x; });  return a; }
+function bdResultBig(){ const big = document.querySelector('#result-card > .big'); if(!big || !BD.on) return; const won = !!document.querySelector('#result-card h2.cheer'); const c = document.createElement('canvas'); c.className = 'res-av'; c.id = 'res-av'; c.setAttribute('aria-hidden', 'true'); big.replaceWith(c); bdResult('res-av', won); }
+function bdResult(id, won){ if(BD.on && document.getElementById(id)) UI.buddy(document.getElementById(id), BD.who, {hold: won ? 'win' : 'lose'}); }
+const bdBase = {renderMission, runOrStop, onFail, win, showResult};
+renderMission = function(){ const args = arguments;  const r = bdBase.renderMission.apply(this, args); const ms = document.getElementById('mission'); if(ms && HAS_AV) ms.insertBefore(BD_CV, ms.firstChild); if(BD.g !== G){ BD.g = G; bdStart(); } return r; };
+runOrStop = function(){ const args = arguments;  const r = bdBase.runOrStop.apply(this, args); if(G && G.running) bdReact('joy', 1400); return r; };
+onFail = function(){ const args = arguments;  const r = bdBase.onFail.apply(this, args); bdReact('miss', 2200); return r; };
+win = function(){ const args = arguments;  const r = bdBase.win.apply(this, args); bdReact('win', 3200); return r; };
+showResult = function(){ const args = arguments;  const r = bdBase.showResult.apply(this, args); if(document.getElementById('res-av')) bdResult('res-av', /class="cheer"/.test(args[0])); return r; };
+/* ================= 🧑 YOUR AVATAR END (p6b) ================= */
 boot();
 </script>
 </body>
 </html>
-<!-- (r9+emoji+back-1+p1b+p2) END OF CodeRobot.html -->
+<!-- (r9+emoji+back-1+p1b+p2+p6b) END OF CodeRobot.html -->

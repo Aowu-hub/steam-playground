@@ -116,6 +116,10 @@
   @keyframes shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-9px) rotate(-1deg);}40%{transform:translateX(9px) rotate(1deg);}60%{transform:translateX(-5px);}80%{transform:translateX(5px);}}
   .qno{position:absolute;top:8px;left:12px;font-weight:800;font-size:0.8rem;opacity:.7;}
   .mascot{position:absolute;top:4px;right:10px;font-size:2rem;line-height:1;transition:transform .2s;}
+  /* 🧑 p6e: your avatar */
+  .qcard #bd-lg{position:absolute;top:2px;right:54px;width:40px;height:46px;pointer-events:none;}
+  @media (orientation:landscape) and (max-height:520px){ .qcard #bd-lg{right:44px;width:32px;height:38px;} }
+  .result-card .res-av{width:128px;height:140px;display:block;margin:0 auto -2px;}
   .mascot.happy{animation:hop .5s ease;} .mascot.sad{animation:droop .6s ease;}
   @keyframes hop{30%{transform:translateY(-14px) rotate(-10deg) scale(1.15);}60%{transform:translateY(0) rotate(6deg);}}
   @keyframes droop{40%{transform:rotate(-18deg) translateY(4px);}}
@@ -233,6 +237,7 @@
       <div class="banner" id="banner"></div>
       <span class="qno" id="qno"></span>
       <span class="mascot" id="mascot">🦉</span>
+      <canvas id="bd-lg" aria-hidden="true"></canvas>   <!-- 🧑 p6e -->
       <div class="word hidden" id="word"></div>
       <div class="vis hidden" id="vis"></div>
       <div class="eq" id="eq"></div>
@@ -710,7 +715,27 @@ msAfter('choosePlayer', name => {
 });
 /* ✨ END MODE SPOTLIGHT */
 </script>
-<script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.chips', {rows: 3}); }</script>
+<script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.chips', {rows: 3}); }/* ================= 🧑 YOUR AVATAR (p6e — ✨ P6 / 11w round 2) =================
+   The player's own avatar beside the game: UI.buddy pictures (cached AvatarActing frames, swapped by a small timer) —
+   nothing is painted in the game loop. It reacts to the game's own moments through the wrappers below (no game logic changes). */
+const HAS_AV = typeof drawAvatar === 'function' && typeof GESTURES !== 'undefined';
+const BD_SAY = {};
+const BD = {on: false, who: null, list: []};
+function bdStart(){
+  BD.list.forEach(b => b && b.stop()); BD.list = []; BD.on = false;
+  const els = ['bd-lg'].map(id => document.getElementById(id)).filter(Boolean);
+  if(!HAS_AV || !UI.buddy || !window.Acting){ els.forEach(e => e.classList.add('hidden')); return; }
+  BD.who = {name: S.player, av: myAvatar(S.player)}; BD.list = els.map((e, i) => UI.buddy(e, BD.who, i ? {fps: 6} : {})).filter(Boolean); BD.on = !!BD.list.length;
+}
+function bdReact(mood, ms){ if(!BD.on) return false; let a = false; BD.list.forEach(b => { const x = b.react(mood, ms); if(x) a = x; });  return a; }
+function bdResultBig(){ const big = document.querySelector('#result-card > .big'); if(!big || !BD.on) return; const won = !!document.querySelector('#result-card h2.cheer'); const c = document.createElement('canvas'); c.className = 'res-av'; c.id = 'res-av'; c.setAttribute('aria-hidden', 'true'); big.replaceWith(c); bdResult('res-av', won); }
+function bdResult(id, won){ if(BD.on && document.getElementById(id)) UI.buddy(document.getElementById(id), BD.who, {hold: won ? 'win' : 'lose'}); }
+const bdBase = {startGame, answer, showResult};
+startGame = function(){ const args = arguments;  const r = bdBase.startGame.apply(this, args); bdStart(); return r; };
+answer = function(){ const args = arguments; BD.r0 = G ? G.right : 0; BD.w0 = G ? G.wrong : 0; const r = bdBase.answer.apply(this, args); if(G && G.right > BD.r0) bdReact('happy', 1300); else if(G && G.wrong > BD.w0) bdReact('miss', 1500); return r; };
+showResult = function(){ const args = arguments;  const r = bdBase.showResult.apply(this, args); bdResultBig(); return r; };
+/* ================= 🧑 YOUR AVATAR END (p6e) ================= */
+</script>
 </body>
 </html>
-<!-- (r9+back-1+modes-3+p1b+p2) END OF MathQuest.html -->
+<!-- (r9+back-1+modes-3+p1b+p2+p6e) END OF MathQuest.html -->
