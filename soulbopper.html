@@ -213,6 +213,14 @@
   .ctl .tb small{bottom:-6px;font-size:0.62rem;}
   .ctl .tpad .mvtip{position:absolute;left:50%;top:-18px;transform:translateX(-50%);font-family:'Nunito',sans-serif;font-weight:900;font-size:0.62rem;color:#fff;background:rgba(20,8,40,0.6);border-radius:8px;padding:1px 6px;white-space:nowrap;opacity:.85;pointer-events:none;}
   .ctl .tpad.on .mvtip{opacity:0;}
+  /* sb-9a2: phone on its side = [panel: cards + stick] [map, full height] [panel: cards + buttons]; panels fill the side space (--pw set by layoutSide) */
+  #scr-play.side .ctl.panel{flex:0 0 var(--pw,150px);width:var(--pw,150px);box-sizing:border-box;flex-direction:column;justify-content:space-between;align-items:center;gap:6px;padding-top:6px;}
+  #scr-play.side .ctl.panel .tpad{--d:var(--pad,130px);} #scr-play.side .ctl.panel .tb{--b:var(--btn,76px);}
+  #scr-play.side .ctl.panel .tbtns{flex-direction:var(--bdir,column);align-items:flex-end;justify-content:center;gap:12px;}
+  #scr-play.side .ctl.panel.r .tb.sk{margin-bottom:var(--sklift,0px);}
+  .sidechips{width:100%;display:flex;flex-direction:column;gap:5px;min-height:0;} .sidechips:empty{display:none;}
+  .sidechips .pchip{width:100%;box-sizing:border-box;overflow:hidden;} .sidechips .pchip .por{width:34px;height:40px;} .sidechips .pchip .stt{display:none;}
+  .sidechips.tight .pchip .pw .pt:nth-child(n+3){display:none;}
   .chipcol.mini{width:118px;gap:5px;} .chipcol.mini .pchip .por{width:34px;height:40px;} .chipcol.mini .pchip .pw .pt:nth-child(n+3){display:none;} .chipcol.mini .pchip{overflow:hidden;} .chipcol.mini .pchip .stt{display:none;}
   .comics-slot:empty,.comic-strip-slot:empty{display:none;}
   /* corners (2–4 players on one tablet) */
@@ -1503,7 +1511,8 @@ function layoutPlay(){
   const touch = isTouch() || window.FORCE_TOUCH, seats = humanSeats();
   G.inset = {l: 0, r: 0, t: 0, b: 0};
   if(touch && seats.length === 1){
-    if(W > H){ sp.classList.add('side'); const c1 = ctlEl(seats[0], 'pad'), c2 = ctlEl(seats[0], 'btns'); arena.insertBefore(c1, arena.firstChild); arena.appendChild(c2); }
+    if(W > H){ sp.classList.add('side'); const c1 = ctlEl(seats[0], 'pad'), c2 = ctlEl(seats[0], 'btns'); c1.classList.add('panel', 'l'); c2.classList.add('panel', 'r');   // sb-9a2: cards on top of each side panel
+      c1.insertAdjacentHTML('afterbegin', '<div class="sidechips" id="sidechips-l"></div>'); c2.insertAdjacentHTML('afterbegin', '<div class="sidechips" id="sidechips-r"></div>'); arena.insertBefore(c1, arena.firstChild); arena.appendChild(c2); layoutSide(); }
     else { sp.classList.add('port'); bottom.appendChild(ctlEl(seats[0], 'both')); }
   } else if(touch && seats.length > 1){
     sp.classList.add('corners');
@@ -1515,7 +1524,23 @@ function layoutPlay(){
   } else {
     bottom.innerHTML = '<div class="legend">' + legendHtml() + '</div>';
   }
-  requestAnimationFrame(() => { resize(); placeChips(); });
+  requestAnimationFrame(() => { resize(); placeChips(); layoutSide(); });
+}
+// sb-9a2: phone on its side — the map takes the full height between the bar and the bottom; the two side panels share what's left,
+// then the stick + buttons grow to fill their panel (≥ 72 px buttons, side by side when the panel is wide enough)
+function layoutSide(){
+  const sp = $('scr-play'); if(!G || !sp.classList.contains('side')) return;
+  const L = $('sidechips-l'), Rr = $('sidechips-r'), W = window.innerWidth, ar = $('arena').getBoundingClientRect(), M = G.M, H = ar.height;
+  const minP = 150, CS = Math.max(8, Math.floor(Math.min((H - 8) / M.H, (W - minP * 2 - 8) / M.W))), pw = Math.max(minP, Math.floor((W - CS * M.W - 8) / 2));
+  sp.style.setProperty('--pw', pw + 'px');
+  const ch = el => el ? el.getBoundingClientRect().height : 0, pad = (el, side) => { const c = el && el.closest('.ctl'); if(!c) return 0; const cs = getComputedStyle(c); return parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight); };
+  const inner = pw - Math.max(pad(L), pad(Rr)) - 4, safeB = 22;
+  const padSize = Math.round(Math.max(96, Math.min(inner, H - ch(L) - safeB - 36, 176)));
+  const roomR = H - ch(Rr) - safeB - 14;
+  let b = Math.min(96, Math.floor((inner - 12) / 2)), dir = 'row', lift = 0;
+  if(b < 72 || roomR < b * 1.5){ dir = 'column'; b = Math.round(Math.max(64, Math.min(92, inner, (roomR - 12) / 2))); } else { b = Math.round(Math.max(72, Math.min(b, roomR / 1.45))); lift = Math.round(b * 0.42); }
+  sp.style.setProperty('--pad', padSize + 'px'); sp.style.setProperty('--btn', b + 'px'); sp.style.setProperty('--bdir', dir); sp.style.setProperty('--sklift', lift + 'px');
+  [L, Rr].forEach(x => x && x.classList.toggle('tight', inner < 150));
 }
 /* 💥📣 sb-9a — ROOM FOR COMICS + THE CROWD (the 💥 Comics chat / 📣 Cheer chat wire their kits here; this game draws no comics itself)
    GameComic.mode()        → 'battle' | 'classic' | 'hold' | 'stage' | ''  (the live match's mode)
@@ -1631,12 +1656,12 @@ function placeChips(){
   const wide = G.sw - (G.inset ? G.inset.l + G.inset.r : 0) > 0 && !$('scr-play').classList.contains('corners');
   const M = G.M, need = M.W * 26 + 330;
   const sideCtl = $('scr-play').classList.contains('side');
-  G.chipMini = sideCtl && G.sh < 560;   // sb-9a: phone held sideways → small chip cards beside the maze, never a top strip
-  G.chipSide = wide && (sideCtl || (G.sw >= need && G.sw > G.sh * 1.15));
+  G.chipMini = false; G.chipPanel = sideCtl && !!$('sidechips-l');   // sb-9a2: phone on its side → cards live in the side panels, the map keeps the whole stage
+  G.chipSide = !G.chipPanel && wide && G.sw >= need && G.sw > G.sh * 1.15;
   ['chipcol-l', 'chipcol-r'].forEach(id => $(id).classList.toggle('mini', !!G.chipMini));
-  $('chipstrip').classList.toggle('hidden', G.chipSide); $('chipcol-l').classList.toggle('hidden', !G.chipSide); $('chipcol-r').classList.toggle('hidden', !G.chipSide);
-  M.P.forEach((p, j) => { const el = G.chipEls[p.i]; if(!el) return; const host = G.chipSide ? $(j % 2 ? 'chipcol-r' : 'chipcol-l') : $('chipstrip'); if(el.parentNode !== host) host.appendChild(el); });
-  G.staticKey = '';
+  $('chipstrip').classList.toggle('hidden', G.chipSide || G.chipPanel); $('chipcol-l').classList.toggle('hidden', !G.chipSide); $('chipcol-r').classList.toggle('hidden', !G.chipSide);
+  M.P.forEach((p, j) => { const el = G.chipEls[p.i]; if(!el) return; const host = G.chipPanel ? $(j % 2 ? 'sidechips-r' : 'sidechips-l') : G.chipSide ? $(j % 2 ? 'chipcol-r' : 'chipcol-l') : $('chipstrip'); if(el.parentNode !== host) host.appendChild(el); });
+  G.staticKey = ''; if(G.chipPanel) layoutSide();
 }
 function chipText(p){
   const M = G.M, ic = [];
@@ -2429,4 +2454,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (sb-8+r33+back-1+modes-3+mg-1+p1c+sb-9a) END OF SoulBopper.html -->
+<!-- (sb-8+r33+back-1+modes-3+mg-1+p1c+sb-9a+sb-9a2) END OF SoulBopper.html -->
