@@ -38,9 +38,14 @@ function ss_() {
 
 // Pulls a shared HTML file (UiKit.html) into a page. Used from each page's
 // head with a raw print scriptlet calling include('UiKit').
+// 🚪 AS-1 one door: include('AvatarKit') also brings the files listed here (same order), so no page has to change when the avatar family grows.
+// Keep each list on ONE line — the test harness (gasmock.js) and the 📲 offline builder (build.js) read these two lines from this file.
+const INCLUDE_ALSO_ = {AvatarKit: ['AvatarActing']};
+const INCLUDE_GROUPS_ = {avatar: ['BallSkins', 'AvatarKit']};
 function include(name) {
-  return HtmlService.createHtmlOutputFromFile(name).getContent();
+  return [name].concat(INCLUDE_ALSO_[name] || []).map(n => HtmlService.createHtmlOutputFromFile(n).getContent()).join('\n');
 }
+function includeGroup(group) { return (INCLUDE_GROUPS_[group] || []).map(include).join('\n'); }
 
 /* ============ ONE-TIME SETUP ============ */
 function setupDataCenter() {
@@ -4210,7 +4215,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -5344,6 +5349,7 @@ function artRepair(name, id) {
 /* ===== on the device only: the grown-up PIN arrives hashed from the family Sheet (OfflineSync.gs) ===== */
 function verifyAdminPin(pin) { var s = String(getSettings().AdminPIN || ''), p = String(pin || ''); if (s.indexOf('#sha256:') === 0) return !!p && s.slice(8) === __hex('steam-admin:' + p); return !!s && s === p; }
 return {"include": typeof include === 'function' ? include : undefined,
+"includeGroup": typeof includeGroup === 'function' ? includeGroup : undefined,
 "setupDataCenter": typeof setupDataCenter === 'function' ? setupDataCenter : undefined,
 "setupGamesTab": typeof setupGamesTab === 'function' ? setupGamesTab : undefined,
 "setupLevelsTab": typeof setupLevelsTab === 'function' ? setupLevelsTab : undefined,
