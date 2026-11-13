@@ -223,6 +223,7 @@ function doGet(e) {
     sweetswap: 'SweetSwap',
     beatcorner: 'BeatCorner',
     slabrall: 'SlaBrall',
+    blasoff: 'BlasOff',   // ⚽ BlasOff: soccer with your avatar (plan BlasOff) — keep on its own line
     brawlbuddies: 'BrawlBuddies',   // 🥊 Brawl Buddies (plan 11i)
     alignext: 'Alignext',
     soulbopper: 'SoulBopper',   // 👻💣 Soul Bopper (plan 11l)   // 🔴 Alignext: Drop + ❌⭕ Omnifile (plan 11x)
@@ -691,6 +692,8 @@ const MODES_ = [
   { game: 'sla-brall', id: 'cup', icon: '🏆', name: 'Tournament', pitch: 'Win the trophy in a cup!', route: 'slabrall', tried: { feat: [['sla-brall', 'cupMatches'], ['sla-brall', 'cups']] } },
   { game: 'sla-brall', id: 'lhost', icon: '📡', name: 'Host a game', pitch: 'Friends join on their own device!', route: 'slabrall', added: '2026-11-13' },   // 📡 lk-1c
   { game: 'sla-brall', id: 'ljoin', icon: '🔗', name: 'Join friends', pitch: 'Play on your own device!', route: 'slabrall', added: '2026-11-13' },   // 📡 p3a (lk-1b asked)
+  { game: 'blasoff', id: 'fours', icon: '⚽', name: 'Soccer 4v4', pitch: 'Small pitch, close camera!', route: 'blasoff', tried: { board: 'blasoff', themeStart: '4v4 ·', feat: [['blasoff', 'win_4v4']] }, added: '2026-11-14' },   // ⚽ bo-1
+  { game: 'blasoff', id: 'sevens', icon: '🏟️', name: 'Soccer 7v7', pitch: 'Bigger pitch, more passing!', route: 'blasoff', tried: { board: 'blasoff', themeStart: '7v7 ·', feat: [['blasoff', 'win_7v7']] }, added: '2026-11-14' },   // ⚽ bo-1
   { game: 'turbo', id: 'ghost', icon: '👻', name: 'Ghost race', pitch: 'Race the family\'s best rides!', route: 'turbo', tried: null },
   { game: 'turbo', id: 'duo', icon: '👥', name: '2-player race', pitch: 'Race a friend, split screen!', route: 'turbo', tried: null },
   { game: 'word-board', id: 'together', icon: '👨‍👩‍👧', name: 'Lettercraft Play together', pitch: 'Word battle with your family!', route: 'wordboard', tried: { feat: [['word-board', 'togetherGames']] } },
@@ -725,6 +728,7 @@ const MODE_GROUPS_ = {
   'eyes-brain': [{k: 'remember', icon: '🔢', en: 'Ways to remember', th: 'วิธีจำ', modes: ['classic', 'backwards', 'colour', 'letters', 'listen', 'word', 'shapes']}, {k: 'challenge', icon: '🏔️', en: 'Challenge', th: 'ท้าทาย', modes: ['challenge', 'daily']}, {k: 'party', icon: '👥', en: 'Party', th: 'เล่นกันหลายคน', modes: ['chain']}],
   'pyraspike': [{k: 'beach', icon: '🏖️', en: 'Beach', th: 'ชายหาด', modes: ['beach']}, {k: 'indoor', icon: '🏐', en: 'Indoor', th: 'ในร่ม', modes: ['small', 'full']}],   // 🔥 pd-1 (R2 folds these into 🏐 PyraSpike next to 🦶 PyraStrike)
   'sla-brall': [{k: 'sports', icon: '🏓', en: 'Sports', th: 'กีฬา', modes: ['slashot', 'slapoof', 'slaball', 'slapong', 'slabam', 'slawall']}, {k: 'cup', icon: '🏆', en: 'Cup', th: 'ทัวร์นาเมนต์', modes: ['cup']}, {k: 'link', icon: '📡', en: 'Own devices', th: 'เล่นหลายเครื่อง', modes: ['lhost', 'ljoin']}],   // 📡 p3a: lk-1b's 🔗 Join friends
+  'blasoff': [{k: 'match', icon: '⚽', en: 'Matches', th: 'แข่งฟุตบอล', modes: ['fours', 'sevens']}],   // ⚽ bo-1
   'brawl-buddies': [{k: 'battle', icon: '🥊', en: 'Battle', th: 'ต่อสู้', modes: ['battle']}, {k: 'adv', icon: '🗺️', en: 'Brawenture', th: 'ผจญภัย', modes: ['brawenture']}],
   'georead': [{k: 'sounds', icon: '🔊', en: 'Sounds', th: 'เสียง', modes: ['phonics', 'rhyme', 'say']}, {k: 'words', icon: '🧱', en: 'Words', th: 'คำ', modes: ['build', 'sight', 'case', 'trace']}, {k: 'reading', icon: '📖', en: 'Reading', th: 'อ่าน', modes: ['story', 'types']}, {k: 'journey', icon: '🗺️', en: 'Journey', th: 'ผจญภัย', modes: ['journey']}],
   'pose-party': [{k: 'pose', icon: '🎯', en: 'Pose', th: 'ท่าโพส', modes: ['classic', 'speed', 'copy']}, {k: 'move', icon: '💃', en: 'Move', th: 'ขยับตัว', modes: ['dance', 'statue', 'freeze']}, {k: 'together', icon: '🧑‍🤝‍🧑', en: 'Together', th: 'เล่นด้วยกัน', modes: ['group', 'mirror', 'letters']}, {k: 'calm', icon: '🧘', en: 'Calm', th: 'ยืดเหยียด', modes: ['yoga']}]
@@ -795,7 +799,7 @@ function modesData_(players) {
 /* ============ 📣 DASHBOARD NEWS ============ */
 // New games (first 14 days), 🌋 Extreme / 💀 Hardcore family records set in the last 7 days, games nobody has tried yet,
 // 🏁 milestones, ⚔️ close calls / 🚦 jams at the top, 📬 mail waiting and 🎂 birthdays (Settings Birthday_<Name> = 'MM-DD').
-const NEW_GAMES_ = [['pyraspike', '2026-11-14', 'Drive · Dink · Dunk — volleyball with a flame!'], ['tdstories', '2026-11-14', 'Story books: defend the tower!'], ['artifactory', '2026-11-08', 'Make it yourself — real tools, real lessons!'], ['georead', '2026-11-08', 'Hear the letters, bump them into words!'], ['geoscout', '2026-11-08', 'Numbers you can touch!'], ['beat-piano', '2026-11-08', '🎹 Piano + 🥁 Drums + 🎸 Band — new ways to play!'], ['wisdeck', '2026-11-08', 'Learn, quiz, collect!'], ['eyes-brain', '2026-11-07', 'Remember the number!'], ['polyplot', '2026-11-07', 'Close shapes, catch creatures!'], ['soul-bopper', '2026-11-07', 'Bomber maze + ghosts!'], ['snakeast', '2026-11-07', 'Ride your snake!'], ['alignext', '2026-11-07', 'Line them up!'], ['brawl-buddies', '2026-11-07', 'Cartoon bonk battle!'], ['pose-party', '2026-11-07', 'Strike a pose!'], ['sla-brall', '2026-11-06', '5 racket sports!'], ['beat-corner', '2026-11-04', 'Hit the beat!'], ['sweet-swap', '2026-11-03', 'Swap to match 3'], ['word-board', '2026-11-03', 'Crossword words'], ['number-board', '2026-11-03', 'Crossword math']];
+const NEW_GAMES_ = [['blasoff', '2026-11-14', 'Soccer with your avatar — blast it in!'], ['pyraspike', '2026-11-14', 'Drive · Dink · Dunk — volleyball with a flame!'], ['tdstories', '2026-11-14', 'Story books: defend the tower!'], ['artifactory', '2026-11-08', 'Make it yourself — real tools, real lessons!'], ['georead', '2026-11-08', 'Hear the letters, bump them into words!'], ['geoscout', '2026-11-08', 'Numbers you can touch!'], ['beat-piano', '2026-11-08', '🎹 Piano + 🥁 Drums + 🎸 Band — new ways to play!'], ['wisdeck', '2026-11-08', 'Learn, quiz, collect!'], ['eyes-brain', '2026-11-07', 'Remember the number!'], ['polyplot', '2026-11-07', 'Close shapes, catch creatures!'], ['soul-bopper', '2026-11-07', 'Bomber maze + ghosts!'], ['snakeast', '2026-11-07', 'Ride your snake!'], ['alignext', '2026-11-07', 'Line them up!'], ['brawl-buddies', '2026-11-07', 'Cartoon bonk battle!'], ['pose-party', '2026-11-07', 'Strike a pose!'], ['sla-brall', '2026-11-06', '5 racket sports!'], ['beat-corner', '2026-11-04', 'Hit the beat!'], ['sweet-swap', '2026-11-03', 'Swap to match 3'], ['word-board', '2026-11-03', 'Crossword words'], ['number-board', '2026-11-03', 'Crossword math']];
 const NEWS_ALIAS_ = { 'beat-piano': { id: 'beat-corner', name: 'BeatCorner 🎹 Piano + 🥁 Drums', icon: '🎹', route: 'beatcorner&game=piano' } };   // news ids that are a new way to play inside an existing game (plan 11-bc)
 function gameNewOrder_() { const seen = {}, out = []; NEW_GAMES_.forEach(x => { if (NEWS_ALIAS_[x[0]] || seen[x[0]]) return; seen[x[0]] = 1; out.push(x[0]); }); return out; }   // 🆕 gro-1: Gameroom newest first
 function safeNews_(players) { try { return newsFor_(players, new Date()); } catch (e) { return []; } }
@@ -1040,6 +1044,8 @@ const BUILT_IN_GAMES = [
     Status: 'Live', PageRoute: 'pyradive', Icon: '🔥', Description: 'Volleyball with your avatar — Drive · Dink · Dunk: 3 touches a side (bump, set, DUNK), a 🔥 Pyra meter that turns your next move into a Pyra… move, roles 🚀 Drive · 🪶 Dink · 💥 Dunk. 🏐 PyraSpike Beach 2v2 · Small 3v3 · Full 6v6, 6 levels, 1–2 players.' },
   { GameID: 'sla-brall', GameName: 'SlaBrall', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Sport / Physics (spin, bounce, angles)',
     Status: 'Live', PageRoute: 'slabrall', Icon: '🏓', Description: '6 racket sports in one: SlaShot table hockey, SlaPoof pickleball, SlaBall tennis, SlaPong ping-pong, SlaBam badminton, SlaWall squash — beat the robot, play 2 players or 2 vs 2, spin shots and 14 power-ups' },
+  { GameID: 'blasoff', GameName: 'BlasOff', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Sport / Physics (passing angles, power, teamwork)',
+    Status: 'Live', PageRoute: 'blasoff', Icon: '⚽', Description: 'Soccer with your avatar — 4v4 or 7v7: pass, shoot, tricks and volleys, shout to your robot keeper, 6 levels with real rules from offside to yellow cards' },
   { GameID: 'pose-party', GameName: 'Pose Party', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Movement / Body awareness (angles, balance)',
     Status: 'Live', PageRoute: 'poseparty', Icon: '📷', Description: 'Copy the poses with your whole body — the camera checks how close you are! Classic levels, 60-second Speed and Copy Me' },
   { GameID: 'brawl-buddies', GameName: 'Brawl Buddies', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Reflex / Timing (high, low, combos)',
@@ -1230,6 +1236,10 @@ const LEVEL_GAMES = {
     badges: ['Spike Basic', 'Spike Junior', 'Spike Intermediate', 'Spike Hard', 'Spike Extreme', 'Spike Hardcore'],
     levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
   },
+  'blasoff': {   // ⚽ bo-1
+    badges: ['Kick Basic', 'Kick Junior', 'Kick Intermediate', 'Kick Hard', 'Kick Extreme', 'Kick Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
   'sla-brall': {
     badges: ['Rally Basic', 'Rally Junior', 'Rally Intermediate', 'Rally Hard', 'Rally Extreme', 'Rally Hardcore'],
     levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
@@ -1352,7 +1362,7 @@ function getLevelGameData(gameId, player) {
   if (gameId === 'brawl-buddies') { out.progressAdv = {}; players.forEach(p => { out.progressAdv[p.Name] = levelProgressFor_(p.Name, 'brawenture'); }); }   // 🗺️ Brawenture board (tales cleared → next tale opens)
   if (gameId === 'brawl-buddies') { out.batDesigns = {}; players.forEach(p => { try { const d = JSON.parse(out.settings['Racket_' + p.Name] || 'null'); if (d) out.batDesigns[p.Name] = d; } catch (e) {} }); }   // 🏏 bs-1 a melee pickup = YOUR Batstick
   if (gameId === 'brawl-buddies') { const all = activePlayers_(listProfilesFull()); out.gear = {}; all.forEach(p => { const o = itemsFor_(p.Name, all).owned; if (o.brawlgear > 0) out.gear[p.Name] = o.brawlgear - 1; }); }   // 🥊 best Brawl gear owned (step index), drawn in fights
-  if (gameId === 'pinball' || gameId === 'sla-brall') { const all = activePlayers_(listProfilesFull()); out.ballSkins = {}; out.rackets = {}; out.ballTrails = {}; out.feathers = {}; all.forEach(p => { const o = itemsFor_(p.Name, all).owned; out.ballSkins[p.Name] = o.ballskin || 0; out.rackets[p.Name] = o.racket || 0; out.bats = out.bats || {}; out.bats[p.Name] = o.batstick || 0; out.ballTrails[p.Name] = o.balltrail || 0; out.feathers[p.Name] = o.feather || 0; }); }   // ⚾ one ball-skin list for Pinball + SlaBrall; 🏓 rackets owned
+  if (gameId === 'pinball' || gameId === 'sla-brall' || gameId === 'blasoff') { const all = activePlayers_(listProfilesFull()); out.ballSkins = {}; out.rackets = {}; out.ballTrails = {}; out.feathers = {}; all.forEach(p => { const o = itemsFor_(p.Name, all).owned; out.ballSkins[p.Name] = o.ballskin || 0; out.rackets[p.Name] = o.racket || 0; out.bats = out.bats || {}; out.bats[p.Name] = o.batstick || 0; out.ballTrails[p.Name] = o.balltrail || 0; out.feathers[p.Name] = o.feather || 0; }); }   // ⚾ one ball-skin list for Pinball + SlaBrall; 🏓 rackets owned
   return out;
 }
 // 👀🧠 Eyes Brain Riot (11k round 4): 🎯 daily family number — the same 8 digits for everyone today (made on the page from the date),
@@ -1720,7 +1730,7 @@ function recordsFor_(gameId, players) {
 }
 
 // Games shown on the Achievements records board.
-const RECORD_GAMES = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'pose-party', 'brawl-buddies', 'brawenture', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'beat-piano', 'beat-drums', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'pyraspike'];
+const RECORD_GAMES = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'brawenture', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'beat-piano', 'beat-drums', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'pyraspike'];
 // Per level: the fastest finish and the top score among active players.
 function gameRecords_(gameId, players) {
   const names = {};
@@ -2415,6 +2425,21 @@ const FEAT_DEFS = {
     m_small: { name: 'Small 3v3 wins', icon: '🏫', kind: 'sum', hidden: true },
     m_full: { name: 'Full 6v6 wins', icon: '🏟️', kind: 'sum', hidden: true },
   },
+  'blasoff': {   // ⚽ bo-1
+    wins: { name: 'Match Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
+    goals: { name: 'Golden Boot', icon: '⚽', kind: 'sum', tiers: [10, 100, 500] },
+    bestGoals: { name: 'Hat-trick Hero', icon: '🎩', kind: 'max', tiers: [2, 3, 5] },
+    assists: { name: 'Playmaker', icon: '🅰️', kind: 'sum', tiers: [5, 50, 200] },
+    tricks: { name: 'Trick Master', icon: '🌀', kind: 'sum', tiers: [10, 100, 500] },
+    volleys: { name: 'Volley Hero', icon: '🎯', kind: 'sum', tiers: [3, 30, 100] },
+    shoutSaves: { name: "Keeper's Voice", icon: '📣', kind: 'sum', tiers: [3, 25, 100] },
+    tackles: { name: 'Ball Winner', icon: '🦶', kind: 'sum', tiers: [10, 100, 500] },
+    cleanSheets: { name: 'Clean Sheet', icon: '🧤', kind: 'sum', tiers: [1, 10, 50] },
+    headers: { name: 'Header Hero', icon: '🤕', kind: 'sum', tiers: [3, 30, 100] },
+    matches: { name: 'Matches', icon: '⚽', kind: 'sum', hidden: true },
+    win_4v4: { name: '4v4 wins', icon: '⚽', kind: 'sum', hidden: true },
+    win_7v7: { name: '7v7 wins', icon: '🏟️', kind: 'sum', hidden: true },
+  },
   'sla-brall': {
     wins: { name: 'Match Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
     rally: { name: 'Rally Machine', icon: '🔁', kind: 'max', tiers: [10, 25, 50] },
@@ -2596,6 +2621,10 @@ const TITLE_DEFS = [
   { id: 'sb_golden', name: 'Golden Racket', icon: '⭐', hint: 'Score 5 points with a Legendary Shot', rule: f => featVal_(f, 'sla-brall', 'legend') >= 5 },
   { id: 'sb_champ', name: 'SlaBrall Champion', icon: '🏆', hint: 'Win a SlaBrall tournament', rule: f => featVal_(f, 'sla-brall', 'cups') >= 1 },
   { id: 'sb_cups', name: 'Cup Collector', icon: '🥇', hint: 'Win 5 SlaBrall tournaments', rule: f => featVal_(f, 'sla-brall', 'cups') >= 5 },
+  { id: 'bo_boot', name: 'Golden Boot', icon: '⚽', hint: 'Score 50 goals in BlasOff', rule: f => featVal_(f, 'blasoff', 'goals') >= 50 },   // ⚽ bo-1
+  { id: 'bo_tricks', name: 'Trick Master', icon: '🌀', hint: 'Land 50 tricks in BlasOff', rule: f => featVal_(f, 'blasoff', 'tricks') >= 50 },
+  { id: 'bo_volley', name: 'Volley Hero', icon: '🎯', hint: 'Hit 10 volleys in BlasOff (Space, Space, then K or J)', rule: f => featVal_(f, 'blasoff', 'volleys') >= 10 },
+  { id: 'bo_voice', name: "Keeper's Voice", icon: '📣', hint: 'Shout your keeper to 10 saves in BlasOff', rule: f => featVal_(f, 'blasoff', 'shoutSaves') >= 10 },
   { id: 'pd_ace', name: 'Ace Driver', icon: '🚀', hint: 'Serve 10 aces in PyraDive', rule: f => featVal_(f, 'pyraspike', 'aces') >= 10 },
   { id: 'pd_dink', name: 'Ghost Dinker', icon: '🪶', hint: 'Set up 20 kills (assists) in PyraDive', rule: f => featVal_(f, 'pyraspike', 'assists') >= 20 },
   { id: 'pd_dunk', name: 'Spirit Dunker', icon: '💥', hint: 'Score 25 kills in PyraDive', rule: f => featVal_(f, 'pyraspike', 'kills') >= 25 },
@@ -2715,7 +2744,7 @@ function featBadges_(f) {
   return out;
 }
 function titleContext_(name, players) {
-  const cleared = {}, bigGames = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'pose-party', 'brawl-buddies', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'pyraspike'];
+  const cleared = {}, bigGames = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'pyraspike'];
   let allRound = true;
   bigGames.forEach(g => {
     const p = g === 'maze' ? mazeProgressFor_(name) : levelProgressFor_(name, g);
@@ -3667,6 +3696,7 @@ const DAILY_GOALS = [
   { id: 'jumps', icon: '🦘', how: 'Jump 20 times in the Family Room today', r: d => (d.room.jumps || 0) >= 20 },
   { id: 'moves', icon: '💃', how: 'Do 10 moves in the Family Room today', r: d => (d.room.gestures || 0) >= 10 },
   { id: 'slabrall', icon: '🏓', how: 'Win a SlaBrall match on Junior or harder today', r: d => d.rows.some(r => r.game === 'sla-brall' && r.level >= 1 && r.stars > 0) },
+  { id: 'blasoff', icon: '⚽', how: 'Win a BlasOff match today', r: d => d.rows.some(r => r.game === 'blasoff' && r.stars > 0) },   // ⚽ bo-1
   { id: 'snakefood', icon: '🐍', how: 'Eat 50 food in Snakize today', r: d => (d.room.snakeFood || 0) >= 50 },
   { id: 'snakeland', icon: '🏰', how: 'Claim 40 % land in one Snakastle game today', r: d => (d.room.snakeLand || 0) >= 40 },
   { id: 'snakepop', icon: '💥', how: 'Pop 2 snakes in Snakigate today', r: d => (d.room.snakePop || 0) >= 2 },
@@ -4441,7 +4471,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
