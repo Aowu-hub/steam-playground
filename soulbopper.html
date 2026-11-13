@@ -274,6 +274,7 @@
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-2b: the cheering crowd (CheerSquad.html) -->
 <script src="inc/ComicKit.js"></script>   <!-- 💥 ck-2a comics (wired by ComicKit through window.GameComic) -->
 <script src="inc/BombSkins.js"></script>
 
@@ -317,7 +318,7 @@
       <div class="note" id="skin-note" style="margin-top:6px"></div>
     </div>
 
-    <div class="box"><h3>⚙️ Extras</h3><div class="chips"><button class="chip" data-sound="pop" onclick="openKeys()">⌨️ Keys &amp; 🎮 controllers</button><span class="comics-slot" id="comics-slot-setup"></span><span class="comics-slot" id="cheer-slot-setup"></span></div></div>
+    <div class="box"><h3>⚙️ Extras</h3><div class="chips"><button class="chip" data-sound="pop" onclick="openKeys()">⌨️ Keys &amp; 🎮 controllers</button><span class="comics-slot" id="comics-slot-setup"></span><span class="comics-slot" id="cheer-slot-setup"><button class="chip" id="cheer-chip" data-sound="pop" title="A cheering crowd beside the maze">📣 Cheer squad: Calm 🙂</button> <button class="chip" id="cheer-lang" data-sound="pop" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></span><!-- 📣 cs-2b --></div></div>
     <div class="go-row"><button class="btn sp-btn sp-primary" id="go-btn" data-sound="pop">💣 Play!</button></div>
   </div>
 </section>
@@ -1333,7 +1334,7 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
-  SET.seats = []; loadPrefs(); loadKeys(); $('who-name').textContent = name; renderMenu(); showScreen('menu');
+  SET.seats = []; loadPrefs(); loadKeys(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); }   /* 📣 cs-2b */ renderMenu(); showScreen('menu');
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">' + (unlockedOf(S.player) > i ? '🏅 Won' : 'Not won yet') + '</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span><span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
@@ -1516,10 +1517,65 @@ function startMatch(opts){
     q: window.__q || 1, avs: specs.map(avOf), winAvs: specs.map(s => myAvatar(avName(s))), humans: hs.length, pads: {}, touch: {}, tap: {}, padPrev: {}, shake: 0, staticKey: '', st: null, lastHud: {}, faces: {}, watch: false};
   G.avFor = i => { const p = G.M.P[i]; if(!p) return null; if(!G.avs[i]){ G.avs[i] = playAv(myAvatar(p.name)); G.winAvs[i] = myAvatar(p.name); } return G.avs[i]; };
   showScreen('play'); watchStage(); GameComic._reset(); layoutPlay(); buildChips(); hud();
+  cheerMount();   /* 📣 cs-2b: the crowd for this match (Off = nothing) */
   G.last = performance.now(); G.raf = requestAnimationFrame(frame);
 }
 function isTouch(){ return ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0; }
 function humanSeats(){ return G ? G.M.P.filter(p => p.human).map(p => p.i) : []; }
+/* 📣 CHEERSQUAD (cs-2b) START — the crowd beside the maze (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+// sides: Hold-the-land teams = 🟠 Sun / 🔵 Moon; otherwise every human = its own side, the bots = the 👻 rival's side
+function cheerSide(p){ const M = G.M; if(M.teams) return p.team; const hs = M.P.filter(x => x.human); return p.human ? hs.indexOf(p) : 1; }
+function cheerMount(){
+  if(!window.Cheer) return; Cheer.unmount(); G.cheerZ = null;
+  const M = G.M, hs = M.P.filter(p => p.human), bots = M.P.some(p => !p.human);
+  const players = M.teams ? [0, 1].map(t => ({name: t ? '🔵 Team Moon' : '🟠 Team Sun', side: t, human: M.P.some(p => p.human && p.team === t)}))
+    : hs.map((p, i) => ({name: p.name, side: i, human: true})).concat(hs.length < 2 ? [{name: bots ? 'Bots' : 'Boo', side: 1, human: false}] : []);
+  Cheer.mount($('arena'), {game: 'soulbopper', players, me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'overlay', zones: cheerZones,
+    avoid: () => Array.from(document.querySelectorAll('#gbar, .top-btn, #scr-play .pchip, #scr-play .sidechips, #scr-play .tpad, #scr-play .tb, #stage .corner, #stage .help-btn, #stage .chelp')),
+    clear: b => { const B = cheerBoard(); return !B || !(b.r > B.x - 3 && b.l < B.x + B.w + 3 && b.b > B.y - 3 && b.t < B.y + B.h + 3); }});
+  if(!window.__cheerSB){ window.__cheerSB = 1; GameComic.listen(cheerOn); }
+}
+// the maze in #arena px (the crowd's own canvas covers #arena)
+function cheerBoard(){ const b = GameComic.board(); if(!b) return null; const a = $('arena').getBoundingClientRect(); return {x: b.left - a.left, y: b.top - a.top, w: b.width, h: b.height}; }
+// where fans may stand (#arena px, re-read every 0.5 s): GameComic.free() beside the maze + the gap between the chips and the controls
+// in each side panel (phone on its side / tablet); tall rooms become stacked rows, nearest the middle first
+function cheerZones(){
+  if(!G) return []; const now = performance.now(); if(G.cheerZ && now - G.cheerZ.at < 500) return G.cheerZ.z;
+  const A = $('arena').getBoundingClientRect(), rects = GameComic.free().map(r => ({x: r.left - A.left, y: r.top - A.top, w: r.width, h: r.height}));
+  document.querySelectorAll('#arena .ctl.panel').forEach(pn => { const P = pn.getBoundingClientRect(), ch = pn.querySelector('.sidechips'), cs = [...pn.querySelectorAll('.tpad, .tb')].map(e => e.getBoundingClientRect()).filter(r => r.height);
+    const top = ch ? ch.getBoundingClientRect().bottom + 4 : P.top + 4, bot = cs.length ? Math.min(...cs.map(r => r.top)) - 4 : P.bottom - 4;
+    rects.push({x: P.left - A.left + 4, y: top - A.top, w: P.width - 8, h: bot - top}); });
+  const z = [];
+  rects.forEach(r => { if(r.w < 50 || r.h < 60) return; const n = Math.max(1, Math.floor(r.h / 100)), rh = Math.min(118, r.h / n);
+    for(let j = 0; j < n; j++) z.push({x: Math.round(r.x), y: Math.round(r.y + r.h - (j + 1) * rh), w: Math.round(r.w), h: Math.round(rh)}); });
+  z.sort((p, q) => Math.abs(p.y + p.h / 2 - A.height * 0.55) - Math.abs(q.y + q.h / 2 - A.height * 0.55) || p.x - q.x);
+  G.cheerZ = {at: now, z}; return z;
+}
+// every engine event (GameComic.listen) → a crowd moment; bots' own news is not news (unless it's the bots' side vs one human)
+function cheerOn(mode, e, M){
+  if(!window.Cheer || !Cheer.active() || !G || G.M !== M) return;
+  const P = M.P[e.i], hs = M.P.filter(p => p.human), say = (kind, p) => { if(!p) return; if(!p.human && (M.teams || hs.length > 1)) return; Cheer.react(kind, {side: cheerSide(p)}); };
+  const now = performance.now();
+  if(e.k === 'go') Cheer.react('start', {side: 0});
+  else if(e.k === 'caught'){ if(P && P.human) say(P.lives === 1 ? 'close' : 'miss', P); const B = M.P[e.by]; if(B && B.human && e.by !== e.i) say('big', B); }
+  else if(e.k === 'pick'){ if(P && P.human && (G.cheerAt || 0) < now - 2500){ G.cheerAt = now; say('goal', P); } }
+  else if(e.k === 'swap'){ const g2 = M.P[e.ghost]; if(g2 && g2.human) say('comeback', g2); }
+  else if(e.k === 'comeback'){ if(P && P.human) say('comeback', P); }
+  else if(e.k === 'lock'){ const g2 = M.P[e.ghost]; if(g2 && g2.human) say('goal', g2); }
+  else if(e.k === 'bosshit'){ const B = M.P[e.by]; if(B && B.human) say('goal', B); }
+  else if(e.k === 'bossdown') Cheer.react('big', {side: 0});
+  else if(e.k === 'exitopen') Cheer.react('goal', {side: 0});
+  else if(e.k === 'roundend'){ const w = M.P[e.winner]; if(w && w.human && !M.done) say('big', w); }
+  else if(e.k === 'sudden') Cheer.react('close', {side: 0});
+}
+function cheerEnd(){ if(!window.Cheer || !Cheer.active() || !G) return; const M = G.M, hs = M.P.filter(p => p.human);
+  if(M.mode === 'stage'){ Cheer.react(M.stageClear ? 'win' : 'lose', {side: 0}); return; }
+  if(M.teams){ const t = M.winSide; if(t != null && hs.some(p => p.team === t)) Cheer.react('win', {side: t}); else Cheer.react('lose', {side: hs.length ? hs[0].team : 0}); return; }
+  const w = M.P[M.winner]; if(w && w.human) Cheer.react('win', {side: cheerSide(w)}); else Cheer.react('lose', {side: 0}); }
+function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  const at = card.querySelector('.res-btns'); if(!at) return; card.insertBefore(c, at); card.insertBefore(cap, at); }, 900); }
+/* 📣 CHEERSQUAD END */
 function layoutPlay(){
   const sp = $('scr-play'), arena = $('arena'), bottom = $('bottom'), W = window.innerWidth, H = window.innerHeight;
   arena.querySelectorAll('.ctl,.corner,.help-btn,.chelp').forEach(e => e.remove()); bottom.innerHTML = '';
@@ -1732,6 +1788,7 @@ function frame(now){
     G.t += dt; stepFx(dt * mult);
     if(G.M.done && !G.shown && G.M.state === 'end' && G.M.endT < 0.6) finishMatch();
   }
+  if(window.Cheer) Cheer.pause(!!(G && G.paused));   /* 📣 cs-2b (not on hold / game over: the crowd keeps cheering) */
   quality(dt);
   draw(); hud();
 }
@@ -1776,7 +1833,7 @@ function leavePlay(){
   if(!G) return; pauseGame();
   UI.confirm ? UI.confirm('Leave this game?', 'Your bombs will stop ticking.', 'Leave', 'Keep playing').then(ok => { if(ok) backToMenu(); else togglePause(); }) : backToMenu();
 }
-function backToMenu(){ if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); $('bottom').innerHTML = ''; document.querySelectorAll('#arena .ctl, #stage .corner, #stage .help-btn, #stage .chelp').forEach(e => e.remove()); renderMenu(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); $('bottom').innerHTML = ''; document.querySelectorAll('#arena .ctl, #stage .corner, #stage .help-btn, #stage .chelp').forEach(e => e.remove()); renderMenu(); showScreen('menu'); }
 document.addEventListener('keydown', e => {
   if(!$('keys-sheet').classList.contains('hidden')){ if(takeKey(e)) return; HELD_TEST.add(e.code); renderHeld(); e.preventDefault(); return; }
   if(!G || $('scr-play').classList.contains('hidden')) return;
@@ -2301,6 +2358,7 @@ let R0 = {OX: 0, OY: 0};
 function finishMatch(){
   if(G.M.mode === 'stage') return finishStage();
   const M = G.M; G.shown = true; G.over = true; const win = M.winner, secs = Math.max(1, Math.round(M.totalT));
+  cheerEnd();   /* 📣 cs-2b: match end */
   const humans = M.P.filter(p => p.human), vsBots = humans.length === 1, wP = M.P[win];
   const myWin = win >= 0 && (M.teams ? M.P[win].team === humans[0].team : win === humans[0].i);
   UISound.play(myWin || (!vsBots && wP && wP.human) ? 'success' : 'error');
@@ -2361,7 +2419,7 @@ function saveText(res, cleared){
   const h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New high score!' : cleared ? (res.best && res.best.score ? 'Best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Saved') : '✅ Saved';
   return featText(res.feats, h);
 }
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces();   /* 📣 cs-2b */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pickOne(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
@@ -2395,6 +2453,7 @@ function showStages(w){
 }
 function finishStage(){
   const M = G.M; G.shown = true; G.over = true; const humans = M.P.filter(p => p.human), clear = !!M.stageClear, secs = Math.max(1, Math.round(M.t)), w = M.stage.world, n = M.stage.n;
+  cheerEnd();   /* 📣 cs-2b: stage end */
   const stars = clear ? BOP.starsFor(M, humans[0].i) : 0, score = clear ? Math.round((800 + Math.max(0, stageTimeOf(M) - M.t) * 10 + stars * 200) * (M.level === 5 ? 3 : 1)) : 0;
   UISound.play(clear ? 'success' : 'error'); if(clear && FX) confetti(['🎉', '🚪', '⭐', THEMES[G.theme].icon], 24);
   const head = clear ? (M.stage.boss ? '<div class="big">👑</div><h2 class="cheer">' + UI.esc(M.boss ? M.boss.name : 'Boss') + ' beaten!</h2>' : '<div class="big">🚪</div><h2 class="cheer">Stage ' + (n + 1) + ' cleared!</h2>')
@@ -2471,4 +2530,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.themes', {rows: 2}); UI.pageRows('.skins', {rows: 2}); }</script>
 </body>
 </html>
-<!-- (sb-8+r33+back-1+modes-3+mg-1+p1c+sb-9a+sb-9a2+p2+p3a+p3c+ck-2a) END OF SoulBopper.html -->
+<!-- (sb-8+r33+back-1+modes-3+mg-1+p1c+sb-9a+sb-9a2+p2+p3a+p3c+ck-2a+cs-2b) END OF SoulBopper.html -->

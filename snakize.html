@@ -241,6 +241,7 @@
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-2b: the cheering crowd (CheerSquad.html) -->
 </head>
 <body ontouchstart="">
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
@@ -258,6 +259,7 @@
   <div class="maps" id="map-list"></div></div>
   <div class="section-head" id="level-head">Pick a level</div>
   <div class="levels" id="level-list"></div>
+  <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the board">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-2b -->
   <div class="menu-row" id="menu-row"></div>
   <details class="rules" id="how"><summary>📖 How to play</summary><div id="how-body"></div></details>
   <div class="ui-leaders" id="leaders"></div>
@@ -1380,7 +1382,7 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
-  loadPrefs(); KEYS = loadKeys(); { const dk = ls(store('tale_diff')); if(TALE_DIFF[dk]) taleOf(name).diff = dk; } $('who-name').textContent = name; renderMenu(); showScreen('menu');
+  loadPrefs(); KEYS = loadKeys(); { const dk = ls(store('tale_diff')); if(TALE_DIFF[dk]) taleOf(name).diff = dk; } $('who-name').textContent = name; renderMenu(); showScreen('menu'); if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); }   /* 📣 cs-2b */
   if(UI.guideOnce) UI.guideOnce('snakize:' + name, [
     {icon: '🐍', title: 'Welcome to Snakize!', text: 'Your avatar rides the snake. Eat food to grow — don\'t bump into walls or yourself.'},
     {icon: '🍎', title: '4 ways to play', text: '🍎 Snakeast = classic grid snake · 🧭 Snakigate = steer anywhere · 🏰 Snakastle = grab land · 📜 Snaketale = story quests.'},
@@ -1588,6 +1590,7 @@ function startGame(opts){
     cam: [{x: 0, y: 0, z: 1, ready: false}, {x: 0, y: 0, z: 1, ready: false}], shake: 0, lastHud: {}};
   savePrefs();
   showScreen('play'); buildControls(); layout();
+  cheerMount();   /* 📣 cs-2b: the crowd for this game (Off = nothing) */
   BAR.level(opts.label || (MODES[mode].icon + ' ' + SN.LEVEL_NAMES[lvl] + (endless ? ' ♾️' : '')), lvl === 5 ? 'hc' : '');
   BAR.meter('grow', '🎯', 0, 'Progress'); if(humans > 1) BAR.meter('grow1', '🎯', 0, 'Player 2 progress'); else BAR.hide('grow1');
   BAR.extra('mus-btn', {icon: musicOn() ? '🎵' : '🔇', label: musicOn() ? 'Music: on' : 'Music: off'});
@@ -1603,6 +1606,7 @@ function loop(now){
   let dt = Math.min(0.05, Math.max(0, (now - G.last) / 1000)); G.last = now;
   if(!G.paused && !G.over){ inputFrame(); SN.step(G.M, dt); G.t += dt; handleEvents(); if(G.M.over && !G.over) gameOver(); }
   else if(G.over){ G.t += dt; }
+  if(window.Cheer) Cheer.pause(!!(G && G.paused));   /* 📣 cs-2b (not on game over: the crowd celebrates then) */
   tickFx(dt); hud(); draw();
 }
 function stepFor(sec){ // harness: run the game without waiting for frames
@@ -1651,20 +1655,20 @@ function handleEvents(){
     const s = e.s != null ? M.snakes[e.s] : null, me = s && s.human;
     if(e.k === 'eat'){ if(me){ blip(1); if(Math.random() < 0.35) react(e.s, gestK('dance'), 0.8); } addFx({k: 'spark', x: e.x, y: e.y, c: '#FFE36E'}); }
     else if(e.k === 'eatBig'){ if(me) blip(1.3); addFx({k: 'spark', x: e.x, y: e.y, c: '#FFC845'}); }
-    else if(e.k === 'gold'){ (G.hood || (G.hood = {}))[e.s] = performance.now(); blip(1.6); react(e.s, gestK('cheer'), 1); addFx({k: 'txt', x: e.x, y: e.y, txt: '+3 ✨', gold: true}); if(me) banner('✨ Golden ' + T.gold + ' +3!', 'gold', 1100); }
+    else if(e.k === 'gold'){ cheerSay('goal', e.s); (G.hood || (G.hood = {}))[e.s] = performance.now(); blip(1.6); react(e.s, gestK('cheer'), 1); addFx({k: 'txt', x: e.x, y: e.y, txt: '+3 ✨', gold: true}); if(me) banner('✨ Golden ' + T.gold + ' +3!', 'gold', 1100); }
     else if(e.k === 'bad'){ UISound.play('bump'); addFx({k: 'txt', x: e.x, y: e.y, txt: '🤢 −2'}); }
-    else if(e.k === 'power'){ UISound.play('unlock'); addFx({k: 'txt', x: e.x, y: e.y, txt: SN.POWERS[e.p].icon, gold: true}); if(me) banner(SN.POWERS[e.p].icon + ' ' + SN.POWERS[e.p].name, 'good', 1400); react(e.s, gestK('cheer'), 0.9); }
-    else if(e.k === 'grow10'){ if(me){ UISound.play('unlock'); react(e.s, gestK('wave'), 1.4); bigWord('🐍 ' + e.len + '!'); } }
+    else if(e.k === 'power'){ cheerSay('goal', e.s, 'power'); UISound.play('unlock'); addFx({k: 'txt', x: e.x, y: e.y, txt: SN.POWERS[e.p].icon, gold: true}); if(me) banner(SN.POWERS[e.p].icon + ' ' + SN.POWERS[e.p].name, 'good', 1400); react(e.s, gestK('cheer'), 0.9); }
+    else if(e.k === 'grow10'){ cheerSay('big', e.s, 'grow'); if(me){ UISound.play('unlock'); react(e.s, gestK('wave'), 1.4); bigWord('🐍 ' + e.len + '!'); } }
     else if(e.k === 'faster'){ UISound.play('key'); setTimeout(() => UISound.play('key'), 120); banner('⚡ Faster!', 'gold', 900); }
     else if(e.k === 'portal'){ UISound.play('whoosh'); }
-    else if(e.k === 'bump'){ UISound.play('error'); G.shake = 0.35; if(s) addFx({k: 'stars', s: e.s, t: 0, life: 1.3}); if(me && s.alive) banner(s.lives > 0 ? '💫 Bonk! ' + '❤️'.repeat(s.lives) + ' left' : '💫 Bonk!', 'bad', 1200); }
+    else if(e.k === 'bump'){ cheerSay(s && s.human && s.lives === 1 ? 'close' : 'miss', e.s, 'bump');   /* 📣 cs-2b: cheerSay('miss', e.s, 'bump') */ UISound.play('error'); G.shake = 0.35; if(s) addFx({k: 'stars', s: e.s, t: 0, life: 1.3}); if(me && s.alive) banner(s.lives > 0 ? '💫 Bonk! ' + '❤️'.repeat(s.lives) + ' left' : '💫 Bonk!', 'bad', 1200); }
     else if(e.k === 'bounce'){ UISound.play('bump'); addFx({k: 'stars', s: e.s, t: 0, life: 0.8}); }
     else if(e.k === 'edge'){ }
     else if(e.k === 'shieldHit'){ UISound.play('pop'); banner('🛡️ Shield saved you!', 'good', 1100); }
     else if(e.k === 'burn'){ UISound.play('whoosh'); addFx({k: 'txt', x: e.x, y: e.y, txt: '🔥'}); }
     else if(e.k === 'boom'){ addFx({k: 'txt', x: e.x, y: e.y, txt: '💥'}); }
     else if(e.k === 'rockfall'){ UISound.play('drop'); }
-    else if(e.k === 'pop'){ UISound.play(e.human ? 'error' : 'pop'); addFx({k: 'burst', x: e.x, y: e.y, big: e.len > 30});
+    else if(e.k === 'pop'){ cheerSay('miss', e.s, 'pop'); if(e.by >= 0 && e.by !== e.s) cheerSay('big', e.by, 'popper'); UISound.play(e.human ? 'error' : 'pop'); addFx({k: 'burst', x: e.x, y: e.y, big: e.len > 30});
       const by = e.by >= 0 ? M.snakes[e.by] : null;
       if(by && by.human){ react(e.by, gestK('cheer'), 1); banner('💥 You popped ' + snakeName(M.snakes[e.s]) + '!', 'gold', 1200); }
       if(e.human){ G.shake = 0.4; banner(M.snakes[e.s].lives > 0 ? '💥 Popped! Back on in a moment…' : '💥 Popped!', 'bad', 1400); } }
@@ -1672,11 +1676,11 @@ function handleEvents(){
     else if(e.k === 'skill'){ UISound.play('whoosh'); react(e.s, SKILL_POSE[e.skill], SKILL_POSE[e.skill].d); if(me) banner(SN.SKILLS[e.skill].icon + ' ' + SN.SKILLS[e.skill].name + '!', 'good', 900); }
     else if(e.k === 'gift'){ if(me){ UISound.play('unlock'); banner((e.why === 'quest' ? '🗺️ ' : '🎁 ') + 'New skill: ' + SN.SKILLS[e.skill].icon + ' ' + SN.SKILLS[e.skill].name, 'good', 1500); } }
     else if(e.k === 'quest'){ if(me) banner('🗺️ Side quest: ' + e.q.text, 'gold', 1800); }
-    else if(e.k === 'questDone'){ UISound.play('success'); react(e.s, gestK('cheer'), 1.2); }
+    else if(e.k === 'questDone'){ cheerSay('goal', e.s, 'quest'); UISound.play('success'); react(e.s, gestK('cheer'), 1.2); }
     else if(e.k === 'questFail'){ }
     else if(e.k === 'lead'){ UISound.play('unlock'); addFx({k: 'txt', x: e.x, y: e.y, txt: '🚩 ' + e.n, gold: true}); banner('🚩 ' + e.n + '/' + G.M.story.flags.length, 'good', 900); }
-    else if(e.k === 'claim'){ if(me){ UISound.play('success'); react(e.s, PLANT, PLANT.d); addFx({k: 'txt', x: e.x, y: e.y, txt: '🚩 +' + e.cells, gold: true}); if(e.cells >= 25) bigWord('🏰 +' + e.cells + '!'); } else addFx({k: 'txt', x: e.x, y: e.y, txt: '🚩'}); }
-    else if(e.k === 'cut'){ const by = e.by >= 0 && e.by !== e.s ? M.snakes[e.by] : null; addFx({k: 'txt', x: e.x, y: e.y, txt: '✂️'});
+    else if(e.k === 'claim'){ cheerSay(e.cells >= 25 ? 'big' : 'goal', e.s, 'claim'); if(me){ UISound.play('success'); react(e.s, PLANT, PLANT.d); addFx({k: 'txt', x: e.x, y: e.y, txt: '🚩 +' + e.cells, gold: true}); if(e.cells >= 25) bigWord('🏰 +' + e.cells + '!'); } else addFx({k: 'txt', x: e.x, y: e.y, txt: '🚩'}); }
+    else if(e.k === 'cut'){ cheerSay('miss', e.s, 'cut'); if(e.by >= 0 && e.by !== e.s) cheerSay('goal', e.by, 'cutter'); const by = e.by >= 0 && e.by !== e.s ? M.snakes[e.by] : null; addFx({k: 'txt', x: e.x, y: e.y, txt: '✂️'});
       if(me){ UISound.play('error'); G.shake = 0.3; banner(e.why === 'self' ? '🙈 Your own trail — back home!' : e.why === 'long' ? '🐍 Trail too long — back home! Eat to grow.' : e.why === 'fire' ? '🔥 Fire burnt your trail — back home!' : e.why === 'wall' ? '🧱 The edge — back home!' : '✂️ ' + (by ? snakeName(by) : 'Someone') + ' cut your trail — back home!', 'bad', 1500); }
       else if(by && by.human){ UISound.play('unlock'); react(e.by, gestK('cheer'), 1); banner('✂️ You cut ' + snakeName(s) + '\'s trail!', 'gold', 1200); } }
     else if(e.k === 'tooLong'){ }
@@ -1742,6 +1746,51 @@ function nextSkill(s){ if(s.useStart && s.start && s.cd <= 0) return s.start; if
 
 /* ================= LAYOUT + DRAW ================= */
 let CV = null, CTX = null, VW = 0, VH = 0, DPR = 1;
+/* 📣 CHEERSQUAD (cs-2b) START — the crowd around the board (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+// sides: every human snake = its own side (its index); bots / the board = the 😈 rival's side
+function cheerMount(){
+  if(!window.Cheer) return; Cheer.unmount();
+  const M = G.M, hs = M.snakes.filter(s => s.human), bots = M.snakes.some(s => !s.human);
+  const players = hs.map((s, i) => ({name: s.name, side: i, human: true})).concat(hs.length < 2 ? [{name: bots ? 'Robo-snakes' : 'Wiggles', side: 1, human: false}] : []);
+  Cheer.mount($('stage'), {game: 'snakize', players, me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'scene', ref: $('cv'),
+    avoid: () => Array.from(document.querySelectorAll('#gbar, #corners .corner, .ctl-side, .ctl-wrap, .quest:not(.hidden), #offer:not(.hidden)')),
+    clear: b => { const R = cheerField(); return !R || !(b.r > R.x - 3 && b.l < R.x + R.w + 3 && b.b > R.y - 3 && b.t < R.y + R.h + 3); }});
+}
+// the board on screen (null = it fills the screen: 🧭 gate, zoomed castle)
+function cheerField(){
+  if(!G) return null; const M = G.M, n = M.n;
+  if(G.mode === 'feast' || (G.story && G.mode !== 'gate' && G.mode !== 'castle')){ const b = feastBox(VW, VH, n); return {x: b.bx, y: b.by, w: b.cell * n, h: b.cell * n}; }
+  if(G.mode === 'castle'){ const b = castleBox(VW, VH, n); if(!b.fit) return null; return {x: Math.floor((VW - b.cell * n) / 2), y: Math.floor((VH - b.cell * n) / 2), w: b.cell * n, h: b.cell * n}; }
+  return null;
+}
+// candidate spots in the margins: a column each side on wide screens, a row above / below on tall ones (team 0 = left / top)
+function cheerScene(g){
+  if(!window.Cheer || !Cheer.active() || !G) return;
+  const R = cheerField(); if(!R) return;
+  const party = Cheer.stats().size === 'party', cands = [], ml = R.x, mt = R.y, mb = VH - R.y - R.h;
+  if(ml >= 46){ const k = Math.min(ml / 62, 0.95) * (party ? 1 : 0.9), step = 92 * k;
+    for(let y = R.y + R.h - 6; y - 100 * k > -2; y -= step) [0, 1].forEach(side => cands.push({id: 'c' + side + ':' + Math.round(y), x: side ? R.x + R.w + ml / 2 : ml / 2, y, k, half: side})); }
+  if(mt >= 60 || mb >= 60){ const k = Math.min(Math.max(mt, mb) / 110, 0.85) * (party ? 1 : 0.9), step = 54 * k;
+    for(let x = step / 2 + 4; x < VW - step / 2; x += step){ if(mt >= 60) cands.push({id: 't:' + Math.round(x), x, y: mt - 4, k: Math.min(k, mt / 110), half: x < VW / 2 ? 0 : 1});
+      if(mb >= 60) cands.push({id: 'b:' + Math.round(x), x, y: VH - 4, k: Math.min(k, mb / 110), half: x < VW / 2 ? 0 : 1}); } }
+  if(!cands.length) return;
+  cands.sort((a, b) => Math.abs(a.y - VH * 0.55) - Math.abs(b.y - VH * 0.55));
+  Cheer.place(g, cands, {key: 'main', w: VW, h: VH});
+}
+function cheerSay(kind, si, why){ if(!window.Cheer || !Cheer.active() || !G) return; const M = G.M, s = M.snakes[si]; if(!s) return;
+  const hs = M.snakes.filter(x => x.human); let side = s.human ? hs.indexOf(s) : 1;
+  if(!s.human && kind === 'miss') return;   /* a bot bumping is not news */
+  if(!s.human && hs.length > 1) return;
+  const now = performance.now(); if(why === 'power' || why === 'grow' || why === 'claim'){ if((G.cheerAt || 0) > now - 2500) return; G.cheerAt = now; }
+  Cheer.react(kind, {side}); }
+function cheerEnd(){ if(!window.Cheer || !Cheer.active() || !G) return; const M = G.M, hs = M.snakes.filter(s => s.human);
+  if(M.winner >= 0 && M.snakes[M.winner] && M.snakes[M.winner].human) Cheer.react('win', {side: hs.indexOf(M.snakes[M.winner])});
+  else if(G.endless) Cheer.react('win', {side: 0});
+  else Cheer.react('lose', {side: 0}); }
+function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  const at = card.querySelector('.res-btns'); if(!at) return; card.insertBefore(c, at); card.insertBefore(cap, at); }, 60); }
+/* 📣 CHEERSQUAD END */
 function layout(){
   const st = $('stage'); CV = $('cv'); CTX = CV.getContext('2d');
   const r = CV.getBoundingClientRect(); DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -1760,6 +1809,7 @@ function draw(){
   if(G.mode === 'gate') drawGate(g, VW, VH, G);
   else if(G.mode === 'castle' && window.drawCastle) window.drawCastle(g, VW, VH, G);
   else drawFeast(g, VW, VH, G, 0);
+  cheerScene(g);   /* 📣 cs-2b: crowd in the free space around the board */
 }
 function star(g, x, y, R, r){ g.beginPath(); for(let i = 0; i < 10; i++){ const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r : R; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } g.closePath(); }
 function rideK(cellPx){ return Math.max(0.26, cellPx * 1.25 / 70); }
@@ -2055,11 +2105,12 @@ document.addEventListener('visibilitychange', () => { if(document.hidden && G &&
 function togglePause(){ if(!G || G.over) return; G.paused = !G.paused; UI.pauseIcon($('pause-btn'), G.paused); banner(G.paused ? '⏸ Paused — P or ▶ to go on' : '▶ Go!', 'good', G.paused ? 600000 : 700); }
 function pauseGame(){ if(G && !G.over && !G.paused) togglePause(); }
 function leavePlay(){ if(G && !G.over){ G.paused = true; UI.confirm({icon: '🐍', title: 'Leave this game?', body: 'The game ends and is not saved.', okText: 'Leave', cancelText: 'Stay'}).then(ok => { if(ok) backToMenu(); else if(G){ G.paused = false; UI.pauseIcon($('pause-btn'), false); } }); return; } backToMenu(); }
-function backToMenu(){ stopLoop(); musicStop(); hideResult(); G = null; KEYHELD.clear(); if(window.afterGameMenu && window.afterGameMenu()) return; renderMenu(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); stopLoop(); musicStop(); hideResult(); G = null; KEYHELD.clear(); if(window.afterGameMenu && window.afterGameMenu()) return; renderMenu(); showScreen('menu'); }
 
 /* ================= RESULT + SAVE ================= */
 function gameOver(){
   const M = G.M; G.over = true; musicStop();
+  cheerEnd();   /* 📣 cs-2b: win / lose crowd */
   const hs = humanIdx(), solo = hs.length === 1, me = M.snakes[0], won = M.winner === 0;
   // win: curl + dance + fireworks · lose: facepalm then clap for the winner
   hs.forEach(i => { if(M.winner === i){ react(i, pickOne(EPIC_DANCES && EPIC_DANCES.length ? EPIC_DANCES : [gestK('dance')]) || gestK('dance'), 9); G.reacts[i].keep = true; } else { react(i, FACEPALM, 1.6); setTimeout(() => { if(G && G.over) react(i, gestK('clap'), 9); }, 1600); } });
@@ -2144,7 +2195,7 @@ function saveText(res, cleared){
   const h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New high score!' : cleared ? (res.best && res.best.score ? 'Best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Saved') : '✅ Feats saved — win to unlock the next level';
   return featText(res.feats, h);
 }
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces();   /* 📣 cs-2b */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pickOne(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
@@ -2386,4 +2437,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.themes', {rows: 2}); UI.pageRows('.skins', {rows: 2}); }</script>
 </body>
 </html>
-<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a+p3e) END OF Snakize.html -->
+<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a+p3e+cs-2b) END OF Snakize.html -->
