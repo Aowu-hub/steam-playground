@@ -441,7 +441,7 @@ var BOP = (function () {
     newRound(M);
     return M;
   }
-  function mkStats() { return {blocks: 0, catches: 0, bots: 0, chains: 0, kicks: 0, tosses: 0, comebacks: 0, swaps: 0, multi: 0, triple: 0, pickups: 0, self: 0, hold: 0, rounds: 0, throws: 0, bossHits: 0}; }
+  function mkStats() { return {blocks: 0, catches: 0, bots: 0, chains: 0, kicks: 0, tosses: 0, comebacks: 0, swaps: 0, multi: 0, triple: 0, pickups: 0, self: 0, hold: 0, rounds: 0, throws: 0, bossHits: 0, hits: 0, carries: 0, homeruns: 0, selfbops: 0}; }
   function newRound(M) {
     var L = M.L, st = M.stage;
     M.round++; M.t = 0; M.state = 'ready'; M.readyT = 2.6; M.endT = 0; M.roundWinner = -1;
@@ -486,6 +486,7 @@ var BOP = (function () {
     if ((l && !c.l) || (r && !c.r)) p.lastAxis = 'h';
     c.u = !!u; c.d = !!d; c.l = !!l; c.r = !!r;
   }
+  function setHold(M, i, on) { var p = M.P[i]; if (p) p.hold = !!on; }   // sb-9: 💣 held down (carry needs 🤾🏏)
   function press(M, i, a, dx, dy) { var p = M.P[i]; if (!p) return; p.buf[a] = a === 'dash' ? {dx: dx, dy: dy} : true; }
 
   /* ---------- movement (grid with turn-assist) ---------- */
@@ -539,9 +540,11 @@ var BOP = (function () {
     if (p.ghost) return trapLock(M, p);
     if (!p.alive || p.edge || p.lock > 0 || p.stun > 0) return false;
     var x = cellX(p), y = cellY(p), f = facingCell(p), done = false;
-    if (p.toss) {
-      var b = bombAt(M, x, y); if (!(b && b.owner === p.i)) { var b2 = bombAt(M, f[0], f[1]); if (b2 && b2.owner === p.i && !b2.slide) b = b2; else b = null; }
-      if (b && !b.slide) { tossBomb(M, p, b); done = true; }
+    if (p.toss) {   // sb-9 🤾🏏: carrying → hit · on your bomb → toss 2 · a bomb in front (anyone's) → 🏏 hit 4
+      var cb = carriedBy(M, p);
+      if (cb) { cb.carry = false; cb.x = x; cb.y = y; hitBomb(M, p, cb); done = true; }
+      else { var b = bombAt(M, x, y); if (b && b.owner === p.i && !b.slide) { tossBomb(M, p, b); done = true; }
+        else { var b2 = bombAt(M, f[0], f[1]); if (b2 && !b2.slide && !b2.fly) { hitBomb(M, p, b2); done = true; } } }
     }
     if (!done && p.kick) { var kb = bombAt(M, f[0], f[1]); if (kb && !kb.slide && !kb.fly) { kb.slide = {dx: p.dx, dy: p.dy, prog: 0}; kb.pass = {}; p.act = {k: 'kick', t: 0}; M.stats[p.i].kicks++; ev(M, 'kick', {i: p.i, id: kb.id}); done = true; } }
     if (!done && p.remote && M.t - p.lastSkill < 0.42 && p.lastSkillNone) { var n = 0; M.bombs.forEach(function (bb) { if (bb.owner === p.i && !bb.fly && !bb.carry && !bb.edgeBy) { bb.t = 0; n++; } }); if (n) { ev(M, 'remote', {i: p.i, n: n}); done = true; } }
@@ -552,6 +555,21 @@ var BOP = (function () {
     b.pass = {}; b.slide = null; p.act = {k: 'toss', t: 0}; M.stats[p.i].tosses++;
     startFly(M, b, Math.round(b.x), Math.round(b.y), dx, dy, 2, p.i);
     ev(M, 'toss', {i: p.i, id: b.id});
+  }
+  function hitBomb(M, p, b) {
+    var dx = p.dx || 0, dy = p.dy || 0; if (!dx && !dy) dy = 1;
+    b.pass = {}; b.slide = null; b.hitBy = p.i; p.act = {k: 'hit', t: 0}; M.stats[p.i].hits++;
+    startFly(M, b, Math.round(b.x), Math.round(b.y), dx, dy, 4, p.i); b.fly.dur = 0.5; b.fly.hit = true;   // flies over walls like a toss, a bit higher
+    ev(M, 'hit', {i: p.i, id: b.id, from: b.owner});
+  }
+  function carriedBy(M, p) { for (var i = 0; i < M.bombs.length; i++) if (M.bombs[i].carry && M.bombs[i].carrier === p.i) return M.bombs[i]; return null; }
+  function stepCarry(M, p, dt) {   // sb-9: hold 💣 on your bomb (with 🤾🏏) → lift it; let go → toss 2 the way you face
+    var cb = carriedBy(M, p);
+    if (cb) { if (!p.hold || p.stun > 0) { cb.carry = false; cb.x = cellX(p); cb.y = cellY(p); tossBomb(M, p, cb); } else { cb.x = p.x; cb.y = p.y; } p.holdT = 0; return; }
+    if (!p.toss || !p.hold || p.lock > 0 || p.stun > 0) { p.holdT = 0; return; }
+    p.holdT = (p.holdT || 0) + dt; if (p.holdT < 0.22) return;
+    var b = bombAt(M, cellX(p), cellY(p)); if (!b || b.owner !== p.i || b.slide || b.fly || b.t < 0.15) return;
+    b.carry = true; b.carrier = p.i; b.pass = {}; p.act = {k: 'carry', t: 0}; M.stats[p.i].carries++; p.holdT = 0; ev(M, 'carry', {i: p.i, id: b.id});
   }
   function wrap(M, v, n) { var lo = 1, hi = n - 2; if (v < lo) return hi - (lo - v - 1); if (v > hi) return lo + (v - hi - 1); return v; }
   function startFly(M, b, fx, fy, dx, dy, n, by) {
@@ -566,6 +584,7 @@ var BOP = (function () {
     b.x = x; b.y = y; b.fly = null; b.pass = overlapPass(M, x, y); b.bounces = 0; ev(M, 'land', {id: b.id, x: x, y: y});
   }
   function stepBomb(M, b, dt) {
+    if (b.carry) { var cq = M.P[b.carrier]; if (!cq || !cq.alive || cq.ghost || cq.edge) { b.carry = false; if (cq) { b.x = cellX(cq); b.y = cellY(cq); } b.pass = overlapPass(M, Math.round(b.x), Math.round(b.y)); } else { b.x = cq.x; b.y = cq.y; } b.t -= dt; return; }
     if (b.fly) { var f = b.fly; f.t += dt; var q = Math.min(1, f.t / f.dur); b.x = f.fx + (f.wrapped ? f.dx * q : (f.tx - f.fx) * q); b.y = f.fy + (f.wrapped ? f.dy * q : (f.ty - f.fy) * q); if (q >= 1) landFly(M, b); return; }
     if (b.slide) {
       var s = b.slide, cx = Math.round(b.x - s.dx * s.prog), cy = Math.round(b.y - s.dy * s.prog);
@@ -600,9 +619,9 @@ var BOP = (function () {
     return out;
   }
   function explode(M, b) {
-    var x = Math.round(b.x), y = Math.round(b.y), cells = blastCells(M, x, y, b.r), pid = b.id, owner = b.edgeBy != null ? b.edgeBy : b.owner;
+    var x = Math.round(b.x), y = Math.round(b.y), cells = blastCells(M, x, y, b.r), pid = b.id, owner = b.edgeBy != null ? b.edgeBy : b.hitBy != null ? b.hitBy : b.owner;   // sb-9: a 🏏 hit bomb counts for the hitter
     M.bombs.splice(M.bombs.indexOf(b), 1);
-    M.pops[pid] = {owner: owner, n: 0, edge: b.edgeBy != null, t: M.t};
+    M.pops[pid] = {owner: owner, n: 0, edge: b.edgeBy != null, t: M.t, hit: b.hitBy != null};
     cells.forEach(function (c) {
       var i = idx(M, c[0], c[1]), g = M.grid[i];
       if (g === 2) breakBlock(M, c[0], c[1], owner);
@@ -660,6 +679,8 @@ var BOP = (function () {
     // 👻 soul swap: a ghost locked this player and the pop caught them → the ghost takes the body
     if (p.lock > 0 && p.lockBy >= 0 && M.P[p.lockBy] && M.P[p.lockBy].ghost) { soulSwap(M, M.P[p.lockBy], p, by); return; }
     credit(M, p, by, src);
+    if (src && src.pid != null && M.pops[src.pid] && M.pops[src.pid].hit && by >= 0 && by !== p.i) { if (M.stats[by]) M.stats[by].homeruns++; ev(M, 'homerun', {i: by, victim: p.i}); }   // sb-9 🏏
+    var cb0 = carriedBy(M, p); if (cb0) { cb0.carry = false; cb0.x = x; cb0.y = y; cb0.pass = overlapPass(M, x, y); }
     p.act = {k: 'caught', t: 0}; p.caughtT = 0; p.lock = 0;
     var list = p.pick.slice(), mode = M.mode;
     ev(M, 'caught', {i: p.i, by: by, x: p.x, y: p.y, theme: M.theme});
@@ -921,6 +942,8 @@ var BOP = (function () {
     }
     // 1b. trapper / kicker: kick a bomb toward a foe in line
     if (p.kick && kind !== 'sleepy') { for (var k = 0; k < 4; k++) { var bx = cellX(p) + DIRS[k][0], by = cellY(p) + DIRS[k][1], b = bombAt(M, bx, by); if (b && !b.slide && foes.some(function (q) { return (DIRS[k][0] ? cellY(q) === by && sgn(cellX(q) - bx) === DIRS[k][0] : cellX(q) === bx && sgn(cellY(q) - by) === DIRS[k][1]); })) { p.dx = DIRS[k][0]; p.dy = DIRS[k][1]; skill(M, p); A.think = 0.3; return; } } }
+    // 1c. sb-9 🏏: from Hard, hit a bomb next to me toward a foe in line 3–6 blocks away (max once ~6 s)
+    if (p.toss && M.level >= 3 && kind !== 'sleepy' && M.t - (A.hitT || -9) > 6) { for (var k2 = 0; k2 < 4; k2++) { var hx = cellX(p) + DIRS[k2][0], hy = cellY(p) + DIRS[k2][1], hb = bombAt(M, hx, hy); if (hb && !hb.slide && !hb.fly && foes.some(function (q) { var ddx = cellX(q) - hx, ddy = cellY(q) - hy; return DIRS[k2][0] ? (cellY(q) === hy && sgn(ddx) === DIRS[k2][0] && Math.abs(ddx) >= 3 && Math.abs(ddx) <= 6) : (cellX(q) === hx && sgn(ddy) === DIRS[k2][1] && Math.abs(ddy) >= 3 && Math.abs(ddy) <= 6); })) { p.dx = DIRS[k2][0]; p.dy = DIRS[k2][1]; if (p.dx) p.face = p.dx; A.hitT = M.t; skill(M, p); A.think = 0.3; return; } } }
     // 2. hold the land: go to the zone
     if (M.zone && M.mode === 'hold') {
       var Z = M.zone, inZ = function (cc) { var x = cc % M.W, y = (cc - x) / M.W; return x >= Z.x && y >= Z.y && x < Z.x + Z.w && y < Z.y + Z.h; };
@@ -1066,9 +1089,10 @@ var BOP = (function () {
       p.dx = d[0]; p.dy = d[1]; if (d[0]) p.face = d[0];
       if (moveAxis(M, p, d[0], d[1], speedOf(M, p) * dt)) { p.moving = true; p.walkT += dt; }
     }
-    if (p.buf.plant) plant(M, p);
+    if (p.buf.plant && !carriedBy(M, p)) plant(M, p);
     if (p.buf.skill) skill(M, p);
     p.buf = {};
+    if (p.human || p.auto) stepCarry(M, p, dt);
     // pick up power-ups
     var it = itemAt(M, cellX(p), cellY(p));
     if (it && Math.abs(p.x - it.x) < 0.45 && Math.abs(p.y - it.y) < 0.45) {
@@ -1099,8 +1123,9 @@ var BOP = (function () {
     if (M.sd) stepSudden(M, dt);
     stepWarn(M, dt);
     M.P.forEach(function (p) { stepPlayer(M, p, dt); });
-    for (var i = M.bombs.length - 1; i >= 0; i--) { var b = M.bombs[i]; if (b.carry) continue; stepBomb(M, b, dt); }
+    for (var i = M.bombs.length - 1; i >= 0; i--) { var b = M.bombs[i]; stepBomb(M, b, dt); }   // sb-9: carried bombs tick too (stepBomb moves them with the carrier)
     var guard = 0;
+    M.bombs.forEach(function (b) { if (b.carry && b.t <= 0) { var cq = M.P[b.carrier]; b.carry = false; if (cq) { b.x = cellX(cq); b.y = cellY(cq); if (M.stats[cq.i]) M.stats[cq.i].selfbops++; ev(M, 'selfbop', {i: cq.i, id: b.id}); } } });   // sb-9: popped in your hands = self bop
     while (guard++ < 40) { var due = M.bombs.filter(function (b) { return !b.fly && !b.carry && b.t <= 0; }); if (!due.length) break; due.forEach(function (b) { if (M.bombs.indexOf(b) >= 0) explode(M, b); }); }
     for (var k in M.fl) { M.fl[k].t -= dt; if (M.fl[k].t <= 0) delete M.fl[k]; }
     for (var j = M.items.length - 1; j >= 0; j--) { var it = M.items[j]; if (it.safe > 0) it.safe -= dt; if (it.t != null) { it.t -= dt; if (it.t <= 0) { M.items.splice(j, 1); ev(M, 'vanish', {x: it.x, y: it.y}); } } }
@@ -1194,7 +1219,7 @@ var BOP = (function () {
   return {DT: DT, LEVELS: LEVELS, POWERS: POWERS, CAP: CAP, HOLD_TARGET: HOLD_TARGET, BOSSES: BOSSES, STAGE_FOES: STAGE_FOES, DIRS: DIRS,
     newMatch: newMatch, newRound: newRound, step: step, setCtrl: setCtrl, press: press, takeEvents: takeEvents, simulate: simulate, scoreFor: scoreFor, starsFor: starsFor,
     blastCells: blastCells, dangerMap: dangerMap, bombAt: bombAt, itemAt: itemAt, idx: idx, solid: solid, free: free, plant: plant, skill: skill, explode: explode, hit: hit,
-    applyPower: applyPower, alivePlayers: alivePlayers, ringCells: ringCells, startSudden: startSudden, spawnPts: spawnPts, mkRng: mkRng, moveAxis: moveAxis, trapLock: trapLock, edgeThrow: edgeThrow};
+    applyPower: applyPower, setHold: setHold, hitBomb: hitBomb, carriedBy: carriedBy, alivePlayers: alivePlayers, ringCells: ringCells, startSudden: startSudden, spawnPts: spawnPts, mkRng: mkRng, moveAxis: moveAxis, trapLock: trapLock, edgeThrow: edgeThrow};
 })();
 // ENGINE END
 </script>
@@ -1273,7 +1298,7 @@ const POWER_INFO = {
   fire:   ['🔥', 'Bigger pop', 'Longer + arms (up to 8)'],
   speed:  ['👟', 'Speed', 'Run faster (up to 5)'],
   kick:   ['👢', 'Kick', 'Walk up to a bomb + ✨ skill → it slides'],
-  toss:   ['🤾', 'Carry & toss', 'Stand on your bomb + ✨ skill → toss it 2 blocks (it bounces)'],
+  toss:   ['🤾', 'Toss & hit', '✨ on your bomb = toss 2 · ✨ next to a bomb = 🏏 hit it 4 (over walls) · hold 💣 = carry, let go = toss (don\'t hold too long!)'],
   shield: ['🛡️', 'Shield', 'Saves you from one pop (a tossed bomb knocks it off)'],
   remote: ['📡', 'Remote pop', 'Double-tap ✨ skill → your bombs pop now'],
   dash:   ['💨', 'Slide dash', 'Double-tap a direction → dash 2 blocks'],
@@ -1657,7 +1682,7 @@ function toggleCornerHelp(){
   const ex = $('stage').querySelector('.chelp'); if(ex){ ex.remove(); return; }
   const d = document.createElement('div'); d.className = 'chelp';
   d.innerHTML = '<b>📱 One tablet, everyone in a corner</b><br>' + humanSeats().map((s, j) => '<span style="color:' + SEAT_COL[j] + '">●</span> P' + (j + 1) + ' ' + UI.esc(G.M.P[s].name)).join(' · ') +
-    '<br>🕹️ Drag the round pad to walk · 💣 plant · ✨ skill (kick / toss / 👻 trap) · tap the pad twice fast = 💨 dash<br><button class="pill" style="margin-top:6px" onclick="toggleCornerHelp()">Got it</button>';
+    '<br>🕹️ Drag the round pad to walk · 💣 plant · ✨ skill (kick / toss / 🏏 hit / 👻 trap) · hold 💣 = carry · tap the pad twice fast = 💨 dash<br><button class="pill" style="margin-top:6px" onclick="toggleCornerHelp()">Got it</button>';
   $('stage').appendChild(d);
 }
 function bindCtl(el, seat){
@@ -1677,8 +1702,8 @@ function bindCtl(el, seat){
     pad.addEventListener('pointerup', end); pad.addEventListener('pointercancel', end);
   }
   el.querySelectorAll('.tb').forEach(b => {
-    b.addEventListener('pointerdown', e => { e.preventDefault(); b.classList.add('down'); if(G && !G.paused && !G.hold) BOP.press(G.M, seat, b.dataset.b); });
-    const up = () => b.classList.remove('down'); b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('pointerleave', up);
+    b.addEventListener('pointerdown', e => { e.preventDefault(); b.classList.add('down'); if(G && b.dataset.b === 'plant'){ G.plantDown = G.plantDown || {}; G.plantDown[seat] = true; } if(G && !G.paused && !G.hold) BOP.press(G.M, seat, b.dataset.b); });
+    const up = () => { b.classList.remove('down'); if(G && G.plantDown && b.dataset.b === 'plant') G.plantDown[seat] = false; }; b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('pointerleave', up);
   });
 }
 // double-tap a direction = 💨 dash (keys, pad and controllers)
@@ -1810,6 +1835,7 @@ function readInputs(){
     let u = has('up') || t === 'u' || pd.u, d = has('down') || t === 'd' || pd.d, l = has('left') || t === 'l' || pd.l, r = has('right') || t === 'r' || pd.r;
     const skill = M.P[seat]; if(skill && skill.human && hs1Skill(seat)) { /* skill button is pressed via events */ }
     BOP.setCtrl(M, seat, u, d, l, r);
+    BOP.setHold(M, seat, !!(has('plant') || (G.plantDown && G.plantDown[seat]) || pd.plant));   // sb-9: hold 💣 = carry
   });
 }
 function hs1Skill(){ return false; }
@@ -1874,6 +1900,10 @@ function handleEvents(list){
     else if(e.k === 'swap'){ const g = M.P[e.ghost], b = M.P[e.body]; boing(400, 0.5, 'triangle', 0.2, 1200); addFx({k: 'swirl', x: e.x, y: e.y, life: 1.0}); bigWord('👻 SOUL SWAP!'); if(g && g.human) say(g.name + ' is back!'); }
     else if(e.k === 'shieldoff'){ boing(880, 0.2, 'triangle', 0.15, 300); if(P) addFx({k: 'emoji', ch: '🛡️', x: P.x, y: P.y - 1, life: 0.7, vy: -1, size: 0.6}); }
     else if(e.k === 'kick' || e.k === 'toss'){ boing(240, 0.12, 'square', 0.12, 480); M.stats; }
+    else if(e.k === 'hit'){ boing(900, 0.09, 'triangle', 0.16, 300); boing(160, 0.18, 'square', 0.14, 520); const hp = M.P[e.i]; if(hp){ feel(hp, '💪', 0.9); addFx({k: 'label', x: hp.x, y: hp.y - 1.4, text: 'Bop… WHACK!', ch: '🏏', life: 1.0, col: '#FFC845'}); } }
+    else if(e.k === 'carry'){ boing(330, 0.1, 'sine', 0.12, 520); const cp = M.P[e.i]; if(cp) feel(cp, '😤', 0.8); }
+    else if(e.k === 'selfbop'){ const sp = M.P[e.i]; if(sp){ feel(sp, '😵', 1.2); addFx({k: 'label', x: sp.x, y: sp.y - 1.4, text: 'Bop… SELF BOP!', ch: '😵', life: 1.2, col: '#FF7A7A'}); } }
+    else if(e.k === 'homerun'){ const hp = M.P[e.i]; if(hp){ feel(hp, '🤩', 1.2); addFx({k: 'label', x: hp.x, y: hp.y - 1.6, text: 'Bop… HOME RUN!!', ch: '🏏', life: 1.3, col: '#3DDCB4'}); } }
     else if(e.k === 'dash'){ if(P) addFx({k: 'emoji', ch: '💨', x: P.x - P.dx * 0.6, y: P.y - P.dy * 0.6 - 0.3, life: 0.5, size: 0.5}); }
     else if(e.k === 'scatter'){ /* items bounce in from the spot (drawn) */ }
     else if(e.k === 'sudden'){ banner(T.sdText, 'bad'); say('Sudden death!'); }
@@ -1956,13 +1986,13 @@ function drawWorld(g, W, H, st, R){
   // flames
   g.save(); for(const k in M.fl){ const f = M.fl[k], x = k % M.W, y = (k - x) / M.W, a = Math.min(1, f.t / 0.2); drawFlame(g, st, x, y, f, CS, a); } g.restore();
   // bombs
-  M.bombs.forEach(b => drawBomb(g, st, b, CS, t));
+  M.bombs.forEach(b => { if(!b.carry) drawBomb(g, st, b, CS, t); });
   // horde (🧟 sudden death)
   if(M.horde){ for(let k = 0; k < 3; k++){ const hx = M.horde.x - M.horde.dir * k * 0.7; emo(g, '🧟', X(hx), Y(M.horde.y) - CS * 0.15 + Math.sin(t * 6 + k) * CS * 0.05, CS * 0.85, 1, M.horde.dir < 0); } }
   // players: sorted by row, ghosts on top
   const order = M.P.filter(p => !p.gone && (p.alive || p.ghost || p.edge || (p.act && p.act.k === 'caught' && p.act.t < 1.2) || (M.mode !== 'hold' && !p.alive && p.caughtT < 1.2))).sort((a, b) => (a.ghost - b.ghost) || (a.y - b.y));
   if(!st.preview) st.fx.forEach(f => { if(f.k === 'stamp') drawPolishFx(g, st, CS, t, f, f.t / f.life, true); });   // CAUGHT! sits behind the avatar
-  order.forEach(p => drawPlayer(g, st, p, CS, t));
+  order.forEach(p => { drawPlayer(g, st, p, CS, t); M.bombs.forEach(b => { if(b.carry && b.carrier === p.i) drawBomb(g, st, b, CS, t); }); });   // sb-9: a carried bomb rides over its carrier's head
   if(M.boss) drawBoss(g, st, M.boss, CS, t);
   // out players (Basic has no ghosts) cheer from the bottom wall
   if(!st.preview){ const outs = M.P.filter(p => p.out && p.caughtT > 1.2); outs.forEach((p, j) => { const av = st.avFor ? st.avFor(p.i) : st.avs[p.i]; drawAvatar(g, {name: p.name, av, dir: 1, walkT: 0, gest: {g: gestK('cheer'), t: t + j}, jumpH: 0}, (1.5 + j * 1.2) * CS, M.H * CS - CS * 0.1, CS / 95, {t}); }); }
@@ -2038,7 +2068,8 @@ function drawBomb(g, st, b, CS, t){
   // (sb-8) a fuse that burns down, colour + rubbery squash that speed up, white flash at the end, 3·2·1 on Basic–Intermediate
   const x = (b.x + 0.5) * CS, y = (b.y + 0.5) * CS, left = Math.max(0, b.t) / (b.max || 3), urg = 1 - left;
   let lift = 0, sc = 1;
-  if(b.fly){ const q = b.fly.t / b.fly.dur; lift = Math.sin(q * Math.PI) * CS * 0.7; sc = 1 + Math.sin(q * Math.PI) * 0.25; }
+  if(b.fly){ const q = b.fly.t / b.fly.dur; lift = Math.sin(q * Math.PI) * CS * (b.fly.hit ? 1.05 : 0.7); sc = 1 + Math.sin(q * Math.PI) * 0.25; }
+  else if(b.carry){ lift = CS * 1.05; sc = 0.8; }
   const by = y - lift - CS * 0.04, wob = Math.sin(t * (5 + urg * 22) + (b.id || 0)) * (0.04 + urg * 0.1), sx = (1 + wob) * sc, sy = (1 - wob) * sc;
   g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x, y + CS * 0.32, CS * 0.3 * (1 - lift / CS * 0.5) * sx, CS * 0.08, 0, 0, 7); g.fill();
   if(!st.preview){ const hue = Math.round(120 - urg * 120), hr = CS * (0.5 + urg * 0.12), hg = g.createRadialGradient(x, by, CS * 0.1, x, by, hr); hg.addColorStop(0, 'hsla(' + hue + ',95%,55%,' + (0.3 + urg * 0.35).toFixed(2) + ')'); hg.addColorStop(1, 'hsla(' + hue + ',95%,55%,0)'); g.fillStyle = hg; g.beginPath(); g.arc(x, by, hr, 0, 7); g.fill(); }
@@ -2064,6 +2095,10 @@ function drawBomb(g, st, b, CS, t){
 function bombLook(st, b){ if(b.boss) return '💥'; if(b.poo) return '💩'; return THEMES[st.theme].bomb; }
 const POSE_KICK = {legR: 1.3, legL: -0.2, armL: 0.9, armR: 0.4, mouth: 'open'};
 const POSE_TOSS = {armR: 2.9, armL: 1.2, mouth: 'open'};
+const POSE_CARRY = {armL: 2.95, armR: 2.95, mouth: 'open'};
+function poseSwing(q){ return q < 0.3 ? {armR: -0.9, armL: -0.5, rot: -0.12, mouth: 'open'} : {armR: 2.2, armL: 1.6, rot: 0.14, mouth: 'open'}; }   // sb-9 🏏 wind-up → follow-through
+const BAT_CACHE = {};
+function batFor(name){ if(BAT_CACHE[name] !== undefined) return BAT_CACHE[name]; let d = null; try{ if(typeof BatStick !== 'undefined') d = BatStick.of(name); if(!d && typeof racketDesign === 'function') d = racketDesign(10, {}); }catch(e){} return (BAT_CACHE[name] = d); }
 let TINT = null;
 function drawPlayer(g, st, p, CS, t){
   const M = st.M, av = st.avFor ? st.avFor(p.i) : (st.avs[p.i] || defaultAvatar(p.name)), x = (p.x + 0.5) * CS, feet = (p.y + 0.5) * CS + CS * 0.34, k = CS / 78;
@@ -2077,6 +2112,7 @@ function drawPlayer(g, st, p, CS, t){
     if(a.k === 'plant' && a.t < 0.35) A.stance = 'crouch';
     else if(a.k === 'kick' && a.t < 0.35) pose = POSE_KICK;
     else if(a.k === 'toss' && a.t < 0.4) pose = POSE_TOSS;
+    else if(a.k === 'hit' && a.t < 0.45){ pose = poseSwing(a.t / 0.45); const bd = batFor(p.name); if(bd && typeof BatStick !== 'undefined') A.av = BatStick.hold(av, bd); }   // sb-9 🏏 your BatStick
     else if(a.k === 'grab' && a.t < 0.45){ A.jumpH = Math.sin(a.t / 0.45 * Math.PI) * 14; }
     else if(a.k === 'cheer' && a.t < 1.1) A.gest = {g: gestK('cheer'), t: a.t};
     else if(a.k === 'win') A.gest = {g: gestK(M.done ? 'dance' : 'cheer'), t: a.t};
@@ -2089,6 +2125,7 @@ function drawPlayer(g, st, p, CS, t){
   if(fleeing && !pose && !A.gest){ pose = {armL: 2.7 + Math.sin(t * 18) * 0.25, armR: 2.7 - Math.sin(t * 18) * 0.25, mouth: 'open', rot: 0.12 * (p.face || 1)}; if(p._fleeAt == null || t - p._fleeAt > 4){ p._fleeAt = t; feel(p, '😱', 1); talk(p, 'flee', p.human ? 0.35 : 0.2); } }
   if(M.state === 'end' && M.roundWinner >= 0 && p.i !== M.roundWinner && p.alive && !p.ghost) A.gest = {g: gestK('clap'), t: G ? G.t : t};
   if(p.inv > 0 && !caught && Math.floor(t * 12) % 2 === 0) alpha *= 0.45;
+  if(!caught && !p.ghost && M.bombs.some(b => b.carry && b.carrier === p.i) && !(p.act && p.act.k === 'hit')) pose = POSE_CARRY;   // sb-9: bomb over the head
   if(p.lock > 0) pose = Object.assign({}, pose || {}, {armL: 0.2, armR: 0.2, eyes: 'open', mouth: 'open'});
   if(p.slow > 0 && st.theme === 'zombie') pose = Object.assign({}, pose || {}, {armL: 1.5, armR: 1.5});
   // ring under the feet in the player's colour
@@ -2159,7 +2196,7 @@ const PART = {
   zombie: [{s: 'goo', c: ['#7BC043', '#9CCC65', '#558B2F']}, {s: 'goo', c: ['#7BC043']}]
 };
 const AMBIENT = {dino: ['🍃', 'fall'], sea: ['🫧', 'rise'], dance: ['✨', 'twinkle'], robot: ['⚙️', 'drift'], space: ['⭐', 'twinkle'], sky: ['☁️', 'drift'], zombie: ['🦇', 'flap']};
-const POWER_WORD = {bomb: '+1 BOMB!', fire: 'BIGGER POP!', speed: 'SPEED UP!', kick: 'KICK!', toss: 'TOSS!', shield: 'SHIELD!', remote: 'REMOTE!', dash: 'DASH!', error: 'UH-OH!'};
+const POWER_WORD = {bomb: '+1 BOMB!', fire: 'BIGGER POP!', speed: 'SPEED UP!', kick: 'KICK!', toss: 'TOSS & HIT!', shield: 'SHIELD!', remote: 'REMOTE!', dash: 'DASH!', error: 'UH-OH!'};
 // friendly lines only — cheering, sorry, phew; never teasing
 const LINES = {
   plant: ['Here it goes!', 'Boom time!', 'Watch out!', 'Tick tock!'],
@@ -2386,7 +2423,7 @@ function finishMatch(){
 }
 function statsFor(M, p, won, vsBots){
   const s = M.stats[p.i];
-  const o = {games: 1, wins: won ? 1 : 0, catches: s.catches, bots: s.bots, blocks: s.blocks, chains: s.chains, kicks: s.kicks, tosses: s.tosses, comebacks: s.comebacks, multi: s.multi, triple: s.triple, pickups: s.pickups};
+  const o = {games: 1, wins: won ? 1 : 0, catches: s.catches, bots: s.bots, blocks: s.blocks, chains: s.chains, kicks: s.kicks, tosses: s.tosses, hits: s.hits || 0, homeruns: s.homeruns || 0, comebacks: s.comebacks, multi: s.multi, triple: s.triple, pickups: s.pickups};
   if(won && vsBots && M.mode === 'battle') o.bestWin = M.level + 1;
   if(M.mode === 'classic'){ o.pooGames = 1; if(won) o.pooWins = 1; }
   if(M.mode === 'hold'){ o.holdSecs = Math.round(s.hold); if(won) o.holdWins = 1; }
@@ -2530,4 +2567,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.themes', {rows: 2}); UI.pageRows('.skins', {rows: 2}); }</script>
 </body>
 </html>
-<!-- (sb-8+r33+back-1+modes-3+mg-1+p1c+sb-9a+sb-9a2+p2+p3a+p3c+ck-2a+cs-2b) END OF SoulBopper.html -->
+<!-- (sb-8+r33+back-1+modes-3+mg-1+p1c+sb-9a+sb-9a2+p2+p3a+p3c+ck-2a+cs-2b+sb-9) END OF SoulBopper.html -->
