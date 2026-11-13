@@ -476,6 +476,33 @@
     .art-bot .ribbon, .art-bot .multi-tag, .art-bot .best-tag{padding:2px 7px;font-size:0.6rem;}
   }
   @media (max-height:520px){ .art-top{top:5px;} .art-top .help-btn, .card-acts .fav, .card-acts .fav-up{height:32px;min-width:32px;} .art-bot{bottom:5px;} }
+  /* 🎴 p5-4: ▶ how-to flip-book — 3 storybook steps (≈ 4 s loop) in the ❓ card; tap = pause / play */
+  .ui-guide-card .ug-art.ca-art span{animation:none;}
+  .ui-guide-card .ug-art.ca-art.has-demo{aspect-ratio:auto;height:auto;display:block;}
+  .ug-art.ca-art .ca-demo{position:relative;display:flex;flex-direction:column;width:100%;cursor:pointer;}
+  .ca-demo .ca-stage{position:relative;width:100%;aspect-ratio:2 / 1;overflow:hidden;}
+  .ca-demo .ca-frame{position:absolute;inset:0;opacity:0;transition:opacity .35s ease;}
+  .ca-demo .ca-frame.on{opacity:1;}
+  .ca-demo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;-webkit-user-drag:none;user-select:none;}
+  .ca-demo .ca-frame.on .fx-fly{animation:cd-fly .9s cubic-bezier(.2,.9,.3,1.25) both;}
+  .ca-demo .ca-frame.on .fx-slide{animation:cd-slide .8s cubic-bezier(.2,.9,.3,1.1) both;}
+  .ca-demo .ca-frame.on .fx-pop{animation:cd-pop .7s cubic-bezier(.2,1.4,.4,1) both;}
+  .ca-demo .ca-frame.on .fx-pulse{animation:cd-pulse 1s ease-in-out infinite;}
+  .ca-demo .ca-frame.on .fx-wiggle{animation:cd-wiggle .45s ease-in-out infinite;}
+  .ca-demo .ca-frame.on .fx-bob{animation:cd-bob 1s ease-in-out infinite;}
+  @keyframes cd-fly{from{transform:translate(24%,-38%) rotate(-10deg);opacity:.2;}to{transform:none;opacity:1;}}
+  @keyframes cd-slide{from{transform:translateX(16%);opacity:.3;}to{transform:none;opacity:1;}}
+  @keyframes cd-pop{0%{transform:scale(.94);opacity:0;}60%{transform:scale(1.02);opacity:1;}100%{transform:none;opacity:1;}}
+  @keyframes cd-pulse{0%,100%{opacity:.55;}50%{opacity:1;}}
+  @keyframes cd-wiggle{0%,100%{transform:translate(-1px,0) rotate(-.5deg);}50%{transform:translate(1px,0) rotate(.5deg);}}
+  @keyframes cd-bob{0%,100%{transform:translateY(0);}50%{transform:translateY(-3%);}}
+  .ca-demo.paused .ca-dm{animation-play-state:paused !important;}
+  .ca-demo .ca-cap{display:flex;align-items:center;gap:8px;background:#FFFDF7;border-top:2px solid #2A1E3A;padding:6px 10px;font-family:var(--font-display,'Fredoka',sans-serif);font-weight:700;font-size:0.86rem;color:#2A1E3A;line-height:1.25;text-align:left;}
+  .ca-demo .ca-cap .ca-n{flex:none;background:#2A1E3A;color:#FFFDF7;border-radius:999px;padding:1px 7px;font-size:0.72rem;}
+  .ui-guide-card .ug-art.ca-art .ca-cap .ca-t{display:block;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ca-demo .ca-cap .ca-pp{flex:none;font-style:normal;font-size:0.8rem;}
+  @media (orientation:landscape) and (max-height:560px){ .ca-demo .ca-cap{padding:3px 6px;gap:5px;font-size:0.66rem;border-top-width:1.5px;} .ca-demo .ca-cap .ca-pp{display:none;} .ca-demo .ca-cap .ca-n{font-size:0.6rem;padding:0 5px;} }
+  @media (prefers-reduced-motion: reduce){ .ca-demo .ca-dm{animation:none !important;} }
 .ui-guide-card .ug-line.mg-head{background:transparent;padding:4px 4px 0;font-size:.95rem;}   /* 🗂️ mg-1 group header in the "+N" sheet */
 </style>
 <script src="inc/UiKit.js"></script>
@@ -1074,7 +1101,113 @@
     const p = parts(id, c1, c2); if(!p) return '';
     return '<span class="ca-scene" aria-hidden="true"><img class="ca-b" alt="" draggable="false" decoding="async" src="' + p.base + '"><img class="ca-m ca-' + p.anim + '" alt="" draggable="false" decoding="async" src="' + p.move + '"></span>';
   }
-  const api = {has: id => !!S[id], parts, html, ids: () => Object.keys(S)};
+  // ======================= ▶ how-to flip-books (p5-4) =======================
+  // D[id](K) → 3 frames {b: still picture, m: the part that moves in once, a: fly | slide | pop | pulse | wiggle | bob, cap: one short line}.
+  // Shown only in the ❓ How to play card (one at a time), so it costs nothing on the Gameroom grid.
+  const D = {};
+  // ➗ Algebros — find the gap → drop the 7 → both sums are true
+  function algBoard(K, placed){
+    const T = 26, St = 29, x0 = 62, y0 = 50, sx = x0 + 4 * St; let b = '';
+    b += '<rect x="40" y="30" width="176" height="160" rx="14" ' + K.fp('#FFFFFF', 'opacity=".6"') + '/>';
+    ['3', '+', '4', '='].forEach((c, i) => b += K.tile(x0 + i * St, y0, c, OP(c), T, OP(c) ? '#B4410C' : null));
+    ['−', '5', '=', '2'].forEach((c, i) => b += K.tile(sx, y0 + (i + 1) * St, c, OP(c), T, OP(c) ? '#B4410C' : null));
+    ['6', '×', '1'].forEach((c, i) => b += K.tile(x0 + i * St, y0 + 3 * St, c, OP(c), T, OP(c) ? '#B4410C' : null));
+    if(!placed) b += '<rect x="' + (sx - 16) + '" y="' + (y0 - 16) + '" width="32" height="32" rx="8" fill="none" stroke="#22A355" stroke-width="2.6" stroke-dasharray="5 4"/>';
+    b += '<rect x="214" y="168" width="70" height="9" rx="4" ' + K.f('#B7794A') + '/>';
+    return {b, sx, y0, St, x0};
+  }
+  D['number-board'] = K => {
+    const A = algBoard(K, false), P = algBoard(K, true);
+    const rack = c => ['8', '+', '9'].map((ch, i) => '<g transform="translate(' + (228 + i * 21) + ' 158) scale(.7)">' + K.tile(0, 0, ch, OP(ch), 26) + '</g>').join('') + (c ? '<g transform="translate(270 158) scale(.7)">' + K.tile(0, 0, '7', '#BBF7D0', 26) + '</g>' : '');
+    return [
+      {b: A.b + rack(true) + K.robot(250, 140, .9, K.c2), m: '<rect x="' + (A.sx - 20) + '" y="' + (A.y0 - 20) + '" width="40" height="40" rx="10" fill="none" stroke="#22A355" stroke-width="4"/>' + K.spark(A.sx - 24, A.y0 - 26, 7) + K.spark(A.sx + 26, A.y0 + 22, 5), a: 'pulse', cap: 'Find the gap in the sums'},
+      {b: A.b + rack(false) + K.robot(250, 140, .9, K.c2), m: K.tile(A.sx, A.y0, '7', '#BBF7D0') + K.spark(A.sx + 22, A.y0 - 20, 6), a: 'fly', cap: 'Drop a tile in — 3 + 4 = 7'},
+      {b: P.b + K.tile(P.sx, P.y0, '7', '#BBF7D0') + rack(false), m: K.check(P.x0 - 4, P.y0 - 30) + K.check(P.sx + 28, P.y0 + 4 * P.St) + K.robot(250, 140, .9, K.c2, {cheer: 1}) + K.burst(P.sx, P.y0, 24, '#FFF3A6', 10).replace('<path ', '<path opacity=".55" ') + K.spark(P.sx + 30, P.y0 - 24, 7), a: 'pop', cap: 'Both sums true — you score!'}
+    ];
+  };
+  // 🏎️ Turbo Trail — race → drift past the rival → through the checkpoint
+  function road(K){
+    let b = '<path d="M0 74 Q160 62 320 74 L320 200 L0 200Z" ' + K.f('#5CC45A') + '/>';
+    b += '<path d="M30 200 C95 150 150 110 151 74 L171 74 C176 110 236 150 306 200 Z" ' + K.f('#6B6F82') + '/><path d="M168 200 C178 150 165 110 161 76" ' + K.l('#ffffff', 3.5, 'stroke-dasharray="12 10"') + '/>';
+    b += '<path d="M30 200 C95 150 150 110 151 74" ' + K.l('#EF4444', 4, 'stroke-dasharray="7 7"') + '/><path d="M306 200 C236 150 176 110 171 74" ' + K.l('#EF4444', 4, 'stroke-dasharray="7 7"') + '/>';
+    b += '<rect x="140" y="50" width="3" height="24" ' + K.fp('#9CA3AF') + '/><rect x="179" y="50" width="3" height="24" ' + K.fp('#9CA3AF') + '/><rect x="140" y="45" width="42" height="9" ' + K.fp('#ffffff') + '/>';
+    for(let i = 0; i < 10; i++) for(let j = 0; j < 2; j++) if((i + j) % 2) b += '<rect x="' + (141 + i * 4) + '" y="' + (46 + j * 4) + '" width="4" height="4" fill="#2B2B3A"/>';
+    const tree = (x, y, s) => '<g transform="translate(' + x + ' ' + y + ') scale(' + s + ')"><rect x="-3" y="0" width="6" height="14" ' + K.fp('#8B5A2B') + '/><circle cx="0" cy="-6" r="12" ' + K.f('#2E9E4F') + '/></g>';
+    return b + tree(40, 92, .9) + tree(78, 78, .55) + tree(118, 70, .35) + tree(282, 96, 1) + tree(240, 80, .6) + tree(206, 72, .38);
+  }
+  D['turbo'] = K => {
+    const R = road(K), lines = y => [0, 1, 2].map(i => '<path d="M' + (120 + i * 30) + ' ' + (y + 30 + i * 4) + ' v14" ' + K.l('#ffffff', 2.6) + '/>').join('');
+    return [
+      {b: R + car(K, 172, 120, .6, K.c2, 2, '#FDE68A'), m: car(K, 166, 170, 1, K.c1, 0, '#ffffff') + lines(170), a: 'bob', cap: 'Race down the trail'},
+      {b: R + car(K, 186, 138, .72, K.c2, 4, '#FDE68A'), m: car(K, 124, 150, 1.02, K.c1, -14, '#ffffff') + [[176, 182, 10], [194, 172, 7], [160, 192, 8]].map(([x, y, r]) => '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" ' + K.fp('#E5E7EB') + '/>').join('') + [0, 1, 2].map(i => '<path d="M' + (44 + i * 6) + ' ' + (128 + i * 13) + ' L' + (78 + i * 4) + ' ' + (126 + i * 13) + '" ' + K.l('#ffffff', 2.6) + '/>').join(''), a: 'slide', cap: 'Drift past the rival'},
+      {b: R + car(K, 214, 176, .95, K.c2, 6, '#FDE68A'), m: car(K, 161, 92, .55, K.c1, 0, '#ffffff') + K.burst(161, 58, 20, '#FFF3A6', 10).replace('<path ', '<path opacity=".7" ') + K.t(161, 58, '+5s', 13, '#B4410C') + K.spark(128, 52, 6) + K.spark(196, 50, 5), a: 'pop', cap: 'Beat the clock at each checkpoint'}
+    ];
+  };
+  // 🐍 Snakize — steer to the fruit → it grows → loop round land to claim it
+  function snGrid(K){ let g = ''; for(let x = 0; x <= 320; x += 20) g += '<line x1="' + x + '" y1="0" x2="' + x + '" y2="200" stroke="' + dark(K.c1, .2) + '" stroke-width="1" opacity=".25"/>'; for(let y = 0; y <= 200; y += 20) g += '<line x1="0" y1="' + y + '" x2="320" y2="' + y + '" stroke="' + dark(K.c1, .2) + '" stroke-width="1" opacity=".25"/>'; return g; }
+  function snake(K, d, hx, hy, rot, spots){
+    let b = K.tube(d, '#22A04A', 24);
+    spots.forEach(([x, y]) => b += '<circle cx="' + x + '" cy="' + y + '" r="3.6" ' + K.fp(K.c2) + '/>');
+    return b + '<g transform="translate(' + hx + ' ' + hy + ') rotate(' + rot + ')"><ellipse cx="0" cy="0" rx="22" ry="16" ' + K.f('#22A04A') + '/><path d="M6 1 Q16 -10 22 -8 Q19 1 22 10 Q16 11 6 1Z" fill="#7F1D1D"/><circle cx="-2" cy="-11" r="6" fill="#fff" stroke="' + INK + '" stroke-width="1.5"/><circle cx="0" cy="-11" r="3" fill="#111"/></g>';
+  }
+  const apple = (K, x, y) => '<g transform="translate(' + x + ' ' + y + ')"><circle r="15" ' + K.f('#EF3B3B') + '/><path d="M0 -14 Q2 -22 6 -24" ' + K.l('#5B3A1A', 2.4) + '/><path d="M3 -18 Q14 -26 18 -16 Q8 -12 3 -18Z" ' + K.f('#3CB04A') + '/><ellipse cx="-5" cy="-5" rx="4" ry="6" fill="#fff" opacity=".55"/></g>';
+  D['snakeast'] = K => {
+    const G = snGrid(K), land = '<path d="M240 160 H320 V200 H240Z" ' + K.f(K.c2) + '/>';
+    const short = snake(K, 'M84 170 C84 140 72 120 84 96 C96 72 140 84 160 98 C176 110 196 100 204 84', 212, 74, -28, [[84, 150], [86, 104], [122, 86], [158, 98], [184, 100]]);
+    const long = snake(K, 'M40 182 C70 196 100 186 106 158 C112 128 72 120 84 96 C96 72 140 84 160 98 C176 110 196 100 204 84 C210 70 222 62 236 60', 244, 58, -10, [[60, 188], [96, 172], [98, 134], [86, 104], [122, 86], [158, 98], [184, 100], [214, 68]]);
+    return [
+      {b: land + short, m: apple(K, 252, 62) + '<path d="M222 78 L238 70" ' + K.l('#FFFFFF', 2.4, 'stroke-dasharray="3 4"') + '/>', a: 'bob', cap: 'Steer your snake to the fruit', bg: G},
+      {b: land + long, m: K.burst(256, 56, 22, '#FFF3A6', 10).replace('<path ', '<path opacity=".7" ') + K.t(256, 56, '+1', 15, '#15803D') + K.spark(282, 36, 6) + K.spark(230, 30, 5), a: 'pop', cap: 'Gulp! Your snake grows longer', bg: G},
+      {b: long, m: '<path d="M180 120 H320 V200 H160 V140 H180Z" ' + K.f(K.c2) + '/><path d="M180 120 H320 V200 H160 V140 H180Z" ' + K.l('#15803D', 3, 'stroke-dasharray="6 6"') + '/><line x1="262" y1="128" x2="262" y2="168" ' + K.l('#5B3A1A', 2.6) + '/><path d="M262 128 L284 136 L262 144Z" ' + K.f('#EF4444') + '/>' + K.spark(214, 156, 6) + K.spark(300, 186, 5), a: 'slide', cap: 'Loop round land to make it yours', bg: G}
+    ];
+  };
+  // 🏭 Artifactory — block on the lathe → shape it → keep your cup
+  function lathe(K, piece, shelfCup){
+    let b = '<rect x="0" y="170" width="320" height="30" ' + K.f('#9A6B43') + '/><rect x="40" y="40" width="96" height="7" rx="3" ' + K.f('#8B5A2B') + '/>';
+    b += '<path d="M52 40 Q48 22 56 14 L70 14 Q78 22 74 40Z" ' + K.f('#3BA0E8') + '/><circle cx="124" cy="31" r="9" ' + K.f('#E85D75') + '/>';
+    if(shelfCup) b += '<path d="M86 40 C84 30 84 22 90 18 L104 18 C110 22 110 30 108 40Z" ' + K.f('#E2B07A') + '/>';
+    b += '<rect x="36" y="146" width="250" height="14" rx="4" ' + K.f('#7C8597') + '/><rect x="52" y="160" width="14" height="14" ' + K.f('#5B6375') + '/><rect x="256" y="160" width="14" height="14" ' + K.f('#5B6375') + '/>';
+    b += '<rect x="40" y="88" width="56" height="58" rx="8" ' + K.f(K.c1) + '/><circle cx="58" cy="106" r="6" ' + K.fp('#FDE68A') + '/><rect x="96" y="104" width="12" height="30" rx="3" ' + K.fp('#A3ACBD') + '/>';
+    b += '<rect x="252" y="106" width="34" height="40" rx="7" ' + K.f(K.c1) + '/><path d="M252 119 L236 119" ' + K.l('#A3ACBD', 7) + '/>';
+    if(piece === 'block') b += '<rect x="108" y="100" width="128" height="38" rx="3" ' + K.f('#C98E55') + '/><path d="M118 108 L226 108 M118 128 L226 128" ' + K.l('#9A6338', 1.4, 'opacity=".7"') + '/>';
+    if(piece === 'half') b += '<path d="M108 104 C130 100 138 92 158 94 C176 96 176 106 182 106 L182 132 C176 132 176 142 158 144 C138 146 130 138 108 134 Z" ' + K.f('#E2B07A') + '/><rect x="180" y="100" width="56" height="38" rx="3" ' + K.f('#C98E55') + '/>';
+    return b + K.kid(292, 196, .9, {goggles: K.c2, shirt: '#3D7DD8', n: 2, aL: shelfCup ? 160 : 120, aR: shelfCup ? 150 : 20, mouth: shelfCup ? 'o' : null});
+  }
+  D['artifactory'] = K => [
+    {b: lathe(K, 'block', false), m: '<path d="M150 84 A28 10 0 0 1 196 86" ' + K.l('#7C3AED', 3) + '/>' + K.arrowHead(196, 86, 20, '#7C3AED') + '<path d="M196 152 A28 10 0 0 1 150 150" ' + K.l('#7C3AED', 3) + '/>' + K.arrowHead(150, 150, 200, '#7C3AED'), a: 'pulse', cap: 'Put a block on the spinning lathe'},
+    {b: lathe(K, 'half', false), m: '<path d="M184 138 L190 168" ' + K.l('#C0C7D4', 6) + '/><rect x="186" y="166" width="10" height="26" rx="4" transform="rotate(-11 191 179)" ' + K.f(K.c2) + '/><path d="M186 136 q14 4 16 -8 q2 -10 -8 -8 q-6 2 -2 8" ' + K.l('#E9B77A', 3) + '/><path d="M188 140 q20 10 30 0 q6 -8 -2 -10" ' + K.l('#D79A5A', 2.6) + '/>' + K.spark(214, 126, 6), a: 'wiggle', cap: 'Shape it with the chisel'},
+    {b: lathe(K, null, true), m: K.burst(97, 28, 26, '#FFF3A6', 10).replace('<path ', '<path opacity=".7" ') + '<path d="M86 40 C84 30 84 22 90 18 L104 18 C110 22 110 30 108 40Z" ' + K.f('#E2B07A') + '/>' + K.spark(126, 14, 6) + K.spark(70, 60, 5), a: 'pop', cap: 'Name it and keep your new cup!'}
+  ];
+  const DCACHE = {};
+  function demo(id, c1, c2){
+    const key = id + c1 + c2; if(DCACHE[key]) return DCACHE[key];
+    const f = D[id]; if(!f) return null;
+    const tag = 'cd' + id.replace(/[^a-z]/g, '');
+    const fr = f(kit(tag + 'x', c1, c2)).map((x, i) => {
+      const Kb = kit(tag + i + 'b', c1, c2), Km = kit(tag + i + 'm', c1, c2), fb = f(Kb)[i], fm = f(Km)[i];
+      return {base: enc(svgOf(Kb, fb.b, true, fb.bg)), move: enc(svgOf(Km, fm.m, false)), a: x.a, cap: x.cap};
+    });
+    return (DCACHE[key] = fr);
+  }
+  // play(el, id, c1, c2): fills el with the flip-book and runs it (≈ 1.7 s a step, last step 2.3 s, loops); tap = pause / play; stops when el leaves the page.
+  function play(el, id, c1, c2){
+    const fr = demo(id, c1, c2); if(!fr) return false;
+    el.innerHTML = '<div class="ca-demo" role="img" aria-label="How ' + id + ' works"><div class="ca-stage">' + fr.map((f, i) => '<div class="ca-frame" data-i="' + i + '"><img class="ca-b" alt="" draggable="false" src="' + f.base + '"><img class="ca-dm fx-' + f.a + '" alt="" draggable="false" src="' + f.move + '"></div>').join('') +
+      '</div><div class="ca-cap"><b class="ca-n"></b><span class="ca-t"></span><i class="ca-pp" aria-hidden="true">❚❚</i></div></div>';   /* caption UNDER the picture, never over it */
+    const box = el.querySelector('.ca-demo'), frames = [...box.querySelectorAll('.ca-frame')], n = frames.length;
+    let i = -1, paused = false, timer = 0;
+    const log = (root.CA_DEMO_LOG = root.CA_DEMO_LOG || []);
+    function show(k){
+      i = k; frames.forEach((f, j) => f.classList.toggle('on', j === k));
+      const m = frames[k].querySelector('.ca-dm'); m.style.animation = 'none'; void m.offsetWidth; m.style.animation = '';
+      box.querySelector('.ca-n').textContent = (k + 1) + '/' + n; box.querySelector('.ca-t').textContent = fr[k].cap; log.push(id + ':' + k);
+    }
+    function tick(){ if(!box.isConnected){ clearTimeout(timer); return; } if(!paused) show((i + 1) % n); timer = setTimeout(tick, i === n - 1 ? 2300 : 1700); }
+    box.addEventListener('click', e => { e.stopPropagation(); paused = !paused; box.classList.toggle('paused', paused); box.querySelector('.ca-pp').textContent = paused ? '▶' : '❚❚'; });
+    tick();
+    return true;
+  }
+  const api = {has: id => !!S[id], parts, html, ids: () => Object.keys(S), hasDemo: id => !!D[id], demo, play, demoIds: () => Object.keys(D)};
   if(typeof module !== 'undefined' && module.exports) module.exports = api; else root.CardArt = api;
 })(typeof window !== 'undefined' ? window : this);
 </script>
@@ -1515,7 +1648,7 @@ function showHelp(g){
   UI.guide([page], {doneText: '▶ Play ' + nameOf(g)});
   const b = document.querySelector('.ui-guide .ug-next');
   const art = document.querySelector('.ui-guide .ug-art');   // 🎴 p5-2 the game's scene on top
-  if(art && window.CardArt && CardArt.has(g.GameID)){ const ga = artOf(g, allGames.indexOf(g)); art.className = 'ug-art ca-art'; art.innerHTML = CardArt.html(g.GameID, ga.c1, ga.c2); }
+  if(art && window.CardArt && CardArt.has(g.GameID)){ const ga = artOf(g, allGames.indexOf(g)); art.className = 'ug-art ca-art'; art.innerHTML = ''; if(CardArt.hasDemo && CardArt.play(art, g.GameID, ga.c1, ga.c2)) art.classList.add('has-demo'); else art.innerHTML = CardArt.html(g.GameID, ga.c1, ga.c2); }   /* p5-4: ▶ flip-book where there is one */
   if(b) b.onclick = () => { document.querySelector('.ui-guide .ug-x').click(); openGame(g); };
 }
 // 👋 Welcome to the Gameroom: once per player on this device, and any time from "❓ How it works".
@@ -1717,4 +1850,4 @@ loadGameroom();
 </script>
 </body>
 </html>
-<!-- (11m+11j+11i+11x-1+11y-1+sb-4+pp-4+ebr-3+r34+wd-1+bc-3+r35b+modes-2+gr-1+gs-2+af-1+mg-1+gro-1+sb2-2+p5+p5-2+p5-3) END OF Gameroom.html -->
+<!-- (11m+11j+11i+11x-1+11y-1+sb-4+pp-4+ebr-3+r34+wd-1+bc-3+r35b+modes-2+gr-1+gs-2+af-1+mg-1+gro-1+sb2-2+p5+p5-2+p5-3+p5-4) END OF Gameroom.html -->
