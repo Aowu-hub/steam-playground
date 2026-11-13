@@ -82,9 +82,6 @@
   #scr-play{position:fixed;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:8px;
     padding:calc(8px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) var(--safe-b, 18px) calc(10px + env(safe-area-inset-left));
     background:var(--bg);}
-  .hud{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;}
-  .hud .pill{background:var(--card);border-radius:14px;padding:7px 11px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.9rem;
-    box-shadow:0 3px 0 rgba(0,0,0,0.06);display:inline-flex;align-items:center;gap:5px;white-space:nowrap;border:none;color:var(--ink);}
   .hud button.pill{cursor:pointer;}
   .hud button.pill:active{transform:translateY(2px);}
   .hud .lvl-pill{background:linear-gradient(135deg,var(--blue),var(--violet));color:#fff;}
@@ -219,10 +216,10 @@
   .stats span{background:var(--panel);border-radius:12px;padding:6px 10px;font-weight:800;font-size:0.85rem;}
   .new-badge{background:linear-gradient(135deg,var(--sun),var(--coral));color:#fff;border-radius:14px;padding:8px 14px;font-family:'Fredoka',sans-serif;font-weight:700;}
   .save-note{font-size:0.78rem;font-weight:700;color:var(--ink-soft);min-height:18px;}
+  .res-btns > #b-menu, .res-btns > #tg-x, .res-btns > #btn-levels, .res-btns > #btn-hc-levels{order:-1;} .res-btns > #b-next, .res-btns > #btn-next{order:2;}   /* 🔘 p1b: exit left, main action right */
   .res-btns{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:4px;}
   .btn{font-family:'Fredoka',sans-serif;font-weight:600;font-size:0.95rem;border:none;border-radius:14px;cursor:pointer;
     padding:11px 16px;color:#fff;background:linear-gradient(135deg,var(--blue),var(--violet));box-shadow:0 4px 0 rgba(0,0,0,0.12);}
-  .btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,0.12);}
   .btn.soft{background:var(--panel);color:var(--ink);}
   .praise{position:absolute;left:50%;top:40%;z-index:7;transform:translate(-50%,-50%);pointer-events:none;text-align:center;white-space:nowrap;
     font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(1.6rem,6vmin,3rem);color:#fff;padding:10px 22px;border-radius:24px;
@@ -238,7 +235,7 @@
 </head>
 <body ontouchstart="">
 
-<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button>
+<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
 
 <section class="screen hidden" id="scr-player">
   <div class="title"><div class="logo">🤖</div><h1>Code the Robot</h1><p>Who's coding today?</p></div>
@@ -259,18 +256,10 @@
 <section class="screen hidden" id="scr-theme">
   <div class="title"><div class="logo" id="theme-logo">🌍</div><h1 id="theme-title">Pick a world</h1><p>Every board is brand new</p></div>
   <div class="pick-grid" id="theme-list"></div>
-  <div style="text-align:center;margin-top:18px;"><button class="btn soft" onclick="showScreen('levels')">◀ Back</button></div>
-</section>
+  </section>
 
 <section class="hidden" id="scr-play">
-  <div class="hud">
-    <button class="pill" onclick="leavePlay()" title="Back to levels">◀</button>
-    <span class="pill lvl-pill" id="hud-level"></span>
-    <span class="pill" id="hud-time">⏱ 0:00</span>
-    <span class="pill" id="hud-stars">⭐ 0/0</span>
-    <span class="pill time-left hidden" id="hud-left"></span>
-    <button class="pill" onclick="newBoard()" title="A brand-new board">🔄<span class="nb-t"> New board</span></button>
-  </div>
+  <div class="hud" id="gbar"></div>   <!-- 🎛️ p1b: UI.gameBar fills this -->
   <div class="stage-wrap" id="stage-wrap">
     <div class="stage" id="stage"><canvas id="cv"></canvas></div>
     <div class="banner" id="banner"></div>
@@ -306,6 +295,14 @@ UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});   // loader + me
 const SESSION_START = Number(''+__SP("sessionStart")+'') || null;
 const DURATION_MIN = Number(''+__SP("durationMin")+'') || null;
 const GAME_ID = 'robot-adventure';
+// 🎛️ p1b: the shared top bar (UiKit UI.gameBar) — ◀ where you came from · 🎚️ Levels · 🏠 | 🤖 Code the Robot · level | scoreboard | game buttons ❓ ⚙️
+const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '🤖', name: 'Code the Robot', levelId: 'hud-level',
+  levels: () => leavePlay(), playing: () => !!(G && !G.over), onLeave: () => { try{ clearInterval(timerId); }catch(e){} try{ speechSynthesis.cancel(); }catch(e){} },
+  pause: {pause: () => { if(typeof pauseGame === 'function') pauseGame(); }, resume: () => { if(typeof resume === 'function') resume(); }},
+  onFit: () => { if(G && typeof layout === 'function') layout(); },
+  extras: [{id: 'new-board-btn', html: '🔄<span class="gt"> New board</span>', label: 'A brand-new board', onClick: () => newBoard(), keep: true}]});
+var NAV_INNER = {theme: ['◀ Code the Robot', () => showScreen('levels')]};   // 🧭 inner screens: their top button goes to the main screen
+UI.navBar(document.getElementById('back-btn'), {onclick: false});
 
 /* ================= LEVELS ================= */
 // Each level teaches one new idea. Everything is random, then a solver
@@ -725,7 +722,7 @@ function hardcoreOver(e){
   setTimeout(() => {
     if(G !== g) return;
     showResult('<div class="big">💀</div><h2>' + UI.esc(FAIL_TEXT[e.why] || 'Oops!') + '</h2><p style="margin:0;font-weight:700;color:var(--ink-soft)">💀 Hardcore ends on the first mistake — try again!</p>' +
-      '<div class="res-btns"><button class="btn" id="btn-hc-same">🔁 Same board</button><button class="btn soft" id="btn-hc-new">🎲 New board</button><button class="btn soft" id="btn-hc-levels">◀ Back</button></div>');
+      '<div class="res-btns"><button class="btn sp-btn sp-primary" id="btn-hc-same">🔁 Same board</button><button class="btn soft sp-btn sp-secondary" id="btn-hc-new">🎲 New board</button><button class="btn soft sp-btn sp-secondary" id="btn-hc-levels">🎚️ Levels</button></div>');
     $('btn-hc-same').onclick = () => { hideResult(); G.over = false; G.failInfo = null; G.badChip = -1; G.fails = 0; G.doneChips = new Set(); resetRobot(true); renderProgram(); updateHud(); };
     $('btn-hc-new').onclick = () => newBoard();
     $('btn-hc-levels').onclick = () => { hideResult(); leavePlay(); };
@@ -1077,11 +1074,11 @@ function pauseGame(){ if(G && !G.pausedAt){ G.pausedAt = performance.now(); G.ru
 function elapsed(){ return G ? (performance.now() - G.t0 - G.pausedTotal) : 0; }
 function updateHud(){
   if(!G) return;
-  $('hud-time').textContent = '⏱ ' + fmt(G.finishMs || elapsed());
+  BAR.time(fmt(G.finishMs || elapsed()));
   const W = WORLDS[G.B.worldKey];
-  $('hud-stars').textContent = W.star + ' ' + (G.got ? G.got.size : 0) + '/' + G.B.stars.length;
+  BAR.count('stars', W.star, (G.got ? G.got.size : 0) + '/' + G.B.stars.length, 'Stars');
   if($('mission').dataset.got !== String(G.got ? G.got.size : 0)){ $('mission').dataset.got = String(G.got ? G.got.size : 0); renderMission(); }
-  if(lockHandle){ const left = lockHandle.remainingMs(), el = $('hud-left'); el.classList.remove('hidden'); el.textContent = '⌛ ' + fmt(left); el.classList.toggle('warn', left < 120000); }
+  if(lockHandle){ const left = lockHandle.remainingMs(); BAR.left(left, left < 120000); }
 }
 let bannerTimer = 0;
 function showBanner(text, bad){
@@ -1159,7 +1156,7 @@ function startGame(lvlIdx, worldKey){
     G = {B, L, lvlIdx, worldKey, prog: [], sel: -1, limit: B.limit, t0: performance.now(), pausedAt: 0, pausedTotal: 0, lastSec: -1,
       runs: 0, fails: 0, hintUsed: false, fx: [], doneChips: new Set(), badChip: -1};
     resetRobot(true);
-    $('hud-level').textContent = L.emoji + ' ' + L.name;
+    BAR.level(L.emoji + ' ' + L.name);
     // 💀 Hardcore: no hint and no slow-mo (the robot always runs at full speed)
     $('btn-hint').classList.toggle('hidden', !!L.hardcore); $('btn-speed').classList.toggle('hidden', !!L.hardcore);
     if(L.hardcore){ if(speedBeforeHC === null) speedBeforeHC = speedFast; speedFast = true; } else if(speedBeforeHC !== null){ speedFast = speedBeforeHC; speedBeforeHC = null; }
@@ -1201,8 +1198,8 @@ function win(){
       '<div class="stats"><span>' + G.L.emoji + ' ' + G.L.name + '</span><span>⏱ ' + fmt(G.finishMs) + '</span><span>' + W.star + ' ' + G.got.size + '/' + G.B.stars.length + '</span>' + (G.fails ? '<span>🛠️ ' + G.fails + ' fix' + (G.fails === 1 ? '' : 'es') + '</span>' : '') + '</div>' +
       (G.hintUsed ? '<div style="font-size:0.78rem;font-weight:700;color:var(--ink-soft)">💡 Hint used — 2 ⭐ at most</div>' : (used > best && G.limit < 99 ? '<div style="font-size:0.78rem;font-weight:700;color:var(--ink-soft)">Can you do it in ' + best + ' blocks for 3 ⭐?</div>' : '')) +
       '<div class="save-note" id="save-note"><span class="ui-spin">✅</span> Saving your progress…</div>' +
-      '<div class="res-btns">' + (nextOk ? '<button class="btn" id="btn-next">Next level ▶</button>' : '') +
-      '<button class="btn soft" id="btn-again">🔁 Same board</button><button class="btn soft" id="btn-new">🔄 New board</button><button class="btn soft" id="btn-levels">◀ Back</button></div>');
+      '<div class="res-btns">' + (nextOk ? '<button class="btn sp-btn sp-primary" id="btn-next">Next level ▶</button>' : '') +
+      '<button class="btn soft sp-btn sp-secondary" id="btn-again">🔁 Same board</button><button class="btn soft sp-btn sp-secondary" id="btn-new">🔄 New board</button><button class="btn soft sp-btn sp-secondary" id="btn-levels">🎚️ Levels</button></div>');
     countUp($('score-count'), score, 900);
     $('btn-again').onclick = () => { hideResult(); G.over = false; G.finishMs = 0; G.prog = []; G.sel = -1; G.hintUsed = false; G.fails = 0; G.t0 = performance.now(); G.pausedTotal = 0; codeChanged(); };
     $('btn-new').onclick = () => newBoard();
@@ -1257,7 +1254,7 @@ function confetti(list, count){
 /* ================= MENUS ================= */
 function showScreen(name){
   ['player', 'levels', 'theme', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
-  $('back-btn').classList.toggle('hidden', name === 'play');
+  $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   // 🧭 p1b
   window.scrollTo(0, 0);
 }
 function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
@@ -1308,7 +1305,7 @@ function chooseLevel(i){
   showScreen('theme');
 }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
-function goGameroom(){ UI.go(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
+function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }   // 🧭 p1b: ◀ = where you came from (Gameroom if we don't know)
 
 // Keyboard: arrows / G L R W add blocks, Enter runs, Backspace removes.
 document.addEventListener('keydown', e => {
@@ -1340,4 +1337,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (r9+emoji+back-1) END OF CodeRobot.html -->
+<!-- (r9+emoji+back-1+p1b) END OF CodeRobot.html -->

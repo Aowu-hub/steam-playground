@@ -106,7 +106,6 @@
   /* ---------- PLAY SCREEN ---------- */
   #scr-play{position:fixed;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:8px;
     padding:calc(8px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) var(--safe-b, 18px) calc(10px + env(safe-area-inset-left));background:var(--bg);}
-  .hud{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;}
   .pill{background:var(--card);border-radius:14px;padding:7px 11px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.9rem;
     box-shadow:0 3px 0 rgba(0,0,0,0.06);display:inline-flex;align-items:center;gap:5px;white-space:nowrap;border:none;color:var(--ink);}
   button.pill{cursor:pointer;} button.pill:active{transform:translateY(2px);}
@@ -321,10 +320,10 @@
   .feat-new{background:#FFF3C4;color:#6B4A00;border-radius:12px;padding:4px 10px;font-weight:800;font-size:0.8rem;animation:pop-in .4s cubic-bezier(.3,1.6,.5,1) both;}
   .title-new{background:linear-gradient(135deg,#7B5CFA,#FF4D8D);color:#fff;border-radius:12px;padding:6px 12px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.95rem;animation:pop-in .5s cubic-bezier(.3,1.6,.5,1) .2s both;box-shadow:0 0 18px rgba(255,77,141,0.5);}
   .save-note{font-size:0.78rem;font-weight:700;color:var(--ink-soft);min-height:18px;}
+  .res-btns > #b-menu, .res-btns > #tg-x, .res-btns > #btn-levels, .res-btns > #btn-hc-levels{order:-1;} .res-btns > #b-next, .res-btns > #btn-next{order:2;}   /* 🔘 p1b: exit left, main action right */
   .res-btns{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:4px;}
   .btn{font-family:'Fredoka',sans-serif;font-weight:600;font-size:0.95rem;border:none;border-radius:14px;cursor:pointer;
     padding:11px 16px;color:#fff;background:linear-gradient(135deg,var(--red),var(--plum));box-shadow:0 4px 0 rgba(0,0,0,0.12);}
-  .btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,0.12);}
   .btn.soft{background:var(--panel);color:var(--ink);}
   .confetti{position:fixed;top:-40px;z-index:390;font-size:1.6rem;pointer-events:none;animation:fall linear forwards;}
   @keyframes fall{to{transform:translateY(110vh) rotate(540deg);}}
@@ -378,7 +377,7 @@
 </head>
 <body ontouchstart="">
 
-<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button>
+<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
 
 <section class="screen hidden" id="scr-player">
   <div class="title"><div class="logo">🔴</div><h1>Checkers</h1><p>Who's playing?</p></div>
@@ -408,23 +407,16 @@
 <section class="screen hidden" id="scr-friend">
   <div class="title"><div class="logo">👫</div><h1>Who is your friend?</h1><p>You play the bottom, your friend plays the top</p></div>
   <div class="pick-grid" id="friend-list"></div>
-  <div style="text-align:center;margin-top:18px;"><button class="btn soft" onclick="showScreen('menu')">◀ Back</button></div>
-</section>
+  </section>
 
 <section class="screen hidden" id="scr-design">
   <div class="title"><div class="logo" id="design-logo">🎨</div><h1 id="design-title">Pick a board</h1><p id="design-sub">Every design plays the same</p></div>
   <div class="designs" id="design-list"></div>
   <div id="skin-pick"></div>
-  <div style="text-align:center;margin-top:18px;"><button class="btn soft" onclick="showScreen('menu')">◀ Back</button></div>
-</section>
+  </section>
 
 <section class="hidden" id="scr-play">
-  <div class="hud">
-    <button class="pill" onclick="leavePlay()" title="Back">◀</button>
-    <span class="pill lvl-pill" id="hud-level"></span>
-    <span class="pill" id="hud-time">⏱ 0:00</span>
-    <span class="pill hidden" id="hud-left"></span>
-  </div>
+  <div class="hud" id="gbar"></div>   <!-- 🎛️ p1b: UI.gameBar fills this -->
   <div class="stage-wrap" id="stage-wrap">
     <div class="board-frame" id="frame"><div class="board" id="board"></div></div>
     <div class="banner" id="banner"></div>
@@ -454,6 +446,14 @@ UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});   // loader + me
 const SESSION_START = Number(''+__SP("sessionStart")+'') || null;
 const DURATION_MIN = Number(''+__SP("durationMin")+'') || null;
 const GAME_ID = 'checkers';
+// 🎛️ p1b: the shared top bar (UiKit UI.gameBar) — ◀ where you came from · 🎚️ Levels · 🏠 | 🔴 Checkers · level | scoreboard | game buttons ❓ ⚙️
+const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '🔴', name: 'Checkers', levelId: 'hud-level',
+  levels: () => leavePlay(), playing: () => !!(G && !G.over), onLeave: () => { try{ clearInterval(timerId); }catch(e){} try{ speechSynthesis.cancel(); }catch(e){} },
+  pause: {pause: () => { if(typeof pauseGame === 'function') pauseGame(); }, resume: () => { if(typeof resume === 'function') resume(); }},
+  onFit: () => { if(G && typeof layout === 'function') layout(); },
+  extras: []});
+var NAV_INNER = {friend: ['◀ Checkers', () => showScreen('menu')], design: ['◀ Checkers', () => showScreen('menu')]};   // 🧭 inner screens: their top button goes to the main screen
+UI.navBar(document.getElementById('back-btn'), {onclick: false});
 
 /* ================= LEVELS + DESIGNS ================= */
 // Basic is a small 6×6 board (6 pieces each) for little hands; the rest are the full 8×8 game.
@@ -600,13 +600,10 @@ function clockTick(){
   G.clockLast = now; clockShow();
   if(G.clockLeft != null && G.clockLeft <= 0 && isHumanTurn()){ G.clockLeft = 0; clockShow(); UISound.play('error'); endGame(-1, 'time'); }
 }
-function clockShow(){
-  let el = $('hud-clock');
-  if(!el){ el = document.createElement('span'); el.className = 'pill clock'; el.id = 'hud-clock'; $('hud-time').insertAdjacentElement('afterend', el); }
-  el.classList.toggle('hidden', !clockOn()); if(!clockOn()) return;
+function clockShow(){   // 🎛️ p1b: the 💀 Hardcore move clock is a ⏳ counter in the shared bar (amber in the last 10 s)
+  if(!clockOn()){ BAR.hide('clock'); return; }
   const left = Math.max(0, G.clockLeft == null ? G.L.clock * 1000 : G.clockLeft), s = Math.ceil(left / 1000);
-  el.innerHTML = '<b>⏳ ' + s + 's</b>'; el.style.setProperty('--p', (left / (G.L.clock * 1000)).toFixed(3)); el.classList.toggle('warn', s <= 10 && isHumanTurn());
-  el.title = '💀 Hardcore: ' + G.L.clock + ' seconds for each move';
+  BAR.count('clock', '⏳', s + 's', '💀 Hardcore: ' + G.L.clock + ' seconds for each move', s <= 10 && isHumanTurn());
 }
 /* ================= STATE ================= */
 let S = {players: [], progress: {}, settings: {}, avatars: {}, player: '', age: ''};
@@ -619,7 +616,7 @@ function saveDesign(){ try{ localStorage.setItem(designKey(), design); }catch(e)
 function showScreen(name){
   ['player', 'menu', 'friend', 'design', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
   if(name !== 'play') danceStop();
-  $('back-btn').classList.toggle('hidden', name === 'play');
+  $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   // 🧭 p1b
   window.scrollTo(0, 0);
 }
 function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
@@ -710,7 +707,7 @@ function startGame(opts){
     names: {1: S.player, '-1': opts.mode === 'bot' ? L.bot : opts.friend}, friend: opts.friend, kings: 0, feats: {doubles: 0, triples: 0, megas: 0, kings: 0}};
   const D = DESIGNS[design];
   $('scr-play').setAttribute('data-design', design);
-  $('hud-level').textContent = opts.mode === 'bot' ? L.emoji + ' ' + L.name + ' · vs ' + L.bot : '👫 ' + S.player + ' vs ' + opts.friend;
+  BAR.level(opts.mode === 'bot' ? L.emoji + ' ' + L.name + ' · vs ' + L.bot : '👫 ' + S.player + ' vs ' + opts.friend);
   $('nm-me').textContent = S.player; $('nm-op').textContent = (opts.mode === 'bot' ? '🤖 ' : '') + G.names[-1];
   $('chip-me').style.background = 'radial-gradient(circle at 35% 30%,var(--p1a),var(--p1b) 70%)'; $('chip-me').textContent = embOf(1);
   $('chip-op').style.background = 'radial-gradient(circle at 35% 30%,var(--p2a),var(--p2b) 70%)'; $('chip-op').textContent = embOf(-1);
@@ -743,8 +740,8 @@ function resign(){
 function elapsed(){ return G ? (G.over ? G.finishMs : performance.now() - G.t0 - G.pausedTotal - (G.pausedAt ? performance.now() - G.pausedAt : 0)) : 0; }
 function updateHud(){
   if(!G) return;
-  $('hud-time').textContent = '⏱ ' + fmt(elapsed());
-  if(lockHandle){ const left = lockHandle.remainingMs(), el = $('hud-left'); el.classList.remove('hidden'); el.textContent = '⌛ ' + fmt(left); el.classList.toggle('warn', left < 120000); }
+  BAR.time(fmt(elapsed()));
+  if(lockHandle){ const left = lockHandle.remainingMs(); BAR.left(left, left < 120000); }
 }
 function pauseGame(){ if(G && !G.pausedAt){ G.pausedAt = performance.now(); clearTimeout(botTimer); } }
 
@@ -1254,7 +1251,7 @@ function endGame(winner, why){
       showResult('<div class="big">' + (winner ? '🏆' : '🤝') + '</div><h2 class="cheer">' + (winner ? UI.esc(name) + ' wins!' : 'It\'s a draw!') + '</h2>' +
         '<p style="margin:-4px 0 0;font-weight:800;color:var(--ink-soft)">' + (why === 'stuck' ? 'No moves left for ' + UI.esc(G.names[-winner]) : why === 'resign' ? UI.esc(G.names[-winner]) + ' gave up' : why === 'draw' ? 'Lots of moves without a jump' : 'Every piece taken!') + '</p>' +
         '<div class="stats"><span>⏱ ' + fmt(G.finishMs) + '</span><span>' + UI.esc(G.names[1]) + ' took ' + G.takenBy[1] + '</span><span>' + UI.esc(G.names[-1]) + ' took ' + G.takenBy[-1] + '</span></div>' +
-        '<div class="res-btns"><button class="btn" id="b-again">🔁 Play again</button><button class="btn soft" id="b-menu">Menu</button></div>');
+        '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">Menu</button></div>');
       $('b-again').onclick = () => startGame({mode: 'duo', lvl: 1, friend: G.friend});
       $('b-menu').onclick = () => { hideResult(); G = null; clearInterval(tickHandle); showScreen('menu'); };
     }, winner ? 1500 : 300);
@@ -1278,7 +1275,7 @@ function endGame(winner, why){
         '<div class="stats"><span>⏱ ' + fmt(G.finishMs) + '</span><span>♟️ ' + left + ' left</span><span>🎯 took ' + G.takenBy[1] + '</span>' + (kings ? '<span>👑 ' + kings + '</span>' : '') + '</div>' +
         (G.hintUsed ? '<div style="font-size:0.78rem;font-weight:700;color:var(--ink-soft)">💡 Hint used — 2 ⭐ at most</div>' : '') +
         '<div class="save-note" id="save-note"><span class="ui-spin">✅</span> Saving your progress…</div>' +
-        '<div class="res-btns">' + (lvl < 5 ? '<button class="btn" id="b-next">' + (lvl === 4 ? 'Try 💀 Hardcore ▶' : 'Next level ▶') + '</button>' : '') + '<button class="btn soft" id="b-again">🔁 Again</button><button class="btn soft" id="b-menu">◀ Back</button></div>');
+        '<div class="res-btns">' + (lvl < 5 ? '<button class="btn sp-btn sp-primary" id="b-next">' + (lvl === 4 ? 'Try 💀 Hardcore ▶' : 'Next level ▶') + '</button>' : '') + '<button class="btn soft sp-btn sp-secondary" id="b-again">🔁 Again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🎚️ Levels</button></div>');
       countUp($('score-count'), score, 900);
       $('b-again').onclick = () => startGame({mode: 'bot', lvl});
       $('b-menu').onclick = () => { hideResult(); G = null; clearInterval(tickHandle); renderLevels(); showScreen('menu'); };
@@ -1293,7 +1290,7 @@ function endGame(winner, why){
       showResult('<div class="big">' + (winner ? '🤖' : '🤝') + '</div><h2>' + (winner ? 'Good game!' : 'It\'s a draw!') + '</h2>' +
         '<p style="margin:-4px 0 0;font-weight:800;color:var(--ink-soft)">' + (winner ? (why === 'time' ? '💀 Time\'s up! The clock ran out.' : why === 'resign' ? 'You gave up this one.' : '🤖 ' + UI.esc(G.L.bot) + ' won this time.') + ' You took ' + G.takenBy[1] + ' piece' + (G.takenBy[1] === 1 ? '' : 's') + '!' : 'Lots of moves without a jump — nobody wins.') + '</p>' +
         '<div class="tip" style="text-align:left">💡 ' + pick(['Keep your back row full — then the bot can\'t get a King easily.', 'Move pieces in pairs so they protect each other.', 'Look before you move: can the bot jump that square next?', 'Try to get a King 👑 — Kings are super strong.', 'Use the 💡 Hint button if you are stuck.']) + '</div>' +
-        '<div class="res-btns"><button class="btn" id="b-again">🔁 Try again</button><button class="btn soft" id="b-menu">◀ Back</button></div>');
+        '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Try again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🎚️ Levels</button></div>');
       $('b-again').onclick = () => startGame({mode: 'bot', lvl: G.lvl});
       $('b-menu').onclick = () => { hideResult(); G = null; clearInterval(tickHandle); renderLevels(); showScreen('menu'); };
     }, 900);
@@ -1380,7 +1377,7 @@ function showBanner(text, kind){
   clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('on'), kind ? 2600 : 2200);
 }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
-function goGameroom(){ UI.go(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
+function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }   // 🧭 p1b: ◀ = where you came from (Gameroom if we don't know)
 
 /* ================= BOOT ================= */
 function boot(){
@@ -1418,4 +1415,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11w-1+11x-4+r32+back-1+modes-3) END OF Checkers.html -->
+<!-- (11w-1+11x-4+r32+back-1+modes-3+p1b) END OF Checkers.html -->

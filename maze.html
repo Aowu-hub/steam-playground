@@ -104,11 +104,6 @@
     padding:calc(8px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) var(--safe-b, 18px) calc(10px + env(safe-area-inset-left));
     background:var(--bg);
   }
-  .hud{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;}
-  .hud .pill{
-    background:var(--card);border-radius:14px;padding:7px 11px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.9rem;
-    box-shadow:0 3px 0 rgba(0,0,0,0.06);display:inline-flex;align-items:center;gap:5px;white-space:nowrap;
-  }
   .hud button.pill{border:none;cursor:pointer;color:var(--ink);}
   .hud button.pill:active{transform:translateY(2px);}
   .hud .lvl-pill{background:linear-gradient(135deg,var(--purple),var(--teal));color:#fff;}
@@ -162,12 +157,12 @@
   .stats span{background:var(--panel);border-radius:12px;padding:6px 10px;font-weight:800;font-size:0.85rem;}
   .new-badge{background:linear-gradient(135deg,var(--sun),var(--coral));color:#fff;border-radius:14px;padding:8px 14px;font-family:'Fredoka',sans-serif;font-weight:700;}
   .save-note{font-size:0.78rem;font-weight:700;color:var(--ink-soft);min-height:18px;}
+  .res-btns > #b-menu, .res-btns > #tg-x, .res-btns > #btn-levels, .res-btns > #btn-hc-levels{order:-1;} .res-btns > #b-next, .res-btns > #btn-next{order:2;}   /* 🔘 p1b: exit left, main action right */
   .res-btns{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:4px;}
   .btn{
     font-family:'Fredoka',sans-serif;font-weight:600;font-size:0.95rem;border:none;border-radius:14px;cursor:pointer;
     padding:11px 16px;color:#fff;background:linear-gradient(135deg,var(--purple),var(--teal));box-shadow:0 4px 0 rgba(0,0,0,0.12);
   }
-  .btn:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,0.12);}
   .btn.soft{background:var(--panel);color:var(--ink);}
   .confetti{position:fixed;top:-40px;z-index:390;font-size:1.6rem;pointer-events:none;animation:fall linear forwards;}
   @keyframes fall{to{transform:translateY(110vh) rotate(540deg);}}
@@ -188,7 +183,7 @@
 <!-- ontouchstart="" lets iOS show :active press effects -->
 <body ontouchstart="">
 
-<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button>
+<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
 
 <!-- WHO'S PLAYING (only when no player was carried in) -->
 <section class="screen hidden" id="scr-player">
@@ -215,20 +210,11 @@
     <p>Your explorer, the goal and the treasures change every time</p>
   </div>
   <div class="pick-grid theme-grid" id="theme-list"></div>
-  <div style="text-align:center;margin-top:18px;"><button class="btn soft" onclick="showScreen('levels')">◀ Back</button></div>
-</section>
+  </section>
 
 <!-- PLAY -->
 <section class="hidden" id="scr-play">
-  <div class="hud">
-    <button class="pill" onclick="leavePlay()" title="Back to levels">◀</button>
-    <span class="pill lvl-pill" id="hud-level"></span>
-    <span class="pill" id="hud-time">⏱ 0:00</span>
-    <span class="pill" id="hud-stars">⭐ 0/3</span>
-    <span class="pill" id="hud-keys">🔑 0</span>
-    <span class="pill time-left hidden" id="hud-left"></span>
-    <button class="pill" onclick="newMaze()" title="A brand-new maze">🔄 New maze</button>
-  </div>
+  <div class="hud" id="gbar"></div>   <!-- 🎛️ p1b: UI.gameBar fills this -->
   <div class="stage-wrap" id="stage-wrap">
     <div class="shaker" id="shaker">
       <div class="stage" id="stage"><canvas id="cv"></canvas></div>
@@ -251,6 +237,14 @@
 <script>
 const WEBAPP_URL = ''+__SP("webAppUrl")+'';
 const CURRENT_PLAYER = ''+__SP("player")+''; window.SP_PAGE = 'maze';
+// 🎛️ p1b: the shared top bar (UiKit UI.gameBar) — ◀ where you came from · 🎚️ Levels · 🏠 | 🧭 Maze · level | scoreboard | game buttons ❓ ⚙️
+const BAR = UI.gameBar(document.getElementById('gbar'), {game: 'maze', icon: '🧭', name: 'Maze', levelId: 'hud-level',
+  levels: () => leavePlay(), playing: () => !!(G && !G.over), onLeave: () => { try{ clearInterval(timerId); }catch(e){} try{ speechSynthesis.cancel(); }catch(e){} },
+  pause: {pause: () => { if(typeof pauseGame === 'function') pauseGame(); }, resume: () => { if(typeof resume === 'function') resume(); }},
+  onFit: () => { if(G && typeof layout === 'function') layout(); },
+  extras: [{id: 'new-maze-btn', html: '🔄<span class="gt"> New maze</span>', label: 'A brand-new maze', onClick: () => newMaze(), keep: true}]});
+var NAV_INNER = {theme: ['◀ Maze', () => showScreen('levels')]};   // 🧭 inner screens: their top button goes to the main screen
+UI.navBar(document.getElementById('back-btn'), {onclick: false});
 UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});   // loader + menus in the player's look before the server answers
 const SESSION_START = Number(''+__SP("sessionStart")+'') || null;
 const DURATION_MIN = Number(''+__SP("durationMin")+'') || null;
@@ -448,9 +442,9 @@ function startGame(lvlIdx, themeKey){
   if(L.smoke) for(let i = 0; i < 7; i++) G.smoke.push({x: Math.random() * lv.n, y: Math.random() * lv.n, r: 1.5 + Math.random() * 2.2, vx: (Math.random() - .5) * .35, vy: (Math.random() - .5) * .35});
   heldDir = -1; autoDir = -1;
   $('stage').style.transform = 'rotate(0deg)';
-  $('hud-level').textContent = L.emoji + ' ' + L.name;
-  $('hud-stars').classList.toggle('hidden', !L.stars);
-  $('hud-keys').classList.toggle('hidden', !lv.doors.size);
+  BAR.level(L.emoji + ' ' + L.name);
+  BAR.hide('stars', !L.stars);
+  BAR.hide('keys', !lv.doors.size);
   updateHud();
   showScreen('play');
   resizeStage();
@@ -967,16 +961,13 @@ function fmt(ms){ const s = Math.max(0, Math.floor(ms / 1000)); return Math.floo
 function elapsed(){ return G ? (performance.now() - G.t0 - G.pausedTotal) : 0; }
 function updateHud(){
   if(!G) return;
-  $('hud-time').textContent = '⏱ ' + fmt(elapsed());
-  $('hud-stars').textContent = G.lv.collectIcon + ' ' + G.stars + '/' + G.lv.stars.size;
+  BAR.time(fmt(elapsed()));
+  if(G.lv.stars.size) BAR.count('stars', G.lv.collectIcon, G.stars + '/' + G.lv.stars.size, 'Stars'); else BAR.hide('stars');
   const held = Array.from(G.keys).map(k => '<i style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' + KEY_COLORS[k].fill + '"></i>').join('');
-  $('hud-keys').innerHTML = '🔑 ' + (held || '0');
+  if(G.lv.doors.size){ BAR.count('keys', '🔑', G.keys.size, 'Keys'); const kb = BAR.el.querySelector('.gb-cnt[title="Keys"] b'); if(kb && held) kb.innerHTML = held; } else BAR.hide('keys');
   if(lockHandle){
     const left = lockHandle.remainingMs();
-    const el = $('hud-left');
-    el.classList.remove('hidden');
-    el.textContent = '⌛ ' + fmt(left);
-    el.classList.toggle('warn', left < 120000);
+    BAR.left(left, left < 120000);
   }
 }
 let bannerTimer = 0;
@@ -1009,10 +1000,10 @@ function showWin(){
     (G.lv.stars.size ? '<span>' + UI.esc(G.lv.collectIcon) + ' ' + G.stars + '/' + G.lv.stars.size + '</span>' : '') + '</div>' +
     '<div class="save-note" id="save-note"><span class="ui-spin">✅</span> Saving your progress…</div>' +
     '<div class="res-btns">' +
-      (nextOk ? '<button class="btn" id="btn-next">Next level ▶</button>' : '') +
-      '<button class="btn soft" id="btn-again">🔄 New maze</button>' +
-      '<button class="btn soft" id="btn-theme">🌍 New world</button>' +
-      '<button class="btn soft" id="btn-levels">◀ Back</button>' +
+      (nextOk ? '<button class="btn sp-btn sp-primary" id="btn-next">Next level ▶</button>' : '') +
+      '<button class="btn soft sp-btn sp-secondary" id="btn-again">🔄 New maze</button>' +
+      '<button class="btn soft sp-btn sp-secondary" id="btn-theme">🌍 New world</button>' +
+      '<button class="btn soft sp-btn sp-secondary" id="btn-levels">🎚️ Levels</button>' +
     '</div>');
   $('btn-again').onclick = () => { hideResult(); startGame(lvlIdx, G.lv.themeKey); };
   $('btn-theme').onclick = () => { hideResult(); chooseLevel(lvlIdx); };
@@ -1079,7 +1070,7 @@ function showLose(){
   const hc = G.L.hardcore, why = G.loseWhy;
   const head = why === 'wall' ? '<div class="big">💀</div><h2>Bump! That was a wall</h2>' : why === 'trap' ? '<div class="big">💀</div><h2>' + UI.esc(G.loseMsg || 'A trap got you!') + '</h2>' : '<div class="big">🌋</div><h2>The lava got you!</h2>';
   showResult(head + '<p style="margin:0;font-weight:700;color:var(--ink-soft)">' + (hc ? '💀 Hardcore ends on the first mistake — try again! You know the way now.' : 'Try the same maze again — you know the way now.') + '</p>' +
-    '<div class="res-btns"><button class="btn" id="btn-retry">Try again</button><button class="btn soft" id="btn-again">🔄 New maze</button><button class="btn soft" id="btn-levels">◀ Back</button></div>');
+    '<div class="res-btns"><button class="btn sp-btn sp-primary" id="btn-retry">Try again</button><button class="btn soft sp-btn sp-secondary" id="btn-again">🔄 New maze</button><button class="btn soft sp-btn sp-secondary" id="btn-levels">🎚️ Levels</button></div>');
   $('btn-retry').onclick = () => retrySame();
   $('btn-again').onclick = () => { hideResult(); newMazeFromOver(); };
   $('btn-levels').onclick = () => { hideResult(); leavePlay(); };
@@ -1150,7 +1141,7 @@ if(!HAS_TOUCH){ document.body.classList.add('no-touch'); $('play-hint').textCont
 /* ================= MENUS ================= */
 function showScreen(name){
   ['player', 'levels', 'theme', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
-  $('back-btn').classList.toggle('hidden', name === 'play');
+  $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   // 🧭 p1b
   window.scrollTo(0, 0);
 }
 function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
@@ -1235,7 +1226,7 @@ function sessionQuery(){
   if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN;
   return q;
 }
-function goGameroom(){ UI.go(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
+function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }   // 🧭 p1b: ◀ = where you came from (Gameroom if we don't know)
 
 /* ================= BOOT ================= */
 function boot(){
@@ -1264,4 +1255,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (11w-1+emoji+r33+back-1) END OF Maze.html -->
+<!-- (11w-1+emoji+r33+back-1+p1b) END OF Maze.html -->

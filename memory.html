@@ -67,8 +67,6 @@
   .rules{background:var(--card);border-radius:18px;padding:8px 14px;margin-top:16px;}
   .rules summary{cursor:pointer;font-family:'Fredoka',sans-serif;font-weight:700;padding:6px 0;}
   .rules li{margin:5px 0;font-size:0.9rem;}
-  .btn{font-family:'Fredoka',sans-serif;font-weight:600;font-size:0.95rem;border:none;border-radius:14px;cursor:pointer;padding:11px 16px;color:#fff;background:linear-gradient(135deg,#9B5DE5,#F15BB5);box-shadow:0 4px 0 rgba(0,0,0,0.12);}
-  .btn:active{transform:translateY(3px);} .btn.soft{background:var(--panel);color:var(--ink);}
   @media (max-width:640px){ .levels{grid-template-columns:repeat(2,1fr);} .levels .lvl:last-child{grid-column:1 / -1;} .themes{grid-template-columns:repeat(2,1fr);} .title h1{font-size:1.6rem;} }
   /* 6 levels (💀 Hardcore added 2026-11-02): 3 + 3 cards, 6 in a row on wide screens, 2 per row on phones */
   .levels{grid-template-columns:repeat(3,1fr);}
@@ -85,7 +83,6 @@
 
   /* ---------- play ---------- */
   #scr-play{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);color:#fff;}
-  .hud{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;padding:calc(8px + env(safe-area-inset-top)) 10px 6px;position:relative;z-index:5;}
   .pill{background:rgba(0,0,0,0.3);border:none;color:#fff;border-radius:14px;padding:6px 10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.9rem;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
   button.pill{cursor:pointer;} button.pill:active{transform:translateY(2px);}
   .pill.lvl-pill{background:linear-gradient(135deg,#9B5DE5,#F15BB5);} .pill.score{font-size:1.1rem;min-width:90px;justify-content:center;}
@@ -115,6 +112,7 @@
   .stats{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;} .stats span{background:var(--panel);border-radius:10px;padding:4px 10px;font-weight:800;font-size:0.82rem;}
   .save-note{font-weight:800;font-size:0.85rem;color:var(--ink-soft);}
   .new-badge,.title-new,.feat-new{display:inline-block;background:linear-gradient(135deg,#FFC845,#FF9F1C);color:#3A2500;border-radius:10px;padding:4px 10px;font-weight:800;margin:2px;}
+  .res-btns > #b-menu, .res-btns > #tg-x, .res-btns > #btn-levels, .res-btns > #btn-hc-levels{order:-1;} .res-btns > #b-next, .res-btns > #btn-next{order:2;}   /* 🔘 p1b: exit left, main action right */
   .res-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
   .confetti{position:fixed;top:-40px;z-index:390;font-size:1.6rem;pointer-events:none;animation:fall linear forwards;}
   @keyframes fall{to{transform:translateY(110vh) rotate(540deg);}}
@@ -185,7 +183,7 @@
 <script src="inc/AvatarKit.js"></script>
 </head>
 <body ontouchstart="">
-<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button>
+<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
 
 <section class="screen hidden" id="scr-player">
   <div class="title"><div class="logo">🃏</div><h1>Memory Match</h1><p>Who's playing?</p></div>
@@ -212,22 +210,12 @@
   <div class="setup">
     <div class="box"><h3>🎴 Pick a deck</h3><div class="decks" id="deck-list"></div></div>
     <div class="box"><h3>👥 Players (up to 4 — tap to add friends)</h3><div class="seats" id="seat-list"></div></div>
-    <div class="go-row"><button class="btn soft" onclick="showScreen('menu')">◀ Back</button><button class="btn" id="go-btn" data-sound="pop">🃏 Deal the cards!</button></div>
+    <div class="go-row"><button class="btn sp-btn sp-primary" id="go-btn" data-sound="pop">🃏 Deal the cards!</button></div>
   </div>
 </section>
 
 <section class="hidden" id="scr-play">
-  <div class="hud">
-    <button class="pill" data-sound="none" onclick="leavePlay()" title="Back">◀</button>
-    <span class="pill lvl-pill" id="hud-level"></span>
-    <span class="pill turn" id="hud-turn"></span>
-    <span class="pill score" id="hud-score">0</span>
-    <span class="pill" id="hud-pairs">🃏 0</span>
-    <span class="pill" id="hud-miss">❌ 0</span>
-    <span class="pill" id="hud-time">⏱ 0:00</span>
-    <span class="pill hidden" id="hud-left"></span>
-    <button class="pill" data-sound="none" onclick="endEarly()" title="End">🏳️</button>
-  </div>
+  <div class="hud" id="gbar"></div>   <!-- 🎛️ p1b: UI.gameBar fills this -->
   <div class="stage" id="stage">
     <div class="banner" id="banner"></div>
     <div class="turncard" id="turncard"><canvas width="220" height="256" id="turn-av"></canvas><b id="turn-name"></b><small id="turn-sub"></small></div>
@@ -245,6 +233,14 @@ UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});   // loader + me
 const SESSION_START = Number(''+__SP("sessionStart")+'') || null;
 const DURATION_MIN = Number(''+__SP("durationMin")+'') || null;
 const GAME_ID = 'memory';
+// 🎛️ p1b: the shared top bar (UiKit UI.gameBar) — ◀ where you came from · 🎚️ Levels · 🏠 | 🃏 Memory Match · level | scoreboard | game buttons ❓ ⚙️
+const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '🃏', name: 'Memory Match', levelId: 'hud-level',
+  levels: () => leavePlay(), playing: () => !!(G && !G.over), onLeave: () => { try{ clearInterval(timerId); }catch(e){} try{ speechSynthesis.cancel(); }catch(e){} },
+  pause: {pause: () => { if(typeof pauseGame === 'function') pauseGame(); }, resume: () => { if(typeof resume === 'function') resume(); }},
+  onFit: () => { if(G && typeof layout === 'function') layout(); },
+  extras: []});
+var NAV_INNER = {setup: ['◀ Memory Match', () => showScreen('menu')]};   // 🧭 inner screens: their top button goes to the main screen
+UI.navBar(document.getElementById('back-btn'), {onclick: false});
 const $ = id => document.getElementById(id);
 const pick = a => a[rnd(a.length)];
 function fmt(ms){ const s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
@@ -285,7 +281,7 @@ function myAvatar(name){ const a = S.avatars[name || S.player]; return a ? fixAv
 /* ================= MENUS ================= */
 function showScreen(name){
   ['player', 'menu', 'setup', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
-  $('back-btn').classList.toggle('hidden', name === 'play'); window.scrollTo(0, 0);
+  $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   // 🧭 p1b window.scrollTo(0, 0);
 }
 function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
 function canPlay(i){ const p = progressOf(S.player); if(i === 5) return p.unlocked >= 5; if(i === 4) return p.unlocked >= 4; return i <= Math.max(p.unlocked, AGE_START[S.age] || 0); }
@@ -344,7 +340,7 @@ function startGame(lvl){
   const faces = shuffle(D.cards.slice()).slice(0, pairs), cards = shuffle(faces.concat(faces).map((f, i) => ({f, id: i, up: false, done: false, by: -1})));
   G = {lvl, L, D, cards, pairs, open: [], wait: false, over: false, paused: false, t0: 0, pausedTotal: 0, started: false, cursor: 0, seen: {},
     players: SEATS.map((n, i) => ({name: n, col: SEAT_COLS[i], pairs: 0, score: 0, miss: 0, streak: 0, best: 0})), turn: 0, found: 0, swaps: 0};
-  $('hud-level').textContent = L.emoji + ' ' + L.name + ' · ' + D.icon;
+  BAR.level(L.emoji + ' ' + L.name + ' · ' + D.icon);
   buildBoard(); buildSide(); showScreen('play'); layout(); hud();
   if(L.peek){
     G.wait = true; G.cards.forEach(c => c.up = true); paintAll(); let left = L.peek; $('peek').classList.remove('hidden'); $('peek').textContent = '👀 Remember them! ' + left;
@@ -453,12 +449,12 @@ function floatText(el, text){ const r = el.getBoundingClientRect(), s = document
 function elapsed(){ return G.started ? performance.now() - G.t0 - G.pausedTotal - (G.paused ? performance.now() - G.pausedAt : 0) : 0; }
 function hud(){
   if(!G) return; const P = G.players[G.turn], solo = G.players.length === 1;
-  $('hud-turn').classList.toggle('hidden', solo); $('hud-turn').textContent = '👉 ' + P.name; $('hud-turn').style.setProperty('--seat', P.col);
-  $('hud-score').textContent = '🏆 ' + (solo ? P.score : G.players.reduce((s, p) => s + p.score, 0)).toLocaleString();
-  $('hud-pairs').textContent = '🃏 ' + G.found + ' / ' + G.pairs; $('hud-miss').textContent = '❌ ' + G.players.reduce((s, p) => s + p.miss, 0);
-  $('hud-time').textContent = '⏱ ' + fmt(elapsed());
+  if(solo) BAR.hide('turn'); else BAR.count('turn', '👉', P.name, 'Whose turn');
+  BAR.score((solo ? P.score : G.players.reduce((s, p) => s + p.score, 0)).toLocaleString());
+  BAR.count('pairs', '🃏', G.found + '/' + G.pairs, 'Pairs found'); BAR.miss(G.players.reduce((s, p) => s + p.miss, 0));
+  BAR.time(fmt(elapsed()));
   G.players.forEach((p, i) => { const d = $('pl-' + i); if(!d) return; d.classList.toggle('now', i === G.turn && !G.over); $('sc-' + i).textContent = p.pairs; $('pile-' + i).textContent = p.score + ' pts' + (p.streak > 1 ? ' · 🔥' + p.streak : ''); });
-  if(lockHandle){ const left = lockHandle.remainingMs(), el = $('hud-left'); el.classList.remove('hidden'); el.textContent = '⌛ ' + fmt(left); el.classList.toggle('warn', left < 120000); }
+  if(lockHandle){ const left = lockHandle.remainingMs(); BAR.left(left, left < 120000); }
 }
 // Keyboard: arrows move the yellow box, Enter/Space flips.
 function markCursor(){ if(!G) return; G.cards.forEach((c, i) => c.el.classList.toggle('cursor', i === G.cursor && G.kbd)); }
@@ -492,7 +488,7 @@ function hardcoreLose(a, b, partner){
     showResult('<div class="big">💀</div><h2>Hardcore over!</h2><p style="margin:-4px 0 0;font-weight:800;color:var(--ink-soft)">You found ' + G.found + ' of ' + G.pairs + ' pairs — the glowing card was one you had already seen.</p>' +
       '<div class="stats"><span>🃏 ' + G.found + ' pairs</span><span>⏱ ' + fmt(elapsed()) + '</span><span>🔥 best streak ' + P.best + '</span></div>' +
       '<div class="tip" style="text-align:left">💡 Say the pictures out loud as you flip them — it helps you remember where they are.</div>' +
-      '<div class="res-btns"><button class="btn" id="b-again">🔁 Try again</button><button class="btn soft" id="b-menu">◀ Back</button></div>');
+      '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Try again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🎚️ Levels</button></div>');
     $('b-again').onclick = () => startGame(G.lvl); $('b-menu').onclick = () => backToMenu();
   }, 2200);
 }
@@ -522,7 +518,7 @@ function finishGame(){
         '<div class="stats"><span>⏱ ' + fmt(secs * 1000) + '</span><span>❌ ' + me.miss + ' misses</span><span>🔥 best streak ' + me.best + '</span>' + (me.miss === 0 ? '<span>💯 perfect!</span>' : '') + (G.swaps ? '<span>🔀 ' + G.swaps + ' swaps</span>' : '') + '</div>'
       : '<div class="podium">' + G.players.slice().sort((a, b) => b.pairs - a.pairs || b.score - a.score).map((p, i) => '<div style="border-left:6px solid ' + p.col + '">' + (p.win ? '👑' : ['🥈', '🥉', '🎈'][Math.min(2, i - 1)] || '🎈') + ' ' + UI.esc(p.name) + '<b>' + p.pairs + ' pairs · ' + p.score + '</b></div>').join('') + '</div><div class="stats"><span>⏱ ' + fmt(secs * 1000) + '</span><span>❌ ' + miss + ' misses</span></div>';
     showResult(head + body + '<div class="save-note" id="save-note"><span class="ui-spin a-pop">✅</span> Saving…</div>' +
-      '<div class="res-btns">' + (me.win && G.lvl < 5 && solo ? '<button class="btn" id="b-next">' + (G.lvl === 4 ? 'Try 💀 Hardcore ▶' : 'Next level ▶') + '</button>' : '') + '<button class="btn' + (me.win && G.lvl < 5 && solo ? ' soft' : '') + '" id="b-again">🔁 Play again</button><button class="btn soft" id="b-menu">◀ Back</button></div>');
+      '<div class="res-btns">' + (me.win && G.lvl < 5 && solo ? '<button class="btn sp-btn sp-primary" id="b-next">' + (G.lvl === 4 ? 'Try 💀 Hardcore ▶' : 'Next level ▶') + '</button>' : '') + '<button class="btn' + (me.win && G.lvl < 5 && solo ? ' soft' : '') + '" id="b-again">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🎚️ Levels</button></div>');
     if(solo) countUp($('score-count'), me.score, 1100);
     const lvl = G.lvl;
     $('b-again').onclick = () => startGame(lvl);
@@ -560,7 +556,7 @@ function showResult(html){ $('result-card').innerHTML = html; $('result').classL
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pick(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
-function goGameroom(){ UI.go(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
+function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }   // 🧭 p1b: ◀ = where you came from (Gameroom if we don't know)
 
 /* ================= BOOT ================= */
 function boot(){
@@ -597,4 +593,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11n+r32+back-1+modes-3) END OF Memory.html -->
+<!-- (11n+r32+back-1+modes-3+p1b) END OF Memory.html -->
