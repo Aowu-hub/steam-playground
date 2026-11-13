@@ -259,12 +259,23 @@
   .next-card .btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
   .next-card canvas{width:min(100%,360px,64vh);height:auto;aspect-ratio:2/1;display:block;margin:0 auto;}
   @media (max-width:520px){ .bcol{flex-basis:160px;} .bchamp{flex-basis:120px;} }
+
+  /* 📡 lk-1b own devices (LinkKit lobby in the SlaBrall look) */
+  .link-wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:10px;}
+  .link-wrap .lk-card{box-shadow:0 3px 0 rgba(0,0,0,0.06);}
+  .link-wrap .lk-head{font-family:'Fredoka',sans-serif;font-size:1.25rem;}
+  .lk-how{display:flex;gap:12px;align-items:center;background:var(--panel);border-radius:14px;padding:10px 12px;font-weight:700;font-size:.9rem;line-height:1.35;text-align:left;}
+  .lk-how.small{background:transparent;color:var(--ink-soft);font-size:.8rem;padding:4px 8px;}
+  .lk-how-ic{font-size:1.6rem;white-space:nowrap;}
+  .lk-how small{color:var(--ink-soft);font-weight:700;}
+  @media (max-height:520px){ #scr-link{padding-top:54px;} #scr-link .title{margin-bottom:4px;} #scr-link .title .logo{display:none;} #scr-link .title h1{font-size:1.3rem;} #scr-link .title p{font-size:.8rem;} #link-how{display:none;} }
 </style>
 <script src="inc/UiKit.js"></script>
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
 <script src="inc/ComicKit.js"></script>
+<script src="inc/LinkKit.js"></script>
 </head>
 <body ontouchstart="">
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
@@ -340,6 +351,12 @@
   <div class="next-card" id="br-next"></div>
   <div class="bracket" id="bracket"></div>
   <div class="go-row"><button class="btn soft sp-btn sp-secondary" id="br-new" data-sound="tap" onclick="newCup()">🗑️ New tournament</button></div>
+</section>
+
+<section class="screen hidden" id="scr-link">   <!-- 📡 lk-1b: own devices — the LinkKit lobby (host: picture code + QR · guest: picture pad) -->
+  <div class="title"><div class="logo">📡</div><h1>Own devices</h1><p id="link-sub">Everyone on their own phone or tablet · same Wi-Fi</p></div>
+  <div class="link-wrap"><div id="link-lobby"></div>
+    <div class="lk-how small" id="link-how"><div class="lk-how-ic">🕹️</div><div>Your stick moves <b>your</b> player. The host's device runs the match — keep it open.<br><small>2 players = 1 vs 1 · 3–4 players = 2 vs 2 (an empty seat gets a 🤖 robot)</small></div></div></div>
 </section>
 
 <section class="hidden" id="scr-play">
@@ -1529,7 +1546,7 @@ const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '�
   pause: {pause: () => { pauseGame(); }, resume: () => { if(G && G.paused && !G.over) togglePause(); }},
   onFit: () => { if(G){ resize(); buildPads(); } },
   extras: [{id: 'pause-btn', html: '<span class="gb-pzi" aria-hidden="true"><i></i><i></i></span>', label: 'Pause (P)', onClick: () => togglePause(), keep: true}]});
-var NAV_INNER = {setup: ['◀ SlaBrall', () => showScreen('menu')], cup: ['◀ SlaBrall', () => showScreen('menu')], bracket: ['◀ SlaBrall', () => backToMenu()]};   // 🧭 inner screens: their top button goes to the main screen
+var NAV_INNER = {link: ['◀ SlaBrall', () => lkExit()], setup: ['◀ SlaBrall', () => showScreen('menu')], cup: ['◀ SlaBrall', () => showScreen('menu')], bracket: ['◀ SlaBrall', () => backToMenu()]};   // 🧭 inner screens: their top button goes to the main screen
 UI.navBar(document.getElementById('back-btn'), {onclick: false});
 const $ = id => document.getElementById(id);
 let FX = 1;   // harness sets 0 (no big words / confetti)
@@ -1574,7 +1591,7 @@ let G = null, lockHandle = null, KEYS = null;
 function store(k){ return 'sp_slabrall_' + k + ':' + (S.player || ''); }
 function ls(k, v){ try{ if(v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }catch(e){ return null; } }
 function loadPrefs(){
-  try{ const p = JSON.parse(ls(store('prefs')) || '{}'); if(SB.SPORTS[p.sport]) SET.sport = p.sport; if(THEMES[p.theme]) SET.theme = p.theme; if(p.powers === false) SET.powers = false; if(p.mode) SET.mode = p.mode; if(['auto', 'behind', 'top'].indexOf(p.view) >= 0) SET.view = p.view; if(p.help === false) SET.help = false; }catch(e){}
+  try{ const p = JSON.parse(ls(store('prefs')) || '{}'); if(SB.SPORTS[p.sport]) SET.sport = p.sport; if(THEMES[p.theme]) SET.theme = p.theme; if(p.powers === false) SET.powers = false; if(p.mode && p.mode !== 'link') SET.mode = p.mode; if(['auto', 'behind', 'top'].indexOf(p.view) >= 0) SET.view = p.view; if(p.help === false) SET.help = false; }catch(e){}
   SET.ball = sharedBall();
 }
 function savePrefs(){ ls(store('prefs'), JSON.stringify({sport: SET.sport, theme: SET.theme, powers: SET.powers, mode: SET.mode, view: SET.view || 'auto', help: SET.help !== false})); }
@@ -1594,7 +1611,7 @@ function ownedRackets(name){ return Math.max(4, Number(((S.settings || {})._rack
 
 /* ================= MENUS ================= */
 function showScreen(name){
-  ['player', 'menu', 'setup', 'cup', 'bracket', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
+  ['player', 'menu', 'setup', 'cup', 'bracket', 'link', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
   $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   /* 🧭 p1c */ window.scrollTo(0, 0);
 }
 function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
@@ -1619,8 +1636,8 @@ function renderMenu(){
   // sports: built once per visit, then only the .on class moves (no page jump)
   const sl = $('sport-list');
   if(!sl.children.length){   // 🗂️ mg-1: 🏓 Sports · 🏆 Cup boxes
-    UI.modeGroups(sl, MODE_GROUPS, mgList(), {next: k => k === 'cup' ? null : $('level-list'),
-      onPick: k => { if(k === 'cup'){ openCup(); return 'stop'; } SET.sport = k; savePrefs(); markSports(); return false; }});
+    UI.modeGroups(sl, MODE_GROUPS, mgList(), {next: k => k === 'cup' || k === 'ljoin' ? null : $('level-list'),
+      onPick: k => { if(k === 'cup'){ openCup(); return 'stop'; } if(k === 'ljoin'){ lkOpenJoin(); return 'stop'; } SET.sport = k; savePrefs(); markSports(); return false; }});
   }
   markSports(); renderLevels(); cupBtnLabel(); mgCupLabel();
   if(window.UI && UI.leaders) UI.leaders($('leaders'), GAME_ID, S.player);
@@ -1632,10 +1649,12 @@ const SPORT_TAG = {slashot: 'Score goals · first to 5 or 7 wins', slapoof: 'Bou
 /* 🗂️ MODE GROUPS (mg-1) */
 const MODE_GROUPS = [
   {k: 'sports', icon: '🏓', en: 'Sports', th: 'กีฬา', c: '#2F7BEA'},
-  {k: 'cup', icon: '🏆', en: 'Cup', th: 'ทัวร์นาเมนต์', c: '#C9760A'}
+  {k: 'cup', icon: '🏆', en: 'Cup', th: 'ทัวร์นาเมนต์', c: '#C9760A'},
+  {k: 'link', icon: '📡', en: 'Own devices', th: 'เล่นหลายเครื่อง', c: '#0E9F8E'}   // 📡 lk-1b
 ];   // 🗂️ mg-1 mode groups (header icon + English + Thai), fixed order
 function mgList(){ return SB.SPORT_ORDER.map(k => ({k, g: 'sports', icon: SB.SPORTS[k].icon, name: SB.SPORTS[k].name, type: SPORT_TYPE[k], sub: SPORT_TAG[k], next: '👇 then pick a level'}))   // 🗂️ mg-1
-  .concat([{k: 'cup', g: 'cup', icon: '🏆', name: ($('cup-btn-t') || {}).textContent || 'Tournament', type: 'A knock-out tournament', sub: ($('cup-btn-s') || {}).textContent || '4 or 8 teams · bracket · trophy', next: '▶ opens the cup', id: 'cup-btn'}]); }
+  .concat([{k: 'cup', g: 'cup', icon: '🏆', name: ($('cup-btn-t') || {}).textContent || 'Tournament', type: 'A knock-out tournament', sub: ($('cup-btn-s') || {}).textContent || '4 or 8 teams · bracket · trophy', next: '▶ opens the cup', id: 'cup-btn'},
+    {k: 'ljoin', g: 'link', icon: '🔗', name: 'Join friends', type: 'Each on their own device', sub: 'To host: pick a level → 📡 Own devices', next: '▶ opens the picture pad'}]); }   // 📡 lk-1b
 function mgCupLabel(){ const b = document.querySelector('#sport-list #cup-btn'); if(!b) return; b.querySelector('.mn').textContent = $('cup-btn-t').textContent; const s = b.querySelector('.ms'); if(s) s.textContent = $('cup-btn-s').textContent; if(UI.modeCards) UI.modeCards($('sport-list')); }
 /* 🗂️ END MODE GROUPS */
 function markSports(){ $('sport-list').querySelectorAll('.ui-mbtn').forEach(b => b.classList.toggle('on', b.dataset.k === SET.sport)); }
@@ -1668,15 +1687,16 @@ function openSetup(lvl){
   $('view-chip').onclick = () => { const o = ['auto', 'behind', 'top']; SET.view = o[(o.indexOf(SET.view || 'auto') + 1) % 3]; savePrefs(); vc(); buildThemes(); UI.toast(SET.view === 'auto' ? '📷 Behind you when you play alone · from above for 2+ players' : SET.view === 'behind' ? '📷 Always from behind you' : '📷 Always from above'); };
   $('help-chip').onclick = () => { SET.help = SET.help === false; savePrefs(); hc(); };
   Comic.chip($('comic-chip'), S.player);   // 💥 sb2-3: per player per device (sp_comics:<Name>), default ON
-  $('go-btn').onclick = () => startMatch();
+  $('go-btn').onclick = () => SET.mode === 'link' ? lkOpenHost() : startMatch();   // 📡 lk-1b
   showScreen('setup');
 }
 function targetText(sp, lvl, tt){ const t = tt || sp.targets[lvl]; return sp.scoring === 'tennis' ? 'First to ' + t + ' game' + (t > 1 ? 's' : '') + '.' : sp.scoring === 'goals' ? 'First to ' + t + ' goals.' : 'First to ' + t + ' points (win by 2).'; }
 function buildModes(){
   const hc = !!LEVEL_UI[SET.level].hardcore, row = $('mode-row');
-  const modes = [['robot', '🤖 Me vs Robot'], ['duo', '👥 2 players'], ['team', '🤝 2 vs 2']];
+  const modes = [['robot', '🤖 Me vs Robot'], ['duo', '👥 2 players'], ['team', '🤝 2 vs 2'], ['link', '📡 Own devices']];   // 📡 lk-1b: each player on their own device
   row.innerHTML = modes.map(([k, n]) => '<button class="chip' + (SET.mode === k ? ' on' : '') + (hc && k !== 'robot' ? ' lock' : '') + '" data-k="' + k + '" data-sound="tap">' + n + '</button>').join('');
-  row.querySelectorAll('.chip').forEach(b => b.onclick = () => { if(hc && b.dataset.k !== 'robot'){ UISound.play('error'); UI.toast('💀 Hardcore is you against the robot'); return; } SET.mode = b.dataset.k; savePrefs(); row.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); buildSeats(); });
+  row.querySelectorAll('.chip').forEach(b => b.onclick = () => { if(hc && b.dataset.k !== 'robot'){ UISound.play('error'); UI.toast('💀 Hardcore is you against the robot'); return; } SET.mode = b.dataset.k; savePrefs(); row.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); buildSeats(); lkGoLabel(); });
+  lkGoLabel();
 }
 function others(){ return S.players.map(p => p.Name).filter(n => n !== S.player); }
 function seatHtml(name, label, me, idx){
@@ -1686,7 +1706,9 @@ function seatHtml(name, label, me, idx){
 function keyHint(seat){ if(SET.mode === 'robot') return seat === 0 ? '⌨️ WASD / arrows' : ''; const K = (KEYS || DEFAULT_KEYS)[seat]; if(!K) return ''; return '⌨️ ' + [K.up, K.left, K.down, K.right].map(keyName).join(' '); }
 function buildSeats(){
   const box = $('seat-box'), list = others();
-  if(SET.mode === 'robot'){
+  if(SET.mode === 'link'){   // 📡 lk-1b
+    box.innerHTML = '<div class="lk-how"><div class="lk-how-ic">📱📲💻</div><div><b>Everyone plays on their own device</b> — phone, tablet or computer, on the same Wi-Fi.<br>You open the room · friends tap <b>🔗 Join friends</b> and the 4 pictures you show.<br><small>2 players = 1 vs 1 · 3–4 players = 2 vs 2 (an empty seat gets a 🤖 robot)</small></div></div>';
+  } else if(SET.mode === 'robot'){
     box.innerHTML = '<div class="seats"><div class="team">' + seatHtml(S.player, 'You', true, 0) + '</div><div class="vs">VS</div><div class="team">' + seatHtml(null, SB.LEVELS[SET.level].name + ' robot', false, 1) + '</div></div>' +
       (LEVEL_UI[SET.level].hardcore ? '<div class="hc-note" style="margin-top:10px">💀 Hardcore: win the match before the robot scores 3 points. ×3 score.</div>' : '');
   } else if(SET.mode === 'duo'){
@@ -1986,7 +2008,8 @@ function takeKey(e){
 /* ================= MATCH ================= */
 function startMatch(cfg){
   hideResult(); savePrefs();
-  if(!cfg || !cfg.seats) cfg = null;   // cfg = a 🏆 tournament match (see playCupMatch)
+  if(!cfg || !cfg.seats) cfg = null;   // cfg = a 🏆 tournament match (see playCupMatch) or a 📡 linked match (cfg.link, lk-1b)
+  const cup = cfg && !cfg.link ? cfg : null, lnk = cfg && cfg.link ? cfg : null;
   const sp = SB.SPORTS[cfg ? cfg.sport : SET.sport], seats = cfg ? cfg.seats : [], level = cfg ? cfg.level : SET.level, theme = cfg ? cfg.theme : SET.theme, powers = cfg ? cfg.powers : SET.powers;
   if(cfg){}
   else if(SET.mode === 'robot') seats.push({name: S.player, side: 0, human: true, seat: 0}, {name: 'Robot', side: 1, human: false});
@@ -1994,20 +2017,21 @@ function startMatch(cfg){
   else { const T = SET.team; seats.push({name: S.player, side: 0, human: true, seat: 0}, {name: T[0] || 'Robot', side: 1, human: !!T[0], seat: 1}, {name: T[1] || 'Robot 2', side: 0, human: !!T[1], seat: 2}, {name: T[2] || 'Robot 3', side: 1, human: !!T[2], seat: 3}); }
   // robots wear their own racket colours; people bring theirs
   const avs = seats.map(s => s.human ? withRacket(myAvatar(s.name === 'Guest' ? 'Guest' : s.name), s.name) : robotAvatar(s.name, sp));
-  const M = SB.newMatch({sport: sp.id, level, theme, powers, target: cfg ? cfg.target : 0, seed: (Date.now() & 0xffffff) ^ 0x5b, players: seats.map((s, i) => ({name: s.name, side: s.side, human: s.human, av: avs[i]}))});
+  const M = SB.newMatch({sport: sp.id, level, theme, powers, target: cfg ? cfg.target : 0, seed: lnk ? lnk.seed : (Date.now() & 0xffffff) ^ 0x5b, players: seats.map((s, i) => ({name: s.name, side: s.side, human: s.human, av: avs[i]}))});
   M.autoServe = 5;
   const humans = M.players.filter(p => p.human);
-  humans.forEach(p => { const s = seats[p.i]; p.seat = cfg ? s.seat : SET.mode === 'robot' ? -1 : s.seat; });   // -1 = alone: every key set drives you
-  G = {M, sp, mode: cfg ? 'cup' : SET.mode, cup: cfg, level, theme, ball: SET.ball, trails: M.players.map(p => p.human ? trailOf(p.name) : -1), feathers: M.players.map(p => p.human ? featherOf(p.name) : -1), th: new Map(), t0: performance.now(), last: 0, acc: 0, paused: false, over: false, raf: 0,
-    held: new Set(), seats, fx: [], bounces: [], deco: makeDeco(SET.theme), lastServeHint: '', pointers: new Map(), startAt: performance.now(), anim: 0,
+  humans.forEach(p => { const s = seats[p.i]; p.seat = cfg ? s.seat : SET.mode === 'robot' ? -1 : s.seat; if(lnk){ p.remote = !!s.remote; p.lseat = s.lseat; } });   // -1 = alone: every key set drives you · 📡 remote = played on another device
+  G = {M, sp, mode: lnk ? 'link' : cfg ? 'cup' : SET.mode, cup, level, theme, ball: lnk ? lnk.ball : SET.ball,
+    link: lnk ? {role: lnk.role, id: lnk.id, host: lnk.host} : null, lk: lnk ? {buf: [], evq: [], trails: new Map(), off: null, snapAt: 0, inAt: 0, ix: 0, iy: 0, lastAt: performance.now(), hintAt: 0, pz: 0, evs: []} : null, trails: M.players.map(p => p.human ? trailOf(p.name) : -1), feathers: M.players.map(p => p.human ? featherOf(p.name) : -1), th: new Map(), t0: performance.now(), last: 0, acc: 0, paused: false, over: false, raf: 0,
+    held: new Set(), seats, fx: [], bounces: [], deco: makeDeco(theme), lastServeHint: '', pointers: new Map(), startAt: performance.now(), anim: 0,
     view: viewFor(M), help: SET.help !== false, aimTold: false,
-    comics: !!FX && M.players.some(p => p.human && Comic.enabled(p.name)), plog: newPlog(), mlog: [], nextStrip: 2 + Math.floor(Math.random() * 3), lastImpact: -99, camY: 0};
-  BAR.level(cfg ? '🏆 ' + cfg.round : sp.icon + ' ' + sp.name + ' · ' + LEVEL_UI[level].emoji + ' ' + SB.LEVELS[level].name, SB.LEVELS[level].hardcore ? 'hc' : '');
+    comics: !!FX && !lnk && M.players.some(p => p.human && Comic.enabled(p.name)), /* 📡 linked: no comic pauses (they would stop every device) */ plog: newPlog(), mlog: [], nextStrip: 2 + Math.floor(Math.random() * 3), lastImpact: -99, camY: 0};
+  BAR.level(cup ? '🏆 ' + cup.round : sp.icon + ' ' + sp.name + ' · ' + LEVEL_UI[level].emoji + ' ' + SB.LEVELS[level].name, SB.LEVELS[level].hardcore ? 'hc' : '');
   G.tn = [teamName(0), teamName(1)];   // 🎛️ p1c: the two sides = two player cards (🧡 left · 🩵 right, a letter badge on small phones), the server glows
   BAR.players([0, 1].map(i => ({k: i, av: (Array.from(G.tn[i] || '?')[0] || '?').toUpperCase(), name: G.tn[i], score: 0, col: i ? '#18B8A6' : '#FF7A1A'})));
   showScreen('play'); resize(); buildPads(); hud();
-  banner((cfg ? '🏆 ' + cfg.round + ' — ' : sp.icon + ' ' + sp.name + ' — ') + targetText(sp, level, M.target), 'good');
-  if(FX) say((cfg ? cfg.round : sp.name) + '! ' + targetText(sp, level, M.target));
+  banner((cup ? '🏆 ' + cup.round + ' — ' : lnk ? '📡 ' : sp.icon + ' ' + sp.name + ' — ') + targetText(sp, level, M.target), 'good');
+  if(FX) say((cup ? cup.round : sp.name) + '! ' + targetText(sp, level, M.target));
   G.last = performance.now(); G.raf = requestAnimationFrame(frame);
 }
 function robotAvatar(name, sp){ const a = defaultAvatar(name + '·bot'); a.eq = a.eq || {}; const v = sp.id === 'slashot' ? 3 : sp.id === 'slapong' ? 1 : sp.id === 'slapoof' ? 0 : 2; a.eq.hand = {id: 'racket', v, o: racketDesign(v, {c1: '#8D99AE', c2: '#2B2D42'})}; return a; }
@@ -2098,7 +2122,7 @@ function topView(W0, H0, sp, box){
 }
 // 📷 which view: Auto = behind for 1 person, top for 2+ people (and for robot-only matches); the setup chip can force one
 function viewFor(M){
-  const hs = M.players.filter(p => p.human), want = SET.view || 'auto';
+  const hs = M.players.filter(p => p.human && !p.remote), want = SET.view || 'auto';   // 📡 only the players on this device choose the camera
   if(M.sp.squash && want !== 'top' && want !== 'behind') return {mode: 'iso', cs: 0};   // 🧱 sb2-2: the squash room in 2.5D, the same for everyone
   if(want === 'top' || (want === 'auto' && hs.length !== 1) || !hs.length) return {mode: 'top', cs: 0};
   return {mode: 'behind', cs: hs[0].side};
@@ -2121,7 +2145,7 @@ function isTouch(){ return ('ontouchstart' in window) || (navigator.maxTouchPoin
 function padBox(w, h){
   // 🕹️ sb2-1: the stick + the big shot buttons get their own strips, the court never sits under a thumb
   const box = {l: 0, r: 0, t: 0, b: 0}; if(!isTouch() || !G) return box;
-  const hs = G.M.players.filter(p => p.human), two = hs.length > 1, portrait = h > w * 1.05, short = !portrait && h < 520;
+  const hs = G.M.players.filter(p => p.human && !p.remote), two = hs.length > 1, portrait = h > w * 1.05, short = !portrait && h < 520;
   const shotW = Math.min(78, Math.max(64, w * 0.185)), stickW = Math.min(150, Math.max(108, (portrait ? w : h) * 0.29));
   if(portrait){ const band = Math.max(stickW, shotW * 2 + 8) + 14; box.b = band; if(two) box.t = band; }
   else { const sideW = Math.max(stickW, shotW * 2 + 8) + 18; if(two){ box.l = sideW; box.r = sideW; } else { box.l = short ? stickW + 16 : 0; box.r = short ? sideW : 0; if(!short) box.b = Math.max(stickW, shotW * 2) + 14; } }
@@ -2134,23 +2158,26 @@ function frame(now){
   if(!G) return;
   const dt = Math.min(0.05, Math.max(0, (now - G.last) / 1000)); G.last = now;
   if(V && V.follow){ const me = G.M.players.find(p => p.human && p.side === V.camSide) || G.M.players.find(p => p.side === V.camSide); if(me){ G.camY += (me.y * 0.32 - G.camY) * Math.min(1, dt * 3); V.follow(G.camY); } }   // 📷 sb2-3 camera follows you sideways
-  if(!G.paused && !G.over && !Comic.busy()){   // 💥 the game waits while a comic panel / strip shows
+  if(G.link && G.link.role === 'guest'){ if(!G.over) readInputs(); lkGuestFrame(now); }   // 📡 a guest never runs the engine: it shows the host's match
+  else if(!G.paused && !G.over && !Comic.busy()){   // 💥 the game waits while a comic panel / strip shows
     readInputs();
     G.acc += dt; let n = 0;
     while(G.acc >= SB.DT && n < 12){ SB.step(G.M, SB.DT); G.acc -= SB.DT; n++; }
-    handleEvents(SB.takeEvents(G.M));
+    const evs = SB.takeEvents(G.M); handleEvents(evs); if(G.lk && evs.length) G.lk.evs.push.apply(G.lk.evs, evs);
     if(G.M.score.done && !G.over) finishMatch();
   }
+  if(G && G.link && G.link.role === 'host') lkHostTick(now);
   G.anim += dt; draw(now / 1000); hud();
   G.raf = requestAnimationFrame(frame);
 }
-function togglePause(){ if(!G || G.over) return; G.paused = !G.paused; UI.pauseIcon($('pause-btn'), G.paused); banner(G.paused ? '⏸ Paused — tap ▶ to play' : '▶ Go!', 'good'); }
-function pauseGame(){ if(G && !G.paused){ G.paused = true; UI.pauseIcon($('pause-btn'), true); } }
+function togglePause(){ if(!G || G.over) return; if(G.link && G.link.role === 'guest'){ Link.send('sbpause', {on: !G.paused}, {sure: true}); return; } G.paused = !G.paused; UI.pauseIcon($('pause-btn'), G.paused); banner(G.paused ? '⏸ Paused — tap ▶ to play' : '▶ Go!', 'good'); }
+function pauseGame(){ if(G && G.link && G.link.role === 'guest'){ if(!G.paused && !G.over) Link.send('sbpause', {on: true}, {sure: true}); return; } if(G && !G.paused){ G.paused = true; UI.pauseIcon($('pause-btn'), true); } }
 function leavePlay(){
   if(!G) return; const was = G.paused; G.paused = true;
-  UI.confirm({icon: '◀', title: 'Leave this match?', body: G.cup ? 'You can play this tournament match again from the bracket.' : 'This match won\'t be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(!G) return; G.paused = was; if(ok){ if(G.cup) backToBracket(); else backToMenu(); } });
+  const lb = G.link ? (G.link.role === 'host' ? 'This ends the match on every device.' : 'A 🤖 robot plays for you until you come back.') : null;   // 📡 lk-1b
+  UI.confirm({icon: '◀', title: 'Leave this match?', body: lb || (G.cup ? 'You can play this tournament match again from the bracket.' : 'This match won\'t be saved.'), okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(!G) return; G.paused = was; if(ok){ if(G.link) lkExit(); else if(G.cup) backToBracket(); else backToMenu(); } });
 }
-function backToMenu(){ if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); $('pads').innerHTML = ''; renderMenu(); showScreen('menu'); }
+function backToMenu(){ if(G && G.link){ lkExit(); return; } if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); $('pads').innerHTML = ''; renderMenu(); showScreen('menu'); }
 
 /* ---------- input ---------- */
 document.addEventListener('keydown', e => {
@@ -2161,17 +2188,17 @@ document.addEventListener('keydown', e => {
   if(e.repeat){ return; }
   G.held.add(e.code); $('pads').classList.add('kbd');
   if(G.paused || G.over) return;
-  G.M.players.forEach(p => { if(!p.human) return; keySetsOf(p).forEach(K => {
+  G.M.players.forEach(p => { if(!p.human || p.remote) return; keySetsOf(p).forEach(K => {
     ['smash', 'drop', 'lob', 'slice'].forEach(a => { if(K[a] === e.code) shot(p.i, a); });
     if(K.power === e.code) firePower(p.i); }); });
-  if(e.code === 'Space'){ const me = G.M.players.find(p => p.human && (p.seat === -1 || p.seat === 0)); if(me) shot(me.i, 'normal'); }
+  if(e.code === 'Space'){ const me = G.M.players.find(p => p.human && !p.remote && (p.seat === -1 || p.seat === 0)); if(me) shot(me.i, 'normal'); }
 });
 document.addEventListener('keyup', e => { if(G) G.held.delete(e.code); });
 window.addEventListener('blur', () => { if(G) G.held.clear(); });
 function keySetsOf(p){ return p.seat === -1 ? [KEYS[0], KEYS[1]] : [KEYS[p.seat] || KEYS[0]]; }
 function readInputs(){
   const M = G.M;
-  M.players.forEach(p => { if(!p.human) return;
+  M.players.forEach(p => { if(!p.human || p.remote) return;   // 📡 remote players send their own stick
     if(p.auto) return;   // test autopilot
     // 🕹️ stick first (analog), else keys — both are SCREEN directions, the view turns them into the world (sb2-1)
     const st = G.sticks && G.sticks.get(p.i);
@@ -2182,11 +2209,11 @@ function readInputs(){
     const w = V ? V.k2w(sx, sy) : {x: sx, y: sy}; p.input.x = w.x; p.input.y = w.y;
   });
 }
-function shot(i, kind){ const p = G.M.players[i]; if(!p || G.paused) return; SB.pressShot(G.M, i, kind); if(kind !== 'normal') floatAt(p, SHOT_ICON[kind] || '', 0.6); }
-function firePower(i){ const p = G.M.players[i]; if(!p || !p.power){ if(p && p.human) UISound.play('error'); return; } SB.usePower(G.M, i); }
+function shot(i, kind){ const p = G.M.players[i]; if(!p || G.paused) return; if(G.link && G.link.role === 'guest'){ if(!G.over) Link.send('sbshot', {a: kind}, {sure: true}); if(kind !== 'normal') floatAt(p, SHOT_ICON[kind] || '', 0.6); return; } SB.pressShot(G.M, i, kind); if(kind !== 'normal') floatAt(p, SHOT_ICON[kind] || '', 0.6); }
+function firePower(i){ const p = G.M.players[i]; if(p && G.link && G.link.role === 'guest'){ if(p.power) Link.send('sbshot', {a: 'power'}, {sure: true}); else UISound.play('error'); return; } if(!p || !p.power){ if(p && p.human) UISound.play('error'); return; } SB.usePower(G.M, i); }
 // touch (sb2-1): a short tap on the court = serve / normal hit; moving is the 🕹️ stick
 function humanFor(side, px, py){
-  const hs = G.M.players.filter(p => p.human); if(hs.length === 1) return hs[0];
+  const hs = G.M.players.filter(p => p.human && !p.remote); if(hs.length === 1) return hs[0];
   const w = V.inv(px, py), mine = hs.filter(p => p.side === (w.x < 0 ? 0 : 1)); if(!mine.length) return null;
   return mine.reduce((a, b) => (Math.hypot(a.x - w.x, a.y - w.y) <= Math.hypot(b.x - w.x, b.y - w.y) ? a : b));
 }
@@ -2203,7 +2230,7 @@ function humanFor(side, px, py){
 })();
 const SHOT_NAME = {smash: 'Smash', lob: 'Lob', drop: 'Drop', slice: 'Slice'};
 function buildPads(){
-  const box = $('pads'); box.innerHTML = ''; G.sticks = new Map(); const hs = G.M.players.filter(p => p.human), two = hs.length > 1;
+  const box = $('pads'); box.innerHTML = ''; G.sticks = new Map(); const hs = G.M.players.filter(p => p.human && !p.remote), two = hs.length > 1;
   const portrait = V && V.H > V.W * 1.05, short = V && !portrait && V.H < 520;
   box.classList.toggle('two', two); box.classList.toggle('port', !!portrait); box.classList.toggle('short', !!short);
   const usedSide = {};
@@ -2241,14 +2268,14 @@ function handleEvents(list){
       logHit(e); }
     else if(e.k === 'serve'){ UISound.play('tap'); G.plog = newPlog(); }
     else if(e.k === 'jump') onJump(e);
-    else if(e.k === 'point'){ const win = M.players.filter(p => p.side === e.side), human = win.some(p => p.human), lost = M.players.some(p => p.human && p.side !== e.side);
+    else if(e.k === 'point'){ const win = M.players.filter(p => p.side === e.side), human = win.some(p => p.human && !p.remote), lost = M.players.some(p => p.human && !p.remote && p.side !== e.side);
       UISound.play(human || !lost ? 'success' : 'bump');
       banner((e.why === 'ace' ? '🎾 ' : e.why === 'goal' || e.why === 'legend' ? '🥅 ' : '') + teamName(e.side) + ' ' + (G.sp.scoring === 'goals' ? 'scores' : 'wins the point') + (WHY[e.why] ? ' — ' + WHY[e.why] : ''), human ? 'good' : 'bad');
       if(e.why === 'goal' || e.why === 'legend' || e.why === 'ace') bigWord(e.why === 'ace' ? 'ACE!' : e.why === 'legend' ? '⭐ GOAL!' : 'GOAL!');
       comicPoint(e); }
     else if(e.k === 'game'){ setTimeout(() => banner('🏆 Game to ' + teamName(e.side) + '!', 'gold'), 900); if(G.stripNext) comicStripNow(); }
     else if(e.k === 'orb'){ UISound.play('unlock'); banner(['⚪ Power orb!', '🔵 Rare power orb!', '🟡 LEGENDARY orb!'][e.tier] + ' Hit the ball through it!', 'gold'); }
-    else if(e.k === 'gotpower'){ const p = M.players[e.p], P = SB.POWERS[e.power]; UISound.play('unlock'); banner(P.icon + ' ' + p.name + ' got ' + P.name + (p.human ? ' — press ' + keyName(keySetsOf(p)[0].power) + ' or ⚡' : ''), 'gold'); }
+    else if(e.k === 'gotpower'){ const p = M.players[e.p], P = SB.POWERS[e.power]; UISound.play('unlock'); banner(P.icon + ' ' + p.name + ' got ' + P.name + (p.human && !p.remote ? ' — press ' + keyName(keySetsOf(p)[0].power) + ' or ⚡' : ''), 'gold'); }
     else if(e.k === 'power'){ const p = M.players[e.p], P = SB.POWERS[e.power]; UISound.play('whoosh'); bigWord(P.icon + ' ' + P.name); if(FX) say(P.name); }
     else if(e.k === 'legendmiss'){ banner('⭐ Too strong! Only a PERFECT hit sends a Legendary back', 'bad'); }
     else if(e.k === 'mirage'){ bigWord('🎭 Fooled you!'); }
@@ -2271,7 +2298,7 @@ function floatAt(p, text, life){ G.fx.push({k: 'txt', x: p.x, y: p.y, z: 2.4, tx
 /* ---------- 💥 comics (sb2-3) — ComicKit: impact panels, Sla… callouts, strips. Off (💬 chip) = small callouts only ---------- */
 function newPlog(){ return {rally: 0, jump: false, jumpPerfect: false, jumpBy: -1, dive: false, diveBy: -1, diveMiss: false, diveMissBy: -1, power: false, smash: false, drop: false, lastHit: -1, lastShot: '', lastJump: null}; }
 const SLA_SHOT = {smash: 'Sla… SMASH!', lob: 'Sla… LOB!', drop: 'Sla… plop.', slice: 'Sla… SLICE!'};   // st-1
-function logHit(e){ const hp = G.M.players[e.p]; if(hp && hp.human && !hp.auto && !e.jump){ const w = e.perfect ? 'Sla… PERFECT!' : SLA_SHOT[e.shot]; if(w && performance.now() - (G.lastSla || 0) > 1200){ G.lastSla = performance.now(); sla(hp, w); } }
+function logHit(e){ const hp = G.M.players[e.p]; if(hp && hp.human && !hp.auto && !hp.remote && !e.jump){ const w = e.perfect ? 'Sla… PERFECT!' : SLA_SHOT[e.shot]; if(w && performance.now() - (G.lastSla || 0) > 1200){ G.lastSla = performance.now(); sla(hp, w); } }
   const L = G.plog; L.rally = e.rally; L.lastHit = e.p; L.lastShot = e.shot; L.lastJump = e.jump || null; if(e.shot === 'smash') L.smash = true; if(e.shot === 'drop') L.drop = true;
   if(e.rally === 15) comicImpact(G.M.players[e.p], 'Sla… 15 HITS!', 'rally', 'smash', '🔁 What a rally!'); }
 function sla(p, text){ if(!FX) return; Comic.callout(text, {small: !G.comics, say: G.comics}); }
@@ -2343,7 +2370,7 @@ function hud(){
   $('pads').querySelectorAll('.shotpad').forEach(d => { const p = M.players[Number(d.dataset.p)]; const b = d.querySelector('.pw'); if(b) b.classList.toggle('ready', !!(p && p.power));
     d.querySelectorAll('.sbtn[data-a]').forEach(x => { if(x.dataset.a !== 'power') x.classList.toggle('armed', !!(p && p.queued === x.dataset.a && M.t - p.queuedT < 0.6)); }); });
   const sh = $('serve-hint'), b0 = M.balls[0], server = b0 && b0.held != null ? M.players[b0.held] : null;
-  if(M.state === 'serve' && server && server.human && !G.paused){ const txt = '🎾 ' + (M.players.filter(p => p.human).length > 1 ? server.name + ': ' : '') + 'tap or press a shot key to serve'; if(sh.textContent !== txt) sh.textContent = txt; sh.classList.remove('hidden'); }
+  if(M.state === 'serve' && server && server.human && !server.remote && !G.paused){ const txt = '🎾 ' + (M.players.filter(p => p.human).length > 1 ? server.name + ': ' : '') + 'tap or press a shot key to serve'; if(sh.textContent !== txt) sh.textContent = txt; sh.classList.remove('hidden'); }
   else sh.classList.add('hidden');
 }
 
@@ -2397,7 +2424,7 @@ function drawEmo(g, ch, x, y, size){ emo(g, ch, x, y, size); }
 function drawGuides(g, V, M, t, opt){
   if(!G || opt.preview || !G.help || G.level >= 3 || M.sp.kind === 'puck' || M.state !== 'play') return;
   const b = M.balls.find(x => x.live && x.real && x.held == null); if(!b) return;
-  M.players.forEach(p => { if(!p.human || b.owner === p.side) return;
+  M.players.forEach(p => { if(!p.human || p.remote || b.owner === p.side) return;
     const land = SB.landingOf(M, b), mine = land && (M.sp.squash || (land.x < 0) === (p.side === 0));
     if(mine){ const pulse = 0.5 + 0.5 * Math.sin(t * 7); g.save(); g.strokeStyle = 'rgba(255,255,255,' + (0.55 + 0.35 * pulse) + ')'; g.lineWidth = 2.5; g.setLineDash([6, 5]); ell(g, V, land.x, land.y, 0.45 + 0.08 * pulse); g.stroke(); g.setLineDash([]);
       g.fillStyle = 'rgba(255,255,255,0.18)'; ell(g, V, land.x, land.y, 0.22); g.fill(); g.restore(); }
@@ -2562,7 +2589,7 @@ function drawPlayer(g, V, M, p, t){
   const label = (p.robot ? '🤖 ' : '') + p.name; const w = g.measureText(label).width + 10; g.fillRect(tag[0] - w / 2, tag[1] - fs, w, fs * 1.35); g.fillStyle = '#fff'; g.fillText(label, tag[0], tag[1]);
   if(p.power){ drawEmo(g, SB.POWERS[p.power].icon, tag[0] + w / 2 + fs * 0.9, tag[1] - fs * 0.35, fs * 1.4); }
   if(p.mirror > 0) drawEmo(g, '🪞', tag[0] - w / 2 - fs * 0.9, tag[1] - fs * 0.35, fs * 1.3);
-  if(p._turn && p.human && sp.squash){ g.font = '900 ' + (fs + 1) + 'px Nunito, sans-serif'; g.fillStyle = '#FFC845'; g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 3; g.strokeText('Your turn!', tag[0], tag[1] - fs * 1.5); g.fillText('Your turn!', tag[0], tag[1] - fs * 1.5); }
+  if(p._turn && p.human && !p.remote && sp.squash){ g.font = '900 ' + (fs + 1) + 'px Nunito, sans-serif'; g.fillStyle = '#FFC845'; g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 3; g.strokeText('Your turn!', tag[0], tag[1] - fs * 1.5); g.fillText('Your turn!', tag[0], tag[1] - fs * 1.5); }
 }
 function gestOf(k){ return GESTURES.find(x => x.k === k) || GESTURES[0]; }
 
@@ -2570,7 +2597,8 @@ function gestOf(k){ return GESTURES.find(x => x.k === k) || GESTURES[0]; }
 function finishMatch(){
   const M = G.M; G.over = true; const win = M.score.winner, sp = G.sp, secs = Math.max(1, Math.round((performance.now() - G.startAt) / 1000));
   const humans = M.players.filter(p => p.human), vsRobot = G.mode === 'robot' || (G.mode === 'team' && M.players.filter(p => p.side === 1).every(p => p.robot));
-  const st = M.stats, myWin = humans.some(p => p.side === win);
+  const mine = G.link ? humans.filter(p => !p.remote) : humans, st = M.stats, myWin = mine.some(p => p.side === win);   // 📡 mine = the players on this device
+  if(G.link && G.link.role === 'host') lkSendEnd(secs);
   const pts = [0, 1].map(s => sp.scoring === 'tennis' ? M.score.games[s] * 4 + M.score.pts[s] : M.score.pts[s]);
   const ratio = pts[1 - win] / Math.max(1, pts[win]), stars = ratio < 0.45 ? 3 : ratio < 0.8 ? 2 : 1;
   const scoreFor = side => Math.round((st[side].points * 100 + st[side].rally * 20 + st[side].aces * 50 + st[side].perfect * 30 + st[side].smash * 15 + (side === win ? 500 : 0)) * (M.lv.hardcore ? 3 : 1));
@@ -2582,15 +2610,16 @@ function finishMatch(){
     : '<div class="big">👑</div><h2 class="cheer">' + UI.esc(teamName(win)) + ' win' + (M.players.filter(p => p.side === win).length > 1 ? '' : 's') + '!</h2>';
   const tip = myWin ? '' : '<div class="note">💡 ' + pickOne(['Watch the shadow — it shows where the ball will land.', 'Move INTO the ball for topspin: it dips and is hard to return.', 'Try a 🌈 lob when the robot runs to the net.', 'Hit the ball through the power orb, then use your power at the right moment!', 'A 🪶 drop shot is great when the robot stays far back.']) + '</div>';
   const scoreLine = sp.scoring === 'tennis' ? M.score.games[0] + ' – ' + M.score.games[1] + ' games' : M.score.pts[0] + ' – ' + M.score.pts[1];
-  const myScore = scoreFor(humans[0] ? humans[0].side : 0);
+  const myScore = scoreFor(mine[0] ? mine[0].side : humans[0] ? humans[0].side : 0);
   showResult(head + '<div class="score-big">' + scoreLine + '</div>' +
     (vsRobot && myWin ? '<div class="rating">' + [1, 2, 3].map(i => '<span class="st' + (i <= stars ? '' : ' off') + '" style="animation-delay:' + (i * 0.15) + 's">⭐</span>').join('') + '</div>' : '') +
     '<div class="stats"><span>🏆 ' + myScore.toLocaleString() + '</span><span>🔁 best rally ' + Math.max(st[0].rally, st[1].rally) + '</span><span>💥 ' + st[0].smash + ' smashes</span><span>🎾 ' + st[0].aces + ' aces</span><span>✨ ' + st[0].perfect + ' perfect</span><span>⏱ ' + fmt(secs * 1000) + '</span></div>' +
     tip + '<div class="save-note" id="save-note">' + (humans.length ? '💾 Saving…' : '') + '</div>' +
-    '<div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="pop" onclick="startMatch()">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="backToMenu()">🎚️ Levels</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button></div>');
+    (G.link ? lkResultBtns() : '<div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="pop" onclick="startMatch()">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="backToMenu()">🎚️ Levels</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button></div>'));
   if(strip4){ const card = $('result-card'), at = card.querySelector('.stats'); if(at) card.insertBefore(Comic.stripEl('winner', {panels: strip4, title: '🏆 ' + sp.name}), at); }
   // save: level result for the players who played the robot; feats for every person
   NOTES.length = 0;
+  if(G.link && G.link.role === 'guest'){ putNote(0, '💾 ' + UI.esc(G.link.host || 'The host') + '\'s device saves the match'); return; }   // 📡 the host saves for everyone
   humans.forEach((p, seat) => {
     const s = st[p.side], won = p.side === win;
     const stats = {wins: won ? 1 : 0, rally: s.rally, smash: s.smash, aces: s.aces, perfect: s.perfect, powers: s.powers, legend: s.legend, goals: s.goals, jumpHits: s.jumpHits, jumpPerfect: s.jumpPerfect, diveSaves: s.diveSaves, matches: 1};
@@ -2605,7 +2634,7 @@ const NOTES = [];
 function readPending(){ try{ return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); }catch(e){ return []; } }
 function writePending(list){ try{ localStorage.setItem(PENDING_KEY, JSON.stringify(list.slice(-20))); }catch(e){} }
 function flushPending(){ const list = readPending(); if(!list.length) return; writePending([]); list.forEach(w => { const r = google.script.run.withFailureHandler(() => writePending(readPending().concat([w]))); if(w.feats) r.saveFeats(w.name, GAME_ID, w.stats); else r.saveLevelResult(GAME_ID, w.name, w.lvl, w.extra); }); }
-function putNote(i, html){ NOTES[i] = html; const n = $('save-note'); if(n) n.innerHTML = NOTES.filter(Boolean).join('<br>'); }
+function putNote(i, html){ NOTES[i] = html; const n = $('save-note'); if(n) n.innerHTML = NOTES.filter(Boolean).join('<br>'); if(G && G.link && G.link.role === 'host') Link.send('sbnotes', NOTES.filter(Boolean).join('<br>'), {sure: true}); }
 function saveWin(name, lvlIdx, extra, seat, tries){
   tries = tries || 0; const p = S.progress[name] || (S.progress[name] = {unlocked: 0, tokens: [], best: []});
   const who = G && G.M.players.filter(q => q.human).length > 1 ? UI.esc(name) + ': ' : '';
@@ -2649,10 +2678,160 @@ function boot(){
     .getLevelGameData(GAME_ID, CURRENT_PLAYER);
 }
 boot();
+/* 📡 LINK (lk-1b): SlaBrall on 2–4 own devices on the same Wi-Fi (LinkKit, plan "LinkKit — full plan.md" §14).
+   HOST = the device that opened the room: runs the real engine (SB.step), gets every guest's stick (sbin, ~30 / s, fast) + shots (sbshot, sure),
+   sends the match picture (sbs ~20 / s, fast) + the engine events (sbe, sure) + the end (sbend) + the save notes (sbnotes).
+   GUEST: never steps the engine — it draws the host's picture 0.1 s behind (smoothed between two pictures), plays sounds / words from the events,
+   steers ITS player with its own camera (behind its own player). A guest that drops → 🤖 robot brain (p.auto) until it rejoins. Comic pauses are off. */
+const LK = {lobby: null, wired: false, urlDone: false, cfg: null, end: null};
+const LK_SNAP_MS = 50, LK_IN_MS = 33, LK_DELAY = 0.1;
+const LK_PSKIP = {av: 1, racket: 1, ai: 1, input: 1, drag: 1, name: 1, i: 1, human: 1, robot: 1, side: 1, lane: 1, slot: 1, auto: 1, remote: 1, seat: 1, lseat: 1, _turn: 1};
+const LK_MSKIP = {sp: 1, lv: 1, rnd: 1, players: 1, balls: 1, events: 1, level: 1, powersOn: 1, theme: 1, target: 1, stats: 1};
+function lkCopy(v, skip){
+  if(typeof v === 'number') return Number.isInteger(v) ? v : Math.round(v * 1000) / 1000;
+  if(!v || typeof v !== 'object') return v;
+  if(Array.isArray(v)) return v.map(x => lkCopy(x));
+  const o = {}; for(const k in v){ const x = v[k]; if(typeof x === 'function' || (skip && skip[k])) continue; o[k] = lkCopy(x); } return o;
+}
+function lkSnap(M){
+  const o = lkCopy(M, LK_MSKIP); o.balls = M.balls.map(b => lkCopy(b, {trail: 1}));
+  o.pl = M.players.map(p => lkCopy(p, LK_PSKIP)); o.au = M.players.map(p => p.auto ? 1 : 0); o.pz = G.paused ? 1 : 0; return o;
+}
+function lkApply(M, a, b, k){
+  for(const key in b){ if(key === 'pl' || key === 'au' || key === 'pz' || key === 'balls' || key === 'at') continue; M[key] = b[key]; }
+  const tr = G.lk.trails, seen = new Set(), mid = a && k < 1;
+  M.balls = (b.balls || []).map(bb => {
+    const o = Object.assign({}, bb), aa = mid && (a.balls || []).find(x => x.id === bb.id);
+    if(aa) ['x', 'y', 'z'].forEach(f => { o[f] = aa[f] + (bb[f] - aa[f]) * k; });
+    let t = tr.get(o.id); if(!t){ t = []; tr.set(o.id, t); } const last = t[t.length - 1];
+    if(!last || Math.abs(last.x - o.x) + Math.abs(last.y - o.y) + Math.abs(last.z - o.z) > 0.02){ t.push({x: o.x, y: o.y, z: o.z}); if(t.length > 18) t.shift(); }
+    o.trail = t; seen.add(o.id); return o; });
+  tr.forEach((v, id) => { if(!seen.has(id)) tr.delete(id); });
+  (b.pl || []).forEach((q, i) => { const p = M.players[i]; if(!p) return; Object.assign(p, q); p.auto = !!(b.au && b.au[i]);
+    const qa = mid && a.pl && a.pl[i]; if(qa) ['x', 'y'].forEach(f => { p[f] = qa[f] + (q[f] - qa[f]) * k; }); });
+}
+// host: one picture every 50 ms + the events of the last frames (also while paused, so the guests show the pause)
+function lkHostTick(now){
+  const L = G.lk; if(!L) return;
+  if(L.evs.length){ Link.send('sbe', {t: G.M.t, list: L.evs}, {sure: true}); L.evs = []; }
+  if(now - L.snapAt >= LK_SNAP_MS){ L.snapAt = now; Link.send('sbs', lkSnap(G.M)); }
+}
+function lkSendEnd(secs){ LK.end = {id: G.link.id, score: G.M.score, stats: G.M.stats, secs}; Link.send('sbs', lkSnap(G.M)); Link.send('sbend', LK.end, {sure: true}); }
+// guest: show the host's match 0.1 s behind, smoothed between two pictures; send my stick
+function lkGuestFrame(now){
+  const L = G.lk, buf = L.buf, M = G.M;
+  if(buf.length){
+    const t = now / 1000 - L.off - LK_DELAY, i = buf.findIndex(x => x.t > t);
+    if(buf[buf.length - 1].pz || i === -1) lkApply(M, null, buf[buf.length - 1], 1);   // paused: show exactly where the host stopped
+    else if(i === 0) lkApply(M, null, buf[0], 1);
+    else { const a = buf[i - 1], b = buf[i]; lkApply(M, a, b, Math.max(0, Math.min(1, (t - a.t) / Math.max(1e-6, b.t - a.t)))); }
+    while(buf.length > 2 && buf[1].t < t - 0.5) buf.shift();
+    while(L.evq.length && (L.evq[0].t <= t + 0.02 || now - L.evq[0].at > 700)) handleEvents(L.evq.shift().list);
+    const last = buf[buf.length - 1];
+    if(!!last.pz !== !!L.pz){ L.pz = last.pz; G.paused = !!last.pz; UI.pauseIcon($('pause-btn'), G.paused); banner(G.paused ? '⏸ Paused — tap ▶ to play' : '▶ Go!', 'good'); }
+  }
+  if(!G.over && now - L.lastAt > 1600 && now - L.hintAt > 2500){ L.hintAt = now; banner('⏳ Waiting for ' + (G.link.host || 'the host') + '…', ''); }
+  const me = M.players.find(p => p.human && !p.remote);
+  if(me && !G.over && now - L.inAt >= LK_IN_MS){
+    const x = Math.round((me.input.x || 0) * 100) / 100, y = Math.round((me.input.y || 0) * 100) / 100;
+    if(x !== L.ix || y !== L.iy || now - L.inAt > 200){ Link.send('sbin', {x, y}); L.ix = x; L.iy = y; L.inAt = now; }
+  }
+}
+function lkPlayer(seat){ return G && G.M.players.find(p => p.human && p.lseat === seat); }
+function lkHere(){ return G && G.link && G.link.role === 'host'; }
+// the same match for every device: my seat → my player (remote = someone else's device)
+function lkLocal(cfg, mySeat, role){
+  const c = JSON.parse(JSON.stringify(cfg)); c.role = role;
+  c.seats.forEach(s => { if(!s.human){ s.seat = 0; return; } s.remote = s.lseat !== mySeat; s.seat = s.remote ? 99 : -1; });
+  return c;
+}
+function lkWhy(e){ const m = String((e && e.message) || e || ''); return /no server|Failed to fetch|NetworkError/i.test(m) ? '📶 Linking needs the internet for a moment — try again' : m || 'Could not open the room'; }
+function lkAv(cv, p){ drawPreviewCanvas(cv, withRacket(myAvatar(p.name), p.name), {name: p.name, t: 1}); }
+function lkGoLabel(){ const b = $('go-btn'); if(b) b.textContent = SET.mode === 'link' ? '📡 Open the room' : '🏓 Play!'; }
+function lkCloseLobby(){ if(LK.lobby && LK.lobby.close) LK.lobby.close(); LK.lobby = null; }
+async function lkOpenHost(){
+  lkWire(); lkCloseLobby(); const sp = SB.SPORTS[SET.sport], L = SB.LEVELS[SET.level];
+  $('link-sub').textContent = 'Friends tap 🔗 Join friends on their own phone or tablet — same Wi-Fi'; showScreen('link');
+  const el = $('link-lobby'); el.innerHTML = '<div class="lk"><div class="lk-msg"><span class="ui-spin a-bob">📡</span> Opening the room<span class="lk-dots"></span></div></div>';
+  try{ await Link.host({game: 'SlaBrall', name: S.player, seats: 4}); }
+  catch(e){ UISound.play('error'); el.innerHTML = '<div class="lk"><div class="lk-msg bad">😕 ' + UI.esc(lkWhy(e)) + '</div></div>'; return; }
+  if($('scr-link').classList.contains('hidden')) return;   // left while it opened
+  LK.lobby = Link.lobby(el, {title: sp.icon + ' ' + sp.name + ' · ' + LEVEL_UI[SET.level].emoji + ' ' + L.name, url: WEBAPP_URL + '?page=slabrall', minPlayers: 2, name: S.player, drawAvatar: lkAv, kind: 'link', onStart: lkGo});
+}
+function lkOpenJoin(code){
+  lkWire(); lkCloseLobby();
+  $('link-sub').textContent = 'Same Wi-Fi as the host'; showScreen('link');
+  LK.lobby = Link.lobby($('link-lobby'), {title: '🏓 SlaBrall', name: S.player, drawAvatar: lkAv, code: code || undefined, onJoined: () => UISound.play('success')});
+}
+// host ▶ Start (lobby) / 🔁 Play again: the linked players → seats (2 = 1 vs 1 · 3–4 = 2 vs 2, a 🤖 fills seat 4)
+function lkGo(){
+  const list = Link.players().filter(p => p.name && p.on).sort((a, b) => a.seat - b.seat).slice(0, 4);
+  if(list.length < 2){ UISound.play('error'); UI.toast('📡 Wait for a friend to join'); return; }
+  const sides = list.length === 2 ? [0, 1] : [0, 1, 0, 1], seats = list.map((p, k) => ({name: p.name, side: sides[k], human: true, lseat: p.seat}));
+  if(seats.length === 3) seats.push({name: 'Robot', side: 1, human: false});
+  LK.cfg = {link: true, id: Date.now().toString(36), sport: SET.sport, level: SET.level, theme: SET.theme, powers: SET.powers, ball: SET.ball, target: 0, seed: (Date.now() & 0xffffff) ^ 0x5b, host: S.player, seats};
+  LK.end = null; lkCloseLobby();
+  Link.send('sbgo', LK.cfg, {sure: true});
+  if(G) cancelAnimationFrame(G.raf); G = null; hideResult();
+  startMatch(lkLocal(LK.cfg, 0, 'host'));
+}
+function lkResultBtns(){
+  if(G.link.role === 'host') return '<div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="pop" onclick="lkGo()">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="lkExit()">🎚️ Levels</button></div>';
+  return '<div class="note lk-wait">⏳ ' + UI.esc(G.link.host || 'The host') + ' can start the next match<span class="lk-dots"></span></div><div class="res-btns"><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="lkExit()">🚪 Leave</button></div>';
+}
+function lkEnded(msg){
+  if(G){ cancelAnimationFrame(G.raf); G.over = true; }
+  showResult('<div class="big">📡</div><h2>' + UI.esc(msg) + '</h2><div class="note">Thanks for playing together!</div><div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="none" onclick="lkExit()">◀ SlaBrall</button></div>');
+}
+function lkExit(){
+  try{ if(Link.status() !== 'idle') Link.leave(); }catch(e){}
+  lkCloseLobby(); LK.cfg = null; LK.end = null;
+  if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); $('pads').innerHTML = ''; renderMenu(); showScreen('menu');
+}
+function lkWire(){
+  if(LK.wired || !window.Link) return; LK.wired = true;
+  // ---- guest side ----
+  Link.on('sbgo', d => { if(Link.isHost() || !d || !d.seats) return; if(G && G.link && G.link.id === d.id) return;
+    LK.cfg = d; LK.end = null; lkCloseLobby(); if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); startMatch(lkLocal(d, Link.seat(), 'guest')); });
+  Link.on('sbs', d => { if(!G || !G.lk || G.link.role !== 'guest' || !d) return; const L = G.lk, at = performance.now() / 1000, off = at - d.t;
+    const last = L.buf[L.buf.length - 1]; if(last && d.t < last.t) return;   // an older picture that came late
+    if(L.off == null || off < L.off || off - L.off > 0.25) L.off = off; else L.off += (off - L.off) * 0.05;
+    L.buf.push(d); if(L.buf.length > 40) L.buf.shift(); L.lastAt = performance.now(); });
+  Link.on('sbe', d => { if(G && G.lk && G.link.role === 'guest' && d && d.list) G.lk.evq.push({t: d.t, list: d.list, at: performance.now()}); });
+  Link.on('sbend', d => { if(!G || !G.link || G.link.role !== 'guest' || G.over || !d || d.id !== G.link.id) return;
+    G.lk.evq.forEach(q => handleEvents(q.list)); G.lk.evq = [];
+    const last = G.lk.buf[G.lk.buf.length - 1]; if(last) lkApply(G.M, null, last, 1);
+    G.M.score = d.score; G.M.stats = d.stats; G.startAt = performance.now() - (d.secs || 1) * 1000; finishMatch(); });
+  Link.on('sbnotes', html => { if(G && G.link && G.link.role === 'guest'){ const n = $('save-note'); if(n) n.innerHTML = String(html || ''); } });
+  Link.on('pause', () => { if(G && G.link && G.link.role === 'guest' && !G.over) banner('🔁 Linking again…', 'bad'); });
+  Link.on('resume', () => { if(G && G.link && G.link.role === 'guest' && !G.over) banner('✅ Back in the game!', 'good'); });
+  Link.on('hostleft', e => { if(Link.isHost()) return; const who = (LK.cfg && LK.cfg.host) || 'The host';
+    if(!G && $('scr-link').classList.contains('hidden')) return;
+    UISound.play('bump'); lkEnded(e && e.reason === 'lost' ? '📶 Lost the link to ' + who : '👋 ' + who + ' ended the game'); });
+  // ---- host side ----
+  Link.on('sbin', (d, seat) => { if(!lkHere() || G.over || !d) return; const p = lkPlayer(seat); if(!p || p.auto) return;
+    const x = Number(d.x) || 0, y = Number(d.y) || 0, m = Math.hypot(x, y), k = m > 1 ? 1 / m : 1; p.input.x = x * k; p.input.y = y * k; });
+  Link.on('sbshot', (d, seat) => { if(!lkHere() || G.over || !d) return; const p = lkPlayer(seat); if(!p || p.auto) return;
+    if(d.a === 'power') firePower(p.i); else if(['normal', 'smash', 'drop', 'lob', 'slice'].indexOf(d.a) >= 0) shot(p.i, d.a); });
+  Link.on('sbpause', (d, seat) => { if(!lkHere() || G.over || !d) return; if(!!d.on !== !!G.paused){ togglePause(); const p = lkPlayer(seat); if(p) banner((G.paused ? '⏸ ' + p.name + ' paused' : '▶ ' + p.name + ' — go!'), 'good'); } });
+  Link.on('leave', e => { if(!lkHere() || G.over) return; const p = lkPlayer(e.seat); if(!p) return; p.auto = true; p.input.x = p.input.y = 0;
+    banner('🤖 Robot plays for ' + p.name + (e.left ? '' : ' until they come back'), 'bad'); });
+  const back = e => { if(!lkHere() || !LK.cfg) return; const p = lkPlayer(e.seat);
+    if(p && p.auto && !G.over){ p.auto = false; p.input.x = p.input.y = 0; banner('👋 ' + p.name + ' is back!', 'good'); UISound.play('success'); }
+    Link.send('sbgo', LK.cfg, {sure: true, to: e.seat}); if(G.over && LK.end) Link.send('sbend', LK.end, {sure: true, to: e.seat}); };
+  Link.on('rejoin', back); Link.on('join', back);
+  addEventListener('pagehide', () => { try{ if(Link.status() !== 'idle') Link.leave(); }catch(e){} });
+}
+// 🔗 the host's QR code opens ?page=slabrall&link=<code> → the picture pad fills itself in after the player pick
+function lkUrlCode(cb){
+  try{ if(window.google && google.script && google.script.url && google.script.url.getLocation){ google.script.url.getLocation(l => cb(((l && l.parameter) || {}).link || '')); return; } }catch(e){}
+  try{ cb(new URLSearchParams(location.search).get('link') || ''); }catch(e){ cb(''); }
+}
+/* 📡 END LINK (lk-1b) */
 /* ✨ MODE SPOTLIGHT (modes-3): ?mode=<id> opens this game straight in that mode after the player pick · "✨ Also try" on the start page · started modes → UI.modeTried */
 const MS_GAME = 'sla-brall';
 function msOpen(id){
-  if(id === 'cup'){ openCup(); return; } if(SB.SPORT_ORDER.indexOf(id) < 0) return; SET.sport = id; savePrefs(); markSports(); const b = document.querySelector('#sport-list .sport.on'); if(b && b.scrollIntoView) b.scrollIntoView({block: 'nearest'});
+  if(id === 'cup'){ openCup(); return; } if(id === 'ljoin'){ lkOpenJoin(); return; } if(SB.SPORT_ORDER.indexOf(id) < 0) return; /* 📡 lk-1b ?mode=ljoin */ SET.sport = id; savePrefs(); markSports(); const b = document.querySelector('#sport-list .sport.on'); if(b && b.scrollIntoView) b.scrollIntoView({block: 'nearest'});
 }
 function msNow(){ return SET.sport; }
 function msWrap(fn, idOf){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ try{ const id = idOf.apply(this, arguments); if(id && UI.modeTried) UI.modeTried(S.player || CURRENT_PLAYER, MS_GAME, id); }catch(e){} return f.apply(this, arguments); }; }
@@ -2664,8 +2843,10 @@ msAfter('choosePlayer', name => {
   const id = UI.modeLink(MODE_LINK); if(id) msOpen(id);
   UI.alsoTry({game: MS_GAME, player: name, current: msNow, at: () => document.querySelector('#scr-menu .title'), open: msOpen});
 });
+msAfter('choosePlayer', () => { if(LK.urlDone) return; LK.urlDone = true;   // 📡 lk-1b: QR link → join
+  lkUrlCode(c => { c = String(c || '').toLowerCase().replace(/[^0-9a-f]/g, '').slice(0, 4); if(c.length === 4) lkOpenJoin(c); }); });
 /* ✨ END MODE SPOTLIGHT */
 </script>
 </body>
 </html>
-<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+p1d) END OF SlaBrall.html -->
+<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+p1d+lk-1b) END OF SlaBrall.html -->
