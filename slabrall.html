@@ -267,6 +267,18 @@
   .lk-how{display:flex;gap:12px;align-items:center;background:var(--panel);border-radius:14px;padding:10px 12px;font-weight:700;font-size:.9rem;line-height:1.35;text-align:left;}
   .lk-how.small{background:transparent;color:var(--ink-soft);font-size:.8rem;padding:4px 8px;}
   .lk-how-ic{font-size:1.6rem;white-space:nowrap;}
+  /* 📡 lk-1c host screen: sport + level picks wrap (never a sideways row) */
+  .lkh{display:flex;flex-direction:column;gap:8px;}
+  .lkh-t{font-weight:800;font-size:.85rem;color:var(--ink-soft);text-align:left;}
+  .lkh-row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+  .lkh-b{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;min-height:42px;font-size:.92rem;border-radius:12px;border:2px solid transparent;background:var(--panel);color:var(--ink);font:inherit;font-weight:800;cursor:pointer;touch-action:manipulation;}
+  .lkh-b.on{border-color:var(--game-a,#2E9E5B);box-shadow:0 0 0 3px rgba(46,158,91,.25);transform:translateY(-1px);}
+  .lkh-b:disabled{opacity:.5;cursor:not-allowed;filter:grayscale(.5);}
+  .lkh-i{font-size:1.3rem;line-height:1;}
+  .lkh-go{align-self:center;margin-top:4px;}
+  #link-alt{display:flex;justify-content:center;}
+  #link-alt:empty{display:none;}
+  @media (max-height:900px){ #link-how{display:none;} }
   .lk-how small{color:var(--ink-soft);font-weight:700;}
   @media (max-height:520px){ #scr-link{padding-top:54px;} #scr-link .title{margin-bottom:4px;} #scr-link .title .logo{display:none;} #scr-link .title h1{font-size:1.3rem;} #scr-link .title p{font-size:.8rem;} #link-how{display:none;} }
 </style>
@@ -355,7 +367,7 @@
 
 <section class="screen hidden" id="scr-link">   <!-- 📡 lk-1b: own devices — the LinkKit lobby (host: picture code + QR · guest: picture pad) -->
   <div class="title"><div class="logo">📡</div><h1>Own devices</h1><p id="link-sub">Everyone on their own phone or tablet · same Wi-Fi</p></div>
-  <div class="link-wrap"><div id="link-lobby"></div>
+  <div class="link-wrap"><div id="link-lobby"></div><div id="link-alt"></div>
     <div class="lk-how small" id="link-how"><div class="lk-how-ic">🕹️</div><div>Your stick moves <b>your</b> player. The host's device runs the match — keep it open.<br><small>2 players = 1 vs 1 · 3–4 players = 2 vs 2 (an empty seat gets a 🤖 robot)</small></div></div></div>
 </section>
 
@@ -1636,8 +1648,8 @@ function renderMenu(){
   // sports: built once per visit, then only the .on class moves (no page jump)
   const sl = $('sport-list');
   if(!sl.children.length){   // 🗂️ mg-1: 🏓 Sports · 🏆 Cup boxes
-    UI.modeGroups(sl, MODE_GROUPS, mgList(), {next: k => k === 'cup' || k === 'ljoin' ? null : $('level-list'),
-      onPick: k => { if(k === 'cup'){ openCup(); return 'stop'; } if(k === 'ljoin'){ lkOpenJoin(); return 'stop'; } SET.sport = k; savePrefs(); markSports(); return false; }});
+    UI.modeGroups(sl, MODE_GROUPS, mgList(), {next: k => k === 'cup' || k === 'ljoin' || k === 'lhost' ? null : $('level-list'),
+      onPick: k => { if(k === 'cup'){ openCup(); return 'stop'; } if(k === 'ljoin'){ lkOpenJoin(); return 'stop'; } if(k === 'lhost'){ lkHostPick(); return 'stop'; } SET.sport = k; savePrefs(); markSports(); return false; }});
   }
   markSports(); renderLevels(); cupBtnLabel(); mgCupLabel();
   if(window.UI && UI.leaders) UI.leaders($('leaders'), GAME_ID, S.player);
@@ -1654,7 +1666,8 @@ const MODE_GROUPS = [
 ];   // 🗂️ mg-1 mode groups (header icon + English + Thai), fixed order
 function mgList(){ return SB.SPORT_ORDER.map(k => ({k, g: 'sports', icon: SB.SPORTS[k].icon, name: SB.SPORTS[k].name, type: SPORT_TYPE[k], sub: SPORT_TAG[k], next: '👇 then pick a level'}))   // 🗂️ mg-1
   .concat([{k: 'cup', g: 'cup', icon: '🏆', name: ($('cup-btn-t') || {}).textContent || 'Tournament', type: 'A knock-out tournament', sub: ($('cup-btn-s') || {}).textContent || '4 or 8 teams · bracket · trophy', next: '▶ opens the cup', id: 'cup-btn'},
-    {k: 'ljoin', g: 'link', icon: '🔗', name: 'Join friends', type: 'Each on their own device', sub: 'To host: pick a level → 📡 Own devices', next: '▶ opens the picture pad'}]); }   // 📡 lk-1b
+    {k: 'lhost', g: 'link', icon: '📡', name: 'Host a game', type: 'Each on their own device', sub: 'Pick a sport + level — friends join you', next: '▶ opens the host screen'},   /* 📡 lk-1c */
+    {k: 'ljoin', g: 'link', icon: '🔗', name: 'Join friends', type: 'Each on their own device', sub: 'Tap the 4 pictures on the host screen', next: '▶ opens the picture pad'}]); }   // 📡 lk-1b
 function mgCupLabel(){ const b = document.querySelector('#sport-list #cup-btn'); if(!b) return; b.querySelector('.mn').textContent = $('cup-btn-t').textContent; const s = b.querySelector('.ms'); if(s) s.textContent = $('cup-btn-s').textContent; if(UI.modeCards) UI.modeCards($('sport-list')); }
 /* 🗂️ END MODE GROUPS */
 function markSports(){ $('sport-list').querySelectorAll('.ui-mbtn').forEach(b => b.classList.toggle('on', b.dataset.k === SET.sport)); }
@@ -2751,18 +2764,44 @@ function lkGoLabel(){ const b = $('go-btn'); if(b) b.textContent = SET.mode === 
 function lkCloseLobby(){ if(LK.lobby && LK.lobby.close) LK.lobby.close(); LK.lobby = null; }
 async function lkOpenHost(){
   lkWire(); lkCloseLobby(); const sp = SB.SPORTS[SET.sport], L = SB.LEVELS[SET.level];
-  $('link-sub').textContent = 'Friends tap 🔗 Join friends on their own phone or tablet — same Wi-Fi'; showScreen('link');
+  $('link-sub').textContent = 'Friends tap 🔗 Join friends on their own phone or tablet — same Wi-Fi'; showScreen('link'); lkAlt('');
   const el = $('link-lobby'); el.innerHTML = '<div class="lk"><div class="lk-msg"><span class="ui-spin a-bob">📡</span> Opening the room<span class="lk-dots"></span></div></div>';
-  try{ await Link.host({game: 'SlaBrall', name: S.player, seats: 4}); }
+  try{ await Link.host({game: 'SlaBrall', name: S.player, seats: 4, page: 'slabrall', label: sp.icon + ' ' + sp.name + ' · ' + LEVEL_UI[SET.level].emoji + ' ' + L.name}); }   // label + page: the 🏠 waiting room (lk-2a)
   catch(e){ UISound.play('error'); el.innerHTML = '<div class="lk"><div class="lk-msg bad">😕 ' + UI.esc(lkWhy(e)) + '</div></div>'; return; }
   if($('scr-link').classList.contains('hidden')) return;   // left while it opened
   LK.lobby = Link.lobby(el, {title: sp.icon + ' ' + sp.name + ' · ' + LEVEL_UI[SET.level].emoji + ' ' + L.name, url: WEBAPP_URL + '?page=slabrall', minPlayers: 2, name: S.player, drawAvatar: lkAv, kind: 'link', onStart: lkGo});
 }
 function lkOpenJoin(code){
-  lkWire(); lkCloseLobby();
-  $('link-sub').textContent = 'Same Wi-Fi as the host'; showScreen('link');
-  LK.lobby = Link.lobby($('link-lobby'), {title: '🏓 SlaBrall', name: S.player, drawAvatar: lkAv, code: code || undefined, onJoined: () => UISound.play('success')});
+  lkWire(); lkCloseLobby(); lkIdle();
+  $('link-sub').textContent = 'Same Wi-Fi as the host'; showScreen('link'); lkAlt('host');
+  LK.lobby = Link.lobby($('link-lobby'), {title: '🏓 SlaBrall', name: S.player, drawAvatar: lkAv, code: code || undefined, onJoined: () => { UISound.play('success'); lkAlt(''); }});
 }
+// 📡 lk-1c: the host screen — 1 · sport, 2 · level (no 💀 Hardcore: that one is you vs the robot), then 📡 Open the room
+function lkLevelOk(i){ return !!LEVEL_UI[i] && !LEVEL_UI[i].hardcore && canPlay(i); }
+function lkHostPick(){
+  lkWire(); lkCloseLobby(); lkIdle();
+  if(!lkLevelOk(SET.level)){ const rec = AGE_START[S.age] || 0; SET.level = lkLevelOk(rec) ? rec : 0; }
+  $('link-sub').textContent = 'Friends join on their own device'; showScreen('link'); lkAlt('join');
+  const el = $('link-lobby');
+  const paint = () => {
+    el.innerHTML = '<div class="lk"><div class="lk-card lkh"><div class="lk-head">📡 Host a game</div>'
+      + '<div class="lkh-t">1 · Sport</div><div class="lkh-row" id="lkh-sports">' + SB.SPORT_ORDER.map(k => { const sp = SB.SPORTS[k];
+          return '<button class="lkh-b' + (k === SET.sport ? ' on' : '') + '" data-sp="' + k + '" data-sound="pop"><span class="lkh-i">' + sp.icon + '</span>' + UI.esc(sp.name) + '</button>'; }).join('') + '</div>'
+      + '<div class="lkh-t">2 · Level</div><div class="lkh-row" id="lkh-levels">' + SB.LEVELS.map((L, i) => !LEVEL_UI[i] || LEVEL_UI[i].hardcore ? '' :
+          '<button class="lkh-b' + (i === SET.level ? ' on' : '') + '" data-lv="' + i + '"' + (canPlay(i) ? ' data-sound="pop"' : ' disabled data-sound="none"') + '><span class="lkh-i">' + (canPlay(i) ? LEVEL_UI[i].emoji : '🔒') + '</span>' + UI.esc(L.name) + '</button>').join('') + '</div>'
+      + '<button class="lk-btn lkh-go" id="lkh-go" data-sound="pop">📡 Open the room</button></div></div>';
+    el.querySelectorAll('[data-sp]').forEach(b => b.onclick = () => { SET.sport = b.dataset.sp; savePrefs(); paint(); });
+    el.querySelectorAll('[data-lv]').forEach(b => b.onclick = () => { if(!lkLevelOk(+b.dataset.lv)) return; SET.level = +b.dataset.lv; paint(); });
+    $('lkh-go').onclick = () => { SET.mode = 'link'; savePrefs(); lkOpenHost(); };
+  };
+  paint();
+}
+function lkAlt(k){
+  const a = $('link-alt'); if(!a) return;
+  a.innerHTML = k === 'host' ? '<button class="btn soft sp-btn sp-secondary" data-sound="pop" onclick="lkHostPick()">📡 Host a game instead</button>'
+    : k === 'join' ? '<button class="btn soft sp-btn sp-secondary" data-sound="pop" onclick="lkOpenJoin()">🔗 Join a friend instead</button>' : '';
+}
+function lkIdle(){ try{ if(window.Link && Link.status() !== 'idle') Link.leave(); }catch(e){} }   // switching host ↔ join closes the old room / link
 // host ▶ Start (lobby) / 🔁 Play again: the linked players → seats (2 = 1 vs 1 · 3–4 = 2 vs 2, a 🤖 fills seat 4)
 function lkGo(){
   const list = Link.players().filter(p => p.name && p.on).sort((a, b) => a.seat - b.seat).slice(0, 4);
@@ -2831,7 +2870,7 @@ function lkUrlCode(cb){
 /* ✨ MODE SPOTLIGHT (modes-3): ?mode=<id> opens this game straight in that mode after the player pick · "✨ Also try" on the start page · started modes → UI.modeTried */
 const MS_GAME = 'sla-brall';
 function msOpen(id){
-  if(id === 'cup'){ openCup(); return; } if(id === 'ljoin'){ lkOpenJoin(); return; } if(SB.SPORT_ORDER.indexOf(id) < 0) return; /* 📡 lk-1b ?mode=ljoin */ SET.sport = id; savePrefs(); markSports(); const b = document.querySelector('#sport-list .sport.on'); if(b && b.scrollIntoView) b.scrollIntoView({block: 'nearest'});
+  if(id === 'cup'){ openCup(); return; } if(id === 'ljoin'){ lkOpenJoin(); return; } if(id === 'lhost'){ lkHostPick(); return; } if(SB.SPORT_ORDER.indexOf(id) < 0) return; /* 📡 lk-1b ?mode=ljoin */ SET.sport = id; savePrefs(); markSports(); const b = document.querySelector('#sport-list .sport.on'); if(b && b.scrollIntoView) b.scrollIntoView({block: 'nearest'});
 }
 function msNow(){ return SET.sport; }
 function msWrap(fn, idOf){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ try{ const id = idOf.apply(this, arguments); if(id && UI.modeTried) UI.modeTried(S.player || CURRENT_PLAYER, MS_GAME, id); }catch(e){} return f.apply(this, arguments); }; }
@@ -2849,4 +2888,4 @@ msAfter('choosePlayer', () => { if(LK.urlDone) return; LK.urlDone = true;   // �
 </script>
 </body>
 </html>
-<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+p1d+lk-1b) END OF SlaBrall.html -->
+<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+lk-1b+p1d+lk-1c) END OF SlaBrall.html -->

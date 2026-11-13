@@ -666,6 +666,7 @@ const MODES_ = [
   { game: 'sla-brall', id: 'slabam', icon: '🏸', name: 'SlaBam', pitch: 'Badminton — fast hit, slow drop!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaBam ·', feat: [['sla-brall', 'win_slabam']] }, added: '2026-11-10' },
   { game: 'sla-brall', id: 'slawall', icon: '🧱', name: 'SlaWall', pitch: 'Squash room — bounce off ANY wall!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaWall ·', feat: [['sla-brall', 'win_slawall']] } },
   { game: 'sla-brall', id: 'cup', icon: '🏆', name: 'Tournament', pitch: 'Win the trophy in a cup!', route: 'slabrall', tried: { feat: [['sla-brall', 'cupMatches'], ['sla-brall', 'cups']] } },
+  { game: 'sla-brall', id: 'lhost', icon: '📡', name: 'Host a game', pitch: 'Friends join on their own device!', route: 'slabrall', added: '2026-11-13' },   // 📡 lk-1c
   { game: 'sla-brall', id: 'ljoin', icon: '🔗', name: 'Join friends', pitch: 'Play on your own device!', route: 'slabrall', added: '2026-11-13' },   // 📡 p3a (lk-1b asked)
   { game: 'turbo', id: 'ghost', icon: '👻', name: 'Ghost race', pitch: 'Race the family\'s best rides!', route: 'turbo', tried: null },
   { game: 'turbo', id: 'duo', icon: '👥', name: '2-player race', pitch: 'Race a friend, split screen!', route: 'turbo', tried: null },
@@ -699,7 +700,7 @@ const MODE_GROUPS_ = {
   'alignext': [{k: 'drop', icon: '🔴', en: 'Drop', th: 'หยอดเหรียญ', modes: ['drop']}, {k: 'omni', icon: '❌⭕', en: 'Omnifile', th: 'วางได้ทุกช่อง', modes: ['omni', 'stack']}],
   'beat-corner': [{k: 'songs', icon: '🎤', en: 'Songs', th: 'เพลง', modes: ['corner']}, {k: 'inst', icon: '🎹', en: 'Instruments', th: 'เครื่องดนตรี', modes: ['piano', 'drums']}, {k: 'together', icon: '🎸', en: 'Together', th: 'เล่นด้วยกัน', modes: ['band']}, {k: 'make', icon: '✏️', en: 'Make', th: 'แต่งเพลง', modes: ['maker']}],
   'eyes-brain': [{k: 'remember', icon: '🔢', en: 'Ways to remember', th: 'วิธีจำ', modes: ['classic', 'backwards', 'colour', 'letters', 'listen', 'word', 'shapes']}, {k: 'challenge', icon: '🏔️', en: 'Challenge', th: 'ท้าทาย', modes: ['challenge', 'daily']}, {k: 'party', icon: '👥', en: 'Party', th: 'เล่นกันหลายคน', modes: ['chain']}],
-  'sla-brall': [{k: 'sports', icon: '🏓', en: 'Sports', th: 'กีฬา', modes: ['slashot', 'slapoof', 'slaball', 'slapong', 'slabam', 'slawall']}, {k: 'cup', icon: '🏆', en: 'Cup', th: 'ทัวร์นาเมนต์', modes: ['cup']}, {k: 'link', icon: '📡', en: 'Own devices', th: 'เล่นหลายเครื่อง', modes: ['ljoin']}],   // 📡 p3a: lk-1b's 🔗 Join friends
+  'sla-brall': [{k: 'sports', icon: '🏓', en: 'Sports', th: 'กีฬา', modes: ['slashot', 'slapoof', 'slaball', 'slapong', 'slabam', 'slawall']}, {k: 'cup', icon: '🏆', en: 'Cup', th: 'ทัวร์นาเมนต์', modes: ['cup']}, {k: 'link', icon: '📡', en: 'Own devices', th: 'เล่นหลายเครื่อง', modes: ['lhost', 'ljoin']}],   // 📡 p3a: lk-1b's 🔗 Join friends
   'brawl-buddies': [{k: 'battle', icon: '🥊', en: 'Battle', th: 'ต่อสู้', modes: ['battle']}, {k: 'adv', icon: '🗺️', en: 'Brawenture', th: 'ผจญภัย', modes: ['brawenture']}],
   'georead': [{k: 'sounds', icon: '🔊', en: 'Sounds', th: 'เสียง', modes: ['phonics', 'rhyme', 'say']}, {k: 'words', icon: '🧱', en: 'Words', th: 'คำ', modes: ['build', 'sight', 'case', 'trace']}, {k: 'reading', icon: '📖', en: 'Reading', th: 'อ่าน', modes: ['story', 'types']}, {k: 'journey', icon: '🗺️', en: 'Journey', th: 'ผจญภัย', modes: ['journey']}],
   'pose-party': [{k: 'pose', icon: '🎯', en: 'Pose', th: 'ท่าโพส', modes: ['classic', 'speed', 'copy']}, {k: 'move', icon: '💃', en: 'Move', th: 'ขยับตัว', modes: ['dance', 'statue', 'freeze']}, {k: 'together', icon: '🧑‍🤝‍🧑', en: 'Together', th: 'เล่นด้วยกัน', modes: ['group', 'mirror', 'letters']}, {k: 'calm', icon: '🧘', en: 'Calm', th: 'ยืดเหยียด', modes: ['yoga']}]
@@ -4341,7 +4342,7 @@ function saveWordJournal(name, words) {
   saveSetting(key, JSON.stringify(list.slice(0, 300)));
   return { ok: true, count: Math.min(300, list.length) };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
