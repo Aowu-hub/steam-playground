@@ -788,6 +788,17 @@ var SB = (function () {
     }
     return !!(p.queued && M.t - p.queuedT < 0.55);
   }
+  // dv-1: does the ball come into your reach by itself in the next moment (its path + where you're moving)? Then no dive — just wait and hit it.
+  function willReach(M, p, b, R) {
+    var pp = paddlePos(M, p), drag = M.sp.drag || 0, x = b.x, y = b.y, z = b.z, vx = b.vx, vy = b.vy, vz = b.vz, h = 1 / 60;
+    for (var t = h; t <= 0.45; t += h) {
+      if (drag) { var k = Math.exp(-drag * Math.sqrt(vx * vx + vy * vy + vz * vz) * h * 0.25); vx *= k; vy *= k; vz *= k; }
+      vz -= G * h; x += vx * h; y += vy * h; z += vz * h; if (z < 0) { if (M.sp.noBounce) return false; z = -z * 0.5; vz = -vz * 0.6; }
+      var px = pp.x + (p.vx || 0) * t * 0.8, py = pp.y + (p.vy || 0) * t * 0.8, ex = x - px, ey = y - py, bx = x - p.x, by = y - p.y;
+      if (z <= 2.5 && (ex * ex + ey * ey <= R * R || bx * bx + by * by <= R * R * 1.1)) return true;
+    }
+    return false;
+  }
   function jumpFail(M, p, perfect) { return (0.1 + 0.03 * M.level) * (perfect ? 0.45 : 1); }
   function hitBall(M, p, b, perfectWindow) {
     if (M.sp.squash) return hitSquash(M, p, b);
@@ -1159,7 +1170,12 @@ var SB = (function () {
         if (sp.kind === 'puck' || d2 > R * R * 1.15 || b.z > 3.9 || !b.real || !wantJump(M, p, b, 'v')) return;
         jump = 'v';
       } else if (d2 > R * R) {   // 🤸 just out of reach to the side
-        if (sp.kind === 'puck' || sp.table || d2 > R * R * 4.4 || b.z > 1.8 || b.z < 0.08 || !b.real || !wantJump(M, p, b, 'h')) return;
+        if (sp.kind === 'puck' || sp.table || d2 > R * R * 4.4 || b.z > 1.8 || b.z < 0.08 || !b.real) return;
+        var bdx = b.x - p.x, bdy = b.y - p.y;
+        if (bdx * bdx + bdy * bdy <= R * R * 1.3) return;   // dv-1 close to your body (over your head / at your feet) = no dive
+        if (p.human && !p.auto && p.queued === 'smash') return;   // dv-1 💥 Smash never dives
+        if (willReach(M, p, b, R)) return;   // dv-1 it's still coming to you — wait
+        if (!wantJump(M, p, b, 'h')) return;
         jump = 'h';
       }
       // robot sometimes misses (by level)
@@ -2948,4 +2964,4 @@ msAfter('choosePlayer', () => { if(LK.urlDone) return; LK.urlDone = true;   // �
 </script>
 </body>
 </html>
-<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+lk-1b+p1d+lk-1c+cs-1+lk-2e) END OF SlaBrall.html -->
+<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+lk-1b+p1d+lk-1c+cs-1+lk-2e+dv-1) END OF SlaBrall.html -->
