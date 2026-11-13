@@ -97,7 +97,6 @@
   .rules{background:var(--card);border-radius:18px;padding:8px 14px;margin-top:16px;}
   .rules summary{cursor:pointer;font-family:'Fredoka',sans-serif;font-weight:700;padding:6px 0;min-height:34px;}
   .rules li{margin:5px 0;font-size:0.9rem;}
-  .btn{font-family:'Fredoka',sans-serif;font-weight:600;font-size:0.95rem;border:none;border-radius:14px;cursor:pointer;padding:11px 16px;min-height:42px;color:#fff;background:linear-gradient(135deg,#14B8A6,#3F7BFF);box-shadow:0 4px 0 rgba(0,0,0,0.12);}
   .btn:active{transform:translateY(3px);} .btn.soft{background:var(--panel);color:var(--ink);}
   .empty{text-align:center;color:var(--ink-soft);font-weight:800;padding:20px;}
   .nsk-chip img{border-radius:6px;}
@@ -108,7 +107,6 @@
   /* ---------- play ---------- */
   #scr-play{position:fixed;inset:0;display:flex;flex-direction:column;background:#0B1830;color:#fff;
     padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);overflow:hidden;}
-  .hud{flex:0 0 auto;display:flex;flex-wrap:nowrap;align-items:center;gap:6px;padding:6px 8px;background:linear-gradient(90deg,#0F5E66,#1E2A5A);min-height:48px;}
   .pill{flex:0 0 auto;border:none;border-radius:12px;background:rgba(255,255,255,0.15);color:#fff;font-weight:800;font-size:0.82rem;padding:6px 9px;min-height:36px;min-width:36px;
     display:inline-flex;align-items:center;justify-content:center;gap:4px;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:default;}
   button.pill{cursor:pointer;}
@@ -175,6 +173,7 @@
   .result-card .big{font-size:3rem;line-height:1;} .result-card h2{margin:6px 0;}
   .result-card .score-big{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1.6rem;margin:4px 0;}
   .result-card .stats{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0;} .result-card .stats span{background:var(--panel);border-radius:10px;padding:3px 9px;font-weight:800;font-size:0.82rem;}
+  .res-btns > #b-menu, .res-btns > #tg-x, .res-btns > #btn-levels, .res-btns > #btn-hc-levels{order:-1;} .res-btns > #b-next, .res-btns > #btn-next{order:2;}   /* 🔘 p1c: exit left, main action right */
   .res-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px;}
   .save-note{font-size:0.82rem;font-weight:800;color:var(--ink-soft);min-height:20px;margin-top:6px;}
   .title-new,.feat-new,.new-badge{color:#0B7A6E;font-weight:900;}
@@ -190,7 +189,7 @@
 <script src="inc/NumberSkins.js"></script>
 </head>
 <body ontouchstart="">
-<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button>
+<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
 
 <section class="screen hidden" id="scr-player">
   <div class="title"><canvas class="logo" id="logo1" width="192" height="128"></canvas><h1>GeoScout</h1><div class="sub2">Geometric · Scale · Count</div><p>Who's playing?</p></div>
@@ -790,9 +789,13 @@ const SND = {
 function toggleSound(){ const on = !UISound.get().enabled; UISound.set(on); $('h-snd').textContent = on ? '🔊' : '🔇'; }
 
 /* ================= MENUS ================= */
+// 🎛️ p1d: the game's own top bar becomes the shared bar in place (UiKit UI.gameBarFrom) — ◀ where you came from · 🎚️ Levels · 🏠 | numbers | buttons ❓
+const BAR = UI.gameBarFrom(document.querySelector('#scr-play .hud'), {game: GAME_ID, icon: '🔢', name: 'GeoScout', playing: () => !!(G && G.phase !== 'over'), onFit: () => window.dispatchEvent(new Event('resize'))});
+var NAV_INNER = {};   // 🧭 inner screens: their top button names + goes to the main screen
+UI.navBar(document.getElementById('back-btn'), {onclick: false});
 function showScreen(name){
   ['player', 'menu', 'play'].forEach(s => { const el = $('scr-' + s); if(el) el.classList.toggle('hidden', s !== name); });
-  $('back-btn').classList.toggle('hidden', name === 'play'); if(name !== 'play') window.scrollTo(0, 0);
+  $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   /* 🧭 p1d */ if(name !== 'play') window.scrollTo(0, 0);
   if(name !== 'play') stopLoop(); drawLogos();
 }
 function drawLogos(){ ['logo1', 'logo2'].forEach(id => { const c = $(id); if(!c || c.offsetParent === null) return; const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); const u = 26;
@@ -870,7 +873,7 @@ function howLines(mode){
     '🔷 A shape weighs as many blocks as it has corners: 🔺 3 · ⬛ 4 · ⬟ 5 · ⬢ 6.', '🧑 Round 3: you sit on the scale — find out how many blocks you weigh!', '⭐⭐⭐ = balanced in the fewest moves, or the right answer first time.', '⌨️ &lt; = &gt; keys answer · ← → pick a block · Enter puts it on the pan · Backspace takes it back.'];
 }
 function renderHow(){ $('how-list').innerHTML = howLines(SET.mode).map(l => '<li>' + l + '</li>').join('') + '<li>💀 Hardcore: numbers up to 1000, a 4-minute clock, one mistake ends the game, ×5 points.</li>'; }
-function openHowSheet(){ openSheet('<h3>❓ How to play — ' + modeLabel(G ? G.M.mode : SET.mode) + '</h3><ul>' + howLines(G ? G.M.mode : SET.mode).map(l => '<li>' + l + '</li>').join('') + '</ul><div class="res-btns"><button class="btn" data-sound="pop" onclick="closeSheet()">👍 Got it</button></div>'); }
+function openHowSheet(){ openSheet('<h3>❓ How to play — ' + modeLabel(G ? G.M.mode : SET.mode) + '</h3><ul>' + howLines(G ? G.M.mode : SET.mode).map(l => '<li>' + l + '</li>').join('') + '</ul><div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="pop" onclick="closeSheet()">👍 Got it</button></div>'); }
 function openSheet(html){ $('sheet-card').innerHTML = html; $('sheet').classList.remove('hidden'); }
 function closeSheet(){ $('sheet').classList.add('hidden'); }
 
@@ -1061,7 +1064,7 @@ async function endGame(timeUp){
     '<div class="stats"><span>' + modeLabel(M.mode) + '</span><span>✅ ' + L.filter(x => x.q === 1).length + ' / ' + M.total + ' perfect</span>' + (M.stats.snaps ? '<span>🧲 ' + M.stats.snaps + ' snaps</span>' : '') + (M.stats.balances ? '<span>⚖️ ' + M.stats.balances + ' balanced</span>' : '') + (M.stats.avatarWeighs ? '<span>🧑 ' + UI.esc(S.player) + ' = ' + GS.avatarWeight(S.player, lvl) + ' blocks</span>' : '') + '<span>⏱️ ' + fmtS(timeSec) + '</span></div>' +
     (res.cleared ? '' : '<div class="save-note">💡 ' + ({scale: 'Count each pan slowly — say the numbers out loud.', count: 'Look for two numbers that make the target together.', shape: 'Fill rows of the same length — a rectangle has straight sides.', tens: 'Use the big blocks first: hundreds, then tens, then ones.', next: 'Say how much it changes each time: +2, +2, +2 …', frac: 'Cut the bar into equal teams first.', wobble: 'Use the biggest blocks first, then fix the top.'}[M.mode] || '') + '</div>') +
     '<div class="save-note" id="save-note">💾 Saving…</div>' +
-    '<div class="res-btns"><button class="btn" data-sound="pop" onclick="startGame()">🔁 Again</button><button class="btn soft" data-sound="none" onclick="backToMenu()">◀ Back</button><button class="btn soft" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button></div>');
+    '<div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="pop" onclick="startGame()">🔁 Again</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="backToMenu()">🎚️ Levels</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button></div>');
   if(res.cleared) ls('sp_geoscout_won:' + S.player, Math.max(unlockedOf(S.player), lvl + 1));
   saveRun(S.player, lvl, {timeSec, stars: res.stars, theme: themeTxt, score: M.score, cleared: res.cleared, stats: statsFor(M)});
 }
@@ -1095,7 +1098,7 @@ function leavePlay(){
 function pauseGame(){}
 function backToMenu(){ stopLoop(); stopTimer(); $('say').classList.add('hidden'); G = null; GID++; hideResult(); closeSheet(); renderMenu(); showScreen('menu'); }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
-function goGameroom(){ UI.go(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
+function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
 window.feedbackContext = () => ({page: 'GeoScout', game: GAME_ID, level: G ? G.M.level : SET.level, mode: G ? G.M.mode : SET.mode});
 
 /* ================= CANVAS ================= */
@@ -1427,7 +1430,7 @@ function battleEnd(){
   const B = G.battle.B, w = B.winner; G.phase = 'over'; UISound.play('success'); confetti(true);
   showResult('<div class="big">⚔️</div><h2>' + (w < 0 ? 'A draw — great battle!' : UI.esc(B.names[w]) + ' wins the battle!') + '</h2><div class="score-big">' + B.wins[0] + ' : ' + B.wins[1] + '</div>' +
     '<div class="stats">' + B.log.map((l, i) => '<span>' + (l.rule === 'high' ? '⬆️' : l.rule === 'low' ? '⬇️' : '🎯' + l.target) + ' ' + l.v[0] + ' vs ' + l.v[1] + (l.w < 0 ? ' 🤝' : l.w === 0 ? ' ⭐' : ' ☆') + '</span>').join('') + '</div>' +
-    '<div class="save-note" id="save-note">💾 Saving…</div><div class="res-btns"><button class="btn" data-sound="pop" onclick="startBattle()">🔁 Again</button><button class="btn soft" data-sound="none" onclick="backToMenu()">◀ Back</button><button class="btn soft" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button></div>');
+    '<div class="save-note" id="save-note">💾 Saving…</div><div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="pop" onclick="startBattle()">🔁 Again</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="backToMenu()">🎚️ Levels</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button></div>');
   const notes = []; [0, 1].forEach(s => { if(s === 1 && B.robot) return; const nm = B.names[s], st = {games: 1, battles: 1, battleWins: w === s ? 1 : 0, bestStreak: 0};
     google.script.run.withSuccessHandler(res => { notes[s] = UI.esc(nm) + ': ' + featText(res, '✅ Saved'); putNote(notes.filter(Boolean).join('<br>')); }).withFailureHandler(() => { writePending(readPending().concat([{name: nm, feats: true, stats: st}])); notes[s] = UI.esc(nm) + ': ⚠️ will be sent next time'; putNote(notes.filter(Boolean).join('<br>')); }).saveFeats(nm, GAME_ID, st); });
 }
@@ -1501,8 +1504,8 @@ function jEnd(){
   showResult('<div class="big">' + T.icon + '</div><h2>Chapter ' + ch.id + ' complete!</h2><div class="score-big">📖 ' + UI.esc(ch.title) + '</div>' +
     '<div class="stats"><span>🏅 Sticker: ' + T.icon + ' ' + ch.op + '</span><span>🧑 friends met: ' + Object.values(J.counts || {}).filter((v, i, a) => a.indexOf(v) === i).map(n => UI.esc(GS.charName(n))).join(', ') + '</span></div>' +
     (newSkin ? '<div class="nsk-new" id="nsk-new"><img alt="" src="' + NumberSkins.previewUrl(newSkin, 56) + '"><span>🎨 New number look: <b>' + UI.esc(NumberSkins.SKINS[newSkin].name) + '</b> — on in 🔢 GeoScout AND ➗ Algebros!</span></div>' : '') +
-    '<div class="save-note" id="save-note">💾 Saving…</div><div class="res-btns">' + (next ? '<button class="btn" data-sound="pop" onclick="startJourney(' + next.id + ')">▶ Chapter ' + next.id + '</button>' : '<button class="btn" data-sound="pop" onclick="startJourney(1)">🔁 Play again</button>') +
-    '<button class="btn soft" data-sound="none" onclick="backToMenu()">◀ Back</button><button class="btn soft" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button></div>');
+    '<div class="save-note" id="save-note">💾 Saving…</div><div class="res-btns">' + (next ? '<button class="btn sp-btn sp-primary" data-sound="pop" onclick="startJourney(' + next.id + ')">▶ Chapter ' + next.id + '</button>' : '<button class="btn sp-btn sp-primary" data-sound="pop" onclick="startJourney(1)">🔁 Play again</button>') +
+    '<button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="backToMenu()">🎚️ Levels</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button></div>');
   google.script.run.withSuccessHandler(res => { putNote((res.first ? '🎁 +' + res.miles + ' Adventure miles!' : '✅ Saved') + featText(res.feats, '')); })
     .withFailureHandler(() => putNote('⚠️ Could not save yet — play the chapter again later to collect the miles.')).geoJourneyDone(name, ch.id);
 }
@@ -1638,4 +1641,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (gs-4) END OF GeoScout.html -->
+<!-- (gs-4+p1d) END OF GeoScout.html -->

@@ -119,7 +119,6 @@
   /* ---------- PLAY SCREEN ---------- */
   #scr-play{position:fixed;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:8px;
     padding:calc(8px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) var(--safe-b, 18px) calc(10px + env(safe-area-inset-left));background:var(--bg);}
-  .hud{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;justify-content:center;min-width:0;}
   .pill{background:var(--card);border-radius:14px;padding:7px 11px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.9rem;font-variant-numeric:tabular-nums;
     box-shadow:0 3px 0 rgba(0,0,0,0.06);display:inline-flex;align-items:center;gap:5px;white-space:nowrap;border:none;color:var(--ink);flex:none;}
   button.pill{cursor:pointer;} button.pill:active{transform:translateY(2px);}
@@ -210,6 +209,7 @@
   .feat-new{background:#FFF3C4;color:#6B4A00;border-radius:12px;padding:4px 10px;font-weight:800;font-size:0.8rem;}
   .title-new{background:linear-gradient(135deg,#7B5CFA,#FF4D8D);color:#fff;border-radius:12px;padding:6px 12px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.95rem;box-shadow:0 0 18px rgba(255,77,141,0.5);}
   .save-note{font-size:0.78rem;font-weight:700;color:var(--ink-soft);min-height:18px;}
+  .res-btns > #b-menu, .res-btns > #tg-x, .res-btns > #btn-levels, .res-btns > #btn-hc-levels{order:-1;} .res-btns > #b-next, .res-btns > #btn-next{order:2;}   /* 🔘 p1c: exit left, main action right */
   .res-btns{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:4px;}
   .btn{font-family:'Fredoka',sans-serif;font-weight:600;font-size:0.95rem;border:none;border-radius:14px;cursor:pointer;
     padding:11px 16px;color:#fff;background:linear-gradient(135deg,var(--red),var(--plum));box-shadow:0 4px 0 rgba(0,0,0,0.12);}
@@ -228,7 +228,7 @@
 </head>
 <body ontouchstart="">
 
-<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button>
+<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
 
 <section class="screen hidden" id="scr-player">
   <div class="title"><div class="logo">🔴</div><h1>Alignext</h1><p>Who's playing?</p></div>
@@ -268,13 +268,12 @@
   <div class="pick-grid" id="friend-list"></div>
   <div class="section-head" id="size-head">📐 Board</div>
   <div class="chips" id="size-chips"></div>
-  <div class="start-row"><button class="btn soft" data-sound="pop" onclick="showScreen('menu')">◀ Back</button><button class="btn" id="fr-go" data-sound="pop" onclick="friendsGo()">Next ▶</button></div>
+  <div class="start-row"><button class="btn sp-btn sp-primary" id="fr-go" data-sound="pop" onclick="friendsGo()">Next ▶</button></div>
 </section>
 
 <section class="screen hidden" id="scr-theme">
   <div class="title"><div class="logo" id="th-logo">🎨</div><h1 id="th-title">Pick a world</h1><p id="th-sub">Every world plays the same</p></div>
   <div class="themes" id="theme-list"></div>
-  <div style="text-align:center;margin-top:18px;"><button class="btn soft" onclick="showScreen('menu')">◀ Back</button></div>
 </section>
 
 <section class="hidden" id="scr-play">
@@ -774,9 +773,13 @@ function lsGet(k, d){ try{ const v = localStorage.getItem(pkey(k)); return v == 
 function lsSet(k, v){ try{ localStorage.setItem(pkey(k), String(v)); }catch(e){} }
 
 /* ================= MENUS ================= */
+// 🎛️ p1d: the game's own top bar becomes the shared bar in place (UiKit UI.gameBarFrom) — ◀ where you came from · 🎚️ Levels · 🏠 | numbers | buttons ❓
+const BAR = UI.gameBarFrom(document.querySelector('#scr-play .hud'), {game: 'alignext', icon: '🔴', name: 'Alignext', playing: () => !!(G && !G.over), onFit: () => window.dispatchEvent(new Event('resize'))});
+var NAV_INNER = {friends: ['◀ Alignext', () => showScreen('menu')], theme: ['◀ Alignext', () => showScreen('menu')]};   // 🧭 inner screens: their top button names + goes to the main screen
+UI.navBar(document.getElementById('back-btn'), {onclick: false});
 function showScreen(name){
   ['player', 'menu', 'friends', 'theme', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
-  $('back-btn').classList.toggle('hidden', name === 'play');
+  $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   /* 🧭 p1d */
   if(name === 'play') requestAnimationFrame(() => { layout(); loop(); }); else cancelLoop();
   window.scrollTo(0, 0);
 }
@@ -1202,7 +1205,7 @@ function showSeriesCard(g0, winners){
   if(G !== g0) return;
   const who = winners.length === 1 ? G.seats[winners[0]].name : '';
   showResult('<div class="big">' + (who ? '🏁' : '🤝') + '</div><h2 class="cheer">' + (who ? UI.esc(who) + ' takes game ' + G.series.game + '!' : 'A draw!') + '</h2>' + seriesLine(G.series) +
-    '<div class="res-btns"><button class="btn" id="b-next">Next game ▶</button><button class="btn soft" id="b-menu">Menu</button></div>');
+    '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-next">Next game ▶</button><button class="btn soft sp-btn sp-secondary" id="b-menu">Menu</button></div>');
   $('b-next').onclick = nextOfSeries; $('b-menu').onclick = toMenu;
 }
 function toMenu(){ hideResult(); G = null; clearInterval(tickHandle); stopClock(); renderMenu(); showScreen('menu'); }
@@ -1215,7 +1218,7 @@ function showWinCard(g0, stars, score, secs, bySeries){
     '<div class="score-big">🏆 <span id="score-count">0</span></div>' +
     '<div class="stats"><span>⏱ ' + fmt(secs * 1000) + '</span><span>' + (G.mode === 'drop' ? '🔴' : '❌') + ' ' + G.myMoves + ' moves</span>' + (G.seats[0].lines ? '<span>〰️ ' + G.seats[0].lines + ' lines of 3</span>' : '') + (G.undoUsed ? '<span>↩️ undo used</span>' : '') + (G.timeouts ? '<span>⏰ ' + G.timeouts + ' time-outs</span>' : '') + '</div>' +
     '<div class="save-note" id="save-note"><span class="ui-spin a-plop">🔴</span> Saving your progress…</div>' +
-    '<div class="res-btns">' + (lvl < 5 ? '<button class="btn" id="b-next">' + (lvl === 4 ? 'Try 💀 Hardcore ▶' : 'Next level ▶') + '</button>' : '') + '<button class="btn soft" id="b-again">🔁 Again</button><button class="btn soft" id="b-menu">◀ Back</button></div>');
+    '<div class="res-btns">' + (lvl < 5 ? '<button class="btn sp-btn sp-primary" id="b-next">' + (lvl === 4 ? 'Try 💀 Hardcore ▶' : 'Next level ▶') + '</button>' : '') + '<button class="btn soft sp-btn sp-secondary" id="b-again">🔁 Again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🎚️ Levels</button></div>');
   countUp($('score-count'), score, 900);
   $('b-again').onclick = () => startGame(Object.assign({}, G.opts, {series: null}));
   $('b-menu').onclick = toMenu;
@@ -1231,7 +1234,7 @@ function showLoseCard(g0, winners, why, series){
   showResult('<div class="big">' + (lost ? '🤖' : '🤝') + '</div><h2>' + (lost ? 'Good game!' : 'It\'s a draw!') + '</h2>' +
     '<p>' + (why === 'resign' ? 'You gave up this one.' : lost ? '🤖 Robo lined them up first this time.' : (G.mode === 'drop' ? 'The stand is full — nobody made a line.' : 'The board is full — nobody made a line.')) + (series ? ' Robo won the best of 3.' : '') + '</p>' + seriesLine(G.series) +
     '<div class="tip" style="text-align:left">💡 ' + pick(TIPS[G.mode]) + '</div>' +
-    '<div class="res-btns"><button class="btn" id="b-again">🔁 Try again</button><button class="btn soft" id="b-menu">◀ Back</button></div>');
+    '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Try again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🎚️ Levels</button></div>');
   $('b-again').onclick = () => startGame(Object.assign({}, G.opts, {series: null}));
   $('b-menu').onclick = toMenu;
 }
@@ -1243,7 +1246,7 @@ function showFamilyCard(g0, winners, why, seriesDone, seriesWinner){
   const sub = why === 'full' && G.seats.length > 2 ? 'Full stand — the most lines of 3 wins: ' + G.seats.map(s => UI.esc(s.name) + ' ' + s.lines).join(' · ') : why === 'resign' ? 'Somebody gave up.' : why === 'full' ? 'Full board — no line this time.' : '';
   showResult('<div class="big">' + (names.length ? '🏆' : '🤝') + '</div><h2 class="cheer">' + head + '</h2>' + (sub ? '<p>' + sub + '</p>' : '') + seriesLine(G.series) +
     '<div class="stats"><span>⏱ ' + fmt(G.finishMs) + '</span>' + G.seats.map(s => '<span style="border:2px solid ' + s.col + '">' + UI.esc(s.name) + ' 〰️ ' + s.lines + '</span>').join('') + '</div>' +
-    '<div class="res-btns">' + (G.series.on && !seriesDone ? '<button class="btn" id="b-next">Next game ▶</button>' : '<button class="btn" id="b-again">🔁 Play again</button>') + '<button class="btn soft" id="b-menu">Menu</button></div>');
+    '<div class="res-btns">' + (G.series.on && !seriesDone ? '<button class="btn sp-btn sp-primary" id="b-next">Next game ▶</button>' : '<button class="btn sp-btn sp-primary" id="b-again">🔁 Play again</button>') + '<button class="btn soft sp-btn sp-secondary" id="b-menu">Menu</button></div>');
   if($('b-next')) $('b-next').onclick = nextOfSeries;
   if($('b-again')) $('b-again').onclick = () => startGame(Object.assign({}, G.opts, {series: null}));
   $('b-menu').onclick = toMenu;
@@ -1895,7 +1898,7 @@ function showBanner(text, kind){
   clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('on'), kind ? 2600 : 2200);
 }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
-function goGameroom(){ UI.go(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
+function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
 window.feedbackContext = () => ({page: 'alignext', game: G ? GAME[G.mode] : GAME[mode], level: G && G.lvl != null ? G.lvl : ''});
 
 /* ================= BOOT ================= */
@@ -1934,4 +1937,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11x-5+back-1+modes-3+mg-1) END OF Alignext.html -->
+<!-- (11x-5+back-1+modes-3+mg-1+p1d) END OF Alignext.html -->

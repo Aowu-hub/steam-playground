@@ -80,7 +80,6 @@
   /* ---------- GAME SHELL ---------- */
   #scr-game{position:fixed;inset:0;display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:8px;
     padding:calc(8px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) var(--safe-b, 18px) calc(10px + env(safe-area-inset-left));}
-  .hud{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;}
   .pill{background:var(--card);border-radius:14px;padding:7px 12px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.92rem;box-shadow:0 3px 0 rgba(0,0,0,0.06);
     display:inline-flex;align-items:center;gap:6px;white-space:nowrap;border:none;}
   button.pill{cursor:pointer;} button.pill:active{transform:translateY(2px);}
@@ -204,6 +203,7 @@
   .score-big{font-family:'Fredoka',sans-serif;font-weight:700;font-size:2rem;color:var(--plum);}
   .save-note{font-size:0.78rem;font-weight:700;color:var(--ink-soft);min-height:18px;}
   .new-badge{background:linear-gradient(135deg,var(--sun),var(--coral));color:#fff;border-radius:14px;padding:8px 14px;font-family:'Fredoka',sans-serif;font-weight:700;}
+  .res-btns > #b-menu, .res-btns > #tg-x, .res-btns > #btn-levels, .res-btns > #btn-hc-levels{order:-1;} .res-btns > #b-next, .res-btns > #btn-next{order:2;}   /* 🔘 p1c: exit left, main action right */
   .res-btns{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
   .btn{font-family:'Fredoka',sans-serif;font-weight:600;font-size:0.95rem;border:none;border-radius:14px;cursor:pointer;padding:11px 16px;color:#fff;
     background:linear-gradient(135deg,var(--c1,#7B5FE0),var(--c2,#FF6F5E));box-shadow:0 4px 0 rgba(0,0,0,0.12);}
@@ -218,7 +218,7 @@
 </head>
 <body ontouchstart="">
 
-<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button>
+<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
 
 <section class="screen hidden" id="scr-player">
   <div class="title"><div class="logo">🕹️</div><h1>Mini Games</h1><p>Who's playing?</p></div>
@@ -238,14 +238,13 @@
   <div class="title"><div class="logo" id="st-logo">🎨</div><h1 id="st-title">Color Match</h1><p>Pick a level to play</p>
     <div class="who">👤 <span id="st-who"></span></div></div>
   <div class="stages" id="stage-list"></div>
-  <div style="text-align:center;margin-top:16px"><button class="btn soft" data-sound="pop" onclick="toHub()">◀ All mini games</button></div>
 </section>
 
 <section class="hidden" id="scr-game">
   <div class="hud">
     <button class="pill" data-sound="pop" onclick="toStages()" title="Pick a level">◀</button>
     <span class="pill game-pill" id="g-name"></span>
-    <button class="pill" id="g-stage" data-sound="pop" onclick="toggleStageMenu()"></button>
+    <button class="pill" id="g-stage" data-gb="slot" data-sound="pop" onclick="toggleStageMenu()"></button>
     <span class="pill hidden" id="g-left"></span>
   </div>
   <div id="g-progress"></div>
@@ -344,9 +343,13 @@ const STAGES = {
 function badgeFor(id, stage){ return GAMES[id].name + ': ' + STAGES[id][stage].name.replace(/!$/, '') + ' Badge'; }
 
 /* ================= MENUS ================= */
+// 🎛️ p1d: the game's own top bar becomes the shared bar in place (UiKit UI.gameBarFrom) — ◀ where you came from · 🎚️ Levels · 🏠 | numbers | buttons ❓
+const BAR = UI.gameBarFrom(document.querySelector('#scr-game .hud'), {game: 'minigames', icon: '🕹️', name: 'Mini Games', playing: () => !!(M && !M.over), onFit: () => window.dispatchEvent(new Event('resize')), help: () => { const h = UI.gameHelp && M && UI.gameHelp(M.id); if(h) UI.guide([h]); }});
+var NAV_INNER = {stages: ['◀ Mini Games', () => toHub()]};   // 🧭 inner screens: their top button names + goes to the main screen
+UI.navBar(document.getElementById('back-btn'), {onclick: false});
 function showScreen(name){
   ['player', 'hub', 'stages', 'game'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
-  $('back-btn').classList.toggle('hidden', name === 'game');
+  $('back-btn').classList.toggle('hidden', name === 'game'); UI.navScreen($('back-btn'), name, NAV_INNER);   /* 🧭 p1d */
   window.scrollTo(0, 0);
 }
 function progressOf(id){ const p = S.progress[S.player] || {}; return p[id] || {unlocked: 0, tokens: []}; }
@@ -396,7 +399,7 @@ function showStages(id){
 }
 function toStages(){ const id = M ? M.id : showStages.id; if(id) showStages(id); else toHub(); }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
-function goGameroom(){ UI.go(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
+function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
 function goBigRobot(){ UI.go(WEBAPP_URL + '?page=robot' + sessionQuery(), 'robot-adventure', 'Opening Code the Robot'); }
 
 /* ================= GAME SHELL ================= */
@@ -517,8 +520,8 @@ function stageCleared(){
     starHtml(stars) + '<div class="score-big">🏆 ' + score.toLocaleString() + '</div>' +
     statRow([['⏱️', secs + 's'], ['❌', M.mistakes], ['🔥', M.bestStreak || 0]]) +
     '<div class="save-note" id="save-note"><span class="ui-spin">✅</span> Saving…</div>' +
-    '<div class="res-btns">' + (nextOk ? '<button class="btn" id="b-next">Next stage ▶</button>' : '') +
-    '<button class="btn soft" id="b-again">🔁 Again</button><button class="btn soft" id="b-hub">◀ Back</button></div>',
+    '<div class="res-btns">' + (nextOk ? '<button class="btn sp-btn sp-primary" id="b-next">Next stage ▶</button>' : '') +
+    '<button class="btn soft sp-btn sp-secondary" id="b-again">🔁 Again</button><button class="btn soft sp-btn sp-secondary" id="b-hub">🎚️ Levels</button></div>',
     () => { if(nextOk) $('b-next').onclick = () => { hideCard(); openGame(id, stage + 1); }; $('b-again').onclick = () => { hideCard(); openGame(id, stage); }; $('b-hub').onclick = () => { hideCard(); showStages(id); }; }
   ), REDUCED ? 300 : 1300);
   save(id, stage, badgeFor(id, stage), {timeSec: secs, stars, score, levelName: st.name});
@@ -534,7 +537,7 @@ function speedOver(){
     starHtml(stars) + '<div class="score-big">🏆 ' + score.toLocaleString() + '</div>' +
     statRow([['⭐', n], ['❌', M.mistakes], ['🔥', M.bestStreak || 0]]) +
     '<div class="save-note" id="save-note"><span class="ui-spin">✅</span> Saving…</div>' +
-    '<div class="res-btns"><button class="btn" id="b-again">🔁 Play again</button><button class="btn soft" id="b-hub">◀ Back</button></div>',
+    '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" id="b-hub">🎚️ Levels</button></div>',
     () => { $('b-again').onclick = () => { hideCard(); openGame(id, stage); }; $('b-hub').onclick = () => { hideCard(); showStages(id); }; }
   ), REDUCED ? 300 : 1300);
   save(id, stage, n >= 10 ? GAMES[id].name + ': ' + st.name.replace(/!$/, '') + ' Star' : '', {timeSec: st.speed, stars, score, levelName: st.name, speed: true});
@@ -819,4 +822,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (r9+back-1) END OF steam-playground.html -->
+<!-- (r9+back-1+p1d) END OF steam-playground.html -->

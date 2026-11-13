@@ -84,7 +84,6 @@
   .ptable{width:100%;border-collapse:collapse;font-size:0.84rem;margin:6px 0 4px;}
   .ptable td,.ptable th{padding:5px 6px;border-top:1px solid var(--panel);text-align:left;vertical-align:top;}
   .ptable th{font-family:'Fredoka',sans-serif;font-weight:700;color:var(--ink-soft);}
-  .btn{font-family:'Fredoka',sans-serif;font-weight:600;font-size:0.95rem;border:none;border-radius:14px;cursor:pointer;padding:11px 16px;min-height:42px;color:#fff;background:linear-gradient(135deg,#2F8CFF,#FF4F8B);box-shadow:0 4px 0 rgba(0,0,0,0.12);}
   .btn:active{transform:translateY(3px);} .btn.soft{background:var(--panel);color:var(--ink);}
   /* setup */
   .setup{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:14px;}
@@ -140,7 +139,6 @@
   .fact.lock{background:var(--panel);border-color:#B8C6D6;color:var(--ink-soft);}
   /* ---------- play ---------- */
   #scr-play{position:fixed;inset:0;display:flex;flex-direction:column;background:#0B1A2B;color:#fff;}
-  .hud{display:flex;align-items:center;gap:6px;padding:calc(6px + env(safe-area-inset-top)) 8px 4px;position:relative;z-index:6;flex-wrap:nowrap;min-width:0;}
   .pill{background:rgba(255,255,255,0.12);border:none;color:#fff;border-radius:14px;padding:6px 10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.88rem;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;min-height:38px;}
   button.pill{cursor:pointer;min-width:38px;justify-content:center;} button.pill:active{transform:translateY(2px);}
   .hud .mid{flex:1 1 auto;display:flex;justify-content:center;align-items:center;gap:6px;min-width:0;}
@@ -197,6 +195,7 @@
   .stats{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;} .stats span{background:var(--panel);border-radius:10px;padding:4px 10px;font-weight:800;font-size:0.82rem;}
   .save-note{font-weight:800;font-size:0.85rem;color:var(--ink-soft);}
   .new-badge,.title-new,.feat-new{display:inline-block;background:linear-gradient(135deg,#FFC845,#FF9F1C);color:#3A2500;border-radius:10px;padding:4px 10px;font-weight:800;margin:2px;}
+  .res-btns > #b-menu, .res-btns > #tg-x, .res-btns > #btn-levels, .res-btns > #btn-hc-levels{order:-1;} .res-btns > #b-next, .res-btns > #btn-next{order:2;}   /* 🔘 p1c: exit left, main action right */
   .res-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
   .confetti{position:fixed;top:-40px;z-index:390;font-size:1.6rem;pointer-events:none;animation:fall linear forwards;}
   @keyframes fall{to{transform:translateY(110vh) rotate(540deg);}}
@@ -211,7 +210,7 @@
 
 </head>
 <body ontouchstart="">
-<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button>
+<button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
 
 <section class="screen hidden" id="scr-player">
   <div class="title"><div class="logo"><canvas class="logo-cv" width="128" height="128"></canvas></div><h1>Polyplot</h1><div class="sub2">Archinota Tessellian</div><p>Who's playing?</p></div>
@@ -244,7 +243,7 @@
     <div class="box" id="shape-box"><h3>🗺️ Map shape</h3><div class="maps" id="shape-list"></div></div>
     <div class="box" id="theme-box"><h3>🎨 Theme <span class="note">(coins, creatures + events)</span></h3><div class="themes" id="theme-list"></div></div>
     <div class="box hidden" id="trail-box"><h3>🖍️ My line trail <span class="note">(looks only)</span></h3><div class="chips" id="trail-who"></div><div class="trails" id="trail-list"></div><div class="note" id="trail-note"></div></div>
-    <div class="go-row"><button class="btn soft" onclick="showScreen('menu')">◀ Back</button><button class="btn" id="go-btn" data-sound="pop" onclick="startGame()">⬛ Play!</button></div>
+    <div class="go-row"><button class="btn sp-btn sp-primary" id="go-btn" data-sound="pop" onclick="startGame()">⬛ Play!</button></div>
   </div>
 </section>
 
@@ -1123,9 +1122,13 @@ function pickOne(a){ return a[Math.floor(Math.random() * a.length)]; }
 function fmtS(s){ s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
 
 /* ================= MENUS ================= */
+// 🎛️ p1d: the game's own top bar becomes the shared bar in place (UiKit UI.gameBarFrom) — ◀ where you came from · 🎚️ Levels · 🏠 | numbers | buttons ❓
+const BAR = UI.gameBarFrom(document.querySelector('#scr-play .hud'), {game: GAME_ID, icon: '🐾', name: 'Polyplot', playing: () => !!(G && !G.over), onFit: () => window.dispatchEvent(new Event('resize'))});
+var NAV_INNER = {setup: ['◀ Polyplot', () => showScreen('menu')]};   // 🧭 inner screens: their top button names + goes to the main screen
+UI.navBar(document.getElementById('back-btn'), {onclick: false});
 function showScreen(name){
   ['player', 'menu', 'setup', 'play'].forEach(s => { const el = $('scr-' + s); if(el) el.classList.toggle('hidden', s !== name); });
-  $('back-btn').classList.toggle('hidden', name === 'play'); window.scrollTo(0, 0);
+  $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   /* 🧭 p1d */ window.scrollTo(0, 0);
   if(name !== 'play') drawLogos();
 }
 function drawLogos(){ document.querySelectorAll('.logo-cv').forEach(c => { const g = c.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, 128, 128);
@@ -1826,7 +1829,7 @@ async function endGame(){
     '<div class="score-big">🏆 ' + score.toLocaleString() + '</div><div class="stats">' + scoreRow + '</div>' +
     '<div class="stats"><span>⬛ ' + st.boxes + ' shapes</span><span>🔗 best chain ' + st.chain + '</span>' + (M.hunt ? '<span>🐾 ' + st.catches + ' caught</span><span>' + THEMES[M.theme].coin[0] + ' ' + st.coins + '</span>' : '') + (M.fort ? '<span>🏗️ ' + st.built + ' built</span><span>👹 ' + st.monsters + ' beaten</span>' : '') + '<span>⏱ ' + fmtS(secs) + '</span></div>' +
     tip + '<div class="save-note" id="save-note">' + (humans.length ? '💾 Saving…' : '') + '</div>' +
-    '<div class="res-btns"><button class="btn" data-sound="pop" onclick="startGame()">🔁 Again</button><button class="btn soft" data-sound="none" onclick="backToMenu()">◀ Back</button><button class="btn soft" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button></div>');
+    '<div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="pop" onclick="startGame()">🔁 Again</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="backToMenu()">🎚️ Levels</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button></div>');
   NOTES.length = 0;
   humans.forEach((p, seat) => {
     const won = M.coop ? win === 0 : win >= 0 && win === p.team, stats = statsFor(M, p, won);
@@ -1879,7 +1882,7 @@ function leavePlay(){
 function pauseGame(){ if(G) G.timerEnd = 0; }
 function backToMenu(){ if(G) cancelAnimationFrame(G.raf); G = null; GID++; hideResult(); closeSheet(); renderMenu(); showScreen('menu'); }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
-function goGameroom(){ UI.go(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
+function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
 window.feedbackContext = () => ({page: 'Polyplot', game: GAME_ID, level: G ? G.M.level : SET.level, mode: SET.mode});
 window.addEventListener('resize', () => { if(G && !$('scr-play').classList.contains('hidden')){ const keep = G.ver; layoutPlay(); buildCards(); } });
 
@@ -1894,7 +1897,7 @@ function openShop(){
     '<div class="shop">' + [0, 1, 2].map(r => '<button class="r' + r + '" data-r="' + r + '"' + (p.coins >= PP.CARD_PRICE[r] && !full ? '' : ' disabled') + '><b>' + ['Common', 'Rare', 'Epic'][r] + ' card · 🪙 ' + PP.CARD_PRICE[r] + '</b>' + Object.keys(PP.CARDS).filter(k => PP.CARDS[k].r === r && (!PP.CARDS[k].hard || M.L.rewind)).map(k => PP.CARDS[k].icon).join(' ') + '</button>').join('') +
     '<button data-bank="1"' + (p.coins >= PP.PRICE.bank ? '' : ' disabled') + '><b>🪙 Bank · 3 coins</b>+1 point (½ box)</button></div>' +
     '<table class="ptable">' + Object.keys(PP.CARDS).filter(k => !PP.CARDS[k].hard || M.L.rewind).map(k => '<tr><td><b>' + PP.CARDS[k].icon + ' ' + PP.CARDS[k].name + '</b></td><td>' + PP.CARDS[k].text + '</td></tr>').join('') + '</table>' +
-    '<div class="go-row"><button class="btn soft" data-sound="none" onclick="closeSheet()">Close</button></div>');
+    '<div class="go-row"><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="closeSheet()">Close</button></div>');
   $('sheet-card').querySelectorAll('.shop button').forEach(b => b.onclick = () => { let ok;
     if(b.dataset.bank){ ok = p.coins >= 3; if(ok){ p.coins -= 3; p.pts += 1; banner('🪙 Banked: +1 point', 'gold'); } } else { const k = PP.buyCard(M, M.cur, Number(b.dataset.r)); ok = !!k; if(k) banner('🃏 ' + PP.CARDS[k].icon + ' ' + PP.CARDS[k].name + '!', 'gold'); }
     UISound.play(ok ? 'success' : 'error'); PP.takeEvents(M); G.ver++; hud(); buildActbar(); openShop(); });
@@ -1910,7 +1913,7 @@ function openJournal(){
     '<div class="note">Catch the 4 field creatures + any hidden one (' + field + ' / 5) → ' + T.pet + ' becomes your 🐾 pet!</div>' +
     '<div class="jgrid">' + JOURNAL_KINDS.map(k => { const a = kindArt(t, k), n = K[k] || 0; return '<div class="jcard' + (n ? '' : ' no') + '" title="' + UI.esc(KIND_TIPS[k] || '') + '">' + (n ? '<span class="n">×' + n + '</span>' : '') + '<span class="e">' + a[0] + '</span>' + UI.esc(a[1]) + '<br><span style="color:var(--ink-soft)">' + UI.esc(KIND_TIPS[k] || '') + '</span></div>'; }).join('') + '</div>' +
     '<h3>' + T.coin[0] + ' ' + T.coin[1] + ' facts · ' + coins + ' collected (10 = a new fact)</h3><div class="facts">' + T.facts.map((f, i) => i < nf ? '<div class="fact">' + T.coin[0] + ' ' + UI.esc(f) + '</div>' : '<div class="fact lock">🔒 ' + (i + 1) * 10 + ' ' + T.coin[1] + 's</div>').join('') + '</div>' +
-    '<div class="go-row" style="margin-top:10px"><button class="btn soft" data-sound="none" onclick="closeSheet()">Close</button></div>');
+    '<div class="go-row" style="margin-top:10px"><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="closeSheet()">Close</button></div>');
 }
 
 /* ================= 🖍️ LINE TRAILS (round 4) — per player per device: sp_polyplot_trail:<Name> ================= */
@@ -1964,4 +1967,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (pp-5+back-1+modes-3+mg-1) END OF Polyplot.html -->
+<!-- (pp-5+back-1+modes-3+mg-1+p1d) END OF Polyplot.html -->
