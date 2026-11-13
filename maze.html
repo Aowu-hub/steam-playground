@@ -93,6 +93,17 @@
   .new-best{display:inline-block;background:linear-gradient(135deg,var(--teal),var(--purple));color:#fff;border-radius:12px;padding:3px 10px;font-weight:800;animation:pop-in .5s ease;}
   @keyframes pop-in{0%{transform:scale(.4);opacity:0;}70%{transform:scale(1.12);}100%{transform:scale(1);opacity:1;}}
   .theme-grid{grid-template-columns:repeat(auto-fill,minmax(118px,1fr));}
+  /* 🗺️ p3e map-size cards (same look as 🔢 Digitinct p3b) */
+  .maps{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:6px;}
+  .mapc{background:var(--card);border:3px solid transparent;border-radius:18px;padding:10px 6px 8px;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--ink);box-shadow:0 4px 0 rgba(0,0,0,0.07);font:inherit;}
+  .mapc > *{width:100%;text-align:center;} .mapc .ic{font-size:1.5rem;line-height:1.1;}
+  .mapc .nm{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1rem;} .mapc .sub{font-size:0.72rem;font-weight:800;color:var(--ink-soft);}
+  .mapc .x{display:inline-block;width:auto;margin:0 auto;padding:2px 8px;border-radius:999px;background:#FFE7A3;color:#5A3B00;font-weight:900;font-size:0.75rem;}
+  html .mapc.on, html [data-theme] .mapc.on{border-color:#FFC845 !important;box-shadow:0 0 0 3px #7C5CFF !important;}
+  .mapc.on::after{content:'✓';position:absolute;top:5px;right:7px;width:20px;height:20px;border-radius:50%;background:#FFC845;color:#3A2500;font-size:.75rem;font-weight:900;display:flex;align-items:center;justify-content:center;}
+  .mapnote{font-size:.75rem;font-weight:800;color:var(--ink-soft);}
+  .lvl .learn{font-size:0.68rem;font-weight:800;color:#0F7A3D;}
+  @media (max-width:820px){ .maps{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;} .mapc{padding:6px 3px 5px;border-radius:14px;} .mapc .ic{font-size:1.15rem;} .mapc .nm{font-size:.88rem;} }
   .surprise{background:linear-gradient(135deg,var(--purple),var(--coral));color:#fff;}
   .surprise .sub{color:rgba(255,255,255,0.85);}
   .section-head{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1rem;margin:4px 0 10px;color:var(--ink-soft);text-align:center;}
@@ -199,7 +210,9 @@
     <p>Every maze is brand new — no two are ever the same!</p>
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div>
   </div>
-  <div class="section-head">Pick a level</div>
+  <div class="section-head">🗺️ 1. Pick a maze size <span class="mapnote">(bigger maze = ×more points)</span></div>
+  <div class="maps" id="map-list"></div>
+  <div class="section-head" id="level-head">🎚️ 2. Pick a difficulty</div>
   <div class="levels" id="level-list"></div>
   <div class="ui-leaders" id="leaders"></div>
 </section>
@@ -265,6 +278,34 @@ const LEVELS = [
   {name:'Hardcore', emoji:'💀', size:25, braid:0.25, stars:3, keys:2, light:3.4, spikes:18, gates:8, blocks:12, checkpoints:0, liquid:'random', smoke:true, shake:true, spin:true, hardcore:true,
    blurb:'One mistake ends it: bump a wall or touch a trap and it is over. No flags!'}
 ];
+/* 🗺️ MAZE SIZE × 🎚️ DIFFICULTY (p3e — Aowu 2026-11-13: pick the map size, then the difficulty) */
+const MAZE_SIZES = [{k: 'auto', icon: '🎚️', name: 'Level size', sub: 'grows with the level'}, {k: 's', icon: '🟩', name: 'Small', n: 9}, {k: 'm', icon: '🟨', name: 'Medium', n: 13},
+  {k: 'l', icon: '🟧', name: 'Large', n: 17}, {k: 'xl', icon: '🟥', name: 'Huge', n: 21}, {k: 'xxl', icon: '🟪', name: 'Giant', n: 25}];
+let MAZE_SIZE = 'auto';
+function sizeMult(n){ return n <= 9 ? 1 : n <= 13 ? 1.25 : n <= 17 ? 1.5 : n <= 21 ? 1.75 : 2; }
+function sizeOf(k){ return MAZE_SIZES.find(z => z.k === (k || MAZE_SIZE)) || MAZE_SIZES[0]; }
+function sizeStore(){ return 'sp_maze_size_' + (S.player || ''); }
+function loadSize(){ try{ const k = localStorage.getItem(sizeStore()); MAZE_SIZE = MAZE_SIZES.some(z => z.k === k) ? k : 'auto'; }catch(e){ MAZE_SIZE = 'auto'; } }
+function saveSize(){ try{ localStorage.setItem(sizeStore(), MAZE_SIZE); }catch(e){} }
+// a difficulty on the picked size: the same traps PER SQUARE, so a small maze is not crowded and a big one not empty
+function levelFor(i, k){
+  const D = LEVELS[i], z = sizeOf(k), n = z.n || D.size;
+  if(n === D.size) return Object.assign({}, D, {mult: sizeMult(n), sizeKey: z.k, std: true});
+  const a = (n * n) / (D.size * D.size), r = n / D.size, sc = (v, f) => v ? Math.max(1, Math.round(v * f)) : 0;
+  return Object.assign({}, D, {size: n, spikes: sc(D.spikes, a), gates: sc(D.gates, a), blocks: sc(D.blocks, a), checkpoints: sc(D.checkpoints, r), mult: sizeMult(n), sizeKey: z.k, std: false});
+}
+function renderMaps(){
+  const box = $('map-list'); if(!box) return; const cur = sizeOf().k;
+  box.innerHTML = MAZE_SIZES.map(z => '<button class="mapc' + (z.k === cur ? ' on' : '') + '" data-k="' + z.k + '" data-sound="tap"><div class="ic">' + z.icon + '</div><div class="nm">' + z.name + '</div>' +
+    '<div class="sub">' + (z.n ? z.n + ' × ' + z.n : z.sub) + '</div><div class="x">' + (z.n ? '×' + sizeMult(z.n) : '×1 → ×2') + '</div></button>').join('');
+  box.querySelectorAll('.mapc').forEach(b => b.onclick = () => { MAZE_SIZE = b.dataset.k; saveSize(); renderLevels(); });
+}
+// 🏆 points for a finish (p3e): level + stars + time left on the par, × Hardcore 3, × the size
+function mazeScore(L, lvlIdx, ms, r){
+  const par = (G.lv.pathLen * 0.33 + 6 + G.lv.doors.size * 10 + G.lv.stars.size * 3), secs = ms / 1000;
+  return Math.round((200 * (lvlIdx + 1) + r * 150 + Math.max(0, par * 1.8 - secs) * 5) * (L.hardcore ? 3 : 1) * (L.mult || 1));
+}
+/* 🗺️ END MAZE SIZE */
 const THEMES = {
   animal: {name:'Animals', icon:'🐾', heroes:['🐶','🐱','🐰','🦊','🐼','🐨','🐯','🐵','🐸'], goals:['🦴','🏡','🧺','🍖'], collect:['🥕','🍎','🍌','🐟','🧀'], blocks:['🪵','🪨','🌳'],
            walls:['jungle'], palettes:[['#FFF4DE','#8D6E63','#F6E2C0'],['#EAF7E1','#5B8C51','#D7EDCB'],['#FDEDE4','#B5644A','#F7D9C8']]},
@@ -343,8 +384,8 @@ function bfs(n, walls, from, blocked){
 function pathTo(prev, goal){ const p = []; for(let c = goal; c !== -1; c = prev[c]) p.unshift(c); return p; }
 
 // Builds one full level: maze + start/goal + all items, checked for fairness.
-function buildLevel(lvlIdx, themeKey){
-  const L = LEVELS[lvlIdx], T = THEMES[themeKey], n = L.size;
+function buildLevel(lvlIdx, themeKey, Lx){
+  const L = Lx || levelFor(lvlIdx), T = THEMES[themeKey], n = L.size;   /* 🗺️ p3e: the picked size */
   const walls = carve(n, L.braid);
   // Start in a random corner, goal = the cell farthest away (so it takes some work).
   const corners = [0, n - 1, n * (n - 1), n * n - 1];
@@ -425,9 +466,9 @@ let lockHandle = null;
 function effectsOn(){ return !REDUCED && !(S.settings.MazeEffects === 'FALSE' || S.settings.MazeEffects === false); }
 
 function startGame(lvlIdx, themeKey){
-  const L = LEVELS[lvlIdx];
+  const L = levelFor(lvlIdx);   /* 🗺️ p3e: this difficulty on the picked maze size */
   if(themeKey === 'surprise') themeKey = pick(Object.keys(THEMES));
-  const lv = buildLevel(lvlIdx, themeKey);
+  const lv = buildLevel(lvlIdx, themeKey, L);
   G = {
     L, lv, pos: lv.start, from: lv.start, moveT0: 0, moveDur: 0, moving: false,
     keys: new Set(), stars: 0, opened: new Set(), gotStars: new Set(), gotKeys: new Set(), flag: lv.start, reached: new Set(),
@@ -443,7 +484,7 @@ function startGame(lvlIdx, themeKey){
   if(L.smoke) for(let i = 0; i < 7; i++) G.smoke.push({x: Math.random() * lv.n, y: Math.random() * lv.n, r: 1.5 + Math.random() * 2.2, vx: (Math.random() - .5) * .35, vy: (Math.random() - .5) * .35});
   heldDir = -1; autoDir = -1;
   $('stage').style.transform = 'rotate(0deg)';
-  BAR.level(L.emoji + ' ' + L.name);
+  BAR.level(L.emoji + ' ' + L.name + (L.std ? '' : ' · ' + L.size + '×' + L.size));
   BAR.hide('stars', !L.stars);
   BAR.hide('keys', !lv.doors.size);
   updateHud();
@@ -997,7 +1038,7 @@ function showWin(){
   showResult(
     '<div class="big">' + UI.esc(G.lv.goalIcon) + '</div><h2>You made it!</h2>' +
     '<div class="rating">' + '⭐'.repeat(r) + '<span style="opacity:.25">' + '⭐'.repeat(3 - r) + '</span></div>' +
-    '<div class="stats"><span>' + L.emoji + ' ' + L.name + '</span><span>⏱ ' + fmt(ms) + '</span>' +
+    '<div class="stats"><span>' + L.emoji + ' ' + L.name + '</span><span>🗺️ ' + L.size + ' × ' + L.size + '</span><span>⏱ ' + fmt(ms) + '</span><span>🏆 ' + mazeScore(L, lvlIdx, ms, r) + (L.mult > 1 ? ' (×' + L.mult + ')' : '') + '</span>' +
     (G.lv.stars.size ? '<span>' + UI.esc(G.lv.collectIcon) + ' ' + G.stars + '/' + G.lv.stars.size + '</span>' : '') + '</div>' +
     '<div class="save-note" id="save-note"><span class="ui-spin">✅</span> Saving your progress…</div>' +
     '<div class="res-btns">' +
@@ -1017,7 +1058,9 @@ function showWin(){
   const p = S.progress[S.player] || (S.progress[S.player] = {unlocked: 0, tokens: [], best: []});
   p.unlocked = Math.max(p.unlocked, lvlIdx + 1);
   const secs = Math.max(1, Math.round(ms / 1000));
-  saveWin(lvlIdx, {timeSec: secs, stars: r, theme: G.lv.themeKey}, p, r);
+  const extra = {stars: r, score: mazeScore(L, lvlIdx, ms, r), theme: L.size + '×' + L.size + ' · ' + G.lv.themeKey};   /* 🗺️ p3e: points × size; the size in the Archive */
+  if(L.std) extra.timeSec = secs;   // ⏱️ best times + family records only on the level's own size (fair)
+  saveWin(lvlIdx, extra, p, r);
 }
 // Wins that could not reach the sheet wait in this browser and are sent
 // again on the next win or the next visit (so "your next win will save it"
@@ -1046,6 +1089,7 @@ function saveWin(lvlIdx, extra, p, r, tries){
       const note = $('save-note'); if(!note) return;
       const parts = [];
       if(res.newBadge) parts.push('<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>');
+      if(res.newHighScore && !res.firstTime && !res.personalBest) parts.push('<span class="new-best">🏆 New high score!</span>');
       if(res.personalBest && !res.firstTime) parts.push('<span class="new-best">🎉 New best time!</span>');
       else if(res.best && res.best.timeSec && !res.personalBest) parts.push('Your best: ⏱ ' + fmt(res.best.timeSec * 1000));
       note.innerHTML = parts.length ? parts.join(' ') : '✅ Progress saved';
@@ -1169,21 +1213,22 @@ function choosePlayer(name){
   // Loaders and pop-ups follow this player's look; the game keeps its own art.
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name);
-  S.player = name; S.age = p ? p.Age : '';
+  S.player = name; S.age = p ? p.Age : ''; loadSize();   /* 🗺️ p3e */
   $('who-name').textContent = name;
   renderLevels(); showScreen('levels');
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 function renderLevels(){
   const box = $('level-list'); box.innerHTML = ''; if(window.UI && UI.leaders) UI.leaders($('leaders'), 'maze', S.player);
+  renderMaps();   /* 🗺️ p3e */
   const p = progressOf(S.player), rec = AGE_RECOMMEND[S.age];
-  LEVELS.forEach((L, i) => {
+  LEVELS.map((D, i) => levelFor(i)).forEach((L, i) => {
     const b = document.createElement('button');
     const open = canPlay(i), done = p.unlocked > i;
     b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (L.hardcore ? ' hardcore' : '');
     b.setAttribute('data-sound', open ? 'pop' : 'none');
     b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">🏅</span>' : (open ? '' : '<span class="badge">🔒</span>')) +
-      '<div class="big">' + L.emoji + '</div><div class="nm">' + L.name + '</div><div class="sub">' + L.blurb + '</div>' +
+      '<div class="big">' + L.emoji + '</div><div class="nm">' + L.name + '</div><div class="learn">🗺️ ' + L.size + ' × ' + L.size + ' · ×' + L.mult + ' points</div><div class="sub">' + L.blurb + '</div>' +
       bestHtml(p, i);
     b.onclick = () => {
       if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore!' : i === 4 ? 'Clear Hard to unlock Extreme!' : 'Clear the level before this one to unlock it'); return; }
@@ -1195,7 +1240,7 @@ function renderLevels(){
 // Best finish time + stars for this level, and the family record holder.
 function bestHtml(p, i){
   const b = (p.best || [])[i], rec = (S.records || [])[i];
-  let h = b && b.timeSec ? '<div class="best"><span class="t">⏱ ' + fmt(b.timeSec * 1000) + '</span>' + starRow(b.stars) + '</div>'
+  let h = b && (b.timeSec || b.score) ? '<div class="best">' + (b.timeSec ? '<span class="t">⏱ ' + fmt(b.timeSec * 1000) + '</span>' : '') + (b.score ? '<span class="t">🏆 ' + b.score + '</span>' : '') + starRow(b.stars) + '</div>'
     : '<div class="best none">' + (p.unlocked > i ? 'Finished!' : 'Not finished yet') + '</div>';
   if(rec) h += '<div class="rec">🏆 Record: ' + UI.esc(rec.name) + ' ' + fmt(rec.timeSec * 1000) + '</div>';
   return h;
@@ -1203,7 +1248,7 @@ function bestHtml(p, i){
 let chosenLevel = 0;
 function chooseLevel(i){
   chosenLevel = i;
-  $('theme-title').textContent = 'Pick a world for ' + LEVELS[i].name;
+  $('theme-title').textContent = 'Pick a world for ' + LEVELS[i].name + ' · ' + levelFor(i).size + ' × ' + levelFor(i).size;
   $('theme-logo').textContent = LEVELS[i].emoji;
   const box = $('theme-list'); box.innerHTML = '';
   const sur = document.createElement('button');
@@ -1256,4 +1301,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (11w-1+emoji+r33+back-1+p1b) END OF Maze.html -->
+<!-- (11w-1+emoji+r33+back-1+p1b+p3e) END OF Maze.html -->

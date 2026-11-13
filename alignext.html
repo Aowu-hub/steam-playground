@@ -79,6 +79,16 @@
   .lvl .best span{background:var(--panel);border-radius:10px;padding:2px 8px;}
   .lvl .best.none{color:var(--ink-soft);}
   .lvl .learn{font-size:0.68rem;font-weight:800;color:var(--red);}
+  /* 🗺️ p3e board cards (same look as 🔢 Digitinct p3b) */
+  .maps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:6px;}
+  .mapc{background:var(--card);border:3px solid transparent;border-radius:18px;padding:10px 6px 8px;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--ink);box-shadow:0 4px 0 rgba(0,0,0,0.07);font:inherit;}
+  .mapc > *{width:100%;text-align:center;} .mapc .ic{font-size:1.4rem;line-height:1.1;}
+  .mapc .nm{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1rem;} .mapc .sub{font-size:0.72rem;font-weight:800;color:var(--ink-soft);}
+  .mapc .x{display:inline-block;width:auto;margin:0 auto;padding:2px 8px;border-radius:999px;background:#FFE7A3;color:#5A3B00;font-weight:900;font-size:0.75rem;}
+  html .mapc.on, html [data-theme] .mapc.on{border-color:#FFC845 !important;box-shadow:0 0 0 3px #7C5CFF !important;}
+  .mapc.on::after{content:'✓';position:absolute;top:5px;right:7px;width:20px;height:20px;border-radius:50%;background:#FFC845;color:#3A2500;font-size:.75rem;font-weight:900;display:flex;align-items:center;justify-content:center;}
+  .mapnote{font-size:.75rem;font-weight:800;color:var(--ink-soft);}
+  @media (max-width:640px){ .maps{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;} .mapc{padding:6px 3px 5px;border-radius:14px;} .mapc .ic{font-size:1.1rem;} .mapc .nm{font-size:.86rem;} }
   .lvl.hardcore{background:linear-gradient(160deg,#7A1020 0%,#2E0609 62%,#0E0204 100%) !important;color:#FFECEC !important;border-color:#FF4040 !important;}
   .lvl.hardcore .nm,.lvl.hardcore .sub,.lvl.hardcore .num,.lvl.hardcore .learn,.lvl.hardcore .best,.lvl.hardcore .best.none{color:#FFECEC !important;}
   .lvl.hardcore .best span{background:rgba(255,255,255,0.16) !important;color:#FFECEC !important;}
@@ -251,7 +261,9 @@
   </div>
   <button class="switch hidden" id="sw-power" data-sound="pop" onclick="togglePower()"><span class="tog"></span><span>⚡ Power mode (Hard + Extreme) — pieces do their chess move</span></button>
   <div class="hidden" id="skin-row"><div class="section-head" id="skin-head" style="margin:10px 0 4px">🎨 My Stack pieces</div><div class="chips" id="skin-chips"></div></div>
-  <div class="section-head" id="lv-head">🤖 Play the robot</div>
+  <div class="section-head" id="map-head">🗺️ 1. Pick a board <span class="mapnote">(bigger board = ×more points)</span></div>
+  <div class="maps" id="map-list"></div>
+  <div class="section-head" id="lv-head">🤖 2. How strong is Robo?</div>
   <div class="levels" id="level-list"></div>
   <div class="section-head">👫 Or play the family</div>
   <div class="row2">
@@ -740,6 +752,23 @@ const DUO_SIZES = {
   omni: [{k: 's', W: 3, H: 3, line: 3, label: '3×3 · 3 in a row'}, {k: 'm', W: 4, H: 4, line: 3, label: '4×4 · 3 in a row'}, {k: 'l', W: 5, H: 5, line: 4, label: '5×5 · 4 in a row'}, {k: 'xl', W: 7, H: 7, line: 5, label: '7×7 · 5 in a row'}],
 };
 const PARTY_SIZE = {3: {W: 9, H: 7, line: 4}, 4: {W: 10, H: 8, line: 4}};
+/* 🗺️ BOARD × 🎚️ ROBOT (p3e — Aowu 2026-11-13: pick the board size, then how strong the robot is). The boards = the family boards. */
+const BOARD_MULT = [1, 1.25, 1.5, 2];
+function boardMult(m, W){ const i = DUO_SIZES[m].findIndex(z => z.W >= W); return BOARD_MULT[i < 0 ? 3 : i]; }
+function boardPick(m){ const k = lsGet('bsize_' + (m || mode), 'auto'); return k === 'auto' || DUO_SIZES[m || mode].some(z => z.k === k) ? k : 'auto'; }
+// a difficulty (how Robo plays) on the picked board
+function levelFor(m, i, k){
+  const D = LEVELS[m][i], key = k || boardPick(m), z = DUO_SIZES[m].find(x => x.k === key);
+  if(!z || (z.W === D.W && z.H === D.H && z.line === D.line)) return Object.assign({}, D, {mult: boardMult(m, D.W), board: key, std: true});
+  return Object.assign({}, D, {W: z.W, H: z.H, line: z.line, mult: BOARD_MULT[DUO_SIZES[m].indexOf(z)], board: key, std: false});
+}
+function renderBoards(){
+  const box = $('map-list'); if(!box) return; const cur = boardPick();
+  const list = [{k: 'auto', icon: '🎚️', name: 'Level board', sub: 'grows with Robo', x: '×1 → ×2'}].concat(DUO_SIZES[mode].map((z, i) => ({k: z.k, icon: ['🟩', '🟨', '🟧', '🟥'][i], name: z.W + ' × ' + z.H, sub: z.line + ' in a row', x: '×' + BOARD_MULT[i]})));
+  box.innerHTML = list.map(z => '<button class="mapc' + (z.k === cur ? ' on' : '') + '" data-k="' + z.k + '" data-sound="tap"><div class="ic">' + z.icon + '</div><div class="nm">' + z.name + '</div><div class="sub">' + z.sub + '</div><div class="x">' + z.x + '</div></button>').join('');
+  box.querySelectorAll('.mapc').forEach(b => b.onclick = () => { lsSet('bsize_' + mode, b.dataset.k); renderMenu(); });
+}
+/* 🗺️ END BOARD */
 // 6 worlds: disc (→ what it turns into in a line), Omnifile X / O, stand + room colours
 const THEMES = {
   dino:  {name: 'Dino Jungle', icon: '🦖', sub: 'Eggs crack and baby dinos hatch', disc: '🥚', line: '🦖', x: '🦴', o: '🥚', bg: ['#14432A', '#4E9A4A', '#9BD06A'], stand: ['#9C8B76', '#5F5040'], edge: '#3F7D2A', hole: '#251D16', sq: ['#D8C7A6', '#B9A47F'], ink: '#fff'},
@@ -853,13 +882,14 @@ function renderMenu(){
   if(window.UI && UI.leaders) UI.leaders($('leaders'), GAME[mode], S.player);
   const box = $('level-list'); box.innerHTML = '';
   const p = progressOf(S.player), rec = AGE_START[S.age];
-  LEVELS[mode].forEach((L, i) => {
+  renderBoards();   /* 🗺️ p3e */
+  LEVELS[mode].map((D, i) => levelFor(mode, i)).forEach((L, i) => {
     const open = canPlay(i), done = p.unlocked > i;
     const b = document.createElement('button');
     b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (L.hardcore ? ' hardcore' : '');
     b.setAttribute('data-sound', open ? 'pop' : 'none'); b.setAttribute('data-lvl', i);
     b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">🏅</span>' : (open ? '' : '<span class="badge">🔒</span>')) +
-      '<div class="big">' + L.emoji + '</div><div class="nm">' + L.name + '</div><div class="learn">' + L.W + '×' + L.H + ' · ' + L.line + ' in a row</div><div class="sub">' + (L.hardcore && !open ? '🔒 Beat Extreme to open 💀 Hardcore' : stk ? stackBlurb(i) : L.blurb) + '</div>' + bestHtml(p, i);
+      '<div class="big">' + L.emoji + '</div><div class="nm">' + L.name + '</div><div class="learn">' + L.W + '×' + L.H + ' · ' + L.line + ' in a row · ×' + L.mult + '</div><div class="sub">' + (L.hardcore && !open ? '🔒 Beat Extreme to open 💀 Hardcore' : stk ? stackBlurb(i) : L.blurb) + '</div>' + bestHtml(p, i);
     b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore' : i === 4 ? 'Beat Hard to unlock Extreme!' : 'Beat the level before this one to unlock it'); return; } chooseTheme({play: 'bot', lvl: i}); };
     box.appendChild(b);
   });
@@ -914,8 +944,8 @@ function friendsGo(){
 /* ---------- 🎨 worlds ---------- */
 function chooseTheme(opts){
   pending = opts;
-  const L = opts.play === 'bot' ? LEVELS[mode][opts.lvl] : null;
-  $('th-title').textContent = L ? 'Pick a world for ' + L.name : 'Pick a world';
+  const L = opts.play === 'bot' ? levelFor(mode, opts.lvl) : null;
+  $('th-title').textContent = L ? 'Pick a world for ' + L.name + ' · ' + L.W + ' × ' + L.H : 'Pick a world';
   $('th-logo').textContent = L ? L.emoji : '🎨';
   $('th-sub').textContent = opts.play === 'bot' ? 'You go first · every world plays the same' : opts.seats.join(' · ');
   const box = $('theme-list'); box.innerHTML = '';
@@ -948,7 +978,7 @@ function previewTheme(cv, key){
 function startGame(opts){
   clearTimeout(G && G.botTimer); hideResult(); stopClock(); $('hud-clock').classList.add('hidden');
   const m = mode, bot = opts.play === 'bot';
-  const L = bot ? LEVELS[m][opts.lvl] : opts.size;
+  const L = bot ? levelFor(m, opts.lvl) : opts.size;   /* 🗺️ p3e: Robo's level on the picked board */
   const names = bot ? [S.player, 'Robo'] : opts.seats;
   const series = opts.series || {on: seriesOn, wins: names.map(() => 0), game: 0, draws: 0};
   const start = series.game % names.length;   // the first player changes every game of a best of 3
@@ -1181,17 +1211,17 @@ function endGame(w, why, line, quitter){
     if(won){
       const parMoves = Math.ceil(L.W * L.H * (G.mode === 'drop' ? 0.3 : G.stack ? 0.6 : 0.45)), parSec = Math.round(L.W * L.H * (G.mode === 'drop' ? 2.2 : 3.5) + 20);
       let stars = 1; if(!G.undoUsed && G.myMoves <= parMoves) stars++; if(stars === 2 && secs <= parSec && !G.timeouts) stars++;
-      const score = Math.round((500 * (G.lvl + 1) + Math.max(0, parSec - secs) * 4 + G.seats[0].lines * 40 + G.seats[0].cardsPlayed * 60 + (stars === 3 ? 150 : 0)) * (L.hardcore ? 3 : 1));
+      const score = Math.round((500 * (G.lvl + 1) + Math.max(0, parSec - secs) * 4 + G.seats[0].lines * 40 + G.seats[0].cardsPlayed * 60 + (stars === 3 ? 150 : 0)) * (L.hardcore ? 3 : 1) * (L.mult || 1));   /* 🗺️ p3e: × board */
       G.result = {stars, score};
       if(sr.on && !seriesDone){ sendFeats(stats); later(() => showSeriesCard(g0, winners), delay); return; }
       if(sr.on && seriesWinner !== 0){ sendFeats(stats); later(() => showLoseCard(g0, winners, why, true), delay); return; }
       if(sr.on) stats.series = 1;
-      saveWin(G.lvl, {timeSec: secs, stars, score, theme: G.theme + (G.stack ? ' · stack' : ''), stats});
+      saveWin(G.lvl, {timeSec: secs, stars, score, theme: G.theme + (G.stack ? ' · stack' : '') + ' · ' + L.W + '×' + L.H, stats});
       later(() => showWinCard(g0, stars, score, secs), delay);
     } else {
       sendFeats(stats);
       if(sr.on && !seriesDone) later(() => showSeriesCard(g0, winners), delay);
-      else if(sr.on && seriesWinner === 0){ saveWin(G.lvl, {timeSec: secs, stars: 1, score: 500 * (G.lvl + 1) * (L.hardcore ? 3 : 1), theme: G.theme, stats: {series: 1}}); later(() => showWinCard(g0, 1, 500 * (G.lvl + 1) * (L.hardcore ? 3 : 1), secs, true), delay); }
+      else if(sr.on && seriesWinner === 0){ const sc = Math.round(500 * (G.lvl + 1) * (L.hardcore ? 3 : 1) * (L.mult || 1)); saveWin(G.lvl, {timeSec: secs, stars: 1, score: sc, theme: G.theme + ' · ' + L.W + '×' + L.H, stats: {series: 1}}); later(() => showWinCard(g0, 1, sc, secs, true), delay); }
       else later(() => showLoseCard(g0, winners, why, sr.on), delay);
     }
     return;
@@ -1214,7 +1244,7 @@ function showWinCard(g0, stars, score, secs, bySeries){
   if(G !== g0) return;
   const lvl = G.lvl, pr = pick(PRAISE);
   showResult('<div class="big">🏆</div><h2 class="cheer">' + UI.esc(pr) + '!</h2>' +
-    '<p>' + (bySeries ? 'You won the best of 3 on ' : 'You beat 🤖 Robo on ') + G.L.name + '!</p>' + seriesLine(G.series) +
+    '<p>' + (bySeries ? 'You won the best of 3 on ' : 'You beat 🤖 Robo on ') + G.L.name + ' · ' + G.L.W + ' × ' + G.L.H + (G.L.mult > 1 ? ' (×' + G.L.mult + ' points)' : '') + '!</p>' + seriesLine(G.series) +
     '<div class="rating">' + [0, 1, 2].map(k => '<span class="st' + (k < stars ? '' : ' off') + '" style="animation-delay:' + (0.25 + k * 0.25) + 's">⭐</span>').join('') + '</div>' +
     '<div class="score-big">🏆 <span id="score-count">0</span></div>' +
     '<div class="stats"><span>⏱ ' + fmt(secs * 1000) + '</span><span>' + (G.mode === 'drop' ? '🔴' : '❌') + ' ' + G.myMoves + ' moves</span>' + (G.seats[0].lines ? '<span>〰️ ' + G.seats[0].lines + ' lines of 3</span>' : '') + (G.undoUsed ? '<span>↩️ undo used</span>' : '') + (G.timeouts ? '<span>⏰ ' + G.timeouts + ' time-outs</span>' : '') + '</div>' +
@@ -1938,4 +1968,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11x-5+back-1+modes-3+mg-1+p1d+p3a) END OF Alignext.html -->
+<!-- (11x-5+back-1+modes-3+mg-1+p1d+p3a+p3e) END OF Alignext.html -->

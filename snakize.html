@@ -74,6 +74,16 @@
   .lvl.recommended::after{content:'Great for you!';position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);white-space:nowrap;background:var(--teal);color:#fff;font-size:0.62rem;font-weight:800;padding:2px 8px;border-radius:8px;}
   .lvl.locked{opacity:.55;cursor:not-allowed;filter:grayscale(.6);}
   .lvl .learn{font-size:0.68rem;font-weight:800;color:#0F7A3D;}
+  /* 🗺️ p3e map-size cards (same look as 🔢 Digitinct p3b) */
+  .maps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:6px;}
+  .mapc{background:var(--card);border:3px solid transparent;border-radius:18px;padding:10px 6px 8px;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--ink);box-shadow:0 4px 0 rgba(0,0,0,0.07);font:inherit;}
+  .mapc > *{width:100%;text-align:center;} .mapc .ic{font-size:1.4rem;line-height:1.1;}
+  .mapc .nm{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1rem;} .mapc .sub{font-size:0.72rem;font-weight:800;color:var(--ink-soft);}
+  .mapc .x{display:inline-block;width:auto;margin:0 auto;padding:2px 8px;border-radius:999px;background:#FFE7A3;color:#5A3B00;font-weight:900;font-size:0.75rem;}
+  html .mapc.on, html [data-theme] .mapc.on{border-color:#FFC845 !important;box-shadow:0 0 0 3px #7C5CFF !important;}
+  .mapc.on::after{content:'✓';position:absolute;top:5px;right:7px;width:20px;height:20px;border-radius:50%;background:#FFC845;color:#3A2500;font-size:.75rem;font-weight:900;display:flex;align-items:center;justify-content:center;}
+  .mapnote{font-size:.75rem;font-weight:800;color:var(--ink-soft);}
+  @media (max-width:640px){ .maps{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;} .mapc{padding:6px 3px 5px;border-radius:14px;} .mapc .ic{font-size:1.1rem;} .mapc .nm{font-size:.86rem;} }
   .lvl .best{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 8px;font-size:0.74rem;font-weight:800;}
   .lvl .best span{background:var(--panel);border-radius:10px;padding:2px 8px;} .lvl .best.none{color:var(--ink-soft);}
   .lvl.hardcore{background:linear-gradient(160deg,#7A1020 0%,#2E0609 62%,#0E0204 100%) !important;color:#FFECEC !important;border-color:#FF4040 !important;}
@@ -244,6 +254,8 @@
   <div class="title"><div class="logo">🐍</div><h1>Snakize</h1><p>Snake + seize — ride your snake, eat, grow and win!</p>
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
   <div class="modes" id="mode-list"></div>
+  <div id="map-wrap"><div class="section-head" id="map-head">🗺️ 1. Pick a map size <span class="mapnote">(bigger map = ×more points)</span></div>
+  <div class="maps" id="map-list"></div></div>
   <div class="section-head" id="level-head">Pick a level</div>
   <div class="levels" id="level-list"></div>
   <div class="menu-row" id="menu-row"></div>
@@ -1307,12 +1319,43 @@ const gestK = k => GESTURES.find(g => g.k === k) || GESTURES[0];
 
 /* ================= STATE ================= */
 let S = {players: [], progress: {}, progGate: {}, progCastle: {}, endless: {}, settings: {}, avatars: {}, player: '', age: ''};
-let SET = {mode: 'feast', level: 0, theme: 'dino', play: 'solo', opp: '', opps: [], endless: false, skill: 'dash'};
+let SET = {mode: 'feast', level: 0, theme: 'dino', play: 'solo', opp: '', opps: [], endless: false, skill: 'dash', sizes: {}};
+/* 🗺️ MAP SIZE × 🎚️ DIFFICULTY (p3e — Aowu 2026-11-13: pick the map size, then the difficulty) */
+const MAP_SIZES = {
+  feast:  [{k: 's', v: 12}, {k: 'm', v: 16}, {k: 'l', v: 20}, {k: 'xl', v: 24}],   // grid n × n
+  gate:   [{k: 's', v: 17}, {k: 'm', v: 24}, {k: 'l', v: 31}, {k: 'xl', v: 36}],   // arena radius
+  castle: [{k: 's', v: 22}, {k: 'm', v: 28}, {k: 'l', v: 34}, {k: 'xl', v: 40}]    // land n × n
+};
+const SIZE_LOOK = [{icon: '🟩', name: 'Small', x: 1}, {icon: '🟨', name: 'Medium', x: 1.25}, {icon: '🟧', name: 'Large', x: 1.5}, {icon: '🟥', name: 'Huge', x: 2}];
+function sizeKey(mode){ const k = (SET.sizes || {})[mode || SET.mode]; return (MAP_SIZES[mode || SET.mode] || []).some(z => z.k === k) ? k : 'auto'; }
+function levelValue(mode, i){ return mode === 'gate' ? SN.GATE[i].R : mode === 'castle' ? SN.CASTLE[i].n : SN.FEAST[i].n; }
+function sizeLabel(mode, v){ return mode === 'gate' ? 'arena ' + v : v + '×' + v; }
+// the picked size for this mode + level: {v, mult, std, n | mods}
+function sizeFor(mode, i){
+  const list = MAP_SIZES[mode]; if(!list) return {std: true, mult: 1, v: 0};
+  const lv = levelValue(mode, i), z = list.find(x => x.k === sizeKey(mode));
+  const idx = z ? list.indexOf(z) : Math.max(0, list.findIndex(x => x.v >= lv)), v = z ? z.v : lv, out = {v, mult: SIZE_LOOK[idx < 0 ? 3 : idx].x, std: !z || z.v === lv, label: sizeLabel(mode, v)};
+  if(out.std) return out;
+  if(mode === 'gate'){ out.engine = {mods: {R: v}}; return out; }
+  out.engine = {n: v};
+  if(mode === 'feast'){ const L = SN.FEAST[i], a = Math.min(1, (v * v) / (L.n * L.n)), sc = x => x ? Math.max(1, Math.round(x * a)) : 0;
+    out.engine.mods = {target: v < L.n ? Math.max(8, Math.round(L.target * v / L.n)) : L.target, rocks: sc(L.rocks), movers: sc(L.movers), portals: L.portals ? Math.max(1, Math.round(L.portals * a)) : 0}; out.target = out.engine.mods.target; }
+  return out;
+}
+function renderSizes(){
+  const wrap = $('map-wrap'), box = $('map-list'); if(!box) return;
+  const list = MAP_SIZES[SET.mode]; if(wrap) wrap.classList.toggle('hidden', !list); if(!list) return;
+  const cur = sizeKey(), unit = SET.mode === 'gate' ? 'radius ' : '';
+  box.innerHTML = [{k: 'auto', icon: '🎚️', name: 'Level size', sub: 'grows with the level', x: '×1 → ×2'}].concat(list.map((z, i) => ({k: z.k, icon: SIZE_LOOK[i].icon, name: SIZE_LOOK[i].name, sub: SET.mode === 'gate' ? 'arena ' + z.v : z.v + ' × ' + z.v, x: '×' + SIZE_LOOK[i].x})))
+    .map(z => '<button class="mapc' + (z.k === cur ? ' on' : '') + '" data-k="' + z.k + '" data-sound="tap"><div class="ic">' + z.icon + '</div><div class="nm">' + z.name + '</div><div class="sub">' + z.sub + '</div><div class="x">' + z.x + '</div></button>').join('');
+  box.querySelectorAll('.mapc').forEach(b => b.onclick = () => { SET.sizes = Object.assign({}, SET.sizes, {[SET.mode]: b.dataset.k}); savePrefs(); renderLevels(); });
+}
+/* 🗺️ END MAP SIZE */
 let G = null, lockHandle = null, KEYS = null, raf = 0;
 function ls(k, v){ try{ if(v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }catch(e){ return null; } }
 function store(k){ return 'sp_snake_' + k + ':' + (S.player || ''); }
-function loadPrefs(){ try{ const p = JSON.parse(ls(store('prefs')) || '{}'); if(THEMES[p.theme]) SET.theme = p.theme; if(MODES[p.mode] && BUILT_MODES.indexOf(p.mode) >= 0) SET.mode = p.mode; if(['solo', 'duo', 'party'].indexOf(p.play) >= 0) SET.play = p.play; if(p.opp) SET.opp = p.opp; if(Array.isArray(p.opps)) SET.opps = p.opps; if(SN.SKILLS[p.skill]) SET.skill = p.skill; SET.endless = !!p.endless; }catch(e){} }
-function savePrefs(){ ls(store('prefs'), JSON.stringify({theme: SET.theme, mode: SET.mode, play: SET.play, opp: SET.opp, opps: SET.opps, skill: SET.skill, endless: SET.endless})); }
+function loadPrefs(){ try{ const p = JSON.parse(ls(store('prefs')) || '{}'); if(THEMES[p.theme]) SET.theme = p.theme; if(MODES[p.mode] && BUILT_MODES.indexOf(p.mode) >= 0) SET.mode = p.mode; if(['solo', 'duo', 'party'].indexOf(p.play) >= 0) SET.play = p.play; if(p.opp) SET.opp = p.opp; if(Array.isArray(p.opps)) SET.opps = p.opps; if(SN.SKILLS[p.skill]) SET.skill = p.skill; SET.endless = !!p.endless; if(p.sizes && typeof p.sizes === 'object') SET.sizes = p.sizes; }catch(e){} }
+function savePrefs(){ ls(store('prefs'), JSON.stringify({theme: SET.theme, mode: SET.mode, play: SET.play, opp: SET.opp, opps: SET.opps, skill: SET.skill, endless: SET.endless, sizes: SET.sizes})); }
 function myAvatar(name){ const a = S.avatars[name]; return a ? fixAv(a) : defaultAvatar(name || 'player'); }
 // riders keep their look, hats and costumes — but not their own ride-on or pet (the snake is the ride today)
 function riderAv(av){ const a = JSON.parse(JSON.stringify(av)); a.eq = Object.assign({}, a.eq || {}); delete a.eq.ride; delete a.eq.pet; return fixAv(a); }
@@ -1348,19 +1391,21 @@ function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return 
 function renderMenu(){
   const ml = $('mode-list');
   mgRender();   // 🗂️ mg-1: modes in groups (MODE_GROUPS + MODE_LIST)
-  if(SET.mode === 'tale'){ renderTale(); howTo(); return; }
+  if(SET.mode === 'tale'){ const mw = $('map-wrap'); if(mw) mw.classList.add('hidden'); renderTale(); howTo(); return; }
   renderLevels(); renderMenuRow(); howTo();
   if(window.UI && UI.leaders && MODES[SET.mode].id !== 'snaketale') UI.leaders($('leaders'), MODES[SET.mode].id, S.player);
 }
 function levelInfo(mode, i){
-  if(mode === 'feast'){ const L = SN.FEAST[i]; return L.n + '×' + L.n + ' · reach ' + L.target; }
-  if(mode === 'gate'){ const L = SN.GATE[i]; return L.bots + ' snakes · ' + (L.time ? (L.time / 60) + ' min' : 'last one wins'); }
-  if(mode === 'castle'){ const L = SN.CASTLE[i]; return L.n + '×' + L.n + ' · ' + (L.win ? L.win + ' % land' : '⏱️ most land'); }
+  const z = sizeFor(mode, i), x = ' · ×' + z.mult;   /* 🗺️ p3e: the picked size */
+  if(mode === 'feast'){ const L = SN.FEAST[i]; return z.v + '×' + z.v + ' · reach ' + (z.target || L.target) + x; }
+  if(mode === 'gate'){ const L = SN.GATE[i]; return L.bots + ' snakes · ' + (L.time ? (L.time / 60) + ' min' : 'last one wins') + ' · arena ' + z.v + x; }
+  if(mode === 'castle'){ const L = SN.CASTLE[i]; return z.v + '×' + z.v + ' · ' + (L.win ? L.win + ' % land' : '⏱️ most land') + x; }
   return '';
 }
 function renderLevels(){
   const box = $('level-list'); box.innerHTML = ''; const p = progOf(SET.mode, S.player), rec = AGE_START[S.age];
-  $('level-head').textContent = MODES[SET.mode].icon + ' ' + MODES[SET.mode].name + ' — pick a level';
+  renderSizes();   /* 🗺️ p3e */
+  $('level-head').textContent = (MAP_SIZES[SET.mode] ? '🎚️ 2. ' : '') + MODES[SET.mode].icon + ' ' + MODES[SET.mode].name + ' — pick a difficulty';
   SN.LEVEL_NAMES.forEach((nm, i) => {
     const open = canPlay(SET.mode, i), done = p.unlocked > i, hc = i === 5, b = document.createElement('button');
     b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (hc ? ' hardcore' : ''); b.dataset.lvl = i; b.setAttribute('data-sound', open ? 'pop' : 'none');
@@ -1397,7 +1442,7 @@ function openSetup(lvl){
   SET.level = lvl; const hc = lvl === 5, m = MODES[SET.mode];
   if(hc) SET.play = 'solo';
   $('setup-logo').textContent = m.icon; $('setup-title').textContent = m.name + ' · ' + SN.LEVEL_NAMES[lvl];
-  $('setup-sub').textContent = SET.mode === 'castle' ? (SN.CASTLE[lvl].win ? 'Own ' + SN.CASTLE[lvl].win + ' % of the map to win' : '⏱️ 3 minutes — the biggest land wins') : SET.mode === 'feast' ? (SET.endless && lvl > 0 ? '♾️ Endless — no target, beat your best score' : 'Grow to ' + SN.FEAST[lvl].target + ' long to win') : SET.mode === 'gate' ? (SN.GATE[lvl].time ? 'Be the longest snake after ' + (SN.GATE[lvl].time / 60) + ' minutes' : 'The edge shrinks — be the last snake left') : '';
+  $('setup-sub').textContent = SET.mode === 'castle' ? (SN.CASTLE[lvl].win ? 'Own ' + SN.CASTLE[lvl].win + ' % of the map to win' : '⏱️ 3 minutes — the biggest land wins') : SET.mode === 'feast' ? (SET.endless && lvl > 0 ? '♾️ Endless — no target, beat your best score' : 'Grow to ' + (sizeFor('feast', lvl).target || SN.FEAST[lvl].target) + ' long to win') : SET.mode === 'gate' ? (SN.GATE[lvl].time ? 'Be the longest snake after ' + (SN.GATE[lvl].time / 60) + ' minutes' : 'The edge shrinks — be the last snake left') : '';
   buildPlayModes(); buildSeats(); buildSkills(); buildThemes(); buildSkin(); feelChip();
   $('go-btn').onclick = () => startGame();
   showScreen('setup');
@@ -1532,12 +1577,13 @@ function startGame(opts){
   const seed = opts.seed || (Date.now() & 0xffffff);
   let botAvs = [];
   if(mode === 'gate' || mode === 'castle'){ const n = opts.bots != null ? opts.bots : (mode === 'gate' ? SN.GATE : SN.CASTLE)[lvl].bots; botAvs = botFamily(seats.length > 1 && mode === 'castle' ? 0 : n, seats.map(s => s.name)); }
-  const M = SN.make(mode, Object.assign({level: lvl, seed, players, endless, skills: skillsOn() && !opts.noSkills, botAvs}, opts.engine || {}));
+  const SZ = opts.story ? {std: true, mult: 1} : sizeFor(mode, lvl);   /* 🗺️ p3e: the picked map size */
+  const M = SN.make(mode, Object.assign({level: lvl, seed, players, endless, skills: skillsOn() && !opts.noSkills, botAvs}, SZ.engine || {}, opts.engine || {}));
   if(opts.afterMake) opts.afterMake(M);
   const humans = M.snakes.filter(s => s.human).length;
   const cols = M.snakes.map((s, i) => s.human ? (humans > 1 || mode === 'castle' ? SEAT_COL[i] : THEMES[theme].body) : (s.col || BOT_COL[i % BOT_COL.length]));
   const avs = M.snakes.map((s, i) => s.boss ? null : s.human ? riderAv(myAvatar(seats[i].name === 'Guest' ? 'Guest' : seats[i].name)) : (s.av || roboAv(i)));
-  G = {M, mode, level: lvl, theme, seats, cols, avs, endless, fx: [], t: 0, paused: false, over: false, shown: false, startAt: performance.now(), story: opts.story || null,
+  G = {M, mode, level: lvl, theme, seats, cols, avs, endless, SZ, fx: [], t: 0, paused: false, over: false, shown: false, startAt: performance.now(), story: opts.story || null,
     reacts: M.snakes.map(() => null), lean: M.snakes.map(() => 0), held: seats.map(() => new Set()), padAim: seats.map(() => null), padBoost: seats.map(() => false),
     cam: [{x: 0, y: 0, z: 1, ready: false}, {x: 0, y: 0, z: 1, ready: false}], shake: 0, lastHud: {}};
   savePrefs();
@@ -2025,7 +2071,7 @@ function showEnd(){
   G.shown = true;
   if(window.storyEnd && G.story) { window.storyEnd(); return; }
   const M = G.M, hs = humanIdx(), solo = hs.length === 1, me = M.snakes[0], won = M.winner === 0, secs = Math.max(1, Math.round(M.t)), gid = MODES[G.mode].id;
-  const stars = solo ? SN.stars(M, 0) : 0, score = SN.score(M, 0), L = SN.lenOf(M, me);
+  const mult = (G.SZ && !G.endless && G.SZ.mult) || 1, stars = solo ? SN.stars(M, 0) : 0, score = Math.round(SN.score(M, 0) * mult), L = SN.lenOf(M, me);   /* 🗺️ p3e: × size */
   let head;
   if(G.endless) head = '<div class="big">♾️</div><h2 class="cheer">' + L + ' long!</h2>';
   else if(solo && G.mode === 'castle') head = won ? '<canvas class="win" id="win-cv" width="360" height="300"></canvas><h2 class="cheer">' + (M.win ? 'You own ' + Math.floor(me.land) + ' % — castle complete!' : 'Biggest land: ' + Math.floor(me.land) + ' %!') + '</h2>' : '<div class="big">🏰</div><h2>' + (M.why === 'out' ? 'Trail cut — out!' : M.why === 'land' || M.why === 'time' ? snakeName(M.snakes[M.winner] || me) + ' got more land' : 'The map is full') + '</h2>';
@@ -2034,7 +2080,7 @@ function showEnd(){
   else head = M.winner >= 0 ? '<canvas class="win" id="win-cv" width="360" height="300"></canvas><h2 class="cheer">' + UI.esc(M.snakes[M.winner].name) + ' wins!</h2>' : '<div class="big">🤝</div><h2>Both out — a draw!</h2>';
   const tips = G.mode === 'castle' ? ['Small loops are safe loops — come home often!', 'Eat food to draw longer trails.', 'Watch out for snakes near your trail — hurry home!'] : G.mode === 'gate' ? ['Big snakes are slow to turn — cut in front of them!', 'Boost only when it\'s safe: it costs length.', 'Popped snakes leave big glowing food — grab it!'] : ['Plan your turn one square early.', 'Leave yourself a way out — don\'t curl into a corner.', 'Golden food = +3 — worth a detour.'];
   const rank = G.mode === 'gate' ? SN.gateRank(M).findIndex(s => s.i === 0) + 1 : 0;
-  showResult(head + '<div class="score-big">⭐ ' + score.toLocaleString() + '</div>' +
+  showResult(head + '<div class="score-big">⭐ ' + score.toLocaleString() + '</div>' + (G.SZ && G.SZ.label && !G.story ? '<div class="note">🗺️ ' + G.SZ.label + (mult > 1 ? ' · ×' + mult + ' points' : '') + '</div>' : '') +
     (solo && won && !G.endless ? '<div class="rating">' + [1, 2, 3].map(i => '<span class="st' + (i <= stars ? '' : ' off') + '" style="animation-delay:' + (i * 0.15) + 's">⭐</span>').join('') + '</div>' : '') +
     '<div class="stats"><span>🐍 longest ' + me.maxLen + '</span><span>🍎 ' + me.eaten + ' eaten</span>' + (me.gold ? '<span>✨ ' + me.gold + ' golden</span>' : '') + (G.mode === 'gate' ? '<span>💥 ' + me.popped + ' popped</span><span>🏅 #' + rank + '</span>' : '') + (G.mode === 'castle' ? '<span>🏰 ' + Math.floor(me.land) + ' % land</span><span>🚩 ' + me.flags + ' flags</span>' + (me.cuts ? '<span>✂️ ' + me.cuts + ' cuts</span>' : '') : '') + (me.skillsUsed ? '<span>⚡ ' + me.skillsUsed + ' skills</span>' : '') + '<span>⏱ ' + fmtS(secs) + '</span></div>' +
     (!solo ? '<div class="stats">' + hs.slice(1).map(i => { const s = M.snakes[i]; return '<span>' + UI.esc(s.name) + ': 🐍 ' + s.maxLen + ' · 🍎 ' + s.eaten + '</span>'; }).join('') + '</div>' : '') +
@@ -2046,7 +2092,7 @@ function showEnd(){
     const s = M.snakes[i], w = M.winner === i; if(/^Guest/.test(s.name)) return;
     const stats = statsFor(M, s, w, solo);
     if(G.endless){ stats['end' + G.level] = SN.score(M, i); stats.endless = SN.score(M, i); saveFeatsOnly(s.name, stats, seat, gid); if(!S.endless[s.name]) S.endless[s.name] = {}; S.endless[s.name][G.level] = Math.max(S.endless[s.name][G.level] || 0, stats.endless); }
-    else if(solo) saveWin(s.name, G.level, {score: SN.score(M, i), stars: w ? stars : 0, cleared: w, timeSec: secs, theme: THEMES[G.theme].name, stats}, seat, gid);
+    else if(solo) saveWin(s.name, G.level, {score: Math.round(SN.score(M, i) * mult), stars: w ? stars : 0, cleared: w, timeSec: secs, theme: THEMES[G.theme].name + (G.SZ && G.SZ.label && !G.story ? ' · ' + G.SZ.label : ''), stats}, seat, gid);
     else saveFeatsOnly(s.name, stats, seat, gid);
   });
 }
@@ -2340,4 +2386,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.themes', {rows: 2}); UI.pageRows('.skins', {rows: 2}); }</script>
 </body>
 </html>
-<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a) END OF Snakize.html -->
+<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a+p3e) END OF Snakize.html -->
