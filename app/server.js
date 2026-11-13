@@ -1404,7 +1404,7 @@ function bopperInfo_(f) {
 }
 // 🎁 daily treasure counters (today): blocks broken + pops that caught 2 or more
 function bopperDaily_(name, stats) {
-  try { const d = dailyRoom_(getSettings(), name, today_()); d.sbBlocks = (d.sbBlocks || 0) + (Number(stats.blocks) || 0); if ((Number(stats.multi) || 0) >= 2) d.sbMulti = (d.sbMulti || 0) + 1; saveSetting('Daily_' + name, JSON.stringify(d)); } catch (e) { console.error('bopper daily: ' + e.message); }
+  try { const d = dailyRoom_(getSettings(), name, today_()); d.sbBlocks = (d.sbBlocks || 0) + (Number(stats.blocks) || 0); if ((Number(stats.multi) || 0) >= 2) d.sbMulti = (d.sbMulti || 0) + 1; d.sbHits = (d.sbHits || 0) + (Number(stats.hits) || 0); saveSetting('Daily_' + name, JSON.stringify(d)); } catch (e) { console.error('bopper daily: ' + e.message); }
 }
 // BeatCorner: one record per song in Settings Beat_<Name> = {level: {song: {score, acc, stars, passed, combo}}}; passing 5 songs in a level clears it (badge + next level).
 const BEAT_SONGS_ = 10, BEAT_TO_CLEAR_ = 5;
@@ -3580,6 +3580,7 @@ const DAILY_GOALS = [
   { id: 'ppchain', icon: '🔗', how: 'Close 5 shapes in one turn in Polyplot today', r: d => (d.room.ppChain || 0) >= 5 },
   { id: 'sbblocks', icon: '💣', how: 'Break 100 blocks in Soul Bopper today', r: d => (d.room.sbBlocks || 0) >= 100 },
   { id: 'sbmulti', icon: '🎯', how: 'Catch 2 with one pop in Soul Bopper today', r: d => (d.room.sbMulti || 0) >= 1 },
+  { id: 'sbhits', icon: '🏏', how: 'Hit 5 bombs with 🤾🏏 in Soul Bopper today', r: d => (d.room.sbHits || 0) >= 5 },
   { id: 'anylevel', icon: '🎮', how: 'Finish any level today', r: d => d.rows.length > 0 },
   { id: 'hard', icon: '⚡', how: 'Play a Hard or Extreme level today', r: d => d.rows.some(r => MINI_IDS_.indexOf(r.game) === -1 && r.level >= 3) },
   { id: 'maze', icon: '🧭', how: 'Finish a Maze today', r: d => d.rows.some(r => r.game === 'maze') },
