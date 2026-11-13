@@ -128,6 +128,7 @@
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-2a: the cheering crowd (CheerSquad.html) -->
 </head>
 <body ontouchstart="">
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
@@ -142,6 +143,7 @@
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
   <div class="section-head">Pick a level</div>
   <div class="levels" id="level-list"></div>
+  <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the board">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-2a -->
   <details class="rules"><summary>📖 How to play</summary><ul>
     <li><b>Hop:</b> arrow keys or W A S D (change them with ⌨️ Keys). On a phone: swipe, tap to hop forward, or use the arrow buttons.</li>
     <li><b>Cross:</b> dodge the traffic, ride the logs and pads across water (don't fall in!), and watch for the flashing lights before a fast one zooms by.</li>
@@ -302,7 +304,7 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
-  loadTheme(); loadKeys(); load3d(); $('who-name').textContent = name; renderLevels(); showScreen('menu');
+  loadTheme(); loadKeys(); load3d(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); }   /* 📣 cs-2a */ renderLevels(); showScreen('menu');
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">No score yet</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span><span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
@@ -394,6 +396,7 @@ function startGame(lvl){
   for(let r = 0; r < VIEW_ROWS + 6; r++) rowAt(r);
   BAR.level(L.emoji + ' ' + L.name + ' · ' + T.icon, L.hardcore ? 'hc' : ''); $('scr-play').style.background = T.bg;
   showScreen('play'); layout(); hudTick(true);
+  cheerMount();   // 📣 cs-2a: the crowd for this game (Off = nothing)
   showBanner(L.hardcore ? '💀 Hardcore — 1 life, no flags, points ×3! Hop to row ' + L.goal + '!' : T.icon + ' ' + T.name + ' — hop to row ' + L.goal + '!'); say('Hop to row ' + L.goal + '!');
   G.last = performance.now(); rafId = requestAnimationFrame(loop);
 }
@@ -406,7 +409,7 @@ function endEarly(){
   if(!G || G.over) return; G.paused = true; G.pausedAt = performance.now();
   UI.confirm({icon: '🏳️', title: 'End this game now?', body: 'Your score will be saved.', okText: 'End game', cancelText: 'Keep hopping'}).then(ok => { if(!G) return; G.pausedTotal += performance.now() - G.pausedAt; G.paused = false; G.last = performance.now(); if(ok) finishGame(); });
 }
-function backToMenu(){ cancelAnimationFrame(rafId); G = null; hideResult(); renderLevels(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); cancelAnimationFrame(rafId); G = null; hideResult(); renderLevels(); showScreen('menu'); }
 function pauseGame(){ if(G && !G.paused){ G.paused = true; G.pausedAt = performance.now(); } }
 
 /* ---------- hopping ---------- */
@@ -433,17 +436,17 @@ function landed(){
   const p = G.p, row = rowAt(p.row);
   if(p.row > G.maxRow){
     G.score += (G.L.mult || 1) * 10 * (p.row - G.maxRow); G.maxRow = p.row;
-    if(!G.cleared && G.maxRow >= G.L.goal){ G.cleared = true; const pr = pick(PRAISE); party('🎉 ' + pr + ', ' + S.player + '!'); say('Goal! Keep going!'); UISound.play('success'); confetti(['🐸', '⭐', '🎉', G.T.icon], 30); cheer(); }
+    if(!G.cleared && G.maxRow >= G.L.goal){ G.cleared = true; const pr = pick(PRAISE); cheerSay('big', 'goal'); party('🎉 ' + pr + ', ' + S.player + '!'); say('Goal! Keep going!'); UISound.play('success'); confetti(['🐸', '⭐', '🎉', G.T.icon], 30); cheer(); }
   }
   if(row.type === 'safe'){
     p.x = Math.round(p.x); p.safeRow = p.row; p.safeX = p.x;
     const it = row.items[p.x];
     if(it === '🪙'){ G.coins++; G.score += (G.L.mult || 1) * 25; delete row.items[p.x]; UISound.play('pop'); addFx('+25', p.x, p.row, '#FFD23F'); coinJoy(); }
-    else if(it === '💎'){ G.gems++; G.score += (G.L.mult || 1) * 100; delete row.items[p.x]; UISound.play('success'); addFx('+100 💎', p.x, p.row, '#7FE7FF'); coinJoy(true); }
+    else if(it === '💎'){ G.gems++; G.score += (G.L.mult || 1) * 100; cheerSay('goal', 'gem'); delete row.items[p.x]; UISound.play('success'); addFx('+100 💎', p.x, p.row, '#7FE7FF'); coinJoy(true); }
     else if(it === '❤️'){ if(G.lives < G.L.lives) G.lives++; delete row.items[p.x]; UISound.play('unlock'); showBanner('❤️ Extra life!', 'gold'); }
     else if(it === '🍌'){ delete row.items[p.x]; showBanner('🍌 Whoops — slippery!'); const nr = p.row + 1, t2 = rowAt(nr); if(!(t2.type === 'safe' && t2.blocks[p.x])){ p.hop = {fx: p.x, fr: p.row, tx: p.x, tr: nr, t: 0, slip: true}; } }
     else if(it === '🕳️'){ delete row.items[p.x]; hit('🕳️ Into a hole!'); return; }
-    if(row.check && !row.checked){ row.checked = true; G.checkpoints++; G.score += (G.L.mult || 1) * 200; showBanner('🏁 Checkpoint ' + G.checkpoints + '! +200', 'gold'); UISound.play('success'); cheer(); say('Checkpoint!'); }
+    if(row.check && !row.checked){ row.checked = true; G.checkpoints++; G.score += (G.L.mult || 1) * 200; showBanner('🏁 Checkpoint ' + G.checkpoints + '! +200', 'gold'); cheerSay('goal', 'cp'); UISound.play('success'); cheer(); say('Checkpoint!'); }
   }
   if(row.type === 'water'){
     const pl = platformAt(row, p.x + 0.5);
@@ -470,7 +473,7 @@ function gestureNow(){ if(!G || G.over || G.dead) return; const g = pick(GESTURE
 // Bonked: a cartoon spin and "poof", then back to the last safe spot (or the end).
 function hit(text, water){
   const p = G.p; if(G.dead || G.over) return;
-  G.dead = true; G.lives--; UISound.play('error'); G.shake = 0.35; showBanner(text || '💫 Bonk!', 'bad');
+  G.dead = true; G.lives--; cheerSay(G.lives === 1 ? 'close' : 'miss'); UISound.play('error'); G.shake = 0.35; showBanner(text || '💫 Bonk!', 'bad');
   for(let i = 0; i < 10; i++) G.fx.push({ch: water ? (G.T.water.lava ? '🔥' : G.T.water.void ? '☁️' : '💦') : pick(['💫', '⭐', '✨']), x: p.x + 0.5 + rand(-0.6, 0.6), row: p.row + rand(-0.2, 0.5), t: 0, life: 0.9, vy: rand(0.6, 1.6)});
   G.a.gest = {g: GESTURES.find(x => x.k === 'spin'), t: 0};
   setTimeout(() => {
@@ -515,7 +518,7 @@ function update(dt){
       for(const o of row.objs){ const d = Math.abs(cx - (o.x + o.w / 2)), r2 = o.w / 2 + 0.28;
         if(o.conf){ if(d < 0.55 && !o.used) confuse(o); continue; }
         if(d < r2){ hit('💫 Bonk! ' + o.ch); break; }
-        if(d < r2 + 0.55 && !o.missed && G.hitCool <= 0){ o.missed = true; G.nearMiss++; G.score += (G.L.mult || 1) * 15; G.hitCool = 0.6; addFx('😱 +15', p.x, p.row, '#FFFFFF'); if(!G.a.gest) G.a.gest = {g: WHOA, t: 0}; } }
+        if(d < r2 + 0.55 && !o.missed && G.hitCool <= 0){ o.missed = true; G.nearMiss++; cheerSay('big', 'close'); G.score += (G.L.mult || 1) * 15; G.hitCool = 0.6; addFx('😱 +15', p.x, p.row, '#FFFFFF'); if(!G.a.gest) G.a.gest = {g: WHOA, t: 0}; } }
     }
     if(row.type === 'rail' && row.train && cx > row.train.x - 0.2 && cx < row.train.x + row.train.w + 0.2) hit('💫 Whoosh! ' + G.T.rush[1] + '!');
   }
@@ -563,10 +566,37 @@ function addFx(text, x, row, col){ G.fx.push({text, col, x: x + 0.5, row: row + 
 function loop(now){
   const dt = Math.min(0.05, (now - G.last) / 1000); G.last = now;
   if(!G.paused && !G.over) update(dt);
+  if(window.Cheer) Cheer.pause(!!(G && G.paused));   // 📣 cs-2a
   draw(now / 1000);
   if(G && !G.over) rafId = requestAnimationFrame(loop);
 }
 
+/* 📣 CHEERSQUAD (cs-2a) START — crowd on the verges (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+function cheerMount(){
+  if(!window.Cheer) return; Cheer.unmount();
+  Cheer.mount($('stage'), {game: 'hopper', players: [{name: S.player, side: 0, human: true}, {name: 'Quackers', side: 1, human: false}],   // 🦆 the rival "races" you
+    me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'scene', ref: $('cv'),
+    avoid: () => Array.from(document.querySelectorAll('#gbar, .keyhint, #pad button')),
+    clear: b => !(b.r > V.ox - V.cell - 2 && b.l < V.ox + V.cell * (COLS + 1) + 2)});   // the lanes run one cell past the board on each side
+}
+// spots: both verges, one or two columns, on every 2nd row in view — they scroll with the rows
+function cheerScene(g, t){
+  if(!window.Cheer || !Cheer.active() || !G) return;
+  const C = V.cell, k = C / 80 * (Cheer.stats().size === 'party' ? 0.85 : 0.75), m = V.ox - C, cols = m > C * 1.6 ? [0.3, 0.72] : [0.5], cands = [], r0 = Math.max(0, Math.floor(G.camRow)), r1 = r0 + Math.max(VIEW_ROWS, V.rows);
+  if(m < C * 0.5) return;   // no verge (narrow phone): nothing to stand on
+  for(let r = r0 + 1; r <= r1; r++){ if(r % 2) continue; [0, 1].forEach(side => cols.forEach((c, j) => {
+    const x = side ? V.ox + C * (COLS + 1) + m * c : m * (1 - c); cands.push({id: r + ':' + side + ':' + j, x, y: oy(r) + C * 0.86, k, half: side}); })); }
+  cands.sort((a, b) => Math.abs(a.y - V.h * 0.45) - Math.abs(b.y - V.h * 0.45));
+  Cheer.place(g, cands, {key: 'main', w: V.w, h: V.h});
+}
+function cheerSay(kind, why){ if(!window.Cheer || !Cheer.active() || !G) return;
+  if(why === 'close' && (G.lastCheerClose || 0) > G.t - 4) return; if(why === 'close') G.lastCheerClose = G.t;
+  Cheer.react(kind, {side: 0}); }
+function cheerEnd(cleared){ if(!window.Cheer || !Cheer.active() || !G) return; Cheer.react(cleared ? 'win' : 'lose', {side: 0});
+  setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+    const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+    const at = card.querySelector('.res-btns'); card.insertBefore(c, at); card.insertBefore(cap, at); }, 1400); }
+/* 📣 CHEERSQUAD END */
 /* ================= DRAWING ================= */
 const cv = $('cv'), ctx = cv.getContext('2d');
 let V = {cell: 60, rh: 60, ox: 0, w: 0, h: 0, dpr: 1, rows: VIEW_ROWS, d3: false};
@@ -652,6 +682,7 @@ function draw(t){
   // edges outside the board, with a bit of scenery from the world
   g.fillStyle = 'rgba(0,0,0,0.2)'; g.fillRect(0, 0, V.ox, V.h); g.fillRect(V.ox + C * COLS, 0, V.w, V.h);
   if(V.ox > C * 0.45){ const side = G.X.side, sz = Math.min(C * 0.8, V.ox * 0.8); for(let r = r1; r >= r0; r--){ const y = oy(r) + C * 0.55; [0, 1].forEach(k => { const hsh = (r * 7 + k * 3) % side.length; if((r + k) % 2) return; emo(g, side[hsh], k ? V.ox + C * COLS + V.ox / 2 : V.ox / 2, y, sz, 0.85); }); } }
+  cheerScene(g, t);   // 📣 cs-2a: crowd on the verges (never on the board)
   // far rows fade into the distance in 3D
   if(V.d3){ const gr = g.createLinearGradient(0, 0, 0, V.h * 0.22); gr.addColorStop(0, G.T.bg); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, V.w, V.h * 0.22); }
   // the moving screen: a themed "apocalypse" rising behind you
@@ -745,6 +776,7 @@ function finishGame(quiet){
   G.over = true; cancelAnimationFrame(rafId);
   const thisGame = G, L = G.L, ms = performance.now() - G.t0 - G.pausedTotal, secs = Math.max(1, Math.round(ms / 1000));
   const cleared = G.cleared, rows = G.maxRow, stars = !cleared ? 0 : rows >= L.goal * 2 ? 3 : rows >= L.goal * 1.5 ? 2 : 1;
+  cheerEnd(cleared);   // 📣 cs-2a
   if(rows > 0 || G.coins) saveWin(G.lvl, {timeSec: secs, stars, score: G.score, theme, cleared, stats: {bestRows: rows, rows: rows, coins: G.coins, gems: G.gems, checkpoints: G.checkpoints, nearMiss: G.nearMiss}});
   if(quiet) return;
   if(cleared){ UISound.play('success'); confetti(['🐸', '⭐', '🎉', G.T.icon], 40); } else { UISound.play('pop'); say('Game over! You hopped ' + rows + ' rows'); }
@@ -815,4 +847,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (r9+back-1+p1c) END OF Hopper.html -->
+<!-- (r9+back-1+p1c+cs-2a) END OF Hopper.html -->

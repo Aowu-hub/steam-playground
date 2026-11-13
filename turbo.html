@@ -186,6 +186,7 @@
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-2a: the cheering crowd (CheerSquad.html) -->
 </head>
 <body ontouchstart="">
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
@@ -200,6 +201,7 @@
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
   <div class="section-head">Pick a race</div>
   <div class="levels" id="level-list"></div>
+  <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd at the roadside">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-2a -->
   <details class="rules"><summary>📖 How to play</summary><ul>
     <li><b>Drive:</b> ⬅️ ➡️ steer, ⬆️ go faster, ⬇️ slow down (W A S D work too — change them with ⌨️ Keys). On a phone use the big buttons.</li>
     <li><b>Clock:</b> reach each 🏁 checkpoint to get more time. Get to the finish before it runs out!</li>
@@ -383,7 +385,7 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
-  loadPrefs(); loadKeys(); $('who-name').textContent = name; renderLevels(); showScreen('menu');
+  loadPrefs(); loadKeys(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); }   /* 📣 cs-2a */ renderLevels(); showScreen('menu');
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">No score yet</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span>' + (b.timeSec ? '<span>⏱ ' + fmt(b.timeSec * 1000) + '</span>' : '') + '<span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
@@ -548,6 +550,7 @@ function startGame(lvl, opts){
   for(let i = 0; i < L.rivals; i++){ let ln = lrnd(L.lanes); while(used.includes(ln) && used.length < L.lanes) ln = lrnd(L.lanes); used.push(ln);
     G.rivals.push({name: names[i % names.length], col: cols[(i * 3 + 1) % cols.length], d: -3 - i * 6, x: laneX(L, ln), tx: laneX(L, ln), v: 0, pace: lrand(0.86, 0.95) + lvl * 0.012, z: 0, wait: 0, decal: DECALS[1 + lrnd(5)][0], bump: 0}); }
   G.camX = G.p.ax; busyInit(); if(duo) setupDuo(opts.duo); spawnAhead();
+  cheerMount();   // 📣 cs-2a: the crowd for this race (Off = nothing)
   $('scr-play').classList.toggle('duo', !!G.duo); $('duohud').classList.toggle('hidden', !G.duo);
   BAR.level(L.emoji + ' ' + L.name + ' · ' + T.icon + (G.wx ? ' ' + WX[G.wx][0] : ''), L.hardcore ? 'hc' : ''); $('scr-play').style.background = T.bg;
   const prog = $('hud-prog'); prog.querySelectorAll('b,em').forEach(e => e.remove());
@@ -568,7 +571,7 @@ function endEarly(){
   if(!G || G.over) return; pauseGame();
   UI.confirm({icon: '🏳️', title: 'End this race now?', body: 'Your score will be saved.', okText: 'End race', cancelText: 'Keep racing'}).then(ok => { if(!G) return; resume(); if(ok) finishGame(); });
 }
-function backToMenu(){ cancelAnimationFrame(rafId); G = null; hideResult(); renderLevels(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); cancelAnimationFrame(rafId); G = null; hideResult(); renderLevels(); showScreen('menu'); }
 function pauseGame(){ if(G && !G.paused){ G.paused = true; G.pausedAt = performance.now(); } }
 function resume(){ if(G && G.paused && !G.over){ G.pausedTotal += performance.now() - G.pausedAt; G.paused = false; G.last = performance.now(); } }
 
@@ -580,7 +583,7 @@ function doJump(power){
 }
 function crash(text, kind){
   const p = G.p; if(p.inv > 0 || p.spin > 0) return;
-  p.spin = 0.9; p.spinDir = Math.random() < 0.5 ? -1 : 1; p.v = Math.min(p.v, 6); p.inv = 1.8; p.boost = 0; p.stars = 1.6; G.crashes++; G.shake = 0.35; UISound.play('error'); showBanner(duoTag() + text, 'bad');
+  p.spin = 0.9; p.spinDir = Math.random() < 0.5 ? -1 : 1; p.v = Math.min(p.v, 6); p.inv = 1.8; p.boost = 0; p.stars = 1.6; G.crashes++; G.shake = 0.35; cheerSay('miss'); UISound.play('error'); showBanner(duoTag() + text, 'bad');
   if(G.L.oneCrash && G.hardOut == null && !G.finished){ G.hardOut = G.t; showBanner('💀 ' + text + ' — Hardcore ends here!', 'bad'); }   // 💀 Hardcore: one crash ends the race
   for(let i = 0; i < 10; i++) G.fx.push({ch: kind === 'water' ? '💦' : pick(['💫', '⭐', '💥']), d: p.d + rand(-1, 2), x: p.ax - roadCx(p.d) + rand(-1.5, 1.5), t: 0, life: 0.8, vy: rand(4, 12), s: rand(0.8, 1.4)});
 }
@@ -591,7 +594,7 @@ function update(dt){
   // countdown lights
   if(W && G.count > 0){ const before = Math.ceil(G.count); G.count -= dt; const after = Math.ceil(G.count);
     if(after !== before && after > 0){ UISound.play('key'); showBanner(['', '🟢 GO!', '🟡 ' + after, '🔴 ' + after][after] || ('🔴 ' + after)); }
-    if(G.count <= 0){ UISound.play('success'); showBanner('🟢 GO GO GO!', 'gold'); say('Go!'); G.t0 = performance.now(); G.pausedTotal = 0; }
+    if(G.count <= 0){ UISound.play('success'); showBanner('🟢 GO GO GO!', 'gold'); cheerSay('start'); say('Go!'); G.t0 = performance.now(); G.pausedTotal = 0; }
   }
   const racing = G.count <= 0 && !G.finished;
   // speed
@@ -618,7 +621,7 @@ function update(dt){
   if(p.z > 0 || p.vz > 0){ p.vz -= GRAV * dt; p.z += p.vz * dt; if(p.z <= 0){ p.z = 0; p.vz = 0; G.shake = Math.max(G.shake, 0.08); UISound.play('drop'); } }
   p.jumpCool = Math.max(0, p.jumpCool - dt); p.inv = Math.max(0, p.inv - dt);
   if(G.hardOut != null && G.t - G.hardOut > 0.9){ finishGame(); return; }
-  if(racing){ G.timeLeft -= dt; G.raceTime += dt; if(G.rec){ while(G.rec.length / 3 <= G.raceTime / GSTEP && G.rec.length < 12000) G.rec.push(Math.round(p.d * 10), Math.round(rel() * 10), Math.round(p.z * 10)); } const s = Math.ceil(G.timeLeft); if(G.timeLeft <= 10 && s < G.lastBeep && s > 0){ G.lastBeep = s; UISound.play('key'); } if(G.timeLeft <= 0){ G.timeLeft = 0; if(G.duo){ G.finished = true; G.cleared = false; G.finishT = G.t; showBanner('⏰ ' + G.who + ' ran out of time!', 'bad'); UISound.play('pop'); } else finishGame(); return; } }
+  if(racing){ G.timeLeft -= dt; G.raceTime += dt; if(G.rec){ while(G.rec.length / 3 <= G.raceTime / GSTEP && G.rec.length < 12000) G.rec.push(Math.round(p.d * 10), Math.round(rel() * 10), Math.round(p.z * 10)); } const s = Math.ceil(G.timeLeft); if(G.timeLeft <= 10 && s < G.lastBeep && s > 0){ G.lastBeep = s; if(s === 5) cheerSay('close'); UISound.play('key'); } if(G.timeLeft <= 0){ G.timeLeft = 0; if(G.duo){ G.finished = true; G.cleared = false; G.finishT = G.t; showBanner('⏰ ' + G.who + ' ran out of time!', 'bad'); UISound.play('pop'); } else finishGame(); return; } }
   // traffic + rivals move
   if(W) G.objs.forEach(o => { if(o.kind !== 'car') return; o.d += o.v * dt;
     if(L.laneChange && !o.tx && !o.busy && LR() < L.laneChange * dt * 0.12 && o.d > p.d + 25){ const ln = clamp(o.lane + (LR() < 0.5 ? -1 : 1), 0, L.lanes - 1); if(ln !== o.lane){ o.lane = ln; o.tx = laneX(L, ln); o.blink = 1.2; } }
@@ -637,12 +640,12 @@ function update(dt){
   if(!p.secret) for(const o of G.objs){
     const dd = Math.abs((o.d + (o.kind === 'flood' || o.kind === 'tunnel' ? o.len / 2 : 0)) - p.d), ov = dd < (o.len + CAR_L) / 2 - 0.3, xo = Math.abs(o.x - px) < (o.w + CAR_W) / 2 - 0.25;
     if(o.kind === 'car'){
-      if(!o.passed && o.d < p.d - (o.len + CAR_L) / 2){ o.passed = true; if(!o.hit){ G.overtakes++; G.score += (G.L.mult || 1) * 20; const gap = Math.abs(o.x - px) - (o.w + CAR_W) / 2; if(gap < 0.6 && p.z < 0.3){ G.nearMiss++; G.score += (G.L.mult || 1) * 30; addFx('😱 +30 Close!', p.d, px, '#FFFFFF'); } } }
+      if(!o.passed && o.d < p.d - (o.len + CAR_L) / 2){ o.passed = true; if(!o.hit){ G.overtakes++; G.score += (G.L.mult || 1) * 20; const gap = Math.abs(o.x - px) - (o.w + CAR_W) / 2; if(gap < 0.6 && p.z < 0.3){ G.nearMiss++; cheerSay('big', 'close'); G.score += (G.L.mult || 1) * 30; addFx('😱 +30 Close!', p.d, px, '#FFFFFF'); } } }
       if(ov && xo && p.z < o.h && !o.hit){ if(p.inv <= 0 && p.spin <= 0){ o.hit = true; o.v = Math.max(o.v, p.v * 0.6); crash('💥 Bonk! Watch the traffic!'); } }
     } else if(o.kind === 'block'){ if(ov && xo && p.z < o.h && !o.hit && p.inv <= 0){ o.hit = true; crash('💥 Crash! ' + o.ch); } }
     else if(o.kind === 'coin'){ if(!o.got && ov && xo && (o.air ? p.z > 0.6 : p.z < 1.6)){ o.got = true; G.coins++; G.score += (G.L.mult || 1) * 25; UISound.play('pop'); addFx('+25', o.d, o.x, '#FFD23F'); } }
     else if(o.kind === 'ramp'){ if(!o.used && ov && xo && p.z < 0.1){ o.used = true; doJump(12); G.score += (G.L.mult || 1) * 75; addFx('🚀 +75 ' + T.ramp + '!', p.d, px, '#FFC845'); } }
-    else if(o.kind === 'boost'){ if(!o.used && ov && xo && p.z < 0.2){ o.used = true; p.boost = 2.2; UISound.play('unlock'); showBanner('⚡ TURBO BOOST!', 'gold'); } }
+    else if(o.kind === 'boost'){ if(!o.used && ov && xo && p.z < 0.2){ o.used = true; p.boost = 2.2; UISound.play('unlock'); showBanner('⚡ TURBO BOOST!', 'gold'); cheerSay('big', 'boost'); } }
     else if(o.kind === 'oil'){ if(!o.used && ov && xo && p.z < 0.1 && p.inv <= 0){ o.used = true; p.spin = 0.7; p.spinDir = Math.random() < 0.5 ? -1 : 1; p.slide = p.spinDir * 3; UISound.play('whoosh'); showBanner('🌀 Whoa — ' + T.oil[0] + '!'); } }
     else if(o.kind === 'pot'){ if(!o.used && ov && xo && p.z < 0.1){ o.used = true; p.v *= 0.55; G.shake = 0.25; UISound.play('bump'); showBanner('😵 Bumpy — ' + T.pot + '!'); } }
     else if(o.kind === 'flood'){ if(!o.told && p.d > o.d && p.d < o.d + o.len){ o.told = true; showBanner('💦 ' + T.flood[0] + ' — sloooow!'); UISound.play('whoosh'); } }
@@ -651,7 +654,7 @@ function update(dt){
   if(p.offroad && p.v > 5 && Math.random() < dt * 14) G.fx.push({dust: true, d: p.d - 2, x: px + rand(-1, 1), t: 0, life: 0.6, vy: 0, s: 1});
   // checkpoints + finish
   const cpAt = (G.cpDone + 1) * L.cp;
-  if(cpAt < L.length && p.d >= cpAt){ G.cpDone++; G.timeLeft += L.cpTime; G.score += (G.L.mult || 1) * 200; G.lastBeep = 99; showBanner(duoTag() + '🏁 Checkpoint! +' + L.cpTime + ' s', 'gold'); UISound.play('success'); say('Checkpoint!'); }
+  if(cpAt < L.length && p.d >= cpAt){ G.cpDone++; G.timeLeft += L.cpTime; G.score += (G.L.mult || 1) * 200; G.lastBeep = 99; showBanner(duoTag() + '🏁 Checkpoint! +' + L.cpTime + ' s', 'gold'); cheerSay('goal', 'cp'); UISound.play('success'); say('Checkpoint!'); }
   if(!G.finished && p.d >= L.length){ G.finished = true; G.cleared = true; G.place = G.duo ? 1 + G.duo.filter((P, j) => j !== G.cur && P.finished && P.cleared).length : 1 + G.rivals.filter(r => r.d > p.d).length + G.ghosts.filter(gh => gh.timeSec < G.raceTime).length; G.finishT = G.t; G.score += (G.L.mult || 1) * Math.round(G.timeLeft) * 20 + [500, 250, 100, 0][G.place - 1];
     party('🏁 ' + PLACES[G.place - 1] + '! ' + pick(PRAISE) + ', ' + (G.who || S.player) + '!'); UISound.play('success'); say(G.duo ? (G.place === 1 ? G.who + ' wins!' : G.who + ' finished!') : G.place === 1 ? 'You win!' : 'Finished!'); confetti(['🏁', '⭐', '🎉', G.T.icon], 36); }
   if(!G.duo && G.finished && G.t - G.finishT > 1.6){ finishGame(); return; }
@@ -691,7 +694,7 @@ function updateRival(rv, dt, racing){
   // a little bump if you touch
   if(Math.abs(rv.d - p.d) < CAR_L - 0.3 && Math.abs(rv.x - rel()) < CAR_W - 0.2 && p.z < 1){ const s = Math.sign(rel() - rv.x) || 1; p.slide = s * 4; rv.x -= s * 0.3; if(rv.bump <= 0){ rv.bump = 1; UISound.play('bump'); } }
   rv.bump = Math.max(0, rv.bump - dt);
-  if(!rv.passedMe && rv.d < p.d - CAR_L && G.t > 4){ rv.passedMe = true; G.overtakes++; G.score += (G.L.mult || 1) * 100; addFx('🏎️ +100 Passed ' + rv.name + '!', p.d, rel(), '#FFC845'); }
+  if(!rv.passedMe && rv.d < p.d - CAR_L && G.t > 4){ rv.passedMe = true; G.overtakes++; cheerSay('goal', 'rival'); G.score += (G.L.mult || 1) * 100; addFx('🏎️ +100 Passed ' + rv.name + '!', p.d, rel(), '#FFC845'); }
   if(rv.d > p.d + CAR_L) rv.passedMe = false;
 }
 function addFx(text, d, x, col){ G.fx.push({text, col, d, x, t: 0, life: 1, vy: 6}); }
@@ -699,10 +702,46 @@ function loop(now){
   let dt = Math.min(0.05, (now - G.last) / 1000); G.last = now;
   if(G.slowmo > 0){ G.slowmo -= dt; dt *= 0.35; }   // 🕳️ a secret passage exit: a short slow-mo
   if(!G.paused && !G.over){ if(G.duo) updateDuo(dt); else update(dt); }
+  if(window.Cheer) Cheer.pause(!!(G && G.paused));   // 📣 cs-2a
   if(G) drawFrame(now / 1000);
   if(G && !G.over) rafId = requestAnimationFrame(loop);
 }
 
+/* 📣 CHEERSQUAD (cs-2a) START — the roadside crowd (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+function cheerMount(){
+  if(!window.Cheer) return; Cheer.unmount();
+  const players = G.duo ? G.duo.map((P, i) => ({name: P.who, side: i, human: true})) : [{name: S.player, side: 0, human: true}].concat((G.L.rivals || (G.ghosts || []).length) ? [{name: 'Rivals', side: 1, human: false}] : []);
+  Cheer.mount($('stage'), {game: 'turbo', players, me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'scene', ref: $('cv'),
+    avoid: () => Array.from(document.querySelectorAll('#gbar, .racebar, #ctl-left, #ctl-right, .keyhint, #duohud .dh')), clear: b => !cheerOnRoad(b),
+    edge: innerHeight > innerWidth * 1.05 ? 0.4 : 0});   // phones held upright: fans may peek in from the screen edge
+}
+// the road + kerbs are never covered: check the box against the road band at its top, middle and bottom rows
+function cheerOnRoad(b){ if(!G) return true; const hw = roadW(G.L) / 2 + 1.1;
+  const n = Math.max(2, Math.ceil((b.b - b.t) / 6));   // every 6 px down the box: the road curves
+  for(let i = 0; i <= n; i++){ const y = b.t + (b.b - b.t) * i / n, d = G.p.d + (V.py - y) / V.ky, cx = sx(d, 0); if(b.r > cx - hw * V.k && b.l < cx + hw * V.k) return true; }
+  return false; }
+// crowd spots: the start, every checkpoint, the finish and every 45 m — both sides of the road (left = team 0, right = team 1)
+function cheerScene(g, t){
+  if(!window.Cheer || !Cheer.active() || !G) return;
+  const L = G.L, p = G.p, hw = roadW(L) / 2, d0 = p.d - (V.h - V.py) / V.ky, d1 = p.d + V.py / V.ky, st = new Set([2, L.length]), cands = [];
+  for(let d = L.cp; d < L.length; d += L.cp) st.add(d);
+  for(let d = Math.ceil(d0 / 45) * 45; d < d1; d += 45) st.add(d);
+  const k = V.k * (Cheer.stats().size === 'party' ? 0.03 : 0.026);
+  Array.from(st).filter(d => d > d0 - 4 && d < d1 + 4).sort((a, b) => Math.abs(a - p.d - 18) - Math.abs(b - p.d - 18)).forEach(d => [-1, 1].forEach(side => [0, 1, 2, 3].forEach(j => {
+    const dd = d + (j % 2) * 1.6, xw = side * (hw + 2.6 + j * 1.6);
+    cands.push({id: Math.round(dd * 10) + ':' + side + ':' + j, x: sx(dd, xw), y: sy(dd), k, half: side < 0 ? 0 : 1}); })));
+  Cheer.place(g, cands, G.duo && V.views ? {key: 'v' + G.cur, x: V.ox || 0, y: V.oy || 0, w: V.w, h: V.h} : {key: 'main', w: V.w, h: V.h});
+}
+function cheerSay(kind, why){ if(!window.Cheer || !Cheer.active() || !G) return; const side = G.duo ? G.cur : 0;
+  if(why === 'close' && (G.lastCheerClose || 0) > G.t - 4) return; if(why === 'close') G.lastCheerClose = G.t;   // close dodges come in bunches
+  Cheer.react(kind, {side}); }
+function cheerEnd(cleared, place){ if(!window.Cheer || !Cheer.active() || !G) return;
+  Cheer.react(cleared ? 'win' : 'lose', {side: 0});   // reaching the 🏁 is a win for the crowd, any place
+  setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+    const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+    const at = card.querySelector('.res-btns'); card.insertBefore(c, at); card.insertBefore(cap, at); }, cleared ? 700 : 1300); }
+function cheerEndDuo(win){ if(window.Cheer && Cheer.active() && win) Cheer.react('win', {side: win.i}); }
+/* 📣 CHEERSQUAD END */
 /* ================= DRAWING ================= */
 const cv = $('cv'), ctx = cv.getContext('2d');
 let V = {k: 20, ky: 12, w: 0, h: 0, dpr: 1, mid: 0, py: 0};
@@ -767,6 +806,7 @@ function draw(t){
   busyItems(items, g, t);
   items.push({d: p.d, me: true, f: () => drawMe(g, t)});
   items.sort((a, b) => b.d - a.d).forEach(it => it.f());
+  cheerScene(g, t);   // 📣 cs-2a: roadside crowd (never on the road), over the roadside deco
   // tunnel darkness + headlights
   const tun = G.objs.find(o => o.kind === 'tunnel' && p.d > o.d - 4 && p.d < o.d + o.len);
   if(tun){ const into = clamp(Math.min(p.d - (tun.d - 4), tun.d + tun.len - p.d) / 10, 0, 1); g.save(); g.globalAlpha = 0.72 * into; g.fillStyle = '#05050A'; g.beginPath(); g.rect(0, 0, V.w, V.h);
@@ -1266,6 +1306,7 @@ function finishDuo(quiet){
   if(quiet) return;
   rows.sort((a, b) => a.place - b.place || b.dist - a.dist || b.score - a.score);
   const win = rows[0].cleared ? rows[0] : rows[0].dist > rows[1].dist ? rows[0] : null;
+  cheerEndDuo(win);   // 📣 cs-2a
   if(win){ say(win.who + ' wins!'); confetti(['🏁', '🏆', '🎉', G.T.icon], 40); UISound.play('success'); } else { UISound.play('pop'); say('Time is up!'); }
   setTimeout(() => {
     if(G !== thisGame) return;
@@ -1286,6 +1327,7 @@ function finishGame(quiet){
   const stars = !cleared ? 0 : (place === 1 && G.crashes <= 1) ? 3 : (place <= 2 && G.crashes <= 3) ? 2 : 1;
   const dist = Math.round(Math.min(G.p.d, L.length)), score = Math.round(G.score);
   if(dist > 20) saveWin(G.lvl, {timeSec: secs, stars, score, theme, cleared, stats: {topSpeed: Math.round(G.maxV * 3.6), overtakes: G.overtakes, jumps: G.jumps, drift: Math.round(G.driftT), coins: G.coins, wins: cleared && L.rivals && place === 1 ? 1 : 0, nearMiss: G.nearMiss, metres: Math.round(dist)}});
+  cheerEnd(cleared, place);   // 📣 cs-2a
   if(cleared && G.ghostRace) saveGhost(score);
   if(quiet) return;
   if(!cleared){ UISound.play('pop'); say('Time is up!'); }
@@ -1373,4 +1415,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11o+r33+modes-3+p1c) END OF Turbo.html -->
+<!-- (11o+r33+modes-3+p1c+cs-2a) END OF Turbo.html -->
