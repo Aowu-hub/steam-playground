@@ -5498,7 +5498,8 @@ const DB_NAME = 'steam-offline';
 // grown-up functions: online app only (Setup page) — never run on the device
 const ONLINE_ONLY = ['setAdminPin', 'saveSettings', 'removeProfile', 'resetPlayerPin', 'savePlayerBirthday', 'setFeedbackStatus', 'getFeedbackList', 'getAdminData', 'saveOfflineKey', 'getOfflineInfo'];
 // sent to the real server when online (they need Google's internet services)
-const FORWARD = ['getWordMeaning', 'checkWord', 'startPoseSession', 'resetPlayerPin'];
+const FORWARD = ['getWordMeaning', 'checkWord', 'startPoseSession', 'resetPlayerPin',
+  'linkHost', 'linkJoin', 'linkHostPoll', 'linkAnswer', 'linkGuestPoll', 'linkRoomSet', 'linkList', 'linkIce'];   // 📡 lk-1a: LinkKit mailbox is online-only
 // never put in the waiting list (readers that may tidy a tab; the real server does that itself)
 const NO_PUSH = /^(get|list|verify|check|is|has)[A-Z]/;
 const MSG_NET = '📴 This needs the internet — try again when this device is online.';
