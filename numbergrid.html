@@ -52,6 +52,16 @@
   .pick:active{transform:translateY(4px);box-shadow:0 1px 0 rgba(0,0,0,0.07);}
   .pick .big{font-size:2.2rem;line-height:1;} .pick .nm{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1rem;} .pick .sub{font-size:0.75rem;color:var(--ink-soft);font-weight:700;}
   .pick canvas{width:72px;height:84px;}
+  /* 🗺️ p3b map cards */
+  .maps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:6px;}
+  .mapc{background:var(--card);border:3px solid transparent;border-radius:18px;padding:10px 6px 8px;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink);box-shadow:0 4px 0 rgba(0,0,0,0.07);font:inherit;}
+  .mapc > *{width:100%;text-align:center;} .mapc .mini{margin:0 auto;width:auto;}
+  .mapc .nm{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1.05rem;} .mapc .sub{font-size:0.72rem;font-weight:800;color:var(--ink-soft);}
+  .mapc .x{display:inline-block;width:auto;margin:0 auto;padding:2px 8px;border-radius:999px;background:#FFE7A3;color:#5A3B00;font-weight:900;font-size:0.75rem;}
+  html .mapc.on, html [data-theme] .mapc.on{border-color:#FFC845 !important;box-shadow:0 0 0 3px #7C5CFF !important;}
+  .mapc.on::after{content:'✓';position:absolute;top:5px;right:7px;width:20px;height:20px;border-radius:50%;background:#FFC845;color:#3A2500;font-size:.75rem;font-weight:900;display:flex;align-items:center;justify-content:center;}
+  .mapnote{font-size:.75rem;font-weight:800;color:var(--ink-soft);}
+  @media (max-width:640px){ .maps{gap:6px;} .mapc{padding:7px 3px 6px;border-radius:14px;} .mapc .sub{display:none;} .mapc .nm{font-size:.9rem;} }
   .section-head{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1.05rem;margin:16px 0 8px;color:var(--ink-soft);text-align:center;}
   .chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
   .chip{border:3px solid transparent;border-radius:16px;background:var(--card);color:var(--ink);cursor:pointer;padding:8px 10px;min-width:108px;
@@ -223,17 +233,20 @@
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
   <div class="section-head">1. Pick your pictures</div>
   <div class="chips" id="theme-list"></div>
-  <div class="section-head">2. Pick a level</div>
+  <div class="section-head">2. 🗺️ Pick a map <span class="mapnote">(bigger map = ×more points)</span></div>
+  <div class="maps" id="map-list"></div>
+  <div class="section-head" id="level-head">3. 🎚️ Pick a difficulty</div>
   <div class="levels" id="level-list"></div>
   <details class="rules"><summary>📖 How to play</summary><ul>
     <li><b>The rule:</b> every row ↔, every column ↕ and every thick-lined box has each picture exactly <b>once</b>.</li>
     <li><b>Play:</b> tap an empty square, then tap a picture at the bottom. Or tap a picture first, then tap squares to paint it in. Keys: arrows + 1–9, Backspace to erase.</li>
+    <li><b>🗺️ Map, then 🎚️ difficulty:</b> pick the size (4 × 4 · 5 × 5 · 6 × 6 · 9 × 9 — a bigger map gives ×1.25 · ×1.5 · ×2 points), then how hard: more or fewer clues, how mistakes show, notes and hints.</li>
     <li><b>Wrong?</b> Basic to Intermediate: it bounces back — try again. Hard and Extreme: it turns red until you fix it. Every miss costs a star.</li>
     <li><b>✏️ Notes</b> (from Intermediate): write small guesses in a square.</li>
     <li><b>💡 Hint:</b> fills one square for you (max 2 stars).</li>
     <li><b>Drag:</b> drag a picture from the bar onto a square to drop it in — every picture set lands its own way (🐾 hop, 💥 splat, 💨 skid, ✨ poof, 🌠 beam…). Drag a picture you placed to move it, or off the board to take it back.</li>
     <li><b>A full row, column or box</b> does a happy wave — and your player jumps off the bench and runs along it! 🎉</li>
-    <li><b>💀 Hardcore:</b> opens after Extreme. Only 17 clues (the fewest possible!), no notes check, no hints, nothing is marked. Fill it all, then press ✅ Submit — one wrong square and it's over. Points ×3!</li>
+    <li><b>💀 Hardcore:</b> opens after Extreme. The fewest clues (17 on 9 × 9 — the fewest possible!), no notes check, no hints, nothing is marked. Fill it all, then press ✅ Submit — one wrong square and it's over. Points ×3!</li>
   </ul></details>
   <div class="ui-leaders" id="leaders"></div>
 </section>
@@ -283,14 +296,28 @@ function shuffle(a){ for(let i = a.length - 1; i > 0; i--){ const j = rnd(i + 1)
 /* ================= LEVELS · THEMES ================= */
 // size n, box [rows, cols] (null = wiggly jigsaw areas), clue range, how a wrong symbol is handled:
 //   'reject' = bounces back (not placed) · 'mark' = placed in red · 'submit' = nothing is checked until ✅ Submit (Hardcore)
-const LEVELS = [
-  {name: 'Basic', emoji: '🌱', n: 4, box: [2, 2], clues: [10, 10], check: 'reject', notes: false, hints: 3, par: 150, base: 300, blurb: '4 × 4 — four pictures'},
-  {name: 'Junior', emoji: '🐣', n: 5, box: null, clues: [12, 13], check: 'reject', notes: false, hints: 3, par: 240, base: 500, blurb: '5 × 5 — wiggly areas'},
-  {name: 'Intermediate', emoji: '🔦', n: 6, box: [2, 3], clues: [17, 18], check: 'reject', notes: true, hints: 3, par: 420, base: 800, blurb: '6 × 6 — six pictures'},
-  {name: 'Hard', emoji: '⚡', n: 9, box: [3, 3], clues: [36, 45], check: 'mark', notes: true, hints: 3, par: 900, base: 1200, blurb: 'Classic 9 × 9 — 36 to 45 clues'},
-  {name: 'Extreme', emoji: '🌋', n: 9, box: [3, 3], clues: [25, 30], check: 'mark', notes: true, hints: 1, par: 1500, base: 1800, blurb: '9 × 9 — only 25 to 30 clues'},
-  {name: 'Hardcore', emoji: '💀', n: 9, box: [3, 3], clues: [17, 17], check: 'submit', notes: true, hints: 0, par: 2400, base: 2500, hardcore: true, blurb: '17 clues — the fewest possible. Submit at the end!'}
+const LEVELS = [   // 🎚️ difficulties (p3b) — the size comes from the 🗺️ map, see MAPS + levelFor()
+  {name: 'Basic', emoji: '🌱', check: 'reject', notes: false, hints: 3, blurb: 'Lots of clues'},
+  {name: 'Junior', emoji: '🐣', check: 'reject', notes: false, hints: 3, blurb: 'Fewer clues'},
+  {name: 'Intermediate', emoji: '🔦', check: 'reject', notes: true, hints: 3, blurb: 'Fewer clues · ✏️ notes'},
+  {name: 'Hard', emoji: '⚡', check: 'mark', notes: true, hints: 3, blurb: 'Even fewer clues'},
+  {name: 'Extreme', emoji: '🌋', check: 'mark', notes: true, hints: 1, blurb: 'Very few clues · 1 hint'},
+  {name: 'Hardcore', emoji: '💀', check: 'submit', notes: true, hints: 0, hardcore: true, blurb: 'The fewest clues · points ×3'}
 ];
+/* 🗺️ MAP × 🎚️ DIFFICULTY (p3b — Aowu F6): pick a map, then a difficulty. Bigger maps give more points (decision §5 Q2). */
+const MAPS = [
+  {k: '4', n: 4, box: [2, 2], mult: 1,    par: 150, name: '4 × 4', blurb: 'Four pictures',  clues: [[10, 10], [9, 9], [8, 8], [7, 7], [6, 6], [6, 6]]},
+  {k: '5', n: 5, box: null,   mult: 1.25, par: 240, name: '5 × 5', blurb: 'Wiggly areas',   clues: [[14, 15], [12, 13], [11, 12], [10, 11], [9, 10], [9, 9]]},
+  {k: '6', n: 6, box: [2, 3], mult: 1.5,  par: 420, name: '6 × 6', blurb: 'Six pictures',   clues: [[22, 24], [19, 20], [17, 18], [15, 16], [13, 14], [12, 12]]},
+  {k: '9', n: 9, box: [3, 3], mult: 2,    par: 900, name: '9 × 9', blurb: 'The classic',    clues: [[46, 50], [40, 45], [36, 40], [32, 36], [25, 30], [17, 17]]}
+];
+const DIFF_PAR = [1, 1.1, 1.25, 1.4, 1.7, 2.6], DIFF_BASE = [300, 500, 800, 1200, 1800, 2500];
+const MAP_START = {'4-5': '4', '6-7': '4', '8-9': '6', '10+': '9'};
+let MAP = '';   // the picked map key ('' = by age)
+function mapOf(k){ return MAPS.find(m => m.k === String(k)) || MAPS[0]; }
+function curMap(){ return mapOf(MAP || MAP_START[S.age] || '4'); }
+function levelFor(i, k){ const D = LEVELS[i], M = k == null ? curMap() : mapOf(k);
+  return Object.assign({}, D, {n: M.n, box: M.box, clues: M.clues[i], par: Math.round(M.par * DIFF_PAR[i]), base: DIFF_BASE[i], mult: M.mult, map: M.k, mapName: M.name, bank: !!D.hardcore && M.n === 9}); }
 // Each theme: 9 symbols (+ spoken names), play colours. Numbers is plain digits.
 const THEMES = {
   numbers:  {name: 'Numbers', icon: '🔢', syms: ['1','2','3','4','5','6','7','8','9'], names: ['one','two','three','four','five','six','seven','eight','nine'], c: ['#E9E6FF', '#B9B2FF'], box: ['#F5F3FF', '#E6E1FF'], line: '#3B3375', pic: false},
@@ -356,8 +383,8 @@ let S = {players: [], progress: {}, settings: {}, avatars: {}, player: '', age: 
 let G = null, theme = 'numbers', timerId = 0, lockHandle = null;
 window.feedbackContext = () => ({page: 'Digitinct', game: GAME_ID, level: G ? LEVELS[G.lvl].name + ' · ' + THEMES[G.theme].name : ''});
 function prefKey(){ return 'sp_numbergrid_prefs:' + S.player; }
-function loadPrefs(){ try{ const p = JSON.parse(localStorage.getItem(prefKey()) || '{}'); if(THEMES[p.theme]) theme = p.theme; if(p.voice === false) voiceOn = false; }catch(e){} }
-function savePrefs(){ try{ localStorage.setItem(prefKey(), JSON.stringify({theme, voice: voiceOn})); }catch(e){} }
+function loadPrefs(){ try{ const p = JSON.parse(localStorage.getItem(prefKey()) || '{}'); if(THEMES[p.theme]) theme = p.theme; if(p.voice === false) voiceOn = false; MAP = MAPS.some(m => m.k === p.map) ? p.map : ''; }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(prefKey(), JSON.stringify({theme, voice: voiceOn, map: MAP})); }catch(e){} }
 function myAvatar(name){ return (S.avatars && S.avatars[name]) || defaultAvatar(name); }
 
 /* ================= PUZZLE ENGINE (any size, boxes or jigsaw areas) ================= */
@@ -406,7 +433,7 @@ function solve(grid, n, reg, limit, random){
 // New puzzle: a random full grid, then take clues away (random order) while the answer stays the only one.
 function makePuzzle(L){
   const n = L.n;
-  if(L.hardcore) return bankPuzzle();
+  if(L.bank) return bankPuzzle();   /* 🗺️ p3b: 17-clue bank = 9 × 9 Hardcore only */
   for(let tries = 0; tries < 30; tries++){
     const reg = L.box ? boxRegions(n, L.box[0], L.box[1]) : jigsawRegions(n);
     const full = solve(new Array(n * n).fill(0), n, reg, 1, true).sol;
@@ -464,17 +491,23 @@ function miniGrid(L){
   return '<div class="mini" style="grid-template-columns:repeat(' + n + ',' + (n === 9 ? 6 : 9) + 'px)">' + Array.from({length: cells}, (_, i) => '<i class="' + (f.has(i) ? 'f' : '') + '" style="' + (n === 9 ? 'width:6px;height:6px' : '') + '"></i>').join('') + '</div>';
 }
 function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">No score yet</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span>' + (b.timeSec ? '<span>⏱ ' + fmt(b.timeSec * 1000) + '</span>' : '') + '<span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
+function renderMaps(){   // 🗺️ p3b
+  const box = $('map-list'); if(!box) return; const cur = curMap().k;
+  box.innerHTML = MAPS.map(M => '<button class="mapc' + (M.k === cur ? ' on' : '') + '" data-k="' + M.k + '" data-sound="tap"><div class="nm">' + M.name + '</div>' + miniGrid(levelFor(0, M.k)) + '<div class="sub">' + M.blurb + '</div><div class="x">×' + M.mult + '</div></button>').join('');
+  box.querySelectorAll('.mapc').forEach(b => b.onclick = () => { MAP = b.dataset.k; savePrefs(); renderLevels(); });
+}
 function renderLevels(){
+  renderMaps();
   const box = $('level-list'); box.innerHTML = ''; if(window.UI && UI.leaders) UI.leaders($('leaders'), GAME_ID, S.player);
   const p = progressOf(S.player), rec = AGE_START[S.age];
-  LEVELS.forEach((L, i) => {
+  LEVELS.map((D, i) => levelFor(i)).forEach((L, i) => {
     const open = canPlay(i), done = p.unlocked > i, b = document.createElement('button');
     b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (L.hardcore ? ' hardcore' : ''); b.setAttribute('data-sound', open ? 'pop' : 'none');
     const clues = L.clues[0] === L.clues[1] ? L.clues[0] : L.clues[0] + '–' + L.clues[1];
     b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">🏅</span>' : open ? '' : '<span class="badge">🔒</span>') +
       '<div class="big">' + L.emoji + '</div><div class="nm">' + L.name + '</div>' + miniGrid(L) + '<div class="learn">' + L.n + ' × ' + L.n + ' · ' + clues + ' clues</div>' +
       '<div class="lives">' + (L.check === 'reject' ? '↩️ wrong ones bounce back' : L.check === 'mark' ? '🟥 wrong ones go red' : '💀 ✅ Submit at the end') + '</div>' +
-      '<div class="sub">' + (L.hardcore && !open ? '🔒 Beat Extreme to open 💀 Hardcore' : L.blurb) + '</div>' + bestHtml(p, i);
+      '<div class="sub">' + (L.hardcore && !open ? '🔒 Beat Extreme to open 💀 Hardcore' : L.blurb) + '</div>' + (L.mult > 1 ? '<div class="lives">🗺️ ' + L.mapName + ' · ×' + L.mult + ' points</div>' : '') + bestHtml(p, i);
     b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore' : i === 4 ? 'Pass Hard to unlock Extreme!' : 'Pass the level before to unlock it'); return; } startGame(i); };
     box.appendChild(b);
   });
@@ -483,7 +516,7 @@ function renderLevels(){
 /* ================= GAME ================= */
 function startGame(lvl, puzzle){
   clearInterval(timerId); hideResult();
-  const L = LEVELS[lvl], T = THEMES[theme], P = puzzle || makePuzzle(L);
+  const L = levelFor(lvl), T = THEMES[theme], P = puzzle || makePuzzle(L);   /* 🗺️ p3b */
   if(!P){ UI.toast('Could not make a puzzle — try again', 'err'); return; }
   const n = P.n, N = n * n;
   G = {lvl, L, theme, n, reg: P.reg, sol: P.sol, givens: P.givens.slice(), v: P.givens.slice(), given: P.givens.map(Boolean), notes: Array.from({length: N}, () => new Set()),
@@ -500,7 +533,7 @@ function startGame(lvl, puzzle){
   buildBoard(); buildPalette(); showScreen('play'); BAR.fit(); layout(); paintAll(); hud(); requestAnimationFrame(() => { if(G) layout(); });   /* again once the picture bar has its real height */
   timerId = setInterval(hud, 500);
   RUNQ.length = 0; G.running = false; buddyStart();
-  const msg = L.hardcore ? '💀 Hardcore: 17 clues — fill it all, then ✅ Submit!' : 'Every row, column and box: each ' + (T.pic ? 'picture' : 'number') + ' once!';
+  const msg = L.hardcore ? '💀 Hardcore: ' + L.clues[0] + ' clues — fill it all, then ✅ Submit!' : 'Every row, column and box: each ' + (T.pic ? 'picture' : 'number') + ' once!';
   showBanner(msg, L.hardcore ? 'bad' : 'gold'); say(L.hardcore ? 'Hardcore! Fill it all, then submit.' : 'Fill the grid. Each one once in every row, column and box.');
   $('tip-line').textContent = 'Tap a square, then a ' + (T.pic ? 'picture' : 'number') + '.';
 }
@@ -835,10 +868,10 @@ function finishGame(why, wrongCount){
   if(solved){
     stars = g.mistakes === 0 && g.hintsUsed === 0 && secs <= L.par ? 3 : g.mistakes <= 2 && g.hintsUsed <= 1 ? 2 : 1;
     if(g.hintsUsed) stars = Math.min(stars, 2);
-    score = Math.max(50, L.base + Math.max(0, L.par - secs) * (g.lvl + 1) * 2 - g.mistakes * 50 - g.hintsUsed * 100) * (L.hardcore ? 3 : 1);
+    score = Math.round(Math.max(50, L.base + Math.max(0, L.par - secs) * (g.lvl + 1) * 2 - g.mistakes * 50 - g.hintsUsed * 100) * (L.hardcore ? 3 : 1) * (L.mult || 1));   /* 🗺️ p3b: × map */
   }
   const stats = {solved: solved ? 1 : 0, cells: g.cells, lines: g.lines, perfect: solved && g.mistakes === 0 && g.hintsUsed === 0 ? 1 : 0, rounds: 1};
-  if(solved) saveWin(S.player, g.lvl, {timeSec: secs, stars, score, theme: g.theme, cleared: true, stats});
+  if(solved) saveWin(S.player, g.lvl, {timeSec: secs, stars, score, theme: L.mapName + ' · ' + g.theme, cleared: true, stats});   /* 🗺️ p3b: the map shows in the Archive */
   const T = THEMES[g.theme];
   if(solved){
     const cells = [...$('board').children]; cells.forEach((d, k) => { d.style.setProperty('--d', (((k / g.n) | 0) * 0.07 + (k % g.n) * 0.03).toFixed(2) + 's'); d.classList.add('wave'); });
@@ -917,4 +950,4 @@ boot();
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.chips', {rows: 3}); }</script>
 </body>
 </html>
-<!-- (r16+emoji+r32+back-1+p1a+p2) END OF NumberGrid.html -->
+<!-- (r16+emoji+r32+back-1+p1a+p2+p3b) END OF NumberGrid.html -->

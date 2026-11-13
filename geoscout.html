@@ -44,6 +44,7 @@
   .title{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;margin-bottom:12px;}
   .title h1{font-size:2.1rem;letter-spacing:.01em;} .title p{margin:0;color:var(--ink-soft);font-weight:700;}
   .title .logo{width:96px;height:64px;}
+  @media (orientation:landscape) and (max-height:500px){ .title{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:2px 12px;margin-bottom:4px;} .title .logo, .title .sub2, .title > p{display:none;} .title h1{font-size:1.35rem;} .section-head{margin-top:4px;margin-bottom:4px;} }   /* 🗂️ p3a */
   .title .sub2{font-size:0.78rem;font-weight:800;color:var(--teal);letter-spacing:.08em;text-transform:uppercase;}
   .who{display:inline-flex;align-items:center;gap:8px;margin-top:6px;background:var(--card);border-radius:14px;padding:6px 12px;font-weight:800;font-size:0.85rem;}
   .who button{border:none;background:none;color:var(--teal);font-weight:800;cursor:pointer;font-size:inherit;text-decoration:underline;padding:0;min-height:34px;}
@@ -200,7 +201,7 @@
   <div class="title"><canvas class="logo" id="logo2" width="192" height="128"></canvas><h1>GeoScout</h1><div class="sub2">Geometric · Scale · Count</div><p>Numbers you can touch — snap, split, weigh!</p>
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
   <div class="section-head">🎮 Way to play</div>
-  <div class="ways" id="way-list"></div>
+  <div id="way-list"></div>
   <div class="way-sub" id="way-sub"></div>
   <div class="opts">
     <div class="box"><h3>🎨 House theme <span class="note">(blocks, scale + room)</span></h3><div class="chips scroll" id="theme-list"></div></div>
@@ -820,12 +821,25 @@ function choosePlayer(name){
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">' + (unlockedOf(S.player) > i ? '🏅 Done' : 'Not done yet') + '</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span><span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
 function renderMenu(){ renderWays(); renderOpts(); renderLevels(); renderHow(); drawLogos(); if(window.UI && UI.leaders) UI.leaders($('leaders'), GAME_ID, S.player); }
+/* 🗂️ MODE GROUPS (p3a — Aowu F5: GeoScout gets mode boxes like every other game) */
+const MODE_GROUPS = [
+  {k: 'numbers', icon: '🧮', en: 'Number play', th: 'เล่นกับตัวเลข', c: '#3D6BFF'},
+  {k: 'shapes', icon: '🔷', en: 'Shapes + parts', th: 'รูปทรง · เศษส่วน', c: '#E07B12'},
+  {k: 'friends', icon: '⚔️', en: 'With friends', th: 'เล่นกับเพื่อน', c: '#D9480F'},
+  {k: 'story', icon: '📖', en: 'Story', th: 'เนื้อเรื่อง', c: '#8E5CF7'}
+];   // fixed order
+const MODE_GROUP_OF = {scale: 'numbers', count: 'numbers', tens: 'numbers', next: 'numbers', shape: 'shapes', frac: 'shapes', wobble: 'shapes', battle: 'friends', journey: 'story'};
+const MODE_ORDER = ['scale', 'count', 'tens', 'next', 'shape', 'frac', 'wobble', 'battle', 'journey'];
+window.MODE_TYPE = {scale: 'A balance-scale game', count: 'A number-block game', tens: 'A place-value game', next: 'A pattern game', shape: 'A shape-building game', frac: 'A fractions game', wobble: 'A tower-stacking game', battle: 'A 2-player tower duel', journey: 'A story adventure'};
 function renderWays(){
-  const box = $('way-list');
-  box.innerHTML = MODES_ON.map(k => { const W = GS.MODES[k]; return '<button class="way' + (SET.mode === k ? ' on' : '') + '" data-k="' + k + '" data-sound="tap"><div class="big">' + W.icon + '</div><div class="nm">' + W.name + '</div><div class="sub">' + W.sub + '</div></button>'; }).join('');
-  box.querySelectorAll('.way').forEach(b => b.onclick = () => { SET.mode = b.dataset.k; savePrefs(); box.querySelectorAll('.way').forEach(x => x.classList.toggle('on', x === b)); renderLevels(); renderHow(); renderOpp(); waySub(); });
+  UI.modeGroups($('way-list'), MODE_GROUPS, MODE_ORDER.filter(k => MODES_ON.indexOf(k) >= 0).map(k => { const W = GS.MODES[k];
+    return {k, g: MODE_GROUP_OF[k], icon: W.icon, name: W.name, sub: W.sub, on: SET.mode === k, next: k === 'journey' ? '👇 then pick a chapter' : k === 'battle' ? '👇 then pick who + a level' : '👇 then pick a level'}; }), {
+    next: () => $('level-head'),
+    onPick: k => { SET.mode = k; savePrefs(); renderLevels(); renderHow(); renderOpp(); waySub(); }
+  });
   waySub();
 }
+/* 🗂️ END MODE GROUPS (p3a) */
 function waySub(){ const W = GS.MODES[SET.mode]; $('way-sub').textContent = W.icon + ' ' + W.name + ' — ' + W.sub;
 }
 function renderOpts(){
@@ -1641,4 +1655,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (gs-4+p1d) END OF GeoScout.html -->
+<!-- (gs-4+p1d+p3a) END OF GeoScout.html -->

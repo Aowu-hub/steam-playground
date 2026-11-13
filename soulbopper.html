@@ -308,6 +308,7 @@
       <div class="opp-list" id="add-list"></div>
       <div id="team-box" style="margin-top:10px"></div>
     </div>
+    <div class="box" id="size-box"><h3>🗺️ Maze size <span class="note">(any size with any level — the level sets how the bots play)</span></h3><div class="chips" id="size-list"></div></div>
     <div class="box" id="theme-box"><h3>🎨 Pick a world <span class="note">(own pop + sudden death in each)</span></h3><div class="themes" id="theme-list"></div></div>
         <div class="box" id="skin-box"><h3>💣 My bomb <span class="note">(looks only — every bomb pops the same)</span></h3>
       <div class="chips" id="skin-who"></div>
@@ -427,6 +428,7 @@ var BOP = (function () {
   function newMatch(o) {
     o = o || {};
     var level = Math.max(0, Math.min(5, o.level | 0)), L = LEVELS[level];
+    if (o.size && o.size[0] >= 9 && o.size[1] >= 9) L = Object.assign({}, L, {w: o.size[0] | 1, h: o.size[1] | 1});   // 🗺️ p3c: a maze size picked apart from the difficulty
     var M = {level: level, L: L, mode: o.mode || 'battle', theme: o.theme || 'dino', seed: (o.seed >>> 0) || 7, specs: (o.players || []).slice(), teams: !!o.teams,
       stage: o.stage || null, ev: [], round: 0, wins: [], done: false, winner: -1, popId: 1, t: 0, gridVer: 0, ghosts: o.ghosts != null ? o.ghosts : level > 0, totalT: 0};
     M.rng = mkRng(M.seed);
@@ -1237,6 +1239,7 @@ const MODES = {
 const MODE_KEYS = ['battle', 'classic', 'hold', 'stage'];
 const MODE_READY = {battle: true, classic: true, hold: true, stage: true};
 /* 🗂️ MODE GROUPS (mg-1) */
+window.MODE_TYPE = {battle: 'A bomb maze battle', hold: 'A king-of-the-hill game', classic: 'A silly bomb party', stage: 'A bomb maze adventure'};   /* 🗂️ p3a: the "what kind of game" line on each mode card (mc-1) */
 const MODE_GROUPS = [
   {k: 'battle', icon: '⚔️', en: 'Battle', th: 'ต่อสู้', c: '#E0452B'},
   {k: 'party', icon: '💩', en: 'Party', th: 'ปาร์ตี้', c: '#C27C0E'},
@@ -1286,12 +1289,24 @@ const PAD_NAMES = ['A / ✕', 'B / ○', 'X / □', 'Y / △', 'L1', 'R1', 'L2',
 
 /* ================= STATE ================= */
 let S = {players: [], progress: {}, settings: {}, avatars: {}, player: '', age: '', bopper: {}};
-let SET = {mode: 'battle', level: 0, theme: 'dino', seats: [], teams: false, teamOf: {}};
+let SET = {mode: 'battle', level: 0, theme: 'dino', seats: [], teams: false, teamOf: {}, size: 'auto'};
+/* 🗺️ MAZE SIZE (p3c — Aowu F7: map × difficulty) */
+const MAZE_SIZES = [{k: 'auto', icon: '🎚️', name: 'Auto', note: 'grows with the level'}, {k: 's', icon: '🟩', name: 'Small', w: 9, h: 9}, {k: 'm', icon: '🟨', name: 'Medium', w: 11, h: 11},
+  {k: 'l', icon: '🟧', name: 'Large', w: 13, h: 11}, {k: 'xl', icon: '🟥', name: 'Huge', w: 15, h: 13}, {k: 'xxl', icon: '🟪', name: 'Giant', w: 17, h: 13}];
+function mazeOf(){ return MAZE_SIZES.find(z => z.k === SET.size) || MAZE_SIZES[0]; }
+function mazeWH(){ const z = mazeOf(), L = BOP.LEVELS[SET.level]; return z.w ? [z.w, z.h] : [L.w, L.h]; }
+function renderSizes(){
+  const box = $('size-box'); if(!box) return; box.classList.toggle('hidden', SET.mode === 'stage');
+  const cur = mazeOf().k, L = BOP.LEVELS[SET.level];
+  $('size-list').innerHTML = MAZE_SIZES.map(z => '<button class="chip' + (z.k === cur ? ' on' : '') + '" data-k="' + z.k + '" data-sound="tap">' + z.icon + ' ' + z.name + ' <small>' + (z.w ? z.w + '×' + z.h : L.w + '×' + L.h) + '</small></button>').join('');
+  $('size-list').querySelectorAll('.chip').forEach(b => b.onclick = () => { SET.size = b.dataset.k; savePrefs(); renderSizes(); const sub = $('setup-sub'); if(sub) sub.textContent = setupSub(); });
+}
+/* 🗺️ END MAZE SIZE */
 let G = null, lockHandle = null, KEYS = null, PADCFG = null;
 function ls(k, v){ try{ if(v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }catch(e){ return null; } }
 function store(k){ return 'sp_soulbopper_' + k + ':' + (S.player || ''); }
-function loadPrefs(){ try{ const p = JSON.parse(ls(store('prefs')) || '{}'); if(THEMES[p.theme]) SET.theme = p.theme; if(MODES[p.mode] && MODE_READY[p.mode]) SET.mode = p.mode; if(Array.isArray(p.seats)) SET.seats = p.seats.filter(n => typeof n === 'string').slice(0, 3); SET.teams = !!p.teams; SET.teamOf = p.teamOf || {}; }catch(e){} }
-function savePrefs(){ ls(store('prefs'), JSON.stringify({theme: SET.theme, mode: SET.mode, seats: SET.seats, teams: SET.teams, teamOf: SET.teamOf})); }
+function loadPrefs(){ try{ const p = JSON.parse(ls(store('prefs')) || '{}'); if(THEMES[p.theme]) SET.theme = p.theme; if(MODES[p.mode] && MODE_READY[p.mode]) SET.mode = p.mode; if(Array.isArray(p.seats)) SET.seats = p.seats.filter(n => typeof n === 'string').slice(0, 3); SET.teams = !!p.teams; if(MAZE_SIZES.some(z => z.k === p.size)) SET.size = p.size; SET.teamOf = p.teamOf || {}; }catch(e){} }
+function savePrefs(){ ls(store('prefs'), JSON.stringify({theme: SET.theme, mode: SET.mode, seats: SET.seats, teams: SET.teams, teamOf: SET.teamOf, size: SET.size})); }
 function myAvatar(name){ const a = S.avatars[name]; return a ? fixAv(a) : defaultAvatar(name || 'player'); }
 function playAv(av){ const a = JSON.parse(JSON.stringify(av)); a.eq = Object.assign({}, a.eq || {}); delete a.eq.ride; delete a.eq.hand; return a; }   // ride-ons stay home in the maze (back for the win dance)
 function bopInfo(name){ return (S.bopper && S.bopper[name]) || {}; }
@@ -1366,7 +1381,7 @@ function renderHow(){
 
 /* ================= SETUP ================= */
 function openSetup(lvl){
-  SET.level = lvl; const L = BOP.LEVELS[lvl], m = MODES[SET.mode];
+  SET.level = lvl; const L = BOP.LEVELS[lvl], m = MODES[SET.mode]; renderSizes();   /* 🗺️ p3c */
   if(LEVEL_UI[lvl].hardcore && SET.mode === 'battle') SET.seats = SET.seats.slice(0, 3);
   $('setup-logo').textContent = m.icon; $('setup-title').textContent = m.name + ' · ' + L.name;
   $('setup-sub').textContent = setupSub();
@@ -1378,8 +1393,8 @@ function openSetup(lvl){
 }
 function setupSub(){
   const L = BOP.LEVELS[SET.level];
-  if(SET.mode === 'battle') return 'Last one standing · best of ' + (SET.level >= 3 ? 5 : 3) + ' · ' + L.w + ' × ' + L.h + ' maze · ' + L.lives + ' ' + (L.lives > 1 ? 'lives' : 'life');
-  if(SET.mode === 'classic') return '💩 poo bombs · comeback throws from 1:00 · ' + L.w + ' × ' + L.h + ' maze';
+  if(SET.mode === 'battle') return 'Last one standing · best of ' + (SET.level >= 3 ? 5 : 3) + ' · ' + mazeWH().join(' × ') + ' maze · ' + L.lives + ' ' + (L.lives > 1 ? 'lives' : 'life');
+  if(SET.mode === 'classic') return '💩 poo bombs · comeback throws from 1:00 · ' + mazeWH().join(' × ') + ' maze';
   if(SET.mode === 'hold') return 'Hold the zone for ' + BOP.HOLD_TARGET[SET.level] + ' s in all — it adds up!' + (SET.level >= 3 ? ' The zone moves every 40 s.' : '');
   if(SET.mode === 'stage') return '7 worlds × 5 stages + a boss · catch every bot, then find the 🚪 exit · ' + L.lives + ' ' + (L.lives > 1 ? 'lives' : 'life') + ' · +1 friend can join';
   return '';
@@ -1492,7 +1507,7 @@ function startMatch(opts){
     specs.push({name: who, kind: k, human: false, team, bot: true});
   }
   const stage = SET.mode === 'stage' ? {world: SET.world, n: SET.stage, boss: SET.stage === 5, foeNames: fam} : null;
-  const M = BOP.newMatch({level: SET.level, mode: SET.mode, theme: stage ? WORLD_KEYS[SET.world] : SET.theme, teams: SET.mode === 'hold' && SET.teams, seed: (Date.now() & 0xffffff) ^ 0x5b, players: specs, ghosts: SET.mode === 'battle' && SET.level > 0, stage});
+  const M = BOP.newMatch({level: SET.level, size: SET.mode === 'stage' ? null : mazeWH(), mode: SET.mode, theme: stage ? WORLD_KEYS[SET.world] : SET.theme, teams: SET.mode === 'hold' && SET.teams, seed: (Date.now() & 0xffffff) ^ 0x5b, players: specs, ghosts: SET.mode === 'battle' && SET.level > 0, stage});
   M.joinNames = fam.length ? fam : ['Ben', 'Mia'];
   M.P.forEach(p => { if(p.human && p.name !== 'Guest' && window.BombSkins) p.skin = skinOf(p.name); });
   const avName = s => s.bot ? s.name.replace(/ \d+$/, '') : s.name, avOf = s => playAv(myAvatar(avName(s) === 'Guest' ? 'Guest' : avName(s)));
@@ -2455,4 +2470,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.themes', {rows: 2}); UI.pageRows('.skins', {rows: 2}); }</script>
 </body>
 </html>
-<!-- (sb-8+r33+back-1+modes-3+mg-1+p1c+sb-9a+sb-9a2+p2) END OF SoulBopper.html -->
+<!-- (sb-8+r33+back-1+modes-3+mg-1+p1c+sb-9a+sb-9a2+p2+p3a+p3c) END OF SoulBopper.html -->
