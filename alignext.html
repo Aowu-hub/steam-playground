@@ -614,13 +614,18 @@ const SK = (function(){
   const DIRS = [[1, 0], [0, 1], [1, 1], [1, -1]];
   // sizes each player gets: 3 sizes ×2 … 6 sizes (Pawn ×3)
   const SETS = {3: {6: 2, 4: 2, 1: 2}, 4: {6: 2, 4: 2, 2: 2, 1: 2}, 5: {6: 2, 5: 2, 4: 2, 2: 2, 1: 2}, 6: {6: 2, 5: 2, 4: 2, 3: 2, 2: 2, 1: 3}};
+  // 🗺️ p4a (Aowu F8): the board sets the COUNTS — 3×3 = only one King, bigger boards get more Pawns; the level sets which kinds
+  function setFor(sizes, N){ const set = Object.assign({}, SETS[sizes] || SETS[3]);
+    if(N <= 3 && set[6]) set[6] = 1; if(set[1]) set[1] = Math.max(set[1], N >= 7 ? 4 : N >= 5 ? 3 : set[1]); return set; }
+  // moveOK: false = place only · 'once' = ONE move per player per game (🔄 ×1) · true = move freely
   function make(N, line, sizes, opts){
     opts = opts || {};
-    const set = SETS[sizes] || SETS[3];
+    const set = setFor(sizes, N), once = opts.moveOK === 'once';
     return {kind: 'stack', W: N, H: N, line, n: 2, stacks: Array.from({length: N * N}, () => []), res: {1: Object.assign({}, set), 2: Object.assign({}, set)},
-      moveOK: !!opts.moveOK, power: !!opts.power, shield: null, noReturn: {}, plies: 0, hist: []};
+      moveOK: !!opts.moveOK, movesLeft: once ? {1: 1, 2: 1} : null, power: !!opts.power, shield: null, noReturn: {}, plies: 0, hist: []};
   }
-  function clone(st){ return Object.assign({}, st, {stacks: st.stacks.map(x => x.slice()), res: {1: Object.assign({}, st.res[1]), 2: Object.assign({}, st.res[2])}, shield: st.shield ? Object.assign({}, st.shield) : null, noReturn: Object.assign({}, st.noReturn), hist: st.hist.slice()}); }
+  const canMove = (st, p) => !!st.moveOK && (!st.movesLeft || st.movesLeft[p] > 0);
+  function clone(st){ return Object.assign({}, st, {stacks: st.stacks.map(x => x.slice()), res: {1: Object.assign({}, st.res[1]), 2: Object.assign({}, st.res[2])}, movesLeft: st.movesLeft ? Object.assign({}, st.movesLeft) : null, shield: st.shield ? Object.assign({}, st.shield) : null, noReturn: Object.assign({}, st.noReturn), hist: st.hist.slice()}); }
   const top = (st, i) => { const s = st.stacks[i]; return s.length ? s[s.length - 1] : null; };
   const owner = (st, i) => { const t = top(st, i); return t ? t.p : 0; };
   // can p put a piece of size s on square i?
@@ -628,7 +633,7 @@ const SK = (function(){
   function moves(st, p){
     const out = [], N2 = st.stacks.length;
     Object.keys(st.res[p]).forEach(k => { const s = Number(k); if(!(st.res[p][s] > 0)) return; for(let i = 0; i < N2; i++) if(canCover(st, i, s, p)) out.push({k: 0, s, to: i}); });
-    if(st.moveOK) for(let i = 0; i < N2; i++){ const t = top(st, i); if(!t || t.p !== p) continue; const nr = st.noReturn[p];
+    if(canMove(st, p)) for(let i = 0; i < N2; i++){ const t = top(st, i); if(!t || t.p !== p) continue; const nr = st.noReturn[p];
       for(let j = 0; j < N2; j++){ if(j === i || !canCover(st, j, t.s, p)) continue; if(nr && nr.from === j && nr.to === i) continue; out.push({k: 1, s: t.s, from: i, to: j}); } }
     return out;
   }
@@ -636,12 +641,12 @@ const SK = (function(){
   function apply(st, m, p){
     const u = {m, p, nr: st.noReturn[p], shield: st.shield, covered: top(st, m.to)};
     if(m.k === 0){ st.res[p][m.s]--; st.stacks[m.to].push({p, s: m.s}); }
-    else { const piece = st.stacks[m.from].pop(); st.stacks[m.to].push(piece); }
+    else { const piece = st.stacks[m.from].pop(); st.stacks[m.to].push(piece); if(st.movesLeft) st.movesLeft[p]--; }
     st.noReturn[p] = m.k === 1 ? {from: m.from, to: m.to} : null;
     st.plies++; st.hist.push(u); return u;
   }
   function undo(st){ const u = st.hist.pop(); if(!u) return; const m = u.m;
-    if(m.k === 0){ st.stacks[m.to].pop(); st.res[u.p][m.s]++; } else { const piece = st.stacks[m.to].pop(); st.stacks[m.from].push(piece); }
+    if(m.k === 0){ st.stacks[m.to].pop(); st.res[u.p][m.s]++; } else { const piece = st.stacks[m.to].pop(); st.stacks[m.from].push(piece); if(st.movesLeft) st.movesLeft[u.p]++; }
     st.noReturn[u.p] = u.nr; st.shield = u.shield; st.plies--; }
   // who owns a full line of tops now → {p: cells}
   const WINS = {};
@@ -718,7 +723,7 @@ const SK = (function(){
     list.forEach(pw => { const s2 = clone(st); applyPower(s2, pw, p); const w = winnerAfter(s2, p); const v = w ? (w.p === p ? 1e6 : -1e6) : evaluate(s2, p) - canWin(s2, 3 - p).length * 200; if(v > bv){ bv = v; best = pw; } });
     return best;
   }
-  return {SETS, make, clone, top, owner, canCover, moves, apply, undo, lines, winnerAfter, canWin, evaluate, powers, applyPower, bestMove, bestPower, POWER_NAME};
+  return {SETS, setFor, canMove, make, clone, top, owner, canCover, moves, apply, undo, lines, winnerAfter, canWin, evaluate, powers, applyPower, bestMove, bestPower, POWER_NAME};
 })();
 // ENGINE END
 
@@ -744,9 +749,10 @@ const LEVELS = {
     {name: 'Hardcore', emoji: '💀', W: 7, H: 7, line: 5, depth: 4, noise: 1, ms: 800, cards: true, timer: 10, hardcore: true, blurb: '7 × 7 · 10 s · no glow'},
   ],
 };
-// ♟️ Omnifile STACK per level: sizes each player gets (3 = King, Rook, Pawn ×2 … 6 = all six, Pawn ×3), moving pieces from Junior, ⚡ power mode switch from Hard (always on in Hardcore)
-const STACK_LV = [{sizes: 3, move: false, depth: 1, miss: 0.35, noise: 4, ms: 250}, {sizes: 3, move: true, depth: 2, miss: 0.12, noise: 3, ms: 350}, {sizes: 4, move: true, depth: 2, miss: 0.05, noise: 2, ms: 450},
-  {sizes: 5, move: true, depth: 3, noise: 1.5, ms: 600, power: 'switch'}, {sizes: 6, move: true, depth: 3, noise: 1, ms: 700, power: 'switch'}, {sizes: 6, move: true, depth: 3, noise: 0, ms: 900, power: 'on'}];
+// ♟️ Omnifile STACK per level (p4a — Aowu F8): which piece KINDS you get (3 = King, Rook, Pawn … 6 = all six; the board sets how many, SK.setFor),
+//   🌱 Basic → ⚡ Hard = place only · 🌋 Extreme = 🔄 one move per game · 💀 Hardcore = move freely + ⚡ powers
+const STACK_LV = [{sizes: 3, move: false, depth: 1, miss: 0.35, noise: 4, ms: 250}, {sizes: 3, move: false, depth: 2, miss: 0.12, noise: 3, ms: 350}, {sizes: 4, move: false, depth: 2, miss: 0.05, noise: 2, ms: 450},
+  {sizes: 5, move: false, depth: 3, noise: 1.5, ms: 600}, {sizes: 6, move: 'once', depth: 3, noise: 1, ms: 700}, {sizes: 6, move: true, depth: 3, noise: 0, ms: 900, power: 'on'}];
 const DUO_SIZES = {
   drop: [{k: 's', W: 6, H: 5, line: 4, label: '6×5 · 4 in a row'}, {k: 'm', W: 7, H: 6, line: 4, label: '7×6 · 4 in a row'}, {k: 'l', W: 8, H: 7, line: 5, label: '8×7 · 5 in a row'}, {k: 'xl', W: 10, H: 8, line: 6, label: '10×8 · 6 in a row'}],
   omni: [{k: 's', W: 3, H: 3, line: 3, label: '3×3 · 3 in a row'}, {k: 'm', W: 4, H: 4, line: 3, label: '4×4 · 3 in a row'}, {k: 'l', W: 5, H: 5, line: 4, label: '5×5 · 4 in a row'}, {k: 'xl', W: 7, H: 7, line: 5, label: '7×7 · 5 in a row'}],
@@ -851,8 +857,8 @@ function mgRender(){
 /* 🗂️ END MODE GROUPS */
 function setVariant(v){ variant = v; lsSet('variant', v); renderMenu(); }
 function togglePower(){ powerOn = !powerOn; lsSet('power', powerOn ? '1' : '0'); $('sw-power').classList.toggle('on', powerOn); renderMenu(); }
-function stackBlurb(i){ const K = STACK_LV[i], names = Object.keys(SK.SETS[K.sizes]).map(Number).sort((a, b) => b - a).map(z => PieceSkins.NAMES[PieceSkins.TYPE_OF[z]]).join(' · ');
-  return '♟️ ' + names + (K.move ? ' · move pieces' : '') + (K.power === 'on' || (K.power && powerOn) ? ' · ⚡ powers' : ''); }
+function stackBlurb(i){ const K = STACK_LV[i], L = levelFor('omni', i), set = SK.setFor(K.sizes, L.W), names = Object.keys(set).map(Number).sort((a, b) => b - a).map(z => PieceSkins.NAMES[PieceSkins.TYPE_OF[z]] + (set[z] === 1 ? ' ×1' : '')).join(' · ');
+  return '♟️ ' + names + (K.move === 'once' ? ' · 🔄 1 move' : K.move ? ' · move freely' : ' · place only') + (K.power === 'on' ? ' · ⚡ powers' : ''); }   /* p4a */
 function toggleSeries(){ seriesOn = !seriesOn; lsSet('series', seriesOn ? '1' : '0'); $('sw-series').classList.toggle('on', seriesOn); }
 function bestHtml(p, i){
   const b = (p.best || [])[i];
@@ -861,7 +867,7 @@ function bestHtml(p, i){
 }
 const RULES = {
   drop: ['🃏 From Intermediate: skill cards! Play 1 card per turn before you drop. Make 3 in a line for a new card, a 2×2 square for a better one (hold 3). A card can\'t win by itself: on a card turn you can\'t finish a line — set it up for next turn.', 'Tap a column (or drag your disc over it) — the disc falls to the lowest free spot.', 'Make a line across, up or diagonal before the other side does.', 'Basic + Junior: 4 in a row · Hard + Extreme: 5 · 💀 Hardcore: 6.', 'A glowing spot = somebody can win there next move — block it!', 'Extreme and Hardcore have a turn clock — when it runs out a random move is played.'],
-  stack: ['♟️ Stack: every player has pieces in sizes — 👑 King is the biggest, ♟️ Pawn the smallest.', 'Put a piece on an empty square, or COVER a smaller piece (yours or theirs). Only the TOP piece counts.', 'From Junior you may MOVE one of your top pieces instead — but lifting it shows what is under it!', 'A piece you just moved can\'t jump straight back next turn.', '⚡ Power mode (switch from Hard, always on in Hardcore): a piece that lands may do its chess move once — Rook / Bishop / Queen push, Knight jumps, King shields its square.'],
+  stack: ['♟️ Stack: every player has pieces in sizes — 👑 King is the biggest, ♟️ Pawn the smallest.', 'Put a piece on an empty square, or COVER a smaller piece (yours or theirs). Only the TOP piece counts.', '🌱 Basic → ⚡ Hard: PLACE only — a piece stays where you put it. 🌋 Extreme: you may MOVE one top piece ONCE per game (🔄 ×1). 💀 Hardcore: move freely — but lifting a piece shows what is under it!', 'A piece you just moved can\'t jump straight back next turn.', 'The board sets how many pieces you get: 3×3 = only ONE 👑 King; bigger boards give more Pawns.', '⚡ Powers (💀 Hardcore, or the family chip): a piece that lands may do its chess move once — Rook / Bishop / Queen push, Knight jumps, King shields its square.'],
   omni: ['🃏 From Hard: skill cards — 1 per turn, before your move. 3 in a line = a new card. On a card turn you can\'t finish a line.', 'Tap any empty square to put your piece there.', 'Make a line across, down or diagonal: 3 in a row on 3×3, more on bigger boards.', 'A glowing square = somebody can win there next move — block it!', 'Extreme and Hardcore have a turn clock — when it runs out a random move is played.'],
 };
 function renderMenu(){
@@ -873,7 +879,7 @@ function renderMenu(){
   const stk = mode === 'omni' && variant === 'stack';
   $('variant-row').classList.add('hidden');   // mg-1: Classic / Stack are mode buttons now
   $('var-classic').classList.toggle('on', !stk); $('var-stack').classList.toggle('on', stk);
-  $('sw-power').classList.toggle('hidden', !stk); $('sw-power').classList.toggle('on', powerOn);
+  $('sw-power').classList.add('hidden');   // p4a: ⚡ powers = 💀 Hardcore only (Aowu F8)
   $('skin-row').classList.toggle('hidden', !stk && mode !== 'drop');
   $('skin-head').textContent = stk ? '🎨 My Stack pieces (also in ♟️ Chess)' : '🎨 My discs (also in 🔴 Checkers)';
   if(stk && window.PieceSkins) PieceSkins.chips($('skin-chips'), PieceSkins.get(S.player), k => { PieceSkins.set(S.player, k); }, true, '🌍 Match the world');
@@ -984,7 +990,7 @@ function startGame(opts){
   const start = series.game % names.length;   // the first player changes every game of a best of 3
   const stack = m === 'omni' && (bot ? variant === 'stack' : !!opts.stack);
   const K = bot ? STACK_LV[opts.lvl] : {sizes: L.W <= 3 ? 3 : L.W <= 4 ? 4 : L.W <= 5 ? 5 : 6, move: true};
-  const power = stack && (bot ? (K.power === 'on' || (K.power === 'switch' && powerOn)) : !!opts.power);
+  const power = stack && (bot ? K.power === 'on' : !!opts.power);   /* p4a */
   const st = stack ? SK.make(L.W, L.line, K.sizes, {moveOK: K.move, power}) : AX.make(m, L.W, L.H, L.line, names.length);
   const seats = names.map((n, i) => ({name: n, bot: (bot && i === 1) || /^Robo \d$/.test(n), av: myAvatar(n), col: COLORS[i], p: i + 1, lines: 0,
     x: 0, tx: 0, walkT: 0, dir: i % 2 ? -1 : 1, g: null, gt0: 0, gloop: false, kind: '', next: performance.now() + 2500 + Math.random() * 3000, placed: false, hand: [], cardsPlayed: 0}));
@@ -1305,7 +1311,7 @@ function renderReserve(){
   if(s.bot || G.over){ box.innerHTML = ''; return; }
   const r = st.res[s.p];
   box.innerHTML = Object.keys(r).map(Number).sort((a, b) => b - a).map(z => '<button class="cardbtn mini res' + (G.sel && G.sel.k === 0 && G.sel.s === z ? ' on' : '') + '" data-size="' + z + '" ' + (r[z] > 0 ? '' : 'disabled') + ' title="' + PieceSkins.NAMES[PieceSkins.TYPE_OF[z]] + '">' +
-    PieceSkins.img(s.skin, PieceSkins.TYPE_OF[z], 1, 'res-img', s.col, true) + '<b>×' + r[z] + '</b></button>').join('') + (st.moveOK ? '<span class="hand-empty">or tap one of your top pieces to move it</span>' : '');
+    PieceSkins.img(s.skin, PieceSkins.TYPE_OF[z], 1, 'res-img', s.col, true) + '<b>×' + r[z] + '</b></button>').join('') + (SK.canMove(st, s.p) ? '<span class="hand-empty">' + (st.movesLeft ? '🔄 1 move left — ' : '') + 'or tap one of your top pieces to move it</span>' : st.movesLeft ? '<span class="hand-empty">🔄 move used</span>' : '');
   box.querySelectorAll('.cardbtn').forEach(b => b.onclick = () => { const z = Number(b.getAttribute('data-size')); G.sel = {k: 0, s: z}; UISound.play('key'); renderReserve(); });
 }
 // squares where the selected piece may go
@@ -1320,12 +1326,12 @@ function stackTap(i, from){
   const st = G.st, s = G.seats[G.cur], t = SK.top(st, i);
   if(G.powerSel){ const pw = G.powerSel.list.find(x => (x.kind === 'shield' ? x.at : x.kind === 'jump' ? x.to : x.from) === i); if(pw) finishPower(pw); else UISound.play('bump'); return; }
   // a drag from one of my pieces to another square = move it
-  if(from != null && from >= 0 && from !== i){ const tf = SK.top(st, from); if(tf && tf.p === s.p && st.moveOK) G.sel = {k: 1, from, s: tf.s}; }
+  if(from != null && from >= 0 && from !== i){ const tf = SK.top(st, from); if(tf && tf.p === s.p && SK.canMove(st, s.p)) G.sel = {k: 1, from, s: tf.s}; }
   const list = SK.moves(st, s.p);
   if(G.sel){ const m = list.find(x => x.to === i && x.k === G.sel.k && (x.k === 0 ? x.s === G.sel.s : x.from === G.sel.from)); if(m){ stackDo(m); return; } }
-  if(t && t.p === s.p && st.moveOK){ if(G.sel && G.sel.k === 1 && G.sel.from === i){ const big = biggestLeft(s.p); G.sel = big ? {k: 0, s: big} : null; } else { G.sel = {k: 1, from: i, s: t.s}; showBanner('🫴 Lifted your ' + PieceSkins.NAMES[PieceSkins.TYPE_OF[t.s]] + ' — tap where it goes'); } UISound.play('key'); renderHand(); return; }
+  if(t && t.p === s.p && SK.canMove(st, s.p)){ if(G.sel && G.sel.k === 1 && G.sel.from === i){ const big = biggestLeft(s.p); G.sel = big ? {k: 0, s: big} : null; } else { G.sel = {k: 1, from: i, s: t.s}; showBanner('🫴 Lifted your ' + PieceSkins.NAMES[PieceSkins.TYPE_OF[t.s]] + ' — tap where it goes'); } UISound.play('key'); renderHand(); return; }
   UISound.play('bump');
-  showBanner(t && !SK.canCover(st, i, G.sel ? G.sel.s : 1, s.p) ? (G.st.shield && G.st.shield.i === i ? '🛡️ Shielded this turn!' : 'Only a BIGGER piece can cover that one') : t && !st.moveOK ? 'Moving pieces starts on Junior' : 'Pick a piece size first', 'warn');
+  showBanner(t && !SK.canCover(st, i, G.sel ? G.sel.s : 1, s.p) ? (G.st.shield && G.st.shield.i === i ? '🛡️ Shielded this turn!' : 'Only a BIGGER piece can cover that one') : t && !SK.canMove(st, s.p) ? (st.movesLeft ? '🔄 You used your 1 move this game' : st.moveOK ? 'Pick a piece size first' : 'Moving pieces: 🌋 Extreme (1 move) and 💀 Hardcore') : 'Pick a piece size first', 'warn');
 }
 function stackDo(m){
   if(!G.view) layout();
@@ -1968,4 +1974,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11x-5+back-1+modes-3+mg-1+p1d+p3a+p3e) END OF Alignext.html -->
+<!-- (11x-5+back-1+modes-3+mg-1+p1d+p3a+p3e+p4a) END OF Alignext.html -->
