@@ -182,6 +182,7 @@
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-3b: the cheering crowd (CheerSquad.html) -->
 </head>
 <body ontouchstart="">
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
@@ -196,6 +197,7 @@
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
   <div class="section-head">Pick a level</div>
   <div class="levels" id="level-list"></div>
+  <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the board">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-3b -->
   <details class="rules"><summary>📖 How to play</summary><ul>
     <li><b>Flip:</b> tap a card (or use the arrow keys + Enter/Space). Then flip another one.</li>
     <li><b>Match:</b> two the same? They stay up and you go again. Not the same? They flip back — remember where they were!</li>
@@ -298,7 +300,7 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : ''; SEATS = [name];
-  loadPrefs(); $('who-name').textContent = name; renderLevels(); showScreen('menu');
+  loadPrefs(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-3b */ renderLevels(); showScreen('menu');
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">No score yet</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span>' + (b.timeSec ? '<span>⏱ ' + fmt(b.timeSec * 1000) + '</span>' : '') + '<span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
@@ -342,15 +344,15 @@ function startGame(lvl){
   G = {lvl, L, D, cards, pairs, open: [], wait: false, over: false, paused: false, t0: 0, pausedTotal: 0, started: false, cursor: 0, seen: {},
     players: SEATS.map((n, i) => ({name: n, col: SEAT_COLS[i], pairs: 0, score: 0, miss: 0, streak: 0, best: 0})), turn: 0, found: 0, swaps: 0};
   BAR.level(L.emoji + ' ' + L.name + ' · ' + D.icon);
-  buildBoard(); buildSide(); showScreen('play'); layout(); hud();
+  buildBoard(); buildSide(); showScreen('play'); layout(); hud(); cheerMount(); /* 📣 cs-3b */
   if(L.peek){
-    G.wait = true; G.cards.forEach(c => c.up = true); paintAll(); let left = L.peek; $('peek').classList.remove('hidden'); $('peek').textContent = '👀 Remember them! ' + left;
+    G.wait = true; G.cards.forEach(c => c.up = true); paintAll(); if(window.Cheer) Cheer.hush(true);   /* 🤫 cs-3b: everyone memorises */ let left = L.peek; $('peek').classList.remove('hidden'); $('peek').textContent = '👀 Remember them! ' + left;
     say('Look carefully!');
     const tk = setInterval(() => { if(!G || G.over){ clearInterval(tk); return; } if(G.paused) return; left--; $('peek').textContent = '👀 Remember them! ' + left;
       if(left <= 0){ clearInterval(tk); $('peek').classList.add('hidden'); G.cards.forEach(c => c.up = false); paintAll(); G.wait = false; go(); } }, 1000);
   } else go();
 }
-function go(){ G.started = true; G.t0 = performance.now(); G.pausedTotal = 0; if(G.players.length > 1) turnCard(0, true); else showBanner('🃏 Find all ' + G.pairs + ' pairs!'); timerId = setInterval(hud, 500); }
+function go(){ G.started = true; cheerGo(); /* 📣 cs-3b */ G.t0 = performance.now(); G.pausedTotal = 0; if(G.players.length > 1) turnCard(0, true); else showBanner('🃏 Find all ' + G.pairs + ' pairs!'); timerId = setInterval(hud, 500); }
 function buildBoard(){
   const b = $('board'); b.innerHTML = ''; b.style.gridTemplateColumns = 'repeat(' + G.L.cols + ', var(--cs))'; b.style.setProperty('--deck-back', G.D.back);
   G.cards.forEach((c, i) => { const el = document.createElement('button'); el.className = 'card'; el.dataset.i = i; el.setAttribute('aria-label', 'Card ' + (i + 1)); el.setAttribute('data-sound', 'none');
@@ -405,7 +407,7 @@ function flip(i){
       const gain = 100 + 50 * (P.streak - 1); P.score += gain; UISound.play('success'); sparkle(a.el); sparkle(b.el);
       const mine = $('mine-' + G.turn); if(mine) mine.insertAdjacentHTML('beforeend', '<i>' + a.f + '</i>');
       cheer(G.turn, P.streak >= 3 ? pick(['dance', 'floss', 'backflip']) : pick(['cheer', 'clap', 'jump', 'highfive'])); G.players.forEach((o, j) => { if(j !== G.turn) cheer(j, 'clap'); });
-      floatText(b.el, '+' + gain + (P.streak > 1 ? ' 🔥×' + P.streak : ''));
+      floatText(b.el, '+' + gain + (P.streak > 1 ? ' 🔥×' + P.streak : '')); cheerSay('goal', G.turn); /* 📣 cs-3b */
       if(P.streak === 3 || P.streak === 5 || P.streak === 8) showBanner('🔥 ' + P.streak + ' in a row! ' + pick(PRAISE) + '!', 'gold');
       G.open = []; G.wait = false; hud();
       if(G.found === G.pairs) setTimeout(finishGame, 500);
@@ -413,7 +415,7 @@ function flip(i){
   } else {
     // 💀 Hardcore: a "forgot" = you had already seen the match of your first card, or your second card was one you had seen
     const partner = G.cards.find(c => c !== a && c.f === a.f), forgot = G.L.hardcore && ((partner && G.seen[partner.id]) || G.seen[b.id]);
-    P.miss++; P.streak = 0; [a, b].forEach(c => { G.seen[c.id] = true; }); cheer(G.turn, pick(['shrug', 'think']));
+    P.miss++; P.streak = 0; cheerSay('miss', G.turn); /* 📣 cs-3b */ [a, b].forEach(c => { G.seen[c.id] = true; }); cheer(G.turn, pick(['shrug', 'think']));
     if(forgot){ hardcoreLose(a, b, partner); return; }
     setTimeout(() => {
       a.el.classList.add('miss'); b.el.classList.add('miss'); UISound.play('bump');
@@ -471,12 +473,12 @@ function leavePlay(){
   UI.confirm({icon: '◀', title: 'Leave this game?', body: 'This board won\'t be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(!G) return; resume(); if(ok) backToMenu(); });
 }
 function endEarly(){ leavePlay(); }
-function backToMenu(){ clearInterval(timerId); G = null; hideResult(); renderLevels(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); clearInterval(timerId); G = null; hideResult(); renderLevels(); showScreen('menu'); }
 function pauseGame(){ if(G && !G.paused){ G.paused = true; G.pausedAt = performance.now(); } }
 function resume(){ if(G && G.paused && !G.over){ G.pausedTotal += performance.now() - G.pausedAt; G.paused = false; } }
 
 // 💀 Hardcore: the run ends — show the card you had already seen, then a gentle result card (a lost run is not saved).
-function hardcoreLose(a, b, partner){
+function hardcoreLose(a, b, partner){ cheerEnd(null); /* 📣 cs-3b */
   G.over = true; clearInterval(timerId); hud();
   setTimeout(() => {
     if(!G) return; a.el.classList.add('miss'); b.el.classList.add('miss'); UISound.play('error');
@@ -500,7 +502,7 @@ function finishGame(){
   if(!G || G.over) return;
   G.over = true; clearInterval(timerId); hud();
   const thisGame = G, L = G.L, secs = Math.max(1, Math.round(elapsed() / 1000)), solo = G.players.length === 1, par = G.pairs * 6;
-  const top = Math.max.apply(null, G.players.map(p => p.pairs)), winners = G.players.filter(p => p.pairs === top);
+  const top = Math.max.apply(null, G.players.map(p => p.pairs)), winners = G.players.filter(p => p.pairs === top); cheerEnd(winners); /* 📣 cs-3b */
   G.players.forEach((p, i) => {
     if(solo) p.score += Math.max(0, par - secs) * 5 + (p.miss === 0 ? 300 : 0);
     if(solo && L.hardcore) p.score *= 3;   // 💀 Hardcore ×3
@@ -553,7 +555,25 @@ function saveText(res){
   return h;
 }
 function countUp(el, to, ms){ if(!el) return; const t0 = performance.now(); (function tick(now){ const p = Math.max(0, Math.min(1, (now - t0) / ms)); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))).toLocaleString(); if(p < 1) requestAnimationFrame(tick); })(t0); }
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+/* 📣 CHEERSQUAD (cs-3b) START — the crowd beside the board (CheerSquad.html, 📣 Cheer chat; same method as Chess / Checkers). Don't remove: the Cheer chat re-applies it. */
+function cheerTaken(){ return Array.from(document.querySelectorAll('#gbar, #board, #side, #turncard, #peek:not(.hidden), .top-btn')); }
+function cheerMount(){
+  if(!window.Cheer || !G) return; Cheer.unmount(); const box = $('scr-play');
+  Cheer.mount(box, {game: 'memory', players: G.players.map((p, i) => ({name: p.name, side: i, human: true})).concat(G.players.length < 2 ? [{name: 'Shuffles', side: 1, human: false}] : []), me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'overlay',
+    zones: () => Cheer.freeZones(box, cheerTaken), avoid: cheerTaken,
+    clear: b => { const B = box.getBoundingClientRect(), F = $('board').getBoundingClientRect(), l = F.left - B.left, t = F.top - B.top; return !(b.r > l - 3 && b.l < l + F.width + 3 && b.b > t - 3 && b.t < t + F.height + 3); }});
+}
+function cheerGo(){ if(!window.Cheer || !Cheer.active() || !G) return; Cheer.hush(false); Cheer.react('start', {side: 0}); }
+function cheerSay(kind, i){ if(!window.Cheer || !Cheer.active() || !G) return; Cheer.react(kind, {side: i}); }
+function cheerEnd(winners){ if(!window.Cheer || !Cheer.active() || !G) return; Cheer.hush(false);
+  if(!winners) return Cheer.react('lose', {side: G.turn});   /* 💀 hardcore: a card you'd seen */
+  if(winners.length !== 1) return Cheer.react('goal', {side: -1});   /* a tie: everyone claps */
+  Cheer.react('win', {side: G.players.indexOf(winners[0])}); }
+function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  const at = card.querySelector('.res-btns'); if(!at) return; card.insertBefore(c, at); card.insertBefore(cap, at); }, 900); }
+/* 📣 CHEERSQUAD END */
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-3b */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pick(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
@@ -594,4 +614,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11n+r32+back-1+modes-3+p1b+p1d) END OF Memory.html -->
+<!-- (11n+r32+back-1+modes-3+p1b+p1d+cs-3b) END OF Memory.html -->
