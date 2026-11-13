@@ -238,6 +238,7 @@ function doGet(e) {
     pyradive: 'PyraDive',   // 🔥 PyraDive: Drive · Dink · Dunk (🏐 PyraSpike volleyball, pd-1) — keep on its own line
     artifactory: 'Artifactory',   // 🏭 Artifactory: the maker app (server in ArtifactoryCode.gs) — keep on its own line
     tdstories: 'TDStories',   // 🏰 TD-Stories: tower-defence story books (+ 🧬 SkillKit shared library) — keep on its own line
+    sciencetory: 'Sciencetory',   // 🔬 Sciencetory: the science lab for your crafted things (server in SciencetoryCode.gs, sc-1) — keep on its own line
     workshop: 'Artifactory',   // 🔨 old Workshop address → Artifactory's Furniture Workshop area (af-1)
     room: 'Room',
     collection: 'Collection',
@@ -685,6 +686,7 @@ const MODES_ = [
   { game: 'pyraspike', id: 'small', icon: '🏫', name: 'PyraSpike Small 3v3', pitch: 'Drive, Dink, Dunk — 3 a side!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🏫 Small 3v3', feat: [['pyraspike', 'm_small']] } },
   { game: 'pyraspike', id: 'full', icon: '🏟️', name: 'PyraSpike Full 6v6', pitch: 'The big arena — 6 a side!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🏟️ Full 6v6', feat: [['pyraspike', 'm_full']] } },
   { game: 'pokadif', id: 'spot', icon: '🖼️', name: 'Find the Difference', pitch: 'Two pictures — poke every change!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '🖼️ Spot' } },
+  { game: 'sciencetory', id: 'mechanic', icon: '⚙️', name: 'Sciencetory Mechanic', pitch: 'Test your crafted things!', route: 'sciencetory', added: '2026-11-14', tried: { board: 'sciencetory', themeStart: '⚙️ Mechanic' } },
   { game: 'sla-brall', id: 'slashot', icon: '🏒', name: 'SlaShot', pitch: 'Table hockey — score goals!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaShot ·', feat: [['sla-brall', 'win_slashot']] } },
   { game: 'sla-brall', id: 'slapoof', icon: '🥒', name: 'SlaPoof', pitch: 'Pickleball — mind the kitchen!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaPoof ·', feat: [['sla-brall', 'win_slapoof']] } },
   { game: 'sla-brall', id: 'slaball', icon: '🎾', name: 'SlaBall', pitch: 'Tennis: 15, 30, 40, game!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaBall ·', feat: [['sla-brall', 'win_slaball']] } },
@@ -801,7 +803,7 @@ function modesData_(players) {
 /* ============ 📣 DASHBOARD NEWS ============ */
 // New games (first 14 days), 🌋 Extreme / 💀 Hardcore family records set in the last 7 days, games nobody has tried yet,
 // 🏁 milestones, ⚔️ close calls / 🚦 jams at the top, 📬 mail waiting and 🎂 birthdays (Settings Birthday_<Name> = 'MM-DD').
-const NEW_GAMES_ = [['pokadif', '2026-11-14', 'Poke the difference — be a little detective!'], ['blasoff', '2026-11-14', 'Soccer with your avatar — blast it in!'], ['pyraspike', '2026-11-14', 'Drive · Dink · Dunk — volleyball with a flame!'], ['tdstories', '2026-11-14', 'Story books: defend the tower!'], ['artifactory', '2026-11-08', 'Make it yourself — real tools, real lessons!'], ['georead', '2026-11-08', 'Hear the letters, bump them into words!'], ['geoscout', '2026-11-08', 'Numbers you can touch!'], ['beat-piano', '2026-11-08', '🎹 Piano + 🥁 Drums + 🎸 Band — new ways to play!'], ['wisdeck', '2026-11-08', 'Learn, quiz, collect!'], ['eyes-brain', '2026-11-07', 'Remember the number!'], ['polyplot', '2026-11-07', 'Close shapes, catch creatures!'], ['soul-bopper', '2026-11-07', 'Bomber maze + ghosts!'], ['snakeast', '2026-11-07', 'Ride your snake!'], ['alignext', '2026-11-07', 'Line them up!'], ['brawl-buddies', '2026-11-07', 'Cartoon bonk battle!'], ['pose-party', '2026-11-07', 'Strike a pose!'], ['sla-brall', '2026-11-06', '5 racket sports!'], ['beat-corner', '2026-11-04', 'Hit the beat!'], ['sweet-swap', '2026-11-03', 'Swap to match 3'], ['word-board', '2026-11-03', 'Crossword words'], ['number-board', '2026-11-03', 'Crossword math']];
+const NEW_GAMES_ = [['sciencetory', '2026-11-14', 'A science lab for the things you made!'], ['pokadif', '2026-11-14', 'Poke the difference — be a little detective!'], ['blasoff', '2026-11-14', 'Soccer with your avatar — blast it in!'], ['pyraspike', '2026-11-14', 'Drive · Dink · Dunk — volleyball with a flame!'], ['tdstories', '2026-11-14', 'Story books: defend the tower!'], ['artifactory', '2026-11-08', 'Make it yourself — real tools, real lessons!'], ['georead', '2026-11-08', 'Hear the letters, bump them into words!'], ['geoscout', '2026-11-08', 'Numbers you can touch!'], ['beat-piano', '2026-11-08', '🎹 Piano + 🥁 Drums + 🎸 Band — new ways to play!'], ['wisdeck', '2026-11-08', 'Learn, quiz, collect!'], ['eyes-brain', '2026-11-07', 'Remember the number!'], ['polyplot', '2026-11-07', 'Close shapes, catch creatures!'], ['soul-bopper', '2026-11-07', 'Bomber maze + ghosts!'], ['snakeast', '2026-11-07', 'Ride your snake!'], ['alignext', '2026-11-07', 'Line them up!'], ['brawl-buddies', '2026-11-07', 'Cartoon bonk battle!'], ['pose-party', '2026-11-07', 'Strike a pose!'], ['sla-brall', '2026-11-06', '5 racket sports!'], ['beat-corner', '2026-11-04', 'Hit the beat!'], ['sweet-swap', '2026-11-03', 'Swap to match 3'], ['word-board', '2026-11-03', 'Crossword words'], ['number-board', '2026-11-03', 'Crossword math']];
 const NEWS_ALIAS_ = { 'beat-piano': { id: 'beat-corner', name: 'BeatCorner 🎹 Piano + 🥁 Drums', icon: '🎹', route: 'beatcorner&game=piano' } };   // news ids that are a new way to play inside an existing game (plan 11-bc)
 function gameNewOrder_() { const seen = {}, out = []; NEW_GAMES_.forEach(x => { if (NEWS_ALIAS_[x[0]] || seen[x[0]]) return; seen[x[0]] = 1; out.push(x[0]); }); return out; }   // 🆕 gro-1: Gameroom newest first
 function safeNews_(players) { try { return newsFor_(players, new Date()); } catch (e) { return []; } }
@@ -1046,6 +1048,8 @@ const BUILT_IN_GAMES = [
     Status: 'Live', PageRoute: 'pyradive', Icon: '🔥', Description: 'Volleyball with your avatar — Drive · Dink · Dunk: 3 touches a side (bump, set, DUNK), a 🔥 Pyra meter that turns your next move into a Pyra… move, roles 🚀 Drive · 🪶 Dink · 💥 Dunk. 🏐 PyraSpike Beach 2v2 · Small 3v3 · Full 6v6, 6 levels, 1–2 players.' },
   { GameID: 'pokadif', GameName: 'Pokadif', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Science / Observation (attention, comparing, counting)',
     Status: 'Live', PageRoute: 'pokadif', Icon: '🔍', Description: 'Be a little detective: two pictures look the same, but a few things changed — poke every difference. Every picture is made on the spot (never the same twice) in the 6 house scenes; 🎨 colour · ➖➕ missing / extra · 📏 size · 🔺 shape · 🔄 turn / flip · 🔢 count, 6 levels, 🔍 magnifier hints.' },
+  { GameID: 'sciencetory', GameName: 'Sciencetory', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Science / Engineering (materials, forces, predicting)',
+    Status: 'Live', PageRoute: 'sciencetory', Icon: '🔬', Description: 'Test the things YOU made in Artifactory like a real lab: press, pull, twist, bend, drop, spin, float … — guess first, then watch the gauge. A test can break a thing (fix it with 🔧 repair, broken is never lost). ⚙️ Mechanic now; ⚗️ Chemistry, 🌈 Optics, 🌌 Cosmic and more coming.' },
   { GameID: 'sla-brall', GameName: 'SlaBrall', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Sport / Physics (spin, bounce, angles)',
     Status: 'Live', PageRoute: 'slabrall', Icon: '🏓', Description: '6 racket sports in one: SlaShot table hockey, SlaPoof pickleball, SlaBall tennis, SlaPong ping-pong, SlaBam badminton, SlaWall squash — beat the robot, play 2 players or 2 vs 2, spin shots and 14 power-ups' },
   { GameID: 'blasoff', GameName: 'BlasOff', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Sport / Physics (passing angles, power, teamwork)',
@@ -1247,6 +1251,11 @@ const LEVEL_GAMES = {
   // 🔍 Pokadif (pk-1): one board — 🖼️ Find the Difference cases (3 pictures); Theme = '🖼️ Spot · <scene>'. R2 adds ⏱️ Arcade on its own board.
   'pokadif': {
     badges: ['Rookie Eye', 'Sharp Spotter', 'Clue Finder', 'Keen Inspector', 'Super Sleuth', 'Master Detective'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  // 🔬 Sciencetory (sc-1): one board — Theme = '<section> · <test>' ('⚙️ Mechanic · Press')
+  'sciencetory': {
+    badges: ['Lab Basic', 'Lab Junior', 'Lab Intermediate', 'Lab Hard', 'Lab Extreme', 'Lab Hardcore'],
     levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
   },
   'sla-brall': {
@@ -1739,7 +1748,7 @@ function recordsFor_(gameId, players) {
 }
 
 // Games shown on the Achievements records board.
-const RECORD_GAMES = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'brawenture', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'beat-piano', 'beat-drums', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'pyraspike', 'pokadif'];
+const RECORD_GAMES = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'brawenture', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'beat-piano', 'beat-drums', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'pyraspike', 'pokadif', 'sciencetory'];
 // Per level: the fastest finish and the top score among active players.
 function gameRecords_(gameId, players) {
   const names = {};
@@ -2459,6 +2468,16 @@ const FEAT_DEFS = {
     hints: { name: 'Magnifier hints', icon: '🔍', kind: 'sum', hidden: true },
     oops: { name: 'Oops pokes', icon: '❌', kind: 'sum', hidden: true },
   },
+  // 🔬 Sciencetory feats (sc-1)
+  'sciencetory': {
+    tests: { name: 'Lab tests', icon: '🔬', kind: 'sum', tiers: [5, 25, 100] },
+    right: { name: 'Good guesses', icon: '🎯', kind: 'sum', tiers: [5, 25, 100] },
+    breaks: { name: 'Crash tests', icon: '💥', kind: 'sum', tiers: [1, 10, 50] },
+    records: { name: 'Family records', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },
+    testKinds: { name: 'Different tests', icon: '⚙️', kind: 'max', tiers: [3, 6, 12] },
+    samples: { name: 'Sample tests', icon: '🧪', kind: 'sum', hidden: true },
+    games: { name: 'Sciencetory runs', icon: '🔬', kind: 'sum', hidden: true },
+  },
   'sla-brall': {
     wins: { name: 'Match Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
     rally: { name: 'Rally Machine', icon: '🔁', kind: 'max', tiers: [10, 25, 50] },
@@ -2640,6 +2659,9 @@ const TITLE_DEFS = [
   { id: 'sb_golden', name: 'Golden Racket', icon: '⭐', hint: 'Score 5 points with a Legendary Shot', rule: f => featVal_(f, 'sla-brall', 'legend') >= 5 },
   { id: 'sb_champ', name: 'SlaBrall Champion', icon: '🏆', hint: 'Win a SlaBrall tournament', rule: f => featVal_(f, 'sla-brall', 'cups') >= 1 },
   { id: 'sb_cups', name: 'Cup Collector', icon: '🥇', hint: 'Win 5 SlaBrall tournaments', rule: f => featVal_(f, 'sla-brall', 'cups') >= 5 },
+  { id: 'sci_rat', name: 'Lab Rat', icon: '🐀', hint: 'Run 10 tests in Sciencetory', rule: f => featVal_(f, 'sciencetory', 'tests') >= 10 },
+  { id: 'sci_pilot', name: 'Test Pilot', icon: '🧑‍✈️', hint: 'Try all 12 ⚙️ Mechanic tests in Sciencetory', rule: f => featVal_(f, 'sciencetory', 'testKinds') >= 12 },
+  { id: 'sci_guess', name: 'Hypothesis Hero', icon: '🎯', hint: 'Guess 20 test results right in Sciencetory', rule: f => featVal_(f, 'sciencetory', 'right') >= 20 },
   { id: 'pk_eyes', name: 'Sharp Eyes', icon: '👀', hint: 'Find 50 differences in Pokadif', rule: f => featVal_(f, 'pokadif', 'found') >= 50 },
   { id: 'pk_eagle', name: 'Eagle Eye', icon: '🦅', hint: 'Finish 10 Pokadif pictures with no oops and no hint', rule: f => featVal_(f, 'pokadif', 'perfect') >= 10 },
   { id: 'pk_case', name: 'Case Closer', icon: '📁', hint: 'Solve 10 Pokadif cases', rule: f => featVal_(f, 'pokadif', 'cases') >= 10 },
@@ -2767,7 +2789,7 @@ function featBadges_(f) {
   return out;
 }
 function titleContext_(name, players) {
-  const cleared = {}, bigGames = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'pyraspike', 'pokadif'];
+  const cleared = {}, bigGames = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'pyraspike', 'pokadif', 'sciencetory'];
   let allRound = true;
   bigGames.forEach(g => {
     const p = g === 'maze' ? mazeProgressFor_(name) : levelProgressFor_(name, g);
@@ -3709,6 +3731,7 @@ const DAILY_GOALS = [
   { id: 'build', icon: '🔨', how: 'Build something in the Furniture Workshop today', r: d => (d.room.built || 0) >= 1 },
   { id: 'board', icon: '♟️', how: 'Beat the bot in Checkers or Chess today', r: d => d.rows.some(r => r.game === 'checkers' || r.game === 'chess') },
   { id: 'brawl', icon: '🥊', how: 'Win 2 brawls in Brawl Buddies today', r: d => d.rows.filter(r => r.game === 'brawl-buddies' && r.stars > 0).length >= 2 },
+  { id: 'sci', icon: '🔬', how: 'Run a science test in Sciencetory today', r: d => d.rows.some(r => r.game === 'sciencetory') },
   { id: 'poke', icon: '🔍', how: 'Solve a Pokadif case today', r: d => d.rows.some(r => r.game === 'pokadif' && r.stars > 0) },
   { id: 'pyra', icon: '🔥', how: 'Win a PyraDive volleyball match today', r: d => d.rows.some(r => r.game === 'pyraspike' && r.stars > 0) },
   { id: 'brawenture', icon: '🗺️', how: 'Finish a Brawenture tale today (any difficulty)', r: d => d.rows.some(r => r.game === 'brawenture' && r.stars > 0) },
@@ -4495,7 +4518,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -5626,6 +5649,253 @@ function artRepair(name, id) {
 // (bp-5) END OF ArtifactoryCode.gs
 
 ;
+/* ===== SciencetoryCode.gs ===== */
+/* SciencetoryCode.gs — 🔬 Sciencetory server (sc-1). Own file: Code.gs is past 300 KB (same pattern as ArtifactoryCode.gs).
+   Plan: Drive "Sciencetory — full plan.md". Shares Artifactory's data: the Artifacts tab (things you made) + the bag (ArtifactoryCode.gs).
+   ⚙️ Mechanic tests (SC-1): press · pull · twist · flex · fatigue · hardness · sharpness · drop · friction · balance · spin · float / leak.
+   Every test is a pure function of the thing (material + shape + quality) — the same thing always gives the same number, no luck.
+   A breakable test can break a thing (look.br → Artifactory's 🔧 repair, bp-5); 🧪 lab samples never belong to anyone and never stay broken.
+   Counts, never logs: Settings SciTests_<Name> = {t: {test: {n, best, of}}, runs, right, breaks}. Records: Archive board 'sciencetory'
+   (Theme '⚙️ Mechanic · Press'), family records = the best of every player's SciTests. */
+const SCI_GAME_ = 'sciencetory';
+
+// material → [mohs, density g/cm³, crush, pull, twist, tough 0-100, flex kind (s spring · b stays bent · x snaps · f floppy), flex deg, fatigue bends, friction μ]
+// kid-scale numbers (relative, rounded) — the lessons say which is stronger, never real engineering values
+const SCI_MATS_ = {
+  oak: [2.5, 0.75, 40, 80, 15, 55, 's', 20, 400, 0.5], bamboo: [2.5, 0.7, 60, 150, 20, 60, 's', 45, 2000, 0.4], teak: [3, 0.65, 50, 90, 18, 55, 's', 18, 500, 0.45],
+  iron: [4.5, 7.9, 250, 200, 150, 80, 'b', 4, 3000, 0.6], copper: [3, 8.96, 200, 210, 120, 85, 'b', 3, 800, 0.5], tin: [1.5, 7.3, 30, 15, 10, 60, 'b', 2, 150, 0.55],
+  bronze: [3.5, 8.8, 300, 250, 170, 70, 's', 8, 2500, 0.45], silver: [2.5, 10.5, 150, 140, 90, 80, 'b', 3, 900, 0.4], gold: [2.5, 19.3, 120, 120, 80, 85, 'b', 2, 700, 0.35],
+  zinc: [2.5, 7.1, 100, 100, 60, 40, 'b', 2, 300, 0.5], brass: [3.5, 8.5, 300, 300, 180, 75, 's', 12, 3000, 0.45], steel: [5.5, 7.85, 400, 450, 250, 90, 's', 30, 10000, 0.5],
+  granite: [6, 2.7, 200, 8, 10, 25, 'x', 1, 1, 0.7], jade: [6.5, 3.3, 300, 40, 30, 70, 'x', 2, 50, 0.4], crystal: [7, 2.65, 300, 30, 10, 20, 'x', 1, 1, 0.3],
+  ruby: [9, 4.0, 500, 50, 20, 35, 'x', 1, 1, 0.3], sapphire: [9, 4.0, 500, 50, 20, 35, 'x', 1, 1, 0.3], amethyst: [7, 2.65, 300, 30, 10, 20, 'x', 1, 1, 0.3],
+  clay: [5, 2.3, 150, 5, 5, 15, 'x', 1, 1, 0.6], glass: [5.5, 2.5, 300, 10, 6, 8, 'x', 1, 1, 0.2], sglass: [5.5, 2.5, 300, 10, 6, 8, 'x', 1, 1, 0.2],
+  fabric: [1, 0.3, 1, 40, 3, 95, 'f', 180, 99999, 0.6], leather: [1.5, 0.9, 2, 30, 5, 95, 'f', 180, 99999, 0.6], fdye: [1, 0.3, 1, 40, 3, 95, 'f', 180, 99999, 0.6],
+  filament: [2, 1.25, 60, 50, 25, 45, 's', 15, 300, 0.35], resin: [3, 1.2, 80, 40, 20, 25, 'x', 2, 50, 0.3], flower: [1, 0.5, 2, 2, 1, 30, 'f', 90, 99999, 0.5],
+  carbon: [1, 0.4, 5, 2, 1, 10, 'x', 1, 1, 0.6]
+};
+const SCI_MAT_NAME_ = { resin: 'Clear resin', fdye: 'Dyed fabric', sglass: 'Blue glass', filament: 'Plastic (PLA)', carbon: 'Charcoal' };
+// 🧪 lab samples — a bar of each material, for anyone (no crafted thing needed); never saved, never broken for good
+const SCI_SAMPLES_ = ['oak', 'bamboo', 'copper', 'steel', 'gold', 'granite', 'glass', 'clay', 'filament', 'fabric'];
+
+// kind → [chunk 0.3-1.4 (how much stuff there is), edge 0-1 (sharpness), tip ° (how far it tilts before it falls; 0 = rolls · -1 = can't stand), spin s (0 = not round), opens (1 = a container)]
+const SCI_SHAPE_ = {
+  cup: [0.9, 0.12, 0, 5, 1], bangle: [0.5, 0.12, -1, 8, 0], pen: [0.4, 0.2, -1, 2, 0], yoyo: [1.0, 0.1, 0, 14, 0], piece: [1.0, 0.15, 0, 6, 0], trophy: [1.2, 0.2, 0, 4, 1],
+  ball: [1.4, 0.05, 0, 9, 0], tbowl: [1.1, 0.12, 0, 7, 1], box: [1.2, 0.15, 0, 6, 0], goblet: [0.7, 0.15, 0, 4, 1],
+  gem: [1.0, 0.4, 40, 3, 0], ring: [0.4, 0.3, -1, 5, 0], necklace: [0.3, 0.2, -1, 0, 0], crown: [0.5, 0.45, 35, 4, 0], tag: [0.4, 0.35, -1, 0, 0],
+  board: [0.7, 0.4, 12, 0, 0], frame: [0.6, 0.35, 15, 0, 0], stand: [1.2, 0.35, 35, 0, 0], badge: [0.5, 0.4, -1, 0, 0], robot: [1.1, 0.35, 25, 0, 0], sign: [0.5, 0.45, 18, 0, 0],
+  medal: [0.45, 0.25, -1, 0, 0], key: [0.35, 0.55, -1, 0, 0], charm: [0.45, 0.3, -1, 0, 0],
+  bowl: [1.0, 0.12, 0, 7, 1], vase: [1.0, 0.15, 0, 4, 1], petbowl: [1.2, 0.12, 0, 6, 1],
+  scarf: [0.3, 0, -1, 0, 0], cape: [0.3, 0, -1, 0, 0], bag: [0.4, 0, 20, 0, 0], flag: [0.3, 0.1, -1, 0, 0], lantern: [0.8, 0.2, 22, 0, 0],
+  spoon: [0.45, 0.5, -1, 0, 0], whistle: [0.6, 0.25, 30, 0, 0], figure: [1.1, 0.25, 30, 0, 0],
+  owl: [1.1, 0.2, 30, 0, 0], fish: [1.1, 0.2, 24, 0, 0], cat: [1.1, 0.2, 30, 0, 0], boat: [1.1, 0.2, 20, 0, 0], bear: [1.1, 0.2, 32, 0, 0], turtle: [1.1, 0.2, 38, 0, 0],
+  pshape: [0.9, 0.3, 30, 0, 0], pspin: [0.9, 0.15, 0, 5, 0], basket: [0.6, 0.1, 35, 0, 1], hat: [0.5, 0.1, 40, 3, 0], fcharm: [0.6, 0.3, -1, 0, 0],
+  sample: [1.0, 0.3, 30, 6, 0]   // 🧪 a lab sample = a round test puck
+};
+const SCI_HW_ = { cup: 1.2, pen: 4, yoyo: 0.6, piece: 2, trophy: 2, ball: 1, tbowl: 0.55, box: 1, goblet: 1.6, bowl: 0.6, vase: 1.6, petbowl: 0.4, pspin: 1.5 };   // height ÷ width of turned things
+const SCI_ROLLS_ = { ball: 1, yoyo: 1, bangle: 1, ring: 1 };   // round things roll down a ramp instead of sliding
+const SCI_FLOATY_ = { boat: 0.35, box: 0.6 };       // closed / boat-shaped things: air inside makes them float higher
+
+// ⚙️ the 12 Mechanic tests — ch = what each level asks (🌱 → 💀) · bk3 / bk4 = range edges for the Hard+ guesses · br = what Artifactory's 🔧 repair calls the break (bp-5 keys)
+const SCI_TESTS_ = {
+  press:    { icon: '🏋️', name: 'Press', unit: 'kg', ch: [10, 25, 50, 100, 250, 500], bk3: [50, 300], bk4: [20, 100, 500], br: 'load', q: 'Will it hold {c} kg pressing down?' },
+  pull:     { icon: '🪢', name: 'Pull', unit: 'kg', ch: [5, 15, 40, 80, 150, 300], bk3: [50, 200], bk4: [20, 100, 400], br: 'bend', q: 'Will it hold when we pull with {c} kg?' },
+  twist:    { icon: '🔄', name: 'Twist', unit: '🖐️', ch: [0.3, 0.6, 1, 2, 4, 8], bk3: [1, 5], bk4: [0.5, 2, 8], br: 'bend', q: 'Will it survive a twist of {c} 🖐️?' },
+  flex:     { icon: '🌿', name: 'Flex', unit: '°', ch: [5, 10, 15, 25, 35, 50], bk3: [5, 25], bk4: [2, 10, 30], br: 'bend', q: 'Will it spring back after a {c}° bend?' },
+  fatigue:  { icon: '🔁', name: 'Fatigue', unit: 'bends', ch: [10, 25, 50, 100, 250, 1000], bk3: [50, 1000], bk4: [10, 200, 2000], br: 'bend', q: 'Will it last {c} little bends?' },
+  hardness: { icon: '💎', name: 'Hardness', unit: 'Mohs', ch: [2.5, 3.5, 5.5, 6.5, 7, 8], bk3: [3, 6], bk4: [2.5, 5, 7], q: 'Will it stay scratch-free from the {t}?' },
+  sharp:    { icon: '🔪', name: 'Sharpness', unit: '/10', ch: [1, 2, 3.5, 5, 6.5, 8], bk3: [2, 5], bk4: [1, 3.5, 6.5], q: 'Can its edge cut {t}?' },
+  drop:     { icon: '🪂', name: 'Drop', unit: 'm', ch: [0.2, 0.5, 1, 2, 4, 8], bk3: [0.5, 3], bk4: [0.3, 1, 5], br: 'drop', q: 'Will it survive a {c} m drop?' },
+  friction: { icon: '🛝', name: 'Friction', unit: '°', ch: [10, 15, 20, 25, 30, 35], bk3: [15, 25], bk4: [12, 20, 30], q: 'Will it stay put on a {c}° ramp?' },
+  balance:  { icon: '⚖️', name: 'Balance', unit: '°', ch: [5, 10, 15, 20, 25, 30], bk3: [15, 30], bk4: [10, 20, 35], q: 'Will it stay standing on a {c}° tilt?' },
+  spin:     { icon: '🌀', name: 'Spin', unit: 's', ch: [2, 3, 5, 7, 9, 12], bk3: [3, 7], bk4: [2, 5, 9], q: 'Will it spin for {c} seconds?' },
+  float:    { icon: '💧', name: 'Float / leak', unit: 'g/cm³', ch: [1, 1, 1, 1, 1, 1], bk3: [1, 3], bk4: [0.5, 1, 3], q: 'Will it float?', leak: { unit: 'min', ch: [1, 2, 5, 10, 30, 60], bk3: [2, 30], bk4: [1, 5, 60], q: 'Will it hold water for {c} min?' } }
+};
+const SCI_ORDER_ = ['press', 'pull', 'twist', 'flex', 'fatigue', 'hardness', 'sharp', 'drop', 'friction', 'balance', 'spin', 'float'];
+// the things the hardness + sharpness tests use, per level (kid-safe: a fingernail, a coin, a nail, a file, a quartz pebble, a topaz)
+const SCI_TOOLS_ = { hardness: [['💅', 'fingernail'], ['🪙', 'copper coin'], ['🔩', 'steel nail'], ['🪚', 'steel file'], ['🪨', 'quartz pebble'], ['💠', 'topaz stone']],
+  sharp: [['🟤', 'play dough'], ['📄', 'paper'], ['🧵', 'thread'], ['🪢', 'string'], ['🥕', 'a carrot'], ['🪵', 'soft wood']] };
+const SCI_MULT_ = [1, 1.25, 1.5, 2, 2.5, 7.5];   // 💀 Hardcore = ×3 of Extreme
+const SCI_INF_ = 99999;
+
+function sciMatOf_(a) {
+  const L = a.look || {}, k = a.kind;
+  if (k === 'fcharm') return 'resin';
+  if (k === 'gem' && SCI_MATS_[L.g]) return L.g;
+  const m = L.m || L.g || Object.keys(a.mats || {})[0] || 'oak';
+  return SCI_MATS_[m] ? m : 'oak';
+}
+function sciNum_(v, d) { const f = Math.pow(10, d || 0); return Math.round(v * f) / f; }
+// 🔍 everything a test needs about a thing (shape + material + how well it was made)
+function sciFacts_(a) {
+  const L = a.look || {}, kind = SCI_SHAPE_[a.kind] ? a.kind : 'sample', S = SCI_SHAPE_[kind], m = sciMatOf_(a), P = SCI_MATS_[m];
+  const q = L.q == null ? 80 : Math.max(0, Math.min(100, Number(L.q) || 0)), qf = 0.75 + q / 400, rep = Math.pow(0.92, Math.min(5, Number(L.rp) || 0)) * (L.kg ? 1.05 : 1);
+  let neck = 1, hollow = false, wall = 20, cgu = 0.5, base = 0.5;
+  const p = Array.isArray(L.p) && L.p.length >= 6 ? L.p.map(Number) : null;
+  if (p) {
+    const mx = Math.max.apply(null, p) || 1; neck = Math.max(0.15, Math.min.apply(null, p.slice(1, p.length - 1).concat([mx])) / mx);
+    let w = 0, s = 0; p.forEach((r, i) => { w += r * r; s += r * r * (i + 0.5) / p.length; }); cgu = w ? s / w : 0.5; base = Math.max(p[0], p[1] || 0) / mx;
+  }
+  if (Array.isArray(L.pi) && L.pi.some(v => v > 0) && p) { hollow = true; wall = 20; L.pi.forEach((v, i) => { if (v > 0) wall = Math.min(wall, (p[Math.min(i, p.length - 1)] || 0) - v); }); }
+  let chunk = S[0]; if (kind === 'board' && L.th != null) chunk = 0.3 + Math.max(0, Math.min(20, Number(L.th))) / 20 * 0.8;
+  return { kind: kind, m: m, P: P, S: S, q: q, qf: qf, rep: rep, neck: neck, hollow: hollow, wall: wall, cgu: cgu, base: base, chunk: chunk, floppy: P[6] === 'f', look: L };
+}
+// 🚫 which tests make no sense for a thing (a scarf can't stand up …) → reason text
+function sciNoFit_(a, test) {
+  const F = sciFacts_(a);
+  if (test === 'balance' && F.S[2] < 0) return 'It can’t stand up by itself — try something that stands.';
+  if (test === 'balance' && F.floppy) return 'Soft cloth flops over — try something that stands.';
+  if (test === 'spin' && (F.floppy || F.S[3] === 0 && ['necklace', 'tag', 'badge', 'medal', 'charm', 'key', 'flag'].indexOf(F.kind) >= 0)) return 'It can’t spin on its own — try something round.';
+  return '';
+}
+function sciOpenContainer_(F) { return !!F.S[4]; }   // cups, bowls, vases … get the 🫗 leak test, everything else the 💧 float test
+// 🧮 the measurement — returns {v (number, SCI_INF_ = never fails), pass, broke, how}
+function sciMeasure_(a, test, lv) {
+  const T = SCI_TESTS_[test], F = sciFacts_(a), P = F.P, ch = T.ch[lv];
+  const strong = F.qf * F.rep;
+  let v = 0, how = '', pass = false, broke = false;
+  if (test === 'press') {
+    v = F.floppy ? SCI_INF_ : P[2] * F.chunk * 2.5 * strong * (F.hollow ? 0.7 : 1);
+    pass = v >= ch; broke = !pass; how = F.floppy ? 'squish' : pass ? 'hold' : 'crush';
+  } else if (test === 'pull') {
+    v = P[3] * F.chunk * 1.5 * strong * (0.4 + 0.6 * F.neck);
+    pass = v >= ch; broke = !pass; how = pass ? (F.floppy ? 'stretch' : 'hold') : 'snap';
+  } else if (test === 'twist') {
+    v = F.floppy ? SCI_INF_ : P[4] * F.chunk * 0.08 * strong * (0.4 + 0.6 * F.neck);
+    pass = v >= ch; broke = !pass; how = F.floppy ? 'wring' : pass ? 'hold' : 'snap';
+  } else if (test === 'flex') {
+    const thin = Math.max(0.5, Math.min(1.6, 1.8 - F.chunk * 0.7));
+    if (P[6] === 's') { v = P[7] * thin * strong; pass = v >= ch; broke = ch > v * 1.6; how = pass ? 'spring' : broke ? 'snap' : 'bent'; }
+    else if (P[6] === 'b') { v = P[7] * thin; pass = v >= ch; how = pass ? 'spring' : 'bent'; }
+    else if (P[6] === 'x') { v = P[7] * thin; pass = v >= ch; broke = !pass; how = pass ? 'spring' : 'snap'; }
+    else { v = 0; pass = false; how = 'flop'; }
+  } else if (test === 'fatigue') {
+    v = F.floppy ? SCI_INF_ : Math.max(1, Math.round(P[8] * strong * (F.chunk < 0.6 ? 1.3 : 1)));
+    pass = v >= ch; broke = !pass; how = F.floppy ? 'flop' : pass ? 'hold' : 'crack';
+  } else if (test === 'hardness') {
+    v = P[0]; pass = v > ch; how = pass ? 'clean' : v === ch ? 'tiny' : 'scratch';
+  } else if (test === 'sharp') {
+    let e = F.S[1];
+    if (F.kind === 'gem') e = 0.6 + (Number(F.look.cut) || 0) * 0.1;
+    if (F.kind === 'pshape' && Array.isArray(F.look.ol)) { const o = F.look.ol, mx = Math.max.apply(null, o), mn = Math.min.apply(null, o); e = Math.min(0.6, 0.2 + (mx - mn) / 20 * 0.5); }
+    if (F.floppy) e = 0;
+    v = Math.min(10, e * Math.min(10, P[0]) * 1.6); pass = v >= ch; how = pass ? 'cut' : 'blunt';
+  } else if (test === 'drop') {
+    v = F.floppy ? SCI_INF_ : 0.1 * Math.pow(10, P[5] / 40) * strong / (1 + Math.max(0, P[1] - 8) / 20);
+    pass = v >= ch; broke = !pass; how = F.floppy ? 'flutter' : pass ? 'bounce' : 'shatter';
+  } else if (test === 'friction') {
+    if (SCI_ROLLS_[F.kind]) { v = 0; pass = false; how = 'roll'; }
+    else { const mu = Math.max(0.08, P[9] - (F.look.v ? 0.15 : 0) - (F.look.c ? 0.05 : 0)); v = Math.atan(mu) * 180 / Math.PI; pass = v > ch; how = pass ? 'grip' : 'slide'; }
+  } else if (test === 'balance') {
+    let tip = F.S[2];
+    if (tip === 0 && SCI_HW_[F.kind] && F.kind !== 'ball') tip = Math.atan(F.base * 0.5 / Math.max(0.15, SCI_HW_[F.kind] * F.cgu)) * 180 / Math.PI;
+    v = Math.max(0, tip); pass = v > ch; how = v === 0 ? 'roll' : pass ? 'stand' : 'topple';
+  } else if (test === 'spin') {
+    const round = F.S[3] > 0 && !F.floppy;
+    v = round ? F.S[3] * (0.7 + Math.min(1, P[1] / 9) * 0.6) * F.qf : 1.2;
+    pass = v >= ch; how = round ? (pass ? 'spin' : 'slow') : 'wobble';
+  } else if (test === 'float') {
+    if (sciOpenContainer_(F)) {   // 🫗 leak test: minutes it holds water
+      const L = F.look, porous = F.m === 'clay' && !L.c ? 3 : ['oak', 'bamboo', 'teak'].indexOf(F.m) >= 0 && !L.v ? 20 : 0;
+      v = F.kind === 'basket' ? 0.1 : F.hollow && F.wall < 1 ? 0.5 : porous || SCI_INF_; const lch = T.leak.ch[lv];
+      pass = v >= lch; how = v >= SCI_INF_ ? 'hold' : v <= 0.5 ? 'pour' : 'seep';   // seep = slowly, even when it lasts long enough
+      return { v: v, pass: pass, broke: false, how: how, leak: true };
+    }
+    v = P[1] * (SCI_FLOATY_[F.kind] || 1);   // a boat / a closed box has air inside → it floats higher than the wood alone
+    pass = v < 1; how = pass ? 'float' : v < 3 ? 'sink' : 'plop';
+  }
+  return { v: v, pass: pass, broke: broke, how: how, leak: false };
+}
+function sciBucket_(v, edges) { let i = 0; while (i < edges.length && v >= edges[i]) i++; return i; }
+function sciRound_(test, v) { if (v >= SCI_INF_) return SCI_INF_; return test === 'press' || test === 'pull' || test === 'fatigue' ? sciNum_(v, 0) : sciNum_(v, v < 1 ? 2 : 1); }
+
+/* ---------- data ---------- */
+function sciStats_(st, name) {
+  const s = jsonSetting_(st, 'SciTests_' + name, {}); const t = s.t && typeof s.t === 'object' ? s.t : {};
+  const out = { t: {}, runs: artInt_(s.runs, 0, 1e6), right: artInt_(s.right, 0, 1e6), breaks: artInt_(s.breaks, 0, 1e6) };
+  SCI_ORDER_.forEach(k => { const r = t[k]; if (r && typeof r === 'object') out.t[k] = { n: artInt_(r.n, 0, 1e6), best: Number(r.best) || 0, of: String(r.of || '').slice(0, 40), low: r.low != null ? Number(r.low) : null }; });
+  return out;
+}
+// 🏆 family records: the best of everyone's SciTests (floating = the LOWEST density floats highest)
+function sciFamily_(st, players) {
+  const rec = {};
+  players.forEach(p => { const s = sciStats_(st, p.Name); SCI_ORDER_.forEach(k => { const r = s.t[k]; if (!r || !r.n) return;
+    if (k === 'float') { if (r.low != null && (!rec[k] || r.low < rec[k].v)) rec[k] = { v: r.low, by: p.Name, of: r.of }; return; }
+    if (r.best > 0 && (!rec[k] || r.best > rec[k].v)) rec[k] = { v: r.best, by: p.Name, of: r.of }; }); });
+  return rec;
+}
+function sciThingsOf_(name) {
+  return artsOf_(name).map(a => { const x = publicArt_(a); x.sci = { m: sciMatOf_(a), no: {} }; SCI_ORDER_.forEach(t => { const r = sciNoFit_(a, t); if (r) x.sci.no[t] = r; }); x.sci.leak = sciOpenContainer_(sciFacts_(a)); return x; });
+}
+function sciMeta_() {
+  const samples = SCI_SAMPLES_.map(m => ({ m: m, name: (SCI_MAT_NAME_[m] || (ART_MATS_[m] ? ART_MATS_[m][1] : m)) + ' sample', icon: ART_MATS_[m] ? ART_MATS_[m][0] : '🧪' }));
+  return { tests: SCI_TESTS_, order: SCI_ORDER_, tools: SCI_TOOLS_, samples: samples, mult: SCI_MULT_, inf: SCI_INF_,
+    mats: Object.keys(SCI_MATS_).reduce((o, k) => { const P = SCI_MATS_[k]; o[k] = { mohs: P[0], dens: P[1], flex: P[6], tough: P[5], name: SCI_MAT_NAME_[k] || (ART_MATS_[k] ? ART_MATS_[k][1] : k), icon: ART_MATS_[k] ? ART_MATS_[k][0] : '🧪', group: ART_MATS_[k] ? ART_MATS_[k][2] : 'craft' }; return o; }, {}) };
+}
+// boot: every player's level progress + avatars (getLevelGameData) + this player's things + counts + family records
+function getSciencetoryData(player) {
+  const out = getLevelGameData(SCI_GAME_, player);
+  const players = activePlayers_(listProfilesFull()), st = out.settings || getSettings();
+  const me = player && players.some(p => p.Name === player) ? player : '';
+  out.player = me;
+  out.things = me ? sciThingsOf_(me) : [];
+  out.sci = me ? sciStats_(st, me) : sciStats_({}, '');
+  out.fam = sciFamily_(st, players);
+  out.meta = sciMeta_();
+  return out;
+}
+// another player picked on the page → their things + counts
+function getSciPlayer(name) {
+  checkPlayer_(name); const st = getSettings(), players = activePlayers_(listProfilesFull());
+  return { player: name, things: sciThingsOf_(name), sci: sciStats_(st, name), fam: sciFamily_(st, players) };
+}
+function sciThing_(name, ref) {
+  ref = String(ref || '');
+  if (/^sample:/.test(ref)) { const m = ref.slice(7); if (SCI_SAMPLES_.indexOf(m) < 0) throw new Error('Pick a lab sample.'); return { id: ref, kind: 'sample', name: (SCI_MAT_NAME_[m] || ART_MATS_[m][1]) + ' sample', look: { k: 'sample', m: m, q: 80 }, mats: {}, owners: [name], sample: true }; }
+  const a = artRows_().find(x => x.id === ref);
+  if (!a || a.owners.indexOf(name) === -1) throw new Error('You can only test your own things.');
+  return a;
+}
+// 🔬 run one test: (name, thing id | 'sample:<mat>', test, level 0-5, guess ('yes' | 'no' below Hard, a range index from Hard), rig 0-1 (how well it was set in the rig))
+function sciRun(name, ref, test, level, guess, rig) {
+  checkPlayer_(name);
+  const T = SCI_TESTS_[test]; if (!T) throw new Error('Pick a test.');
+  const lv = Math.max(0, Math.min(5, Math.floor(Number(level)) || 0)), rg = Math.max(0, Math.min(1, Number(rig) || 0));
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  let res;
+  try {
+    const a = sciThing_(name, ref);
+    if (a.look && a.look.br && !a.sample) throw new Error('It is broken — repair it in Artifactory first.');
+    const no = sciNoFit_(a, test); if (no) throw new Error(no);
+    const M = sciMeasure_(a, test, lv), val = sciRound_(test, M.v), meta = M.leak ? T.leak : T, ranges = lv >= 4 ? meta.bk4 : lv >= 3 ? meta.bk3 : null;
+    const bucket = ranges ? sciBucket_(M.v, ranges) : -1;
+    const right = ranges ? Number(guess) === bucket : (String(guess) === 'yes') === M.pass;
+    // the thing: a real break sets look.br (Artifactory repairs it); samples only break on screen
+    if (M.broke && !a.sample) { a.look.br = T.br || 'load'; a.look.bs = test; writeArt_(a); }
+    // counts + records
+    const st = getSettings(), players = activePlayers_(listProfilesFull()), fam0 = sciFamily_(st, players), S = sciStats_(st, name);
+    const r = S.t[test] || (S.t[test] = { n: 0, best: 0, of: '', low: null });
+    const fin = val < SCI_INF_ && val > 0, before = r.n;
+    r.n++; S.runs++; if (right) S.right++; if (M.broke) S.breaks++;
+    let mine = false, fam = false;
+    if (a.sample) { /* 🧪 samples are the same for everyone — they count, but records are for things YOU made */ }
+    else if (test === 'float' && !M.leak) { if (r.low == null || M.v < r.low) { r.low = sciNum_(M.v, 2); r.of = a.name; mine = before > 0; } fam = !fam0.float || M.v < fam0.float.v; }
+    else if (fin && val > r.best) { r.best = val; r.of = a.name; mine = before > 0; fam = !fam0[test] || val > fam0[test].v; }
+    saveSetting('SciTests_' + name, JSON.stringify(S));
+    const stars = 1 + (rg >= 0.6 ? 1 : 0) + (right ? 1 : 0), score = Math.round((60 + 40 * rg + (right ? 100 : 0) + (fam ? 50 : 0)) * SCI_MULT_[lv]);
+    const tool = SCI_TOOLS_[test] ? SCI_TOOLS_[test][lv] : null;
+    res = { test: test, level: lv, value: val, inf: val >= SCI_INF_, pass: M.pass, broke: M.broke, how: M.how, leak: M.leak, unit: meta.unit, ch: meta.ch[lv], tool: tool,
+      ranges: ranges, bucket: bucket, guess: guess, right: right, rig: rg, stars: stars, score: score, m: sciMatOf_(a), kind: a.kind, sample: !!a.sample,
+      item: a.sample ? { id: a.id, kind: 'sample', name: a.name, look: a.look } : publicArt_(a), rec: { mine: mine, fam: fam, best: test === 'float' && !M.leak ? r.low : r.best, famPrev: fam0[test] || null },
+      kinds: Object.keys(S.t).filter(k => S.t[k].n > 0).length, stats: { tests: 1, right: right ? 1 : 0, breaks: M.broke ? 1 : 0, records: fam ? 1 : 0, testKinds: Object.keys(S.t).filter(k => S.t[k].n > 0).length, samples: a.sample ? 1 : 0 } };
+  } finally { lock.releaseLock(); }
+  // the Archive board (Theme = section · test), feats + titles — after the lock (saveLevelResult takes it itself)
+  try { res.save = saveLevelResult(SCI_GAME_, name, res.level, { score: res.score, stars: res.stars, cleared: res.stars >= 2, timeSec: 0, theme: '⚙️ Mechanic · ' + SCI_TESTS_[test].name, stats: res.stats }); }
+  catch (e) { res.save = { err: String(e && e.message || e) }; }
+  return res;
+}
+// (sc-1) END OF SciencetoryCode.gs
+
+;
 /* ===== on the device only: the grown-up PIN arrives hashed from the family Sheet (OfflineSync.gs) ===== */
 function verifyAdminPin(pin) { var s = String(getSettings().AdminPIN || ''), p = String(pin || ''); if (s.indexOf('#sha256:') === 0) return !!p && s.slice(8) === __hex('steam-admin:' + p); return !!s && s === p; }
 return {"include": typeof include === 'function' ? include : undefined,
@@ -5768,7 +6038,10 @@ return {"include": typeof include === 'function' ? include : undefined,
 "artFamSave": typeof artFamSave === 'function' ? artFamSave : undefined,
 "artFamRemove": typeof artFamRemove === 'function' ? artFamRemove : undefined,
 "artTest": typeof artTest === 'function' ? artTest : undefined,
-"artRepair": typeof artRepair === 'function' ? artRepair : undefined};
+"artRepair": typeof artRepair === 'function' ? artRepair : undefined,
+"getSciencetoryData": typeof getSciencetoryData === 'function' ? getSciencetoryData : undefined,
+"getSciPlayer": typeof getSciPlayer === 'function' ? getSciPlayer : undefined,
+"sciRun": typeof sciRun === 'function' ? sciRun : undefined};
 } };
 
 const VER = self.STEAM_GS.ver;
