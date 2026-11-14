@@ -695,6 +695,7 @@ const MODES_ = [
   { game: 'pokadif', id: 'blink', icon: '👁️', name: 'Blink', pitch: 'One picture blinks — what changed?', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '👁️ Blink' } },
   { game: 'pokadif', id: 'odd', icon: '🎯', name: 'Odd One Out', pitch: 'Poke the one that doesn\'t belong!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '🎯 Odd One Out' } },
   { game: 'sciencetory', id: 'mechanic', icon: '⚙️', name: 'Sciencetory Mechanic', pitch: 'Test your crafted things!', route: 'sciencetory', added: '2026-11-14', tried: { board: 'sciencetory', themeStart: '⚙️ Mechanic' } },
+  { game: 'sciencetory', id: 'chem', icon: '⚗️', name: 'Sciencetory Chemistry', pitch: 'Hunt elements, build molecules!', route: 'sciencetory', added: '2026-11-14', tried: { board: 'sciencetory', themeStart: '⚗️ Chemistry' } },   // ⚗️ sc-2a
   { game: 'sla-brall', id: 'slashot', icon: '🏒', name: 'SlaShot', pitch: 'Table hockey — score goals!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaShot ·', feat: [['sla-brall', 'win_slashot']] } },
   { game: 'sla-brall', id: 'slapoof', icon: '🥒', name: 'SlaPoof', pitch: 'Pickleball — mind the kitchen!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaPoof ·', feat: [['sla-brall', 'win_slapoof']] } },
   { game: 'sla-brall', id: 'slaball', icon: '🎾', name: 'SlaBall', pitch: 'Tennis: 15, 30, 40, game!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaBall ·', feat: [['sla-brall', 'win_slaball']] } },
@@ -2496,6 +2497,9 @@ const FEAT_DEFS = {
     testKinds: { name: 'Different tests', icon: '⚙️', kind: 'max', tiers: [3, 6, 12] },
     samples: { name: 'Sample tests', icon: '🧪', kind: 'sum', hidden: true },
     games: { name: 'Sciencetory runs', icon: '🔬', kind: 'sum', hidden: true },
+    elements: { name: 'Element cards', icon: '📇', kind: 'max', tiers: [10, 40, 118] },   // ⚗️ sc-2a (sciChemSave: how many of the 118 you own)
+    compounds: { name: 'Molecules built', icon: '⚛️', kind: 'max', tiers: [5, 20, 50] },
+    chemRounds: { name: 'Chemistry rounds', icon: '⚗️', kind: 'sum', hidden: true },
   },
   'sla-brall': {
     wins: { name: 'Match Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
@@ -2681,6 +2685,8 @@ const TITLE_DEFS = [
   { id: 'sci_rat', name: 'Lab Rat', icon: '🐀', hint: 'Run 10 tests in Sciencetory', rule: f => featVal_(f, 'sciencetory', 'tests') >= 10 },
   { id: 'sci_pilot', name: 'Test Pilot', icon: '🧑‍✈️', hint: 'Try all 12 ⚙️ Mechanic tests in Sciencetory', rule: f => featVal_(f, 'sciencetory', 'testKinds') >= 12 },
   { id: 'sci_guess', name: 'Hypothesis Hero', icon: '🎯', hint: 'Guess 20 test results right in Sciencetory', rule: f => featVal_(f, 'sciencetory', 'right') >= 20 },
+  { id: 'sci_elem', name: 'Element Hunter', icon: '📇', hint: 'Collect 40 element cards in ⚗️ Sciencetory Chemistry', rule: f => featVal_(f, 'sciencetory', 'elements') >= 40 },   // ⚗️ sc-2a
+  { id: 'sci_mol', name: 'Molecule Maker', icon: '⚛️', hint: 'Build 20 different molecules in ⚗️ Sciencetory Chemistry', rule: f => featVal_(f, 'sciencetory', 'compounds') >= 20 },
   { id: 'pk_eyes', name: 'Sharp Eyes', icon: '👀', hint: 'Find 50 differences in Pokadif', rule: f => featVal_(f, 'pokadif', 'found') >= 50 },
   { id: 'pk_eagle', name: 'Eagle Eye', icon: '🦅', hint: 'Finish 10 Pokadif pictures with no oops and no hint', rule: f => featVal_(f, 'pokadif', 'perfect') >= 10 },
   { id: 'pk_case', name: 'Case Closer', icon: '📁', hint: 'Solve 10 Pokadif cases', rule: f => featVal_(f, 'pokadif', 'cases') >= 10 },
@@ -4556,7 +4562,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -5688,7 +5694,7 @@ function artRepair(name, id) {
 
 ;
 /* ===== SciencetoryCode.gs ===== */
-/* SciencetoryCode.gs — 🔬 Sciencetory server (sc-1). Own file: Code.gs is past 300 KB (same pattern as ArtifactoryCode.gs).
+/* SciencetoryCode.gs — 🔬 Sciencetory server (sc-1, ⚗️ Chemistry sc-2a). Own file: Code.gs is past 300 KB (same pattern as ArtifactoryCode.gs).
    Plan: Drive "Sciencetory — full plan.md". Shares Artifactory's data: the Artifacts tab (things you made) + the bag (ArtifactoryCode.gs).
    ⚙️ Mechanic tests (SC-1): press · pull · twist · flex · fatigue · hardness · sharpness · drop · friction · balance · spin · float / leak.
    Every test is a pure function of the thing (material + shape + quality) — the same thing always gives the same number, no luck.
@@ -5869,6 +5875,62 @@ function sciMeta_() {
   return { tests: SCI_TESTS_, order: SCI_ORDER_, tools: SCI_TOOLS_, samples: samples, mult: SCI_MULT_, inf: SCI_INF_,
     mats: Object.keys(SCI_MATS_).reduce((o, k) => { const P = SCI_MATS_[k]; o[k] = { mohs: P[0], dens: P[1], flex: P[6], tough: P[5], name: SCI_MAT_NAME_[k] || (ART_MATS_[k] ? ART_MATS_[k][1] : k), icon: ART_MATS_[k] ? ART_MATS_[k][0] : '🧪', group: ART_MATS_[k] ? ART_MATS_[k][2] : 'craft' }; return o; }, {}) };
 }
+/* ---------- ⚗️ CHEMISTRY (sc-2a) ----------
+   Element cards = counts in Settings SciElements_<Name> = {e: [atomic numbers found in 🔍 Element hunt / ⚛️ Formula builder], c: [compound ids built]}.
+   Crafting unlocks cards too: every material a player crafted with (Artifacts tab, `mats` + look.m / g) → its elements (SCI_MAT_ELEMS_).
+   The element + compound data lives in the page include ChemTable.html (built by Test Harness/chemtable-build/build_chem.py). */
+const SCI_MAT_ELEMS_ = {
+  oak: [6, 1, 8], bamboo: [6, 1, 8], teak: [6, 1, 8], iron: [26], copper: [29], tin: [50], bronze: [29, 50], silver: [47], gold: [79], zinc: [30], brass: [29, 30], steel: [26, 6],
+  granite: [14, 8, 13, 19, 11], jade: [11, 13, 14, 8], crystal: [14, 8], ruby: [13, 8, 24], sapphire: [13, 8, 26, 22], amethyst: [14, 8, 26],
+  clay: [13, 14, 8, 1], fabric: [6, 1, 8], leather: [6, 1, 17], glass: [14, 8, 11, 20], sglass: [14, 8, 11, 20, 27], filament: [6, 1, 8],
+  led: [31, 7], battery: [30, 25, 3], paint: [22, 8, 6, 1], varnish: [6, 1, 8], dye: [6, 1, 7, 8], fdye: [6, 1, 7, 8, 13, 19, 16],
+  flower: [6, 1, 8, 7], sand: [14, 8], carbon: [6], cobalt: [27], alum: [19, 13, 16, 8, 1]
+};
+function sciChemStats_(st, name) {
+  const s = jsonSetting_(st, 'SciElements_' + name, {});
+  const e = (Array.isArray(s.e) ? s.e : []).map(Number).filter(n => n >= 1 && n <= 118 && Math.floor(n) === n);
+  const c = (Array.isArray(s.c) ? s.c : []).map(String).filter(x => /^[a-z0-9]{1,16}$/.test(x));
+  return { e: Array.from(new Set(e)).sort((a, b) => a - b), c: Array.from(new Set(c)), r: artInt_(s.r, 0, 1e6) };
+}
+// elements you met by crafting: every material in every thing you own
+function sciCraftElems_(name) {
+  const set = {};
+  artsOf_(name).forEach(a => { const ms = Object.keys(a.mats || {}); const L = a.look || {}; if (L.m) ms.push(L.m); if (L.g) ms.push(L.g);
+    ms.forEach(m => (SCI_MAT_ELEMS_[m] || []).forEach(n => { set[n] = 1; })); });
+  return Object.keys(set).map(Number).sort((a, b) => a - b);
+}
+function sciChemView_(st, name) {
+  const s = sciChemStats_(st, name), craft = name ? sciCraftElems_(name) : [], all = {};
+  s.e.concat(craft).forEach(n => { all[n] = 1; });
+  return { e: s.e, c: s.c, craft: craft, all: Object.keys(all).map(Number).sort((a, b) => a - b), rounds: s.r, mats: SCI_MAT_ELEMS_ };
+}
+// one finished ⚗️ round: (name, level 0-5, kind 'hunt' | 'formula', {found: [atomic numbers], built: [compound ids], right, total, score, stars, timeSec})
+function sciChemSave(name, level, kind, res) {
+  checkPlayer_(name);
+  if (kind !== 'hunt' && kind !== 'formula') throw new Error('Pick a chemistry game.');
+  const lv = Math.max(0, Math.min(5, Math.floor(Number(level)) || 0)); res = res || {};
+  const found = (Array.isArray(res.found) ? res.found : []).map(Number).filter(n => n >= 1 && n <= 118 && Math.floor(n) === n).slice(0, 40);
+  const built = (Array.isArray(res.built) ? res.built : []).map(String).filter(x => /^[a-z0-9]{1,16}$/.test(x)).slice(0, 20);
+  const total = Math.max(1, Math.min(20, Math.floor(Number(res.total)) || 1)), right = Math.max(0, Math.min(total, Math.floor(Number(res.right)) || 0));
+  const stars = Math.max(1, Math.min(3, Math.floor(Number(res.stars)) || 1)), score = Math.max(0, Math.min(30000, Math.round(Number(res.score)) || 0));
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  let out;
+  try {
+    const st = getSettings(), before = sciChemView_(st, name), S = sciChemStats_(st, name);
+    const had = {}; before.all.forEach(n => { had[n] = 1; });
+    const newCards = found.filter(n => !had[n]).filter((n, i, a) => a.indexOf(n) === i);
+    const newComps = built.filter(x => S.c.indexOf(x) < 0).filter((x, i, a) => a.indexOf(x) === i);
+    S.e = Array.from(new Set(S.e.concat(found))).sort((a, b) => a - b); S.c = S.c.concat(newComps); S.r++;
+    saveSetting('SciElements_' + name, JSON.stringify(S));
+    const all = before.all.concat(newCards).sort((a, b) => a - b);
+    out = { kind: kind, level: lv, newCards: newCards, newComps: newComps, chem: { e: S.e, c: S.c, craft: before.craft, all: all, rounds: S.r }, score: score, stars: stars,
+      stats: { chemRounds: 1, elements: all.length, compounds: S.c.length } };
+  } finally { lock.releaseLock(); }
+  try { out.save = saveLevelResult(SCI_GAME_, name, lv, { score: score, stars: stars, cleared: stars >= 2, timeSec: Math.max(0, Math.round(Number(res.timeSec) || 0)),
+    theme: '⚗️ Chemistry · ' + (kind === 'hunt' ? 'Element hunt' : 'Formula builder'), stats: out.stats }); }
+  catch (e) { out.save = { err: String(e && e.message || e) }; }
+  return out;
+}
 // boot: every player's level progress + avatars (getLevelGameData) + this player's things + counts + family records
 function getSciencetoryData(player) {
   const out = getLevelGameData(SCI_GAME_, player);
@@ -5879,12 +5941,13 @@ function getSciencetoryData(player) {
   out.sci = me ? sciStats_(st, me) : sciStats_({}, '');
   out.fam = sciFamily_(st, players);
   out.meta = sciMeta_();
+  out.chem = sciChemView_(st, me);   // ⚗️ element cards + compounds (sc-2a)
   return out;
 }
 // another player picked on the page → their things + counts
 function getSciPlayer(name) {
   checkPlayer_(name); const st = getSettings(), players = activePlayers_(listProfilesFull());
-  return { player: name, things: sciThingsOf_(name), sci: sciStats_(st, name), fam: sciFamily_(st, players) };
+  return { player: name, things: sciThingsOf_(name), sci: sciStats_(st, name), fam: sciFamily_(st, players), chem: sciChemView_(st, name) };
 }
 function sciThing_(name, ref) {
   ref = String(ref || '');
@@ -5931,7 +5994,7 @@ function sciRun(name, ref, test, level, guess, rig) {
   catch (e) { res.save = { err: String(e && e.message || e) }; }
   return res;
 }
-// (sc-1) END OF SciencetoryCode.gs
+// (sc-1+sc-2a) END OF SciencetoryCode.gs
 
 ;
 /* ===== on the device only: the grown-up PIN arrives hashed from the family Sheet (OfflineSync.gs) ===== */
@@ -6079,6 +6142,7 @@ return {"include": typeof include === 'function' ? include : undefined,
 "artFamRemove": typeof artFamRemove === 'function' ? artFamRemove : undefined,
 "artTest": typeof artTest === 'function' ? artTest : undefined,
 "artRepair": typeof artRepair === 'function' ? artRepair : undefined,
+"sciChemSave": typeof sciChemSave === 'function' ? sciChemSave : undefined,
 "getSciencetoryData": typeof getSciencetoryData === 'function' ? getSciencetoryData : undefined,
 "getSciPlayer": typeof getSciPlayer === 'function' ? getSciPlayer : undefined,
 "sciRun": typeof sciRun === 'function' ? sciRun : undefined};
