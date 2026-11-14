@@ -696,9 +696,10 @@ const MODES_ = [
   { game: 'pyraspike', id: 'rallyrun', icon: '🏃', name: 'PyraDive Rally Run', pitch: 'Training: the ball gets faster and faster!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🏃 Rally Run', feat: [['pyraspike', 'm_rallyrun']] } },
   { game: 'pyraspike', id: 'juggle', icon: '🤹', name: 'PyraDive Juggle', pitch: 'Training: keep it up — foot, knee, head!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🤹 Juggle', feat: [['pyraspike', 'm_juggle']] } },
   { game: 'pyraspike', id: 'party', icon: '🌀', name: 'Spark Party', pitch: 'A bouncy ball + extra balls at once!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🌀 Spark Party', feat: [['pyraspike', 'm_party']] } },
+  { game: 'pyraspike', id: 'cups', icon: '🏆', name: 'PyraDive Cups', pitch: 'Knock-out cups — Cup of 4, Cup of 8, 👑 Family Cup!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🏆 Cup of 4', feat: [['pyraspike', 'm_cupfour'], ['pyraspike', 'm_cupeight'], ['pyraspike', 'm_familycup']] } },
   { game: 'pokadif', id: 'spot', icon: '🖼️', name: 'Find the Difference', pitch: 'Two pictures — poke every change!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '🖼️ Spot' } },
   { game: 'pokadif', id: 'detective', icon: '🕵️', name: 'Detective Adventure', pitch: 'Solve a case: find · read · crack!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif-case' } },
-  { game: 'pokadif', id: 'arcade', icon: '⏱️', name: 'Photo Hunt Arcade', pitch: 'Race the clock — every find adds time!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif-arcade' } },
+  { game: 'pokadif', id: 'arcade', icon: '⏱️', name: 'Photo Hunt Arcade', pitch: 'Speed run to the 🏁 — beat your time!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif-arcade' } },
   { game: 'pokadif', id: 'blink', icon: '👁️', name: 'Blink', pitch: 'One picture blinks — what changed?', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '👁️ Blink' } },
   { game: 'pokadif', id: 'odd', icon: '🎯', name: 'Odd One Out', pitch: 'Poke the one that doesn\'t belong!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '🎯 Odd One Out' } },
   { game: 'sciencetory', id: 'mechanic', icon: '⚙️', name: 'Sciencetory Mechanic', pitch: 'Test your crafted things!', route: 'sciencetory', added: '2026-11-14', tried: { board: 'sciencetory', themeStart: '⚙️ Mechanic' } },
@@ -755,7 +756,7 @@ const MODE_GROUPS_ = {
   'alignext': [{k: 'drop', icon: '🔴', en: 'Drop', th: 'หยอดเหรียญ', modes: ['drop']}, {k: 'omni', icon: '❌⭕', en: 'Omnifile', th: 'วางได้ทุกช่อง', modes: ['omni', 'stack']}],
   'beat-corner': [{k: 'songs', icon: '🎤', en: 'Songs', th: 'เพลง', modes: ['corner']}, {k: 'inst', icon: '🎹', en: 'Instruments', th: 'เครื่องดนตรี', modes: ['piano', 'drums']}, {k: 'together', icon: '🎸', en: 'Together', th: 'เล่นด้วยกัน', modes: ['band']}, {k: 'make', icon: '✏️', en: 'Make', th: 'แต่งเพลง', modes: ['maker']}],
   'eyes-brain': [{k: 'remember', icon: '🔢', en: 'Ways to remember', th: 'วิธีจำ', modes: ['classic', 'backwards', 'colour', 'letters', 'listen', 'word', 'shapes']}, {k: 'challenge', icon: '🏔️', en: 'Challenge', th: 'ท้าทาย', modes: ['challenge', 'daily']}, {k: 'party', icon: '👥', en: 'Party', th: 'เล่นกันหลายคน', modes: ['chain']}],
-  'pyraspike': [{k: 'spike', icon: '🏐', en: 'PyraSpike', th: 'วอลเลย์บอล', modes: ['beach', 'small', 'full']}, {k: 'strike', icon: '🦶', en: 'PyraStrike', th: 'ตะกร้อ', modes: ['strikesolo', 'strikeduo', 'strikeregu', 'hoop']}, {k: 'spark', icon: '⚡', en: 'PyraSpark', th: 'บอลข้ามโต๊ะ', modes: ['sparksolo', 'sparkduo']}, {k: 'train', icon: '🎯', en: 'Training', th: 'ฝึกซ้อม', modes: ['zonehits', 'combo', 'rallyrun', 'juggle']}, {k: 'fun', icon: '🎪', en: 'Fun', th: 'สนุก', modes: ['party']}],   // 🔥 pd-3a
+  'pyraspike': [{k: 'spike', icon: '🏐', en: 'PyraSpike', th: 'วอลเลย์บอล', modes: ['beach', 'small', 'full']}, {k: 'strike', icon: '🦶', en: 'PyraStrike', th: 'ตะกร้อ', modes: ['strikesolo', 'strikeduo', 'strikeregu', 'hoop']}, {k: 'spark', icon: '⚡', en: 'PyraSpark', th: 'บอลข้ามโต๊ะ', modes: ['sparksolo', 'sparkduo', 'party']}, {k: 'train', icon: '🎯', en: 'Training + Cups', th: 'ฝึกซ้อม + ถ้วย', modes: ['zonehits', 'combo', 'rallyrun', 'juggle', 'cups']}],   // 🔥 pd-3a
   'sla-brall': [{k: 'sports', icon: '🏓', en: 'Sports', th: 'กีฬา', modes: ['slashot', 'slapoof', 'slaball', 'slapong', 'slabam', 'slawall']}, {k: 'cup', icon: '🏆', en: 'Cup', th: 'ทัวร์นาเมนต์', modes: ['cup']}, {k: 'link', icon: '📡', en: 'Own devices', th: 'เล่นหลายเครื่อง', modes: ['lhost', 'ljoin']}],   // 📡 p3a: lk-1b's 🔗 Join friends
   'blasoff': [{k: 'match', icon: '⚽', en: 'Matches', th: 'แข่งฟุตบอล', modes: ['fours', 'sevens', 'elevens']}, {k: 'small', icon: '🏙️', en: 'Futsal + Street', th: 'ฟุตซอล · สตรีท', modes: ['futsal', 'street']}, {k: 'skill', icon: '🕺', en: 'Tricks + skills', th: 'ลีลา · ทักษะ', modes: ['battle', 'skills', 'shootout']}],   // ⚽ bo-1 · 🌍 bo-2a · 🏙️ bo-2b
   'brawl-buddies': [{k: 'battle', icon: '🥊', en: 'Battle', th: 'ต่อสู้', modes: ['battle']}, {k: 'adv', icon: '🗺️', en: 'Brawenture', th: 'ผจญภัย', modes: ['brawenture']}],
@@ -2480,6 +2481,36 @@ const FEAT_DEFS = {
     m_beach: { name: 'Beach 2v2 wins', icon: '🏖️', kind: 'sum', hidden: true },
     m_small: { name: 'Small 3v3 wins', icon: '🏫', kind: 'sum', hidden: true },
     m_full: { name: 'Full 6v6 wins', icon: '🏟️', kind: 'sum', hidden: true },
+    traps: { name: 'Sticky Feet', icon: '🦵', kind: 'sum', tiers: [20, 200, 1000] },
+    pops: { name: 'Pop Star', icon: '⬆️', kind: 'sum', tiers: [20, 200, 1000] },
+    edges: { name: 'Edge Lord', icon: '💥', kind: 'sum', tiers: [3, 30, 150] },
+    feeds: { name: 'Toss Buddy', icon: '🤲', kind: 'sum', tiers: [10, 100, 500] },
+    hoops: { name: 'Hoop Master', icon: '⭕', kind: 'sum', tiers: [5, 50, 250] },
+    streak_juggle: { name: 'Juggle Star', icon: '🤹', kind: 'max', tiers: [10, 25, 50] },
+    spirits: { name: 'Spirit Diver', icon: '🔥', kind: 'sum', tiers: [1, 20, 100] },
+    duos: { name: 'Duo Spirit', icon: '🔥🔥', kind: 'sum', tiers: [1, 10, 50] },
+    trios: { name: 'Trio Legend', icon: '🔥🔥🔥', kind: 'sum', tiers: [1, 5, 25] },
+    beasts: { name: 'Beast Keeper', icon: '📖', kind: 'max', tiers: [10, 25, 50] },
+    cups: { name: 'PyraChamp', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },
+    familyCups: { name: 'Captain Flame', icon: '👑', kind: 'sum', tiers: [1, 3, 10] },
+    drill_zone: { name: 'Zone Hits best', icon: '🎯', kind: 'max', hidden: true },
+    drill_combo: { name: 'Body Combo best', icon: '🔗', kind: 'max', hidden: true },
+    drill_run: { name: 'Rally Run best', icon: '🏃', kind: 'max', hidden: true },
+    drill_juggle: { name: 'Juggle best', icon: '🤹', kind: 'max', hidden: true },
+    m_strikesolo: { name: 'Strike 1v1 wins', icon: '🦶', kind: 'sum', hidden: true },
+    m_strikeduo: { name: 'Strike Duo wins', icon: '🦵', kind: 'sum', hidden: true },
+    m_strikeregu: { name: 'Strike Regu wins', icon: '🧶', kind: 'sum', hidden: true },
+    m_hoop: { name: 'Hoop Takraw wins', icon: '⭕', kind: 'sum', hidden: true },
+    m_sparksolo: { name: 'Spark 1v1 wins', icon: '⚡', kind: 'sum', hidden: true },
+    m_sparkduo: { name: 'Spark Duo wins', icon: '🌩️', kind: 'sum', hidden: true },
+    m_zonehits: { name: 'Zone Hits played', icon: '🎯', kind: 'sum', hidden: true },
+    m_combo: { name: 'Body Combo played', icon: '🔗', kind: 'sum', hidden: true },
+    m_rallyrun: { name: 'Rally Run played', icon: '🏃', kind: 'sum', hidden: true },
+    m_juggle: { name: 'Juggle played', icon: '🤹', kind: 'sum', hidden: true },
+    m_party: { name: 'Spark Party wins', icon: '🌀', kind: 'sum', hidden: true },
+    m_cupfour: { name: 'Cup of 4 played', icon: '🏆', kind: 'sum', hidden: true },
+    m_cupeight: { name: 'Cup of 8 played', icon: '🏆', kind: 'sum', hidden: true },
+    m_familycup: { name: 'Family Cup played', icon: '👑', kind: 'sum', hidden: true },
   },
   'blasoff': {   // ⚽ bo-1
     wins: { name: 'Match Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
@@ -2536,7 +2567,8 @@ const FEAT_DEFS = {
   },
   // ⏱️ Pokadif Arcade feats (pk-2b)
   'pokadif-arcade': {
-    pictures: { name: 'Best Arcade run', icon: '📸', kind: 'max', tiers: [5, 15, 30], unit: ' pictures' },
+    pictures: { name: 'Most pictures in a run', icon: '📸', kind: 'max', tiers: [5, 10, 15], unit: ' pictures' },
+    finishes: { name: 'Speed runs finished', icon: '🏁', kind: 'sum', tiers: [1, 10, 50] },   // ⏱️ pk-3d
     checkpoints: { name: 'Arcade checkpoints', icon: '✅', kind: 'sum', tiers: [3, 20, 100] },
     found: { name: 'Arcade finds', icon: '🔎', kind: 'sum', tiers: [30, 300, 1500] },
     games: { name: 'Arcade runs', icon: '⏱️', kind: 'sum', hidden: true },
@@ -2745,7 +2777,7 @@ const TITLE_DEFS = [
   { id: 'pk_case', name: 'Case Closer', icon: '📁', hint: 'Solve 10 Pokadif cases', rule: f => featVal_(f, 'pokadif', 'cases') >= 10 },
   { id: 'pk_odd', name: 'Odd Spotter', icon: '🎯', hint: 'Find 30 odd ones in Pokadif', rule: f => featVal_(f, 'pokadif', 'odd') >= 30 },
   { id: 'pk_blink', name: 'Blink Master', icon: '👁️', hint: 'Find 30 changes in Pokadif Blink', rule: f => featVal_(f, 'pokadif', 'blinks') >= 30 },
-  { id: 'pk_arc', name: 'Speed Sleuth', icon: '📸', hint: 'Finish 15 pictures in one Pokadif Arcade run', rule: f => featVal_(f, 'pokadif-arcade', 'pictures') >= 15 },
+  { id: 'pk_arc', name: 'Speed Sleuth', icon: '📸', hint: 'Finish a 15-picture Pokadif speed run (🌋 or 💀)', rule: f => featVal_(f, 'pokadif-arcade', 'pictures') >= 15 },
   { id: 'pk_cp', name: 'Checkpoint Champ', icon: '✅', hint: 'Reach 20 checkpoints in Pokadif Arcade', rule: f => featVal_(f, 'pokadif-arcade', 'checkpoints') >= 20 },
   { id: 'pk_sleuth', name: 'Master Sleuth', icon: '🕵️', hint: 'Close all 3 Pokadif case books (🧲 🦖 🐙)', rule: f => featVal_(f, 'pokadif-case', 'casebook') >= 3 },
   { id: 'pk_story', name: 'Case Cracker', icon: '📁', hint: 'Close a case in Pokadif Detective Adventure', rule: f => featVal_(f, 'pokadif-case', 'stories') >= 1 },
@@ -2763,6 +2795,22 @@ const TITLE_DEFS = [
   { id: 'pd_wall', name: 'Wall Titan', icon: '🧱', hint: 'Stuff-block 10 dunks in PyraDive', rule: f => featVal_(f, 'pyraspike', 'stuffs') >= 10 },
   { id: 'pd_flame', name: 'Flame Starter', icon: '🔥', hint: 'Use 10 Pyra… moves in PyraDive', rule: f => featVal_(f, 'pyraspike', 'pyras') >= 10 },
   { id: 'pd_rally', name: 'Rally King / Queen', icon: '🔁', hint: 'Keep a 20-touch rally going in PyraDive', rule: f => featVal_(f, 'pyraspike', 'rally') >= 20 },
+  { id: 'pd_trap', name: 'Sticky Feet', icon: '🦵', hint: 'Trap 30 balls in PyraStrike / PyraSpark', rule: f => featVal_(f, 'pyraspike', 'traps') >= 30 },
+  { id: 'pd_pop', name: 'Pop Star', icon: '⬆️', hint: 'Pop the ball up 30 times in PyraSpark', rule: f => featVal_(f, 'pyraspike', 'pops') >= 30 },
+  { id: 'pd_edge', name: 'Edge Lord', icon: '💥', hint: 'Hit 10 EDGE balls in PyraSpark', rule: f => featVal_(f, 'pyraspike', 'edges') >= 10 },
+  { id: 'pd_feed', name: 'Toss Buddy', icon: '🤲', hint: 'Feed your teammate 20 serves in PyraStrike', rule: f => featVal_(f, 'pyraspike', 'feeds') >= 20 },
+  { id: 'pd_hoop', name: 'Hoop Master', icon: '⭕', hint: 'Kick 15 balls through the hoop in Hoop Takraw', rule: f => featVal_(f, 'pyraspike', 'hoops') >= 15 },
+  { id: 'pd_juggle', name: 'Juggle Star', icon: '🤹', hint: 'Keep it up 20 times in a row in 🤹 Juggle', rule: f => featVal_(f, 'pyraspike', 'streak_juggle') >= 20 },
+  { id: 'pd_set', name: 'Sky Setter', icon: '🙌', hint: 'Set 50 balls in PyraDive', rule: f => featVal_(f, 'pyraspike', 'sets') >= 50 },
+  { id: 'pd_bump', name: 'Perfect Passer', icon: '🤚', hint: 'Bump 50 balls in PyraSpike', rule: f => featVal_(f, 'pyraspike', 'bumps') >= 50 },
+  { id: 'pd_dive', name: 'PyraDiver', icon: '🤸', hint: 'Make 15 diving saves in PyraDive', rule: f => featVal_(f, 'pyraspike', 'dives') >= 15 },
+  { id: 'pd_spirit', name: 'Spirit Diver', icon: '🔥', hint: 'Call 5 creatures with a Spirit Dive', rule: f => featVal_(f, 'pyraspike', 'spirits') >= 5 },
+  { id: 'pd_duo', name: 'Duo Spirit', icon: '🔥🔥', hint: 'Win 3 Spirit Duo Dives with a teammate', rule: f => featVal_(f, 'pyraspike', 'duos') >= 3 },
+  { id: 'pd_trio', name: 'Trio Legend', icon: '🔥🔥🔥', hint: 'Make 2 Spirit Trio Dives with your team', rule: f => featVal_(f, 'pyraspike', 'trios') >= 2 },
+  { id: 'pd_beast', name: 'Beast Keeper', icon: '📖', hint: 'Find 25 creatures for your Spirit Bestiary', rule: f => featVal_(f, 'pyraspike', 'beasts') >= 25 },
+  { id: 'pd_master', name: 'Spirit Master', icon: '🐉', hint: 'Find all 50 creatures of the Spirit Bestiary', rule: f => featVal_(f, 'pyraspike', 'beasts') >= 50 },
+  { id: 'pd_champ', name: 'PyraChamp', icon: '🏆', hint: 'Win a PyraDive cup', rule: f => featVal_(f, 'pyraspike', 'cups') >= 1 },
+  { id: 'pd_captain', name: 'Captain Flame', icon: '👑', hint: 'Win the 👑 Family Cup in PyraDive', rule: f => featVal_(f, 'pyraspike', 'familyCups') >= 1 },
   { id: 'newcomer', name: 'Newcomer', icon: '🌱', hint: 'Everyone starts here', rule: () => true },
   { id: 'pb_jackpot', name: 'Jackpot Hunter', icon: '🎰', hint: 'Hit a Pinball jackpot', rule: f => featVal_(f, 'pinball', 'jackpots') >= 1 },
   { id: 'pb_royal', name: 'Jackpot Royalty', icon: '💰', hint: 'Hit 5 Pinball jackpots', rule: f => featVal_(f, 'pinball', 'jackpots') >= 5 },
@@ -4625,7 +4673,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
