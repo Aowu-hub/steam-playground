@@ -281,6 +281,21 @@
   @media (max-height:900px){ #link-how{display:none;} }
   .lk-how small{color:var(--ink-soft);font-weight:700;}
   @media (max-height:520px){ #scr-link{padding-top:54px;} #scr-link .title{margin-bottom:4px;} #scr-link .title .logo{display:none;} #scr-link .title h1{font-size:1.3rem;} #scr-link .title p{font-size:.8rem;} #link-how{display:none;} }
+/* 📺 lk-5e: Room hostess — the phone as a controller */
+.lkh-gos{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:4px;} .lkh-gos .lkh-go{margin-top:0;display:inline-flex;flex-direction:column;align-items:center;line-height:1.15;flex:1 1 140px;max-width:220px;}
+.lkh-gos .lkh-go small{display:block;font-size:.68rem;font-weight:700;opacity:.85;margin-top:2px;} .lkh-gos .lkh-tvgo{background:linear-gradient(135deg,#7B4FE0,#3B82F6);color:#fff;}
+#lk-ctl{position:absolute;z-index:3;pointer-events:none;} #lk-ctl.on{inset:0;display:flex;align-items:flex-start;justify-content:center;padding-top:5%;background:radial-gradient(circle at 50% 30%,#3b1d6e 0%,#1d1240 60%,#120b2a 100%);}
+#lk-ctl.mini{left:8px;top:8px;} #lk-ctl .lkc-btn{pointer-events:auto;border:0;border-radius:999px;padding:9px 16px;font:800 .9rem Nunito,sans-serif;background:#fff;color:#3b1d6e;box-shadow:0 3px 0 rgba(0,0,0,.25);cursor:pointer;}
+#lk-ctl .lkc-mini{padding:6px 12px;font-size:.78rem;opacity:.92;}
+.lkc-card{display:flex;flex-direction:column;align-items:center;gap:4px;color:#fff;text-align:center;max-width:92%;} .lkc-info{display:flex;flex-direction:column;align-items:center;gap:4px;}
+.lkc-card canvas{width:110px;height:125px;animation:lkc-bob 2.4s ease-in-out infinite;}
+.lkc-name{font:900 1.4rem Nunito,sans-serif;} .lkc-team{font-weight:800;font-size:.9rem;padding:3px 12px;border-radius:999px;background:rgba(255,255,255,.12);} .lkc-team.s0{color:#FFB070;} .lkc-team.s1{color:#7FE6DA;}
+.lkc-score{font:900 2.1rem Nunito,sans-serif;letter-spacing:.02em;margin:4px 0;line-height:1.1;} .lkc-score small{font-size:.7rem;font-weight:700;opacity:.7;vertical-align:middle;} .lkc-games{display:block;font-size:.8rem;font-weight:800;opacity:.75;}
+.lkc-tv{font-weight:800;color:#FFE9A8;text-shadow:0 0 8px rgba(255,214,102,.6);margin-bottom:6px;}
+@keyframes lkc-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}} @media (prefers-reduced-motion:reduce){.lkc-card canvas{animation:none;}}
+.lkc-name.s0{color:#FFD2A8;} .lkc-name.s1{color:#BDF3EC;}
+@media (max-height:520px){#lk-ctl.on{padding-top:58px;} .lkc-card{flex-direction:row;gap:18px;} .lkc-card canvas{width:96px;height:110px;} .lkc-name{font-size:1.15rem;} .lkc-score{font-size:1.6rem;margin:0;} .lkc-tv{margin-bottom:2px;}}
+
 </style>
 <script src="inc/UiKit.js"></script>
 <script src="inc/BallSkins.js"></script>
@@ -2203,7 +2218,8 @@ function frame(now){
   }
   if(G && G.link && G.link.role === 'host') lkHostTick(now);
   if(window.Cheer) Cheer.pause(!!(G.paused || Comic.busy()));   // 📣 cs-1
-  G.anim += dt; draw(now / 1000); hud();
+  G.anim += dt; if(!G.ctl) draw(now / 1000);
+  hud();   // 📺 lk-5e: a controller phone (G.ctl) doesn't draw the court — it is on the TV
   G.raf = requestAnimationFrame(frame);
 }
 function togglePause(){ if(!G || G.over) return; if(G.link && G.link.role === 'guest'){ Link.send('sbpause', {on: !G.paused}, {sure: true}); return; } G.paused = !G.paused; UI.pauseIcon($('pause-btn'), G.paused); banner(G.paused ? '⏸ Paused — tap ▶ to play' : '▶ Go!', 'good'); }
@@ -2739,13 +2755,14 @@ function finishMatch(){
   const pts = [0, 1].map(s => sp.scoring === 'tennis' ? M.score.games[s] * 4 + M.score.pts[s] : M.score.pts[s]);
   const ratio = pts[1 - win] / Math.max(1, pts[win]), stars = ratio < 0.45 ? 3 : ratio < 0.8 ? 2 : 1;
   const scoreFor = side => Math.round((st[side].points * 100 + st[side].rally * 20 + st[side].aces * 50 + st[side].perfect * 30 + st[side].smash * 15 + (side === win ? 500 : 0)) * (M.lv.hardcore ? 3 : 1));
-  if(FX && !G.cup){ if(myWin) confetti(['🏓', '🎾', '⭐', '🏆', '🎉'], 30); }
-  if(!G.cup) UISound.play(myWin ? 'success' : 'error');
+  const tvShow = !!(G.link && !mine.length);   // 📺 lk-5e: the Room hostess has no player — it cheers for the winners
+  if(FX && !G.cup){ if(myWin || tvShow) confetti(['🏓', '🎾', '⭐', '🏆', '🎉'], 30); }
+  if(!G.cup) UISound.play(myWin || tvShow ? 'success' : 'error');
   if(G.cup){ cupFinish(win, secs, scoreFor); return; }
   const strip4 = G.comics ? winnerPanels(win) : null; if(strip4) setTimeout(() => Comic.strip('winner', {panels: strip4, title: '🏆 ' + sp.name + ' · ' + teamName(win)}), 450);
   const head = G.mode === 'robot' ? (myWin ? '<div class="big">🏆</div><h2 class="cheer">You beat the robot!</h2>' : '<div class="big">🤖</div><h2>The robot wins this time</h2>')
     : '<div class="big">👑</div><h2 class="cheer">' + UI.esc(teamName(win)) + ' win' + (M.players.filter(p => p.side === win).length > 1 ? '' : 's') + '!</h2>';
-  const tip = myWin ? '' : '<div class="note">💡 ' + pickOne(['Watch the shadow — it shows where the ball will land.', 'Move INTO the ball for topspin: it dips and is hard to return.', 'Try a 🌈 lob when the robot runs to the net.', 'Hit the ball through the power orb, then use your power at the right moment!', 'A 🪶 drop shot is great when the robot stays far back.']) + '</div>';
+  const tip = myWin || tvShow ? '' : '<div class="note">💡 ' + pickOne(['Watch the shadow — it shows where the ball will land.', 'Move INTO the ball for topspin: it dips and is hard to return.', 'Try a 🌈 lob when the robot runs to the net.', 'Hit the ball through the power orb, then use your power at the right moment!', 'A 🪶 drop shot is great when the robot stays far back.']) + '</div>';
   const scoreLine = sp.scoring === 'tennis' ? M.score.games[0] + ' – ' + M.score.games[1] + ' games' : M.score.pts[0] + ' – ' + M.score.pts[1];
   const myScore = scoreFor(mine[0] ? mine[0].side : humans[0] ? humans[0].side : 0);
   showResult(head + '<div class="score-big">' + scoreLine + '</div>' +
@@ -2820,7 +2837,7 @@ boot();
    sends the match picture (sbs ~20 / s, fast) + the engine events (sbe, sure) + the end (sbend) + the save notes (sbnotes).
    GUEST: never steps the engine — it draws the host's picture 0.1 s behind (smoothed between two pictures), plays sounds / words from the events,
    steers ITS player with its own camera (behind its own player). A guest that drops → 🤖 robot brain (p.auto) until it rejoins. Comic pauses are off. */
-const LK = {lobby: null, wired: false, urlDone: false, cfg: null, end: null};
+const LK = {lobby: null, wired: false, urlDone: false, cfg: null, end: null, tv: false};   // 📺 lk-5e: tv = this device is the Room hostess
 const LK_SNAP_MS = 50, LK_IN_MS = 33, LK_DELAY = 0.1;
 const LK_PSKIP = {av: 1, racket: 1, ai: 1, input: 1, drag: 1, name: 1, i: 1, human: 1, robot: 1, side: 1, lane: 1, slot: 1, auto: 1, remote: 1, seat: 1, lseat: 1, _turn: 1};
 const LK_MSKIP = {sp: 1, lv: 1, rnd: 1, players: 1, balls: 1, events: 1, level: 1, powersOn: 1, theme: 1, target: 1, stats: 1};
@@ -2873,6 +2890,35 @@ function lkGuestFrame(now){
     const x = Math.round((me.input.x || 0) * 100) / 100, y = Math.round((me.input.y || 0) * 100) / 100;
     if(x !== L.ix || y !== L.iy || now - L.inAt > 200){ Link.send('sbin', {x, y}); L.ix = x; L.iy = y; L.inAt = now; }
   }
+  if(G.ctl) lkCtlScore();
+}
+// 📺 lk-5e: in a Room hostess match the phone is a 🎮 controller — the court is on the TV (the court is not drawn here: cheap)
+function lkCtlWant(){ try{ return localStorage.getItem('sp_sb_ctl') !== '0'; }catch(e){ return true; } }
+function lkCtlOff(){ const el = $('lk-ctl'); if(el) el.remove(); const st = $('stage'); if(st) st.classList.remove('lk-ctl-on'); if(G) G.ctl = false; }
+function lkCtl(on){
+  if(!G || !G.link || G.link.role !== 'guest'){ lkCtlOff(); return; }
+  G.ctl = !!on; try{ localStorage.setItem('sp_sb_ctl', on ? '1' : '0'); }catch(e){}
+  const st = $('stage'); st.classList.toggle('lk-ctl-on', G.ctl);
+  let el = $('lk-ctl'); if(!el){ el = document.createElement('div'); el.id = 'lk-ctl'; st.appendChild(el); }
+  const me = G.M.players.find(p => p.human && !p.remote) || G.M.players[0];
+  el.className = G.ctl ? 'on' : 'mini';
+  if(G.ctl){
+    const team = teamName(me.side), pair = team !== me.name;   // 1 vs 1: the team is just your name
+    el.innerHTML = '<div class="lkc-card"><canvas id="lkc-av" width="150" height="170"></canvas><div class="lkc-info"><div class="lkc-name s' + me.side + '">' + (me.side ? '🩵 ' : '🧡 ') + UI.esc(me.name) + '</div>'
+      + (pair ? '<div class="lkc-team s' + me.side + '">👥 ' + UI.esc(team) + '</div>' : '') + '<div class="lkc-score" id="lkc-score"></div>'
+      + '<div class="lkc-tv">📺 Look at the TV!</div><button class="lkc-btn" id="lkc-sw" data-sound="pop">👀 Show the court here</button></div></div>';
+    try{ drawPreviewCanvas($('lkc-av'), me.av || withRacket(myAvatar(me.name), me.name), {name: me.name, t: 1}); }catch(e){}
+    const cv = $('court'), g = cv.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height);
+    el.dataset.sc = ''; lkCtlScore();
+  } else el.innerHTML = '<button class="lkc-btn lkc-mini" id="lkc-sw" data-sound="pop">📺 Controller only</button>';
+  $('lkc-sw').onclick = e => { e.stopPropagation(); lkCtl(!G.ctl); if(window.UISound) UISound.play('pop'); };
+  $('lkc-sw').onpointerdown = e => e.stopPropagation();
+}
+function lkCtlScore(){
+  const el = $('lk-ctl'), b = $('lkc-score'); if(!el || !b || !G) return;
+  const sc = G.M.score, me = G.M.players.find(p => p.human && !p.remote), my = me ? me.side : 0;
+  const t = sc.pts[my] + ' – ' + sc.pts[1 - my], gm = G.sp.scoring === 'tennis' ? 'games ' + sc.games[my] + ' – ' + sc.games[1 - my] : '';
+  if(el.dataset.sc !== t + gm){ el.dataset.sc = t + gm; b.innerHTML = '<small>you</small> ' + t + ' <small>them</small>' + (gm ? '<span class="lkc-games">' + gm + '</span>' : ''); }
 }
 function lkPlayer(seat){ return G && G.M.players.find(p => p.human && p.lseat === seat); }
 function lkHere(){ return G && G.link && G.link.role === 'host'; }
@@ -2888,9 +2934,9 @@ function lkGoLabel(){ const b = $('go-btn'); if(b) b.textContent = SET.mode === 
 function lkCloseLobby(){ if(LK.lobby && LK.lobby.close) LK.lobby.close(); LK.lobby = null; }
 async function lkOpenHost(){
   lkWire(); lkCloseLobby(); const sp = SB.SPORTS[SET.sport], L = SB.LEVELS[SET.level];
-  $('link-sub').textContent = 'Friends tap 🔗 Join friends on their own phone or tablet — same Wi-Fi'; showScreen('link'); lkAlt('');
+  $('link-sub').textContent = LK.tv ? '📺 This screen is the Room hostess — players tap 🔗 Join friends on their own phone (same Wi-Fi)' : 'Friends tap 🔗 Join friends on their own phone or tablet — same Wi-Fi'; showScreen('link'); lkAlt('');
   const el = $('link-lobby'); el.innerHTML = '<div class="lk"><div class="lk-msg"><span class="ui-spin a-bob">📡</span> Opening the room<span class="lk-dots"></span></div></div>';
-  try{ await Link.host({game: 'SlaBrall', name: S.player, seats: 4, page: 'slabrall', label: sp.icon + ' ' + sp.name + ' · ' + LEVEL_UI[SET.level].emoji + ' ' + L.name}); }   // label + page: the 🏠 waiting room (lk-2a)
+  try{ await Link.host({game: 'SlaBrall', name: S.player, seats: 4, hostess: !!LK.tv, page: 'slabrall', label: sp.icon + ' ' + sp.name + ' · ' + LEVEL_UI[SET.level].emoji + ' ' + L.name + (LK.tv ? ' · 📺 on the TV' : '')}); }   // label + page: the 🏠 waiting room (lk-2a)
   catch(e){ UISound.play('error'); el.innerHTML = '<div class="lk"><div class="lk-msg bad">😕 ' + UI.esc(lkWhy(e)) + '</div></div>'; return; }
   if($('scr-link').classList.contains('hidden')) return;   // left while it opened
   LK.lobby = Link.lobby(el, {title: sp.icon + ' ' + sp.name + ' · ' + LEVEL_UI[SET.level].emoji + ' ' + L.name, url: WEBAPP_URL + '?page=slabrall', minPlayers: 2, name: S.player, drawAvatar: lkAv, kind: 'link', onStart: lkGo});
@@ -2913,10 +2959,12 @@ function lkHostPick(){
           return '<button class="lkh-b' + (k === SET.sport ? ' on' : '') + '" data-sp="' + k + '" data-sound="pop"><span class="lkh-i">' + sp.icon + '</span>' + UI.esc(sp.name) + '</button>'; }).join('') + '</div>'
       + '<div class="lkh-t">2 · Level</div><div class="lkh-row" id="lkh-levels">' + SB.LEVELS.map((L, i) => !LEVEL_UI[i] || LEVEL_UI[i].hardcore ? '' :
           '<button class="lkh-b' + (i === SET.level ? ' on' : '') + '" data-lv="' + i + '"' + (canPlay(i) ? ' data-sound="pop"' : ' disabled data-sound="none"') + '><span class="lkh-i">' + (canPlay(i) ? LEVEL_UI[i].emoji : '🔒') + '</span>' + UI.esc(L.name) + '</button>').join('') + '</div>'
-      + '<button class="lk-btn lkh-go" id="lkh-go" data-sound="pop">📡 Open the room</button></div></div>';
+      + '<div class="lkh-gos"><button class="lk-btn lkh-go" id="lkh-go" data-sound="pop">📡 Open the room<small>this device plays too</small></button>'
+      + '<button class="lk-btn lkh-go lkh-tvgo" id="lkh-tv" data-sound="pop">📺 Room hostess<small>court on the TV · phones play</small></button></div></div></div>';
     el.querySelectorAll('[data-sp]').forEach(b => b.onclick = () => { SET.sport = b.dataset.sp; savePrefs(); paint(); });
     el.querySelectorAll('[data-lv]').forEach(b => b.onclick = () => { if(!lkLevelOk(+b.dataset.lv)) return; SET.level = +b.dataset.lv; paint(); });
-    $('lkh-go').onclick = () => { SET.mode = 'link'; savePrefs(); lkOpenHost(); };
+    $('lkh-go').onclick = () => { LK.tv = false; SET.mode = 'link'; savePrefs(); lkOpenHost(); };
+    $('lkh-tv').onclick = () => { LK.tv = true; SET.mode = 'link'; savePrefs(); lkOpenHost(); };
   };
   paint();
 }
@@ -2928,34 +2976,40 @@ function lkAlt(k){
 function lkIdle(){ try{ if(window.Link && Link.status() !== 'idle') Link.leave(); }catch(e){} }   // switching host ↔ join closes the old room / link
 // host ▶ Start (lobby) / 🔁 Play again: the linked players → seats (2 = 1 vs 1 · 3–4 = 2 vs 2, a 🤖 fills seat 4)
 function lkGo(){
-  const list = Link.players().filter(p => p.name && p.on).sort((a, b) => a.seat - b.seat).slice(0, 4);
-  if(list.length < 2){ UISound.play('error'); UI.toast('📡 Wait for a friend to join'); return; }
+  const tv = !!(Link.hostess && Link.hostess());   // 📺 lk-5e: the TV's seat 0 is the screen — every player is on their own phone
+  const list = Link.players().filter(p => p.name && p.on && !p.screen).sort((a, b) => a.seat - b.seat).slice(0, 4);
+  if(list.length < 2){ UISound.play('error'); UI.toast(tv ? '📺 Wait for 2 players to join' : '📡 Wait for a friend to join'); return; }
   const sides = list.length === 2 ? [0, 1] : [0, 1, 0, 1], seats = list.map((p, k) => ({name: p.name, side: sides[k], human: true, lseat: p.seat}));
   if(seats.length === 3) seats.push({name: 'Robot', side: 1, human: false});
-  LK.cfg = {link: true, id: Date.now().toString(36), sport: SET.sport, level: SET.level, theme: SET.theme, powers: SET.powers, ball: SET.ball, target: 0, seed: (Date.now() & 0xffffff) ^ 0x5b, host: S.player, seats};
+  LK.cfg = {link: true, id: Date.now().toString(36), sport: SET.sport, level: SET.level, theme: SET.theme, powers: SET.powers, ball: SET.ball, target: 0, seed: (Date.now() & 0xffffff) ^ 0x5b, host: S.player, tv, seats};
   LK.end = null; lkCloseLobby();
   Link.send('sbgo', LK.cfg, {sure: true});
   if(G) cancelAnimationFrame(G.raf); G = null; hideResult();
   startMatch(lkLocal(LK.cfg, 0, 'host'));
 }
+function lkAskAgain(b){ if(window.UI && UI.busy) UI.busy(b, 'sla-brall', 'Asking the TV…'); Link.ask('again'); }   // 📺 lk-5e
 function lkResultBtns(){
-  if(G.link.role === 'host') return '<div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="pop" onclick="lkGo()">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="lkExit()">🎚️ Levels</button></div>';
-  return '<div class="note lk-wait">⏳ ' + UI.esc(G.link.host || 'The host') + ' can start the next match<span class="lk-dots"></span></div><div class="res-btns"><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="lkExit()">🚪 Leave</button></div>';
+  if(G.link.role === 'host') return '<div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="pop" onclick="lkGo()">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="lkExit()">' + (LK.cfg && LK.cfg.tv ? '🚪 End the room' : '🎚️ Levels') + '</button></div>';
+  const tv = LK.cfg && LK.cfg.tv;   // 📺 lk-5e
+  if(tv && Link.captain && Link.captain() === Link.seat()) return '<div class="res-btns"><button class="btn sp-btn sp-primary" id="lk-again" data-sound="pop" onclick="lkAskAgain(this)">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="lkExit()">🚪 Leave</button></div>';
+  return '<div class="note lk-wait">⏳ ' + UI.esc(tv ? 'The TV or the first player' : (G.link.host || 'The host')) + ' can start the next match<span class="lk-dots"></span></div><div class="res-btns"><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="lkExit()">🚪 Leave</button></div>';
 }
 function lkEnded(msg){
   if(G){ cancelAnimationFrame(G.raf); G.over = true; }
+  lkCtlOff();
   showResult('<div class="big">📡</div><h2>' + UI.esc(msg) + '</h2><div class="note">Thanks for playing together!</div><div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="none" onclick="lkExit()">◀ SlaBrall</button></div>');
 }
 function lkExit(){
   try{ if(Link.status() !== 'idle') Link.leave(); }catch(e){}
   lkCloseLobby(); LK.cfg = null; LK.end = null;
-  if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); $('pads').innerHTML = ''; renderMenu(); showScreen('menu');
+  if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); $('pads').innerHTML = ''; lkCtlOff(); LK.tv = false; renderMenu(); showScreen('menu');
 }
 function lkWire(){
   if(LK.wired || !window.Link) return; LK.wired = true;
   // ---- guest side ----
   Link.on('sbgo', d => { if(Link.isHost() || !d || !d.seats) return; if(G && G.link && G.link.id === d.id) return;
-    LK.cfg = d; LK.end = null; lkCloseLobby(); if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); startMatch(lkLocal(d, Link.seat(), 'guest')); });
+    LK.cfg = d; LK.end = null; lkCloseLobby(); if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); startMatch(lkLocal(d, Link.seat(), 'guest'));
+    if(d.tv) lkCtl(lkCtlWant()); else lkCtlOff(); });
   Link.on('sbs', d => { if(!G || !G.lk || G.link.role !== 'guest' || !d) return; const L = G.lk, at = performance.now() / 1000, off = at - d.t;
     const last = L.buf[L.buf.length - 1]; if(last && d.t < last.t) return;   // an older picture that came late
     if(L.off == null || off < L.off || off - L.off > 0.25) L.off = off; else L.off += (off - L.off) * 0.05;
@@ -2983,6 +3037,8 @@ function lkWire(){
     if(p && p.auto && !G.over){ p.auto = false; p.input.x = p.input.y = 0; banner('👋 ' + p.name + ' is back!', 'good'); UISound.play('success'); }
     Link.send('sbgo', LK.cfg, {sure: true, to: e.seat}); if(G.over && LK.end) Link.send('sbend', LK.end, {sure: true, to: e.seat}); };
   Link.on('rejoin', back); Link.on('join', back);
+  Link.on('lk:ask', (d, seat) => { if(!lkHere() || !G.over || !d || d.what !== 'again' || !LK.cfg || !LK.cfg.tv) return;   // 📺 lk-5e: the first player's 🔁
+    if(Link.captain() === seat) lkGo(); });
   addEventListener('pagehide', () => { try{ if(Link.status() !== 'idle') Link.leave(); }catch(e){} });
 }
 // 🔗 the host's QR code opens ?page=slabrall&link=<code> → the picture pad fills itself in after the player pick
@@ -3012,4 +3068,4 @@ msAfter('choosePlayer', () => { if(LK.urlDone) return; LK.urlDone = true;   // �
 </script>
 </body>
 </html>
-<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+lk-1b+p1d+lk-1c+cs-1+lk-2e+dv-1+tb-1) END OF SlaBrall.html -->
+<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+lk-1b+p1d+lk-1c+cs-1+lk-2e+dv-1+tb-1+lk-5e) END OF SlaBrall.html -->
