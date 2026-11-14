@@ -247,6 +247,8 @@
   /* 📡 lk-3d own devices */
   #scr-link .lx-top{display:flex;justify-content:flex-start;padding:6px 4px 0;} #scr-link .lx-alt{display:flex;justify-content:center;margin:12px 0;}
   .lx-pick{display:flex;flex-direction:column;gap:10px;margin-top:10px;} .lx-pick .btn{width:100%;}
+  .lx-pick .btn{flex-direction:column;line-height:1.2;} .lx-pick .btn small{display:block;font-size:.72rem;font-weight:600;opacity:.85;margin-top:3px;}   /* 📺 lk-5d */
+  .lx-pick .lx-tv{--game-a:#7B4FE0;--game-b:#3B82F6;background:linear-gradient(135deg,#7B4FE0,#3B82F6);} #rack.lx-tvrack{min-height:0;} #acts.lx-tvhide{display:none;}   /* 📺 lk-5d: the TV has no rack */
   .lx-over{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(10,8,30,.55);}
   .buddy .who{display:none;position:absolute;right:8px;top:6px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.78rem;background:rgba(0,0,0,0.35);color:#fff;border-radius:10px;padding:2px 8px;}
   @media (orientation:landscape) and (max-height:560px){ .buddy{height:52px;} .swapbox{min-height:40px;padding:3px 6px;} .sb-go,.sb-x{min-height:34px;} .sb-tiles button{width:28px;height:28px;font-size:0.9rem;} }
@@ -780,6 +782,8 @@ function bagN(){ return G.lx && G.lx.role === 'guest' ? (G.lx.bagN || 0) : G.bag
 function setMsg(html, kind){ const m = $('msg'); m.innerHTML = html; m.className = 'msg' + (kind ? ' ' + kind : ''); }
 function renderRack(hidden){
   if(G.lx) hidden = false;   // 📡 lk-3d: your own rack, always (nobody else sees it)
+  if(G.lx && G.lx.seat < 0){ $('rack').innerHTML = ''; $('rack').classList.add('lx-tvrack'); $('eq-txt').textContent = '📺 Each player’s tiles stay on their own device'; renderSwapBox(); return; }   // 📺 lk-5d: the TV has no rack
+  $('rack').classList.remove('lx-tvrack');
   const P = G.lx ? G.players[G.lx.seat] : cur(), box = $('rack'); box.innerHTML = '';
   if(!hidden && !P.bot) markFresh(P);
   for(let k = 0; k < RACK; k++){
@@ -1406,6 +1410,8 @@ const nbMenuBase = renderMenu; renderMenu = function(){ const r = nbMenuBase.app
 boot();
 
 /* 📡 LINK (lk-3d): 🔤 Algebros on 2–4 own devices (LinkKit). The host's device runs the game; guests see the board + ONLY their own rack. */
+/* 📺 lk-5d Room hostess: the host device can be the TV — then it holds NO player (G.lx.seat = -1, no rack): every player is a guest,
+   the TV checks every number sentence, shows the board + scores + whose turn, and calls the next player; ▶ Start / 🔁 also from the first player (Link.ask). */
 const LX = {wired: false, lobby: null, pending: null, cfg: null, autoT: 0, talk: {}};
 const LX_TALK = ['Hmm… 🤔', 'I’ve got a sum! 💡', 'Don’t peek! 🙈', 'Which number… 🔢', 'Almost ready! ⏳', 'This one’s big! 🌟', 'Shh, counting… 🤫', 'Watch this! 😎', 'Carry the one… ✏️', 'Ooh, a ×3 square! ✨', 'Hello everyone! 👋', 'Plus or times? 🤯'];
 function lxSend(kind, d){ if(!G || !G.lx) return; G.lx.sent = true; setActs(false); setMsg('<span class="ui-spin a-bounce">📨</span> Sending to the host…', ''); Link.send(kind, Object.assign({tn: G.lx.tn}, d), {sure: true}); }
@@ -1416,63 +1422,68 @@ function lxIdle(){ try{ if(window.Link && Link.status() !== 'idle') Link.leave()
 function lxChoose(){
   const card = $('sheet-card');
   card.innerHTML = '<div class="big" style="font-size:2.4rem">📡</div><h2>Own devices</h2><div class="lbl">Each player on their own phone, tablet or computer — same Wi-Fi or 🌍 anywhere. Your tiles stay on your screen.</div>' +
-    '<div class="lx-pick"><button class="btn sp-btn sp-primary" id="lx-host" data-sound="pop">📡 Host a game</button><button class="btn sp-btn sp-secondary" id="lx-join" data-sound="pop">🔗 Join friends</button><button class="btn soft sp-btn sp-ghost" id="lx-x" data-sound="none">Cancel</button></div>';
-  $('lx-host').onclick = () => { closeSheet(); lxHostPick(); }; $('lx-join').onclick = () => { closeSheet(); lxJoin(); }; $('lx-x').onclick = closeSheet;
+    '<div class="lx-pick"><button class="btn sp-btn sp-primary" id="lx-host" data-sound="pop">🎮 Host and play<small>this device plays too</small></button>' +
+    '<button class="btn sp-btn sp-primary lx-tv" id="lx-tv" data-sound="pop">📺 Room hostess<small>this screen shows the board on the TV · everyone plays on their own device</small></button>' +
+    '<button class="btn sp-btn sp-secondary" id="lx-join" data-sound="pop">🔗 Join friends</button><button class="btn soft sp-btn sp-ghost" id="lx-x" data-sound="none">Cancel</button></div>';
+  $('lx-host').onclick = () => { closeSheet(); lxHostPick(false); }; $('lx-tv').onclick = () => { closeSheet(); lxHostPick(true); };
+  $('lx-join').onclick = () => { closeSheet(); lxJoin(); }; $('lx-x').onclick = closeSheet;
   $('sheet').classList.remove('hidden');
 }
-function lxHostPick(){
-  lxWire(); lxCloseLobby(); lxIdle();
+function lxHostPick(tv){   // 📺 lk-5d: tv = Room hostess
+  lxWire(); lxCloseLobby(); lxIdle(); LX.tv = !!tv;
   const card = $('sheet-card');
   const draw = () => {
-    card.innerHTML = '<div class="big" style="font-size:2.4rem">📡</div><h2>Host a game</h2><div class="lbl">Friends join on their own device with the room number</div>' +
+    card.innerHTML = '<div class="big" style="font-size:2.4rem">' + (LX.tv ? '📺' : '📡') + '</div><h2>' + (LX.tv ? 'Room hostess' : 'Host a game') + '</h2><div class="lbl">' + (LX.tv ? 'This screen shows the board — the players join on their own devices' : 'Friends join on their own device with the room number') + '</div>' +
       '<div class="lbl">Signs</div><div class="opt-row" id="lxh-diff">' + Object.keys(TOGETHER).map(k => '<button class="o' + (together.diff === k ? ' on' : '') + '" data-k="' + k + '">' + TOGETHER[k].name + ' ' + TOGETHER[k].ops.map(show).join(' ') + '</button>').join('') + '</div>' +
       '<div class="lbl">Board</div><div class="opt-row" id="lxh-size"><button class="o' + (together.size === 11 ? ' on' : '') + '" data-s="11">11 × 11</button><button class="o' + (together.size === 15 ? ' on' : '') + '" data-s="15">15 × 15</button></div>' +
       '<div class="lbl">Rounds</div><div class="opt-row" id="lxh-rounds">' + [5, 8, 12].map(r => '<button class="o' + (together.rounds === r ? ' on' : '') + '" data-r="' + r + '">' + r + '</button>').join('') + '</div>' +
-      '<div class="res-btns"><button class="btn sp-btn sp-primary" id="lxh-go">📡 Open the room</button><button class="btn soft sp-btn sp-secondary" id="lxh-x">Cancel</button></div>';
+      '<div class="res-btns"><button class="btn sp-btn sp-primary" id="lxh-go">' + (LX.tv ? '📺' : '📡') + ' Open the room</button><button class="btn soft sp-btn sp-secondary" id="lxh-x">Cancel</button></div>';
     card.querySelectorAll('#lxh-diff .o').forEach(b => b.onclick = () => { together.diff = b.dataset.k; draw(); });
     card.querySelectorAll('#lxh-size .o').forEach(b => b.onclick = () => { together.size = Number(b.dataset.s); draw(); });
     card.querySelectorAll('#lxh-rounds .o').forEach(b => b.onclick = () => { together.rounds = Number(b.dataset.r); draw(); });
-    $('lxh-go').onclick = () => { savePrefs(); closeSheet(); lxOpenHost(); };
+    $('lxh-go').onclick = () => { savePrefs(); closeSheet(); lxOpenHost(LX.tv); };
     $('lxh-x').onclick = closeSheet;
   };
   draw(); $('sheet').classList.remove('hidden');
 }
 function lxLabel(){ const d = TOGETHER[together.diff] || {}; return '➗ ' + (d.name || 'Easy') + ' ' + (d.ops || []).map(show).join(' ') + ' · ' + together.size + '×' + together.size + ' · ' + together.rounds + ' rounds'; }
-async function lxOpenHost(){
+async function lxOpenHost(tv){
   lxWire(); lxCloseLobby();
-  $('lx-sub').textContent = 'Friends tap 🔗 Join friends on their own phone or tablet — same Wi-Fi or 🌍 anywhere'; showScreen('link'); lxAlt('');
-  const el = $('lx-lobby'); el.innerHTML = '<div class="lk"><div class="lk-msg"><span class="ui-spin a-bob">📡</span> Opening the room<span class="lk-dots"></span></div></div>';
-  try{ await Link.host({game: 'Algebros', name: S.player, seats: 4, page: 'numberboard', label: lxLabel()}); }
+  $('lx-sub').textContent = tv ? '📺 This screen is the Room hostess — players tap 🔗 Join friends on their own devices' : 'Friends tap 🔗 Join friends on their own phone or tablet — same Wi-Fi or 🌍 anywhere'; showScreen('link'); lxAlt('');
+  const el = $('lx-lobby'); el.innerHTML = '<div class="lk"><div class="lk-msg"><span class="ui-spin a-bob">' + (tv ? '📺' : '📡') + '</span> Opening the room<span class="lk-dots"></span></div></div>';
+  try{ await Link.host({game: 'Algebros', name: S.player, seats: 4, hostess: !!tv, page: 'numberboard', label: lxLabel() + (tv ? ' · 📺 on the TV' : '')}); }
   catch(e){ UISound.play('error'); el.innerHTML = '<div class="lk"><div class="lk-msg bad">😕 ' + UI.esc((e && e.message) || 'Could not open the room') + '</div></div>'; return; }
   if($('scr-link').classList.contains('hidden')) return;
   LX.lobby = Link.lobby(el, {title: lxLabel(), url: WEBAPP_URL + '?page=numberboard', minPlayers: 2, name: S.player, drawAvatar: lxAv, kind: 'number-board', onStart: lxHostGo});
 }
 function lxJoin(code){
   lxWire(); lxCloseLobby(); lxIdle();
-  $('lx-sub').textContent = 'Same Wi-Fi as the host'; showScreen('link'); lxAlt('host');
-  LX.lobby = Link.lobby($('lx-lobby'), {title: '➗ Algebros', name: S.player, drawAvatar: lxAv, code: code || undefined, onJoined: () => { UISound.play('success'); lxAlt(''); }});
+  $('lx-sub').textContent = 'Same Wi-Fi as the host — or 🌍 anywhere'; showScreen('link'); lxAlt('host');
+  LX.lobby = Link.lobby($('lx-lobby'), {title: '➗ Algebros', name: S.player, drawAvatar: lxAv, code: code || undefined, kind: 'number-board', onJoined: () => { UISound.play('success'); lxAlt(''); }});
 }
 function lxAlt(k){ const a = $('lx-alt'); if(!a) return; a.innerHTML = k === 'host' ? '<button class="btn soft sp-btn sp-secondary" data-sound="pop" onclick="lxHostPick()">📡 Host a game instead</button>' : ''; }
 function lxExit(){
   lxIdle(); lxCloseLobby(); clearTimeout(LX.autoT); LX.cfg = null;
   const o = document.querySelector('.lx-over'); if(o) o.remove();
   if(G && G.lx){ if(window.Cheer) Cheer.unmount(); clearInterval(timerId); G = null; hideResult(); closeSheet(); }
+  $('acts').classList.remove('lx-tvhide'); $('rack').classList.remove('lx-tvrack');   // 📺 lk-5d
   renderMenu(); showScreen('menu');
 }
 function lxLeavePlay(){
   if(G.over){ lxExit(); return; }
   const host = G.lx.role === 'host';
-  UI.confirm({icon: '◀', title: host ? 'End the game for everyone?' : 'Leave this game?', body: host ? 'You are the host — the game stops on every device.' : '🤖 The robot plays your turns until you come back.', okText: host ? 'End game' : 'Leave', cancelText: 'Keep playing'}).then(ok => { if(ok) lxExit(); });
+  UI.confirm({icon: '◀', title: host ? 'End the game for everyone?' : 'Leave this game?', body: host ? (G.lx.tv ? '📺 You are the Room hostess — the game stops on every device.' : 'You are the host — the game stops on every device.') : '🤖 The robot plays your turns until you come back.', okText: host ? 'End game' : 'Leave', cancelText: 'Keep playing'}).then(ok => { if(ok) lxExit(); });
 }
 // ---- host ----
 function lxHostGo(){
-  const list = Link.players().filter(p => p.name && p.on).sort((a, b) => a.seat - b.seat).slice(0, 4);
-  if(list.length < 2){ UISound.play('error'); UI.toast('📡 Wait for a friend to join'); return; }
-  LX.cfg = {id: Date.now().toString(36), diff: together.diff, size: together.size, rounds: together.rounds, theme, host: S.player, seats: list.map(p => ({name: p.name, lseat: p.seat}))};
-  lxCloseLobby(); hideResult(); closeSheet();
-  LX.pending = {role: 'host', seat: 0, tn: 0, seats: LX.cfg.seats.map(x => Object.assign({}, x)), id: LX.cfg.id};
+  const tv = !!(Link.hostess && Link.hostess());   // 📺 lk-5d: the TV holds no player
+  const list = Link.players().filter(p => p.name && p.on && !p.screen).sort((a, b) => a.seat - b.seat).slice(0, 4);
+  if(list.length < 2){ UISound.play('error'); UI.toast(tv ? '📺 Wait for 2 players to join' : '📡 Wait for a friend to join'); return; }
+  LX.cfg = {id: Date.now().toString(36), diff: together.diff, size: together.size, rounds: together.rounds, theme, host: S.player, tv, seats: list.map(p => ({name: p.name, lseat: p.seat}))};
+  lxCloseLobby(); hideResult(); closeSheet(); const o = document.querySelector('.lx-over'); if(o) o.remove();
+  LX.pending = {role: 'host', seat: tv ? -1 : 0, tn: 0, seats: LX.cfg.seats.map(x => Object.assign({}, x)), id: LX.cfg.id, tv};
   startGame('together');                                   // the engine runs here; G.lx comes from LX.pending
-  G.players.forEach((P, k) => { if(k !== 0) Link.send('nbgo', {cfg: LX.cfg, seat: k, st: lxState(k)}, {sure: true, to: G.lx.seats[k].lseat}); });
+  G.players.forEach((P, k) => { if(k !== G.lx.seat) Link.send('nbgo', {cfg: LX.cfg, seat: k, st: lxState(k)}, {sure: true, to: G.lx.seats[k].lseat}); });
 }
 function lxState(k){
   return {id: G.lx.id, tn: G.lx.tn, cur: G.cur, round: G.round, passes: G.passes, bagN: G.bag.length, over: G.over, last: G.last,
@@ -1482,11 +1493,13 @@ function lxState(k){
 }
 function lxSync(){ if(!G || !G.lx || G.lx.role !== 'host') return; G.players.forEach((P, k) => { if(k !== G.lx.seat) Link.send('nbstate', lxState(k), {sure: true, to: G.lx.seats[k].lseat}); }); }
 function lxBeginTurn(first){
-  const P = cur(), mine = G.cur === G.lx.seat; G.pend = []; G.sel = null; G.swap = null; G.cursor = null; G.ghost = []; G.lx.sent = false;
+  $('acts').classList.toggle('lx-tvhide', G.lx.seat < 0);   // 📺 lk-5d: no play buttons on the TV
+  const P = cur(), mine = G.cur === G.lx.seat, tv = G.lx.seat < 0; G.pend = []; G.sel = null; G.swap = null; G.cursor = null; G.ghost = []; G.lx.sent = false;
   if(G.lx.role === 'host'){ G.lx.tn++; lxSync(); }
   updateScores(); hudTick(); paintAll(); renderRack(false); setActs(mine);
-  $('turnbar').textContent = mine ? '🎲 Your turn, ' + P.name : '✏️ ' + P.name + ' is thinking…';
+  $('turnbar').textContent = mine ? '🎲 Your turn, ' + P.name : (tv ? '🎲 ' : '✏️ ') + P.name + (tv ? '’s turn' : ' is thinking…');
   if(mine){ setMsg(G.cells.every(c => !c) ? '⭐ Start over the star in the middle — make a sentence like 3 + 4 = 7' : 'Tap a tile, then a square', ''); say(P.name + ', your turn!'); }
+  else if(tv){ setMsg('📺 ' + UI.esc(P.name) + ' is making a number sentence on their own device…', ''); say(P.name + ', your turn!'); }   // 📺 lk-5d: the TV calls the next player
   else setMsg('✏️ ' + UI.esc(P.name) + ' is thinking — plan your next number sentence!', '');
   if(first) showBanner('📡 ' + G.players.length + ' devices — make the best number sentences!', 'gold');
   clearTimeout(LX.autoT);
@@ -1522,7 +1535,7 @@ function lxGuestStart(d){
   LX.cfg = d.cfg; lxCloseLobby(); hideResult(); closeSheet(); const o = document.querySelector('.lx-over'); if(o) o.remove();
   together.diff = d.cfg.diff; together.size = d.cfg.size; together.rounds = d.cfg.rounds;
   const keepTheme = theme; theme = THEMES[d.cfg.theme] ? d.cfg.theme : theme;
-  LX.pending = {role: 'guest', seat: d.seat, tn: -1, seats: d.cfg.seats, id: d.cfg.id, bagN: 0};
+  LX.pending = {role: 'guest', seat: d.seat, tn: -1, seats: d.cfg.seats, id: d.cfg.id, bagN: 0, tv: !!d.cfg.tv};
   startGame('together'); theme = keepTheme;
   G.bag = []; lxApply(d.st);
 }
@@ -1555,10 +1568,11 @@ function lxBubble(g, x, w, h, tnow, P){
   g.fillStyle = '#2B1B5A'; g.textBaseline = 'middle'; g.fillText(text, bx + 7, by + 10.5); g.restore();
 }
 function lxResultBtns(g){
-  return g.lx.role === 'host' ? '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 End the room</button></div>'
-    : '<div class="note lk-wait">⏳ ' + UI.esc((LX.cfg && LX.cfg.host) || 'The host') + ' can start the next game<span class="lk-dots"></span></div><div class="res-btns"><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 Leave</button></div>';
+  if(g.lx.role === 'host') return '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 End the room</button></div>';
+  if(g.lx.tv && Link.captain && Link.captain() === Link.seat()) return '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 Leave</button></div>';   // 📺 the first player may start the next game
+  return '<div class="note lk-wait">⏳ ' + UI.esc(g.lx.tv ? 'The TV or the first player' : ((LX.cfg && LX.cfg.host) || 'The host')) + ' can start the next game<span class="lk-dots"></span></div><div class="res-btns"><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 Leave</button></div>';
 }
-function lxResultWire(g){ const a = $('b-again'); if(a) a.onclick = () => lxHostGo(); $('b-menu').onclick = () => lxExit(); }
+function lxResultWire(g){ const a = $('b-again'); if(a) a.onclick = () => { if(g.lx.role !== 'host'){ UI.busy(a, 'number-board', 'Asking the TV…'); Link.ask('again'); } else lxHostGo(); }; $('b-menu').onclick = () => lxExit(); }
 function lxEnded(msg){
   if(G){ G.over = true; clearTimeout(LX.autoT); }
   hideResult(); closeSheet(); const o0 = document.querySelector('.lx-over'); if(o0) o0.remove();   // the message sits on top, alone
@@ -1580,6 +1594,8 @@ function lxWire(){
     UISound.play('bump'); lxEnded(e && e.reason === 'lost' ? '📶 Lost the link to ' + ((LX.cfg && LX.cfg.host) || 'the host') : '👋 ' + ((LX.cfg && LX.cfg.host) || 'The host') + ' ended the game'); });
   // host side
   ['play', 'swap', 'pass'].forEach(k => Link.on('nb' + k, (d, lseat) => { if(Link.isHost() && G && G.lx) lxHostMove(k, d || {}, lseat); }));
+  Link.on('lk:ask', (d, lseat) => { if(!Link.isHost() || !d || d.what !== 'again' || !G || !G.lx || !G.over || !G.lx.tv) return;   // 📺 lk-5d: the first player's 🔁
+    if(Link.captain() === lseat) lxHostGo(); });
   Link.on('leave', e => { if(!Link.isHost() || !G || !G.lx || G.over) return; const k = lxSeatOf(e.seat), P = G.players[k]; if(!P) return; P.away = true;
     showBanner('📶 ' + P.name + ' dropped out — 🤖 the robot plays their turns until they come back', 'bad'); lxSync();
     if(G.cur === k){ clearTimeout(LX.autoT); LX.autoT = setTimeout(() => lxAuto(P), LX_AUTO_MS); } });
@@ -1619,4 +1635,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.chips', {rows: 3}); }</script>
 </body>
 </html>
-<!-- (11v+emoji+r32+back-1+modes-3+gs-4+p1a+p1a-3+p2+p4c+cs-3b+lk-3d+lk-5a) END OF NumberBoard.html -->
+<!-- (11v+emoji+r32+back-1+modes-3+gs-4+p1a+p1a-3+p2+p4c+cs-3b+lk-3d+lk-5a+lk-5d) END OF NumberBoard.html -->
