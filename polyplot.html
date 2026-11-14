@@ -207,6 +207,7 @@
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-3c: the cheering crowd (CheerSquad.html) -->
 
 </head>
 <body ontouchstart="">
@@ -223,6 +224,7 @@
   <div class="modes" id="mode-list"></div>
   <div class="section-head" id="level-head">🎚️ Pick a level</div>
   <div class="levels" id="level-list"></div>
+  <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the game">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-3c -->
   <details class="rules" id="how"><summary>📖 How to play</summary>
     <ul id="how-list"></ul>
     <table class="ptable" id="shape-table"></table>
@@ -1152,7 +1154,7 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
-  SET.seats = []; loadPrefs(); $('who-name').textContent = name; renderMenu(); showScreen('menu');
+  SET.seats = []; loadPrefs(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-3c */ renderMenu(); showScreen('menu');
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">' + (unlockedOf(S.player) > i ? '🏅 Won' : 'Not won yet') + '</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span><span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
@@ -1274,7 +1276,7 @@ function startGame(cfgOver){
   G = {id: GID, M, cfg, t0: performance.now(), busy: true, ver: 1, sver: -1, view: null, zoom: 1, panX: 0, panY: 0, sel: -1, hover: -1, ghost: null, route: [], mode: null, target: null, fx: [], av: [], timerEnd: 0, cursor: 0, undoWin: false, factShown: {}, heads: [], over: false, raf: 0, lastChain: [], replay: null, disp: null, vis: {m: {}, s: {}, c: {}}, tw: [], proj: []};
   M.P.forEach((p, i) => { G.av.push({x: M.dots[p.at].x, y: M.dots[p.at].y, path: null, walkT: 0, dir: 1, gest: FX ? {g: gestK('cheer'), t: 0} : null, gestEnd: 1.4, rest: null, dizzy: 0, hold: null}); });
   M.P.forEach((p, i) => G.heads.push(headPic(i)));
-  showScreen('play'); layoutPlay(); buildCards(); buildActbar(); paintFast();
+  showScreen('play'); layoutPlay(); buildCards(); buildActbar(); paintFast(); cheerMount(); /* 📣 cs-3c */
   if(!$('scr-play').dataset.bound) bindBoard();
   G.raf = requestAnimationFrame(frame);
   banner(M.coop ? '🛡️ Defend the base! ' + M.waves + ' waves are coming' : M.fort ? '🏰 Close boxes next to your base to build!' : '⬛ Close a shape to own it!', 'good');
@@ -1367,11 +1369,11 @@ function nextTurn(){
   if(M.over){ return endGame(); }
   const p = M.P[M.cur]; hud();
   if(M.fort && !PP.legalList(M).length){ G.busy = true; banner('✋ No lines left to draw — the monsters move!', 'bad'); const id = G.id; setTimeout(async () => { if(G && G.id === id){ G.showP = M.cur; G.disp = snapBoard(); PP.pass(M); await playTurnShow(PP.takeEvents(M)); if(G && G.id === id) nextTurn(); } }, 700 * SPEED); return; }
-  if(p.bot){ G.busy = true; buildActbar(); const id = G.id; setTimeout(() => { if(G && G.id === id) botMove(); }, (G.undoWin ? 1700 : 650 / speedMul()) * SPEED); }
+  if(p.bot){ G.busy = true; buildActbar(); const id = G.id; if(window.Cheer) Cheer.hush(true);   /* 🤫 cs-3c */ setTimeout(() => { if(G && G.id === id) botMove(); }, (G.undoWin ? 1700 : 650 / speedMul()) * SPEED); }
   else { G.busy = false; buildActbar(); startTimer(); if(M.P.filter(q => !q.bot).length > 1) banner('✏️ ' + p.name + ' — your turn!', 'good'); }
 }
 function startTimer(){ const T = G.M.L.timer; if(!T){ $('clock').classList.add('hidden'); G.timerEnd = 0; return; } G.timerEnd = performance.now() + T * 1000; $('clock').classList.remove('hidden'); }
-async function botMove(){
+async function botMove(){ if(window.Cheer) Cheer.hush(false); /* 📣 cs-3c */
   const M = G.M, id = G.id; G.undoWin = false;
   if(M.hunt){ const c = PP.botCard(M); if(c){ const k = M.P[M.cur].cards[c.idx]; const r = PP.playCard(M, M.cur, c.idx, c.target); if(r.ok){ banner('🃏 ' + M.P[M.cur].name + ' plays ' + PP.CARDS[k].icon + ' ' + PP.CARDS[k].name, 'gold'); handleEvents(PP.takeEvents(M)); G.ver++; hud(); await wait(700); if(!G || G.id !== id) return; } } }
   const e = PP.botPick(M); if(e < 0){ if(M.fort){ G.showP = M.cur; G.disp = snapBoard(); PP.pass(M); await playTurnShow(PP.takeEvents(M)); if(G && G.id === id) nextTurn(); return; } PP.finish(M); return endGame(); }
@@ -1523,6 +1525,7 @@ function fxAtDot(d, ch, extra){ const D = G.M.dots[d]; if(D) addFx(Object.assign
 // engine events → sounds, banners, avatar moves
 function handleEvents(list){
   if(!G || !list.length) return; const M = G.M, T = THEMES[M.theme]; G.ver++;
+  cheerEvents(list); /* 📣 cs-3c */
   list.forEach(e => {
     const nm = e.p != null && M.P[e.p] ? M.P[e.p].name : '';
     switch(e.k){
@@ -1810,6 +1813,7 @@ function drawLive(g, t){
 /* ================= END OF THE GAME ================= */
 async function endGame(){
   if(!G || G.over) return; G.over = true; G.busy = true; G.timerEnd = 0; const M = G.M, id = G.id; hud(); buildActbar();
+  cheerEnd(); /* 📣 cs-3c */
   const secs = Math.max(1, Math.round((performance.now() - G.t0) / 1000)), humans = M.P.filter(p => !p.bot), vsBots = humans.length === 1 && M.P.length > 1;
   const win = M.winner, my = humans[0], myWin = M.coop ? win === 0 : win >= 0 && win === my.team;
   // win dance on the biggest owned area + replay of the final chains
@@ -1874,14 +1878,43 @@ function saveText(res, cleared){
   const h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New high score!' : cleared ? (res.best && res.best.score ? 'Best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Saved') : '✅ Saved';
   return featText(res.feats, h);
 }
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+/* 📣 CHEERSQUAD (cs-3c) START — the crowd (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+// sides: teams → team; otherwise each player = their seat (you = 0, 🤖 / friend = 1 …)
+function cheerSide(i){ const M = G.M, p = M.P[i]; return !p ? 0 : M.teams ? p.team : i; }
+// the dots board on the page (+ the avatars' head room above the top row, + a margin) — the crowd never stands there
+function cheerBoard(){ const r = $('cv').getBoundingClientRect(), M = G.M, v = G.view; if(!v) return r; const sc = v.sc, head = Math.min(sc * 1.15, 110);
+  const l = r.left + Math.max(0, WX(0) - sc * 0.5), t = r.top + Math.max(0, WY(0) - head), rr2 = r.left + Math.min(G.cw, WX(M.w) + sc * 0.5), b = r.top + Math.min(G.ch, WY(M.h) + sc * 0.5);
+  return {left: l, top: t, right: rr2, bottom: b, width: rr2 - l, height: b - t}; }
+function cheerTaken(){ return Array.from(document.querySelectorAll('#scr-play .hud, .top-btn, #side-l .pcard, #side-r .pcard, #strip:not(.hidden), #actbar, #cap, #zoombox:not(.hidden)')).concat(G ? [{getBoundingClientRect: cheerBoard}] : []); }
+function cheerMount(){
+  if(!window.Cheer || !G) return; Cheer.unmount(); const M = G.M, box = $('scr-play');
+  const players = M.teams ? [0, 1].map(t => ({name: t ? '🔵 Team 2' : '🟠 Team 1', side: t, human: M.P.some(p => !p.bot && p.team === t)})) : M.P.map((p, i) => ({name: p.name, side: i, human: !p.bot}));
+  Cheer.mount(box, {game: 'polyplot', players, me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'overlay',
+    zones: () => Cheer.freeZones(box, cheerTaken), avoid: () => cheerTaken().filter(e => e.nodeType), clear: b => { if(!G) return false; const B = box.getBoundingClientRect(), R = cheerBoard(); return !(b.r > R.left - B.left - 3 && b.l < R.right - B.left + 3 && b.b > R.top - B.top - 3 && b.t < R.bottom - B.top + 3); }});
+}
+function cheerEvents(list){ if(!window.Cheer || !Cheer.active() || !G) return; const M = G.M, now = performance.now(), human = i => M.P[i] && !M.P[i].bot;
+  list.forEach(e => { const i = e.p;
+    if(e.k === 'close'){ if((G.cheerAt || 0) > now - 700 && e.chain < 3) return; G.cheerAt = now; Cheer.react(e.chain >= 3 ? 'big' : 'goal', {side: cheerSide(i)}); }
+    else if(e.k === 'catch' || e.k === 'build') Cheer.react('big', {side: cheerSide(i)});
+    else if((e.k === 'slip' || e.k === 'tagged' || e.k === 'steal' || e.k === 'decoy') && i != null && human(i)) Cheer.react('miss', {side: cheerSide(i)});
+    else if(e.k === 'event') Cheer.react('close', {side: -1});
+  }); }
+function cheerEnd(){ if(!window.Cheer || !Cheer.active() || !G) return; Cheer.hush(false); const M = G.M, w = M.winner, hs = M.P.filter(p => !p.bot);
+  if(M.coop) return Cheer.react(w === 0 ? 'win' : 'lose', {side: 0});
+  if(w == null || w < 0) return Cheer.react('goal', {side: -1});   /* a draw: everyone claps */
+  const mine = M.P.some(p => !p.bot && (M.teams ? p.team === w : M.P.indexOf(p) === w)); if(mine || hs.length > 1) Cheer.react('win', {side: M.teams ? w : w}); else Cheer.react('lose', {side: 0}); }
+function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  const at = card.querySelector('.res-btns'); if(!at) return; at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); }, 900); }
+/* 📣 CHEERSQUAD END */
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-3c */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function leavePlay(){
   if(!G) return; if(G.over){ backToMenu(); return; }
   UI.confirm ? UI.confirm('Leave this game?', 'The map will be lost.', 'Leave', 'Keep playing').then(ok => { if(ok) backToMenu(); }) : backToMenu();
 }
 function pauseGame(){ if(G) G.timerEnd = 0; }
-function backToMenu(){ if(G) cancelAnimationFrame(G.raf); G = null; GID++; hideResult(); closeSheet(); renderMenu(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); if(G) cancelAnimationFrame(G.raf); G = null; GID++; hideResult(); closeSheet(); renderMenu(); showScreen('menu'); }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
 function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
 window.feedbackContext = () => ({page: 'Polyplot', game: GAME_ID, level: G ? G.M.level : SET.level, mode: SET.mode});
@@ -1969,4 +2002,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.themes', {rows: 2}); UI.pageRows('.maps', {rows: 2}); UI.pageRows('.trails', {rows: 2}); }</script>
 </body>
 </html>
-<!-- (pp-5+back-1+modes-3+mg-1+p1d+p2+p3a) END OF Polyplot.html -->
+<!-- (pp-5+back-1+modes-3+mg-1+p1d+p2+p3a+cs-3c) END OF Polyplot.html -->

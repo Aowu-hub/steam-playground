@@ -206,6 +206,7 @@
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-3c: the cheering crowd (CheerSquad.html) -->
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
 
 <section class="screen hidden" id="scr-player">
@@ -222,6 +223,7 @@
   <div class="chips" id="theme-list"></div>
   <div class="section-head">3. Pick a level</div>
   <div class="levels" id="level-list"></div>
+  <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the game">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-3c -->
   <div class="section-head" id="song-head">4. Pick a song</div>
   <div class="songs" id="song-list"></div>
   <div class="menu-tools"><button class="btn soft sp-btn sp-secondary" data-sound="pop" id="keys-btn" onclick="openKeys()">🎹 Keys + ⏱ timing</button></div>
@@ -567,6 +569,7 @@ function startSong(lvl, i){
   BAR.level(L.emoji + ' ' + L.name, L.hardcore ? 'hc' : ''); BAR.score(0); BAR.count('combo', '🔥', 0, 'Combo');   // 🎛️ p1c: every slot exists before the first fit
   $('hud-song').textContent = '★'.repeat(Math.min(5, song.star)) + (song.star > 5 ? '+' + (song.star - 5) : '') + ' ' + song.name + ' · ' + song.bpm + ' BPM';
   showScreen('play'); layout(); hud();
+  cheerMount(); /* 📣 cs-3c */
   // clock: the audio clock when sound can play (in step with the music), else the page clock
   const c = audioCtx();
   if(c && c.state === 'suspended') try{ c.resume(); }catch(e){}
@@ -666,6 +669,7 @@ function grade(n, err){
   const w = G.L.win, gi = err <= w[0] ? 0 : err <= w[1] ? 1 : err <= w[2] ? 2 : 3;
   if(gi === 3){ miss(n); return; }
   n.res = GRADES[gi][0]; G.counts[n.res]++; G.combo++; G.missRow = 0; G.maxCombo = Math.max(G.maxCombo, G.combo); G.judged++;
+  cheerCombo(); /* 📣 cs-3c */
   const big = n.kind === 'big' ? 2 : 1;
   addScore(GRADES[gi][1] * big); G.health = Math.min(100, G.health + (gi === 0 ? 2 : 1));
   popText(n.lane, GRADES[gi][2], gi); burst(n.lane, gi, big);
@@ -676,6 +680,7 @@ function miss(n){
   n.res = 'miss'; n.holding = false; G.counts.miss++; G.combo = 0; G.missRow++; G.judged++;
   G.health = Math.max(0, G.health - (G.L.noFail ? 0 : G.L.hardcore ? 12 : 7)); popText(n.lane, 'Miss', 3);
   if(G.missRow >= 2){ G.dance.mood = 'oops'; G.dance.moodT = 0; }
+  cheerMiss(); /* 📣 cs-3c */
   missSnd();
   if(G.L.hardcore && G.missRow >= 3) return endSong('fail3');
   if(!G.L.noFail && G.health <= 0) return endSong('fail');
@@ -858,7 +863,7 @@ function leavePlay(){
   if(!G.paused) togglePause();
   UI.confirm({icon: '◀', title: 'Leave this song?', body: 'This song will not be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(ok) backToMenu(); else if(G && G.paused) togglePause(); });
 }
-function backToMenu(){ cancelAnimationFrame(raf); if(G && G.useAudio) try{ AU.ctx.suspend(); }catch(e){} G = null; $('pause-card').classList.add('hidden'); hideResult(); renderMenu(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); cancelAnimationFrame(raf); if(G && G.useAudio) try{ AU.ctx.suspend(); }catch(e){} G = null; $('pause-card').classList.add('hidden'); hideResult(); renderMenu(); showScreen('menu'); }
 
 /* ================= MENUS ================= */
 function showScreen(name){
@@ -881,7 +886,7 @@ function choosePlayer(name){
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
   loadPrefs(); loadPianoKeys(); loadDrumKeys(); if(START_MODE && MODES_ON.indexOf(START_MODE) >= 0 && !choosePlayer.done){ MODE = START_MODE; choosePlayer.done = true; }
   if(!canPlay(selLevel)) selLevel = Math.min(AGE_START[S.age] || 0, (MODE === 'corner' ? progressOf(name) : modeProgress(name)).unlocked);
-  $('who-name').textContent = name; renderMenu(); showScreen('menu');
+  $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-3c */ renderMenu(); showScreen('menu');
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 function renderMenu(){
@@ -954,6 +959,7 @@ function endSong(why){
   if(G.useAudio) setTimeout(() => { try{ if(G && G.over) AU.ctx.suspend(); }catch(e){} }, why === 'done' ? 400 : 0);
   const g = G, L = g.L, acc = accuracy(), passed = why === 'done' && acc >= L.pass, stars = !passed ? 0 : acc >= 0.95 ? 3 : acc >= 0.85 ? 2 : 1, c = g.counts;
   const secs = Math.round(g.song.beats * g.spb);
+  cheerEnd(why, passed); /* 📣 cs-3c */
   const stats = {notes: c.perfect + c.great + c.good, perfects: c.perfect, bestCombo: g.maxCombo, songs: passed ? 1 : 0, rounds: 1};
   const rec = {score: g.score, acc: Math.round(acc * 1000) / 1000, stars, passed, combo: g.maxCombo};
   if(passed){ const pr = pick(PRAISE); party('🎉 ' + pr + ', ' + S.player + '!'); confetti([g.T.a[0], g.T.b[0], '🎵', '⭐', g.T.big], 36); UISound.play('success'); }
@@ -1010,7 +1016,23 @@ function saveText(res){
   return h;
 }
 function countUp(el, to, ms){ if(!el) return; const t0 = performance.now(); (function tick(now){ const p = Math.max(0, Math.min(1, (now - t0) / ms)); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))).toLocaleString(); if(p < 1) requestAnimationFrame(tick); })(t0); }
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+/* 📣 CHEERSQUAD (cs-3c) START — the crowd (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+// 🎵 the song screen: you (side 0) vs 🥁 Thump (the rival's side); fans stand beside the note field + the dancer
+function cheerTaken(){ return Array.from(document.querySelectorAll('#gbar, #hud-song, #health, #field, #dancer, #banner.on, .top-btn')); }
+function cheerMount(){
+  if(!window.Cheer || !G) return; Cheer.unmount(); const box = $('scr-play'); G.cheerLow = false;
+  Cheer.mount(box, {game: 'beatcorner', players: [{name: S.player, side: 0, human: true}, {name: 'Thump', side: 1, human: false}], me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'overlay',
+    zones: () => Cheer.freeZones(box, cheerTaken), avoid: cheerTaken, clear: () => true});
+}
+function cheerCombo(){ if(!window.Cheer || !Cheer.active() || !G) return; const c = G.combo; if(c === 10 || c === 25 || (c >= 50 && c % 25 === 0)) Cheer.react('big', {side: 0}); if(G.health >= 45) G.cheerLow = false; }
+function cheerMiss(){ if(!window.Cheer || !Cheer.active() || !G) return; if(G.missRow === 2) Cheer.react('miss', {side: 0});
+  if(!G.L.noFail && G.health > 0 && G.health < 30 && !G.cheerLow){ G.cheerLow = true; Cheer.react('close', {side: 0}); } }
+function cheerEnd(why, passed){ if(!window.Cheer || !Cheer.active()) return; Cheer.react(passed ? 'win' : 'lose', {side: 0}); }
+function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  const at = card.querySelector('.res-btns'); if(!at) return; at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); }, 900); }
+/* 📣 CHEERSQUAD END */
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-3c */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pick(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
@@ -2541,4 +2563,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.chips', {rows: 3}); }</script>
 </body>
 </html>
-<!-- (bc-5+back-1+modes-3+bc-6+bc-7+bc-8+mg-1+p1c+p2+p3a) END OF BeatCorner.html -->
+<!-- (bc-5+back-1+modes-3+bc-6+bc-7+bc-8+mg-1+p1c+p2+p3a+cs-3c) END OF BeatCorner.html -->

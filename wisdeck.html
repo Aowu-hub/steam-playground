@@ -368,6 +368,7 @@
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-3c: the cheering crowd (CheerSquad.html) -->
 <script src="inc/FlagFont.js"></script>
 <script src="inc/WisCards.js"></script>
 <script src="inc/WisCards2.js"></script>
@@ -400,6 +401,7 @@
   <div class="lv-note" id="lv-note"></div>
   <div class="section-head">🎚️ Pick a level</div>
   <div class="levels" id="level-list"></div>
+  <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the game">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-3c -->
   <div class="section-head">🏠 Quiz room</div>
   <div class="chips scroll" id="room-list"></div>
   <details class="rules"><summary>📖 Points + question types</summary><ul id="pts-list"></ul></details>
@@ -895,7 +897,7 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
-  S.deck = deckFor(name); loadPrefs(); $('who-name').textContent = name; renderMenu(); showScreen('menu');
+  S.deck = deckFor(name); loadPrefs(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-3c */ renderMenu(); showScreen('menu');
   if(window.UI && UI.guideOnce) UI.guideOnce('wisdeck', [
     {icon: '🃏', title: 'Welcome to WisDeck!', text: 'Every card is a real thing — a flag, a dinosaur, a planet, a formula. Each card has a ⚡ power from 1 to 9 that comes from a real fact.'},
     {icon: '📚', title: 'Learn first', text: 'Pick a shelf, then a category, and flip through the cards. 🔊 says the name in English and Thai.'}]);
@@ -1055,7 +1057,7 @@ function openLevels(cat){
 
 /* ================= 🧠 QUIZ ================= */
 let Q = null, QT = null, QID = 0;
-function view(v){ ['learn', 'quiz', 'table', 'buzz'].forEach(x => $('v-' + x).classList.toggle('hidden', x !== v)); }
+function view(v){ cheerView(v); /* 📣 cs-3c */ ['learn', 'quiz', 'table', 'buzz'].forEach(x => $('v-' + x).classList.toggle('hidden', x !== v)); }
 function startQuiz(cat, lv){
   Q = WD.makeQuiz(WC, {cat, level: lv, seed: (Date.now() ^ (Math.random() * 1e9)) >>> 0}); Q.room = roomFor(cat); Q.gid = ++QID; Q.wonFresh = 0;
   const c = WC.CAT[cat], L = WD.LEVELS[lv]; $('q-title').textContent = c.icon + ' ' + c.en + ' · ' + L.icon + ' ' + L.name;
@@ -1131,7 +1133,7 @@ function startTimer(){
 function submit(ans, btn, extra){
   const q = Q && Q.qs[Q.i]; if(!q || q.done || Q.over && Q.i >= Q.qs.length) return; q.done = true; if(QT) cancelAnimationFrame(QT);
   extra = extra || {}; const secs = (performance.now() - q.t0) / 1000, cd = C(q.card), gid = Q.gid;
-  const res = WD.answer(Q, ans, {secs, timeout: extra.timeout}, WC); hud();
+  const res = WD.answer(Q, ans, {secs, timeout: extra.timeout}, WC); hud(); cheerSay(res.ok ? 'goal' : 'miss', 0); /* 📣 cs-3c */
   const box = $('q-box');
   // show what was right
   box.querySelectorAll('.opt').forEach(b => { b.disabled = true; const id = b.dataset.id;
@@ -1174,14 +1176,14 @@ function flyCard(id, el){
     {transform: `translate(${x0}px,${y0 - 40}px) rotateY(0) scale(1.1)`, offset: 0.6}, {transform: `translate(${x1}px,${y1}px) scale(.2)`, opacity: .4}], {duration: 1200, easing: 'ease-in-out'});
   a.onfinish = () => { f.remove(); const d = $('q-deck'); d.animate([{transform: 'scale(1.3)'}, {transform: 'scale(1)'}], {duration: 250}); };
 }
-function leaveQuiz(to){ const wasDaily = Q && Q.daily; if(QT) cancelAnimationFrame(QT); podStop(); try{ speechSynthesis.cancel(); }catch(e){} Q = null; view('learn'); if(to === 'daily' || wasDaily) openDaily(); else openLevels(CUR || L && L.k || 'wisflag'); }
+function leaveQuiz(to){ if(window.Cheer) Cheer.unmount(); const wasDaily = Q && Q.daily; if(QT) cancelAnimationFrame(QT); podStop(); try{ speechSynthesis.cancel(); }catch(e){} Q = null; view('learn'); if(to === 'daily' || wasDaily) openDaily(); else openLevels(CUR || L && L.k || 'wisflag'); }
 
 /* ================= 🏁 RESULT + SAVE ================= */
 function finishQuiz(){
   if(QT) cancelAnimationFrame(QT); if(Q.daily) return finishDaily(); const r = WD.result(Q), lv = Q.level, cat = Q.cat, name = S.player;
   const got = WD.winCards(S.deck, r.won, lv, WC), full = WD.fullCats(S.deck, WC);
   S.deck.full = full; S.deck.tot = S.deck.tot || {}; S.deck.tot[cat] = WC.cards(cat).length;
-  podGesture(r.stars >= 3 ? 'dance' : r.stars ? 'cheer' : 'oops'); if(r.stars) UISound.play('win'); else UISound.play('error');
+  podGesture(r.stars >= 3 ? 'dance' : r.stars ? 'cheer' : 'oops'); cheerQuizEnd(r); /* 📣 cs-3c */ if(r.stars) UISound.play('win'); else UISound.play('error');
   if(r.cleared) ls('sp_wisdeck_won:' + name, Math.max(Number(ls('sp_wisdeck_won:' + name)) || 0, Math.min(5, lv + 1)));
   const uniq = [...new Set(r.won)], tierUp = {}; got.ups.forEach(u => { tierUp[u.id] = u.tier; });
   const L = WD.LEVELS[lv], c = WC.CAT[cat];
@@ -1334,7 +1336,25 @@ function tableStart(names){ TB.A = names.map(n => n ? {name: n, av: myAvatar(n),
   TB.raf = requestAnimationFrame(loop); }
 function tableGest(i, k){ const A = TB.A[i]; if(!A) return; const g = gestOf(k); A.gest = g ? {g, t: 0} : null; }
 function lookAway(name, then){ const el = $('lookaway'); el.innerHTML = '<div class="big">🙈</div><h2>' + UI.esc(name) + '\'s turn</h2><p>Everyone else looks away!</p><button class="btn sp-btn sp-primary gold" data-sound="pop" id="la-go">👀 I\'m ' + UI.esc(name) + ' — show my cards</button>'; el.classList.remove('hidden'); $('la-go').onclick = () => { el.classList.add('hidden'); then(); }; }
-function leaveTable(){ if(TB.raf) cancelAnimationFrame(TB.raf); TB.raf = 0; TB.think = false; clearInterval(PICK.timer); closePeek(); T = null; view('learn'); openTableMenu(TM.kind); }
+function leaveTable(){ if(window.Cheer) Cheer.unmount(); if(TB.raf) cancelAnimationFrame(TB.raf); TB.raf = 0; TB.think = false; clearInterval(PICK.timer); closePeek(); T = null; view('learn'); openTableMenu(TM.kind); }
+/* 📣 CHEERSQUAD (cs-3c) START — the crowd (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+// ❓ quiz: you vs the 🦊 rival · 🃏 table: side 0 = you (bottom seat), side 1 = 🤖 / your friend (top seat)
+function cheerTaken(){ const q = !$('v-quiz').classList.contains('hidden');
+  return Array.from(document.querySelectorAll(q ? '#v-quiz .qhud, #q-tbar, #q-mypod, #v-quiz .qstage > *, #q-res:not(.hidden), .top-btn' : '#v-table .qhud, #t-seat0 > *, #t-seat1 > *, #t-mid, #t-bottom > *, #t-res:not(.hidden), .top-btn')); }
+function cheerMount(kind){
+  if(!window.Cheer) return; Cheer.unmount(); const box = $('scr-play'), two = kind === 'table' && T && T.two;
+  const players = kind === 'quiz' ? [{name: S.player, side: 0, human: true}, {name: 'Quizzy', side: 1, human: false}] : [{name: S.player, side: 0, human: true}, {name: two ? T.names[1] : 'Robot', side: 1, human: !!two}];
+  Cheer.mount(box, {game: 'wisdeck', players, me: {name: S.player}, family: (S.players || []).map(p => p.Name).filter(n => !two || n !== T.names[1]), avatars: S.avatars || {}, mode: 'overlay',
+    zones: () => Cheer.freeZones(box, cheerTaken), avoid: cheerTaken, clear: () => true});
+}
+function cheerView(v){ if(!window.Cheer) return; if(v === 'quiz' || v === 'table') setTimeout(() => cheerMount(v), 0); else Cheer.unmount(); }   /* after T / Q are set */
+function cheerHush(on){ if(window.Cheer) Cheer.hush(!!on); }
+function cheerSay(kind, side){ if(window.Cheer && Cheer.active()) Cheer.react(kind, {side}); }
+function cheerQuizEnd(r){ if(window.Cheer && Cheer.active()) Cheer.react(r.stars ? 'win' : 'lose', {side: 0}); }
+function cheerRound(w){ if(!window.Cheer || !Cheer.active()) return; if(w === -1) Cheer.react('goal', {side: -1}); else Cheer.react('goal', {side: w}); }
+function cheerJack(M){ if(!window.Cheer || !Cheer.active() || !M || !M.setOver) return; const w = M.setWinner; if(w == null || w < 0) Cheer.react('goal', {side: -1}); else Cheer.react(M.S[w] && M.S[w].total === M.target ? 'big' : 'goal', {side: w}); }
+function cheerTableEnd(w){ if(!window.Cheer || !Cheer.active()) return; Cheer.hush(false); if(w === 0) Cheer.react('win', {side: 0}); else if(w === 1) Cheer.react(T && T.two ? 'win' : 'lose', {side: T && T.two ? 1 : 0}); else Cheer.react('goal', {side: -1}); }
+/* 📣 CHEERSQUAD END */
 function showTable(){ $('t-res').classList.add('hidden'); view('table'); showScreen('play'); }
 function dots(n){ return '🟡'.repeat(n) + '⚪'.repeat(Math.max(0, 3 - n)); }
 function setDots(i, n){ const el = $('t-dots' + i); if(!el) return; const had = Number(el.dataset.n) || 0; el.dataset.n = n; el.innerHTML = [0, 1, 2].map(k => '<i class="' + (k < n && k >= had ? 'pop' : '') + '">' + (k < n ? '🟡' : '⚪') + '</i>').join(''); }   // a new win dot pops in
@@ -1409,11 +1429,12 @@ async function countPick(seat, i){
 async function playOut(seat, i){ const btn = $('t-bottom').querySelector('button[data-i="' + i + '"]'), c = T.M.P[seat].hand[i], gid = T.gid; if(!btn || !SPEED) return;
   const from = rectOf(btn.querySelector('.wcard')); btn.style.visibility = 'hidden'; await fly(cardHtml(c, {mini: true}), from, handSpot(T.two ? seat : 0), 260, -8); if(!T || T.gid !== gid) return;
   tableGest(T.two ? seat : 0, 'flip'); await fly(backHtml(T.names[seat]), handSpot(T.two ? seat : 0), rectOf($('t-slot' + seat)), 360, 0); }
-async function botOut(i){ if(!SPEED) return; TB.think = true; await wait(450); TB.think = false; const backs = $('t-hh1').querySelectorAll('.wcard'); tableGest(1, 'flip'); await fly(backHtml(null), rectOf(backs[Math.min(i, backs.length - 1)]), rectOf($('t-slot1')), 420, 180); }
+async function botOut(i){ if(!SPEED) return; TB.think = true; cheerHush(1); await wait(450); TB.think = false; cheerHush(0); const backs = $('t-hh1').querySelectorAll('.wcard'); tableGest(1, 'flip'); await fly(backHtml(null), rectOf(backs[Math.min(i, backs.length - 1)]), rectOf($('t-slot1')), 420, 180); }
 async function reveal(a, b){
   const M = T.M, gid = T.gid, before = [M.P[0].hand.slice(), M.rule], ev = WD.countPlay(M, a, b); $('t-bottom').innerHTML = '';
   const slot = (c, e, w, k) => '<div class="slot ' + (ev.winner === -1 ? '' : w ? 'win' : 'lose') + '" id="t-slot' + k + '">' + cardHtml(c, {mini: true}).replace('class="wcard', 'class="wcard flipin') + '<span class="eff">⚡ ' + e + '</span></div>';
   $('t-duel').innerHTML = slot(ev.cards[0], ev.eff[0], ev.winner === 0, 0) + '<div class="vs">⚔️</div>' + slot(ev.cards[1], ev.eff[1], ev.winner === 1, 1);
+  cheerRound(ev.winner); /* 📣 cs-3c */
   let who = ev.winner === -1 ? '🤝 Same power — a draw!' : (ev.winner === 0 ? T.names[0] : T.names[1] || '🤖 Robot') + ' wins the round!';
   if(BASIC() && ev.winner === 1 && !T.two){ const rule = before[1], better = before[0].find(c => { const e = WD.effPower(c, rule, shelfOfCard); return rule.dir > 0 ? e > ev.eff[1] : e < ev.eff[1]; });   // 🌱 the mistake explains itself
     who += '<span class="tip">💡 ' + (rule.dir > 0 ? '⬆️ Higher' : '⬇️ Lower') + ' wins: your ⚡' + ev.eff[0] + ' vs ⚡' + ev.eff[1] + '. ' + (better ? 'Your ' + UI.esc(better.en) + ' would have won!' : 'No card could win this one — save your best for later.') + '</span>'; }
@@ -1453,6 +1474,7 @@ function renderJack(){
   $('t-mid').innerHTML = '<div class="goal">' + GOAL.jack(M.target) + '</div><div class="rulecard"><div class="big">🎯 ' + M.target + '</div><div class="sm">' + (M.setOver ? '' : human ? UI.esc(T.names[me]) + '\'s turn' : '🤖 Robot is thinking…') + '</div></div><div class="tmsg" id="t-msg"></div><div class="tbtns" id="t-btns"></div>' +
     '<div class="pile" id="t-pile">' + backHtml(null) + backHtml(null) + backHtml(null) + '</div>';
   const s = M.S[me], P = M.P[me];
+  if(M.setOver && M.cheerSet !== M.set){ M.cheerSet = M.set; cheerJack(M); } /* 📣 cs-3c */
   if(M.setOver){ const w = M.setWinner, ls = w === 0 ? S1 : S0; let m = w === -1 ? '🤝 Same total — this set is a draw' : (w === 0 ? T.names[0] : T.names[1] || '🤖 Robot') + ' wins set ' + M.set + '!' + (M.S[w] && M.S[w].total === M.target ? ' 🎯 Exactly ' + M.target + '!' : '');
     if(BASIC() && w === 1 && !T.two) m += '<span class="tip">💡 ' + (S0.total > M.target ? S0.total + ' is over ' + M.target + '. Next time stand at 17 or more.' : 'The robot got closer to ' + M.target + '. Take one more card when you are far away.') + '</span>';
     $('t-msg').innerHTML = m; if(w >= 0){ tableGest(w, 'cheer'); tableGest(1 - w, 'oops'); }
@@ -1471,7 +1493,7 @@ function renderJack(){
   else botTurn();
 }
 function jackAct(stand){ const M = T.M, prev = M.turn; T.firstTurn = false; pointAt(null); WD.jackEnd(M, stand); if(!M.setOver) tableGest(M.turn, 'flip'); if(!M.setOver && T.two && M.turn !== prev) lookAway(T.names[M.turn], renderJack); else renderJack(); }
-async function botTurn(){ const M = T.M, gid = T.gid; TB.think = true; await wait(800); TB.think = false; if(!T || T.gid !== gid || M.setOver) return; tableGest(1, 'flip'); WD.jackBot(M, T.lv); renderJack(); }
+async function botTurn(){ const M = T.M, gid = T.gid; TB.think = true; cheerHush(1); await wait(800); TB.think = false; cheerHush(0); if(!T || T.gid !== gid || M.setOver) return; tableGest(1, 'flip'); WD.jackBot(M, T.lv); renderJack(); }
 
 /* ================= 🏁 table result + save ================= */
 function finishTable(){
@@ -1479,6 +1501,7 @@ function finishTable(){
   const exact = kind === 'jack' ? M.P[0].exact : 0, sweep = w === 0 && op === 0;
   const score = w === 0 ? Math.round((500 + (sweep ? 500 : 0) + exact * 100) * L.mult) : Math.round((my * 50 + exact * 100) * L.mult);
   const stars = w !== 0 ? 0 : sweep ? 3 : my - op >= 2 ? 2 : 1;
+  cheerTableEnd(w); /* 📣 cs-3c */
   tableGest(w === 0 ? 0 : 1, 'dance'); if(w >= 0) tableGest(1 - w, 'oops'); UISound.play(w === 0 || T.two ? 'win' : 'error'); pointAt(null); closePeek(); if(w === 0 || T.two) burst($('t-score'), ['🎉', '⭐', '🏆', '✨']);
   const winName = w === 0 ? T.names[0] : w === 1 ? (T.names[1] || '🤖 Robot') : '';
   $('q-res').innerHTML = ''; $('q-res').classList.add('hidden');   // one save note on the page at a time
@@ -1656,4 +1679,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.strip', {rows: 1, nav: false}); UI.pageRows('.qres .won', {rows: 2}); }</script>
 </body>
 </html>
-<!-- (back-1+modes-3+wd-13+p1d+p2+p3a+size-1) END OF WisDeck.html -->
+<!-- (back-1+modes-3+wd-13+p1d+p2+p3a+size-1+cs-3c) END OF WisDeck.html -->
