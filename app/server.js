@@ -54,7 +54,7 @@ const REMOTE_NET_JS_ = "window.SP_NET||(window.SP_NET={ok:{},bad:[],alt:function
 function remoteTag_(n) {
   const M = remoteMap_(), x = REMOTE_FAIL_TEST_ ? 'x-netfail-' : '';
   return '<script>' + REMOTE_NET_JS_ + '</script>\n' + (M.n[n] || []).map(p => {
-    const f = p[1], a = M.base + x + f, b = M.cdn + x + f, sri = ' integrity="' + p[2] + '" crossorigin="anonymous"';
+    const f = p[1], a = M.base + x + f, b = M.cdn + x + f, sri = ' integrity="' + p[2] + '" crossorigin="anonymous"' + (p[3] ? ' id="' + p[3] + '"' : '');   // 📦 sm-1: a block's id travels with it
     if (p[0] === 'css') return '<link rel="stylesheet" href="' + a + '"' + sri + ' onerror="SP_NET.css(this,\'' + b + '\',\'' + n + '\')">';
     return '<script charset="utf-8" src="' + a + '"' + sri + ' onload="SP_NET.ok[\'' + f + '\']=1"></script>\n<script>SP_NET.alt(\'' + f + '\',\'' + b + '\',\'' + p[2] + '\',\'' + n + '\')</script>';
   }).join('\n');
@@ -4721,7 +4721,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
