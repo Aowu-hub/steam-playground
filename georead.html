@@ -270,6 +270,7 @@
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-4b: the cheering crowd (CheerSquad.html) -->
 <script src="inc/LetterSkins.js"></script>
 <script src="inc/WordMeanings.js"></script>
 </head>
@@ -293,6 +294,7 @@
   </div>
   <div class="section-head" id="level-head">🎚️ Pick a level</div>
   <div class="levels" id="level-list"></div>
+  <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the play">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-4b -->
   <details class="rules" id="how"><summary>📖 How to play</summary><ul id="how-list"></ul></details>
   <div class="ui-leaders" id="leaders"></div>
 </section>
@@ -1026,7 +1028,7 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
-  loadPrefs(); $('who-name').textContent = name; renderMenu(); showScreen('menu');
+  loadPrefs(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4b */ renderMenu(); showScreen('menu');
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">' + (unlockedOf(S.player) > i ? '🏅 Done' : 'Not done yet') + '</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span><span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
@@ -1104,7 +1106,7 @@ function openSheet(html){ $('sheet-card').innerHTML = html; $('sheet').classList
 function closeSheet(){ $('sheet').classList.add('hidden'); }
 
 /* ================= PLAY ================= */
-function startGame(){
+function startGame(){ setTimeout(cheerMount, 0); /* 📣 cs-4b */
   const seed = (Date.now() ^ (Math.random() * 1e9)) >>> 0, learned = learnedSet();
   const game = GR.makeGame({mode: SET.mode, level: SET.level, seed, learned});
   G = {id: ++GID, mode: SET.mode, level: SET.level, house: SET.house, skin: SET.skin, faces: SET.faces, game, i: -1, score: 0, perfect: 0, misses: 0, t0: performance.now(), t: 0,
@@ -1292,7 +1294,7 @@ function puffAt(el){ if(!FX || !el) return; const r = el.getBoundingClientRect()
 function roundDone(R, info){
   stopTimer(); R.done = true; setSteps(9); const secsLeft = G.timer ? Math.max(0, G.timeLeft || 0) : 0, pts = GR.roundPoints(G.level, R.misses, secsLeft);
   G.score += pts; if(!R.misses) G.perfect++; G.misses += R.misses; $('h-score').textContent = '🏆 ' + G.score.toLocaleString();
-  floatText((R.misses ? '+' : '⭐ +') + pts); gesture(R.misses ? 'clap' : 'cheer');
+  floatText((R.misses ? '+' : '⭐ +') + pts); gesture(R.misses ? 'clap' : 'cheer'); G.cheerRun = R.misses ? 0 : (G.cheerRun || 0) + 1; G.cheerAt = 0; cheerSay(G.cheerRun && G.cheerRun % 3 === 0 ? 'big' : 'goal', 'round'); /* 📣 cs-4b */
   if(info.word && R.type !== 'sound'){ const mm = meaningOf(info.word); G.words.push({w: info.word.toUpperCase(), m: mm.m, e: mm.e});
     const m = $('mean'); m.classList.remove('hidden'); m.innerHTML = '<span class="me">' + (mm.e || '📖') + '</span><div><b>' + UI.esc(info.word) + '</b><p>' + UI.esc(mm.m || '') + '</p></div><button class="hear" data-sound="none" id="mean-hear" aria-label="Hear the meaning">🔊</button>';
     $('mean-hear').onclick = () => Voice.say([{t: info.word, rate: 0.9, gap: 250}, {t: mm.m, rate: 0.95}]); }
@@ -1534,7 +1536,8 @@ function renderRoad(){
     b.onclick = () => { if(!open){ UISound.play('error'); UI.toast('🔒 Finish chapter ' + i + ' first'); return; } startJourney(i); };
     box.appendChild(b); });
 }
-function startJourney(ch){
+function startJourney(ch){ setTimeout(cheerMount, 0); /* 📣 cs-4b */
+  /* journey */
   const C = GR.CHAPTERS[ch], seed = (Date.now() ^ (Math.random() * 1e9)) >>> 0, learned = learnedSet();
   G = {id: ++GID, mode: 'journey', chapter: ch, level: 0, house: C.house, skin: SET.skin, faces: true, game: GR.journeyGame(ch, seed), i: -1, score: 0, perfect: 0, misses: 0, puzzles: 0, t0: performance.now(), t: 0,
     st: {blends: 0, built: 0, found: 0, magic: 0, rhymes: 0, sight: 0, traced: 0, cases: 0, stories: 0, sorted: 0, said: 0}, words: [], learned, A: {name: S.player, av: myAvatar(S.player), dir: 1, walkT: 0, gest: null},
@@ -1600,7 +1603,7 @@ async function finaleCheck(R, heardShare){
 }
 // end of a chapter: stars from the puzzles, save, the reward
 function endJourney(){
-  if(!G || G.over) return; G.over = true; Voice.cancel(); const ch = G.chapter, C = GR.CHAPTERS[ch], puzzles = G.game.rounds.filter(r => r.type !== 'scene').length, stars = Math.max(1, GR.stars(G.perfect, puzzles));
+  if(!G || G.over) return; cheerEnd(true); /* chapter */ /* 📣 cs-4b */ G.over = true; Voice.cancel(); const ch = G.chapter, C = GR.CHAPTERS[ch], puzzles = G.game.rounds.filter(r => r.type !== 'scene').length, stars = Math.max(1, GR.stars(G.perfect, puzzles));
   saveLearned(G.learned); const was = journeyOf(S.player), first = ch >= was.done;
   const loc = journeyOf(S.player); loc.done = Math.max(loc.done, ch + 1); loc.st[ch] = Math.max(loc.st[ch] || 0, stars); ls('sp_georead_journey:' + S.player, JSON.stringify(loc));
   UISound.play('success'); confetti(['🔤', '🎉', '⭐', HOUSES[C.house].icon].concat(C.join.split('').map(l => GR.PALS[l][0])), 30); gesture('dance');
@@ -1771,7 +1774,7 @@ function stackPositions(){
   const cv = $('cv'), r = cv.getBoundingClientRect(), P = G && G.place; if(!P) return [];
   return (G.stackShown || []).map((g, i) => ({x: r.left + P.bx0 + i * P.bs + P.bs / 2, y: r.top + P.by - P.bs / 2, s: P.bs}));
 }
-function gesture(k){ if(!G || !G.A) return; const g = GESTURES.find(x => x.k === k); if(g) G.A.gest = {g, t: 0}; }
+function gesture(k){ if(k === 'shrug' && G && !G.over) cheerSay('miss', 'try'); /* 📣 cs-4b */ if(!G || !G.A) return; const g = GESTURES.find(x => x.k === k); if(g) G.A.gest = {g, t: 0}; }
 function talk(){ if(G) G.talkT = 0.45; }
 // 💬 what the avatar is saying — letter sounds show the letters, words show the word
 let BUB = 0, SAYREV = null;
@@ -1871,6 +1874,7 @@ document.addEventListener('keydown', e => {
 /* ================= END + SAVE ================= */
 function endGame(){
   if(!G || G.over) return; G.over = true; stopTimer(); const total = G.game.rounds.length, stars = GR.stars(G.perfect, total), cleared = stars >= 1, secs = Math.max(1, Math.round((performance.now() - G.t0) / 1000));
+  cheerEnd(cleared); /* 📣 cs-4b */
   saveLearned(G.learned);
   gesture(cleared ? 'dance' : 'shrug'); UISound.play(cleared ? 'success' : 'pop'); if(cleared) confetti(['🔤', '🎉', '⭐', '📦', HOUSES[G.house].icon], 24);
   const M = MODES[G.mode], st = G.st, chips = [];
@@ -1910,14 +1914,41 @@ function saveText(res, cleared){
   const h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New high score!' : cleared ? (res.best && res.best.score ? 'Best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Saved') : '✅ Saved';
   return featText(res.feats, h);
 }
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+/* 📣 CHEERSQUAD (cs-4b) START — the crowd beside the play (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+// solo: you = side 0, the 😈 rival = side 1. Fans stand only where the bar, the question / board and the controls leave room.
+function cheerTaken(){ return Array.from(document.querySelectorAll('#hud, #work, #bubble:not(.hidden)')).concat(cheerGuide(), cheerGround()); }
+function cheerHard(){ return cheerTaken(); }
+// your guide on the map + the letter boxes over its head (wide screens: the left patch from just above the boxes down — fans may use
+// the sky above; tall screens: the bottom strip under the panel, up to just right of the guide) — the crowd keeps out of it
+function cheerGuide(){ const Z = G && G.zone, st = $('stage'); if(!Z || !st) return []; const R = st.getBoundingClientRect();
+  const b = Z.wide ? {l: 0, t: Math.max(0, Z.feet - 150 * Z.k - 12), r: Z.pl, b: Z.H} : {l: 0, t: Z.pt + Z.ph, r: Math.min(Z.W, Z.ax + 46 * Z.k + 12), b: Z.H};
+  return [{getBoundingClientRect: () => ({left: R.left + b.l, right: R.left + b.r, top: R.top + b.t, bottom: R.top + b.b, width: b.r - b.l, height: b.b - b.t})}]; }
+// the ground under your guide's feet line: the stands stand on it (zones only)
+function cheerGround(){ const Z = G && G.zone, st = $('stage'); if(!Z || !st) return []; const R = st.getBoundingClientRect(), y = Z.feet + 2;
+  return [{getBoundingClientRect: () => ({left: R.left, right: R.right, top: R.top + y, bottom: R.bottom, width: R.width, height: R.height - y})}]; }
+function cheerMount(){
+  if(!window.Cheer) return; Cheer.unmount(); if(!(G)) return; const box = document.querySelector('#scr-play .arena'); if(!box) return;
+  Cheer.mount(box, {game: 'georead', players: [{name: S.player, side: 0, human: true}, {name: 'Rival', side: 1, human: false}], me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'overlay', floor: true,
+    zones: () => Cheer.freeZones(box, cheerTaken), avoid: cheerHard,
+    clear: b => { const B = box.getBoundingClientRect(); return !cheerHard().some(e => { const r = e.getBoundingClientRect(); if(r.width < 2 || r.height < 2) return false; const l = r.left - B.left, t = r.top - B.top; return b.r > l - 3 && b.l < l + r.width + 3 && b.b > t - 3 && b.t < t + r.height + 3; }); }});
+}
+// small wins / misses get a 1.2 s breather so quick answers aren't a wall of cheers; big ones and the ends always play
+function cheerSay(kind, why){ if(!kind || !window.Cheer || !Cheer.active() || !G) return; const now = performance.now();
+  if((kind === 'goal' || kind === 'miss') && (G.cheerAt || 0) > now - 1200) return; if(kind === 'big' && (G.cheerBig || 0) > now - 900) return;
+  if(kind === 'goal' || kind === 'miss') G.cheerAt = now; if(kind === 'big') G.cheerBig = now; Cheer.react(kind, {side: 0}); }
+function cheerEnd(won){ if(window.Cheer && Cheer.active()) Cheer.react(won ? 'win' : 'lose', {side: 0}); }
+function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  const at = card.querySelector('.res-btns'); if(!at) return; at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); }, 900); }
+/* 📣 CHEERSQUAD END */
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-4b */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function leavePlay(){
   if(!G) return; if(G.over){ backToMenu(); return; }
   UI.confirm ? UI.confirm('Leave this game?', 'Your points so far will be lost.', 'Leave', 'Keep playing').then(ok => { if(ok) backToMenu(); }) : backToMenu();
 }
 function pauseGame(){ stopTimer(); Voice.cancel(); }
-function backToMenu(){ stopTimer(); stopLoop(); Voice.cancel(); G = null; GID++; hideResult(); closeSheet(); renderMenu(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); stopTimer(); stopLoop(); Voice.cancel(); G = null; GID++; hideResult(); closeSheet(); renderMenu(); showScreen('menu'); }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
 function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
 window.feedbackContext = () => ({page: 'GeoRead', game: GAME_ID, level: G ? G.level : SET.level, mode: G ? G.mode : SET.mode});
@@ -1954,4 +1985,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (gr-7+mg-1+p1d+p3a) END OF GeoRead.html -->
+<!-- (gr-7+mg-1+p1d+p3a+cs-4b) END OF GeoRead.html -->

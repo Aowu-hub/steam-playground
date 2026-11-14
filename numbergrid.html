@@ -221,6 +221,7 @@
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-4b: the cheering crowd (CheerSquad.html) -->
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
 
 <section class="screen hidden" id="scr-player">
@@ -237,6 +238,7 @@
   <div class="maps" id="map-list"></div>
   <div class="section-head" id="level-head">3. 🎚️ Pick a difficulty</div>
   <div class="levels" id="level-list"></div>
+  <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the play">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-4b -->
   <details class="rules"><summary>📖 How to play</summary><ul>
     <li><b>The rule:</b> every row ↔, every column ↕ and every thick-lined box has each picture exactly <b>once</b>.</li>
     <li><b>Play:</b> tap an empty square, then tap a picture at the bottom. Or tap a picture first, then tap squares to paint it in. Keys: arrows + 1–9, Backspace to erase.</li>
@@ -477,7 +479,7 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
-  loadPrefs(); $('who-name').textContent = name; renderMenu(); showScreen('menu');
+  loadPrefs(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4b */ renderMenu(); showScreen('menu');
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 // Theme row: built once per menu visit, a tap only moves the highlight (no page jump).
@@ -514,7 +516,7 @@ function renderLevels(){
 }
 
 /* ================= GAME ================= */
-function startGame(lvl, puzzle){
+function startGame(lvl, puzzle){ setTimeout(cheerMount, 0); /* 📣 cs-4b */
   clearInterval(timerId); hideResult();
   const L = levelFor(lvl), T = THEMES[theme], P = puzzle || makePuzzle(L);   /* 🗺️ p3b */
   if(!P){ UI.toast('Could not make a puzzle — try again', 'err'); return; }
@@ -624,13 +626,15 @@ function place(i, v){
   if(L.check === 'reject' && !right){
     G.mistakes++; UISound.play('error');
     const d = $('board').children[i]; d.classList.remove('shake'); void d.offsetWidth; d.classList.add('shake');
+    cheerSay('miss', 'reject'); /* 📣 cs-4b */
     const why = conflictWhy(i, v); showBanner('↩️ ' + (why || pick(OOPS)), 'bad'); say(why || 'Not there. Try again!'); hud(); return;
   }
   G.v[i] = v; G.notes[i].clear(); G.cells++;
-  if(L.check === 'mark' && !right){ G.wrongAt.add(i); G.mistakes++; UISound.play('error'); showBanner('🟥 That one is not right — fix it!', 'bad'); say('Oops, not that one.'); }
+  if(L.check === 'mark' && !right){ G.wrongAt.add(i); G.mistakes++; UISound.play('error'); cheerSay('miss', 'mark'); /* 📣 cs-4b */ showBanner('🟥 That one is not right — fix it!', 'bad'); say('Oops, not that one.'); }
   else { G.wrongAt.delete(i); UISound.play(L.check === 'submit' ? 'tap' : 'pop'); }
   if(right && L.check !== 'submit'){ peersOf(i).forEach(j => { if(G.notes[j].delete(v)) paintCell(j); }); if(T.pic && L.n <= 6) say(T.names[v - 1]); checkLines(i); }
   paintCell(i, true); paintSel(); paintPalette(); hud();
+  if(right && L.check !== 'submit' && !G.cheerClose && G.v.filter((x, k) => x !== G.sol[k]).length === 3){ G.cheerClose = 1; cheerSay('close', 'last3'); } /* 📣 cs-4b */
   if(right || L.check === 'submit') dropFx(i);
   if(L.check !== 'submit' && G.v.every((x, k) => x === G.sol[k])) finishGame('solved');
 }
@@ -652,7 +656,7 @@ function checkLines(i){
     cells.forEach((k, idx) => { const d = $('board').children[k]; d.classList.remove('wave'); void d.offsetWidth; d.style.setProperty('--d', (idx * 0.05).toFixed(2) + 's'); d.classList.add('wave'); setTimeout(() => d.classList.remove('wave'), 1400); });
     sparkle($('board').children[cells[Math.floor(cells.length / 2)]]);
   });
-  if(any){ UISound.play('success'); showBanner(any > 1 ? '🎉 ' + any + ' lines at once!' : pick(['🎉 Line done!', '✨ Full row!', '🌟 Box complete!', '🎊 Yay!']), 'gold'); }
+  if(any){ UISound.play('success'); cheerSay(any > 1 ? 'big' : 'goal', 'line'); /* 📣 cs-4b */ showBanner(any > 1 ? '🎉 ' + any + ' lines at once!' : pick(['🎉 Line done!', '✨ Full row!', '🌟 Box complete!', '🎊 Yay!']), 'gold'); }
 }
 function erase(){
   if(!G || G.over) return; const i = G.sel; if(i < 0 || G.given[i]) return;
@@ -694,7 +698,7 @@ function leavePlay(){
   pauseGame();
   UI.confirm({icon: '◀', title: 'Leave this puzzle?', body: 'This puzzle will not be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(ok) backToMenu(); else resume(); });
 }
-function backToMenu(){ clearInterval(timerId); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); renderMenu(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); clearInterval(timerId); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); renderMenu(); showScreen('menu'); }
 document.addEventListener('keydown', e => {
   if(!G || G.over || $('scr-play').classList.contains('hidden') || !$('result').classList.contains('hidden')) return;
   const n = G.n, k = e.key;
@@ -872,6 +876,7 @@ function finishGame(why, wrongCount){
   }
   const stats = {solved: solved ? 1 : 0, cells: g.cells, lines: g.lines, perfect: solved && g.mistakes === 0 && g.hintsUsed === 0 ? 1 : 0, rounds: 1};
   if(solved) saveWin(S.player, g.lvl, {timeSec: secs, stars, score, theme: L.mapName + ' · ' + g.theme, cleared: true, stats});   /* 🗺️ p3b: the map shows in the Archive */
+  cheerEnd(solved); /* 📣 cs-4b */
   const T = THEMES[g.theme];
   if(solved){
     const cells = [...$('board').children]; cells.forEach((d, k) => { d.style.setProperty('--d', (((k / g.n) | 0) * 0.07 + (k % g.n) * 0.03).toFixed(2) + 's'); d.classList.add('wave'); });
@@ -925,7 +930,26 @@ function saveText(res){
   return h;
 }
 function countUp(el, to, ms){ if(!el) return; const t0 = performance.now(); (function tick(now){ const p = Math.max(0, Math.min(1, (now - t0) / ms)); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))).toLocaleString(); if(p < 1) requestAnimationFrame(tick); })(t0); }
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+/* 📣 CHEERSQUAD (cs-4b) START — the crowd beside the play (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+// solo: you = side 0, the 😈 rival = side 1. Fans stand only where the bar, the question / board and the controls leave room.
+function cheerTaken(){ return Array.from(document.querySelectorAll('#gbar, .top-btn, #board-wrap, #side-col')); }
+function cheerHard(){ return cheerTaken(); }
+function cheerMount(){
+  if(!window.Cheer) return; Cheer.unmount(); if(!(G)) return; const box = $('scr-play'); if(!box) return;
+  Cheer.mount(box, {game: 'digitinct', players: [{name: S.player, side: 0, human: true}, {name: 'Rival', side: 1, human: false}], me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'overlay',
+    zones: () => Cheer.freeZones(box, cheerTaken), avoid: cheerHard,
+    clear: b => { const B = box.getBoundingClientRect(); return !cheerHard().some(e => { const r = e.getBoundingClientRect(); if(r.width < 2 || r.height < 2) return false; const l = r.left - B.left, t = r.top - B.top; return b.r > l - 3 && b.l < l + r.width + 3 && b.b > t - 3 && b.t < t + r.height + 3; }); }});
+}
+// small wins / misses get a 1.2 s breather so quick answers aren't a wall of cheers; big ones and the ends always play
+function cheerSay(kind, why){ if(!kind || !window.Cheer || !Cheer.active() || !G) return; const now = performance.now();
+  if((kind === 'goal' || kind === 'miss') && (G.cheerAt || 0) > now - 1200) return; if(kind === 'big' && (G.cheerBig || 0) > now - 900) return;
+  if(kind === 'goal' || kind === 'miss') G.cheerAt = now; if(kind === 'big') G.cheerBig = now; Cheer.react(kind, {side: 0}); }
+function cheerEnd(won){ if(window.Cheer && Cheer.active()) Cheer.react(won ? 'win' : 'lose', {side: 0}); }
+function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  const at = card.querySelector('.res-btns'); if(!at) return; at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); }, 900); }
+/* 📣 CHEERSQUAD END */
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-4b */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pick(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
@@ -950,4 +974,4 @@ boot();
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.chips', {rows: 3}); }</script>
 </body>
 </html>
-<!-- (r16+emoji+r32+back-1+p1a+p2+p3b) END OF NumberGrid.html -->
+<!-- (r16+emoji+r32+back-1+p1a+p2+p3b+cs-4b) END OF NumberGrid.html -->

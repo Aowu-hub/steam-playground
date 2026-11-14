@@ -187,6 +187,7 @@
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-4b: the cheering crowd (CheerSquad.html) -->
 <script src="inc/NumberSkins.js"></script>
 </head>
 <body ontouchstart="">
@@ -210,6 +211,7 @@
   </div>
   <div class="section-head" id="level-head">🎚️ Pick a level</div>
   <div class="levels" id="level-list"></div>
+  <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the play">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-4b -->
   <div class="levels hidden" id="chapter-list"></div>
   <details class="rules" id="how"><summary>📖 How to play</summary><ul id="how-list"></ul></details>
   <div class="ui-leaders" id="leaders"></div>
@@ -816,7 +818,7 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
-  loadPrefs(); $('who-name').textContent = name; renderMenu(); showScreen('menu');
+  loadPrefs(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4b */ renderMenu(); showScreen('menu');
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">' + (unlockedOf(S.player) > i ? '🏅 Done' : 'Not done yet') + '</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span><span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
@@ -892,7 +894,7 @@ function openSheet(html){ $('sheet-card').innerHTML = html; $('sheet').classList
 function closeSheet(){ $('sheet').classList.add('hidden'); }
 
 /* ================= PLAY ================= */
-function startGame(){
+function startGame(){ setTimeout(cheerMount, 0); /* 📣 cs-4b */
   if(SET.mode === 'battle'){ startBattle(); return; }
   if(SET.mode === 'journey'){ startJourney(Math.min(6, journeyDone(S.player) + 1)); return; }
   hideResult(); closeSheet();
@@ -1019,6 +1021,7 @@ async function roundDone(ok, r){
   else msg = '🎯 <b>' + it.target + '</b>! ' + (rec.stars === 3 ? 'In the fewest moves!' : rec.moves + ' moves (best ' + it.par + ')');
   const quiz = it.kind === 'compare' || it.kind === 'choice';
   if(quiz && FX && SPEED){ await wait(ok ? 950 : 1950); if(!G || G.id !== id) return; }
+  cheerSay(ok ? (rec.stars === 3 ? 'big' : 'goal') : 'miss', 'round'); /* 📣 cs-4b */
   if(ok){ if(!quiz) SND.win(); avatarDo(rec.stars === 3 ? 'dance' : 'cheer'); confetti(); } else { if(!quiz) SND.bad(); avatarDo('shrug'); }
   banner(msg + '<br>' + (rec.stars ? '⭐'.repeat(rec.stars) : '') + ' +' + rec.pts, (ok ? 'good' : 'bad') + (quiz ? ' low' : ''));
   renderBar();
@@ -1070,6 +1073,7 @@ function statsFor(M){ const s = M.stats; return {games: 1, snaps: s.snaps, split
 async function endGame(timeUp){
   if(!G) return; const M = G.M, id = G.id; if(timeUp) M.failed = true; const res = GS.finish(M); G.phase = 'over'; stopTimer();
   if(FX && SPEED){ avatarDo(res.cleared ? 'dance' : 'shrug'); await wait(700); if(!G || G.id !== id) return; }
+  cheerEnd(res.cleared); /* 📣 cs-4b */
   if(res.cleared){ UISound.play('success'); confetti(true); } else UISound.play('pop');
   const lvl = M.level, timeSec = Math.round((performance.now() - G.t0) / 1000), themeTxt = modeLabel(M.mode) + ' · ' + THEMES[G.theme].icon + ' ' + THEMES[G.theme].name;
   const L = M.log;
@@ -1103,14 +1107,57 @@ function saveText(res, cleared){
   const h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New high score!' : cleared ? (res.best && res.best.score ? 'Best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Saved') : '✅ Saved';
   return featText(res.feats, h);
 }
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+/* 📣 CHEERSQUAD (cs-4b) START — the crowd beside the play (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+// solo: you = side 0, the 😈 rival = side 1. Fans stand only where the bar, the question / board and the controls leave room.
+function cheerTaken(){ return Array.from(document.querySelectorAll('#hud, #goal, #gtip:not(.hidden), #say:not(.hidden), #bar')).concat(cheerOcc(), cheerGround()); }
+function cheerHard(){ return Array.from(document.querySelectorAll('#hud, #goal, #gtip:not(.hidden), #say:not(.hidden), #bar')).concat(cheerOcc(true)); }
+// the game paints everything on ONE canvas: compare it with the bare room (drawRoom, same frame time) at 1/8 size — a column with
+// anything on it (blocks, the scale, your avatar, labels) is taken for the whole round (only grows), sampled while you play
+function cheerOcc(core){
+  if(!G || !G.M || !W || !H || !CV.width) return [];
+  const it = G.M.item, size = Math.round(W), now = performance.now(); let O = G.cheerOcc; if(O && (O.id !== G.id || O.size !== size)) O = null;
+  const same = !!O && O.item === it, calm = !!it && G.phase === 'play' && !G.reveal && !(G.fx && G.fx.length) && !(G.drag && G.drag.on) && now - (G.roundT0 || 0) > 500 && G.cheerT != null;
+  if(!calm || (same && now - O.t < 1000)) return O ? (core ? O.core : O.blocks) : [{getBoundingClientRect: () => CV.getBoundingClientRect()}];   /* not ready yet: nobody · reveal / next round: the stands stay put */
+  const cell = 8, cw = Math.max(1, Math.ceil(W / cell)), ch = Math.max(1, Math.ceil(H / cell));
+  const bg = G.cheerBg || (G.cheerBg = document.createElement('canvas')); if(bg.width !== CV.width || bg.height !== CV.height){ bg.width = CV.width; bg.height = CV.height; }
+  const bx = bg.getContext('2d'); bx.setTransform(CV.width / W, 0, 0, CV.height / H, 0, 0); drawRoom(bx, G.cheerT);
+  const sm = G.cheerSm || (G.cheerSm = document.createElement('canvas')); sm.width = cw; sm.height = ch * 2; const sx = sm.getContext('2d', {willReadFrequently: true});
+  sx.drawImage(CV, 0, 0, cw, ch); sx.drawImage(bg, 0, ch, cw, ch); const d = sx.getImageData(0, 0, cw, ch * 2).data, off = cw * ch * 4;
+  const raw = same ? O.raw.slice() : new Array(cw).fill(0); let hit = 0;
+  for(let x = 0; x < cw; x++){ let on = 0; for(let y = 0; y < ch && !on; y++){ const i = (y * cw + x) * 4; if(Math.abs(d[i] - d[i + off]) + Math.abs(d[i + 1] - d[i + off + 1]) + Math.abs(d[i + 2] - d[i + off + 2]) > 36) on = 1; }
+    if(on){ hit++; raw[x] = 1; } }
+  if(hit > cw * 0.97) return O ? (core ? O.core : O.blocks) : [{getBoundingClientRect: () => CV.getBoundingClientRect()}];   /* a blank / changing frame: try again */
+  const cols = raw.map((v, x) => raw.slice(Math.max(0, x - 5), x + 6).some(Boolean) ? 1 : 0);   /* + 40 px room so a fan's sign / bubble still fits */
+  const runs = c => { const out = []; let x0 = -1; for(let x = 0; x <= cw; x++){ if(x < cw && c[x]){ if(x0 < 0) x0 = x; } else if(x0 >= 0){ const l = x0 * cell, r = Math.min(W, x * cell);
+      out.push({getBoundingClientRect: () => { const R = CV.getBoundingClientRect(); return {left: R.left + l, right: R.left + r, top: R.top, bottom: R.bottom, width: r - l, height: R.height}; }}); x0 = -1; } } return out; };   /* the stage's height can change (the answer bar hides): read live */
+  const blocks = runs(cols), coreB = runs(raw);
+  G.cheerOcc = {id: G.id, size, item: it, t: now, raw, blocks, core: coreB}; return core ? coreB : blocks;
+}
+// the dirt under the grass line: the stands stand ON the grass (zones only — a fan's shadow may touch it)
+function cheerGround(){ return W && H ? [{getBoundingClientRect: () => { const R = CV.getBoundingClientRect(), gy = H - Math.max(26, H * 0.08) + 3; return {left: R.left, right: R.right, top: R.top + gy, bottom: R.bottom, width: R.width, height: R.height - gy}; }}] : []; }
+function cheerMount(){
+  if(!window.Cheer) return; Cheer.unmount(); if(!(G && G.M && !G.battle && !G.J)) return; const box = $('stage'); if(!box) return;
+  Cheer.mount(box, {game: 'geoscout', players: [{name: S.player, side: 0, human: true}, {name: 'Rival', side: 1, human: false}], me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'overlay', floor: true,
+    zones: () => Cheer.freeZones(box, cheerTaken), avoid: cheerHard,
+    clear: b => { const B = box.getBoundingClientRect(); return !cheerHard().some(e => { const r = e.getBoundingClientRect(); if(r.width < 2 || r.height < 2) return false; const l = r.left - B.left, t = r.top - B.top; return b.r > l - 3 && b.l < l + r.width + 3 && b.b > t - 3 && b.t < t + r.height + 3; }); }});
+}
+// small wins / misses get a 1.2 s breather so quick answers aren't a wall of cheers; big ones and the ends always play
+function cheerSay(kind, why){ if(!kind || !window.Cheer || !Cheer.active() || !G) return; const now = performance.now();
+  if((kind === 'goal' || kind === 'miss') && (G.cheerAt || 0) > now - 1200) return; if(kind === 'big' && (G.cheerBig || 0) > now - 900) return;
+  if(kind === 'goal' || kind === 'miss') G.cheerAt = now; if(kind === 'big') G.cheerBig = now; Cheer.react(kind, {side: 0}); }
+function cheerEnd(won){ if(window.Cheer && Cheer.active()) Cheer.react(won ? 'win' : 'lose', {side: 0}); }
+function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  const at = card.querySelector('.res-btns'); if(!at) return; at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); }, 900); }
+/* 📣 CHEERSQUAD END */
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-4b */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function leavePlay(){
   if(!G) return; if(G.phase === 'over' || G.J || (G.battle && G.battle.B.round === 0 && G.battle.phase !== 'reveal')){ backToMenu(); return; }
   UI.confirm ? UI.confirm('Leave this game?', 'Your points so far will be lost.', 'Leave', 'Keep playing').then(ok => { if(ok) backToMenu(); }) : backToMenu();
 }
 function pauseGame(){}
-function backToMenu(){ stopLoop(); stopTimer(); $('say').classList.add('hidden'); G = null; GID++; hideResult(); closeSheet(); renderMenu(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); stopLoop(); stopTimer(); $('say').classList.add('hidden'); G = null; GID++; hideResult(); closeSheet(); renderMenu(); showScreen('menu'); }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
 function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
 window.feedbackContext = () => ({page: 'GeoScout', game: GAME_ID, level: G ? G.M.level : SET.level, mode: G ? G.M.mode : SET.mode});
@@ -1299,6 +1346,7 @@ function drawAvatarCorner(g, t, gy){
 function draw(t){
   if(!G || !W) return; const g = CTX; g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, H);
   const gy = drawRoom(g, t);
+  G.cheerT = t; /* 📣 cs-4b */
   if(G.battle){ drawBattle(g, t, gy); drawFx(g); return; }
   if(G.J && !G.M.item){ drawJourney(g, t, gy); drawFx(g); return; }
   const it = G.M.item; if(!it) return; G.avBox = undefined;
@@ -1655,4 +1703,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (gs-4+p1d+p3a) END OF GeoScout.html -->
+<!-- (gs-4+p1d+p3a+cs-4b) END OF GeoScout.html -->

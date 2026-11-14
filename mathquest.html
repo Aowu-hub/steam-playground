@@ -199,6 +199,7 @@
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-4b: the cheering crowd (CheerSquad.html) -->
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
 
 <section class="screen hidden" id="scr-player">
@@ -215,6 +216,7 @@
   <div class="chips worlds" id="world-list"></div>
   <div class="section-head">3. Pick a level</div>
   <div class="levels" id="level-list"></div>
+  <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the play">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-4b -->
   <details class="rules"><summary>📖 How to play</summary><ul>
     <li><b>Answer:</b> tap the right number (or press 1, 2, 3, 4). Tap 🔊 to hear the question again.</li>
     <li><b>Pictures:</b> on the first levels you can count the pictures, hop along the number line, count the rows or share into baskets.</li>
@@ -424,7 +426,7 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
-  loadPrefs(); $('who-name').textContent = name; renderMenu(); showScreen('menu');
+  loadPrefs(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4b */ renderMenu(); showScreen('menu');
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 // The series + world rows: built once per menu visit, a tap only moves the highlight (no page jump).
@@ -466,7 +468,7 @@ function challengeKey(){ return 'sp_mathquest_challenge:' + (S.player || ''); }
 function challengeBest(){ try { return JSON.parse(localStorage.getItem(challengeKey()) || 'null'); } catch(e){ return null; } }
 
 /* ================= GAME ================= */
-function startGame(lvl){
+function startGame(lvl){ setTimeout(cheerMount, 0); /* 📣 cs-4b */
   clearInterval(timerId); hideResult();
   const ch = lvl === 'c', L = ch ? CHALLENGE : LEVELS[lvl], W = WORLDS[world];
   if(ch) lvl = 3;   // Hard-sized numbers for ➕ ➖
@@ -533,11 +535,11 @@ function answer(v, btn){
     const pts = Math.round((100 * (G.lvl + 1) + Math.min(G.streak, 20) * 10 * (G.lvl + 1)) * (G.L.hardcore ? 3 : 1) * (G.usedHint ? 0.5 : 1) * seriesMult());
     G.score += pts; floatText(btn, '+' + pts); sparkle(btn);
     if(mark){ mark.textContent = q.ask.toLocaleString(); mark.classList.add('got'); }
-    UISound.play('success'); mascot('happy');
+    UISound.play('success'); mascot('happy'); cheerSay([5, 10, 15].includes(G.streak) ? 'big' : 'goal', 'right'); /* 📣 cs-4b */
     if([3, 5, 10, 15].includes(G.streak)){ showBanner('🔥 ' + G.streak + ' in a row!', 'gold'); if(G.streak >= 5) UISound.play('unlock'); }
     else if(voiceOn) say(pick(RIGHT_WORDS));
   } else {
-    G.wrong++; G.streak = 0; btn.classList.add('wrong'); UISound.play('error'); mascot('sad');
+    G.wrong++; G.streak = 0; btn.classList.add('wrong'); UISound.play('error'); mascot('sad'); cheerSay('miss', 'wrong'); /* 📣 cs-4b */
     const card = $('qcard'); card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
     if(mark) mark.textContent = q.ask.toLocaleString();
     const hl = $('hintline'); hl.textContent = 'The answer is ' + q.ask.toLocaleString() + ' — ' + explain(q); hl.classList.remove('hidden');
@@ -576,7 +578,7 @@ function hud(){
   if(G.challenge){ BAR.count('q', '✅', G.right, 'Right'); BAR.miss(G.wrong); } else BAR.count('q', '❓', Math.min(G.qi + 1, G.L.qs) + '/' + G.L.qs, 'Question');
   BAR.time(fmt(left), left < 10000);
   $('timefill').style.width = (frac * 100).toFixed(1) + '%'; $('timebar').classList.toggle('low', frac < 0.2);
-  if(left < 10000 && !hudLow){ hudLow = true; showBanner('⏱ 10 seconds left!', 'bad'); } if(left >= 10000) hudLow = false;
+  if(left < 10000 && !hudLow){ hudLow = true; showBanner('⏱ 10 seconds left!', 'bad'); cheerSay('close', 'time'); /* 📣 cs-4b */ } if(left >= 10000) hudLow = false;
   if(lockHandle){ const l = lockHandle.remainingMs(); BAR.left(l, l < 120000); }
 }
 function pauseGame(){ if(G && !G.paused && !G.over){ G.paused = true; G.pausedAt = performance.now(); } }
@@ -586,7 +588,7 @@ function leavePlay(){
   pauseGame();
   UI.confirm({icon: '◀', title: 'Leave this round?', body: 'This round will not be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(ok) backToMenu(); else resume(); });
 }
-function backToMenu(){ clearInterval(timerId); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); renderMenu(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); clearInterval(timerId); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); renderMenu(); showScreen('menu'); }
 document.addEventListener('keydown', e => {
   if(!G || G.over || $('scr-play').classList.contains('hidden')) return;
   const n = Number(e.key); if(n >= 1 && n <= 4){ const b = $('answers').querySelectorAll('.ans')[n - 1]; if(b && !b.classList.contains('off')) answer(Number(b.dataset.v), b); e.preventDefault(); }
@@ -609,6 +611,7 @@ function finishGame(why){
   const stats = {correct: g.right, bestStreak: g.bestStreak, perfect: cleared && g.wrong === 0 ? 1 : 0, rounds: 1};
   if(g.score > 0 || cleared) saveWin(S.player, g.lvl, {timeSec: secs, stars, score: g.score, theme: g.world + ':' + g.series, cleared, stats});
   const W = WORLDS[g.world];
+  cheerEnd(cleared); /* 📣 cs-4b */
   if(cleared){ const pr = pick(PRAISE); party('🎉 ' + pr + ', ' + S.player + '!'); say(pr + ', ' + S.player + '!'); confetti(['🧮', '⭐', '🎉', W.icon, SERIES[g.series].icon, '💯'], 40); UISound.play('success'); }
   else { UISound.play('pop'); say(why === 'time' ? 'Time is up! Good try!' : why === 'hardcore' ? 'Hardcore over. Try again!' : 'Good try! Let\'s practise.'); }
   setTimeout(() => {
@@ -635,6 +638,7 @@ function challengeOver(){
   const old = challengeBest(), best = !old || g.right > old.right || (g.right === old.right && score > old.score);
   if(best) try { localStorage.setItem(challengeKey(), JSON.stringify({right: g.right, wrong: g.wrong, score: score})); } catch(e){}
   if(S.player && g.right) google.script.run.withFailureHandler(() => {}).saveFeats(S.player, 'math-quest', {sprintBest: g.right, sprintRounds: 1, correct: g.right, bestStreak: g.bestStreak});
+  cheerEnd(!!(best && g.right)); /* 📣 cs-4b */
   if(best && g.right){ party('⏱️ New best: ' + g.right + ' right!'); confetti(['⏱️', '⭐', '🧮', '🎉'], 30); UISound.play('success'); say('New best! ' + g.right + ' right!'); } else { UISound.play('pop'); say(g.right + ' right! Good try!'); }
   setTimeout(() => {
     if(G !== g) return;
@@ -678,7 +682,26 @@ function saveText(res){
   return h;
 }
 function countUp(el, to, ms){ if(!el) return; const t0 = performance.now(); (function tick(now){ const p = Math.max(0, Math.min(1, (now - t0) / ms)); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))).toLocaleString(); if(p < 1) requestAnimationFrame(tick); })(t0); }
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+/* 📣 CHEERSQUAD (cs-4b) START — the crowd beside the play (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+// solo: you = side 0, the 😈 rival = side 1. Fans stand only where the bar, the question / board and the controls leave room.
+function cheerTaken(){ return Array.from(document.querySelectorAll('#gbar, .top-btn, #timebar, #qcard, #scr-play .side-col')); }
+function cheerHard(){ return cheerTaken(); }
+function cheerMount(){
+  if(!window.Cheer) return; Cheer.unmount(); if(!(G)) return; const box = $('scr-play'); if(!box) return;
+  Cheer.mount(box, {game: 'mathquest', players: [{name: S.player, side: 0, human: true}, {name: 'Rival', side: 1, human: false}], me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'overlay',
+    zones: () => Cheer.freeZones(box, cheerTaken), avoid: cheerHard,
+    clear: b => { const B = box.getBoundingClientRect(); return !cheerHard().some(e => { const r = e.getBoundingClientRect(); if(r.width < 2 || r.height < 2) return false; const l = r.left - B.left, t = r.top - B.top; return b.r > l - 3 && b.l < l + r.width + 3 && b.b > t - 3 && b.t < t + r.height + 3; }); }});
+}
+// small wins / misses get a 1.2 s breather so quick answers aren't a wall of cheers; big ones and the ends always play
+function cheerSay(kind, why){ if(!kind || !window.Cheer || !Cheer.active() || !G) return; const now = performance.now();
+  if((kind === 'goal' || kind === 'miss') && (G.cheerAt || 0) > now - 1200) return; if(kind === 'big' && (G.cheerBig || 0) > now - 900) return;
+  if(kind === 'goal' || kind === 'miss') G.cheerAt = now; if(kind === 'big') G.cheerBig = now; Cheer.react(kind, {side: 0}); }
+function cheerEnd(won){ if(window.Cheer && Cheer.active()) Cheer.react(won ? 'win' : 'lose', {side: 0}); }
+function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  const at = card.querySelector('.res-btns'); if(!at) return; at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); }, 900); }
+/* 📣 CHEERSQUAD END */
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-4b */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pick(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
@@ -738,4 +761,4 @@ showResult = function(){ const args = arguments;  const r = bdBase.showResult.ap
 </script>
 </body>
 </html>
-<!-- (r9+back-1+modes-3+p1b+p2+p6e) END OF MathQuest.html -->
+<!-- (r9+back-1+modes-3+p1b+p2+p6e+cs-4b) END OF MathQuest.html -->
