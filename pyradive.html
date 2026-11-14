@@ -1821,6 +1821,7 @@ function choosePlayer(name){
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
   loadPrefs(); KEYS = loadKeys(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-pd */
   bestiaryCount(); if(window.SpiritBestiary) SpiritBestiary.load(name).then(bestiaryCount);   // 📖 found creatures (this device + the server)
+  if(S.looksSrv && !S.looksSrv[name] && ['ball', 'table', 'bomb'].some(k => ls(lookKey(k, name)) != null)) saveLooks();   // 🎨 pd-4e: picks made before pd-4e go up once
   const ml = UI.modeLink ? UI.modeLink(MODE_LINK) : '';
   if(ml && modeInfo(ml)) pickMode(ml);
   renderMenu(); showScreen('menu'); msAlso();
@@ -1963,7 +1964,10 @@ function ownTables(name){ return (typeof TableSkins !== 'undefined') ? TableSkin
 function ownBombs(name){ if(!(typeof BombSkins !== 'undefined')) return ['']; const b = (S.bombs || {})[name] || {}; return [''].concat(BombSkins.owned({themes: b.themes || {}, extras: b.extras || []})); }
 function lookOwned(kind, name){ return kind === 'ball' ? ownBalls(name) : kind === 'table' ? ownTables(name) : ownBombs(name); }
 function lookGet(kind, name){ name = name || S.player; const own = lookOwned(kind, name), v = ls(lookKey(kind, name)); const def = kind === 'table' ? 'classic' : ''; return v != null && own.indexOf(v) >= 0 ? v : def; }
-function lookSet(kind, v){ ls(lookKey(kind, S.player), v); LOOKS[kind] = v; }
+function lookSet(kind, v){ ls(lookKey(kind, S.player), v); LOOKS[kind] = v; saveLooks(); }
+// 🎨 pd-4e: looks follow the PLAYER (Aowu 2026-11-14) — the server row PyraLooks_<Name> wins at start; every pick is saved to it. This device keeps a copy (offline + instant).
+function seedLooks(all){ S.looksSrv = all || {}; Object.keys(S.looksSrv).forEach(n => { const o = S.looksSrv[n] || {}; ['ball', 'table', 'bomb'].forEach(k => { if(typeof o[k] === 'string') ls(lookKey(k, n), o[k]); }); }); }
+function saveLooks(){ const n = S.player; if(!n || !window.google || !google.script || !google.script.run) return; const o = {ball: ls(lookKey('ball', n)) || '', table: ls(lookKey('table', n)) || 'classic', bomb: ls(lookKey('bomb', n)) || ''}; (S.looksSrv || (S.looksSrv = {}))[n] = o; google.script.run.withFailureHandler(() => {}).savePyraLooks(n, o); }
 function loadLooks(){ ['ball', 'table', 'bomb'].forEach(k => { LOOKS[k] = lookGet(k); }); }
 function ballV(v){ return v === '' || v == null ? null : /^\d+$/.test(v) ? Number(v) : v; }
 function lookName(kind, v){
@@ -3009,7 +3013,7 @@ function boot(){
   UI.loading('pyraspike');
   google.script.run.withSuccessHandler(d => {
       UI.loaded();
-      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {}; S.ballSkins = d.ballSkins || {}; S.tableSkins = d.tableSkins || {}; S.bombs = d.bombs || {};
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {}; S.ballSkins = d.ballSkins || {}; S.tableSkins = d.tableSkins || {}; S.bombs = d.bombs || {}; seedLooks(d.looks || {}); if(window.SpiritBestiary) S.players.forEach(p => { if(p.Name !== CURRENT_PLAYER) SpiritBestiary.load(p.Name); });   /* 🎨 ⭐ pd-4e: looks + pins of every family player */
       UISound.applySettings(S.settings);
       const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
       lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
@@ -3023,4 +3027,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pd-4c+cs-pd+ck-2d) END OF PyraDive.html -->
+<!-- (pd-4c+cs-pd+ck-2d+pd-4e) END OF PyraDive.html -->

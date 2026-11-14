@@ -1422,6 +1422,7 @@ function getLevelGameData(gameId, player) {
   if (gameId === 'brawl-buddies') { const all = activePlayers_(listProfilesFull()); out.gear = {}; all.forEach(p => { const o = itemsFor_(p.Name, all).owned; if (o.brawlgear > 0) out.gear[p.Name] = o.brawlgear - 1; }); }   // 🥊 best Brawl gear owned (step index), drawn in fights
   if (gameId === 'pinball' || gameId === 'sla-brall' || gameId === 'blasoff') { const all = activePlayers_(listProfilesFull()); out.ballSkins = {}; out.rackets = {}; out.ballTrails = {}; out.feathers = {}; all.forEach(p => { const o = itemsFor_(p.Name, all).owned; out.ballSkins[p.Name] = o.ballskin || 0; out.rackets[p.Name] = o.racket || 0; out.bats = out.bats || {}; out.bats[p.Name] = o.batstick || 0; out.ballTrails[p.Name] = o.balltrail || 0; out.feathers[p.Name] = o.feather || 0; }); }   // ⚾ one ball-skin list for Pinball + SlaBrall; 🏓 rackets owned
   if (gameId === 'pyraspike') { const all = activePlayers_(listProfilesFull()); out.ballSkins = {}; out.tableSkins = {}; all.forEach(p => { const o = itemsFor_(p.Name, all).owned; out.ballSkins[p.Name] = o.ballskin || 0; out.tableSkins[p.Name] = o.tableskin || 0; }); out.bombs = bopperData_(players); }   // 🎨 PyraDive pd-4c: 🎱 ball skins · 🏓 table looks · 💣 Soul Bopper bombs for 🌀 Spark Party
+  if (gameId === 'pyraspike') { const st = getSettings(); out.looks = {}; activePlayers_(listProfilesFull()).forEach(p => { try { const v = st['PyraLooks_' + p.Name]; if (v) out.looks[p.Name] = JSON.parse(v); } catch (e) {} }); }   // 🎨 pd-4e: each player's picked looks (server row PyraLooks_<Name>)
   return out;
 }
 // 👀🧠 Eyes Brain Riot (11k round 4): 🎯 daily family number — the same 8 digits for everyone today (made on the page from the date),
@@ -4686,6 +4687,18 @@ function getBestiaryAll(name) {
   return { found: found, pins: pins };
 }
 
+// 🎨 pd-4e: PyraDive looks follow the PLAYER (Aowu 2026-11-14) — ONE Settings row "PyraLooks_<Name>" = {ball, table, bomb}
+// (🎱 BallSkins index or 'art:<id>' · 🏓 TableSkins key or 'art:<id>' · 💣 BombSkins id). The whole set each time = a choice: the newest wins.
+function savePyraLooks(name, looks) {
+  if (!activePlayers_(listProfilesFull()).some(p => p.Name === name)) throw new Error('Unknown player.');
+  if (!looks || typeof looks !== 'object' || Array.isArray(looks)) throw new Error('Bad data.');
+  const str = v => String(v == null ? '' : v), art = /^art:[A-Za-z0-9]{1,40}$/;
+  const ball = str(looks.ball), table = str(looks.table || 'classic'), bomb = str(looks.bomb);
+  const clean = { ball: (/^\d{1,2}$/.test(ball) || art.test(ball)) ? ball : '', table: (/^[a-z]{2,12}$/.test(table) || art.test(table)) ? table : 'classic', bomb: /^[A-Za-z0-9:_-]{0,40}$/.test(bomb) ? bomb : '' };
+  saveSetting('PyraLooks_' + name, JSON.stringify(clean));
+  return { ok: true, looks: clean };
+}
+
 // 🧬 SkillKit saves (td-1, plan "TD-Stories — full plan.md" §6): ONE Settings row per player per game — "SkillTree_<game>_<Name>" =
 // {ch: chapters done (only grows), last: {<hero>: SkillKit tree.save()}, lastForms} — picks + evolve forms, never a log.
 const SKILL_TREE_GAMES_ = ['td-draprincess'];
@@ -4701,7 +4714,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -6271,6 +6284,7 @@ return {"include": typeof include === 'function' ? include : undefined,
 "getBestiary": typeof getBestiary === 'function' ? getBestiary : undefined,
 "saveBestiaryPins": typeof saveBestiaryPins === 'function' ? saveBestiaryPins : undefined,
 "getBestiaryAll": typeof getBestiaryAll === 'function' ? getBestiaryAll : undefined,
+"savePyraLooks": typeof savePyraLooks === 'function' ? savePyraLooks : undefined,
 "saveSkillTree": typeof saveSkillTree === 'function' ? saveSkillTree : undefined,
 "startPoseSession": typeof startPoseSession === 'function' ? startPoseSession : undefined,
 "doPost": typeof doPost === 'function' ? doPost : undefined,
