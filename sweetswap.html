@@ -237,6 +237,7 @@
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-4a: the cheering crowd (CheerSquad.html) -->
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
 
 <section class="screen hidden" id="scr-player">
@@ -251,6 +252,7 @@
   <div class="chips" id="theme-list"></div>
   <div class="section-head">2. Pick a level</div>
   <div class="levels" id="level-list"></div>
+  <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the board">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-4a -->
   <details class="rules"><summary>📖 How to play</summary><ul>
     <li><b>Swap:</b> tap a picture, then tap the one next to it (or slide your finger from one to the other). If it makes a row of 3 or a 2 × 2 square of the same, they pop! If not, they swap back and the move is free.</li>
     <li><b>Goals:</b> each level shows what to collect at the top (like 🍓 × 12) or blockers to break — 🧊 ice box, 📦 package, ⛓️ metal cage, 🔥 flame cage, 🔒 space prison, ⛽ gas out or ☄️ meteor cage (pop the picture underneath). Finish the goals before the moves run out.</li>
@@ -463,7 +465,7 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
-  loadPrefs(); $('who-name').textContent = name; renderMenu(); showScreen('menu');
+  loadPrefs(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4a */ renderMenu(); showScreen('menu');
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 function picHtml(k, T){ T = T || THEMES[theme]; if(k < 0) return '🌈'; return T.shapes ? '<b style="color:' + SHAPE_COLORS[k] + '">' + T.pics[k] + '</b>' : T.pics[k]; }
@@ -492,7 +494,7 @@ function renderLevels(){
 
 /* ================= GAME ================= */
 let CS = 50, GAP = 4;
-function startGame(lvl){
+function startGame(lvl){ setTimeout(cheerMount, 0); /* 📣 cs-4a */
   hideResult(); clearInterval(timerId); clearTimeout(hintTimer);
   const L = LEVELS[lvl], T = THEMES[theme], n = L.n;
   const ice = L.ice ? iceLayout(n, L.ice) : new Array(n * n).fill(0);
@@ -619,6 +621,7 @@ async function trySwap(a, b){
   if(goalsDone() && G.stage < G.stages){ await nextStage(); if(!G) return; }
   G.busy = false;
   if(goalsDone()) return winGame();
+  if(G.moves === 3) cheerSay('close'); /* 📣 cs-4a */
   if(G.moves <= 0) return finishGame('moves');
   if(!allMoves(G.g, G.n).length) await reshuffle();
   armHint();
@@ -710,6 +713,7 @@ async function popCells(cells, creates, opt){
     if(gl.t === 'collect') gl.got = Math.min(gl.need, gl.got + (collected[gl.k] || 0)); else if(gl.t === 'ice') gl.got = Math.min(gl.need, gl.got + iceHit); else if(gl.t === 'special') gl.got = Math.min(gl.need, gl.got + creates.length);
     if(gl.got !== before) bump = k; });
   renderGoals(bump);
+  cheerSay('goal', 'goal'); /* 📣 cs-4a */
   if(popped){ UISound.play(creates.length || fired.size ? 'success' : 'pop'); pling(G.chain || 1); }
   creates.forEach(c => { if(c.sp === 'power' || c.sp === 'rainbow') ringAt(c.i, 2.2); });
   await sleep(220);
@@ -864,7 +868,7 @@ function powerSnd(kind){
   else if(kind === 'chain') [0, 1, 2, 3].forEach(k => sfx(2000, 0.07, 'sawtooth', 0.07, 500, k * 0.06));
   else sfx(120, 0.6, 'sine', 0.22, 900);
 }
-function combo(text){ const a = $('arena'), d = document.createElement('div'); d.className = 'combo'; d.textContent = text; a.appendChild(d); setTimeout(() => d.remove(), 950); }
+function combo(text){ cheerSay('big', 'combo'); /* 📣 cs-4a */ const a = $('arena'), d = document.createElement('div'); d.className = 'combo'; d.textContent = text; a.appendChild(d); setTimeout(() => d.remove(), 950); }
 function floatAt(i, text){ const [x, y] = xy(i), d = document.createElement('div'); d.className = 'float'; d.textContent = text; d.style.left = (x + CS * 0.1) + 'px'; d.style.top = y + 'px'; $('board').appendChild(d); setTimeout(() => d.remove(), 820); }
 
 function toggleVoice(){ voiceOn = !voiceOn; savePrefs(); paintVoice(); if(!voiceOn) try{ speechSynthesis.cancel(); }catch(e){} }
@@ -876,7 +880,7 @@ function leavePlay(){
   pauseGame();
   UI.confirm({icon: '◀', title: 'Leave this game?', body: 'This game will not be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(ok) backToMenu(); else resume(); });
 }
-function backToMenu(){ clearInterval(timerId); clearHint(); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); renderMenu(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); clearInterval(timerId); clearHint(); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); renderMenu(); showScreen('menu'); }
 
 /* ================= FINISH ================= */
 // Sweet finish: every move left turns into bonus points.
@@ -895,6 +899,7 @@ function finishGame(why, left){
   const stats = {matches: g.matches, specials: g.specials, bestCombo: g.bestCombo, rounds: 1};
   if(g.stages > 1) stats.stages = g.stage - (cleared ? 0 : 1);
   if(g.score > 0) saveWin(S.player, g.lvl, {timeSec: secs, stars, score: g.score, theme: g.theme, cleared, stats});
+  cheerEnd(cleared); /* 📣 cs-4a */
   if(cleared){ const pr = pick(PRAISE); party('🎉 ' + pr + ', ' + S.player + '!'); say(pr + ', ' + S.player + '!'); confetti(['🍬', '⭐', '🎉', T.shapes ? '🍭' : T.pics[0], T.shapes ? '🧁' : T.pics[1]], 40); UISound.play('success'); }
   else { UISound.play('pop'); say('Out of moves! So close!'); }
   setTimeout(() => {
@@ -941,7 +946,25 @@ function saveText(res){
   return h;
 }
 function countUp(el, to, ms){ if(!el) return; const t0 = performance.now(); (function tick(now){ const p = Math.max(0, Math.min(1, (now - t0) / ms)); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))).toLocaleString(); if(p < 1) requestAnimationFrame(tick); })(t0); }
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+/* 📣 CHEERSQUAD (cs-4a) START — the crowd beside the board (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+// solo: you = side 0, the 😈 rival = side 1. Fans stand only where the bar, goals, board and controls leave room.
+function cheerTaken(){ return Array.from(document.querySelectorAll('#gbar, .top-btn, #goals, .goals, #board')); }
+function cheerMount(){
+  if(!window.Cheer || !G) return; Cheer.unmount(); const box = $('scr-play');
+  Cheer.mount(box, {game: 'sweetswap', players: [{name: S.player, side: 0, human: true}, {name: 'Rival', side: 1, human: false}], me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'overlay',
+    zones: () => Cheer.freeZones(box, cheerTaken), avoid: cheerTaken,
+    clear: b => { const B = box.getBoundingClientRect(), F = $('board').getBoundingClientRect(), l = F.left - B.left, t = F.top - B.top; return !(b.r > l - 3 && b.l < l + F.width + 3 && b.b > t - 3 && b.t < t + F.height + 3); }});
+}
+// small wins get a 1.2 s breather so a cascade isn't a wall of cheers; big ones and the ends always play
+function cheerSay(kind, why){ if(!kind || !window.Cheer || !Cheer.active() || !G) return; const now = performance.now();
+  if(kind === 'goal' && (G.cheerAt || 0) > now - 1200) return; if(kind === 'big' && (G.cheerBig || 0) > now - 900) return;
+  if(kind === 'goal') G.cheerAt = now; if(kind === 'big') G.cheerBig = now; Cheer.react(kind, {side: 0}); }
+function cheerEnd(cleared){ if(window.Cheer && Cheer.active()) Cheer.react(cleared ? 'win' : 'lose', {side: 0}); }
+function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  const at = card.querySelector('.res-btns'); if(!at) return; at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); }, 900); }
+/* 📣 CHEERSQUAD END */
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-4a */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pick(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
@@ -968,4 +991,4 @@ boot();
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.chips', {rows: 3}); }</script>
 </body>
 </html>
-<!-- (r22+back-1+p1b+p2) END OF SweetSwap.html -->
+<!-- (r22+back-1+p1b+p2+cs-4a) END OF SweetSwap.html -->

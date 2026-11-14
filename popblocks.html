@@ -161,6 +161,7 @@
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-4a: the cheering crowd (CheerSquad.html) -->
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
 
 <section class="screen hidden" id="scr-player">
@@ -175,6 +176,7 @@
   <div class="chips" id="theme-list"></div>
   <div class="section-head">2. Pick a level</div>
   <div class="levels" id="level-list"></div>
+  <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the board">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-4a -->
   <details class="rules"><summary>📖 How to play</summary><ul>
     <li><b>Pop:</b> tap 2 or more touching blocks that are the same (💀 Hardcore: 3 or more). Blocks above fall down, empty columns slide together.</li>
     <li><b>Big groups = big points:</b> 2 blocks = 20, 5 = 125, 10 = 500! Pop small groups first so big ones join up.</li>
@@ -438,7 +440,7 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
-  loadPrefs(); $('who-name').textContent = name; renderMenu(); showScreen('menu');
+  loadPrefs(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4a */ renderMenu(); showScreen('menu');
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 
@@ -479,7 +481,7 @@ function sprite(ch, px){
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#000'; g.font = px + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
   g.fillText(ch, c.width / 2, c.height / 2 + px * 0.06); SPR[key] = c; return c;
 }
-function startGame(lvl, round){
+function startGame(lvl, round){ setTimeout(cheerMount, 0); /* 📣 cs-4a */
   hideResult(); cancelAnimationFrame(raf); clearInterval(timerId);
   const L = LEVELS[lvl], T = THEMES[theme], R = round || makeRound(lvl);
   if(!R){ UI.toast('Could not make a board — try again', 'err'); return; }
@@ -541,7 +543,7 @@ function applyEvent(ev, before){
   const mult = 1 + Math.min(G.combo, 3) * 0.5;
   const gained = Math.round(ev.pts * mult);
   G.score += gained;
-  const n = ev.popped.length + ev.blasted.filter(b => b.c.t === 'n').length; G.popped += n; G.bigGroup = Math.max(G.bigGroup, ev.group);
+  const n = ev.popped.length + ev.blasted.filter(b => b.c.t === 'n').length; G.popped += n; G.bigGroup = Math.max(G.bigGroup, ev.group); cheerSay(G.combo >= 2 ? 'big' : ev.group >= 6 ? 'goal' : '', G.combo >= 2 ? 'combo' : 'pop'); /* 📣 cs-4a */
   if(ev.fired.length) G.powers++; if(ev.made) G.made++;
   // missions
   G.missions.forEach((m, k) => {
@@ -573,6 +575,7 @@ function checkEnd(){
   const B = G.B;
   if(!G.wonShown && G.score >= G.target && missionsDone()){ G.wonShown = true; $('done-btn').classList.remove('hidden'); setTimeout(() => { if(G && !G.over){ showBanner('🎯 You did it! Keep popping for more stars — or tap 🏁', 'gold'); say('You did it! Keep popping for more stars!'); } }, 700); }
   if(boardEmpty(B)){ G.allClear = true; setTimeout(() => finishGame('clear'), 900); return; }
+  if(G.limit && G.movesLeft === 3) cheerSay('close'); /* 📣 cs-4a */
   if(G.limit && G.movesLeft <= 0){ setTimeout(() => finishGame('moves'), 900); return; }
   if(!anyMove(B, G.L.minG)) setTimeout(() => finishGame('stuck'), 900);
 }
@@ -677,7 +680,7 @@ function leavePlay(){
   pauseGame();
   UI.confirm({icon: '◀', title: 'Leave this round?', body: 'This round will not be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(ok) backToMenu(); else resume(); });
 }
-function backToMenu(){ cancelAnimationFrame(raf); clearInterval(timerId); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); renderMenu(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); cancelAnimationFrame(raf); clearInterval(timerId); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); renderMenu(); showScreen('menu'); }
 document.addEventListener('keydown', e => {
   if(!G || G.over || $('scr-play').classList.contains('hidden')) return;
   if(e.key === 'u' || e.key === 'U' || ((e.ctrlKey || e.metaKey) && e.key === 'z')){ undo(); e.preventDefault(); }
@@ -697,6 +700,7 @@ function finishGame(why){
   const stats = {popped: g.popped, bigGroup: g.bigGroup, powers: g.powers, allClear: g.allClear ? 1 : 0, bestCombo: g.bestCombo, rounds: 1};
   if(g.score > 0) saveWin(S.player, g.lvl, {timeSec: secs, stars, score: g.score, theme: g.theme, cleared, stats});
   const T = THEMES[g.theme];
+  cheerEnd(cleared); /* 📣 cs-4a */
   if(cleared){ const pr = pick(PRAISE); party('🎉 ' + pr + ', ' + S.player + '!'); say(pr + ', ' + S.player + '!'); confetti(['🫧', '⭐', '🎉', T.syms[0], T.syms[1], T.syms[2]], 40); UISound.play('success'); }
   else { UISound.play('pop'); say(why === 'moves' ? 'Out of taps! Good try!' : 'No more groups! Good try!'); }
   setTimeout(() => {
@@ -747,7 +751,25 @@ function saveText(res){
   return h;
 }
 function countUp(el, to, ms){ if(!el) return; const t0 = performance.now(); (function tick(now){ const p = Math.max(0, Math.min(1, (now - t0) / ms)); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))).toLocaleString(); if(p < 1) requestAnimationFrame(tick); })(t0); }
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+/* 📣 CHEERSQUAD (cs-4a) START — the crowd beside the board (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+// solo: you = side 0, the 😈 rival = side 1. Fans stand only where the bar, goals, board and controls leave room.
+function cheerTaken(){ return Array.from(document.querySelectorAll('#gbar, .top-btn, .goalbar, #cv')); }
+function cheerMount(){
+  if(!window.Cheer || !G) return; Cheer.unmount(); const box = $('scr-play');
+  Cheer.mount(box, {game: 'popblocks', players: [{name: S.player, side: 0, human: true}, {name: 'Rival', side: 1, human: false}], me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'overlay',
+    zones: () => Cheer.freeZones(box, cheerTaken), avoid: cheerTaken,
+    clear: b => { const B = box.getBoundingClientRect(), F = $('cv').getBoundingClientRect(), l = F.left - B.left, t = F.top - B.top; return !(b.r > l - 3 && b.l < l + F.width + 3 && b.b > t - 3 && b.t < t + F.height + 3); }});
+}
+// small wins get a 1.2 s breather so a cascade isn't a wall of cheers; big ones and the ends always play
+function cheerSay(kind, why){ if(!kind || !window.Cheer || !Cheer.active() || !G) return; const now = performance.now();
+  if(kind === 'goal' && (G.cheerAt || 0) > now - 1200) return; if(kind === 'big' && (G.cheerBig || 0) > now - 900) return;
+  if(kind === 'goal') G.cheerAt = now; if(kind === 'big') G.cheerBig = now; Cheer.react(kind, {side: 0}); }
+function cheerEnd(cleared){ if(window.Cheer && Cheer.active()) Cheer.react(cleared ? 'win' : 'lose', {side: 0}); }
+function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  const at = card.querySelector('.res-btns'); if(!at) return; at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); }, 900); }
+/* 📣 CHEERSQUAD END */
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-4a */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pick(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
@@ -793,4 +815,4 @@ boot();
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.chips', {rows: 3}); }</script>
 </body>
 </html>
-<!-- (r9+back-1+p1b+p2+p6e) END OF PopBlocks.html -->
+<!-- (r9+back-1+p1b+p2+p6e+cs-4a) END OF PopBlocks.html -->
