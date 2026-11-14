@@ -5829,7 +5829,7 @@ function artRepair(name, id) {
 
 ;
 /* ===== SciencetoryCode.gs ===== */
-/* SciencetoryCode.gs — 🔬 Sciencetory server (sc-1, ⚗️ Chemistry sc-2a, ⚛️ Quantum atom builder sc-2b). Own file: Code.gs is past 300 KB (same pattern as ArtifactoryCode.gs).
+/* SciencetoryCode.gs — 🔬 Sciencetory server (sc-1, ⚗️ Chemistry sc-2a, ⚛️ Quantum atom builder sc-2b, 💡 LED · ✨ glow · 🐱 cat sc-2b2). Own file: Code.gs is past 300 KB (same pattern as ArtifactoryCode.gs).
    Plan: Drive "Sciencetory — full plan.md". Shares Artifactory's data: the Artifacts tab (things you made) + the bag (ArtifactoryCode.gs).
    ⚙️ Mechanic tests (SC-1): press · pull · twist · flex · fatigue · hardness · sharpness · drop · friction · balance · spin · float / leak.
    Every test is a pure function of the thing (material + shape + quality) — the same thing always gives the same number, no luck.
@@ -6042,7 +6042,9 @@ function sciChemView_(st, name) {
 }
 // 🎨 how many ⚛️ atom looks a player owns (Code.gs ITEM_LINES atomskin; 0 = only Classic)
 function sciAtomSkins_(name) { try { return itemsFor_(name, activePlayers_(listProfilesFull())).owned.atomskin || 0; } catch (e) { return 0; } }
-const SCI_CHEM_KINDS_ = { hunt: '⚗️ Chemistry · Element hunt', formula: '⚗️ Chemistry · Formula builder', atom: '⚛️ Quantum · Atom builder' };
+const SCI_CHEM_KINDS_ = { hunt: '⚗️ Chemistry · Element hunt', formula: '⚗️ Chemistry · Formula builder', atom: '⚛️ Quantum · Atom builder',
+  led: '⚛️ Quantum · LED colours', glow: '⚛️ Quantum · Glow charge-up', cat: '⚛️ Quantum · Cat in the box' };   // 💡 ✨ 🐱 sc-2b2
+const SCI_Q_KINDS_ = { atom: 1, led: 1, glow: 1, cat: 1 };
 // one finished ⚗️ / ⚛️ round: (name, level 0-5, kind 'hunt' | 'formula' | 'atom', {found: [atomic numbers], built: [compound ids], atoms: [atomic numbers built], right, total, score, stars, timeSec})
 function sciChemSave(name, level, kind, res) {
   checkPlayer_(name);
@@ -6062,11 +6064,11 @@ function sciChemSave(name, level, kind, res) {
     const newComps = built.filter(x => S.c.indexOf(x) < 0).filter((x, i, a) => a.indexOf(x) === i);
     const newAtoms = atoms.filter(n => S.a.indexOf(n) < 0).filter((n, i, a) => a.indexOf(n) === i);
     S.e = Array.from(new Set(S.e.concat(found, atoms))).sort((a, b) => a - b); S.c = S.c.concat(newComps); S.a = S.a.concat(newAtoms).sort((a, b) => a - b);
-    if (kind === 'atom') S.q++; else S.r++;
+    if (SCI_Q_KINDS_[kind]) S.q++; else S.r++;
     saveSetting('SciElements_' + name, JSON.stringify(S));
     const extra = atoms.filter(n => !had[n] && newCards.indexOf(n) < 0).filter((n, i, a) => a.indexOf(n) === i); newCards.push.apply(newCards, extra);
     const all = before.all.concat(newCards).sort((a, b) => a - b);
-    const stats = kind === 'atom' ? { quantumRounds: 1, atoms: S.a.length, elements: all.length } : { chemRounds: 1, elements: all.length, compounds: S.c.length };
+    const stats = kind === 'atom' ? { quantumRounds: 1, atoms: S.a.length, elements: all.length } : SCI_Q_KINDS_[kind] ? { quantumRounds: 1, elements: all.length } : { chemRounds: 1, elements: all.length, compounds: S.c.length };
     out = { kind: kind, level: lv, newCards: newCards, newComps: newComps, newAtoms: newAtoms, chem: { e: S.e, c: S.c, a: S.a, craft: before.craft, all: all, rounds: S.r, qrounds: S.q }, score: score, stars: stars, stats: stats };
   } finally { lock.releaseLock(); }
   try { out.save = saveLevelResult(SCI_GAME_, name, lv, { score: score, stars: stars, cleared: stars >= 2, timeSec: Math.max(0, Math.round(Number(res.timeSec) || 0)),
@@ -6139,7 +6141,7 @@ function sciRun(name, ref, test, level, guess, rig) {
   catch (e) { res.save = { err: String(e && e.message || e) }; }
   return res;
 }
-// (sc-1+sc-2a+sc-2b) END OF SciencetoryCode.gs
+// (sc-1+sc-2a+sc-2b+sc-2b2) END OF SciencetoryCode.gs
 
 ;
 /* ===== on the device only: the grown-up PIN arrives hashed from the family Sheet (OfflineSync.gs) ===== */
