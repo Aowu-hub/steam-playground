@@ -155,6 +155,15 @@
   .spirit-card.duo{--rot:-4deg;} .spirit-card.trio{border-width:5px;}
   .spirit-card .sc-new{position:absolute;top:-.7rem;right:-.6rem;background:#FFE14A;border:3px solid #1B1030;border-radius:99px;padding:.05rem .5rem;font:700 .8rem 'Fredoka',sans-serif;transform:rotate(8deg);}
   .bestiary-btn{margin-left:.4rem;}
+  /* 🎗️ pd-5a: the Spirit Dive name = a slim ribbon at the top of the play area (the effect itself is on the court) */
+  .spirit-card.rib{top:6px;left:50%;flex-direction:row;gap:.45rem;padding:.2rem .8rem .2rem .45rem;border-width:3px;border-radius:999px;box-shadow:3px 3px 0 #1B1030;max-width:94%;
+    background:linear-gradient(90deg,var(--sc,#FF6B1A),#FFF3C4 55%,#FFFFFF);animation:spirit-rib 2.2s cubic-bezier(.2,1.4,.4,1) both;}
+  .spirit-card.rib b{font-size:clamp(1.2rem,4.5vw,1.8rem);line-height:1;} .spirit-card.rib big{font-size:clamp(.9rem,3.2vw,1.3rem);white-space:nowrap;}
+  .spirit-card.rib small{font-size:clamp(.55rem,1.6vw,.75rem);} .spirit-card.rib i{font-size:clamp(.6rem,1.8vw,.8rem);white-space:nowrap;}
+  .spirit-card.rib .sc-strip{margin:0;} .spirit-card.rib .sc-strip span{font-size:.62rem;padding:0 .25rem;}
+  .spirit-card.rib .sc-new{top:-.55rem;right:-.4rem;font-size:.65rem;}
+  @media (max-width:560px){ .spirit-card.rib .sc-strip{display:none;} .spirit-card.rib small{display:none;} }
+  @keyframes spirit-rib{0%{opacity:0;transform:translate(-160%,0) skewX(-12deg);}12%{opacity:1;transform:translate(-50%,0) skewX(0);}85%{opacity:1;transform:translate(-50%,0);}100%{opacity:0;transform:translate(-50%,-140%);}}
   .spirit-card small{font-size:clamp(.7rem,2.2vw,1rem);letter-spacing:.14em;font-weight:700;background:#1B1030;color:#FFE14A;padding:.05rem .6rem;border-radius:99px;}
   .spirit-card b{font-size:clamp(1.8rem,min(10vw,11vh),5rem);line-height:1.05;}
   .spirit-card big{font-size:clamp(1rem,min(5vw,6vh),2.6rem);font-weight:700;line-height:1;}
@@ -2184,14 +2193,89 @@ function spiritShow(e){
   if(!G) return; const p = G.M.players[e.p], b = G.M.ball, c = spiritOf(e.creature) || {icon: e.icon, col: '#FF6B1A'}, isNew = bestiaryAdd(e);
   snd('unlock'); snd('whoosh'); spark(b.x, b.y, b.z, c.col, 40); spark(b.x, b.y, b.z, '#FFE14A', 20);
   if(!FX) return;
-  G.shake = 0.28; G.slow = 0.75;
+  G.slow = 1.05;   // slow motion while the creature comes (real time; the shake comes on the impact)
+  spiritFx(e, c);
   const host = $('bigword-host'); host.innerHTML = '';
-  const d = document.createElement('div'); d.className = 'spirit-card ' + (e.tier || 'solo'); d.style.setProperty('--sc', c.col);
+  const d = document.createElement('div'); d.className = 'spirit-card rib ' + (e.tier || 'solo'); d.style.setProperty('--sc', c.col);   // 🎗️ pd-5a: a slim name ribbon at the top — the show is on the court
   const mv = e.name.replace(/^Spirit (Duo |Trio )?Dive : /, ''), who = (e.ids || [e.p]).map(id => G.M.players[id] && G.M.players[id].name).filter(Boolean);
   const label = e.tier === 'trio' ? '🔥🔥×3 SPIRIT TRIO DIVE' : e.tier === 'duo' ? '🔥🔥×2 SPIRIT DUO DIVE' : '🔥🔥 SPIRIT DIVE';
   const strip = e.slot === 'combo' ? '<div class="sc-strip"><span>🛡️ Dig</span><span>🙌 Set</span><span>💥 Spike</span><span>×2 point!</span></div>' : '';
   d.innerHTML = (isNew ? '<span class="sc-new">NEW! 📖</span>' : '') + '<small>' + label + '</small><b>' + c.icon + '</b><big>' + UI.esc(mv) + '</big>' + strip + '<i>' + UI.esc(who.join(' + ')) + '</i>';
-  host.appendChild(d); setTimeout(() => d.remove(), 1700);
+  host.appendChild(d); setTimeout(() => d.remove(), 2200);
+}
+/* 🔥🔥 pd-5a Spirit Dive effect (Aowu 21:57 "the spirit is just a card which defeats the purpose of special effect"), drawn on the court in real time:
+   0 – 0.45 s  a magic circle opens under each caller + a light pillar, the screen dims, the creature rises out of the pillar, huge + glowing
+   0.45 – 0.9  it swoops down into the ball (after-images + a ribbon in its colour)
+   0.9         IMPACT: white flash, shockwave ring on the floor, a burst, a big shake — then it rides the ball (drawBall). Trio = 3 pillars, bigger creature. */
+const SPFX = [], CRE_SPR = {};
+function creatureSprite(icon, col, px){
+  px = Math.max(24, Math.round(px / 8) * 8); const key = icon + col + px; if(CRE_SPR[key]) return CRE_SPR[key];
+  const c = document.createElement('canvas'), R = px * 0.95; c.width = c.height = Math.ceil(R * 2); const g = c.getContext('2d');
+  const gr = g.createRadialGradient(R, R, px * 0.1, R, R, R); gr.addColorStop(0, 'rgba(255,255,255,0.95)'); gr.addColorStop(0.35, col); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.globalAlpha = 0.75; g.fillStyle = gr; g.beginPath(); g.arc(R, R, R, 0, 7); g.fill(); g.globalAlpha = 1;
+  emo(g, icon, R, R, px);
+  if(Object.keys(CRE_SPR).length > 24) for(const k in CRE_SPR) delete CRE_SPR[k];
+  return (CRE_SPR[key] = c);
+}
+function spiritFx(e, c){
+  if(!G) return; const M = G.M, callers = (e.ids || [e.p]).map(id => M.players[id]).filter(Boolean).map(q => ({x: q.x, y: q.y}));
+  if(!callers.length) return;
+  SPFX.length = 0; SPFX.push({t: 0, last: performance.now(), c, callers, tier: e.tier || 'solo', trail: [], hit: false});
+}
+function drawSpiritFx(g, M){
+  if(!SPFX.length || !V) return; const f = SPFX[0], now = performance.now(), rdt = Math.min(0.1, (now - f.last) / 1000); f.last = now; f.t += rdt;
+  const t = f.t, T1 = 0.42, TH = 0.6, T2 = 0.95, END = 1.6, c = f.c, b = M.ball;   // rise · hover (it roars) · swoop · impact
+  if(t > END){ SPFX.length = 0; return; }
+  const big = f.tier === 'trio' ? 4.6 : f.tier === 'duo' ? 4 : 3.4;
+  // dim the screen while it comes
+  if(t < T2 + 0.2){ g.fillStyle = 'rgba(10,6,30,' + (0.38 * Math.min(1, t / 0.15) * (t > T2 ? 1 - (t - T2) / 0.2 : 1)).toFixed(3) + ')'; g.fillRect(0, 0, V.W, V.H); }
+  // magic circles + light pillars under the callers
+  g.save(); g.globalCompositeOperation = 'lighter';
+  f.callers.forEach((q, i) => { const [x, y, s] = P(q.x, q.y, 0), open = Math.min(1, t / 0.25), fade = t < 1.1 ? 1 : Math.max(0, 1 - (t - 1.1) / 0.3), r = V.k * s * (0.5 + open * 1.1);
+    if(fade <= 0) return;
+    g.save(); g.translate(x, y); g.scale(1, 0.38); g.globalAlpha = 0.9 * fade; g.strokeStyle = c.col; g.lineWidth = Math.max(2, r * 0.08);
+    g.beginPath(); g.arc(0, 0, r, 0, 7); g.stroke(); g.setLineDash([r * 0.18, r * 0.12]); g.lineDashOffset = -t * r * 2; g.beginPath(); g.arc(0, 0, r * 0.72, 0, 7); g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#FFFFFF'; for(let k = 0; k < 6; k++){ const a = k * Math.PI / 3 + t * 3; g.beginPath(); g.arc(Math.cos(a) * r * 0.86, Math.sin(a) * r * 0.86, Math.max(1.5, r * 0.06), 0, 7); g.fill(); }
+    g.restore();
+    const ph = Math.min(V.H, V.k * s * 9) * open, pw = r * 1.1, pg = g.createLinearGradient(0, y - ph, 0, y); pg.addColorStop(0, 'rgba(255,255,255,0)'); pg.addColorStop(0.6, c.col); pg.addColorStop(1, '#FFFFFF');
+    g.globalAlpha = 0.5 * fade * (0.85 + 0.15 * Math.sin(t * 30 + i)); g.fillStyle = pg; g.fillRect(x - pw / 2, y - ph, pw, ph); });
+  g.restore(); g.globalAlpha = 1;
+  // the creature: rises out of the (middle) caller, then swoops into the ball
+  if(t < T2){
+    const q0 = f.callers[Math.floor(f.callers.length / 2)], [bx, by, bs] = P(b.x, b.y, b.z), [sx0, sy0, ss] = P(q0.x, q0.y, 0);
+    let x, y, sc;
+    const pxMax = Math.min(V.H * 0.45, V.k * ss * big * 1.2), yTop = 52 + pxMax * 0.8, yHi = Math.max(yTop, sy0 - V.k * ss * 4.4);   // stays on screen, under the name ribbon
+    if(t < T1){ const u = t / T1, e1 = 1 - Math.pow(1 - u, 3); x = sx0; y = sy0 + (yHi - sy0) * e1; sc = 0.4 + e1 * 0.8; }
+    else if(t < TH){ const u = (t - T1) / (TH - T1); x = sx0 + Math.sin(u * Math.PI * 3) * V.k * 0.25; y = yHi - Math.sin(u * Math.PI) * V.k * 0.3; sc = 1.2 + Math.sin(u * Math.PI) * 0.12; }
+    else { const u = (t - TH) / (T2 - TH), e2 = u * u, x1 = sx0, y1 = yHi, cxp = (x1 + bx) / 2 + (bx > x1 ? -1 : 1) * V.k * 1.5, cyp = Math.max(yTop, Math.min(y1, by) - V.k * 2.4);
+      x = (1 - e2) * (1 - e2) * x1 + 2 * (1 - e2) * e2 * cxp + e2 * e2 * bx; y = (1 - e2) * (1 - e2) * y1 + 2 * (1 - e2) * e2 * cyp + e2 * e2 * by; sc = 1.2 - u * 0.55; }
+    if(!f.spr) f.spr = creatureSprite(c.icon, c.col, Math.min(V.H * 0.5, V.k * big * 1.25));   // one picture per Spirit Dive, scaled while it flies
+    const px = Math.min(V.H * 0.45, V.k * ss * big * sc * (1 + 0.06 * Math.sin(t * 22))), spr = f.spr;
+    f.trail.push([x, y]); if(f.trail.length > 9) f.trail.shift();
+    if(f.trail.length > 2){ g.save(); g.globalCompositeOperation = 'lighter'; g.lineCap = 'round'; g.lineJoin = 'round';
+      for(let k = 1; k < f.trail.length; k++){ const a = k / f.trail.length; g.globalAlpha = a * 0.8; g.strokeStyle = k > f.trail.length - 3 ? '#FFFFFF' : c.col; g.lineWidth = px * 0.22 * a; g.beginPath(); g.moveTo(f.trail[k - 1][0], f.trail[k - 1][1]); g.lineTo(f.trail[k][0], f.trail[k][1]); g.stroke(); }
+      g.restore(); }
+    const w = px * 1.9;
+    f.trail.slice(0, -1).forEach(([tx, ty], k) => { if(k % 3) return; g.globalAlpha = 0.16 * (k + 1) / f.trail.length; g.drawImage(spr, tx - w * 0.4, ty - w * 0.4, w * 0.8, w * 0.8); });   // after-images
+    g.globalAlpha = 0.68; g.drawImage(spr, x - w / 2, y - w / 2, w, w); g.globalAlpha = 1;   // a bit see-through: the players stay visible (Aowu 22:22)
+  }
+  // IMPACT
+  if(t >= T2 && !f.hit){ f.hit = true; f.hx = b.x; f.hy = b.y; f.hz = b.z; G.shake = f.tier === 'solo' ? 0.4 : 0.55; snd('bump'); spark(b.x, b.y, b.z, c.col, 46); spark(b.x, b.y, b.z, '#FFFFFF', 24); }
+  if(f.hit){ const u = (t - T2) / (END - T2);
+    if(u < 0.25){ g.fillStyle = 'rgba(255,255,255,' + (0.6 * (1 - u / 0.25)).toFixed(3) + ')'; g.fillRect(0, 0, V.W, V.H); }   // flash
+    const [wx, wy, ws] = P(f.hx, f.hy, 0), rw = V.k * ws * (0.6 + u * 5.5);   // shockwave on the floor under the hit
+    g.save(); g.translate(wx, wy); g.scale(1, 0.38); g.globalAlpha = Math.max(0, 0.9 * (1 - u)); g.strokeStyle = c.col; g.lineWidth = Math.max(2, V.k * 0.3 * (1 - u)); g.beginPath(); g.arc(0, 0, rw, 0, 7); g.stroke();
+    g.strokeStyle = '#FFFFFF'; g.lineWidth = Math.max(1, V.k * 0.12 * (1 - u)); g.beginPath(); g.arc(0, 0, rw * 0.8, 0, 7); g.stroke(); g.restore(); g.globalAlpha = 1;
+    if(u < 0.5){ const [hx, hy] = P(f.hx, f.hy, f.hz); g.save(); g.globalCompositeOperation = 'lighter'; g.strokeStyle = c.col; g.globalAlpha = 0.8 * (1 - u * 2); g.lineWidth = 3;   // speed burst lines
+      for(let k = 0; k < 14; k++){ const a = k * Math.PI / 7 + 0.2, r0 = V.k * (0.6 + u * 3), r1 = r0 + V.k * (1.4 - u * 2); g.beginPath(); g.moveTo(hx + Math.cos(a) * r0, hy + Math.sin(a) * r0); g.lineTo(hx + Math.cos(a) * r1, hy + Math.sin(a) * r1); g.stroke(); }
+      g.restore(); g.globalAlpha = 1; }
+  }
+}
+// ▲ a ball above the top of the play area (high lobs since pd-5a keeps less sky)
+function drawOffBall(g, M){
+  const b = M.ball; if(!b || M.phase !== 'rally') return; const [x, y] = P(b.x, b.y, b.z); if(y > 6) return;
+  const cx = Math.max(16, Math.min(V.W - 16, x)), r = Math.max(7, V.k * 0.2), a = 0.75 + 0.25 * Math.sin(performance.now() / 120);
+  g.globalAlpha = a; g.fillStyle = '#FFE14A'; g.strokeStyle = '#1B1030'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx, 4); g.lineTo(cx - r, 4 + r * 1.3); g.lineTo(cx + r, 4 + r * 1.3); g.closePath(); g.fill(); g.stroke(); g.globalAlpha = 1;
 }
 function spiritOf(k){ for(const L of [PD.SPIRITS, PD.SPIRITS_DUO, PD.SPIRITS_TRIO]) for(const slot in L){ const c = L[slot].find(x => x.k === k); if(c) return c; } return null; }
 /* ⭕ the robots' turn can be skipped (⏭): the rest of their turn is played out at once */
@@ -2229,10 +2313,11 @@ function readInput(){
   if(!G) return;
   G.locals.forEach(p => {
     const st = G.sticks.get(p.id);
-    if(st && st.v){ PD.input(G.M, p.id, st.v.x, st.v.y); return; }
+    if(st && st.v){ if(V && V.rot) PD.input(G.M, p.id, -st.v.y, st.v.x); else PD.input(G.M, p.id, st.v.x, st.v.y); return; }
     const seats = G.locals.length === 1 ? [0, 1] : [p.human - 1];
     let x = 0, y = 0; seats.forEach(s => { if(G.keysDown.has(s + ':left')) x -= 1; if(G.keysDown.has(s + ':right')) x += 1; if(G.keysDown.has(s + ':up')) y -= 1; if(G.keysDown.has(s + ':down')) y += 1; });
-    PD.input(G.M, p.id, Math.max(-1, Math.min(1, x)), Math.max(-1, Math.min(1, y)));
+    x = Math.max(-1, Math.min(1, x)); y = Math.max(-1, Math.min(1, y));
+    if(V && V.rot) PD.input(G.M, p.id, -y, x); else PD.input(G.M, p.id, x, y);
   });
 }
 function buildPads(){
@@ -2302,20 +2387,39 @@ function updateGuideUi(){
    Side view, 2.5D: x along the screen, y = depth (far = up the screen + a little to the right), z = up.
    ONE painter (drawScene) for play AND the arena preview cards. */
 let V = null;
+/* 📐 pd-5a court view (Aowu 21:57 "map squeeze"): only HR = 2.6 m of sky is kept over the far side (was 4.8 m — half the screen was empty),
+   the court looks down more steeply to fill the rest, and a lob that leaves the top shows a ▲ marker (drawOffBall).
+   📱 o.rot = phones held upright: the court TURNS — your side at the bottom, the net across the middle, the whole court on screen. */
+const VIEW_HR = 2.6;
 function makeView(W, H, M, o){
   o = o || {};
-  const L = M.L, Wd = M.W, skewF = 0.4;
-  let depthF = 0.34;
-  const padB = o.padB || 0, padT = o.padT || 6;
-  const kx = W / (1.78 * (L + 1.4) + Wd * skewF), ky = (H - padB - padT) / (Wd * depthF + 4.8);
+  const L = M.L, Wd = M.W, skewF = 0.4, HR = VIEW_HR;
+  const padB = o.padB || 0, padT = o.padT || 6, Hh = Math.max(40, H - padB - padT);
+  if(o.rot){
+    const Xn = L + 1.8, Yh = Wd / 2 + 0.9;
+    const kx = W / (2 * Yh), ky = Hh / (2 * Xn * 0.34 + HR), k = Math.min(kx, ky);
+    const depthF = Math.max(0.34, Math.min(1, (Hh / k - HR) / (2 * Xn)));
+    const dp = 2 * Xn * depthF * k, slack = Math.max(0, Hh - dp - HR * k);
+    return {W, H, k, dp, sk: 0, cx: W / 2, gy: H - padB - slack * 0.5, L, Wd, Xn, rot: true, camX: 0, follow: false, kx};
+  }
+  let depthF = 0.42; const ext0 = (Wd + 2.6) / Wd;
+  const kx = W / (1.78 * (L + 1.4) + Wd * skewF), ky = Math.min(Hh / (Wd * ext0 * depthF + HR), o.crowd ? (Hh - (o.crowd - padT)) / (Wd * ext0 * depthF + 2.4) : 1e9);
   let k = Math.min(kx, ky), follow = false;
-  if(o.zoom && kx < ky && (kx < 30 || H > W * 1.05)){ k = Math.min(ky, Math.max(kx * (H > W * 1.05 ? 1.7 : 1), 30)); follow = k > kx * 1.02; }   // upright screens zoom in + the camera follows the ball
-  // a tall screen with room to spare looks down on the court a bit more (deeper court, less empty sky)
-  depthF = Math.max(0.34, Math.min(0.62, ((H - padB - padT) / k - 4.8) / Wd * 0.8));
-  const dp = Wd * depthF * k, sk = Wd * skewF * k, used = dp + 4.8 * k, slack = Math.max(0, H - padB - padT - used);
-  return {W, H, k, dp, sk, cx: W / 2 - sk * 0.5, gy: H - padB - slack * 0.35, L, Wd, camX: 0, follow, kx};
+  if(o.zoom && kx < ky && kx < 30){ k = Math.min(ky, 30); follow = k > kx * 1.02; }   // tiny screens zoom in + the camera follows the ball
+  // room to spare → look down on the court more (deeper court, less empty sky)
+  // 📣 the crowd stands on a band above the far side: keep room for it (its band = 2.4 m + room for heads / signs) — still far less sky than before pd-5a
+  const sky = Math.max(HR * k, o.crowd ? 2.4 * k + o.crowd - padT : 0), ext = (Wd + 2.6) / Wd;   // ext: the floor reaches 2.6 m past the far line (the stands start there)
+  depthF = Math.max(0.42, Math.min(0.95, (Hh - sky) / (k * Wd * ext) * 0.95));
+  const dp = Wd * depthF * k, sk = Wd * skewF * k, used = dp * ext + sky, slack = Math.max(0, Hh - used);
+  return {W, H, k, dp, sk, cx: W / 2 - sk * 0.5, gy: H - padB - slack * 0.5, L, Wd, camX: 0, follow, kx};
 }
-function P(x, y, z){ const d = (V.Wd / 2 - y) / V.Wd, s = 1 - 0.22 * d; return [V.cx + (x - V.camX) * V.k * s + d * V.sk, V.gy - d * V.dp - z * V.k * s, s]; }
+function P(x, y, z){
+  if(V.rot){ const d = (x + V.Xn) / (2 * V.Xn), s = 1 - 0.3 * d; return [V.cx + y * V.k * s, V.gy - d * V.dp - z * V.k * s, s]; }   // 📱 turned: x = up the screen (your side at the bottom), y = across
+  const d = (V.Wd / 2 - y) / V.Wd, s = 1 - 0.22 * d; return [V.cx + (x - V.camX) * V.k * s + d * V.sk, V.gy - d * V.dp - z * V.k * s, s]; }
+// the far edge of the floor on screen = where the stands start (📣 crowd + tests use it): side view = the far side line, turned = the far END
+function farLineY(M){ return V.rot ? P(M.L + 4.5, 0, 0)[1] : P(0, -M.W / 2 - 2.6, 0)[1]; }
+// depth order key (far → near): side view = y, turned view = −x
+function DK(x, y){ return V && V.rot ? -x : y; }
 function resize(){
   if(!G) return; const st = $('stage').getBoundingClientRect(), cv = $('court');
   const dpr = Math.max(1, Math.min(2, (window.devicePixelRatio || 1)) * G.q);
@@ -2323,7 +2427,7 @@ function resize(){
   const touch = isTouch(), portrait = st.height > st.width * 1.05;
   const stick = Math.min(148, Math.max(96, st.width * 0.29));
   const padB = touch ? (portrait ? Math.max(st.height * 0.34, stick + 40) : Math.min(stick * 0.42, st.height * 0.2)) : 30;
-  V = makeView(st.width, st.height, G.M, {padB, padT: 42, zoom: true});
+  V = makeView(st.width, st.height, G.M, {padB, padT: 42, zoom: true, rot: st.height > st.width * 1.15, crowd: 44});   // 📱 pd-5a: upright = the turned court
   if(G.cam != null) V.camX = G.cam;
 }
 function draw(dt){
@@ -2335,6 +2439,7 @@ function draw(dt){
   let sh = 0; if(G.shake > 0){ G.shake -= dt; sh = G.shake * 30; }
   if(sh) g.translate((Math.random() - 0.5) * sh, (Math.random() - 0.5) * sh);
   drawScene(g, M, {t: performance.now() / 1000, live: true});
+  drawSpiritFx(g, M); drawOffBall(g, M);   // 🔥🔥 pd-5a
   // particles + floating words
   G.fx = G.fx.filter(f => (f.t += dt) < f.life);
   G.fx.forEach(f => { f.x += f.vx * dt; f.y += f.vy * dt; f.z += f.vz * dt; f.vz -= 9 * dt; const [x, y] = P(f.x, f.y, Math.max(0, f.z)); g.globalAlpha = 1 - f.t / f.life; g.fillStyle = f.col; g.beginPath(); g.arc(x, y, 2.4 + 2 * (1 - f.t / f.life), 0, 7); g.fill(); });
@@ -2358,7 +2463,8 @@ function drawScene(g, M, o){
   // floor (free zone) + court
   const sand = M.sp.sand, tk = PD.isStrike(M), LK = arenaLook(M);   // 🦶 takraw court: green floor, teal court, service circles · 🎪 pd-4c theme colours (🏖️ Beach stays sand)
   const cA = tk ? (LK.tk ? LK.tk[0] : '#2FA37A') : LK.court ? LK.court[0] : '#E8813A', cB = tk ? (LK.tk ? LK.tk[1] : '#2C9B73') : LK.court ? LK.court[1] : '#E27832';
-  poly(g, [P(-L - 4.5, -Wd / 2 - 2.6, 0), P(L + 4.5, -Wd / 2 - 2.6, 0), P(L + 4.5, Wd / 2 + 3.4, 0), P(-L - 4.5, Wd / 2 + 3.4, 0)], sand ? '#E9C98A' : LK.floor || (tk ? '#1F7A57' : '#2B56B8'));
+  const fy0 = V.rot ? -Wd / 2 - 12 : -Wd / 2 - 2.6, fy1 = V.rot ? Wd / 2 + 12 : Wd / 2 + 3.4;   // 📱 turned: the floor reaches both screen edges
+  poly(g, [P(-L - 4.5, fy0, 0), P(L + 4.5, fy0, 0), P(L + 4.5, fy1, 0), P(-L - 4.5, fy1, 0)], sand ? '#E9C98A' : LK.floor || (tk ? '#1F7A57' : '#2B56B8'));
   const hp = isHoop(M) || PD.isSpark(M);   // ⭕ / ⚡ no court lines
   if(!hp) poly(g, [P(-L, -Wd / 2, 0), P(0, -Wd / 2, 0), P(0, Wd / 2, 0), P(-L, Wd / 2, 0)], sand ? '#F2D79E' : cA);
   if(!hp) poly(g, [P(0, -Wd / 2, 0), P(L, -Wd / 2, 0), P(L, Wd / 2, 0), P(0, Wd / 2, 0)], sand ? '#F0D398' : cB);
@@ -2378,9 +2484,9 @@ function drawScene(g, M, o){
   // ball shadow
   const b = M.ball; { const [x, y, s] = P(b.x, b.y, 0), sz = V.k * 0.18 * s * Math.max(0.35, 1 - b.z / 7); g.fillStyle = 'rgba(0,0,0,' + Math.max(0.1, 0.3 - b.z * 0.03) + ')'; g.beginPath(); g.ellipse(x, y, sz * 1.5, sz * 0.6, 0, 0, 7); g.fill(); }
   // people + ball sorted far → near; the net sits in the middle of the depth
-  const objs = M.players.map(p => ({y: p.y, f: () => drawPlayer(g, M, p, t, o)}));
-  objs.push({y: b.y + 0.01, f: () => drawBall(g, M, t)});
-  if(M.extras) M.extras.forEach(e => { if(e.live) objs.push({y: e.y + 0.01, f: () => drawExtra(g, M, e, t)}); });   // 🌀 Spark Party balls
+  const objs = M.players.map(p => ({y: DK(p.x, p.y), f: () => drawPlayer(g, M, p, t, o)}));
+  objs.push({y: DK(b.x, b.y) + 0.01, f: () => drawBall(g, M, t)});
+  if(M.extras) M.extras.forEach(e => { if(e.live) objs.push({y: DK(e.x, e.y) + 0.01, f: () => drawExtra(g, M, e, t)}); });   // 🌀 Spark Party balls
   objs.sort((a, c) => a.y - c.y);
   let netDone = false;
   const net = isHoop(M) ? () => { if(!M.sp.noHoop) drawHoop(g, M, t); } : PD.isSpark(M) ? () => drawTable(g, M, t) : () => drawNet(g, M);
@@ -2507,7 +2613,7 @@ function arenaDeco(g, d, W, H, farY, top, ph, layer){
   }
 }
 function drawArena(g, M, t){
-  const W = V.W, H = V.H, farY = P(0, -M.W / 2 - 2.6, 0)[1];
+  const W = V.W, H = V.H, farY = farLineY(M);
   const top = Math.max(0, farY - Math.min(V.k * 2.4, farY - 4));
   const bg = arenaBg(M, W, H, farY, top, Math.floor(t * 4) % 4); g.drawImage(bg, -20, -20, W + 40, H + 40);
   // spotlights (🪩 neon = coloured beams that sweep · ☁️ Olympus = warm sun rays · 🐙 / 🦖 / 🪐 none)
@@ -2724,13 +2830,13 @@ function drawBall(g, M, t){
   if(b.spirit && M.phase === 'rally'){ const c = spiritOf(b.spirit); if(c){   // 🔥🔥 the creature rides the ball
     const sp = Math.hypot(b.vx, b.vy) || 1, dx = -b.vx / sp, w = 1 + 0.08 * Math.sin(t * 14);
     g.globalAlpha = 0.35; g.fillStyle = c.col; g.beginPath(); g.arc(x, y, r * 3.2 * w, 0, 7); g.fill(); g.globalAlpha = 1;
-    emo(g, c.icon, x + dx * r * 1.6, y - r * 1.2, r * 3.6 * w, 1, b.vx < 0); } }
+    emo(g, c.icon, x + dx * r * 1.6, y - r * 1.2, r * 3.6 * w, 0.75, b.vx < 0); } }   // 👻 pd-5a: a bit see-through
   else if(b.pyra && M.phase === 'rally') emo(g, '🔥', x, y - r * 1.4, r * 1.6);
 }
 // ①②③ touch counter above each half (lights up with each touch on that side)
 function drawCounters(g, M){
   if(M.phase !== 'rally' && M.phase !== 'serve') return;
-  [0, 1].forEach(t => { const r = Math.max(7, Math.min(16, V.k * 0.26)), q = P(PD.sgn(t) * M.L * 0.5, -M.W / 2 - 2.6, 0), x = Math.max(r * 4, Math.min(V.W - r * 4, q[0])), y = Math.max(96 + r, q[1] - r * 1.8), n = M.side === t && M.phase === 'rally' ? M.n : 0;
+  [0, 1].forEach(t => { const r = Math.max(7, Math.min(16, V.k * 0.26)), q = V.rot ? P(PD.sgn(t) * M.L * 0.5, M.W / 2 + 0.6, 0) : P(PD.sgn(t) * M.L * 0.5, -M.W / 2 - 2.6, 0), x = Math.max(r * 4, Math.min(V.W - r * 4, q[0])), y = V.rot ? Math.max(r * 2, q[1]) : Math.max(96 + r, q[1] - r * 1.8), n = M.side === t && M.phase === 'rally' ? M.n : 0;
     for(let i = 0; i < 3; i++){ const cx = x + (i - 1) * r * 2.5, on = i < n; g.fillStyle = on ? TEAM_COL[t] : 'rgba(255,255,255,0.18)'; g.beginPath(); g.arc(cx, y, r, 0, 7); g.fill();
       g.strokeStyle = on ? '#FFFFFF' : 'rgba(255,255,255,0.4)'; g.lineWidth = 2; g.stroke();
       g.fillStyle = on ? '#FFFFFF' : 'rgba(255,255,255,0.65)'; g.font = '700 ' + Math.round(r * 1.2) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(i + 1, cx, y + 1); g.textBaseline = 'alphabetic'; } });
@@ -3027,4 +3133,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pd-4c+cs-pd+ck-2d+pd-4e) END OF PyraDive.html -->
+<!-- (pd-4c+cs-pd+ck-2d+pd-4e+pd-5a) END OF PyraDive.html -->
