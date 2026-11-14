@@ -4665,6 +4665,22 @@ function saveBestiary(name, add, game) {
   return { ok: true, n: Object.keys(d).length };
 }
 function getBestiary(name) { let d = {}; try { d = JSON.parse(getSettings()['Bestiary_' + name] || '{}') || {}; } catch (e) { d = {}; } return d; }
+// ⭐ pd-4d: favourite pins follow the PLAYER (Aowu 2026-11-14 "player based not device based") — ONE Settings row "BestiaryPins_<Name>" = {'solo:dunk': 'garuda', …}
+// (one creature per tier + move; the whole set is sent each time, so it's a choice: the newest wins). getBestiaryAll = found + pins in one trip (pins null = never saved).
+const BESTIARY_PIN_KEY_ = /^(solo|duo|trio):(dunk|block|drive|dink|save|combo)$/;
+function saveBestiaryPins(name, pins) {
+  if (!activePlayers_(listProfilesFull()).some(p => p.Name === name)) throw new Error('Unknown player.');
+  if (!pins || typeof pins !== 'object' || Array.isArray(pins)) throw new Error('Bad data.');
+  const clean = {}; Object.keys(pins).slice(0, 30).forEach(k => { const v = String(pins[k] || ''); if (BESTIARY_PIN_KEY_.test(k) && /^[a-z]{2,24}$/.test(v)) clean[k] = v; });
+  saveSetting('BestiaryPins_' + name, JSON.stringify(clean));
+  return { ok: true, pins: clean };
+}
+function getBestiaryAll(name) {
+  const st = getSettings(); let found = {}, pins = null;
+  try { found = JSON.parse(st['Bestiary_' + name] || '{}') || {}; } catch (e) { found = {}; }
+  if (st['BestiaryPins_' + name] != null && st['BestiaryPins_' + name] !== '') { try { pins = JSON.parse(st['BestiaryPins_' + name]) || {}; } catch (e) { pins = {}; } }
+  return { found: found, pins: pins };
+}
 
 // 🧬 SkillKit saves (td-1, plan "TD-Stories — full plan.md" §6): ONE Settings row per player per game — "SkillTree_<game>_<Name>" =
 // {ch: chapters done (only grows), last: {<hero>: SkillKit tree.save()}, lastForms} — picks + evolve forms, never a log.
@@ -4681,7 +4697,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -6240,6 +6256,8 @@ return {"include": typeof include === 'function' ? include : undefined,
 "saveWordJournal": typeof saveWordJournal === 'function' ? saveWordJournal : undefined,
 "saveBestiary": typeof saveBestiary === 'function' ? saveBestiary : undefined,
 "getBestiary": typeof getBestiary === 'function' ? getBestiary : undefined,
+"saveBestiaryPins": typeof saveBestiaryPins === 'function' ? saveBestiaryPins : undefined,
+"getBestiaryAll": typeof getBestiaryAll === 'function' ? getBestiaryAll : undefined,
 "saveSkillTree": typeof saveSkillTree === 'function' ? saveSkillTree : undefined,
 "startPoseSession": typeof startPoseSession === 'function' ? startPoseSession : undefined,
 "doPost": typeof doPost === 'function' ? doPost : undefined,
