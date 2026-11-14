@@ -241,6 +241,17 @@
   .guess button.tminus{background:#F25F5C;box-shadow:0 3px 0 #B8322F;} .guess button.tplus{background:#22C3A1;box-shadow:0 3px 0 #138A71;}
   @media (max-aspect-ratio:4/5){ .ladder{width:min(46vw,200px);} }
   @media (max-height:520px){ .bulb{width:52px;height:52px;} .bulbbox small{display:none;} .legend2 span{padding:1px 6px;font-size:.62rem;} .chips2 button{padding:3px 8px;font-size:.72rem;} .am-top canvas.qbud{width:40px;height:50px;} .guess button{width:34px;height:34px;font-size:1.3rem;} .guess b{font-size:1.2rem;} }
+  /* ---------- 🧫 Kitchen lab (sc-2c) ---------- */
+  .xopts{display:flex;flex-wrap:wrap;gap:clamp(6px,1vmin,12px);justify-content:center;max-width:980px;}
+  .xopts button{border:0;border-radius:18px;padding:clamp(6px,1vmin,10px) clamp(10px,1.6vmin,18px);background:#fff;color:#16233A;font-weight:900;font-size:clamp(.82rem,1.7vmin,1.12rem);cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,0.25);display:flex;align-items:center;gap:6px;}
+  .xopts button i{font-style:normal;font-size:1.45em;line-height:1;}
+  .xopts button.kglow{animation:pt-glow .9s ease-in-out infinite;} .xopts button.no{opacity:.45;} .xopts button.yes{outline:4px solid #22C3A1;}
+  .xopts button:disabled{cursor:default;}
+  .xmeter{display:inline-flex;align-items:center;gap:8px;font-weight:900;color:#C9D6EA;font-size:clamp(.75rem,1.5vmin,1rem);}
+  .xmeter b{display:inline-block;width:clamp(80px,14vmin,160px);height:12px;border-radius:8px;background:rgba(255,255,255,0.15);overflow:hidden;position:relative;}
+  .xmeter b::after{content:'';position:absolute;inset:0;width:var(--f,0%);background:linear-gradient(90deg,#7EDBC4,#22C3A1);transition:width .4s;}
+  .xsafe{font-weight:800;font-size:.85rem;color:var(--ink-soft);text-align:center;margin:-6px 0 10px;}
+  @media (max-height:520px){ .xopts button{padding:4px 9px;font-size:.74rem;} .xopts button i{font-size:1.2em;} }
   /* ---------- ⚗️ CHEMISTRY (sc-2a) ---------- */
   .chem-count{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:-4px 0 12px;}
   .chem-count span{background:var(--card);border-radius:14px;padding:5px 12px;font-weight:900;font-size:0.86rem;box-shadow:0 3px 0 rgba(0,0,0,0.06);}
@@ -451,6 +462,22 @@
     <div class="fm-act" id="cat-act"></div>
   </div>
 </section>
+<section class="screen hidden" id="scr-xhub">
+  <div class="title"><div class="logo">🧫</div><h1>Kitchen lab</h1><p id="xhub-sub"></p></div>
+  <div class="xsafe">🧑‍🔬 Real experiments with kitchen things — try them at home with a grown-up. Never taste lab stuff!</div>
+  <div class="chem-count" id="xhub-count"></div>
+  <div class="chem-hub" id="xhub-hub"></div>
+</section>
+<section class="hidden play2" id="scr-exp">
+  <div class="hud" id="xbar"></div>
+  <div class="am">
+    <div class="am-top"><div class="am-goal"><i id="x-eye"></i><b id="x-name"></b><span class="am-need" id="x-need"></span><small id="x-hint"></small></div><canvas class="stage" id="x-cv"></canvas><canvas class="qbud" id="x-buddy"></canvas></div>
+    <div class="fm-msg" id="x-msg"></div>
+    <div class="legend2" id="x-legend"></div>
+    <div class="xopts" id="x-opts"></div>
+    <div class="fm-act" id="x-act"></div>
+  </div>
+</section>
 <section class="screen hidden" id="scr-chem">
   <div class="title"><div class="logo">⚗️</div><h1>Chemistry lab</h1><p id="chem-sub"></p></div>
   <div class="chem-count" id="chem-count"></div>
@@ -503,7 +530,7 @@ const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '�
   levels: () => leavePlay(), playing: () => !!(G && G.phase !== 'done'), onLeave: () => { stopLoop(); },
   scoreMin: '5ch', onFit: () => { if(G) resize(); }});
 BAR.score(0); BAR.miss(0); BAR.count('tests', '🧪', 0, 'Tests run today');
-var NAV_INNER = {lab: ['◀ Sciencetory', () => showScreen('menu')], chem: ['◀ Sciencetory', () => { renderMenu(); showScreen('menu'); }], table: ['◀ Chemistry', () => openChem(SET.level)], qhub: ['◀ Sciencetory', () => { renderMenu(); showScreen('menu'); }]};
+var NAV_INNER = {lab: ['◀ Sciencetory', () => showScreen('menu')], chem: ['◀ Sciencetory', () => { renderMenu(); showScreen('menu'); }], table: ['◀ Chemistry', () => openChem(SET.level)], qhub: ['◀ Sciencetory', () => { renderMenu(); showScreen('menu'); }], xhub: ['◀ Chemistry', () => openChem(SET.level)]};
 UI.navBar(document.getElementById('back-btn'), {onclick: false});
 const $ = id => document.getElementById(id);
 let SCI_FX = 1;   // the harness sets 0: no waits, no confetti — whole tests run at once
@@ -615,8 +642,8 @@ window.GameComic = {
 
 /* ================= MENUS ================= */
 function showScreen(name){
-  ['player', 'menu', 'lab', 'play', 'chem', 'table', 'hunt', 'formula', 'qhub', 'atom', 'led', 'glow', 'cat'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
-  $('back-btn').classList.toggle('hidden', name === 'play' || name === 'hunt' || name === 'formula' || name === 'atom' || name === 'led' || name === 'glow' || name === 'cat'); UI.navScreen($('back-btn'), name, NAV_INNER); window.scrollTo(0, 0);
+  ['player', 'menu', 'lab', 'play', 'chem', 'table', 'hunt', 'formula', 'qhub', 'atom', 'led', 'glow', 'cat', 'xhub', 'exp'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
+  $('back-btn').classList.toggle('hidden', name === 'play' || name === 'hunt' || name === 'formula' || name === 'atom' || name === 'led' || name === 'glow' || name === 'cat' || name === 'exp'); UI.navScreen($('back-btn'), name, NAV_INNER); window.scrollTo(0, 0);
   if(name !== 'lab') labHand(null);
 }
 function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
@@ -1104,13 +1131,13 @@ function openChem(lv){
   SET.level = lv; const U = LEVEL_UI[lv];
   $('chem-sub').textContent = U.emoji + ' ' + U.name + ' · ' + {0: '🔤 match the letters — the table glows to help you', 1: '🔤 find the letters', 2: '🔢 find the numbers', 3: '📛 names only', 4: '💡 facts, the name hidden', 5: '💡 facts against the clock'}[lv];
   $('chem-count').innerHTML = '<span>📇 ' + CHEM.all.length + ' / 118 element cards</span><span>⚛️ ' + CHEM.c.length + ' / ' + COMPS.length + ' molecules</span>';
-  const H = [['hunt', '🔍', 'Element hunt', 'Find 8 elements on the table from clues — each find = a 📇 card'], ['formula', '⚛️', 'Formula builder', 'Snap atoms together into 5 real molecules'], ['table', '🧪', 'Periodic table', 'All 118 elements — your ⭐ cards + every fact']];
+  const H = [['hunt', '🔍', 'Element hunt', 'Find 8 elements on the table from clues — each find = a 📇 card'], ['formula', '⚛️', 'Formula builder', 'Snap atoms together into 5 real molecules'], ['table', '🧪', 'Periodic table', 'All 118 elements — your ⭐ cards + every fact'], ['xlab', '🧫', 'Kitchen lab', '5 safe experiments — colours, crystals, fizz + rust']];
   $('chem-hub').innerHTML = H.map((h, i) => '<button class="pick" data-g="' + h[0] + '" data-sound="pop" style="animation:sc-pop .4s ' + (i * 0.08) + 's both"><div class="big">' + h[1] + '</div><div class="nm">' + h[2] + '</div><div class="sub">' + h[3] + '</div></button>').join('');
-  $('chem-hub').querySelectorAll('[data-g]').forEach(b => b.onclick = () => { const g = b.dataset.g; if(g === 'hunt') startHunt(); else if(g === 'formula') startFormula(); else openTable(); });
+  $('chem-hub').querySelectorAll('[data-g]').forEach(b => b.onclick = () => { const g = b.dataset.g; if(g === 'hunt') startHunt(); else if(g === 'formula') startFormula(); else if(g === 'xlab') openXhub(); else openTable(); });
   renderSkins('chem-skins'); showScreen('chem');
   if(lv === 0) setTimeout(() => { if(!$('scr-chem').classList.contains('hidden')){ const b = $('chem-hub').querySelector('[data-g="hunt"]'); b.classList.add('glow-next'); labHand(b); } }, 400 * SCI_FX);
 }
-function leaveChem(toLevels){ stopHunt(); stopFormula(); hideResult(); labHand(null); if(toLevels){ renderMenu(); showScreen('menu'); } else openChem(SET.level); }
+function leaveChem(toLevels){ stopHunt(); stopFormula(); stopExp(); hideResult(); labHand(null); if(toLevels){ renderMenu(); showScreen('menu'); } else openChem(SET.level); }
 
 // ---------- the table painter: one layout for explore + hunt (sideways on tall screens) ----------
 function rowY(r){ return r <= 7 ? r - 1 : r === 9 ? 7.35 : 8.35; }
@@ -1351,16 +1378,16 @@ function chemSave(kind, res){
     const h = '<h2>' + KU[0] + '</h2><div class="rating">' + [1, 2, 3].map(i => '<span class="st' + (i <= res.stars ? '' : ' off') + '">⭐</span>').join('') + '</div>' +
       '<div class="tc-row"><span class="ok">🎯 ' + res.right + ' / ' + res.total + ' ' + KU[2] + '</span><span class="gold">🏆 ' + res.score.toLocaleString() + '</span></div>' +
       (nw.length ? '<div class="why"><b>📇 New element cards (' + nw.length + ')</b><div class="newcards">' + nw.map(n => { const e = EL[n - 1]; return '<span style="background:' + CATS[e.cat].col + '">' + e.sym + ' · ' + UI.esc(e.name) + '</span>'; }).join('') + '</div></div>' : '<div class="why"><b>📇 ' + CHEM.all.length + ' / 118 cards</b>No new cards this time — try a harder level for rarer elements!</div>') +
-      (kind === 'formula' && r && r.newComps && r.newComps.length ? '<div class="tc-row"><span class="gold">⚛️ ' + r.newComps.length + ' new molecule' + (r.newComps.length > 1 ? 's' : '') + ' in your book</span></div>' : '') +
+      ((kind === 'formula' || (KIND_UI[kind] || [])[3] === 2) && r && r.newComps && r.newComps.length ? '<div class="tc-row"><span class="gold">⚛️ ' + r.newComps.length + ' new molecule' + (r.newComps.length > 1 ? 's' : '') + ' in your book</span></div>' : '') +
       (kind === 'atom' && r && r.newAtoms && r.newAtoms.length ? '<div class="tc-row"><span class="gold">⚛️ ' + r.newAtoms.length + ' new atom' + (r.newAtoms.length > 1 ? 's' : '') + ' built — ' + CHEM.a.length + ' so far</span></div>' : '') +
       (newLooks.length ? '<div class="why"><b>🎨 New atom look' + (newLooks.length > 1 ? 's' : '') + ' unlocked: ' + newLooks.map(L => L.icon + ' ' + UI.esc(L.name)).join(' · ') + '!</b><div class="newcards">' + newLooks.map(L => '<img src="' + AtomSkins.url('O', CPK.O, L.k, 64) + '" style="width:56px;height:56px" alt="">').join('') + '</div>Pick it on the lab screen.</div>' : '') +
       '<div class="save-note" id="save-note">' + (r ? saveText(r.save || {}, res.stars >= 2) : '⚠️ Could not save — check the connection.') + '</div>' +
       '<div class="res-btns" id="res-btns"><button class="sp-btn sp-secondary" id="res-levels" data-sound="tap">🎚️ Levels</button><button class="sp-btn sp-secondary" id="res-again" data-sound="pop">🔁 Play again</button><button class="sp-btn sp-primary" id="res-next" data-sound="pop">⚗️ Chemistry ▶</button></div><div class="comics-slot" id="comic-strip-slot"></div>';
     showResult(h);
-    if(KU[3]){ $('res-next').textContent = '⚛️ Quantum ▶'; }
-    $('res-levels').onclick = () => KU[3] ? leaveQuantum(true) : leaveChem(true); $('res-again').onclick = () => { hideResult(); KU[1](); }; $('res-next').onclick = () => KU[3] ? leaveQuantum(false) : leaveChem(false);
+    if(KU[3]){ $('res-next').textContent = KU[3] === 2 ? '🧫 Kitchen lab ▶' : '⚛️ Quantum ▶'; }
+    $('res-levels').onclick = () => KU[3] === 1 ? leaveQuantum(true) : leaveChem(true); $('res-again').onclick = () => { hideResult(); KU[1](); }; $('res-next').onclick = () => KU[3] === 1 ? leaveQuantum(false) : KU[3] === 2 ? leaveXlab() : leaveChem(false);
     if(r && r.save && r.save.unlocked != null){ const p = S.progress[S.player] || (S.progress[S.player] = {unlocked: 0, tokens: [], best: []}); p.unlocked = Math.max(p.unlocked, r.save.unlocked); }
-    if(res.stars >= 2 && SCI_FX) confetti(KU[3] ? ['⚛️', '⭐', '🔴', '🔵'] : ['⚗️', '⭐', '⚛️', '🧪'], 20);
+    if(res.stars >= 2 && SCI_FX) confetti(KU[3] === 2 ? ['🧫', '⭐', '🫧', '💎'] : KU[3] ? ['⚛️', '⭐', '🔴', '🔵'] : ['⚗️', '⭐', '⚛️', '🧪'], 20);
     gcEmit('card', {kind, stars: res.stars});
   };
   google.script.run.withSuccessHandler(show).withFailureHandler(() => show(null)).sciChemSave(S.player, lv, kind, res);
@@ -1720,12 +1747,304 @@ function catOpen(){
 }
 function catEnd(){ CG.done = true; const res = {found: [], built: [], right: CG.first, total: CG.list.length, score: Math.round(CG.score * SCI_MULT(CG.lv)), stars: qStars(CG.first, CG.list.length), timeSec: Math.round((Date.now() - CG.t0) / 1000)}; stopCat(); chemSave('cat', res); }
 
+/* ================= 🧫 KITCHEN LAB (sc-2c) — 5 kid-safe experiments on one bench =================
+   Each round: a question (or a job), the bench shows the glasses, you pick / do it, the bench plays what really happens, the message says why.
+   Rounds marked once = predict → watch (one answer, the bench then shows the truth). Others: try again with a hint. */
+Object.assign(KIND_UI, {ph: ['🌈 Colours tested!', () => startExp('ph'), 'right first time', 2], crystal: ['💎 Crystals grown!', () => startExp('crystal'), 'right first time', 2],
+  dissolve: ['🧂 Races watched!', () => startExp('dissolve'), 'right predictions', 2], mix: ['🫧 Mixes sorted!', () => startExp('mix'), 'right first time', 2], rust: ['🌧️ Rust lab done!', () => startExp('rust'), 'right first time', 2]});
+const XEXP = [['ph', '🌈', 'pH colours', 'Red-cabbage juice changes colour — sour, plain or soapy?'], ['crystal', '💎', 'Crystal garden', 'Fill the water with salt or sugar, hang a string, wait a week'],
+  ['dissolve', '🧂', 'Dissolving race', 'Which glass dissolves first? Size, warmth + stirring'], ['mix', '🫧', 'Mix or react?', 'Just mixed, or new stuff made? Look for the signs'], ['rust', '🌧️', 'Rust lab', 'What rusts, what turns green, what stays shiny']];
+const WATER = '#9ED8F0', CABBAGE = '#7A4BAA';
+const LIQ = {lemon: {i: '🍋', n: 'Lemon juice', t: 'acid', ph: 2, col: '#E5306A', b: 'citric'}, vinegar: {i: '🍶', n: 'Vinegar', t: 'acid', ph: 3, col: '#EC4C86', b: 'vinegar'}, apple: {i: '🍎', n: 'Apple juice', t: 'acid', ph: 4, col: '#C2468F', b: 'citric'},
+  water: {i: '💧', n: 'Water', t: 'neutral', ph: 7, col: CABBAGE, b: 'water'}, soda: {i: '🧁', n: 'Baking soda water', t: 'base', ph: 9, col: '#3A7FC8', b: 'soda'}, soap: {i: '🧼', n: 'Soap water', t: 'base', ph: 10, col: '#2FA68A', b: ''}};
+const PHT = {acid: ['🩷', 'PINK', 'an ACID (sour, like lemon)'], neutral: ['🟣', 'PURPLE', 'NEUTRAL (plain, like water)'], base: ['🟢', 'BLUE-GREEN', 'a BASE (slippery, like soap)']};
+const CRY = {salt: {i: '🧂', n: 'Salt', shape: 'cube', b: 'salt', el: [11, 17], cap: [3, 4]}, sugar: {i: '🍬', n: 'Sugar', shape: 'chunk', b: 'sucrose', el: [6, 1, 8], cap: [4, 7]}, epsom: {i: '🫙', n: 'Epsom salt', shape: 'needle', b: 'epsom', el: [12, 16, 8], cap: [3, 6]}};
+const SHAPES = {cube: ['🧊', 'little cubes'], needle: ['🪡', 'long needles'], chunk: ['💎', 'big chunky crystals']};
+const PAIRS = {fizz: ['🧁', 'Baking soda', '🍶', 'Vinegar', 1, '🫧 bubbles of a NEW gas (carbon dioxide)', 'fizz', ['soda', 'vinegar', 'co2'], [11, 6, 8, 1], '#F3EBD0'],
+  sand: ['🏖️', 'Sand', '💧', 'Water', 0, 'the sand just sinks — pour the water off and it is still sand', 'sand', ['sand', 'water'], [14, 8], WATER],
+  salt: ['🧂', 'Salt', '💧', 'Water', 0, 'the salt hides in the water — let it dry and the salt comes back', 'dissolve', ['salt', 'water'], [11, 17], WATER],
+  oil: ['🫒', 'Cooking oil', '💧', 'Water', 0, 'two layers — the oil floats on top, nothing new is made', 'layer', ['water'], [6, 1], WATER],
+  curd: ['🍋', 'Lemon juice', '🥛', 'Milk', 1, '🧀 soft lumps (curds) — new stuff', 'lumps', ['citric'], [20, 8], '#F8F5EE'],
+  cabbage: ['🍋', 'Lemon juice', '🟣', 'Cabbage juice', 1, '🎨 a brand-new colour', 'colour', ['citric'], [6, 1, 8], CABBAGE],
+  sugar: ['🍬', 'Sugar', '💧', 'Water', 0, 'the sugar dissolves — it is still sugar + water', 'dissolve', ['sucrose', 'water'], [6, 1, 8], WATER],
+  yeast: ['🍞', 'Yeast + sugar', '♨️', 'Warm water', 1, '🫧 slow foam — the yeast makes a gas (it can blow up a balloon!)', 'foam', ['co2', 'glucose'], [6, 8], '#D9C7A0'],
+  chalk: ['🖍️', 'Chalk', '🍶', 'Vinegar', 1, '🫧 fizz — the chalk is slowly eaten away', 'chalkfizz', ['chalk', 'co2'], [20, 6, 8], '#F3EBD0'],
+  paint: ['🔵', 'Blue paint', '🔴', 'Red paint', 0, 'it looks new, but it’s a MIXTURE — the red and blue bits are both still there', 'paint', [], [], '#E0393E']};
+const XSIGNS = '<span style="background:#fff">Signs of NEW stuff: 🫧 bubbles · 🎨 new colour · 🧀 lumps · 🌡️ gets warm</span>';
+const XITEM = {nail: ['🔩', 'Iron nail'], coin: ['🪙', 'Copper coin'], ring: ['💍', 'Gold ring'], spoon: ['🥄', 'Plastic spoon'], pnail: ['🎨', 'Painted nail']};
+let XG = null, XBUD = null, X_RAF = 0;
+const XBAR = qBar('xbar', '🧫', 'Kitchen lab', 'exp-level', () => XG, () => { if(XG) XG.done = true; }, () => drawBench());
+XBAR.count('exp', '🧪', '1/5', 'Test');
+
+function openXhub(){
+  stopExp(); const lv = SET.level, U = LEVEL_UI[lv];
+  $('xhub-sub').textContent = U.emoji + ' ' + U.name + ' · ' + ['the answer glows to help you', 'hints if you miss', 'guess first, then watch', 'no colour charts', 'tricky ones', 'against the clock — one try'][lv];
+  $('xhub-count').innerHTML = '<span>📇 ' + CHEM.all.length + ' / 118 element cards</span><span>⚛️ ' + CHEM.c.length + ' / ' + COMPS.length + ' molecules</span>';
+  $('xhub-hub').innerHTML = XEXP.map((h, i) => '<button class="pick" data-g="' + h[0] + '" data-sound="pop" style="animation:sc-pop .4s ' + (i * 0.08) + 's both"><div class="big">' + h[1] + '</div><div class="nm">' + h[2] + '</div><div class="sub">' + h[3] + '</div></button>').join('');
+  $('xhub-hub').querySelectorAll('[data-g]').forEach(b => b.onclick = () => startExp(b.dataset.g));
+  showScreen('xhub');
+  if(lv === 0) setTimeout(() => { if(!$('scr-xhub').classList.contains('hidden')){ const b = $('xhub-hub').querySelector('[data-g="ph"]'); b.classList.add('glow-next'); labHand(b); } }, 400 * SCI_FX);
+}
+function leaveXlab(){ stopExp(); hideResult(); labHand(null); openXhub(); }
+
+// ---------- the rounds of each experiment, per level ----------
+function cup(o){ return Object.assign({label: '', sub: '', col: WATER, lvl: 0.62, solid: null, item: null, shape: 'cube', string: false, warm: false, stir: false}, o); }
+function xRounds(exp, lv){
+  const R = [], once = lv >= 2;
+  if(exp === 'ph'){
+    const chart = lv <= 1, kinds = lv === 0 ? ['make', 'make', 'make', 'make', 'make'] : lv === 1 ? ['make', 'make', 'predict', 'make', 'predict'] : lv === 2 ? ['predict', 'make', 'predict', 'make', 'predict'] : lv === 3 ? ['sort', 'predict', 'sort', 'sort', 'predict'] : lv === 4 ? ['sort', 'neutral', 'predict', 'sort', 'neutral'] : ['predict', 'sort', 'neutral', 'make', 'sort'];
+    const types = shuffle(['acid', 'base', 'neutral', 'acid', 'base']);
+    kinds.forEach((k, i) => {
+      const tp = types[i], pool = Object.keys(LIQ).filter(x => LIQ[x].t === tp), liq = pool[Math.floor(Math.random() * pool.length)];
+      const base = {eye: '🌈 pH colours · red-cabbage juice', legend: chart ? Object.keys(PHT).map(t => '<span style="background:' + (t === 'acid' ? '#F7A1BE' : t === 'neutral' ? '#C7A8E8' : '#9ED9C8') + '">' + PHT[t][0] + ' ' + PHT[t][1] + ' = ' + PHT[t][2].split(' (')[0] + '</span>').join('') : '', found: [6, 1, 8], cups: [cup({label: '🟣 cabbage juice', col: CABBAGE})]};
+      if(k === 'make'){
+        const opts = shuffle(lv === 0 ? ['lemon', 'water', 'soap'] : shuffle(Object.keys(LIQ).filter(x => LIQ[x].t === tp)).slice(0, 1).concat(shuffle(Object.keys(LIQ).filter(x => LIQ[x].t !== tp)).slice(0, 3)));
+        R.push(Object.assign(base, {q: 'Make it ' + PHT[tp][0] + ' ' + PHT[tp][1], need: 'Pour in one kitchen liquid', hint: lv === 0 ? '👆 ' + PHT[tp][1].toLowerCase() + ' = ' + PHT[tp][2] : 'Which liquid is ' + PHT[tp][2].split(' (')[0].toLowerCase() + '?',
+          opts: opts.map(x => ({k: x, i: LIQ[x].i, t: LIQ[x].n})), ok: x => LIQ[x].t === tp, showWrong: true, play: x => xPour(x), why: x => LIQ[x].i + ' ' + LIQ[x].n + ' made it ' + PHT[LIQ[x].t][1].toLowerCase() + ' — it is ' + PHT[LIQ[x].t][2] + '. ' + PHT[tp][1] + ' needs ' + PHT[tp][2] + '.',
+          good: x => LIQ[x].i + ' ' + LIQ[x].n + ' is ' + PHT[tp][2] + ' → ' + PHT[tp][0] + ' ' + PHT[tp][1].toLowerCase() + '!', built: x => [LIQ[x].b].filter(Boolean)}));
+      } else if(k === 'predict' || k === 'sort'){
+        const L = LIQ[liq], pred = k === 'predict';
+        R.push(Object.assign(base, {q: pred ? 'What colour will ' + L.i + ' ' + L.n + ' make?' : 'Is ' + L.i + ' ' + L.n + ' an acid, neutral or a base?', need: pred ? 'Guess, then watch it pour' : 'pH ' + L.ph + (lv >= 3 ? '' : ''), hint: k === 'sort' ? 'pH under 7 = acid · 7 = neutral · over 7 = base' : lv <= 2 ? 'Sour things → pink · plain → purple · soapy → blue-green' : '', once: once,
+          opts: pred ? Object.keys(PHT).map(t => ({k: t, i: PHT[t][0], t: PHT[t][1].charAt(0) + PHT[t][1].slice(1).toLowerCase()})) : [{k: 'acid', i: '🍋', t: 'Acid'}, {k: 'neutral', i: '💧', t: 'Neutral'}, {k: 'base', i: '🧼', t: 'Base'}],
+          ok: x => x === L.t, playAns: () => xPour(liq), why: () => L.i + ' ' + L.n + ' has pH ' + L.ph + ' → ' + PHT[L.t][2] + ' → ' + PHT[L.t][0] + ' ' + PHT[L.t][1].toLowerCase() + '.', good: () => L.i + ' ' + L.n + ' (pH ' + L.ph + ') is ' + PHT[L.t][2] + ' → ' + PHT[L.t][0] + '!', built: () => [L.b].filter(Boolean)}));
+      } else {
+        const n = 2 + Math.floor(Math.random() * 3);
+        R.push(Object.assign(base, {q: 'Make the pink juice 🟣 PURPLE again', need: 'Add baking soda, one spoon at a time', hint: 'Acid + base cancel out → neutral. Stop when it is purple!', stepper: 'neutral', n, good: () => 'Purple = neutral! ' + n + ' spoons of baking soda cancelled the lemon\u2019s acid (the fizz was carbon dioxide).', cups: [cup({label: '🟣 + 🍋', col: LIQ.lemon.col})], found: [6, 1, 8, 11], builtAns: ['soda', 'co2', 'citric']}));
+      }
+    });
+  } else if(exp === 'crystal'){
+    const list = lv === 3 ? ['q-warm', 'sugar', 'salt'] : lv === 4 ? ['q-shape', 'epsom', 'sugar'] : ['salt', 'sugar', 'epsom'];
+    list.forEach(k => {
+      if(k === 'q-warm') return R.push({eye: '💎 Crystal garden', q: 'Which glass can hold MORE sugar?', need: 'Before it gets full', hint: 'A grown-up pours the warm water', once: true,
+        opts: [{k: 'cold', i: '❄️', t: 'Cold water'}, {k: 'warm', i: '♨️', t: 'Warm water'}, {k: 'same', i: '🤝', t: 'The same'}], ok: x => x === 'warm', cups: [cup({label: '❄️ cold'}), cup({label: '♨️ warm', warm: true})],
+        playAns: () => { XG.cups[0].solid = {kind: 'pile', amt: 1, to: 0.6, rate: 1}; XG.cups[1].solid = {kind: 'pile', amt: 1, to: 0, rate: 1}; return 1200; },
+        why: () => 'Warm water holds much more sugar — its busy little bits make room for more.', good: () => 'Warm water holds about twice as much sugar!', found: [6, 1, 8], built: () => ['sucrose']});
+      if(k === 'q-shape'){ const c = ['salt', 'epsom', 'sugar'][Math.floor(Math.random() * 3)], C = CRY[c];
+        return R.push({eye: '💎 Crystal garden', q: 'What crystals does ' + C.i + ' ' + C.n + ' grow?', need: 'Each stuff has its own crystal shape', hint: '', once: true, opts: Object.keys(SHAPES).map(x => ({k: x, i: SHAPES[x][0], t: SHAPES[x][1]})), ok: x => x === C.shape,
+          cups: [cup({label: C.i + ' ' + C.n, string: true, shape: C.shape})], playAns: () => { XG.cups[0].cryTo = 1; XG.dayTo = 7; return 1600; }, why: () => C.n + ' grows ' + SHAPES[C.shape][1] + ' ' + SHAPES[C.shape][0] + ' — its tiny bits always stack the same way.', good: () => SHAPES[C.shape][1] + ' ' + SHAPES[C.shape][0] + '!', found: C.el, built: () => [C.b]}); }
+      const C = CRY[k], warm = k !== 'salt', cap = C.cap[warm ? 1 : 0];
+      R.push({eye: '💎 Crystal garden', q: 'Grow ' + C.i + ' ' + C.n + ' crystals', need: (warm ? '♨️ warm' : '❄️ cold') + ' water · fill it up', hint: lv <= 1 ? 'Add spoons until a little stays at the bottom — then the water is full' : 'Crystals only grow from FULL (saturated) water', stepper: 'crystal', cap, meter: lv <= 1, good: () => (cap + 1) + ' spoons filled the water — a week later ' + C.n + ' grew ' + SHAPES[C.shape][1] + ' ' + SHAPES[C.shape][0] + '!',
+        cups: [cup({label: C.i + ' ' + C.n + ' · ' + (warm ? '♨️ warm' : '❄️ cold'), warm, shape: C.shape})], found: C.el, builtAns: [C.b, 'water']});
+    });
+  } else if(exp === 'dissolve'){
+    const F = {size: ['✨ grains', '🧊 cube'], temp: ['♨️ warm', '❄️ cold'], stir: ['🥄 stirred', '✋ still']}, rounds = [];
+    const one = () => shuffle(['size', 'temp', 'stir']).slice(0, 1);
+    for(let i = 0; i < 4; i++){
+      let A = {size: 1, temp: 1, stir: 1}, B = {size: 1, temp: 1, stir: 1}; ['size', 'temp', 'stir'].forEach(f => { A[f] = B[f] = Math.random() < 0.5 ? 0 : 1; });
+      if(lv <= 2 && !(lv === 2 && i === 3)) one().forEach(f => { A[f] = 0; B[f] = 1; });
+      else if(lv === 2) { /* a fair 'same' round: only the cup colour differs */ }
+      else if(lv === 3) shuffle(['size', 'temp', 'stir']).slice(0, 2).forEach(f => { A[f] = 0; B[f] = 1; });
+      else { const fs = shuffle(['size', 'temp', 'stir']); A[fs[0]] = 0; B[fs[0]] = 1; A[fs[1]] = 1; B[fs[1]] = 0; if(i % 2) { A[fs[2]] = 0; B[fs[2]] = 1; } }
+      if(Math.random() < 0.5){ const t = A; A = B; B = t; }
+      const sp = c => (c.size ? 1 : 3) * (c.temp ? 1 : 2) * (c.stir ? 1 : 2), sa = sp(A), sb = sp(B), ans = sa > sb ? 'A' : sb > sa ? 'B' : 'same';
+      const lab = c => F.size[c.size] + '\n' + F.temp[c.temp] + '\n' + F.stir[c.stir];
+      rounds.push({eye: '🧂 Dissolving race · sugar', q: 'Which sugar dissolves first?', need: '🅰️ vs 🅱️ — look under each glass', hint: lv <= 1 ? 'Small bits, warm water and stirring all make sugar dissolve faster' : '', once: lv >= 2,
+        opts: [{k: 'A', i: '🅰️', t: 'Glass A'}, {k: 'B', i: '🅱️', t: 'Glass B'}, {k: 'same', i: '🤝', t: 'Same time'}], ok: x => x === ans,
+        cups: [cup({label: '🅰️', sub: lab(A), warm: !A.temp, stir: !A.stir, solid: {kind: A.size ? 'cube' : 'grains', amt: 1}}), cup({label: '🅱️', sub: lab(B), warm: !B.temp, stir: !B.stir, solid: {kind: B.size ? 'cube' : 'grains', amt: 1}})],
+        playAns: () => { XG.cups[0].solid.to = 0; XG.cups[0].solid.rate = sa / 3.2; XG.cups[1].solid.to = 0; XG.cups[1].solid.rate = sb / 3.2; return 3200 / Math.min(sa, sb) + 400; },
+        hintWhy: () => 'Look at what is different: ' + ['size', 'temp', 'stir'].filter(f => A[f] !== B[f]).map(f => XHELP[f].replace(/ \(.*/, '') + ' dissolves sugar faster').join(' · ') + '.',
+        why: () => ans === 'same' ? 'Both glasses have exactly the same helpers, so they tie.' : 'Glass ' + ans + ' won — ' + xWhy(ans === 'A' ? A : B, ans === 'A' ? B : A), good: () => ans === 'same' ? 'A tie — a fair test changes only one thing!' : 'Glass ' + ans + ' won — ' + xWhy(ans === 'A' ? A : B, ans === 'A' ? B : A), found: [6, 1, 8], built: () => ['sucrose']});
+    }
+    R.push.apply(R, rounds);
+  } else if(exp === 'mix'){
+    const pool = lv <= 1 ? ['fizz', 'sand', 'oil', 'curd', 'salt'] : lv <= 3 ? ['fizz', 'sand', 'oil', 'curd', 'salt', 'sugar', 'yeast', 'cabbage'] : ['paint', 'salt', 'cabbage', 'chalk', 'yeast', 'oil', 'sugar', 'curd'];
+    shuffle(pool).slice(0, 5).forEach(k => { const p = PAIRS[k];
+      R.push({eye: '🫧 Mix or react?', q: p[0] + ' ' + p[1] + ' + ' + p[2] + ' ' + p[3], need: lv <= 1 ? 'Mix them, watch, then sort it' : 'Guess first, then mix', hint: lv <= 1 ? 'A reaction makes NEW stuff' : '', legend: lv <= 2 ? XSIGNS : '', watch: lv <= 1, once: lv >= 2,
+        opts: [{k: 'mix', i: '🔀', t: 'Just a mixture'}, {k: 'react', i: '⚗️', t: 'A reaction'}], ok: x => (x === 'react') === !!p[4], cups: [cup({label: p[2] + ' ' + p[3], col: p[9]})],
+        playAns: () => xMixFx(p[6]), why: () => (p[4] ? 'A reaction: ' : 'Just a mixture: ') + p[5] + '.', good: () => (p[4] ? '⚗️ Reaction — ' : '🔀 Mixture — ') + p[5] + '.', found: p[8], built: () => p[7]}); });
+  } else {
+    const L = lv === 0 ? ['which2', 'copper', 'which3'] : lv === 1 ? ['which4', 'copper', 'fastest'] : lv === 2 ? ['which4', 'fastest', 'copper'] : lv === 3 ? ['fastest', 'paint', 'copper'] : ['paint', 'needs', 'fastest'];
+    L.forEach(k => {
+      const base = {eye: '🌧️ Rust lab · two weeks in a wet dish', once: lv >= 2, found: [26, 8], built: () => ['rust']};
+      if(/^which/.test(k)){ const items = k === 'which2' ? ['nail', 'ring'] : k === 'which3' ? ['nail', 'ring', 'spoon'] : ['nail', 'coin', 'ring', 'spoon']; const its = shuffle(items);
+        return R.push(Object.assign(base, {q: 'Which one will RUST?', need: 'Two weeks in water + air', hint: lv === 0 ? 'Rust is orange-brown — it grows on iron' : '', opts: its.map(x => ({k: x, i: XITEM[x][0], t: XITEM[x][1]})), ok: x => x === 'nail',
+          cups: its.map(x => cup({label: XITEM[x][0], lvl: 0.35, item: {kind: x}})), playAns: () => xDays(14, its.map(x => x === 'nail' ? [1, 0] : x === 'coin' ? [0, 0.7] : [0, 0])),
+          why: x => XITEM[x][1] + ' doesn’t rust. Only IRON rusts — water + air turn it into orange-brown rust (iron oxide).', good: () => 'Iron + water + air → rust (iron oxide)!'})); }
+      if(k === 'copper') return R.push(Object.assign(base, {q: 'What colour does a 🪙 copper coin turn?', need: 'After a long time outside', hint: lv === 0 ? 'Old copper roofs + statues show it' : '', opts: [{k: 'green', i: '🟢', t: 'Green'}, {k: 'rust', i: '🟤', t: 'Rusty orange'}, {k: 'shiny', i: '✨', t: 'Stays shiny'}], ok: x => x === 'green',
+        cups: [cup({label: '🪙 outside', lvl: 0.2, item: {kind: 'coin'}})], playAns: () => xDays(14, [[0, 1]]), why: () => 'Copper turns GREEN (patina) — like the famous green statues. Only iron makes orange rust.', good: () => 'Copper patina is green!', found: [29, 8, 6], built: () => ['patina']}));
+      if(k === 'fastest'){ const d = shuffle(['dry', 'tap', 'salt']); const D = {dry: ['🏜️', 'Dry jar', 0, 0.15], tap: ['💧', 'Tap water', 0.4, 0.55], salt: ['🧂', 'Salt water', 0.4, 1]};
+        return R.push(Object.assign(base, {q: 'Which nail rusts FASTEST?', need: 'Same nails, different jars', hint: lv <= 1 ? 'Salt helps rust grow — that’s why cars rust near the sea' : '', opts: d.map(x => ({k: x, i: D[x][0], t: D[x][1]})), ok: x => x === 'salt',
+          cups: d.map(x => cup({label: D[x][0] + ' ' + D[x][1], lvl: D[x][2], col: x === 'salt' ? '#C6E4EE' : WATER, item: {kind: 'nail'}})), playAns: () => xDays(14, d.map(x => [D[x][3], 0])), why: () => 'Salt water rusts iron fastest — the salt helps the water and air work. A dry nail hardly rusts.', good: () => 'Salt speeds rust up!', found: [26, 8, 11, 17]})); }
+      if(k === 'paint'){ const d = shuffle(['bare', 'paint', 'salt']); const D = {bare: ['🔩', 'Bare nail in water', 0.75, 'nail'], paint: ['🎨', 'Painted nail in water', 0, 'pnail'], salt: ['🧂', 'Bare nail in salt water', 1, 'nail']};
+        return R.push(Object.assign(base, {q: 'Which nail will NOT rust?', need: 'Two weeks in a jar', hint: '', opts: d.map(x => ({k: x, i: D[x][0], t: D[x][1]})), ok: x => x === 'paint',
+          cups: d.map(x => cup({label: D[x][0], lvl: 0.4, item: {kind: D[x][3]}})), playAns: () => xDays(14, d.map(x => [D[x][2], 0])), why: () => 'Paint keeps water + air away from the iron — no rust. That’s why bikes and bridges are painted.', good: () => 'Paint is a raincoat for iron!'})); }
+      R.push(Object.assign(base, {q: 'What does iron need to rust?', need: 'Think of a nail on a dry shelf vs in the rain', hint: '', opts: [{k: 'wa', i: '💧', t: 'Water + air'}, {k: 'a', i: '🌬️', t: 'Air only'}, {k: 'h', i: '🔥', t: 'Heat'}], ok: x => x === 'wa',
+        cups: [cup({label: '🏜️ dry', lvl: 0, item: {kind: 'nail'}}), cup({label: '🌧️ wet', lvl: 0.35, item: {kind: 'nail'}})], playAns: () => xDays(14, [[0.1, 0], [0.9, 0]]), why: () => 'Iron needs BOTH water and air to rust — the dry nail stays shiny.', good: () => 'Water + air → rust!'}));
+    });
+  }
+  return R;
+}
+const XHELP = {size: '✨ small grains (×3)', temp: '♨️ warm water (×2)', stir: '🥄 stirring (×2)'};
+function xWhy(W, Lo){ const wh = ['size', 'temp', 'stir'].filter(f => !W[f] && Lo[f]).map(f => XHELP[f]), lh = ['size', 'temp', 'stir'].filter(f => !Lo[f] && W[f]).map(f => XHELP[f]);
+  return 'it had ' + wh.join(' + ') + (lh.length ? ', which beat ' + lh.join(' + ') + ' in the other glass.' : '.'); }
+
+// ---------- bench actions (set where things go; the loop moves them there) ----------
+function xPour(k){ const c = XG.cups[0]; c.col = LIQ[k].col; c.lvlTo = Math.min(0.8, c.lvl + 0.1); return 900; }
+function xMixFx(fx){ const c = XG.cups[0];
+  if(fx === 'fizz' || fx === 'chalkfizz'){ c.bub = fx === 'fizz' ? 40 : 14; c.foamTo = fx === 'fizz' ? 1 : 0.4; if(fx === 'chalkfizz') c.solid = {kind: 'cube', amt: 1, to: 0.6, rate: 0.2}; setTimeout(() => { if(XG && XG.cups[0] === c){ c.bub = 3; c.foamTo = 0.2; } }, 1600 * SCI_FX); }
+  else if(fx === 'sand'){ c.cloud = 1; c.sandTo = 1; }
+  else if(fx === 'dissolve'){ c.solid = {kind: 'grains', amt: 1, to: 0, rate: 0.8}; }
+  else if(fx === 'layer'){ c.layerTo = 1; }
+  else if(fx === 'lumps'){ c.lumpsTo = 1; c.col = '#F1EBD8'; }
+  else if(fx === 'colour'){ c.col = LIQ.lemon.col; }
+  else if(fx === 'foam'){ c.bub = 8; c.foamTo = 0.8; }
+  else if(fx === 'paint'){ c.col = '#7B3F9E'; }
+  return 1700; }
+function xDays(n, rg){ XG.dayTo = n; XG.cups.forEach((c, i) => { if(c.item){ c.item.rustTo = rg[i][0]; c.item.greenTo = rg[i][1]; } }); return 2000; }
+
+// ---------- game flow ----------
+function startExp(exp){
+  stopExp(); const lv = SET.level, list = xRounds(exp, lv), X = XEXP.find(e => e[0] === exp);
+  XG = {exp, lv, list, i: 0, tries: 0, first: 0, score: 0, miss: 0, found: [], built: [], t0: Date.now(), done: false, solved: false};
+  hideResult(); labHand(null); showScreen('exp'); XBAR.level(LEVEL_UI[lv].emoji + ' ' + LEVEL_UI[lv].name); XBAR.score(0); XBAR.miss(0); XBAR.fit();
+  XBUD = qBuddy(XBUD, 'x-buddy'); xNext(); if(UI.modeTried) UI.modeTried(S.player, GAME_ID, 'chem'); gcEmit('start', {game: exp}); xLoop();
+}
+function stopExp(){ if(XG){ XG.done = true; clearTimeout(XG.tm); clearTimeout(XG.gt); clearTimeout(XG.pt); } if(XBUD){ XBUD.stop(); XBUD = null; } cancelAnimationFrame(X_RAF); }
+function xNext(){
+  if(!XG || XG.done) return; clearTimeout(XG.tm); clearTimeout(XG.gt); clearTimeout(XG.pt); if(XG.i >= XG.list.length) return xEnd();
+  const r = XG.list[XG.i], lv = XG.lv; XG.tries = 0; XG.solved = false; XG.watched = !r.watch; XG.busy = false; XG.picked = null; XG.spoons = 0; XG.day = 0; XG.dayTo = 0; XG.glowK = null;
+  XG.cups = r.cups.map(c => Object.assign({}, JSON.parse(JSON.stringify(c)), {cur: c.col, bubs: [], bub: 0, foam: 0, foamTo: 0, lumps: 0, lumpsTo: 0, layer: 0, layerTo: 0, cloud: 0, sand: 0, sandTo: 0, cry: 0, cryTo: 0, lvlTo: c.lvl}));
+  XG.cups.forEach(c => { if(c.item){ c.item.rust = 0; c.item.green = 0; c.item.rustTo = 0; c.item.greenTo = 0; } if(c.solid){ c.solid.to = c.solid.amt; c.solid.rate = 0; } });
+  XBAR.count('exp', '🧪', (XG.i + 1) + '/' + XG.list.length, 'Test');
+  $('x-eye').textContent = r.eye; $('x-name').textContent = r.q; $('x-need').textContent = r.need; $('x-hint').textContent = r.hint || ''; $('x-legend').innerHTML = r.legend || '';
+  $('x-msg').className = 'fm-msg'; $('x-msg').textContent = '';
+  xRender(); drawBench();
+  if(lv === 0 && !r.stepper) XG.gt = setTimeout(() => { if(XG && !XG.solved && XG.watched){ XG.glowK = r.opts.find(o => r.ok(o.k)).k; xRender(); } }, 6000 * SCI_FX);
+  if(lv === 5) XG.tm = setTimeout(() => { if(XG && !XG.done && !XG.solved){ XG.miss++; XBAR.miss(XG.miss); UISound.play('error'); xAnswer('⏱️ Time! '); } }, 15000);
+}
+function xRender(){
+  const r = XG.list[XG.i], lv = XG.lv, opts = $('x-opts'), act = $('x-act');
+  if(r.stepper){ opts.innerHTML = r.meter ? '<span class="xmeter">💧 Water full <b style="--f:' + Math.min(100, Math.round(XG.spoons / r.cap * 100)) + '%"></b> ' + Math.min(100, Math.round(XG.spoons / r.cap * 100)) + ' %</span>' : '<span class="xmeter">🥄 ' + XG.spoons + ' spoon' + (XG.spoons === 1 ? '' : 's') + ' in</span>'; }
+  else if(!XG.watched) opts.innerHTML = '';
+  else { opts.innerHTML = r.opts.map(o => '<button data-k="' + o.k + '" data-sound="tap" class="' + (o.k === XG.glowK && !XG.solved ? 'kglow' : '') + (XG.solved ? (r.ok(o.k) ? ' yes' : o.k === XG.picked ? ' no' : '') : '') + '"' + (XG.solved || XG.busy ? ' disabled' : '') + '><i>' + o.i + '</i>' + UI.esc(o.t) + '</button>').join('');
+    opts.querySelectorAll('button').forEach(b => b.onclick = () => xPick(b.dataset.k)); }
+  let h = '';
+  if(XG.solved) h = '<button class="sp-btn sp-primary sp-lg" id="x-next" data-sound="pop">' + (XG.i + 1 < XG.list.length ? 'Next test ▶' : '📋 Finish') + '</button>';
+  else if(r.watch && !XG.watched) h = '<button class="sp-btn sp-primary sp-lg glow-next" id="x-mix" data-sound="pop">🥄 Mix them!</button>';
+  else if(r.stepper === 'crystal'){ const full = XG.spoons > r.cap; h = '<button class="sp-btn sp-secondary sp-lg' + (lv <= 1 && !full ? ' glow-next' : '') + '" id="x-add" data-sound="pop"' + (XG.busy ? ' disabled' : '') + '>🥄 Add a spoon</button><button class="sp-btn sp-primary sp-lg' + (lv <= 1 && full ? ' glow-next' : '') + '" id="x-hang" data-sound="pop"' + (XG.busy || !XG.spoons ? ' disabled' : '') + '>🧵 Hang a string + wait</button>'; }
+  else if(r.stepper === 'neutral') h = '<button class="sp-btn sp-secondary sp-lg" id="x-add" data-sound="pop"' + (XG.busy ? ' disabled' : '') + '>🧁 Add a spoon</button><button class="sp-btn sp-primary sp-lg" id="x-stop" data-sound="pop"' + (XG.busy || !XG.spoons ? ' disabled' : '') + '>🛑 Stop — it’s purple!</button>';
+  act.innerHTML = h;
+  if($('x-next')) $('x-next').onclick = () => { if(!XG || !XG.solved) return; XG.i++; xNext(); };
+  if($('x-mix')) $('x-mix').onclick = () => { if(XG.busy) return; XG.busy = true; xRender(); const ms = r.playAns(); UISound.play('pop'); XG.pt = setTimeout(() => { if(!XG || XG.done) return; XG.busy = false; XG.watched = true; $('x-msg').className = 'fm-msg'; $('x-msg').textContent = '👀 What happened? Is there NEW stuff?'; xRender();
+    if(XG.lv === 0) XG.gt = setTimeout(() => { if(XG && !XG.solved){ XG.glowK = r.opts.find(o => r.ok(o.k)).k; xRender(); } }, 6000 * SCI_FX); }, ms * SCI_FX); };
+  if($('x-add')) $('x-add').onclick = () => xSpoon();
+  if($('x-hang')) $('x-hang').onclick = () => xHang();
+  if($('x-stop')) $('x-stop').onclick = () => xStop();
+}
+function xPick(k){
+  if(!XG || XG.solved || XG.busy || XG.done) return; const r = XG.list[XG.i], right = r.ok(k); XG.picked = k;
+  if(r.once){ XG.busy = true; xRender(); $('x-msg').className = 'fm-msg'; $('x-msg').textContent = '👀 Watch…'; const ms = r.playAns ? r.playAns() : 600; XG.pt = setTimeout(() => { if(!XG || XG.done) return; XG.busy = false; xJudge(right, k); }, ms * SCI_FX); return; }
+  if(right){ XG.busy = true; xRender(); const ms = r.play ? r.play(k) : r.playAns && XG.watched && !r.watch ? r.playAns() : 300; XG.pt = setTimeout(() => { if(!XG || XG.done) return; XG.busy = false; xJudge(true, k); }, ms * SCI_FX); return; }
+  if(r.showWrong && r.play){ XG.busy = true; xRender(); const ms = r.play(k); XG.pt = setTimeout(() => { if(!XG || XG.done) return; XG.busy = false; xJudge(false, k); XG.pt = setTimeout(() => { if(XG && !XG.solved){ XG.cups[0].col = CABBAGE; xRender(); } }, 1400 * SCI_FX); }, ms * SCI_FX); return; }
+  xJudge(false, k);
+}
+function xGot(r, k){ (r.found || []).forEach(n => { if(XG.found.indexOf(n) < 0) XG.found.push(n); }); (r.builtAns || (r.built ? r.built(k) : [])).forEach(b => { if(b && XG.built.indexOf(b) < 0) XG.built.push(b); }); }
+function xJudge(right, k){
+  const r = XG.list[XG.i], lv = XG.lv;
+  if(right){ const pts = qPts(XG.tries); XG.score += pts; if(XG.tries === 0) XG.first++; XG.solved = true; clearTimeout(XG.tm); clearTimeout(XG.gt); xGot(r, k);
+    UISound.play('success'); if(XBUD) XBUD.react('joy'); XBAR.score(Math.round(XG.score * SCI_MULT(lv)));
+    $('x-msg').className = 'fm-msg ok'; $('x-msg').textContent = '✅ ' + (r.good ? r.good(k) : 'Right!') + ' · +' + pts; xRender(); gcEmit('right', {exp: XG.exp}); return; }
+  XG.tries++; XG.miss++; XBAR.miss(XG.miss); UISound.play('error'); if(XBUD) XBUD.react('miss'); gcEmit('wrong', {exp: XG.exp});
+  if(r.once || lv === 5){ XG.score += 10; XG.solved = true; clearTimeout(XG.tm); clearTimeout(XG.gt); xGot(r, k); if(!r.once && r.playAns) r.playAns(); $('x-msg').className = 'fm-msg'; $('x-msg').textContent = '🤔 ' + (r.why ? r.why(k) : '') + ' · +10 for watching'; xRender(); return; }
+  if(lv <= 2 && XG.tries >= 2 && r.opts) XG.glowK = r.opts.find(o => r.ok(o.k)).k;
+  $('x-msg').className = 'fm-msg'; $('x-msg').textContent = '🤔 ' + (r.hintWhy ? r.hintWhy(k) : r.why ? r.why(k) : 'Not quite.') + (lv <= 2 ? ' Try again!' : ''); xRender();
+}
+function xAnswer(pre){ const r = XG.list[XG.i]; XG.solved = true; clearTimeout(XG.gt); if(r.playAns) r.playAns(); if(r.stepper === 'crystal'){ XG.cups[0].string = true; XG.cups[0].cryTo = 1; XG.dayTo = 7; } if(r.stepper === 'neutral') XG.cups[0].col = CABBAGE;
+  $('x-msg').className = 'fm-msg'; $('x-msg').textContent = pre + (r.stepper === 'crystal' ? 'It needed ' + (r.cap + 1) + ' spoons — the water was full when one stayed at the bottom.' : r.stepper === 'neutral' ? 'It needed ' + r.n + ' spoons of baking soda to be neutral purple.' : r.good ? 'Answer: ' + r.good() : ''); xRender(); }
+// 💎 / 🌈 stepper jobs
+function xSpoon(){
+  if(!XG || XG.solved || XG.busy) return; const r = XG.list[XG.i], c = XG.cups[0]; XG.spoons++; UISound.play('pop');
+  if(r.stepper === 'crystal'){ const left = Math.max(0, XG.spoons - r.cap); c.solid = {kind: 'pile', amt: (c.solid ? c.solid.amt : 0) + 1, to: left * 0.5, rate: 1.4};
+    $('x-msg').className = 'fm-msg'; $('x-msg').textContent = left ? (left === 1 ? '👀 A little stays at the bottom now — the water is FULL!' : '🥄 More is piling up at the bottom — the water can’t take any more.') : '✨ It disappeared into the water — the water can still take more.'; }
+  else { const n = r.n, s = XG.spoons; c.col = s < n ? hexLerp(LIQ.lemon.col, CABBAGE, s / n) : s === n ? CABBAGE : hexLerp(CABBAGE, LIQ.soda.col, Math.min(1, (s - n) / 2)); c.bub = 18; setTimeout(() => { if(c) c.bub = 0; }, 900 * SCI_FX);
+    $('x-msg').className = 'fm-msg'; $('x-msg').textContent = '🫧 Fizz! ' + (s < n ? 'Still a bit pink…' : s === n ? 'Look at the colour now…' : 'Hmm, the colour is changing again…'); }
+  xRender();
+}
+function xHang(){
+  if(!XG || XG.solved || XG.busy || !XG.spoons) return; const r = XG.list[XG.i], c = XG.cups[0], full = XG.spoons > r.cap; c.string = true; XG.busy = true; XG.day = 0; XG.dayTo = 7; c.cryTo = full ? 1 : 0; xRender();
+  XG.pt = setTimeout(() => { if(!XG || XG.done) return; XG.busy = false;
+    if(full) return xJudge(true);
+    XG.tries++; XG.miss++; XBAR.miss(XG.miss); UISound.play('error'); if(XBUD) XBUD.react('miss'); gcEmit('wrong', {exp: XG.exp});
+    if(XG.lv === 5) return xAnswer('❌ Nothing grew. ');
+    c.string = false; XG.day = 0; XG.dayTo = 0; $('x-msg').className = 'fm-msg'; $('x-msg').textContent = '🤔 A week later… nothing grew. The water could still take more — keep adding until a little stays at the bottom.'; xRender(); }, 2200 * SCI_FX);
+}
+function xStop(){
+  if(!XG || XG.solved || XG.busy || !XG.spoons) return; const r = XG.list[XG.i], s = XG.spoons;
+  if(s === r.n) return xJudge(true);
+  XG.tries++; XG.miss++; XBAR.miss(XG.miss); UISound.play('error'); if(XBUD) XBUD.react('miss'); gcEmit('wrong', {exp: XG.exp});
+  if(XG.lv === 5) return xAnswer('❌ ');
+  $('x-msg').className = 'fm-msg'; $('x-msg').textContent = '🤔 ' + (s < r.n ? 'Still pink = still an acid. Add more baking soda until it is purple.' : 'Too much — blue-green means a BASE now. Just the right amount makes neutral purple. Let’s start again!');
+  if(s > r.n){ XG.spoons = 0; XG.cups[0].col = LIQ.lemon.col; } xRender();
+}
+function xEnd(){ XG.done = true; const res = {found: XG.found.slice(), built: XG.built.slice(), right: XG.first, total: XG.list.length, score: Math.round(XG.score * SCI_MULT(XG.lv)), stars: qStars(XG.first, XG.list.length), timeSec: Math.round((Date.now() - XG.t0) / 1000)}; const k = XG.exp; stopExp(); chemSave(k, res); }
+
+// ---------- the bench (canvas) ----------
+function hexLerp(a, b, t){ const p = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16)), A = p(a), B = p(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * Math.max(0, Math.min(1, t))).toString(16).padStart(2, '0')).join(''); }
+function xLoop(){ cancelAnimationFrame(X_RAF); if(!XG || XG.done) return; const now = performance.now(), dt = XG.lastT ? Math.min(0.1, (now - XG.lastT) / 1000) : 0; XG.lastT = now; xStep(dt); drawBench(); if(SCI_FX) X_RAF = requestAnimationFrame(xLoop); }
+function xStep(dt){   // dt = 0 → jump straight to the end (tests, SCI_FX 0)
+  if(!XG || !XG.cups) return; const k = dt ? Math.min(1, dt * 3) : 1, mv = (v, to, sp) => dt ? (v < to ? Math.min(to, v + sp * dt) : Math.max(to, v - sp * dt)) : to;
+  XG.day = mv(XG.day || 0, XG.dayTo || 0, (XG.dayTo || 1) / 1.6);
+  XG.cups.forEach(c => { c.cur = dt ? hexLerp(c.cur, c.col, k) : c.col; c.lvl = mv(c.lvl, c.lvlTo, 0.4); c.foam = mv(c.foam, c.foamTo, 0.8); c.lumps = mv(c.lumps, c.lumpsTo, 0.6); c.layer = mv(c.layer, c.layerTo, 0.8); c.sand = mv(c.sand, c.sandTo, 0.7); c.cloud = mv(c.cloud, 0, 0.5); c.cry = mv(c.cry, c.cryTo, 0.6);
+    if(c.solid) c.solid.amt = dt ? mv(c.solid.amt, c.solid.to, c.solid.rate || 1) : c.solid.to;
+    if(c.item){ const f = XG.dayTo ? XG.day / XG.dayTo : 0; c.item.rust = (c.item.rustTo || 0) * (dt ? f : 1); c.item.green = (c.item.greenTo || 0) * (dt ? f : 1); }
+    if(dt && c.bub > 0){ c.bubT = (c.bubT || 0) + dt * c.bub; while(c.bubT > 1){ c.bubT--; c.bubs.push({x: Math.random(), y: 1, r: 0.02 + Math.random() * 0.04, v: 0.4 + Math.random() * 0.6}); } }
+    c.bubs = c.bubs.filter(b => (b.y -= b.v * dt) > 0).slice(-80); });
+}
+function drawBench(){
+  const cv = $('x-cv'); if(!cv || !XG || !XG.cups) return; if(!SCI_FX) xStep(0); const r = cv.getBoundingClientRect(); if(r.width < 10 || r.height < 10) return;
+  const dpr = Math.min(2, devicePixelRatio || 1); if(cv.width !== Math.round(r.width * dpr) || cv.height !== Math.round(r.height * dpr)){ cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
+  const g = cv.getContext('2d'), W = r.width, H = r.height, n = XG.cups.length; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const lab = n > 1 && XG.cups.some(c => c.sub), fs = Math.max(11, Math.min(18, H * 0.06)), top = XG.dayTo ? fs * 1.8 : 6, bottom = fs * (lab ? 4.6 : 1.7);
+  const rows = n >= 3 && H > W * 0.9 ? 2 : 1, cols = Math.ceil(n / rows), Wd = W < 520 ? W - 58 : W, cellW = Wd / cols, cellH = (H - top) / rows;   // tall phones: 2 rows of glasses, room for the lab buddy
+  const ch = Math.max(30, Math.min(cellH - bottom - 8, cellW * 0.8 * 1.3)), cw = ch / 1.3;
+  if(XG.dayTo){ g.fillStyle = '#FFE08A'; g.font = '900 ' + fs + 'px Nunito, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'top'; g.fillText('📅 Day ' + Math.round(XG.day) + (XG.day >= XG.dayTo - 0.01 ? ' ✓' : ' …'), W / 2, 4); }
+  XG.cups.forEach((c, i) => { const row = Math.floor(i / cols), col = i % cols, inRow = row === rows - 1 ? n - cols * (rows - 1) : cols, off = (Wd - inRow * cellW) / 2;
+    const x = off + col * cellW + (cellW - cw) / 2, y = top + row * cellH + (cellH - ch - bottom) / 2; drawCup(g, x, y, cw, ch, c, i);
+    g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'top'; xFit(g, c.label, cellW * 0.95, fs, '900'); g.fillText(c.label, x + cw / 2, y + ch + 4);
+    if(lab){ g.fillStyle = '#C9D6EA'; String(c.sub).split('\n').forEach((ln, j) => { xFit(g, ln, cellW * 0.95, fs * 0.8, '800'); g.fillText(ln, x + cw / 2, y + ch + 4 + fs * (1.25 + 0.95 * j)); }); } });
+}
+function xFit(g, txt, w, fs, wt){ let f = fs; g.font = wt + ' ' + f + 'px Nunito, sans-serif'; while(f > 8 && g.measureText(txt).width > w){ f -= 1; g.font = wt + ' ' + f + 'px Nunito, sans-serif'; } }
+function drawCup(g, x, y, w, h, c, idx){
+  const glass = () => { g.beginPath(); g.moveTo(x, y); g.lineTo(x + w, y); g.lineTo(x + w * 0.92, y + h - 10); g.quadraticCurveTo(x + w * 0.9, y + h, x + w * 0.8, y + h); g.lineTo(x + w * 0.2, y + h); g.quadraticCurveTo(x + w * 0.1, y + h, x + w * 0.08, y + h - 10); g.closePath(); };
+  if(c.warm){ g.fillStyle = 'rgba(255,140,60,0.18)'; g.fillRect(x - 4, y + h - 6, w + 8, 8); }
+  g.save(); glass(); g.clip();
+  g.fillStyle = 'rgba(255,255,255,0.06)'; g.fillRect(x, y, w, h);
+  const ly = y + h * (1 - c.lvl);
+  if(c.lvl > 0.01){ g.globalAlpha = 0.85; g.fillStyle = c.cur; g.fillRect(x, ly, w, h); g.globalAlpha = 1;
+    if(c.layer > 0){ g.fillStyle = 'rgba(232,197,71,' + (0.85 * c.layer) + ')'; g.fillRect(x, ly - h * 0.12 * c.layer, w, h * 0.14 * c.layer); }
+    if(c.cloud > 0){ g.fillStyle = 'rgba(194,160,110,' + (0.5 * c.cloud) + ')'; g.fillRect(x, ly, w, h); }
+    if(c.foam > 0){ g.fillStyle = 'rgba(255,255,255,0.9)'; for(let k = 0; k < 9; k++){ g.beginPath(); g.arc(x + w * (k + 0.5) / 9, ly - 2, w * 0.07 * (0.6 + c.foam), 0, Math.PI * 2); g.fill(); } } }
+  if(c.sand > 0){ g.fillStyle = '#D2B48C'; g.fillRect(x, y + h - h * 0.14 * c.sand, w, h); }
+  if(c.lumps > 0){ g.fillStyle = 'rgba(255,255,255,0.95)'; for(let k = 0; k < 10; k++){ const a = (k * 97 % 100) / 100, b = (k * 53 % 100) / 100; g.beginPath(); g.arc(x + w * (0.18 + 0.64 * a), ly + (y + h - ly) * (0.15 + 0.7 * b), w * 0.05 * c.lumps, 0, Math.PI * 2); g.fill(); } }
+  if(c.solid && c.solid.amt > 0.01){ const a = c.solid.amt;
+    if(c.solid.kind === 'cube'){ const s = w * 0.3 * Math.cbrt(Math.min(1, a)); g.fillStyle = '#FFFFFF'; g.strokeStyle = '#B7C6D6'; g.lineWidth = 2; g.fillRect(x + w / 2 - s / 2, y + h - s - 3, s, s); g.strokeRect(x + w / 2 - s / 2, y + h - s - 3, s, s); }
+    else if(c.solid.kind === 'grains'){ g.fillStyle = '#FFFFFF'; const m = Math.round(40 * Math.min(1, a)); for(let k = 0; k < m; k++){ const a1 = (k * 37 % 41) / 41, b1 = (k * 17 % 23) / 23; g.fillRect(x + w * (0.25 + 0.5 * a1), y + h - 5 - h * 0.12 * b1 * Math.min(1, a), 3, 3); } }
+    else { const rr = w * 0.16 * Math.sqrt(Math.min(3, a)); g.fillStyle = '#FFFFFF'; g.beginPath(); g.ellipse(x + w / 2, y + h - 2, rr * 1.4, rr, 0, Math.PI, 0); g.fill(); } }
+  c.bubs.forEach(b => { g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 1.5; g.beginPath(); g.arc(x + w * (0.15 + 0.7 * b.x), ly + (y + h - ly) * b.y, w * b.r, 0, Math.PI * 2); g.stroke(); });
+  if(c.item){ const it = c.item, cx = x + w / 2, by = y + h - 6;
+    if(it.kind === 'nail' || it.kind === 'pnail'){ const nl = h * 0.62, nw = Math.max(5, w * 0.08); g.fillStyle = it.kind === 'pnail' ? '#3F6FD8' : '#9AA3AD'; g.fillRect(cx - nw / 2, by - nl, nw, nl - nw); g.beginPath(); g.moveTo(cx - nw / 2, by - nw); g.lineTo(cx + nw / 2, by - nw); g.lineTo(cx, by); g.fill(); g.fillRect(cx - nw * 1.4, by - nl - nw * 0.6, nw * 2.8, nw * 0.7);
+      if(it.rust > 0){ g.fillStyle = 'rgba(176,84,34,' + Math.min(1, it.rust) + ')'; for(let k = 0; k < 9; k++){ g.beginPath(); g.arc(cx + (k % 2 ? 1 : -1) * nw * 0.25, by - nl * (0.08 + 0.1 * k), nw * (0.25 + 0.3 * it.rust), 0, Math.PI * 2); g.fill(); } } }
+    else if(it.kind === 'coin'){ const rr = w * 0.22; g.fillStyle = hexLerp('#C87533', '#4FB89A', it.green || 0); g.beginPath(); g.ellipse(cx, by - rr * 0.4, rr, rr * 0.45, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = 'rgba(0,0,0,0.25)'; g.stroke(); }
+    else if(it.kind === 'ring'){ const rr = w * 0.18; g.strokeStyle = '#E6B422'; g.lineWidth = Math.max(4, w * 0.06); g.beginPath(); g.ellipse(cx, by - rr * 0.5, rr, rr * 0.5, 0, 0, Math.PI * 2); g.stroke(); }
+    else { g.fillStyle = '#5DADE2'; g.beginPath(); g.ellipse(cx - w * 0.18, by - 8, w * 0.12, w * 0.08, 0, 0, Math.PI * 2); g.fill(); g.fillRect(cx - w * 0.08, by - 11, w * 0.34, 6); } }
+  if(c.string){ g.strokeStyle = '#EDE3C7'; g.lineWidth = 2; g.beginPath(); g.moveTo(x + w / 2, y + 4); g.lineTo(x + w / 2, y + h * 0.75); g.stroke();
+    const m = Math.round(12 * c.cry); for(let k = 0; k < m; k++){ const yy = y + h * (0.22 + 0.042 * k), xx = x + w / 2 + (k % 2 ? 1 : -1) * w * (0.03 + 0.05 * ((k * 7) % 3)), sz = w * (0.035 + 0.05 * c.cry) * (0.8 + 0.4 * ((k * 5) % 3) / 2);
+      g.fillStyle = 'rgba(235,248,255,0.95)'; g.strokeStyle = '#9CC9E8'; g.lineWidth = 1.5;
+      if(c.shape === 'needle'){ g.save(); g.translate(xx, yy); g.rotate((k % 3 - 1) * 0.6); g.fillRect(-sz * 0.12, -sz, sz * 0.24, sz * 2); g.strokeRect(-sz * 0.12, -sz, sz * 0.24, sz * 2); g.restore(); }
+      else if(c.shape === 'chunk'){ g.beginPath(); for(let q = 0; q < 6; q++){ const an = q / 6 * Math.PI * 2; g.lineTo(xx + Math.cos(an) * sz, yy + Math.sin(an) * sz * 0.8); } g.closePath(); g.fill(); g.stroke(); }
+      else { g.fillRect(xx - sz / 2, yy - sz / 2, sz, sz); g.strokeRect(xx - sz / 2, yy - sz / 2, sz, sz); } } }
+  g.restore();
+  if(c.string){ g.fillStyle = '#C08A4E'; g.fillRect(x - w * 0.1, y - 4, w * 1.2, 7); }
+  if(c.stir){ g.save(); g.translate(x + w * 0.7, y - 4); g.rotate(0.35 + (SCI_FX ? Math.sin(performance.now() / 160) * 0.2 : 0)); g.fillStyle = '#C0C7D1'; g.fillRect(-3, 0, 6, h * 0.8); g.restore(); }
+  glass(); g.lineWidth = 3; g.strokeStyle = 'rgba(255,255,255,0.65)'; g.stroke();
+}
+
 /* ================= SAVE QUEUE + NAV ================= */
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
 function goBack(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
 function pauseGame(){ if(G) G.held = true; }
 window.feedbackContext = () => ({page: 'Sciencetory', game: GAME_ID, level: G ? G.lv : SET.level, mode: SET.sec, test: SET.test});
-window.addEventListener('resize', () => { if(G && !$('scr-play').classList.contains('hidden')) resize(); chemResize(); if(AG && !$('scr-atom').classList.contains('hidden')) drawAtomNow(); if(WG && !$('scr-glow').classList.contains('hidden')) drawGlow(); if(CG && !$('scr-cat').classList.contains('hidden')) layoutCats(); if(LG && !$('scr-led').classList.contains('hidden')) ledPlace(); });
+window.addEventListener('resize', () => { if(G && !$('scr-play').classList.contains('hidden')) resize(); chemResize(); if(AG && !$('scr-atom').classList.contains('hidden')) drawAtomNow(); if(WG && !$('scr-glow').classList.contains('hidden')) drawGlow(); if(CG && !$('scr-cat').classList.contains('hidden')) layoutCats(); if(LG && !$('scr-led').classList.contains('hidden')) ledPlace(); if(XG && !$('scr-exp').classList.contains('hidden')) drawBench(); });
 function huntClueOff(){ const cl = $('hunt-clue'); if(cl){ cl.classList.remove('ingap'); cl.removeAttribute('style'); } }
 
 /* ================= BOOT ================= */
@@ -1747,4 +2066,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (sc-1+sc-2a+sc-2a2+sc-2b+sc-2b2) END OF Sciencetory.html -->
+<!-- (sc-1+sc-2a+sc-2a2+sc-2b+sc-2b2+sc-2c) END OF Sciencetory.html -->

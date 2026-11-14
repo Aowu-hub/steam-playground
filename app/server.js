@@ -5829,7 +5829,7 @@ function artRepair(name, id) {
 
 ;
 /* ===== SciencetoryCode.gs ===== */
-/* SciencetoryCode.gs — 🔬 Sciencetory server (sc-1, ⚗️ Chemistry sc-2a, ⚛️ Quantum atom builder sc-2b, 💡 LED · ✨ glow · 🐱 cat sc-2b2). Own file: Code.gs is past 300 KB (same pattern as ArtifactoryCode.gs).
+/* SciencetoryCode.gs — 🔬 Sciencetory server (sc-1, ⚗️ Chemistry sc-2a, ⚛️ Quantum atom builder sc-2b, 💡 LED · ✨ glow · 🐱 cat sc-2b2, 🧫 Kitchen lab sc-2c). Own file: Code.gs is past 300 KB (same pattern as ArtifactoryCode.gs).
    Plan: Drive "Sciencetory — full plan.md". Shares Artifactory's data: the Artifacts tab (things you made) + the bag (ArtifactoryCode.gs).
    ⚙️ Mechanic tests (SC-1): press · pull · twist · flex · fatigue · hardness · sharpness · drop · friction · balance · spin · float / leak.
    Every test is a pure function of the thing (material + shape + quality) — the same thing always gives the same number, no luck.
@@ -6043,7 +6043,8 @@ function sciChemView_(st, name) {
 // 🎨 how many ⚛️ atom looks a player owns (Code.gs ITEM_LINES atomskin; 0 = only Classic)
 function sciAtomSkins_(name) { try { return itemsFor_(name, activePlayers_(listProfilesFull())).owned.atomskin || 0; } catch (e) { return 0; } }
 const SCI_CHEM_KINDS_ = { hunt: '⚗️ Chemistry · Element hunt', formula: '⚗️ Chemistry · Formula builder', atom: '⚛️ Quantum · Atom builder',
-  led: '⚛️ Quantum · LED colours', glow: '⚛️ Quantum · Glow charge-up', cat: '⚛️ Quantum · Cat in the box' };   // 💡 ✨ 🐱 sc-2b2
+  led: '⚛️ Quantum · LED colours', glow: '⚛️ Quantum · Glow charge-up', cat: '⚛️ Quantum · Cat in the box',   // 💡 ✨ 🐱 sc-2b2
+  ph: '⚗️ Chemistry · pH colours', crystal: '⚗️ Chemistry · Crystal garden', dissolve: '⚗️ Chemistry · Dissolving race', mix: '⚗️ Chemistry · Mix or react', rust: '⚗️ Chemistry · Rust lab' };   // 🧫 Kitchen lab sc-2c
 const SCI_Q_KINDS_ = { atom: 1, led: 1, glow: 1, cat: 1 };
 // one finished ⚗️ / ⚛️ round: (name, level 0-5, kind 'hunt' | 'formula' | 'atom', {found: [atomic numbers], built: [compound ids], atoms: [atomic numbers built], right, total, score, stars, timeSec})
 function sciChemSave(name, level, kind, res) {
@@ -6141,7 +6142,7 @@ function sciRun(name, ref, test, level, guess, rig) {
   catch (e) { res.save = { err: String(e && e.message || e) }; }
   return res;
 }
-// (sc-1+sc-2a+sc-2b+sc-2b2) END OF SciencetoryCode.gs
+// (sc-1+sc-2a+sc-2b+sc-2b2+sc-2c) END OF SciencetoryCode.gs
 
 ;
 /* ===== on the device only: the grown-up PIN arrives hashed from the family Sheet (OfflineSync.gs) ===== */
