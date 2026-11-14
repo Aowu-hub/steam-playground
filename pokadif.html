@@ -273,7 +273,7 @@
     <li>🌱 Basic: 🎨 colours + ➖➕ missing / extra things · 🐣 Junior adds 📏 size + 🔺 shape · 🔦 Intermediate adds 🔄 turn / flip + 🔢 count.</li>
     <li>🔍 <b>Magnifier</b>: stuck? It shows you one change (a few per picture).</li>
     <li>👁️ <b>Blink</b>: ONE picture flips between A and B — poke what changes. Harder levels put a blank blink in between, so the change hides!</li>
-    <li>⏱️ <b>Photo Hunt Arcade</b>: pictures in a row against the clock — every find adds time, every 5 pictures is a ✅ checkpoint with a big time bonus. From ⚡ Hard a wrong poke costs time. Best run per level!</li>
+    <li>⏱️ <b>Photo Hunt Arcade</b>: a speed run — race through 10 to 15 pictures to the 🏁 finish. The clock counts up, every 5 pictures is a ✅ checkpoint split, from ⚡ Hard a wrong poke adds seconds, and on 🌋 / 💀 every find gives ⏳ +3 s more time left. Beat your best time for ⭐⭐⭐!</li>
     <li>🎯 <b>Odd One Out</b>: all the cards are alike but one — poke it. From ⚡ Hard: 🧮 the sum that isn't right, 🔤 the word that doesn't rhyme · 🌋 Extreme: 🌀 the one that breaks the pattern.</li>
     <li>🕵️ <b>Detective Adventure</b>: a case book in 3 chapters — 🔍 find the thief's footprints, 📜 read and answer, 🚶 walk the map, 🖼️ check the camera, 🔐 crack the code and 👉 catch the thief who matches BOTH clues. Every chapter gives you a 🎓 lesson card!</li>
     <li>⚡ Hard adds 🧮 sums and 🔤 words on little signs · 🌋 Extreme adds 🌀 bead patterns.</li>
@@ -620,22 +620,26 @@ var PK = (function () {
   }
   function oddPoints(level, r) { var p = 100 + Math.max(0, 15 - r.secs) * 8 - r.oops * 15 - r.hints * 40; return Math.max(0, Math.round(p * (1 + level * 0.25) * ((ODD[level] || {}).hardcore ? 3 : 1))); }
 
-  // ---------- ⏱️ PHOTO HUNT ARCADE (pk-2b): pictures in a row against the clock ----------
-  // start s · + s per find · + s per finished picture · ✅ checkpoint every 5 pictures (+ s) · − s per wrong poke (only from ⚡ Hard) · n changes a picture · 🔍 per run
+  // ---------- ⏱️ PHOTO HUNT ARCADE = a SPEED RUN (pk-3d, Aowu 14:35 "Basic can go on forever → a limit, no seconds added, a speed run") ----------
+  // goal = pictures to the 🏁 finish · limit = time limit (s) · par = ⭐⭐⭐ time (⭐⭐ ≤ par × 1.4, ⭐ = finished) · oops = + s on YOUR clock (only from ⚡ Hard)
+  // bonus = 🌋 / 💀 only (Aowu 14:44 "harder → add seconds"): each find gives ⏳ + s MORE TIME LEFT before the limit — your run time (the score) never changes
+  // n changes a picture · 🔍 per run. ✅ checkpoint every 5 pictures = a split time (no bonus).
   var ARCADE = [
-    { start: 60, find: 6, pic: 5, cp: 15, oops: 0, n: 2, hints: 3 },
-    { start: 55, find: 5, pic: 5, cp: 15, oops: 0, n: 3, hints: 2 },
-    { start: 50, find: 5, pic: 4, cp: 15, oops: 0, n: 3, hints: 2 },
-    { start: 45, find: 4, pic: 4, cp: 12, oops: 3, n: 4, hints: 1 },
-    { start: 40, find: 4, pic: 3, cp: 12, oops: 4, n: 4, hints: 1 },
-    { start: 35, find: 3, pic: 3, cp: 10, oops: 5, n: 5, hints: 0, hardcore: true }
+    { goal: 10, limit: 240, par: 120, oops: 0, n: 2, hints: 3 },
+    { goal: 10, limit: 240, par: 140, oops: 0, n: 3, hints: 2 },
+    { goal: 12, limit: 300, par: 190, oops: 0, n: 3, hints: 2 },
+    { goal: 12, limit: 300, par: 210, oops: 3, n: 4, hints: 1 },
+    { goal: 15, limit: 360, par: 280, oops: 4, n: 4, hints: 1, bonus: 3 },
+    { goal: 15, limit: 360, par: 300, oops: 5, n: 5, hints: 0, bonus: 3, hardcore: true }
   ];
   var CHECK_EVERY = 5;
+  // r = {found, pictures, finished, time (s, incl. oops seconds)} — a finished run scores more the faster it is
   function arcadeScore(level, r) {
-    var p = r.found * 100 + r.pictures * 250 + r.checkpoints * 1000;
-    return Math.round(p * (1 + level * 0.25) * (ARCADE[level] && ARCADE[level].hardcore ? 3 : 1));
+    var A = ARCADE[level] || ARCADE[0], p = r.found * 100 + r.pictures * 250 + (r.finished ? 1000 + Math.max(0, A.limit - r.time) * 20 : 0);
+    return Math.round(p * (1 + level * 0.25) * (A.hardcore ? 3 : 1) * (r.finished ? 1 : 0.5));
   }
-  function arcadeStars(r) { return Math.min(3, r.checkpoints || 0); }   // ⭐ per checkpoint (5 · 10 · 15 pictures); cleared = the first checkpoint
+  function arcadeStars(level, r) { var A = ARCADE[level] || ARCADE[0]; if (!r.finished) return 0; return r.time <= A.par ? 3 : r.time <= A.par * 1.4 ? 2 : 1; }
+  function mmss(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
 
   function signature(sc) { return (hash(JSON.stringify([sc.theme, sc.A, sc.B])) >>> 0).toString(36); }
 
@@ -844,7 +848,7 @@ var PK = (function () {
   function nextRank(cleared) { for (var i = 0; i < RANKS.length; i++) if (RANKS[i].at > cleared) return RANKS[i]; return null; }
 
   return { W: W, H: H, GROUND: GROUND, MIN_HIT: MIN_HIT, KINDS: KINDS, SHAPES: SHAPES, THEMES: THEMES, THEME_KEYS: THEME_KEYS, PAL: PAL, TYPES: TYPES, TYPE_INFO: TYPE_INFO,
-    LEVELS: LEVELS, RANKS: RANKS, TYPES6: TYPES6, WORD_SETS: WORD_SETS, RHYMES: RHYMES, ODD: ODD, ODD_ROUNDS: ODD_ROUNDS, makeOdd: makeOdd, oddPoints: oddPoints, makePattern: makePattern, sumText: sumText, ARCADE: ARCADE, CHECK_EVERY: CHECK_EVERY, arcadeScore: arcadeScore, arcadeStars: arcadeStars, STORY: STORY, BOOTS: BOOTS, VERBS: VERBS, CASES: CASES, caseById: caseById, makeCase: makeCase, makeWalk: makeWalk, makeDigit: makeDigit, bfs: bfs, clueMatch: clueMatch, storyPoints: storyPoints, caseBonus: caseBonus, rng: rng, newSeed: newSeed, makeScene: makeScene, signature: signature, poke: poke, pokeFound: pokeFound, radiusOf: radiusOf, hitOf: hitOf,
+    LEVELS: LEVELS, RANKS: RANKS, TYPES6: TYPES6, WORD_SETS: WORD_SETS, RHYMES: RHYMES, ODD: ODD, ODD_ROUNDS: ODD_ROUNDS, makeOdd: makeOdd, oddPoints: oddPoints, makePattern: makePattern, sumText: sumText, ARCADE: ARCADE, CHECK_EVERY: CHECK_EVERY, arcadeScore: arcadeScore, arcadeStars: arcadeStars, mmss: mmss, STORY: STORY, BOOTS: BOOTS, VERBS: VERBS, CASES: CASES, caseById: caseById, makeCase: makeCase, makeWalk: makeWalk, makeDigit: makeDigit, bfs: bfs, clueMatch: clueMatch, storyPoints: storyPoints, caseBonus: caseBonus, rng: rng, newSeed: newSeed, makeScene: makeScene, signature: signature, poke: poke, pokeFound: pokeFound, radiusOf: radiusOf, hitOf: hitOf,
     colDist: colDist, picturePoints: picturePoints, starsFor: starsFor, rankOf: rankOf, nextRank: nextRank, fits: fits };
 })();
 if (typeof module !== 'undefined') module.exports = PK;
@@ -1020,7 +1024,7 @@ const LEVEL_UI = [
   {emoji: '🌋', blurb: 'Smaller changes, more things to check.'},
   {emoji: '💀', blurb: 'Tiny changes + look-alikes, no magnifier, 3 oops = case lost. ×3 points.', hardcore: true}
 ];
-const ARC_BLURB = ['60 s, + 6 s a find. Oops cost nothing.', '+ 📏 size + 🔺 shape', '+ 🔄 turn + 🔢 count', 'Oops = − 3 s · + 🧮 sums + 🔤 words', 'Oops = − 4 s · + 🌀 patterns', '35 s start, oops = − 5 s, no magnifier. ×3 points.'];
+const ARC_BLURB = ['Oops cost nothing · 3 magnifiers', '+ 📏 size + 🔺 shape', '+ 🔄 turn + 🔢 count', 'Oops = ⏱ + 3 s · + 🧮 sums + 🔤 words', 'Each find = ⏳ + 3 s time left · oops = ⏱ + 4 s · + 🌀', 'Each find = ⏳ + 3 s time left · oops = ⏱ + 5 s · no 🔍 · ×3'];   // pk-3d: a speed run
 const ODD_BLURB = ['🎨 colours + 🔺 shapes, 4 big cards', '+ 📏 bigger / smaller', '+ 🔄 turned + 🔢 counting', '+ 🧮 odd sums + 🔤 odd words', '+ 🌀 patterns, 12 cards', 'Tiny changes, 3 oops = case lost. ×3 points.'];
 const BLINK_BLURB = ['The picture flips A ↔ B — changes pop out', 'A tiny blink between the pictures', 'A longer blink — harder!', 'Long blink, + sums + words', '+ patterns, quick flips', 'Quick flips, long blinks, 3 oops. ×3 points.'];
 const BLINK = [{show: 1300, gap: 0}, {show: 1200, gap: 80}, {show: 1100, gap: 140}, {show: 1000, gap: 180}, {show: 900, gap: 220}, {show: 750, gap: 260}];   // ms each picture shows · the blank blink between (longer = harder to see the change)
@@ -1033,7 +1037,7 @@ const MODES = [
   {k: 'spot', g: 'spot', icon: '🖼️', name: 'Find the Difference', type: 'A spot-the-difference game', sub: 'Two pictures — poke every change', next: '👇 then pick a level'},
   {k: 'blink', g: 'spot', icon: '👁️', name: 'Blink', type: 'A flicker-and-find game', sub: 'One picture blinks — what changed?', next: '👇 then pick a level'},
   {k: 'odd', g: 'odd', icon: '🎯', name: 'Odd One Out', type: 'A find-the-odd-one game', sub: 'Poke the one that doesn\'t belong', next: '👇 then pick a level'},
-  {k: 'arcade', g: 'endless', icon: '⏱️', name: 'Photo Hunt Arcade', type: 'A race-the-clock game', sub: 'Each find adds time — how far?', next: '👇 then pick a level'},
+  {k: 'arcade', g: 'endless', icon: '⏱️', name: 'Photo Hunt Arcade', type: 'A race-the-clock game', sub: 'A speed run: race to the 🏁 — beat your best time!', next: '👇 then pick a level'},
   {k: 'detective', g: 'stories', icon: '🕵️', name: 'Detective Adventure', type: 'A detective story game', sub: 'Solve a case: find · read · walk · crack', next: '👇 then pick a case + level'},
   {k: 'race', g: 'next', icon: '🏁', name: 'Race', type: 'Round 4', sub: 'Who finds them first?', soon: true}
 ];
@@ -1102,7 +1106,7 @@ function msNow(){ return SET.mode; }
 function msOpen(id){ if(!MODES.some(m => m.k === id && !m.soon)) return; SET.mode = id; markModes(); if(UI.modePoint) UI.modePoint($('level-list')); }
 function msAlso(){ if(UI.alsoTry) UI.alsoTry({player: S.player, game: GAME_ID, at: () => document.querySelector('#scr-menu .title'), current: msNow, noDrop: true, open: msOpen}); }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
-function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">' + (SET.mode === 'arcade' ? 'No run yet' : 'No case solved yet') + '</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span><span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
+function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">' + (SET.mode === 'arcade' ? 'No run yet' : 'No case solved yet') + '</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span>' + (SET.mode === 'arcade' && b.timeSec ? '<span>⏱ ' + PK.mmss(b.timeSec) + '</span>' : '') + '<span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
 function renderMenu(){
   const ml = $('mode-list');
   if(!ml.children.length) UI.modeGroups(ml, MODE_GROUPS, MODES.map(m => Object.assign({}, m)), {next: () => $('level-head'), moreText: '👇 Pick a level below',
@@ -1126,7 +1130,7 @@ function renderLevels(){
     const U = LEVEL_UI[i], open = canPlay(i), done = p.unlocked > i, b = document.createElement('button');
     b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (U.hardcore ? ' hardcore' : ''); b.setAttribute('data-sound', open ? 'pop' : 'none'); b.dataset.lv = i;
     b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">' + BADGES[i][0] + '</span>' : open ? '' : '<span class="badge">🔒</span>') +
-      '<div class="big">' + U.emoji + '</div><div class="nm">' + L.name + '</div><div class="learn">' + (SET.mode === 'detective' ? '📖 3 chapters · 🔍📜🚶🖼️🔐👉' : SET.mode === 'arcade' ? '⏱️ ' + PK.ARCADE[i].start + ' s · ' + PK.ARCADE[i].n + ' a picture' : SET.mode === 'odd' ? PK.ODD[i].cards + ' cards · ' + PK.ODD_ROUNDS + ' rounds' : L.n + ' changes · ' + L.pics + ' pictures') + '</div><div class="sub">' + (U.hardcore && !open ? '🔒 Beat Extreme to open 💀 Hardcore' : SET.mode === 'detective' ? STORY_BLURB[i] : SET.mode === 'arcade' ? ARC_BLURB[i] : SET.mode === 'odd' ? ODD_BLURB[i] : SET.mode === 'blink' ? BLINK_BLURB[i] : U.blurb) + '</div>' + bestHtml(p, i);
+      '<div class="big">' + U.emoji + '</div><div class="nm">' + L.name + '</div><div class="learn">' + (SET.mode === 'detective' ? '📖 3 chapters · 🔍📜🚶🖼️🔐👉' : SET.mode === 'arcade' ? '🏁 ' + PK.ARCADE[i].goal + ' pictures · ⭐⭐⭐ under ' + PK.mmss(PK.ARCADE[i].par) : SET.mode === 'odd' ? PK.ODD[i].cards + ' cards · ' + PK.ODD_ROUNDS + ' rounds' : L.n + ' changes · ' + L.pics + ' pictures') + '</div><div class="sub">' + (U.hardcore && !open ? '🔒 Beat Extreme to open 💀 Hardcore' : SET.mode === 'detective' ? STORY_BLURB[i] : SET.mode === 'arcade' ? ARC_BLURB[i] : SET.mode === 'odd' ? ODD_BLURB[i] : SET.mode === 'blink' ? BLINK_BLURB[i] : U.blurb) + '</div>' + bestHtml(p, i);
     b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore' : i === 4 ? 'Solve a Hard case to unlock Extreme!' : 'Solve the level before to unlock it'); return; } startCase(i); };
     box.appendChild(b);
   });
@@ -1145,18 +1149,18 @@ function startCase(lvl){
   if(SET.mode === 'detective') return storyStart(lvl);
   const mode = MODES.some(m => m.k === SET.mode && !m.soon) ? SET.mode : 'spot', L = PK.LEVELS[lvl], O = PK.ODD[lvl];
   G = {mode, level: lvl, L, O, pic: -1, over: false, paused: false, held: false, secs: 0, last: performance.now(), found: [], marks: [], scene: null, used: {}, lastTheme: '',
-    lives: (mode === 'odd' ? O.lives : mode === 'arcade' ? 0 : L.lives) || 0, rounds: mode === 'odd' ? PK.ODD_ROUNDS : mode === 'arcade' ? 9999 : L.pics,
-    A: mode === 'arcade' ? Object.assign({}, PK.ARCADE[lvl]) : null, timeLeft: mode === 'arcade' ? PK.ARCADE[lvl].start : 0, cps: 0, pics: 0, total: {found: 0, oops: 0, hints: 0, perfect: 0, quick: 0, points: 0}, picLog: [], busy: true, k: 1, dpr: Math.min(2, window.devicePixelRatio || 1)};
+    lives: (mode === 'odd' ? O.lives : mode === 'arcade' ? 0 : L.lives) || 0, rounds: mode === 'odd' ? PK.ODD_ROUNDS : mode === 'arcade' ? PK.ARCADE[lvl].goal : L.pics,
+    A: mode === 'arcade' ? Object.assign({}, PK.ARCADE[lvl]) : null, timeLeft: mode === 'arcade' ? PK.ARCADE[lvl].limit : 0, run: 0, pen: 0, extra: 0, cps: 0, splits: [], pics: 0, total: {found: 0, oops: 0, hints: 0, perfect: 0, quick: 0, points: 0}, picLog: [], busy: true, k: 1, dpr: Math.min(2, window.devicePixelRatio || 1)};
   $('scr-play').dataset.mode = mode;
   GC_LOG.length = 0;
   if(UI.modeTried) UI.modeTried(S.player, GAME_ID, SET.mode);
   showScreen('play');
   BAR.level(L.name + (L.hardcore ? ' 💀' : ''));
-  BAR.count('pic', MODE_ICON[mode] === '⏱️' ? '📸' : MODE_ICON[mode], mode === 'arcade' ? '0' : '1/' + G.rounds, mode === 'odd' ? 'Round' : mode === 'arcade' ? 'Pictures done' : 'Picture');
+  BAR.count('pic', MODE_ICON[mode] === '⏱️' ? '📸' : MODE_ICON[mode], mode === 'arcade' ? '0/' + G.rounds : '1/' + G.rounds, mode === 'odd' ? 'Round' : mode === 'arcade' ? 'Pictures to the 🏁' : 'Picture');
   BAR.count('found', '🔎', '0/' + L.n, 'Found'); BAR.hide('found', mode === 'odd');
   BAR.miss(0);
   const hasSlot = k => !!document.querySelector('#scr-play .gb-' + k);   // a slot is only made when this case needs it (old ones from another case are hidden)
-  if(mode === 'arcade') BAR.time(G.timeLeft); else if(lvl > 0) BAR.time(0); else if(hasSlot('time')) BAR.hide('time', true);
+  if(mode === 'arcade') BAR.time(0); else if(lvl > 0) BAR.time(0); else if(hasSlot('time')) BAR.hide('time', true);
   $('tbar').classList.toggle('hidden', mode !== 'arcade'); if(mode === 'arcade'){ G.hints = G.A.hints; arcBar(); }
   if(G.lives) BAR.lives(G.lives); else if(hasSlot('lives')) BAR.hide('lives', true);
   BAR.fit();
@@ -1172,11 +1176,11 @@ function nextPicture(){
   G.lastTheme = theme; G.used[sc.sig] = 1; G.scene = sc; G.found = sc.diffs.map(() => false); G.pOops = 0; G.pHints = 0; G.pSecs = 0; G.lastFind = performance.now(); G.glowAt = -1;
   if(G.mode !== 'arcade') G.hints = L.hints;
   const nN = sc.diffs.length;
-  clearMarks(); if(G.mode === 'arcade') BAR.count('pic', '📸', String(G.pics), 'Pictures done'); else BAR.count('pic', MODE_ICON[G.mode], (G.pic + 1) + '/' + G.rounds, 'Picture'); BAR.count('found', '🔎', '0/' + nN, 'Found');
+  clearMarks(); if(G.mode === 'arcade') BAR.count('pic', '📸', G.pics + '/' + G.rounds, 'Pictures to the 🏁'); else BAR.count('pic', MODE_ICON[G.mode], (G.pic + 1) + '/' + G.rounds, 'Picture'); BAR.count('found', '🔎', '0/' + nN, 'Found');
   $('dots').innerHTML = sc.diffs.map(() => '<i></i>').join('');
   updHint(); layout(true);
   ['pic-a', 'pic-b'].forEach(id => { const e = $(id); e.classList.remove('in'); void e.offsetWidth; e.classList.add('in'); });
-  if(G.mode === 'arcade') goal(G.pic === 0 ? '⏱️ Find ' + nN + ' · +' + G.A.find + ' s a find' + (G.level >= 3 ? ' · oops −' + G.A.oops + ' s' : '') + '!' : '📸 Picture ' + (G.pic + 1) + ' — find ' + nN + '!');
+  if(G.mode === 'arcade') goal(G.pic === 0 ? (G.A.bonus ? '🏁 ' + G.rounds + ' pictures! Find ⏳+' + G.A.bonus + ' s · oops ⏱+' + G.A.oops + ' s' : '🏁 ' + G.rounds + ' pictures — go, go, go!' + (G.A.oops ? ' Oops = +' + G.A.oops + ' s' : '')) : '📸 ' + (G.pic + 1) + '/' + G.rounds + ' — find ' + nN + '!');
   else if(G.mode === 'blink') goal(G.pic === 0 && G.level === 0 ? '👁️ The picture flips A ↔ B. Poke what changes! (' + L.n + ' to find)' : '👁️ Watch it blink — find ' + L.n + ' changes!' + (G.level < 2 ? ' ' + typeTips() : ''));
   else goal(G.pic === 0 && G.level === 0 ? '👀 Look at A and B. Poke what\'s different! (' + L.n + ' to find)' : '🔍 Find ' + L.n + ' differences!' + (G.level < 2 ? ' ' + typeTips() : ''));
   G.busy = false;
@@ -1245,7 +1249,7 @@ function found(i){
   const n = G.found.filter(Boolean).length, L = G.L, N = G.scene.diffs.length;
   const dots = $('dots').children; if(dots[n - 1]) dots[n - 1].classList.add('on');
   if(G.mode === 'detective' && G.step && G.step.verb === 'find') BAR.count('found', '👣', n + '/' + N, 'Footprints'); else BAR.count('found', '🔎', n + '/' + N, 'Found');
-  if(G.mode === 'arcade'){ G.timeLeft += G.A.find; G.total.found++; timePop('+' + G.A.find + ' s'); arcBar(); }
+  if(G.mode === 'arcade'){ G.total.found++; if(G.A.bonus){ G.extra += G.A.bonus; arcClock(); timePop('⏳ +' + G.A.bonus + ' s'); } }   // pk-3d: run time never shrinks; 🌋 / 💀 finds give ⏳ more time LEFT (Aowu 14:44)
   UISound.play('success'); bdReact('happy', 1300);
   goal((FOUND_SAY[d.sub] || '🎉 Found one!') + ' ' + (n < N ? (N - n) + ' more to find.' : ''), 'yay');
   moment('found', {i, type: d.t, sub: d.sub, n});
@@ -1258,7 +1262,7 @@ function oops(side, p){
   const pic = $(side === 'A' ? 'pic-a' : 'pic-b'); pic.classList.remove('shake'); void pic.offsetWidth; pic.classList.add('shake');
   moment('oops', {side, x: Math.round(p.x), y: Math.round(p.y)});
   if(G.mode === 'arcade'){
-    if(G.A.oops){ G.timeLeft = Math.max(0, G.timeLeft - G.A.oops); timePop('−' + G.A.oops + ' s', true); arcBar(); goal('Oops! −' + G.A.oops + ' s — look closely.', 'oops'); if(G.timeLeft <= 0) timeUp(); return; }
+    if(G.A.oops){ G.pen += G.A.oops; arcClock(); timePop('+' + G.A.oops + ' s', true); goal('Oops! +' + G.A.oops + ' s on your clock — look closely.', 'oops'); if(G.timeLeft <= 0) timeUp(); return; }
     goal('Oops! That part is the same in both. Keep looking!', 'oops'); return;
   }
   if(G.L.lives){
@@ -1335,7 +1339,7 @@ function tick(){
   const now = performance.now(), dt = (now - G.last) / 1000; G.last = now;
   if(G.paused || G.held || G.busy || $('scr-play').classList.contains('hidden')) { G.lastFind += dt * 1000; return; }
   G.secs += dt; G.pSecs += dt;
-  if(G.mode === 'arcade'){ G.timeLeft = Math.max(0, G.timeLeft - dt); BAR.time(Math.ceil(G.timeLeft), G.timeLeft <= 10); arcBar(); if(G.timeLeft <= 0) return timeUp(); }
+  if(G.mode === 'arcade'){ arcClock(); if(G.timeLeft <= 0) return timeUp(); }
   else if(G.level > 0) BAR.time(Math.floor(G.secs));
   if(G.mode === 'detective' && !(G.step && (G.step.verb === 'find' || G.step.verb === 'spot'))) return storyTick(now);
   const glowS = G.mode === 'odd' ? G.O.glow : G.L.glow;
@@ -1485,16 +1489,18 @@ function oddHint(){
   moment('hint', {type: G.odd.type});
 }
 /* ================= ⏱️ PHOTO HUNT ARCADE (pk-2b): pictures in a row against the clock — + time per find, ✅ checkpoint every 5 pictures ================= */
-function arcBar(){ const e = $('tbar'); if(!e || !G || !G.A) return; const f = Math.max(0, Math.min(1, G.timeLeft / Math.max(G.A.start, 60))); e.firstElementChild.style.width = (f * 100) + '%'; e.classList.toggle('low', G.timeLeft <= 10); }
+function arcClock(){ G.run = G.secs + G.pen; G.timeLeft = Math.max(0, G.A.limit + (G.extra || 0) - G.run); BAR.time(Math.floor(G.run), G.timeLeft <= 20); arcBar(); }   // ⏱ counts UP (+ oops seconds); the bar = time left before the limit
+function arcBar(){ const e = $('tbar'); if(!e || !G || !G.A) return; const f = Math.max(0, Math.min(1, G.timeLeft / G.A.limit)); e.firstElementChild.style.width = (f * 100) + '%'; e.classList.toggle('low', G.timeLeft <= 20); }
 function timePop(txt, bad){ if(!FX) return; const e = document.createElement('div'); e.className = 'tpop' + (bad ? ' bad' : ''); e.textContent = txt; $('board').appendChild(e); setTimeout(() => e.remove(), 1000); }
 function arcPictureDone(){
-  G.busy = true; G.pics++; G.timeLeft += G.A.pic; arcBar(); BAR.count('pic', '📸', String(G.pics), 'Pictures done');
+  G.busy = true; G.pics++; arcClock(); BAR.count('pic', '📸', G.pics + '/' + G.rounds, 'Pictures to the 🏁');
   if(!G.pOops && !G.pHints) G.total.perfect++;
   G.total.quick = G.total.quick ? Math.min(G.total.quick, Math.max(1, Math.round(G.pSecs))) : Math.max(1, Math.round(G.pSecs));
+  if(G.pics >= G.rounds){ G.finished = true; bigWord('🏁 FINISH!', '⏱ ' + PK.mmss(G.run)); UISound.play('success'); bdReact('win', 1800); confetti(['🏁', '⏱️', '⭐'], 22); moment('finish', {n: G.pics, time: Math.round(G.run)}); pkWait(1400).then(() => { if(G && !G.over) arcFinish(); }); return; }
   const cp = G.pics % PK.CHECK_EVERY === 0;
-  if(cp){ G.cps++; G.timeLeft += G.A.cp; arcBar(); bigWord('✅ Checkpoint ' + G.cps + '!', '+' + (G.A.cp + G.A.pic) + ' s'); UISound.play('unlock'); bdReact('joy', 1800); confetti(['⏱️', '✅', '⭐'], 14); }
-  else { bigWord('📸 ' + pkPick(PRAISE), '+' + G.A.pic + ' s'); UISound.play('success'); bdReact('happy', 1200); }
-  moment(cp ? 'checkpoint' : 'picdone', {n: G.pics, cps: G.cps, left: Math.round(G.timeLeft)});
+  if(cp){ G.cps++; G.splits.push(Math.round(G.run)); bigWord('✅ Checkpoint ' + G.cps + '!', '⏱ ' + PK.mmss(G.run) + ' · ' + (G.rounds - G.pics) + ' to go'); UISound.play('unlock'); bdReact('joy', 1800); confetti(['⏱️', '✅', '⭐'], 14); }
+  else { bigWord('📸 ' + pkPick(PRAISE), G.pics + '/' + G.rounds); UISound.play('success'); bdReact('happy', 1200); }
+  moment(cp ? 'checkpoint' : 'picdone', {n: G.pics, cps: G.cps, time: Math.round(G.run)});
   pkWait(cp ? 1300 : 800).then(() => {
     if(!G || G.over) return;
     ['pic-a', 'pic-b'].forEach(id => $(id).classList.add('out'));
@@ -1502,17 +1508,19 @@ function arcPictureDone(){
   });
 }
 function timeUp(){ if(!G || G.over || G.timeUp) return; G.timeUp = true; G.busy = true; UISound.play('error');
-  G.scene.diffs.forEach((d, i) => { if(!G.found[i]) ['A', 'B'].forEach(s => mark(s, 'miss', d.x, d.y, d.hit)); }); bigWord('⏱️ Time\'s up!'); moment('timeup', {pics: G.pics}); pkWait(1400).then(() => { if(G && !G.over) arcFinish(); }); }
+  G.scene.diffs.forEach((d, i) => { if(!G.found[i]) ['A', 'B'].forEach(s => mark(s, 'miss', d.x, d.y, d.hit)); }); bigWord('⏱️ Time\'s up!'); moment('timeup', {pics: G.pics, goal: G.rounds}); pkWait(1400).then(() => { if(G && !G.over) arcFinish(); }); }
 function arcFinish(){
   if(!G || G.over) return; G.over = true; stopTicker(); hideHand();
-  const T = G.total, r = {found: T.found, pictures: G.pics, checkpoints: G.cps}, score = PK.arcadeScore(G.level, r), stars = PK.arcadeStars(r), cleared = G.cps >= 1, L = G.L, secs = Math.round(G.secs);
+  const T = G.total, run = Math.round(G.run || 0), r = {found: T.found, pictures: G.pics, finished: !!G.finished, time: run}, score = PK.arcadeScore(G.level, r), stars = PK.arcadeStars(G.level, r), cleared = !!G.finished, L = G.L, secs = Math.round(G.secs);
+  const before = ((progressOf(S.player, ARC_ID) || {}).best || [])[G.level], pb = cleared && before && before.timeSec && run < before.timeSec;
   NOTES.length = 0;
   let h = '<div class="res-det" id="res-det"><canvas id="res-av" width="240" height="264"></canvas><svg class="hat" viewBox="0 0 60 30" aria-hidden="true"><path d="M8 23 Q30 1 52 23 Z" fill="#8B5A2B" stroke="#3B2410" stroke-width="2"/><path d="M12 19 Q30 7 48 19" fill="none" stroke="#C99A5B" stroke-width="2" stroke-dasharray="3 3"/><path d="M3 24 H57" stroke="#3B2410" stroke-width="4" stroke-linecap="round"/><circle cx="30" cy="5" r="3" fill="#C99A5B"/></svg><span class="glass">⏱️</span></div>'
-    + '<h2 class="' + (cleared ? 'cheer' : '') + '">' + (cleared ? '⏱️ Great run, detective!' : '⏱️ Time\'s up!') + '</h2>'
+    + '<h2 class="' + (cleared ? 'cheer' : '') + '">' + (cleared ? '🏁 Finished in ' + PK.mmss(run) + '!' : '⏱️ Time\'s up!') + '</h2>'
+    + (pb ? '<div class="thief">🥇 New best time! (was ' + PK.mmss(before.timeSec) + ')</div>' : '')
     + '<div class="note">⏱️ Photo Hunt Arcade · ' + L.name + (L.hardcore ? ' 💀' : '') + ' · ' + houseLabel() + '</div>'
     + '<div class="rating">' + [1, 2, 3].map(i => '<span class="st' + (i <= stars ? '' : ' off') + '">⭐</span>').join('') + '</div><div class="score-big">🏆 ' + score.toLocaleString() + '</div>'
-    + '<div class="stats"><span>📸 ' + G.pics + ' picture' + (G.pics === 1 ? '' : 's') + '</span><span>✅ ' + G.cps + ' checkpoint' + (G.cps === 1 ? '' : 's') + '</span><span>🔎 ' + T.found + ' finds</span><span>❌ ' + T.oops + ' oops</span><span>⏱ ' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0') + '</span></div>';
-  if(!cleared) h += '<div class="note">💡 Reach ✅ checkpoint 1 (' + PK.CHECK_EVERY + ' pictures) to open the next level.</div>';
+    + '<div class="stats"><span>📸 ' + G.pics + '/' + G.rounds + ' pictures</span><span>⏱ ' + PK.mmss(run) + '</span>' + (G.splits.length ? '<span>✅ ' + G.splits.map(PK.mmss).join(' · ') + '</span>' : '') + '<span>🔎 ' + T.found + ' finds</span><span>❌ ' + T.oops + ' oops' + (G.pen ? ' (+' + G.pen + ' s)' : '') + '</span></div>'
+    + '<div class="note">' + (cleared ? (stars < 3 ? '⭐⭐⭐ under ' + PK.mmss(G.A.par) + ' — can you go faster?' : '⭐⭐⭐ Lightning eyes!') : '💡 Reach the 🏁 (' + G.rounds + ' pictures) within ' + PK.mmss(G.A.limit) + ' to open the next level.') + '</div>';
   h += '<div class="save-note" id="save-note">' + (S.player ? '💾 Saving…' : '') + '</div>'
     + '<div class="res-btns" id="res-btns"><button class="sp-btn sp-secondary" id="res-levels" data-sound="tap">🎚️ Levels</button><button class="sp-btn sp-secondary" id="res-again" data-sound="pop">🔁 Play again</button>'
     + (cleared && G.level < 5 ? '<button class="sp-btn sp-primary" id="res-next" data-sound="pop">Next level ▶</button>' : '') + '</div><div class="comics-slot" id="comic-strip-slot"></div>';
@@ -1523,8 +1531,8 @@ function arcFinish(){
   if($('res-next')) $('res-next').onclick = () => startCase(Math.min(5, (G ? G.level : SET.level) + 1));
   if(cleared){ confetti(['⏱️', '⭐', '🕵️', '🎉'], 22); UISound.play('success'); } else bdReact('lose', 2000);
   moment(cleared ? 'win' : 'lose', {score, stars, pics: G.pics, cps: G.cps});
-  const stats = {games: 1, pictures: G.pics, checkpoints: G.cps, found: T.found, oops: T.oops, hints: T.hints};
-  if(S.player) saveWin(S.player, G.level, {score, stars, cleared, timeSec: secs, theme: '⏱️ Arcade · ' + houseLabel(), stats}, null, 0, ARC_ID);
+  const stats = {games: 1, pictures: G.pics, checkpoints: G.cps, finishes: cleared ? 1 : 0, found: T.found, oops: T.oops, hints: T.hints};
+  if(S.player) saveWin(S.player, G.level, {score, stars, cleared, timeSec: cleared ? run : 0, theme: '⏱️ Speed run · ' + houseLabel(), stats}, null, 0, ARC_ID);   // timeSec only for a finished run → best time per level
   if(UI.alsoTry) UI.alsoTry({player: S.player, game: GAME_ID, at: () => $('res-btns'), current: SET.mode, open: id => { leavePlay(); msOpen(id); }});
   SET.level = G.level;
 }
@@ -1883,4 +1891,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c) END OF Pokadif.html -->
+<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d) END OF Pokadif.html -->

@@ -717,6 +717,7 @@ const MODES_ = [
   { game: 'blasoff', id: 'fours', icon: '⚽', name: 'Soccer 4v4', pitch: 'Small pitch, close camera!', route: 'blasoff', tried: { board: 'blasoff', themeStart: '4v4 ·', feat: [['blasoff', 'win_4v4']] }, added: '2026-11-14' },   // ⚽ bo-1
   { game: 'blasoff', id: 'sevens', icon: '🏟️', name: 'Soccer 7v7', pitch: 'Bigger pitch, more passing!', route: 'blasoff', tried: { board: 'blasoff', themeStart: '7v7 ·', feat: [['blasoff', 'win_7v7']] }, added: '2026-11-14' },   // ⚽ bo-1
   { game: 'blasoff', id: 'elevens', icon: '🌍', name: 'Soccer 11v11', pitch: 'Full pitch, 11 a side!', route: 'blasoff', tried: { board: 'blasoff', themeStart: '11v11 ·', feat: [['blasoff', 'win_11v11']] }, added: '2026-11-14' },   // 🌍 bo-2a
+  { game: 'blasoff', id: 'party', icon: '🎉', name: 'Party ball', pitch: 'A wild bomb ball, confetti goals!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Party ball ·', feat: [['blasoff', 'win_party']] }, added: '2026-11-14' },   // 🎉 bo-3c
   { game: 'blasoff', id: 'futsal', icon: '🥅', name: 'Futsal 5v5', pitch: 'Fast court soccer, heavy ball!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Futsal 5v5 ·', feat: [['blasoff', 'win_5v5']] }, added: '2026-11-14' },   // 🏟️ bo-2b
   { game: 'blasoff', id: 'street', icon: '🏙️', name: 'Street 1v1', pitch: 'Nutmeg = a point, first to 5!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Street 1v1 ·', feat: [['blasoff', 'win_1v1']] }, added: '2026-11-14' },   // 🏙️ bo-2b
   { game: 'blasoff', id: 'skills', icon: '🎯', name: 'Skill challenges', pitch: '7 drills, three stars each!', route: 'blasoff', tried: { feat: [['blasoff', 'skills']] }, added: '2026-11-14' },   // 🎯 bo-3a
@@ -758,7 +759,7 @@ const MODE_GROUPS_ = {
   'eyes-brain': [{k: 'remember', icon: '🔢', en: 'Ways to remember', th: 'วิธีจำ', modes: ['classic', 'backwards', 'colour', 'letters', 'listen', 'word', 'shapes']}, {k: 'challenge', icon: '🏔️', en: 'Challenge', th: 'ท้าทาย', modes: ['challenge', 'daily']}, {k: 'party', icon: '👥', en: 'Party', th: 'เล่นกันหลายคน', modes: ['chain']}],
   'pyraspike': [{k: 'spike', icon: '🏐', en: 'PyraSpike', th: 'วอลเลย์บอล', modes: ['beach', 'small', 'full']}, {k: 'strike', icon: '🦶', en: 'PyraStrike', th: 'ตะกร้อ', modes: ['strikesolo', 'strikeduo', 'strikeregu', 'hoop']}, {k: 'spark', icon: '⚡', en: 'PyraSpark', th: 'บอลข้ามโต๊ะ', modes: ['sparksolo', 'sparkduo', 'party']}, {k: 'train', icon: '🎯', en: 'Training + Cups', th: 'ฝึกซ้อม + ถ้วย', modes: ['zonehits', 'combo', 'rallyrun', 'juggle', 'cups']}],   // 🔥 pd-3a
   'sla-brall': [{k: 'sports', icon: '🏓', en: 'Sports', th: 'กีฬา', modes: ['slashot', 'slapoof', 'slaball', 'slapong', 'slabam', 'slawall']}, {k: 'cup', icon: '🏆', en: 'Cup', th: 'ทัวร์นาเมนต์', modes: ['cup']}, {k: 'link', icon: '📡', en: 'Own devices', th: 'เล่นหลายเครื่อง', modes: ['lhost', 'ljoin']}],   // 📡 p3a: lk-1b's 🔗 Join friends
-  'blasoff': [{k: 'match', icon: '⚽', en: 'Matches', th: 'แข่งฟุตบอล', modes: ['fours', 'sevens', 'elevens']}, {k: 'small', icon: '🏙️', en: 'Futsal + Street', th: 'ฟุตซอล · สตรีท', modes: ['futsal', 'street']}, {k: 'skill', icon: '🕺', en: 'Tricks + skills', th: 'ลีลา · ทักษะ', modes: ['battle', 'skills', 'shootout']}],   // ⚽ bo-1 · 🌍 bo-2a · 🏙️ bo-2b
+  'blasoff': [{k: 'match', icon: '⚽', en: 'Matches', th: 'แข่งฟุตบอล', modes: ['fours', 'sevens', 'elevens', 'party']}, {k: 'small', icon: '🏙️', en: 'Futsal + Street', th: 'ฟุตซอล · สตรีท', modes: ['futsal', 'street']}, {k: 'skill', icon: '🕺', en: 'Tricks + skills', th: 'ลีลา · ทักษะ', modes: ['battle', 'skills', 'shootout']}],   // ⚽ bo-1 · 🌍 bo-2a · 🏙️ bo-2b
   'brawl-buddies': [{k: 'battle', icon: '🥊', en: 'Battle', th: 'ต่อสู้', modes: ['battle']}, {k: 'adv', icon: '🗺️', en: 'Brawenture', th: 'ผจญภัย', modes: ['brawenture']}],
   'georead': [{k: 'sounds', icon: '🔊', en: 'Sounds', th: 'เสียง', modes: ['phonics', 'rhyme', 'say']}, {k: 'words', icon: '🧱', en: 'Words', th: 'คำ', modes: ['build', 'sight', 'case', 'trace']}, {k: 'reading', icon: '📖', en: 'Reading', th: 'อ่าน', modes: ['story', 'types']}, {k: 'journey', icon: '🗺️', en: 'Journey', th: 'ผจญภัย', modes: ['journey']}],
   'pose-party': [{k: 'pose', icon: '🎯', en: 'Pose', th: 'ท่าโพส', modes: ['classic', 'speed', 'copy']}, {k: 'move', icon: '💃', en: 'Move', th: 'ขยับตัว', modes: ['dance', 'statue', 'freeze']}, {k: 'together', icon: '🧑‍🤝‍🧑', en: 'Together', th: 'เล่นด้วยกัน', modes: ['group', 'mirror', 'letters']}, {k: 'calm', icon: '🧘', en: 'Calm', th: 'ยืดเหยียด', modes: ['yoga']}]
@@ -2537,6 +2538,7 @@ const FEAT_DEFS = {
     juggles: { name: 'Keepy-ups', icon: '🦶', kind: 'max', tiers: [10, 25, 50] },
     win_pens: { name: 'Shootout wins', icon: '🥅', kind: 'sum', hidden: true },
     win_battle: { name: 'Tricks Battle wins', icon: '🎤', kind: 'sum', tiers: [1, 10, 50] },   // 🎤 bo-3b
+    win_party: { name: 'Party ball wins', icon: '🎉', kind: 'sum', tiers: [1, 10, 50] },   // 🎉 bo-3c
   },
   // 🔍 Pokadif feats (pk-1)
   'pokadif': {
@@ -4673,7 +4675,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
