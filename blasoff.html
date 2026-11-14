@@ -165,6 +165,7 @@
   @keyframes hand-bob{50%{transform:translate(6px,-8px) rotate(-8deg);}}
   .kb-hint{position:absolute;left:50%;top:50px;transform:translateX(-50%);z-index:12;pointer-events:none;background:rgba(8,16,40,0.82);border-radius:12px;padding:5px 12px;font-weight:800;font-size:0.8rem;white-space:nowrap;max-width:96%;overflow:hidden;text-overflow:ellipsis;}
   .kb-hint kbd{background:#fff;color:#13254A;border-radius:5px;padding:0 5px;font-family:'Fredoka',sans-serif;margin:0 1px;}
+  .radar{position:absolute;right:calc(8px + env(safe-area-inset-right));top:8px;z-index:12;border-radius:8px;box-shadow:0 0 0 2px rgba(255,255,255,0.75),0 4px 10px rgba(0,0,0,0.35);pointer-events:none;}
   /* 📱↻ phones held upright: matches are played sideways */
   .turn-card{position:absolute;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:radial-gradient(circle at 50% 40%,#1F3A7A,#0B1530 70%);text-align:center;padding:24px;}
   .turn-card .ph{font-size:4.2rem;animation:turn-ph 2s ease-in-out infinite;}
@@ -244,6 +245,7 @@
     <div class="goal-line hidden" id="goal-line"></div>
     <div class="kb-hint hidden" id="kb-hint"></div>
     <div class="shout-kb hidden" id="shout-kb"></div>
+    <canvas class="radar hidden" id="radar" aria-label="radar: the whole pitch"></canvas>
     <div class="pads" id="pads"></div>
     <div class="turn-card hidden" id="turn-card"><div class="ph">📱</div><h2>Turn your phone sideways ↻</h2><p>Matches are played with the phone on its side — more pitch, room for both thumbs.</p></div>
   </div>
@@ -267,7 +269,13 @@ var BO = (function () {
      4v4 = 4 outfield players + a 🧤 robot keeper (formations 1-2-1 / 2-2 count outfield players) · 7v7 = 6 + keeper (2-3-1 / 3-2-1). */
   var SIZES = {
     4: {n: 4, Lh: 21, Wh: 13.5, goalW: 2.6, goalH: 2.0, boxL: 6, boxW: 7.5, spot: 7.5, cam: 1, forms: {'121': [[-0.62, 0], [-0.32, -0.55], [-0.32, 0.55], [-0.04, 0]], '22': [[-0.6, -0.42], [-0.6, 0.42], [-0.16, -0.46], [-0.16, 0.46]]}, formOrder: ['121', '22'], formName: {'121': '1-2-1 diamond', '22': '2-2 box'}},
-    7: {n: 6, Lh: 31, Wh: 20, goalW: 3.1, goalH: 2.2, boxL: 9, boxW: 11, spot: 9, cam: 1.3, forms: {'231': [[-0.64, -0.42], [-0.64, 0.42], [-0.34, -0.66], [-0.36, 0], [-0.34, 0.66], [-0.04, 0]], '321': [[-0.66, -0.58], [-0.68, 0], [-0.66, 0.58], [-0.32, -0.36], [-0.32, 0.36], [-0.04, 0]]}, formOrder: ['231', '321'], formName: {'231': '2-3-1', '321': '3-2-1'}}
+    7: {n: 6, Lh: 31, Wh: 20, goalW: 3.1, goalH: 2.2, boxL: 9, boxW: 11, spot: 9, cam: 1.3, forms: {'231': [[-0.64, -0.42], [-0.64, 0.42], [-0.34, -0.66], [-0.36, 0], [-0.34, 0.66], [-0.04, 0]], '321': [[-0.66, -0.58], [-0.68, 0], [-0.66, 0.58], [-0.32, -0.36], [-0.32, 0.36], [-0.04, 0]]}, formOrder: ['231', '321'], formName: {'231': '2-3-1', '321': '3-2-1'}},
+    // 🌍 bo-2a: 11v11 = 10 outfield + keeper on a kids-size full pitch (≈ 96 × 62 m), the camera goes semi-wide
+    11: {n: 10, Lh: 48, Wh: 31, goalW: 3.66, goalH: 2.44, boxL: 15, boxW: 19, spot: 10.5, cam: 1.9, forms: {
+      '442': [[-0.72, -0.62], [-0.75, -0.21], [-0.75, 0.21], [-0.72, 0.62], [-0.4, -0.66], [-0.42, -0.22], [-0.42, 0.22], [-0.4, 0.66], [-0.06, -0.2], [-0.06, 0.2]],
+      '433': [[-0.72, -0.62], [-0.75, -0.21], [-0.75, 0.21], [-0.72, 0.62], [-0.44, -0.42], [-0.48, 0], [-0.44, 0.42], [-0.1, -0.58], [-0.04, 0], [-0.1, 0.58]],
+      '352': [[-0.74, -0.42], [-0.77, 0], [-0.74, 0.42], [-0.42, -0.74], [-0.45, -0.34], [-0.5, 0], [-0.45, 0.34], [-0.42, 0.74], [-0.06, -0.2], [-0.06, 0.2]]},
+      formOrder: ['442', '433', '352'], formName: {'442': '4-4-2', '433': '4-3-3', '352': '3-5-2'}}
   };
   // 👮 rules by level (plan §7) · bo-1b (Aowu 2026-11-14): 🌋 Extreme ≈ 18 % / 💀 Hardcore ≈ 8–10 % wins for a simple test player: offside 0 off · 1 simple · 2 full; aim help 3 strong · 2 medium · 1 light · 0 none
   var LEVELS = [
@@ -290,8 +298,8 @@ var BO = (function () {
   // ---------- match ----------
   function newMatch(o) {
     o = o || {};
-    var S = SIZES[o.size === 7 ? 7 : 4], lv = clamp(o.level | 0, 0, 5), L = LEVELS[lv];
-    var M = {S: S, size: o.size === 7 ? 7 : 4, level: lv, L: L, theme: o.theme || 'classic', rnd: mulberry((o.seed | 0) || 1234567), t: 0, clock: 0, half: 1,
+    var S = SIZES[o.size] || SIZES[4], lv = clamp(o.level | 0, 0, 5), L = LEVELS[lv];
+    var M = {S: S, size: SIZES[o.size] ? +o.size : 4, level: lv, L: L, theme: o.theme || 'classic', rnd: mulberry((o.seed | 0) || 1234567), t: 0, clock: 0, half: 1,
       halfLen: o.half || L.half, phase: 'kickoff', phaseT: 0, score: [0, 0], events: [], log: [], players: [], ctrls: [], forms: [o.form0 || S.formOrder[0], o.form1 || S.formOrder[0]],
       shout: [null, null], kickSide: 0, golden: false, goldenT: 0, pens: null, done: false, winner: -1, fast: !!o.fast, guided: o.guided == null ? L.guided : o.guided,
       stats: [newStats(), newStats()], rs: null, cards: [], noOffside: !!o.noOffside};
@@ -350,7 +358,7 @@ var BO = (function () {
     M.players.forEach(function (p) {
       var d = dirOf(p.side), h;
       if (p.gk) h = {x: -d * (S.Lh - 0.9), y: 0};
-      else { var f = S.forms[M.forms[p.side]][p.slot]; h = {x: d * Math.min(-0.05, f[0] * 0.95) * S.Lh, y: f[1] * S.Wh * 0.85}; if (h.x * d > -2.2 && Math.abs(h.y) < 9.5 && p.side !== side) h.x = -d * Math.max(9.6, 2.2); }
+      else { var f = S.forms[M.forms[p.side]][p.slot]; h = {x: d * Math.min(-0.05, f[0] * 0.95) * S.Lh, y: f[1] * S.Wh * 0.85}; if (h.x * d > -2.2 && Math.abs(h.y) < S.boxW * 0.5 && p.side !== side) h.x = -d * Math.max(S.boxW * 0.5, 2.2); }
       p.x = h.x; p.y = h.y; p.z = 0; p.vx = p.vy = p.vz = 0; p.st = 'ok'; p.stT = 0; p.fx = d; p.fy = 0; p.dive = 0; p.diveT = 0; p.holdT = 0; p.celebrate = 0; p.pressT = 0; p.immune = 0;
     });
     // the kick-off taker stands by the ball
@@ -1105,7 +1113,7 @@ const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '�
   levels: () => leavePlay(), playing: () => !!(G && !G.over), onLeave: () => { try{ speechSynthesis.cancel(); }catch(e){} },
   pause: {pause: () => pauseGame(), resume: () => { if(G && G.paused && !G.over) togglePause(); }},
   onFit: () => { if(G){ resize(); buildPads(); } },
-  extras: [{id: 'pause-btn', html: '<span class="gb-pzi" aria-hidden="true"><i></i><i></i></span>', label: 'Pause (P)', onClick: () => togglePause(), keep: true}]});
+  extras: [{id: 'zoom-btn', icon: '🔍', label: 'Zoom in / out (Z)', onClick: () => toggleZoom(), keep: true}, {id: 'pause-btn', html: '<span class="gb-pzi" aria-hidden="true"><i></i><i></i></span>', label: 'Pause (P)', onClick: () => togglePause(), keep: true}]});
 var NAV_INNER = {setup: ['◀ BlasOff', () => showScreen('menu')]};   // 🧭 the setup screen's top button goes back to the BlasOff start page
 UI.navBar(document.getElementById('back-btn'), {onclick: false});
 const $ = id => document.getElementById(id);
@@ -1155,11 +1163,13 @@ const MODE_GROUPS = [
 const MODES = [
   {k: 'fours', g: 'match', icon: '⚽', name: 'Soccer 4v4', type: 'A small-pitch soccer game', sub: '4 + a robot keeper a side · close camera', next: '👇 then pick a level'},
   {k: 'sevens', g: 'match', icon: '🏟️', name: 'Soccer 7v7', type: 'A bigger soccer match', sub: '7 a side · bigger pitch, more passing', next: '👇 then pick a level'},
-  {k: 'next11', g: 'soon', icon: '🌍', name: '11v11 · Futsal · Street', type: 'Round 2', sub: 'Big matches, indoor futsal, 1v1 street cage', soon: true},
+  {k: 'elevens', g: 'match', icon: '🌍', name: 'Soccer 11v11', type: 'A full-size soccer match', sub: '11 a side · wide camera, 🔍 zoom, radar', next: '👇 then pick a level'},
+  {k: 'nextfutsal', g: 'soon', icon: '🏙️', name: 'Futsal · Street 1v1', type: 'Round 2', sub: 'Indoor futsal 5v5 + a 1v1 street cage', soon: true},
   {k: 'nexttricks', g: 'soon', icon: '🎤', name: 'Tricks Battle', type: 'Round 3', sub: 'Tricks on the beat + skill challenges', soon: true},
   {k: 'nextcup', g: 'soon', icon: '🏆', name: 'Cups + Kick Tale', type: 'Round 4', sub: 'Family cup, league and a story', soon: true}
 ];
-window.MODE_TYPE = {fours: 'A small-pitch soccer game', sevens: 'A bigger soccer match'};
+window.MODE_TYPE = {fours: 'A small-pitch soccer game', sevens: 'A bigger soccer match', elevens: 'A full-size soccer match'};
+const SZ_ID = {4: 'fours', 7: 'sevens', 11: 'elevens'}, ID_SZ = {fours: 4, sevens: 7, elevens: 11};
 
 /* ================= STATE ================= */
 let S = {players: [], progress: {}, settings: {}, avatars: {}, ballSkins: {}, player: '', age: ''};
@@ -1167,7 +1177,7 @@ let SET = {size: 4, level: 0, who: 'robot', opp: '', mate: '', theme: 'classic',
 let G = null, lockHandle = null, KEYS = null, V = null;
 function ls(k, v){ try{ if(v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }catch(e){ return null; } }
 function store(k){ return 'sp_blasoff_' + k + ':' + (S.player || ''); }
-function loadPrefs(){ try{ const p = JSON.parse(ls(store('prefs')) || 'null'); if(p) Object.assign(SET, {size: p.size === 7 ? 7 : 4, theme: LOOKS[p.theme] ? p.theme : 'classic', night: !!p.night, view: p.view || 'auto', form: p.form || '121', who: p.who || 'robot'}); }catch(e){} SET.ball = sharedBall(); fixForm(); }
+function loadPrefs(){ try{ const p = JSON.parse(ls(store('prefs')) || 'null'); if(p) Object.assign(SET, {size: BO.SIZES[p.size] ? +p.size : 4, theme: LOOKS[p.theme] ? p.theme : 'classic', night: !!p.night, view: p.view || 'auto', form: p.form || '121', who: p.who || 'robot'}); }catch(e){} SET.ball = sharedBall(); fixForm(); }
 function savePrefs(){ ls(store('prefs'), JSON.stringify({size: SET.size, theme: SET.theme, night: SET.night, view: SET.view, form: SET.form, who: SET.who})); }
 function fixForm(){ const Sz = BO.SIZES[SET.size]; if(!Sz.forms[SET.form]) SET.form = Sz.formOrder[0]; }
 function ownedBalls(name){ return Math.min(BallSkins.count, Number((S.ballSkins || {})[name || S.player]) || 0); }
@@ -1202,13 +1212,13 @@ function renderMenu(){
   if(!box.children.length){
     UI.modeGroups(box, MODE_GROUPS, MODES.map(m => Object.assign({}, m)), {next: () => $('lvl-head'), moreText: '👇 Pick a level below',
       onPick: k => { const m = MODES.find(x => x.k === k); if(m && m.soon){ UISound.play('error'); UI.toast('🔜 ' + m.name + ' comes in BlasOff ' + m.type.toLowerCase() + '!'); return 'stop'; }
-        SET.size = k === 'sevens' ? 7 : 4; fixForm(); savePrefs(); markModes(); renderLevels(); return false; }});
+        SET.size = ID_SZ[k] || 4; fixForm(); savePrefs(); markModes(); renderLevels(); return false; }});
     box.querySelectorAll('.ui-mbtn').forEach(b => { if(MODES.find(m => m.k === b.dataset.k && m.soon)) b.classList.add('soon'); });
   }
   markModes(); renderLevels(); renderRulesTable();
   if(UI.leaders) UI.leaders($('leaders'), GAME_ID, S.player);
 }
-function markModes(){ $('mode-list').querySelectorAll('.ui-mbtn').forEach(b => b.classList.toggle('on', b.dataset.k === (SET.size === 7 ? 'sevens' : 'fours'))); $('lvl-head').textContent = 'Pick a level · ' + SET.size + 'v' + SET.size; }
+function markModes(){ $('mode-list').querySelectorAll('.ui-mbtn').forEach(b => b.classList.toggle('on', b.dataset.k === SZ_ID[SET.size])); $('lvl-head').textContent = 'Pick a level · ' + SET.size + 'v' + SET.size; }
 function rulesOf(i){ const L = BO.LEVELS[i], r = []; if(L.offside) r.push('🚩 offside'); if(L.fouls) r.push('🟢 fouls'); if(L.cards) r.push('🟨 cards'); if(L.stamina) r.push('💨 stamina'); r.push(['🎯 no aim help', '🎯 light aim', '🎯 medium aim', '🎯 big aim help'][L.aim]); r.push('⏱ 2 × ' + Math.round(L.half / 60) + ' min'); return r.join(' · '); }
 function renderLevels(){
   const box = $('level-list'); box.innerHTML = ''; const p = progressOf(S.player), rec = AGE_START[S.age];
@@ -1232,8 +1242,8 @@ function renderRulesTable(){
 function openSetup(lvl){
   SET.level = lvl; const L = BO.LEVELS[lvl], Sz = BO.SIZES[SET.size];
   if(LEVEL_UI[lvl].hardcore) SET.who = 'robot';
-  $('setup-logo').textContent = SET.size === 7 ? '🏟️' : '⚽'; $('setup-title').textContent = 'Soccer ' + SET.size + 'v' + SET.size + ' · ' + L.name;
-  $('setup-sub').textContent = (SET.size === 4 ? '4 players + a 🧤 robot keeper a side. ' : '6 players + a 🧤 robot keeper a side. ') + '2 halves of ' + Math.round(L.half / 60) + ' min · ' + (L.draw === 'pens' ? 'a draw = 🥅 penalty shootout.' : 'a draw = ⚡ golden goal.');
+  $('setup-logo').textContent = {4: '⚽', 7: '🏟️', 11: '🌍'}[SET.size]; $('setup-title').textContent = 'Soccer ' + SET.size + 'v' + SET.size + ' · ' + L.name;
+  $('setup-sub').textContent = (Sz.n + ' players + a 🧤 robot keeper a side. ') + (SET.size === 11 ? 'Wide camera — 🔍 zoom in with Z · radar in the corner. ' : '') + '2 halves of ' + Math.round(L.half / 60) + ' min · ' + (L.draw === 'pens' ? 'a draw = 🥅 penalty shootout.' : 'a draw = ⚡ golden goal.');
   buildWho(); buildForms(); buildLooks(); buildBalls();
   const VIEW_TXT = {auto: '📷 View: Auto', behind: '📷 View: Behind your team', side: '📷 View: From the side', top: '📷 View: From above'};
   const vc = () => { $('view-chip').textContent = VIEW_TXT[SET.view] || VIEW_TXT.auto; $('view-chip').classList.toggle('on', SET.view !== 'auto'); };
@@ -1257,7 +1267,7 @@ function buildForms(){
   $('form-row').innerHTML = Sz.formOrder.map(f => '<button class="chip' + (SET.form === f ? ' on' : '') + '" data-f="' + f + '" data-sound="tap">' + formIcon(f) + ' ' + Sz.formName[f] + '</button>').join('');
   $('form-row').querySelectorAll('.chip').forEach(b => b.onclick = () => { SET.form = b.dataset.f; savePrefs(); buildForms(); });
 }
-function formIcon(f){ return {'121': '🔷', '22': '🟦', '231': '🔺', '321': '🛡️'}[f] || '📋'; }
+function formIcon(f){ return {'121': '🔷', '22': '🟦', '231': '🔺', '321': '🛡️', '442': '🧱', '433': '⚔️', '352': '🎯'}[f] || '📋'; }
 function buildLooks(){
   const box = $('look-list');
   if(!box.children.length){
@@ -1330,7 +1340,7 @@ function startMatch(){
   G = {M, L, Sz, size, level: lv, theme: SET.theme, night: SET.theme === 'classic' && SET.night, ball: SET.ball, humans, mode: SET.who, tn: [teamName(0), teamName(1)],
     avs: M.players.map(p => { const h = humans.find(x => x.name === p.name && x.side === p.side); return kitAv(h ? myAvatar(h.name === 'Guest' ? 'Guest' : h.name) : defaultAvatar(p.name + '·robo' + p.side), p.side, p.gk); }),
     spr: M.players.map(() => ({})), t0: performance.now(), last: performance.now(), acc: 0, paused: false, over: false, raf: 0, held: new Set(), sticks: new Map(), btn: new Map(),
-    cam: null, anim: 0, startAt: performance.now(), shoutShow: [0, 0], guideHand: true, lastScore: '', endAt: 0, help: L.guided, floatQ: []};
+    cam: null, anim: 0, sq: size === 11 ? 1.0 : 1.3, zoom: ls(store('zoom' + size)) === '1', startAt: performance.now(), shoutShow: [0, 0], guideHand: true, lastScore: '', endAt: 0, help: L.guided, floatQ: []};
   G.view = viewMode();
   GameComic._reset();
   BAR.level('⚽ ' + size + 'v' + size + ' · ' + LEVEL_UI[lv].emoji + ' ' + L.name, L.hardcore ? 'hc' : '');
@@ -1382,7 +1392,7 @@ function makeView(W, H, box, eye, look, fovMode){
   return {W, H, box, F, cx, cy, eye, look, toC, proj, P, sc, k2w, portrait};
 }
 function updateCam(dt){
-  const M = G.M, Sz = G.Sz, b = M.ball, vm = G.view, d = vm.side === 0 ? 1 : -1, k = Sz.cam * (G.W && G.H > G.W ? 1.25 : 1);
+  const M = G.M, Sz = G.Sz, b = M.ball, vm = G.view, d = vm.side === 0 ? 1 : -1, k = Sz.cam * (G.W && G.H > G.W ? 1.25 : 1) * (G.zoom ? (Sz.cam > 1.5 ? 0.55 : 0.75) : 1);
   let wx = b.x + b.vx * 0.3, wy = b.y;
   if(M.phase === 'pens' && M.pens){ wx = d * 0 + BO.dirOf(M.pens.turn) * (Sz.Lh - Sz.spot * 0.6); wy = 0; }
   const c = G.cam || (G.cam = {x: wx, y: wy});
@@ -1458,7 +1468,7 @@ function crowd(g, V, Lk, Sz, t, night){
   const Lh = Sz.Lh + 6, ey = Sz.Wh + 5, cols = Lk.crowd, emoList = Lk.crowdEmo;
   for(const side of [-1, 1]) for(let r = 0; r < 5; r++){
     const y = side * (ey + 1.4 + r * 2.2), z0 = 0.95 + r * 1.45;
-    for(let x = -Lh, i = 0; x <= Lh; x += 1.25, i++){
+    for(let x = -Lh, i = 0; x <= Lh; x += Sz.Lh > 40 ? 2 : 1.25, i++){
       const wave = Math.max(0, Math.sin(t * 2.6 - x * 0.22 - (side > 0 ? 0 : 2))) * 0.55, c = V.P(x, y, z0 + wave); if(!c) continue;
       const s = V.sc(x, y, z0); if(s < 1.2) continue;
       const h = (i * 7 + r * 13 + (side > 0 ? 5 : 0)) % 17;
@@ -1471,7 +1481,7 @@ function crowd(g, V, Lk, Sz, t, night){
   const ex = Sz.Lh + 7, Wy = Sz.Wh + 4;
   for(const side of [-1, 1]) for(let r = 0; r < 5; r++){
     const x = side * (ex + 1.4 + r * 2.2), z0 = 0.95 + r * 1.45;
-    for(let y = -Wy, i = 0; y <= Wy; y += 1.25, i++){
+    for(let y = -Wy, i = 0; y <= Wy; y += Sz.Lh > 40 ? 2 : 1.25, i++){
       const wave = Math.max(0, Math.sin(t * 2.6 - y * 0.22 + (side > 0 ? 1 : 3))) * 0.55, c = V.P(x, y, z0 + wave); if(!c) continue;
       const s = V.sc(x, y, z0); if(s < 1.2) continue;
       const h = (i * 11 + r * 7 + (side > 0 ? 3 : 0)) % 17;
@@ -1506,10 +1516,10 @@ function drawLookPreview(c, k){
   g.save(); drawWorld(g, Vp, LOOKS[k], Sz, 1.2, k === 'classic' && SET.night); drawGoal(g, Vp, Sz, 1, LOOKS[k]); const b = Vp.P(Sz.Lh * 0.1, 0, 0.2); if(b) drawSoccerBall(g, b[0], b[1], Math.max(3, Vp.sc(0, 0, 0) * 0.3), 0.4); g.restore();
 }
 /* 🧑 avatars: each player's looks are drawn ONCE into small pictures (stand · 4 run steps · kick · air · lying), then copied each frame (fast with 14 players) */
-const SPR_W = 150, SPR_H = 160, SPR_FX = 75, SPR_FY = 140, SPR_Q = 1.3;
+const SPR_W = 150, SPR_H = 160, SPR_FX = 75, SPR_FY = 140;
 function sprite(i, key){
   const box = G.spr[i]; if(box[key]) return box[key];
-  const c = document.createElement('canvas'); c.width = Math.round(SPR_W * SPR_Q); c.height = Math.round(SPR_H * SPR_Q); const g = c.getContext('2d'); g.scale(SPR_Q, SPR_Q);
+  const Q = G.sq, c = document.createElement('canvas'); c.width = Math.round(SPR_W * Q); c.height = Math.round(SPR_H * Q); const g = c.getContext('2d'); g.scale(Q, Q);
   const p = G.M.players[i], a = {name: p.name, av: G.avs[i], dir: 1, walkT: 0}, o = {t: 0, still: true};
   if(key.indexOf('run') === 0) a.walkT = 0.01 + (+key.slice(3)) * (Math.PI * 2 / 11) / 4;
   else if(key === 'kick') o.pose = {legR: -1.05, legL: 0.25, armL: 0.9, armR: -0.5};
@@ -1533,7 +1543,7 @@ function drawPlayer(g, p, t){
   const key = playerKey(p), img = sprite(p.i, key), lift = (p.z + (p.celebrate > 0 ? Math.abs(Math.sin(t * 9)) * 0.35 : 0) + (p.st === 'dive' ? 0.5 : 0)) * s;
   g.save(); g.translate(f[0], f[1] - lift);
   if(p.st === 'dive') g.rotate((p.dive || 1) * dir * 0.9);
-  g.scale(dir * k / SPR_Q, k / SPR_Q); g.drawImage(img, -SPR_FX * SPR_Q, -SPR_FY * SPR_Q); g.restore();
+  g.scale(dir * k / G.sq, k / G.sq); g.drawImage(img, -SPR_FX * G.sq, -SPR_FY * G.sq); g.restore();
   if(p.cards && G.M.L.cards){ g.fillStyle = '#FFD23F'; g.fillRect(f[0] + s * 0.35, f[1] - s * 1.9 - lift, s * 0.18, s * 0.26); }
   if(c){   // name + a triangle over the person you steer
     const top = f[1] - s * 2.35 - lift, fs = Math.max(10, Math.min(15, s * 0.42)); g.font = '700 ' + fs + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'bottom';
@@ -1577,6 +1587,25 @@ function drawFrame(t){
     g.lineWidth = 5; g.strokeStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.arc(f[0], f[1] - r * 2.6, r * 0.6, 0, 7); g.stroke(); g.strokeStyle = c.kAt >= 0 ? '#FF5A1F' : '#2DBE6C'; g.beginPath(); g.arc(f[0], f[1] - r * 2.6, r * 0.6, -Math.PI / 2, -Math.PI / 2 + pw * Math.PI * 2); g.stroke(); });
 }
 
+/* ---------- 📡 radar mini-map (11v11, and 7v7 when zoomed in): the whole pitch, both teams, the ball, you, the part the camera shows ---------- */
+function radarOn(){ return G && (G.size === 11 || (G.size === 7 && G.zoom)); }
+function drawRadar(){
+  const cv = $('radar'); if(!radarOn()){ cv.classList.add('hidden'); return; } cv.classList.remove('hidden');
+  const Sz = G.Sz, M = G.M, w = Math.round(lim(G.W * 0.19, 92, 168)), h = Math.round(w * Sz.Wh / Sz.Lh), dpr = G.dpr || 1;
+  if(cv.width !== Math.round(w * dpr)){ cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.width = w + 'px'; cv.style.height = h + 'px'; }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const flip = G.view.mode === 'behind' && G.view.side === 1 ? -1 : 1, X = x => (x * flip / Sz.Lh + 1) / 2 * (w - 6) + 3, Y = y => (-y * flip / Sz.Wh + 1) / 2 * (h - 6) + 3;
+  g.fillStyle = 'rgba(30,110,60,0.85)'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 1; g.strokeRect(3, 3, w - 6, h - 6); g.beginPath(); g.moveTo(w / 2, 3); g.lineTo(w / 2, h - 3); g.stroke();
+  [-1, 1].forEach(s => { const x0 = X(s * Sz.Lh), x1 = X(s * (Sz.Lh - Sz.boxL)); g.strokeRect(Math.min(x0, x1), Math.min(Y(Sz.boxW), Y(-Sz.boxW)), Math.abs(x1 - x0), Math.abs(Y(-Sz.boxW) - Y(Sz.boxW))); });
+  M.players.forEach(p => { g.fillStyle = p.gk ? (p.side ? '#4CB963' : '#FFD23F') : TEAM_COL[p.side]; g.beginPath(); g.arc(X(p.x), Y(p.y), p.ctrl >= 0 ? 3.6 : 2.6, 0, 7); g.fill(); if(p.ctrl >= 0){ g.strokeStyle = SEAT_COL[M.ctrls[p.ctrl].seat % 2]; g.lineWidth = 1.6; g.beginPath(); g.arc(X(p.x), Y(p.y), 5.2, 0, 7); g.stroke(); } });
+  g.fillStyle = '#FFFFFF'; g.strokeStyle = '#13254A'; g.lineWidth = 1; g.beginPath(); g.arc(X(M.ball.x), Y(M.ball.y), 2.6, 0, 7); g.fill(); g.stroke();
+  if(V){ const pts = [[0.05, 0.3], [0.95, 0.3], [0.95, 0.98], [0.05, 0.98]].map(([a, b2]) => groundAt(V.W * a, V.H * b2)).filter(Boolean);
+    if(pts.length === 4){ g.strokeStyle = 'rgba(255,255,255,0.6)'; g.setLineDash([3, 2]); g.beginPath(); pts.forEach((q, i) => g[i ? 'lineTo' : 'moveTo'](X(lim(q.x, -Sz.Lh, Sz.Lh)), Y(lim(q.y, -Sz.Wh, Sz.Wh)))); g.closePath(); g.stroke(); g.setLineDash([]); } }
+}
+// a screen point → the ground point under it (the camera box on the radar)
+function groundAt(px, py){ const e = V.eye, l = V.look; let fx = l[0] - e[0], fy = l[1] - e[1], fz = l[2] - e[2]; const fm = Math.hypot(fx, fy, fz); fx /= fm; fy /= fm; fz /= fm; let rx = fy, ry = -fx; const rm = Math.hypot(rx, ry) || 1; rx /= rm; ry /= rm; const ux = ry * fz, uy = -rx * fz, uz = rx * fy - ry * fx;
+  const a = (px - V.cx) / V.F, b = -(py - V.cy) / V.F, dx = fx + rx * a + ux * b, dy = fy + ry * a + uy * b, dz = fz + uz * b; if(dz >= -1e-3) return null; const t = -e[2] / dz; return {x: e[0] + dx * t, y: e[1] + dy * t}; }
+
 /* ---------- loop ---------- */
 function frame(now){
   if(!G) return;
@@ -1592,10 +1621,11 @@ function frame(now){
   }
   if(G.endAt && !G.over && now - G.endAt > (FX ? 1400 : 50)) finishMatch();
   if(!G) return;
-  updateCam(dt); drawFrame(now / 1000); hud(now);
+  updateCam(dt); drawFrame(now / 1000); drawRadar(); hud(now);
   G.raf = requestAnimationFrame(frame);
 }
 function togglePause(){ if(!G || G.over) return; G.paused = !G.paused; UI.pauseIcon($('pause-btn'), G.paused); banner(G.paused ? '⏸ Paused — tap ▶ to play' : '▶ Go!', 'good'); if(!G.paused) G.last = performance.now(); }
+function toggleZoom(){ if(!G) return; G.zoom = !G.zoom; ls(store('zoom' + G.size), G.zoom ? '1' : '0'); const b = $('zoom-btn'); if(b) b.classList.toggle('gb-on', G.zoom); banner(G.zoom ? '🔍 Zoomed in — closer to the ball' : '🔭 Wide view — see the whole team', 'good'); }
 function pauseGame(){ if(G && !G.paused && !G.over){ G.paused = true; UI.pauseIcon($('pause-btn'), true); } }
 function leavePlay(){
   if(!G) return; const was = G.paused; G.paused = true;
@@ -1657,6 +1687,7 @@ document.addEventListener('keydown', e => {
   if(!G || $('scr-play').classList.contains('hidden')) return;
   if(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'PageUp', 'PageDown', 'Home', 'End'].indexOf(e.code) >= 0) e.preventDefault();
   if(e.code === 'Escape' || e.code === 'KeyP'){ if(!e.repeat) togglePause(); return; }
+  if(e.code === 'KeyZ' && !keySetsOf(G.M.ctrls[0]).some(K => Object.values(K).includes('KeyZ'))){ if(!e.repeat) toggleZoom(); return; }
   if(e.repeat) return;
   G.held.add(e.code); $('pads').classList.add('kbd');
   if(G.paused || G.over || G.turnPause) return;
@@ -1864,7 +1895,7 @@ window.feedbackContext = () => ({page: 'BlasOff', game: GAME_ID, level: G ? G.le
    slots: #comics-slot-setup, #cheer-slot-setup (setup ⚙️ Extras row) · #comic-strip-slot (result card) */
 const GameComic = {
   _fns: [], _log: [],
-  mode(){ return G && !G.over ? (G.size === 7 ? 'sevens' : 'fours') : ''; },
+  mode(){ return G && !G.over ? SZ_ID[G.size] : ''; },
   hold(on){ if(!G || G.over) return false; G.hold = !!on; if(!on) G.last = performance.now(); return true; },
   listen(fn){ this._fns.push(fn); return () => { this._fns = this._fns.filter(f => f !== fn); }; },
   log(){ return this._log.slice(); },
@@ -1873,7 +1904,7 @@ const GameComic = {
   free(){ const st = $('stage').getBoundingClientRect(), taken = [...document.querySelectorAll('#pads .stick, #pads .btnpad, #pads .swbtn')].map(e => e.getBoundingClientRect()).filter(r => r.width);
     const rows = [{left: st.left, top: st.top, right: st.right, bottom: st.top + st.height * 0.3}]; return rows.map(r => { taken.forEach(t => { if(t.top < r.bottom && t.bottom > r.top && t.left < r.right && t.right > r.left){ if(t.left - r.left > r.right - t.right) r.right = t.left - 4; else r.left = t.right + 4; } }); return {left: Math.round(r.left), top: Math.round(r.top), width: Math.round(r.right - r.left), height: Math.round(r.bottom - r.top)}; }).filter(r => r.width >= 60 && r.height >= 40); },
   _reset(){ this._log = []; },
-  _feed(list){ if(!list || !list.length || !G) return; const M = G.M, md = (G.size === 7 ? 'sevens' : 'fours'); list.forEach(e => { this._log.push(e); this._fns.forEach(f => { try{ f(md, e, M); }catch(err){} }); }); if(this._log.length > 600) this._log.splice(0, this._log.length - 600); }
+  _feed(list){ if(!list || !list.length || !G) return; const M = G.M, md = SZ_ID[G.size]; list.forEach(e => { this._log.push(e); this._fns.forEach(f => { try{ f(md, e, M); }catch(err){} }); }); if(this._log.length > 600) this._log.splice(0, this._log.length - 600); }
 };
 window.GameComic = GameComic;
 
@@ -1894,11 +1925,11 @@ function boot(){
 boot();
 /* ✨ MODE SPOTLIGHT: ?mode=<id> opens this game straight in that mode after the player pick · "✨ Also try" on the start page · started modes → UI.modeTried */
 const MS_GAME = 'blasoff';
-function msOpen(id){ if(id !== 'fours' && id !== 'sevens') return; SET.size = id === 'sevens' ? 7 : 4; fixForm(); savePrefs(); markModes(); renderLevels(); const b = document.querySelector('#mode-list .ui-mbtn.on'); if(b && b.scrollIntoView) b.scrollIntoView({block: 'nearest'}); }
-function msNow(){ return (SET.size === 7 ? 'sevens' : 'fours'); }
+function msOpen(id){ if(!ID_SZ[id]) return; SET.size = ID_SZ[id]; fixForm(); savePrefs(); markModes(); renderLevels(); const b = document.querySelector('#mode-list .ui-mbtn.on'); if(b && b.scrollIntoView) b.scrollIntoView({block: 'nearest'}); }
+function msNow(){ return SZ_ID[SET.size]; }
 function msWrap(fn, idOf){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ try{ const id = idOf.apply(this, arguments); if(id && UI.modeTried) UI.modeTried(S.player || CURRENT_PLAYER, MS_GAME, id); }catch(e){} return f.apply(this, arguments); }; }
 function msAfter(fn, after){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ const r = f.apply(this, arguments); try{ after.apply(this, arguments); }catch(e){} return r; }; }
-msWrap('startMatch', () => (SET.size === 7 ? 'sevens' : 'fours'));
+msWrap('startMatch', () => SZ_ID[SET.size]);
 msAfter('choosePlayer', name => {
   if(!window.UI || !UI.modeLink) return;
   const id = UI.modeLink(MODE_LINK); if(id) msOpen(id);
@@ -1908,4 +1939,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (bo-1b) END OF BlasOff.html -->
+<!-- (bo-2a) END OF BlasOff.html -->
