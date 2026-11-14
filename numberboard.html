@@ -244,6 +244,10 @@
   .sb-go{background:linear-gradient(135deg,#7A5CFA,#5B4BE0);color:#fff;} .sb-go:disabled{opacity:.45;} .sb-x{background:rgba(255,255,255,0.85);color:#3B2A20;min-width:40px;}
   .buddy{position:relative;height:74px;border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,0.35),rgba(255,255,255,0.12));overflow:hidden;flex:none;}
   .buddy canvas{position:absolute;left:0;top:0;width:100%;height:100%;}
+  /* 📡 lk-3d own devices */
+  #scr-link .lx-top{display:flex;justify-content:flex-start;padding:6px 4px 0;} #scr-link .lx-alt{display:flex;justify-content:center;margin:12px 0;}
+  .lx-pick{display:flex;flex-direction:column;gap:10px;margin-top:10px;} .lx-pick .btn{width:100%;}
+  .lx-over{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(10,8,30,.55);}
   .buddy .who{display:none;position:absolute;right:8px;top:6px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.78rem;background:rgba(0,0,0,0.35);color:#fff;border-radius:10px;padding:2px 8px;}
   @media (orientation:landscape) and (max-height:560px){ .buddy{height:52px;} .swapbox{min-height:40px;padding:3px 6px;} .sb-go,.sb-x{min-height:34px;} .sb-tiles button{width:28px;height:28px;font-size:0.9rem;} }
   @media (prefers-reduced-motion: reduce){ .tile.hit2{animation:hit .35s ease;} }
@@ -262,6 +266,7 @@
 <script src="inc/AvatarActing.js"></script>
 <script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-3b: the cheering crowd (CheerSquad.html) -->
 <script src="inc/NumberSkins.js"></script>
+<script src="inc/LinkKit.js"></script>   <!-- 📡 lk-3d: own devices -->
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
 
 <section class="screen hidden" id="scr-player">
@@ -294,6 +299,12 @@
     <li><b>👨‍👩‍👧 Play together:</b> 2–4 players take turns on one device — pass it on when it's the next player's turn.</li>
   </ul></details>
   <div class="ui-leaders" id="leaders"></div>
+</section>
+
+<section class="screen hidden" id="scr-link">   <!-- 📡 lk-3d: own devices lobby -->
+  <div class="lx-top"><button class="btn soft sp-btn sp-secondary lx-back" data-sound="none" onclick="lxExit()">◀ Algebros</button></div>
+  <div class="title"><div class="logo">📡</div><h1>Own devices</h1><p id="lx-sub">Same Wi-Fi as the host</p></div>
+  <div id="lx-lobby"></div><div class="lx-alt" id="lx-alt"></div>
 </section>
 
 <section class="hidden" id="scr-play">
@@ -594,8 +605,8 @@ function chooseMove(moves, strength){
 
 /* ================= MENUS ================= */
 function showScreen(name){
-  ['player', 'menu', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
-  $('back-btn').classList.toggle('hidden', name === 'play'); window.scrollTo(0, 0);
+  ['player', 'menu', 'play', 'link'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));   // 📡 lk-3d: + link
+  $('back-btn').classList.toggle('hidden', name === 'play' || name === 'link'); window.scrollTo(0, 0);
 }
 function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
 function canPlay(i){ const p = progressOf(S.player); if(i === 5) return p.unlocked >= 5; if(i === 4) return p.unlocked >= 4; return i <= Math.max(p.unlocked, AGE_START[S.age] || 0); }
@@ -639,6 +650,9 @@ function renderLevels(){
   const t = document.createElement('button'); t.className = 'pick lvl together'; t.id = 'together-card'; t.setAttribute('data-sound', 'pop');
   t.innerHTML = '<div class="big">👨‍👩‍👧</div><div class="nm">Play together</div><div class="lives">2–4 players · one device · pass it on</div><div class="sub">Who makes the best number sentences?</div>';
   t.onclick = openTogether; box.appendChild(t);
+  const o = document.createElement('button'); o.className = 'pick lvl together'; o.id = 'link-card'; o.setAttribute('data-sound', 'pop');   // 📡 lk-3d
+  o.innerHTML = '<div class="big">📡</div><div class="nm">Own devices</div><div class="lives">2–4 players · each on their own phone / tablet</div><div class="sub">Same Wi-Fi · your tiles stay on your screen</div>';
+  o.onclick = lxChoose; box.appendChild(o);
 }
 
 /* ---------- 👨‍👩‍👧 Play-together setup ---------- */
@@ -675,7 +689,8 @@ function startGame(lvl){
     pend: [], sel: null, cursor: null, swap: null, passes: 0, hintsLeft: L.hints, hintsUsed: 0, over: false, busy: false, zoom: 1, last: [], ghost: [],
     t0: performance.now(), paused: false, pausedAt: 0, pausedTotal: 0};
   G.bag = makeBag(G.cfg);
-  const names = tg ? together.players.slice() : [S.player];
+  if(tg && LX.pending){ G.lx = LX.pending; LX.pending = null; }   // 📡 lk-3d
+  const names = G.lx ? G.lx.seats.map(x => x.name) : tg ? together.players.slice() : [S.player];
   names.forEach(n => G.players.push({name: n, bot: false, rack: [], score: 0, eqs: 0, best: 0, bingos: 0}));
   if(!tg) G.players.push({name: 'Robot', bot: true, rack: [], score: 0, eqs: 0, best: 0, bingos: 0});
   G.players.forEach(P => refill(P));
@@ -722,7 +737,7 @@ function updateScores(){ BAR.players(G.players.map((P, k) => ({k: k, score: P.sc
 function hudTick(){
   if(!G) return;
   BAR.round(Math.min(G.round, G.L.rounds), G.L.rounds);
-  $('bag-txt').textContent = '🎒 ' + G.bag.length + ' left';
+  $('bag-txt').textContent = '🎒 ' + bagN() + ' left';
   if(lockHandle){ const l = lockHandle.remainingMs(); BAR.left(l, l < 120000); }
 }
 function layout(){
@@ -742,6 +757,7 @@ function toggleZoom(){ if(!G) return; G.zoom = G.zoom > 1 ? 1 : 1.7; BAR.extra('
 
 /* ---------- turns ---------- */
 function beginTurn(first){
+  if(G.lx) return lxBeginTurn(first);   // 📡 lk-3d
   const P = cur(); G.pend = []; G.sel = null; G.swap = null; G.cursor = null; G.ghost = [];
   updateScores(); hudTick(); paintAll();
   if(P.bot){ setMsg('<span class="ui-spin a-bounce think">' + THEMES[G.theme].bot + '</span> Robot is thinking…', 'bot'); $('turnbar').textContent = '🤖 Robot\'s turn'; renderRack(true); setActs(false); setTimeout(botTurn, 700); if(window.Cheer) Cheer.hush(true);   /* 🤫 cs-3b */ return; }
@@ -759,10 +775,12 @@ function passDevice(P){
   $('pass-go').onclick = () => { closeSheet(); renderRack(false); setMsg(G.cells.every(c => !c) ? '⭐ Start over the star in the middle' : 'Tap a tile, then a square', ''); say(P.name + ', your turn!'); };
   $('sheet').classList.remove('hidden');
 }
-function setActs(on){ ['b-play', 'b-check', 'b-hint', 'b-recall', 'b-mix', 'b-swap', 'b-pass'].forEach(id => { $(id).disabled = !on; }); if(on){ $('b-hint').disabled = G.hintsLeft <= 0; $('hint-n').textContent = 'Hint ' + G.hintsLeft; $('b-swap').disabled = G.bag.length < 1; } }
+function setActs(on){ ['b-play', 'b-check', 'b-hint', 'b-recall', 'b-mix', 'b-swap', 'b-pass'].forEach(id => { $(id).disabled = !on; }); if(on){ $('b-hint').disabled = G.hintsLeft <= 0; $('hint-n').textContent = 'Hint ' + G.hintsLeft; $('b-swap').disabled = bagN() < 1; } }
+function bagN(){ return G.lx && G.lx.role === 'guest' ? (G.lx.bagN || 0) : G.bag.length; }   // 📡 lk-3d: a guest only knows how many are left
 function setMsg(html, kind){ const m = $('msg'); m.innerHTML = html; m.className = 'msg' + (kind ? ' ' + kind : ''); }
 function renderRack(hidden){
-  const P = cur(), box = $('rack'); box.innerHTML = '';
+  if(G.lx) hidden = false;   // 📡 lk-3d: your own rack, always (nobody else sees it)
+  const P = G.lx ? G.players[G.lx.seat] : cur(), box = $('rack'); box.innerHTML = '';
   if(!hidden && !P.bot) markFresh(P);
   for(let k = 0; k < RACK; k++){
     const x = P.rack[k], b = document.createElement('button'); b.className = 'rt'; b.setAttribute('data-sound', 'none');
@@ -778,7 +796,7 @@ function renderRack(hidden){
 }
 
 /* ---------- placing tiles ---------- */
-function canAct(){ return G && !G.over && !G.busy && !cur().bot && $('sheet').classList.contains('hidden'); }
+function canAct(){ return G && !G.over && !G.busy && !cur().bot && $('sheet').classList.contains('hidden') && (!G.lx || (G.cur === G.lx.seat && !G.lx.sent)); }   // 📡 lk-3d: only on your turn
 function tapRack(id){
   if(!canAct()) return;
   if(G.swap){ if(G.swap.has(id)) G.swap.delete(id); else G.swap.add(id); renderRack(false); $('swap-txt').textContent = 'Swap ' + G.swap.size; return; }
@@ -846,9 +864,10 @@ function recallAll(){ if(!canAct()) return; G.pend = []; G.cursor = null; G.sel 
 function mixRack(){ if(!canAct()) return; const P = cur(); shuffle(P.rack); renderRack(false); }
 function toggleSwap(){
   if(!canAct()) return;
-  if(!G.swap){ if(!G.bag.length){ UI.toast('The bag is empty'); return; } startSwap(); renderRack(false); return; }
+  if(!G.swap){ if(!bagN()){ UI.toast('The bag is empty'); return; } startSwap(); renderRack(false); return; }
   const ids = [...G.swap]; G.swap = null; $('b-swap').classList.remove('on'); $('swap-txt').textContent = 'Swap';
   if(!ids.length){ setMsg('Tap a tile, then a square', ''); renderRack(false); return; }
+  if(G.lx && G.lx.role === 'guest'){ lxSend('nbswap', {ids}); return; }   // 📡 lk-3d
   doSwap(cur(), ids); showBanner('🔁 ' + cur().name + ' swapped ' + ids.length + ' tile' + (ids.length === 1 ? '' : 's'), 'gold'); G.passes = 0; endTurn();
 }
 function doSwap(P, ids){
@@ -858,7 +877,7 @@ function doSwap(P, ids){
 }
 function passTurn(){
   if(!canAct()) return;
-  UI.confirm({icon: '⏭', title: 'Pass your turn?', body: 'You keep your tiles and get no points this turn.', okText: 'Pass', cancelText: 'Keep playing'}).then(ok => { if(!ok || !G) return; recallAll(); G.passes++; showBanner('⏭ ' + cur().name + ' passed', ''); endTurn(); });
+  UI.confirm({icon: '⏭', title: 'Pass your turn?', body: 'You keep your tiles and get no points this turn.', okText: 'Pass', cancelText: 'Keep playing'}).then(ok => { if(!ok || !G) return; recallAll(); if(G.lx && G.lx.role === 'guest'){ lxSend('nbpass', {}); return; } G.passes++; showBanner('⏭ ' + cur().name + ' passed', ''); endTurn(); });
 }
 function useHint(){
   if(!canAct() || G.hintsLeft <= 0) return;
@@ -884,10 +903,12 @@ function playMove(){
     if(G.L.hardcore){ G.pend.forEach(p => { p.state = 'bad'; }); paintAll(); setMsg('❌ ' + (j.text ? '<b>' + j.text + '</b> — ' : '') + j.msg, 'bad'); finishGame('hardcore', j); return; }
     G.pend.forEach(p => { p.state = 'bad'; }); paintAll(); setMsg('❌ ' + (j.text ? '<b>' + j.text + '</b> — ' : '') + j.msg, 'bad'); UISound.play('error'); return;
   }
+  if(G.lx && G.lx.role === 'guest'){ lxSend('nbplay', {pend: G.pend.map(q => ({i: q.i, id: q.id, t: q.t, blank: !!q.blank}))}); return; }   // 📡 lk-3d: the host checks + plays it
   commit(P, G.pend, j);
 }
 // Put a checked move on the board, score it, refill the rack.
 function commit(P, pend, j){
+  if(G.lx && G.lx.role === 'host') Link.send('nbplayed', {tn: G.lx.tn, seat: G.cur, pend: pend.map(q => ({i: q.i, id: q.id, t: q.t, blank: !!q.blank})), j}, {sure: true});   // 📡 lk-3d
   G.last = pend.map(p => p.i);
   pend.forEach(p => { G.cells[p.i] = {as: p.t, pts: p.blank ? 0 : (PTS[p.t] || 0), blank: p.blank, by: G.cur, fresh: true}; const at = P.rack.findIndex(r => r.id === p.id); if(at >= 0) P.rack.splice(at, 1); });
   P.score += j.score; P.eqs += j.lines.length; P.best = Math.max(P.best, j.score); if(j.bingo) P.bingos++;
@@ -917,6 +938,7 @@ async function celebrate(P, j){
 }
 function endTurn(){
   if(!G || G.over) return;
+  if(G.lx && G.lx.role === 'guest') return;   // 📡 lk-3d: the host moves the turn on
   const P = cur();
   if(!P.rack.length && !G.bag.length) return finishGame('out');
   if(G.passes >= G.players.length * 2) return finishGame('stuck');
@@ -924,9 +946,9 @@ function endTurn(){
   if(G.cur === 0){ G.round++; if(G.round > G.L.rounds) return finishGame('rounds'); if(G.round === G.L.rounds) showBanner('🏁 Last round!', 'gold'); }
   beginTurn(false);
 }
-function botTurn(){ if(window.Cheer) Cheer.hush(false); /* 📣 cs-3b */
-  if(!G || G.over || !cur().bot) return;
-  const P = cur(), moves = findMoves(P.rack, G.L.bot >= 0.9 ? 1400 : 900), m = chooseMove(moves, G.L.bot);
+function botTurn(force){ if(window.Cheer) Cheer.hush(false); /* 📣 cs-3b */   // 📡 lk-3d: force = 🤖 plays for a player whose device dropped out
+  if(!G || G.over || (!cur().bot && !force)) return;
+  const P = cur(), moves = findMoves(P.rack, G.L.bot >= 0.9 ? 1400 : 900), m = chooseMove(moves, force ? 0.3 : G.L.bot);
   if(!m){
     if(G.bag.length){ const keep = P.rack.find(x => x.t === '='), ids = P.rack.filter(x => x !== keep).slice(0, 4).map(x => x.id); doSwap(P, ids); G.passes = 0; setMsg(THEMES[G.theme].bot + ' Robot swapped ' + ids.length + ' tiles', 'bot'); showBanner('🔁 Robot swapped tiles', 'bot'); }
     else { G.passes++; setMsg(THEMES[G.theme].bot + ' Robot passed', 'bot'); }
@@ -1126,9 +1148,9 @@ function buddyFrame(now){
       }catch(e){}
     }
     if(!me){ g.fillStyle = 'rgba(120,72,30,0.95)'; g.fillRect(x - 22, seatY - 4, 44, 7); }
-    else { g.fillStyle = '#FF4D8D'; g.beginPath(); g.moveTo(x - 6, 4); g.lineTo(x + 6, 4); g.lineTo(x, 11); g.fill(); }
+    else { g.fillStyle = '#FF4D8D'; g.beginPath(); g.moveTo(x - 6, 4); g.lineTo(x + 6, 4); g.lineTo(x, 11); g.fill(); if(G.lx && idx !== G.lx.seat && !P.bot) lxBubble(g, x, w, h, tnow, P); }
   });
-  const who = $('buddy-who'); if(who){ const P = cur(); who.textContent = P.bot ? '🤖 Robot is thinking…' : (G.L.together || ps.length > 2 ? P.name + "'s turn" : 'Your turn, ' + P.name); }
+  const who = $('buddy-who'); if(who){ const P = cur(); who.textContent = P.bot ? '🤖 Robot is thinking…' : G.lx ? (G.cur === G.lx.seat ? 'Your turn, ' + P.name : '✏️ ' + P.name + ' is thinking…') : (G.L.together || ps.length > 2 ? P.name + "'s turn" : 'Your turn, ' + P.name); }
 }
 
 /* ---------- ✋ drag tiles: rearrange the hand, drop on the board, drop in the 🔁 swap box ---------- */
@@ -1178,7 +1200,7 @@ function dragDrop(d, x, y){
   const t = dragTarget(x, y); dragEnd(d);
   if(!G || !canAct()){ if(G) renderRack(false); return; }
   if(t && t.kind === 'cell'){ placeAt(t.i, d.id, false); return; }
-  if(t && t.kind === 'box'){ if(!G.bag.length){ UI.toast('The bag is empty'); renderRack(false); renderSwapBox(); return; } if(!G.swap) startSwap(); G.swap.add(d.id); UISound.play('drop'); renderRack(false); $('swap-txt').textContent = 'Swap ' + G.swap.size; return; }
+  if(t && t.kind === 'box'){ if(!bagN()){ UI.toast('The bag is empty'); renderRack(false); renderSwapBox(); return; } if(!G.swap) startSwap(); G.swap.add(d.id); UISound.play('drop'); renderRack(false); $('swap-txt').textContent = 'Swap ' + G.swap.size; return; }
   if(t && t.kind === 'rack') UISound.play('pop');
   afterChange();
 }
@@ -1247,6 +1269,7 @@ function elapsed(){ return G ? performance.now() - G.t0 - G.pausedTotal - (G.pau
 function pauseGame(){ if(G && !G.paused && !G.over){ G.paused = true; G.pausedAt = performance.now(); } }
 function resume(){ if(G && G.paused && !G.over){ G.pausedTotal += performance.now() - G.pausedAt; G.paused = false; } }
 function leavePlay(){
+  if(G && G.lx){ lxLeavePlay(); return; }   // 📡 lk-3d
   if(!G || G.over){ backToMenu(); return; }
   pauseGame();
   UI.confirm({icon: '◀', title: 'Leave this game?', body: 'This game will not be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(ok) backToMenu(); else resume(); });
@@ -1290,7 +1313,7 @@ function finishGame(why, bad){
 }
 function togetherOver(g, secs){
   const order = g.players.slice().sort((a, b) => b.score - a.score), top = order[0].score, winners = order.filter(p => p.score === top);
-  g.players.forEach(P => { if(P.eqs) google.script.run.withFailureHandler(() => {}).saveFeats(P.name, GAME_ID, {equations: P.eqs, bestMove: P.best, bingos: P.bingos, togetherGames: 1}); });
+  if(!(g.lx && g.lx.role === 'guest')) g.players.forEach(P => { if(P.eqs) google.script.run.withFailureHandler(() => {}).saveFeats(P.name, GAME_ID, {equations: P.eqs, bestMove: P.best, bingos: P.bingos, togetherGames: 1}); });
   party('🏆 ' + winners.map(w => w.name).join(' & ') + (winners.length > 1 ? ' tie!' : ' wins!')); confetti(['➗', '⭐', '🎉', '🏆'], 40); UISound.play('success');
   say(winners.map(w => w.name).join(' and ') + (winners.length > 1 ? ' tie!' : ' wins!'));
   setTimeout(() => {
@@ -1299,14 +1322,14 @@ function togetherOver(g, secs){
       '<div class="standings">' + order.map((P, k) => '<div class="' + (P.score === top ? 'win' : '') + '"><span>' + ['🥇', '🥈', '🥉', '4️⃣'][k] + ' ' + UI.esc(P.name) + '</span><span>' + P.score + ' · ✏️ ' + P.eqs + '</span></div>').join('') + '</div>' +
       '<div class="stats"><span>⏱ ' + fmt(secs * 1000) + '</span><span>🔁 ' + g.L.rounds + ' rounds</span></div>' +
       '<div class="save-note">👨‍👩‍👧 Play-together games count for badges, not levels</div>' +
-      '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🎚️ Levels</button></div>');
-    $('b-again').onclick = () => startGame('together'); $('b-menu').onclick = () => backToMenu();
+      (g.lx ? lxResultBtns(g) : '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🎚️ Levels</button></div>'));
+    if(g.lx){ lxResultWire(g); return; } $('b-again').onclick = () => startGame('together'); $('b-menu').onclick = () => backToMenu();
   }, 1600);
 }
 function party(text){ const p = document.createElement('div'); p.className = 'praise'; p.textContent = text; document.body.appendChild(p); setTimeout(() => p.remove(), 1600); }
 function floatText(el, text){ if(!el) return; const r = el.getBoundingClientRect(), s = document.createElement('div'); s.className = 'float'; s.textContent = text; s.style.cssText = 'left:' + (r.left + r.width / 2 - 16) + 'px;top:' + (r.top - 8) + 'px'; document.body.appendChild(s); setTimeout(() => s.remove(), 1000); }
 let bannerTimer = 0;
-function showBanner(text, kind){ const b = $('banner'); b.textContent = text; ['gold', 'bad', 'bot'].forEach(k => b.classList.toggle(k, kind === k)); b.classList.add('on'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('on'), 2000); }
+function showBanner(text, kind){ if(G && G.lx && G.lx.role === 'host') Link.send('nbban', {text, kind}, {sure: true}); const b = $('banner'); b.textContent = text; ['gold', 'bad', 'bot'].forEach(k => b.classList.toggle(k, kind === k)); b.classList.add('on'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('on'), 2000); }
 
 /* ================= SAVE ================= */
 const PENDING_KEY = 'sp_numberboard_pending';
@@ -1382,10 +1405,204 @@ const nbRackBase = renderRack; renderRack = function(hidden){ const r = nbRackBa
 const nbMenuBase = renderMenu; renderMenu = function(){ const r = nbMenuBase.apply(this, arguments); renderNumberLooks(); if(window.UI && UI.ptab){ UI.ptab.apply(S.player); UI.ptab.chips(document.getElementById('ptab-list'), S.player); } return r; };   /* 🏷️ p4c */
 boot();
 
+/* 📡 LINK (lk-3d): 🔤 Algebros on 2–4 own devices (LinkKit). The host's device runs the game; guests see the board + ONLY their own rack. */
+const LX = {wired: false, lobby: null, pending: null, cfg: null, autoT: 0, talk: {}};
+const LX_TALK = ['Hmm… 🤔', 'I’ve got a sum! 💡', 'Don’t peek! 🙈', 'Which number… 🔢', 'Almost ready! ⏳', 'This one’s big! 🌟', 'Shh, counting… 🤫', 'Watch this! 😎', 'Carry the one… ✏️', 'Ooh, a ×3 square! ✨', 'Hello everyone! 👋', 'Plus or times? 🤯'];
+function lxSend(kind, d){ if(!G || !G.lx) return; G.lx.sent = true; setActs(false); setMsg('<span class="ui-spin a-bounce">📨</span> Sending to the host…', ''); Link.send(kind, Object.assign({tn: G.lx.tn}, d), {sure: true}); }
+function lxSeatOf(lseat){ return G && G.lx ? G.lx.seats.findIndex(x => x.lseat === lseat) : -1; }
+function lxAv(cv, p){ const g = cv.getContext('2d'); g.clearRect(0, 0, cv.width, cv.height); drawPreviewCanvas(cv, myAvatar(p.name), {name: p.name, t: 1}); }
+function lxCloseLobby(){ if(LX.lobby && LX.lobby.close) LX.lobby.close(); LX.lobby = null; }
+function lxIdle(){ try{ if(window.Link && Link.status() !== 'idle') Link.leave(); }catch(e){} }
+function lxChoose(){
+  const card = $('sheet-card');
+  card.innerHTML = '<div class="big" style="font-size:2.4rem">📡</div><h2>Own devices</h2><div class="lbl">Each player on their own phone, tablet or computer — same Wi-Fi. Your tiles stay on your screen.</div>' +
+    '<div class="lx-pick"><button class="btn sp-btn sp-primary" id="lx-host" data-sound="pop">📡 Host a game</button><button class="btn sp-btn sp-secondary" id="lx-join" data-sound="pop">🔗 Join friends</button><button class="btn soft sp-btn sp-ghost" id="lx-x" data-sound="none">Cancel</button></div>';
+  $('lx-host').onclick = () => { closeSheet(); lxHostPick(); }; $('lx-join').onclick = () => { closeSheet(); lxJoin(); }; $('lx-x').onclick = closeSheet;
+  $('sheet').classList.remove('hidden');
+}
+function lxHostPick(){
+  lxWire(); lxCloseLobby(); lxIdle();
+  const card = $('sheet-card');
+  const draw = () => {
+    card.innerHTML = '<div class="big" style="font-size:2.4rem">📡</div><h2>Host a game</h2><div class="lbl">Friends join on their own device with the room number</div>' +
+      '<div class="lbl">Signs</div><div class="opt-row" id="lxh-diff">' + Object.keys(TOGETHER).map(k => '<button class="o' + (together.diff === k ? ' on' : '') + '" data-k="' + k + '">' + TOGETHER[k].name + ' ' + TOGETHER[k].ops.map(show).join(' ') + '</button>').join('') + '</div>' +
+      '<div class="lbl">Board</div><div class="opt-row" id="lxh-size"><button class="o' + (together.size === 11 ? ' on' : '') + '" data-s="11">11 × 11</button><button class="o' + (together.size === 15 ? ' on' : '') + '" data-s="15">15 × 15</button></div>' +
+      '<div class="lbl">Rounds</div><div class="opt-row" id="lxh-rounds">' + [5, 8, 12].map(r => '<button class="o' + (together.rounds === r ? ' on' : '') + '" data-r="' + r + '">' + r + '</button>').join('') + '</div>' +
+      '<div class="res-btns"><button class="btn sp-btn sp-primary" id="lxh-go">📡 Open the room</button><button class="btn soft sp-btn sp-secondary" id="lxh-x">Cancel</button></div>';
+    card.querySelectorAll('#lxh-diff .o').forEach(b => b.onclick = () => { together.diff = b.dataset.k; draw(); });
+    card.querySelectorAll('#lxh-size .o').forEach(b => b.onclick = () => { together.size = Number(b.dataset.s); draw(); });
+    card.querySelectorAll('#lxh-rounds .o').forEach(b => b.onclick = () => { together.rounds = Number(b.dataset.r); draw(); });
+    $('lxh-go').onclick = () => { savePrefs(); closeSheet(); lxOpenHost(); };
+    $('lxh-x').onclick = closeSheet;
+  };
+  draw(); $('sheet').classList.remove('hidden');
+}
+function lxLabel(){ const d = TOGETHER[together.diff] || {}; return '➗ ' + (d.name || 'Easy') + ' ' + (d.ops || []).map(show).join(' ') + ' · ' + together.size + '×' + together.size + ' · ' + together.rounds + ' rounds'; }
+async function lxOpenHost(){
+  lxWire(); lxCloseLobby();
+  $('lx-sub').textContent = 'Friends tap 🔗 Join friends on their own phone or tablet — same Wi-Fi'; showScreen('link'); lxAlt('');
+  const el = $('lx-lobby'); el.innerHTML = '<div class="lk"><div class="lk-msg"><span class="ui-spin a-bob">📡</span> Opening the room<span class="lk-dots"></span></div></div>';
+  try{ await Link.host({game: 'Algebros', name: S.player, seats: 4, page: 'numberboard', label: lxLabel()}); }
+  catch(e){ UISound.play('error'); el.innerHTML = '<div class="lk"><div class="lk-msg bad">😕 ' + UI.esc((e && e.message) || 'Could not open the room') + '</div></div>'; return; }
+  if($('scr-link').classList.contains('hidden')) return;
+  LX.lobby = Link.lobby(el, {title: lxLabel(), url: WEBAPP_URL + '?page=numberboard', minPlayers: 2, name: S.player, drawAvatar: lxAv, kind: 'number-board', onStart: lxHostGo});
+}
+function lxJoin(code){
+  lxWire(); lxCloseLobby(); lxIdle();
+  $('lx-sub').textContent = 'Same Wi-Fi as the host'; showScreen('link'); lxAlt('host');
+  LX.lobby = Link.lobby($('lx-lobby'), {title: '➗ Algebros', name: S.player, drawAvatar: lxAv, code: code || undefined, onJoined: () => { UISound.play('success'); lxAlt(''); }});
+}
+function lxAlt(k){ const a = $('lx-alt'); if(!a) return; a.innerHTML = k === 'host' ? '<button class="btn soft sp-btn sp-secondary" data-sound="pop" onclick="lxHostPick()">📡 Host a game instead</button>' : ''; }
+function lxExit(){
+  lxIdle(); lxCloseLobby(); clearTimeout(LX.autoT); LX.cfg = null;
+  const o = document.querySelector('.lx-over'); if(o) o.remove();
+  if(G && G.lx){ if(window.Cheer) Cheer.unmount(); clearInterval(timerId); G = null; hideResult(); closeSheet(); }
+  renderMenu(); showScreen('menu');
+}
+function lxLeavePlay(){
+  if(G.over){ lxExit(); return; }
+  const host = G.lx.role === 'host';
+  UI.confirm({icon: '◀', title: host ? 'End the game for everyone?' : 'Leave this game?', body: host ? 'You are the host — the game stops on every device.' : '🤖 The robot plays your turns until you come back.', okText: host ? 'End game' : 'Leave', cancelText: 'Keep playing'}).then(ok => { if(ok) lxExit(); });
+}
+// ---- host ----
+function lxHostGo(){
+  const list = Link.players().filter(p => p.name && p.on).sort((a, b) => a.seat - b.seat).slice(0, 4);
+  if(list.length < 2){ UISound.play('error'); UI.toast('📡 Wait for a friend to join'); return; }
+  LX.cfg = {id: Date.now().toString(36), diff: together.diff, size: together.size, rounds: together.rounds, theme, host: S.player, seats: list.map(p => ({name: p.name, lseat: p.seat}))};
+  lxCloseLobby(); hideResult(); closeSheet();
+  LX.pending = {role: 'host', seat: 0, tn: 0, seats: LX.cfg.seats.map(x => Object.assign({}, x)), id: LX.cfg.id};
+  startGame('together');                                   // the engine runs here; G.lx comes from LX.pending
+  G.players.forEach((P, k) => { if(k !== 0) Link.send('nbgo', {cfg: LX.cfg, seat: k, st: lxState(k)}, {sure: true, to: G.lx.seats[k].lseat}); });
+}
+function lxState(k){
+  return {id: G.lx.id, tn: G.lx.tn, cur: G.cur, round: G.round, passes: G.passes, bagN: G.bag.length, over: G.over, last: G.last,
+    cells: G.cells.map(c => c ? {as: c.as, pts: c.pts, blank: !!c.blank, by: c.by} : null),
+    players: G.players.map(P => ({name: P.name, score: P.score, eqs: P.eqs, best: P.best, bingos: P.bingos, away: !!P.away})),
+    rack: (G.players[k] || {rack: []}).rack.map(x => ({id: x.id, t: x.t}))};
+}
+function lxSync(){ if(!G || !G.lx || G.lx.role !== 'host') return; G.players.forEach((P, k) => { if(k !== G.lx.seat) Link.send('nbstate', lxState(k), {sure: true, to: G.lx.seats[k].lseat}); }); }
+function lxBeginTurn(first){
+  const P = cur(), mine = G.cur === G.lx.seat; G.pend = []; G.sel = null; G.swap = null; G.cursor = null; G.ghost = []; G.lx.sent = false;
+  if(G.lx.role === 'host'){ G.lx.tn++; lxSync(); }
+  updateScores(); hudTick(); paintAll(); renderRack(false); setActs(mine);
+  $('turnbar').textContent = mine ? '🎲 Your turn, ' + P.name : '✏️ ' + P.name + ' is thinking…';
+  if(mine){ setMsg(G.cells.every(c => !c) ? '⭐ Start over the star in the middle — make a sentence like 3 + 4 = 7' : 'Tap a tile, then a square', ''); say(P.name + ', your turn!'); }
+  else setMsg('✏️ ' + UI.esc(P.name) + ' is thinking — plan your next number sentence!', '');
+  if(first) showBanner('📡 ' + G.players.length + ' devices — make the best number sentences!', 'gold');
+  clearTimeout(LX.autoT);
+  if(G.lx.role === 'host' && !mine && P.away) LX.autoT = setTimeout(() => lxAuto(P), LX_AUTO_MS);
+}
+const LX_AUTO_MS = window.LX_AUTO_MS || 20000;
+function lxAuto(P){ if(!G || G.over || cur() !== P || !P.away || G.busy) return; showBanner('🤖 Robot plays for ' + P.name, 'bot'); botTurn(true); }
+function lxHostMove(kind, d, lseat){
+  const k = lxSeatOf(lseat), P = G && G.players[k];
+  const bad = msg => Link.send('nbbad', {msg}, {sure: true, to: lseat});
+  if(!P || G.over) return;
+  if(k !== G.cur || G.busy) return bad('It is not your turn yet');
+  if(d && d.tn != null && d.tn !== G.lx.tn) return bad('That turn is over');
+  clearTimeout(LX.autoT);
+  if(kind === 'pass'){ G.passes++; showBanner('⏭ ' + P.name + ' passed', ''); endTurn(); return; }
+  if(kind === 'swap'){ const ids = (d.ids || []).filter(id => P.rack.some(r => r.id === id)); if(!ids.length || !G.bag.length) return bad('Nothing to swap');
+    doSwap(P, ids); showBanner('🔁 ' + P.name + ' swapped ' + ids.length + ' tile' + (ids.length === 1 ? '' : 's'), 'gold'); G.passes = 0; endTurn(); return; }
+  // play: every tile must be in their rack, on an empty square
+  const used = new Set(), pend = [];
+  for(const q of (d.pend || [])){
+    const x = P.rack.find(r => r.id === q.id && !used.has(r.id)), i = Number(q.i);
+    if(!x || !(i >= 0 && i < G.N * G.N) || G.cells[i] || pend.some(z => z.i === i)) return bad('Those tiles do not fit — try again');
+    if(x.t !== '?' && x.t !== q.t) return bad('Those tiles do not fit — try again');
+    used.add(x.id); pend.push({i, id: x.id, t: x.t === '?' ? String(q.t || '0').slice(0, 3) : x.t, blank: x.t === '?'});
+  }
+  const j = judge(pend, P.rack.length);
+  if(!j.ok) return bad((j.text ? j.text + ' — ' : '') + j.msg);
+  G.pend = pend; commit(P, pend, j);
+}
+// ---- guest ----
+function lxGuestStart(d){
+  if(!d || !d.cfg) return;
+  LX.cfg = d.cfg; lxCloseLobby(); hideResult(); closeSheet(); const o = document.querySelector('.lx-over'); if(o) o.remove();
+  together.diff = d.cfg.diff; together.size = d.cfg.size; together.rounds = d.cfg.rounds;
+  const keepTheme = theme; theme = THEMES[d.cfg.theme] ? d.cfg.theme : theme;
+  LX.pending = {role: 'guest', seat: d.seat, tn: -1, seats: d.cfg.seats, id: d.cfg.id, bagN: 0};
+  startGame('together'); theme = keepTheme;
+  G.bag = []; lxApply(d.st);
+}
+function lxApply(st){
+  if(!G || !G.lx || !st || st.id !== G.lx.id) return;
+  if(G.busy || G.running){ clearTimeout(LX.applyT); LX.applyT = setTimeout(() => lxApply(st), 250); return; }   // let the sentence finish flying in
+  G.cells = st.cells.map(c => c ? Object.assign({}, c) : null); G.last = st.last || [];
+  G.cur = st.cur; G.round = st.round; G.passes = st.passes; G.lx.bagN = st.bagN;
+  st.players.forEach((q, k) => { const P = G.players[k]; if(!P) return; Object.assign(P, {score: q.score, eqs: q.eqs, best: q.best, bingos: q.bingos, away: q.away}); });
+  G.players.forEach((P, k) => { if(k !== G.lx.seat) P.rack = []; });   // other racks stay on their own devices
+  const me = G.players[G.lx.seat]; me.rack = st.rack.map(x => ({id: x.id, t: x.t}));
+  if(st.tn !== G.lx.tn){ G.lx.tn = st.tn; lxBeginTurn(false); } else { paintAll(); updateScores(); hudTick(); renderRack(false); }
+}
+// ---- every device: a number sentence was played (the host already checked it) ----
+function lxPlayed(d){
+  if(!G || !G.lx || G.lx.role !== 'guest' || !d || !d.j) return;
+  G.cur = d.seat; const P = G.players[d.seat];
+  if(d.seat === G.lx.seat) G.pend = [];   // my tiles: the host's copy is the truth
+  commit(P, d.pend, d.j);
+}
+function lxBubble(g, x, w, h, tnow, P){
+  const st = LX.talk[P.name] || (LX.talk[P.name] = {i: Math.floor(Math.random() * LX_TALK.length), at: tnow});
+  if(tnow - st.at > 4.2){ st.i = (st.i + 1 + Math.floor(Math.random() * 3)) % LX_TALK.length; st.at = tnow; }
+  if(tnow - st.at > 3.4) return;                            // a short pause between lines
+  const text = LX_TALK[st.i]; g.save(); g.font = '700 12px Fredoka, system-ui, sans-serif';
+  const tw = g.measureText(text).width + 14, bx = Math.max(4, Math.min(w - tw - 4, x + 14)), by = 4;
+  g.fillStyle = 'rgba(255,255,255,0.95)'; g.strokeStyle = 'rgba(0,0,0,0.18)';
+  g.beginPath(); if(g.roundRect) g.roundRect(bx, by, tw, 20, 10); else g.rect(bx, by, tw, 20); g.fill(); g.stroke();
+  g.beginPath(); g.moveTo(bx + 8, by + 20); g.lineTo(bx + 4, by + 27); g.lineTo(bx + 15, by + 20); g.fill();
+  g.fillStyle = '#2B1B5A'; g.textBaseline = 'middle'; g.fillText(text, bx + 7, by + 10.5); g.restore();
+}
+function lxResultBtns(g){
+  return g.lx.role === 'host' ? '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 End the room</button></div>'
+    : '<div class="note lk-wait">⏳ ' + UI.esc((LX.cfg && LX.cfg.host) || 'The host') + ' can start the next game<span class="lk-dots"></span></div><div class="res-btns"><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 Leave</button></div>';
+}
+function lxResultWire(g){ const a = $('b-again'); if(a) a.onclick = () => lxHostGo(); $('b-menu').onclick = () => lxExit(); }
+function lxEnded(msg){
+  if(G){ G.over = true; clearTimeout(LX.autoT); }
+  hideResult(); closeSheet(); const o0 = document.querySelector('.lx-over'); if(o0) o0.remove();   // the message sits on top, alone
+  const o = document.createElement('div'); o.className = 'lx-over';
+  o.innerHTML = '<div class="result-card"><div class="big">📡</div><h2>' + UI.esc(msg) + '</h2><div class="note">Thanks for playing together!</div><div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="none" onclick="lxExit()">◀ Algebros</button></div></div>';
+  document.body.appendChild(o);
+}
+function lxWire(){
+  if(LX.wired || !window.Link) return; LX.wired = true;
+  // guest side
+  Link.on('nbgo', d => { if(Link.isHost() || !d || !d.cfg) return; if(G && G.lx && G.lx.id === d.cfg.id){ lxApply(d.st); return; } lxGuestStart(d); });
+  Link.on('nbstate', st => { if(!Link.isHost()) lxApply(st); });
+  Link.on('nbplayed', d => { if(!Link.isHost()) lxPlayed(d); });
+  Link.on('nbban', d => { if(!Link.isHost() && d && G && G.lx) showBanner(d.text, d.kind); });
+  Link.on('nbbad', d => { if(Link.isHost() || !G || !G.lx) return; G.lx.sent = false; G.busy = false; setActs(true);
+    G.pend.forEach(p => { p.state = 'bad'; }); paintAll(); setMsg('❌ ' + UI.esc((d && d.msg) || 'Not right'), 'bad'); UISound.play('error'); });
+  Link.on('nbend', d => { if(Link.isHost() || !G || !G.lx || G.over) return; if(d && d.st) { G.busy = false; G.running = false; lxApply(d.st); } finishGame('rounds'); });
+  Link.on('hostleft', e => { if(Link.isHost()) return; if(!G && $('scr-link').classList.contains('hidden')) return;
+    UISound.play('bump'); lxEnded(e && e.reason === 'lost' ? '📶 Lost the link to ' + ((LX.cfg && LX.cfg.host) || 'the host') : '👋 ' + ((LX.cfg && LX.cfg.host) || 'The host') + ' ended the game'); });
+  // host side
+  ['play', 'swap', 'pass'].forEach(k => Link.on('nb' + k, (d, lseat) => { if(Link.isHost() && G && G.lx) lxHostMove(k, d || {}, lseat); }));
+  Link.on('leave', e => { if(!Link.isHost() || !G || !G.lx || G.over) return; const k = lxSeatOf(e.seat), P = G.players[k]; if(!P) return; P.away = true;
+    showBanner('📶 ' + P.name + ' dropped out — 🤖 the robot plays their turns until they come back', 'bad'); lxSync();
+    if(G.cur === k){ clearTimeout(LX.autoT); LX.autoT = setTimeout(() => lxAuto(P), LX_AUTO_MS); } });
+  const back = e => { if(!Link.isHost() || !G || !G.lx || !LX.cfg) return; const k = lxSeatOf(e.seat), P = G.players[k]; if(!P) return;
+    if(P.away){ P.away = false; showBanner('👋 ' + P.name + ' is back!', 'gold'); UISound.play('success'); if(G.cur === k) clearTimeout(LX.autoT); }
+    Link.send('nbgo', {cfg: LX.cfg, seat: k, st: lxState(k)}, {sure: true, to: e.seat}); };
+  Link.on('rejoin', back); Link.on('join', back);
+  addEventListener('pagehide', () => { try{ if(Link.status() !== 'idle') Link.leave(); }catch(e){} });
+}
+// the host tells everyone when the game ends (final scores)
+(function(){ const f = finishGame; finishGame = function(why, bad){ if(G && G.lx && G.lx.role === 'host' && !G.over){ const k0 = G.lx.seat; G.players.forEach((P, k) => { if(k !== k0) Link.send('nbend', {why, st: Object.assign(lxState(k), {over: true})}, {sure: true, to: G.lx.seats[k].lseat}); }); } return f.apply(this, arguments); }; })();
+// 🔗 QR / waiting room: ?page=numberboard&link=<code> → the number pad (the waiting room leaves it empty to type)
+function lxUrlCode(cb){
+  try{ if(window.google && google.script && google.script.url && google.script.url.getLocation){ google.script.url.getLocation(l => cb(((l && l.parameter) || {}).link || '')); return; } }catch(e){}
+  try{ cb(new URLSearchParams(location.search).get('link') || ''); }catch(e){ cb(''); }
+}
+/* 📡 END LINK (lk-3d) */
+
 /* ✨ MODE SPOTLIGHT (modes-3): ?mode=<id> opens this game straight in that mode after the player pick · "✨ Also try" on the start page · started modes → UI.modeTried */
 const MS_GAME = 'number-board';
 function msOpen(id){
   if(id === 'together') openTogether();
+  if(id === 'lhost') lxHostPick(); if(id === 'ljoin') lxJoin();   // 📡 lk-3d
 }
 function msNow(){ return ''; }
 function msWrap(fn, idOf){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ try{ const id = idOf.apply(this, arguments); if(id && UI.modeTried) UI.modeTried(S.player || CURRENT_PLAYER, MS_GAME, id); }catch(e){} return f.apply(this, arguments); }; }
@@ -1394,6 +1611,7 @@ msWrap('startGame', lvl => lvl === 'together' ? 'together' : '');
 msAfter('choosePlayer', name => {
   if(!window.UI || !UI.modeLink) return;
   const id = UI.modeLink(MODE_LINK); if(id) msOpen(id);
+  lxUrlCode(c => { c = String(c || '').replace(/[^0-9]/g, '').slice(0, 4); if(c.length === 4) lxJoin(c); });   // 📡 lk-3d
   UI.alsoTry({game: MS_GAME, player: name, current: msNow, at: () => document.querySelector('#scr-menu .title'), open: msOpen});
 });
 /* ✨ END MODE SPOTLIGHT */
@@ -1401,4 +1619,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.chips', {rows: 3}); }</script>
 </body>
 </html>
-<!-- (11v+emoji+r32+back-1+modes-3+gs-4+p1a+p1a-3+p2+p4c+cs-3b) END OF NumberBoard.html -->
+<!-- (11v+emoji+r32+back-1+modes-3+gs-4+p1a+p1a-3+p2+p4c+cs-3b+lk-3d) END OF NumberBoard.html -->
