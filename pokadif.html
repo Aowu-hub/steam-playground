@@ -340,6 +340,9 @@ var PK = (function () {
     space: { name: 'Moon Base',    icon: '🪐', top: '#05061F', bot: '#2A2680', ground: '#6B6F86', hill: '#80849C', deco: ['🪐', '⭐', '☄️', '🛰️', '🌙'], kinds: ['planet', 'rocket', 'star', 'crystal', 'circle', 'diamond', 'cloud', 'gear', 'heart', 'dice'] },
     sky:   { name: 'Cloud Temple', icon: '☁️', top: '#4FA3E0', bot: '#CDEBFF', ground: '#F4F8FF', hill: '#DDEBFB', deco: ['🌈', '🕊️', '🏛️', '☀️', '🪁'], kinds: ['cloud', 'bird', 'balloon', 'house', 'tree', 'flower', 'heart', 'star', 'leaf', 'boat'] }
   };
+  // 📖 pk-4c: two scenes only for case books (not houses): 🌱 Greenhouse · ⏰ Clock Tower
+  THEMES.garden = { name: 'Greenhouse', icon: '🌱', top: '#7CC6A0', bot: '#E8F7D8', ground: '#6B4A2E', hill: '#8BC86A', deco: ['🌻', '🪴', '🐝', '🦋', '🌷'], kinds: ['flower', 'leaf', 'tree', 'mushroom', 'ladybug', 'snail', 'circle', 'heart', 'star', 'balloon'], caseOnly: true };
+  THEMES.clock = { name: 'Clock Tower', icon: '⏰', top: '#3A2A4A', bot: '#B98A5A', ground: '#5A4030', hill: '#7A5A40', deco: ['🔔', '⚙️', '🕯️', '🦉', '🗝️'], kinds: ['gear', 'circle', 'star', 'house', 'diamond', 'hexagon', 'square', 'bird', 'crystal', 'dice'], caseOnly: true };
   var THEME_KEYS = ['dino', 'sea', 'disco', 'robot', 'space', 'sky'];
   // 📸 pk-4a Family Photo Hunt: 7 trip places (the 🧳 Avatraveller regions) — a painted landmark behind the family (painter: pkTrip)
   var TRIP_PROPS = ['suitcase', 'camera', 'icecream', 'balloon', 'flower', 'heart', 'star', 'bird'];
@@ -467,7 +470,11 @@ var PK = (function () {
     } else if (type === 'equation') {
       if (a.k !== 'sign' || a.tt !== 'eq') return null;
       var e = { a: a.eq.a, b: a.eq.b, op: a.eq.op, c: a.eq.c }, st = mag >= 0.7 ? 2 : 1;
-      if (R() < 0.5) e.c = e.c + (R() < 0.5 || e.c <= st ? st : -st); else { e.b = e.b + (e.b <= st ? st : (R() < 0.5 ? st : -st)); }
+      // pk-4c: try every ± change, skip look-alike digit swaps (2↔3, 5↔6 …: < 45 changed pixels on a 💀 tiny sign) when a bolder one exists
+      var cands = [], bold = [];
+      [['c', st], ['c', -st], ['b', st], ['b', -st]].forEach(function (m) { var v = e[m[0]] + m[1]; if (v < 1) return; var x = { a: e.a, b: e.b, op: e.op, c: e.c }; x[m[0]] = v; var tx = sumText(x); if (tx === a.txt) return; cands.push(x); if (!lookAlike(a.txt, tx)) bold.push(x); });
+      if (!cands.length) return null;
+      e = pick(R, bold.length ? bold : cands);
       b.eq = e; b.txt = sumText(e); if (b.txt === a.txt) return null; d.sub = 'sum';
     } else if (type === 'word') {
       if (a.k !== 'sign' || a.tt !== 'word') return null;
@@ -495,6 +502,12 @@ var PK = (function () {
     return room;
   }
   // can this item carry this type at all? (so the scene gets the right kind of item for it)
+  var LOOK_ALIKE = ['23', '38', '56', '68', '89', '08', '17', '35', '69'];
+  function lookAlike(t1, t2) {   // the two texts differ only in look-alike digits?
+    if (t1.length !== t2.length) return false; var any = false;
+    for (var i = 0; i < t1.length; i++) if (t1[i] !== t2[i]) { var pr = [t1[i], t2[i]].sort().join(''); if (LOOK_ALIKE.indexOf(pr) < 0) return false; any = true; }
+    return any;
+  }
   function fits(type, k) { var K = KINDS[k]; if (type === 'equation' || type === 'word') return k === 'sign'; if (type === 'pattern') return k === 'beads';
     if (k === 'sign' || k === 'beads') return type === 'colour' || type === 'gone';
     if (type === 'turn') return !!(K.h || K.r); if (type === 'count') return !!K.n; return true; }
@@ -803,7 +816,73 @@ var PK = (function () {
         yes: [['🪨', 'rock'], ['🍎', 'apple'], ['⚽', 'football'], ['🔑', 'key'], ['📚', 'book'], ['👟', 'shoe']],
         no: [['🪶', 'feather'], ['🍃', 'leaf'], ['🎈', 'balloon'], ['🫧', 'bubble'], ['❄️', 'snowflake'], ['☁️', 'cloud'], ['🧻', 'tissue'], ['🌬️', 'puff of wind']],
         trick: [['🪂', 'parachute'], ['🍂', 'big dry leaf']], why: { yes: 'is heavy and small — gravity pulls it down fast!', no: 'is light and catches the air — the air slows it down.' } },
-      solved: 'The moon rock is back in its glass case — Commander Luna does a giant moon jump! 🌙🦘' }
+      solved: 'The moon rock is back in its glass case — Commander Luna does a giant moon jump! 🌙🦘' },
+    // ☁️ pk-4c
+    { id: 'cloud', n: 6, icon: '☁️', name: 'The Cloud Castle Code', theme: 'sky', topic: 'Codes + patterns', place: 'the Cloud Castle', owner: 'Queen Nimbus', thing: 'rainbow crown', walkTo: 'tower top', dropAt: 'by the rainbow bridge',
+      open: '☁️ Queen Nimbus\'s rainbow crown has vanished from the Cloud Castle! The thief left a secret code — and footprints in the fluffy clouds…',
+      suspects: [['🦄', 'Sparkle the Unicorn'], ['🕊️', 'Pip the Dove'], ['🐉', 'Puff the Dragon'], ['🧚', 'Twinkle the Fairy'], ['🦅', 'Swoop the Eagle']],
+      drops: [['🪶', 'a white feather'], ['🎀', 'a rainbow ribbon'], ['⭐', 'a star clip'], ['🍬', 'a sweet'], ['🎐', 'a wind chime'], ['🧁', 'a cupcake crumb']],
+      clutter: ['cloud', 'bird', 'balloon', 'star', 'heart', 'diamond', 'hexagon', 'circle'],
+      count: '🌈',
+      chapters: [
+        { title: 'The empty cushion', icon: '👑', say: 'The crown\'s cushion is empty — and the clouds are full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
+        { title: 'Up the rainbow', icon: '🌈', say: 'The prints climb the rainbow bridge. Find the way to the tower top — then check the castle camera!', steps: ['walk', 'spot'] },
+        { title: 'The code door', icon: '🔐', say: 'A door with a secret code at the tower top… crack it, then catch the thief!', steps: ['crack', 'accuse'] }
+      ],
+      lessons: [
+        { icon: '🔁', title: 'Patterns repeat', text: 'A pattern is something that repeats: red, blue, red, blue… If you know the rule, you can guess what comes next!' },
+        { icon: '🔐', title: 'Secret codes', text: 'A code swaps letters for numbers or pictures: A = 1, B = 2, C = 3… Spies and computers use codes to keep messages safe.' },
+        { icon: '🐝', title: 'Patterns in nature', text: 'Bees build honeycomb from the same 6-sided shape again and again — and every snowflake has 6 arms!' }
+      ],
+      quiz: { ask: 'Queen Nimbus shows you some things. Which one has a pattern that REPEATS?', nope: 'Which one has NO repeating pattern?',
+        yes: [['🦓', 'zebra stripes'], ['🐝', 'honeycomb'], ['❄️', 'snowflake'], ['🕸️', 'spider web'], ['🍍', 'pineapple'], ['🐯', 'tiger stripes']],
+        no: [['🪨', 'pebble'], ['💧', 'water drop'], ['☁️', 'cloud'], ['🥔', 'potato'], ['🍞', 'bread'], ['🥚', 'egg'], ['🧈', 'butter'], ['🍦', 'ice cream']],
+        trick: [['🧶', 'tangled wool'], ['🎨', 'paint splash']], why: { yes: 'has a pattern that repeats again and again!', no: 'has no repeating pattern — it is all mixed up.' } },
+      solved: 'The rainbow crown is back on Queen Nimbus — and a rainbow shines over the castle! 👑🌈' },
+    // 🌱 pk-4c
+    { id: 'garden', n: 7, icon: '🌱', name: 'The Wilting Garden', theme: 'garden', topic: 'What plants need', place: 'the Greenhouse', owner: 'Grandma Bloom', thing: 'golden watering can', walkTo: 'tool shed', dropAt: 'by the tomato plants',
+      open: '🌱 Grandma Bloom\'s golden watering can is gone — and her plants are drooping! Muddy footprints lead out of the Greenhouse…',
+      suspects: [['🐌', 'Slowy the Snail'], ['🐰', 'Bun the Rabbit'], ['🐛', 'Wiggles the Caterpillar'], ['🐦', 'Chirp the Sparrow'], ['🦔', 'Spike the Hedgehog']],
+      drops: [['🥕', 'a nibbled carrot'], ['🌰', 'a seed'], ['🍓', 'a strawberry'], ['🥬', 'a lettuce leaf'], ['🍄', 'a mushroom'], ['🌼', 'a petal']],
+      clutter: ['flower', 'leaf', 'tree', 'mushroom', 'ladybug', 'snail', 'circle', 'heart'],
+      count: '🌷',
+      chapters: [
+        { title: 'The dry pots', icon: '🪴', say: 'The watering can is gone and the pots are dry — the soil is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
+        { title: 'Through the veggie patch', icon: '🥕', say: 'The prints go through the veggie patch. Find the way to the tool shed — then check the garden camera!', steps: ['walk', 'spot'] },
+        { title: 'The locked shed', icon: '🔐', say: 'The tool shed is locked… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
+      ],
+      lessons: [
+        { icon: '💧', title: 'Plants need water', text: 'Roots drink water from the soil and carry it all the way up to the leaves.' },
+        { icon: '☀️', title: 'Food from light', text: 'Leaves use sunlight, air and water to make the plant\'s own food. That is why plants grow toward the light!' },
+        { icon: '🪱', title: 'Good soil', text: 'Soil gives plants food and something to hold on to. Worms help by mixing it and making it soft.' }
+      ],
+      quiz: { ask: 'Grandma Bloom asks: which one does a plant NEED to grow?', nope: 'Which one does a plant NOT need to grow?',
+        yes: [['💧', 'water'], ['☀️', 'sunlight'], ['🌬️', 'air'], ['🪱', 'good soil'], ['🌡️', 'warmth']],
+        no: [['🍬', 'sweets'], ['🧃', 'juice'], ['🎮', 'video games'], ['🧸', 'teddy bear'], ['📺', 'TV'], ['🍕', 'pizza'], ['🎵', 'loud music'], ['👟', 'shoes']],
+        trick: [['🥤', 'fizzy drink'], ['🧂', 'salt']], why: { yes: 'is something every plant needs to grow!', no: 'is not what a plant needs — water, light, air and soil are!' } },
+      solved: 'The golden watering can is back — Grandma Bloom\'s flowers stand up tall again! 🌷💧' },
+    // ⏰ pk-4c
+    { id: 'clock', n: 8, icon: '⏰', name: 'The Clock That Ran Backwards', theme: 'clock', topic: 'Time + gears', place: 'the Clock Tower', owner: 'Mr Tick-Tock', thing: 'golden winding key', walkTo: 'gear room', dropAt: 'by the big bell',
+      open: '⏰ The Clock Tower is ticking BACKWARDS! Someone took Mr Tick-Tock\'s golden winding key — dusty footprints climb the stairs…',
+      suspects: [['🦉', 'Hoot the Owl'], ['🐭', 'Squeak the Mouse'], ['🦇', 'Flap the Bat'], ['🐿️', 'Nutty the Squirrel'], ['🧙', 'Wizard Whiz']],
+      drops: [['🔩', 'a tiny screw'], ['⚙️', 'a little gear'], ['🧀', 'a cheese crumb'], ['🪶', 'a black feather'], ['🌰', 'an acorn'], ['🕯️', 'a candle stub']],
+      clutter: ['gear', 'circle', 'star', 'house', 'diamond', 'hexagon', 'square', 'bird'],
+      count: '🔔',
+      chapters: [
+        { title: 'The empty hook', icon: '🗝️', say: 'The golden key\'s hook is empty — and the dusty floor is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
+        { title: 'Up the stairs', icon: '🪜', say: 'The prints climb the winding stairs. Find the way to the gear room — then check the tower camera!', steps: ['walk', 'spot'] },
+        { title: 'The locked clock case', icon: '🔐', say: 'The clock case is locked… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
+      ],
+      lessons: [
+        { icon: '⚙️', title: 'Gears turn each other', text: 'When one gear turns, the gear touching it turns the OTHER way. A clock uses lots of gears!' },
+        { icon: '🕐', title: 'Hours and minutes', text: 'The short hand shows the hour, the long hand shows the minutes. One hour is 60 minutes.' },
+        { icon: '🌍', title: 'The Earth is a clock', text: 'One spin of the Earth is one day. One trip all the way around the Sun is one year!' }
+      ],
+      quiz: { ask: 'Mr Tick-Tock asks: which one helps us tell the TIME?', nope: 'Which one does NOT tell the time?',
+        yes: [['⏰', 'alarm clock'], ['⌚', 'watch'], ['⏳', 'sand timer'], ['🕰️', 'old clock'], ['📅', 'calendar'], ['⏱️', 'stopwatch']],
+        no: [['🥄', 'spoon'], ['🧸', 'teddy bear'], ['🍎', 'apple'], ['👟', 'shoe'], ['🎈', 'balloon'], ['📚', 'book'], ['🧦', 'sock'], ['🪨', 'rock']],
+        trick: [['🧭', 'compass'], ['🌡️', 'thermometer']], why: { yes: 'helps us tell the time!', no: 'does not tell the time.' } },
+      solved: 'The golden key is back — tick, tock, the Clock Tower runs forwards again! ⏰✨' }
   ];
   function caseById(id) { for (var i = 0; i < CASES.length; i++) if (CASES[i].id === id) return CASES[i]; return CASES[0]; }
   // 🔐 one code digit + where it hides
@@ -1141,6 +1220,12 @@ function pkBackground(g, sc){
   if(sc.theme === 'sky'){ g.fillStyle = 'rgba(255,255,255,0.35)'; for(let i = 0; i < 3; i++){ const x = R() * PK.W, y = 20 + R() * 80; g.beginPath(); g.ellipse(x, y, 40 + R() * 30, 9, 0, 0, 7); g.fill(); } }
   if(sc.theme === 'robot'){ g.strokeStyle = 'rgba(160,220,255,0.12)'; g.lineWidth = 1; for(let x = 20; x < PK.W; x += 40){ g.beginPath(); g.moveTo(x, 0); g.lineTo(x, PK.GROUND); g.stroke(); } for(let y = 20; y < PK.GROUND; y += 40){ g.beginPath(); g.moveTo(0, y); g.lineTo(PK.W, y); g.stroke(); } }
   if(sc.theme === 'dino'){ g.fillStyle = 'rgba(20,40,10,0.25)'; g.beginPath(); g.moveTo(0, PK.GROUND); for(let x = 0; x <= PK.W; x += 25) g.lineTo(x, PK.GROUND - 30 - Math.sin(x * 0.03 + sc.seed % 7) * 18); g.lineTo(PK.W, PK.GROUND); g.fill(); }
+  if(sc.theme === 'garden'){ g.strokeStyle = 'rgba(255,255,255,0.45)'; g.lineWidth = 2; for(let x = 0; x <= PK.W; x += 50){ g.beginPath(); g.moveTo(x, 0); g.lineTo(x, PK.GROUND); g.stroke(); } g.beginPath(); g.moveTo(0, 70); g.lineTo(PK.W, 70); g.stroke();
+    g.fillStyle = 'rgba(60,140,60,0.35)'; for(let x = 12; x < PK.W; x += 34){ g.beginPath(); g.ellipse(x, PK.GROUND - 4, 16, 10, 0, Math.PI, 0); g.fill(); } }   // 🌱 pk-4c greenhouse glass + plant rows
+  if(sc.theme === 'clock'){ const cx = PK.W / 2, cy = 92; g.fillStyle = 'rgba(255,240,200,0.18)'; g.beginPath(); g.arc(cx, cy, 72, 0, 7); g.fill(); g.strokeStyle = 'rgba(255,230,180,0.35)'; g.lineWidth = 3; g.stroke();
+    g.lineWidth = 2; for(let i = 0; i < 12; i++){ const a = i * Math.PI / 6; g.beginPath(); g.moveTo(cx + Math.cos(a) * 60, cy + Math.sin(a) * 60); g.lineTo(cx + Math.cos(a) * 68, cy + Math.sin(a) * 68); g.stroke(); }
+    g.lineWidth = 4; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx - 26, cy - 30); g.moveTo(cx, cy); g.lineTo(cx + 44, cy + 8); g.stroke();
+    g.fillStyle = 'rgba(255,220,160,0.12)'; [[30, 40, 26], [PK.W - 34, 54, 32]].forEach(c => { g.beginPath(); for(let k = 0; k < 16; k++){ const a = k * Math.PI / 8, r = k % 2 ? c[2] : c[2] * 0.78; g.lineTo(c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r); } g.closePath(); g.fill(); }); }   // ⏰ pk-4c clock face + gears
   if(T.mark){ if(sc.theme === 'trip_aurora' || sc.theme === 'trip_moon'){ for(let i = 0; i < 22; i++){ g.fillStyle = 'rgba(255,255,255,' + (0.3 + R() * 0.5) + ')'; g.beginPath(); g.arc(R() * PK.W, R() * PK.GROUND * 0.6, 0.6 + R() * 1.3, 0, 7); g.fill(); } } pkTrip(g, sc, R); }
   else { g.fillStyle = T.hill; g.beginPath(); g.ellipse(PK.W * 0.25, PK.GROUND + 8, PK.W * 0.42, 26, 0, 0, 7); g.ellipse(PK.W * 0.8, PK.GROUND + 12, PK.W * 0.36, 22, 0, 0, 7); g.fill(); }
   g.fillStyle = T.ground; g.fillRect(0, PK.GROUND + 4, PK.W, PK.H - PK.GROUND);
@@ -1737,7 +1822,7 @@ function caseOf(){ return PK.caseById(SET.caseId || 'magnet'); }
 function caseSeen(){ try{ return JSON.parse(localStorage.getItem(CASE_KEY + ':' + (S.player || '')) || '{}'); }catch(e){ return {}; } }
 function caseSeenSave(o){ try{ localStorage.setItem(CASE_KEY + ':' + (S.player || ''), JSON.stringify(o)); }catch(e){} }
 function lessonCount(){ return Object.keys(caseSeen()).filter(k => /^L:/.test(k)).length; }
-const CASE_SHELF = [{id: 'magnet'}, {id: 'dino'}, {id: 'ship'}, {id: 'disco'}, {id: 'moon'}];   // pk-3b: 3 case books · pk-4b: + 🪩 🪐
+const CASE_SHELF = [{id: 'magnet'}, {id: 'dino'}, {id: 'ship'}, {id: 'disco'}, {id: 'moon'}, {id: 'cloud'}, {id: 'garden'}, {id: 'clock'}];   // pk-3b: 3 case books · pk-4b: + 🪩 🪐 · pk-4c: + ☁️ 🌱 ⏰
 function renderCases(){
   const box = $('house-list'), seen = caseSeen();
   box.innerHTML = CASE_SHELF.map(c => { const C = c.soon ? c : PK.caseById(c.id), on = (SET.caseId || 'magnet') === c.id;
@@ -2078,4 +2163,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d+pk-4a+pk-4b) END OF Pokadif.html -->
+<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d+pk-4a+pk-4b+pk-4c) END OF Pokadif.html -->
