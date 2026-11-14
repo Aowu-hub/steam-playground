@@ -262,6 +262,7 @@
 <script src="inc/TableSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-pd: the cheering crowd (CheerSquad.html) in front of the painted stands -->
 <script src="inc/SpiritBestiary.js"></script>
 </head>
 <body ontouchstart="">
@@ -280,6 +281,7 @@
   <div id="mode-list"></div>
   <div class="section-head" id="level-head">Pick a level</div>
   <div class="levels" id="level-list"></div>
+  <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd in the stands">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-pd -->
   <div class="comics-slot" id="comics-slot-menu"></div>
   <details class="rules"><summary>📖 How to play</summary><ul>
     <li><b>3 touches a side:</b> 🚀 <b>Drive</b> serves it over · 🤚 the 1st touch <b>bumps</b> it up · 🪶 the 2nd <b>sets</b> it high · 💥 the 3rd <b>dunks</b> it over the net!</li>
@@ -1816,7 +1818,7 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
-  loadPrefs(); KEYS = loadKeys(); $('who-name').textContent = name;
+  loadPrefs(); KEYS = loadKeys(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-pd */
   bestiaryCount(); if(window.SpiritBestiary) SpiritBestiary.load(name).then(bestiaryCount);   // 📖 found creatures (this device + the server)
   const ml = UI.modeLink ? UI.modeLink(MODE_LINK) : '';
   if(ml && modeInfo(ml)) pickMode(ml);
@@ -2032,13 +2034,14 @@ function startMatch(){
   if(isTouch() && innerHeight > innerWidth * 1.05 && !ls('sp_pyradive_turn')){ ls('sp_pyradive_turn', '1'); banner('↻ Turn sideways for a bigger court', 'good', 2600); }
   else if(cupOn) banner(CUPS[SET.cupState.k].icon + ' ' + cupRoundName(SET.cupState) + ' · ' + PD.MODES[SET.mode].icon + ' first to ' + M.target, 'gold', 2400);
   else banner(PD.MODES[SET.mode].icon + ' ' + PD.MODES[SET.mode].name + ' · ' + (M.drill ? levelGoal(SET.mode, SET.level).split(' · ⭐')[0] + ' · ' + DRILL_GOAL[M.drill.k].split(' · ')[0] : M.setsTo > 1 ? 'best of 3 sets to ' + M.target : 'first to ' + M.target), 'good', 2400);
+  cheerMount(); /* 📣 cs-pd */
   startLoop();
 }
 function startLoop(){ stopLoop(); G.last = performance.now(); const f = ts => { RAF = requestAnimationFrame(f); frame(ts); }; RAF = requestAnimationFrame(f); }
 function stopLoop(){ if(RAF) cancelAnimationFrame(RAF); RAF = 0; }
-function setPaused(on){ if(!G || G.over) return; G.paused = !!on; if(!on) G.last = performance.now(); }
+function setPaused(on){ if(!G || G.over) return; G.paused = !!on; if(window.Cheer) Cheer.pause(G.paused); /* 📣 cs-pd */ if(!on) G.last = performance.now(); }
 function pauseGame(){ setPaused(true); }
-function leavePlay(){ stopLoop(); if(G) G.over = true; G = null; if(SET.cupState && SET.cup){ SET.mode = SET.cupState.sportBack || SET.mode; } SET.cupState = null; freeSprites(); hideResult(); $('pads').innerHTML = ''; renderMenu(); showScreen('menu'); }
+function leavePlay(){ if(window.Cheer) Cheer.unmount(); stopLoop(); if(G) G.over = true; G = null; if(SET.cupState && SET.cup){ SET.mode = SET.cupState.sportBack || SET.mode; } SET.cupState = null; freeSprites(); hideResult(); $('pads').innerHTML = ''; renderMenu(); showScreen('menu'); }
 function frame(ts){
   if(!G) return;
   let dt = Math.min(0.1, Math.max(0, (ts - G.last) / 1000)); G.last = ts;
@@ -2064,6 +2067,7 @@ function handleEvents(list){
   list.forEach(e => {
     GC_LOG.push(Object.assign({mode: GAME_ID}, e)); if(GC_LOG.length > 600) GC_LOG.shift();
     GC_LISTEN.forEach(fn => { try{ fn(GAME_ID, e, M); }catch(err){} });
+    cheerEvent(e, M); /* 📣 cs-pd */
     const b = M.ball, p = e.p != null ? M.players[e.p] : null;
     switch(e.k){
       case 'serve': snd('whoosh'); spark(b.x, b.y, b.z, e.pyra ? '#FF6B1A' : '#FFFFFF', e.kind === 'jump' ? 16 : 10);
@@ -2507,6 +2511,7 @@ function drawArena(g, M, t){
     [[0.12, 1], [0.88, -1]].forEach(([fx, d]) => { g.beginPath(); g.moveTo(W * fx, 0); g.lineTo(W * fx + d * W * 0.08, 0); g.lineTo(W * 0.5 + d * W * 0.22, H); g.lineTo(W * 0.5 - d * W * 0.05, H); g.closePath(); g.fill(); }); }
   else if(LK.spot === 'neon'){ ['#FF4FD8', '#3CF2FF', '#FFE14A'].forEach((c, i) => { const sw = Math.sin(t * 0.9 + i * 2.1) * W * 0.25, fx = W * (0.2 + i * 0.3); g.globalAlpha = 0.1; g.fillStyle = c; g.beginPath(); g.moveTo(fx - W * 0.015, 0); g.lineTo(fx + W * 0.015, 0); g.lineTo(fx + sw + W * 0.1, H); g.lineTo(fx + sw - W * 0.1, H); g.closePath(); g.fill(); }); }
   g.globalAlpha = 1;
+  cheerScene(g, M, W, H, farY, top); /* 📣 cs-pd */
   // big screen (score) when there is room above the stands
   if(top > 150 && G && G.M === M){ const bw = Math.min(220, W * 0.3), bx = W / 2 - bw / 2, by = top - 44;
     g.fillStyle = '#05081A'; rr(g, bx, by, bw, 34, 8); g.fill(); g.strokeStyle = '#FF6B1A'; g.lineWidth = 2; g.stroke();
@@ -2889,6 +2894,7 @@ function finishCupMatch(){
   if(!won || Cs.alive.length === 1){
     Cs.done = true; Cs.place = won ? 'champion' : roundOf === 2 ? 'final' : roundOf === 4 ? 'semi' : 'quarter';
     const C = CUPS[Cs.k], champ = Cs.place === 'champion', stars = champ ? 3 : Cs.place === 'final' ? 2 : Cs.place === 'semi' ? 1 : 0;
+    if(champ) cheerChamp(); /* 📣 cs-pd */
     const pts = Math.round((champ ? 3000 : Cs.place === 'final' ? 1800 : Cs.place === 'semi' ? 900 : 300) * (C.n === 8 ? 1.5 : 1) * (1 + Cs.level * 0.25) * (LEVEL_UI[Cs.level].hardcore ? 3 : 1));
     showCupCard(last);
     G.locals.forEach((p, i) => { if(p.name === 'Guest') return;
@@ -2933,7 +2939,63 @@ function saveText(res, cleared, drill, cup){
   const h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New high score!' : cleared ? (res.best && res.best.score ? 'Best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Saved') : '✅ Feats saved — win to unlock the next level';
   return featText(res.feats, h);
 }
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+/* 📣 CHEERSQUAD (cs-pd) START — the live crowd in front of the painted stands (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+// sides: 0 = left / orange (the people) · 1 = right / blue (robots, or a 2nd person). Fans = family members not on court (robots may carry family names: those stay out too).
+function cheerMount(){
+  if(!window.Cheer || !G || !G.M) return; Cheer.unmount(); const M = G.M, on = new Set(M.players.map(p => p.name)), hum = t => M.players.some(p => p.team === t && p.human);
+  const nm = t => { const p = M.players.find(q => q.team === t && q.human) || M.players.find(q => q.team === t); return p ? p.name : ['Orange', 'Blue'][t]; };
+  Cheer.mount($('stage'), {game: 'pyraspike', players: [{name: nm(0), side: 0, human: hum(0) || !hum(1)}, {name: nm(1), side: 1, human: hum(1)}], me: {name: S.player},
+    family: (S.players || []).map(p => p.Name).filter(n => !on.has(n)), avatars: S.avatars || {}, mode: 'scene', ref: $('court'),
+    avoid: () => Array.from(document.querySelectorAll('#gbar, .top-btn, #pads > *, #keylegend:not(.hidden)')), clear: () => true});   /* the court, net and players paint over the crowd anyway */
+}
+// the stands band: 2 staggered rows (front row on the band's bottom edge, back row smaller + higher, half a step over), gaps where the game draws its own things
+function cheerScene(g, M, W, H, farY, top){
+  if(!window.Cheer || !G || G.M !== M || !Cheer.active()) return; const bh = farY - top; if(bh < 18) return;   /* phones upright: the band is too thin (never shrink the court) */
+  const k1 = Math.min(1.05, bh * 0.92 / 100) * (Cheer.stats().size === 'party' ? 1 : 0.92), k2 = k1 * 0.86, two = bh > 46, step = Math.max(26, 46 * k1), gaps = [];
+  if(!isHoop(M) && !PD.isSpark(M)){ const r = Math.max(7, Math.min(16, V.k * 0.26)); gaps.push([P(0, -M.W / 2 - 0.45, 0)[0], 14 + 16 * k1]); [0, 1].forEach(t => gaps.push([Math.max(r * 4, Math.min(W - r * 4, P(PD.sgn(t) * M.L * 0.5, -M.W / 2 - 2.6, 0)[0])), r * 4.6]));
+  }
+  if(isHoop(M)) gaps.push([P(0, 0, 0)[0], V.k * 1.1 + 20]);   /* the hoop + its ropes */
+  if(PD.isSpark(M)) gaps.push([W / 2, Math.min(W * 0.12, V.k * 0.9) + 16]);   /* the table's net posts */
+  const shot = top > 150 ? Math.min(220, W * 0.3) / 2 + 14 : 0;   /* the big score screen above the stands */
+  const free = (x, back) => !gaps.some(([gx, gw]) => Math.abs(x - gx) < gw) && !(back && shot && Math.abs(x - W / 2) < shot);
+  const key = [Math.round(W), Math.round(farY), Math.round(top), two, Cheer.stats().size].join('|');
+  if(G.cheerKey !== key){ G.cheerKey = key; const c = [];
+    for(let x = step * 0.6; x < W - step * 0.4; x += step) if(free(x, false)) c.push({id: 'f' + Math.round(x), x, y: farY - 2 - 5 * k1, k: k1, half: x < W / 2 ? 0 : 1});
+    if(two) for(let x = step * 1.1; x < W - step * 0.4; x += step) if(free(x, true)) c.push({id: 'b' + Math.round(x), x, y: farY - bh * 0.42, k: k2, half: x < W / 2 ? 0 : 1});
+    c.sort((a, b) => (a.id[0] === b.id[0] ? 0 : a.id[0] === 'f' ? -1 : 1) || Math.abs(a.x - W / 2) - Math.abs(b.x - W / 2));   /* front row first, near the middle first */
+    G.cheerOrder = c; }
+  Cheer.place(g, G.cheerOrder, {key: 'stands', w: W, h: H});
+}
+// small wins get a 1.2 s breather (a fast rally isn't a wall of cheers); big ones, misses and the ends always play
+function cheerSay(kind, side){ if(!kind || !window.Cheer || !Cheer.active() || !G) return; const now = performance.now();
+  if(kind === 'goal' && (G.cheerAt || 0) > now - 1200) return; if(kind === 'big' && (G.cheerBig || 0) > now - 700) return;
+  if(kind === 'goal') G.cheerAt = now; if(kind === 'big'){ G.cheerBig = now; G.cheerAt = now; } Cheer.react(kind, {side: side == null ? 0 : side}); }
+function cheerEvent(e, M){ if(!window.Cheer || !Cheer.active() || !G) return; const tm = e.team != null ? e.team : e.p != null && M.players[e.p] ? M.players[e.p].team : 0;
+  switch(e.k){
+    case 'serveReady': case 'serveToss': Cheer.hush(true); break;   /* 🤫 quiet for the serve */
+    case 'serve': Cheer.hush(false); break;
+    case 'kill': cheerSay(e.pyra || e.spirit ? 'big' : 'goal', tm); break;
+    case 'ace': case 'stuff': cheerSay('big', tm); break;
+    case 'pyra': cheerSay('big', tm); break;
+    case 'spirit': case 'teamSpirit': cheerSay('big', -1); break;   /* everyone stands for a creature */
+    case 'edge': Cheer.react('close', {side: -1}); setTimeout(() => cheerSay('goal', tm), 700); break;
+    case 'longRally': if(e.n >= 10 && e.n % 5 === 0) Cheer.react('close', {side: -1}); break;
+    case 'fault': case 'out': case 'serveMiss': Cheer.hush(false); Cheer.react('miss', {side: tm}); break;
+    case 'point': Cheer.hush(false); if(e.why === 'in' || e.why === 'drop') cheerSay('goal', tm); break;
+    case 'setPoint': case 'matchPoint': Cheer.react('close', {side: tm}); break;
+    case 'comeback': Cheer.react('comeback', {side: tm}); break;
+    case 'hoop': case 'partyPoint': cheerSay('goal', tm); break;
+    case 'drillHit': if(e.streak === 5 || e.streak === 10) cheerSay(e.streak >= 10 ? 'big' : 'goal', 0); break;
+    case 'drillEnd': Cheer.hush(false); Cheer.react(e.stars >= 3 ? 'win' : e.stars ? 'goal' : 'lose', {side: 0}); break;
+    case 'match': { Cheer.hush(false); const w = e.winner, duo = M.players.some(p => p.team === 1 && p.human) && M.players.some(p => p.team === 0 && p.human);
+      if(w == null || w < 0) Cheer.react('goal', {side: -1}); else if(duo || w === 0) Cheer.react('win', {side: w}); else Cheer.react('lose', {side: 0}); break; }
+  } }
+function cheerChamp(){ if(window.Cheer && Cheer.active()){ Cheer.react('win', {side: 0}); setTimeout(() => { if(window.Cheer && Cheer.active()) Cheer.react('big', {side: -1}); }, 1600); } }   /* 🏆 the biggest win */
+function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  const at = card.querySelector('.res-btns'); if(at) { at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); } else { card.appendChild(cap); card.appendChild(c); } }, 900); }
+/* 📣 CHEERSQUAD END */
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-pd */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pdPick(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
@@ -2960,4 +3022,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pd-4c) END OF PyraDive.html -->
+<!-- (pd-4c+cs-pd) END OF PyraDive.html -->
