@@ -1787,6 +1787,7 @@ function getGameLeaders(gameId) {
   const P = {};
   const me = n => P[n] || (P[n] = { name: n, levels: 0, hardcore: false, bestScore: 0, bestTime: 0, stars: 0, plays: 0, last: '', pts: { levels: 0, score: 0, time: 0, stars: 0, plays: 0 }, medals: [] });
   rows.forEach(r => { const m = me(r.name); m.plays++; if (r.score > m.bestScore) m.bestScore = r.score; if (r.date > m.last) m.last = r.date; });
+  rows.forEach(r => { const h = String(r.theme || '').split(' · ')[0].trim(); if (!h) return; const ways = me(r.name).ways || (me(r.name).ways = {}), w = ways[h] || (ways[h] = { best: 0, plays: 0 }); w.plays++; if (r.score > w.best) w.best = r.score; });   // 🏆 pd-3c: best per way to play (Theme head) → PyraDive's sport columns
   players.forEach(p => { const pr = gameId === 'maze' ? mazeProgressFor_(p.Name) : levelProgressFor_(p.Name, gameId);
     if (!pr.unlocked && !P[p.Name]) return; const m = me(p.Name); m.levels = Math.min(LEVEL_COUNT, pr.unlocked); m.hardcore = pr.unlocked >= LEVEL_COUNT;
     for (let i = 0; i < m.levels; i++) m.pts.levels += LEADER_LEVEL_PTS[i];
@@ -4555,7 +4556,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */

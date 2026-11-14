@@ -220,6 +220,22 @@
   .confetti{position:fixed;top:-40px;z-index:390;font-size:1.6rem;pointer-events:none;animation:fall linear forwards;}
   @keyframes fall{to{transform:translateY(110vh) rotate(540deg);}}
   .empty{text-align:center;color:var(--ink-soft);font-weight:800;padding:20px;}
+/* 🏆 pd-3c sport columns on the PyraDive leaderboard */
+.pdl-card .pdl-row{grid-template-columns:34px 40px minmax(0,1fr) auto auto;}
+.pdl-head{display:grid;align-items:end;gap:8px;padding:0 8px 2px;font-weight:800;font-size:.7rem;color:var(--ink-soft);}
+.pdl-hn{align-self:center;} .pdl-hp{min-width:60px;text-align:center;}
+.pdl-cols{display:grid;grid-template-columns:repeat(4,62px);gap:5px;}
+.pdl-hc{border:2px solid transparent;background:var(--panel);color:var(--ink);border-radius:10px;padding:2px 0 3px;font:inherit;font-size:.66rem;font-weight:800;cursor:pointer;display:flex;flex-direction:column;align-items:center;line-height:1.1;}
+.pdl-hc b{font-size:1.05rem;} .pdl-hc.on{border-color:#FFC845;box-shadow:0 0 0 2px var(--game-a,#FF6B3D);}
+.pdl-c{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--panel);border-radius:10px;padding:3px 2px;font-weight:800;font-size:.76rem;line-height:1.15;min-height:38px;font-variant-numeric:tabular-nums;}
+.pdl-c b{font-size:.95rem;} .pdl-c.none{opacity:.45;} .pdl-c.king{box-shadow:inset 0 0 0 2px #FFC845;background:color-mix(in srgb,#FFC845 22%,var(--panel));}
+.pdl-c i{position:absolute;top:-8px;right:-4px;font-style:normal;font-size:.8rem;}
+@media (max-width:620px){
+  .pdl-card .pdl-row{grid-template-columns:28px 34px minmax(0,1fr) auto;row-gap:4px;}
+  .pdl-card .pdl-cols{grid-column:3 / span 2;grid-row:2;grid-template-columns:repeat(4,minmax(0,1fr));}
+  .pdl-head .pdl-hn,.pdl-head .pdl-hp{display:none;}
+  .pdl-head .pdl-cols{grid-row:1;}
+}
 </style>
 <script src="inc/UiKit.js"></script>
 <script src="inc/BallSkins.js"></script>
@@ -1398,7 +1414,8 @@ var PD = (function () {
       if (!ok || (M.lastP === p.id && M.t - b.hitT < 0.3)) return;
       if (isPerson(p)) { if (p.want) sparkTouch(M, p, p.want.key); return; }
       if (M.recv[T] !== p.id || M.t - M.assignT < lv.bot.react * 0.7 || b.vz > 0.6) return;
-      if (p.missFor !== M.rally + ':' + M.n) { p.missFor = M.rally + ':' + M.n; var fast = hyp(b.vx, b.vy) > 5.5 * lv.spd ? 0.14 : 0, smash = M.lastAct === 'dunk' ? 0.12 : M.lastAct === 'edge' ? 0.2 : 0; p.willMiss = M.rnd() < lv.bot.miss * (M.ball.spirit ? 3 : M.ball.pyra ? 1.6 : 0.7) + fast + smash; }
+      if (p.missFor !== M.rally + ':' + M.n) { p.missFor = M.rally + ':' + M.n; var fast = hyp(b.vx, b.vy) > 5.5 * lv.spd ? 0.14 : 0, smash = M.lastAct === 'dunk' ? 0.12 : M.lastAct === 'edge' ? 0.2 : 0; var tired = Math.max(0, M.rally - 16) * 0.015;   /* 🥵 pd-3c: tired legs — after ~8 crossings robots miss a bit more each touch, so robot-vs-robot rallies end */
+        p.willMiss = M.rnd() < lv.bot.miss * (M.ball.spirit ? 3 : M.ball.pyra ? 1.6 : 0.7) + fast + smash + tired; }
       if (p.willMiss) return;
       var duo = teamOf(M, T).length > 1, mateDone = !duo || teamOf(M, T).every(function (q) { return M.touched.indexOf(q.id) >= 0 || q.id === p.id; });
       var direct = !duo && M.n === 0 && b.z - p.z > 0.7 && b.z - p.z < 1.4 && M.rnd() < 0.45;
@@ -1605,7 +1622,45 @@ function renderMenu(){
   const ml = $('mode-list');
   if(!ml.children.length) UI.modeGroups(ml, MODE_GROUPS, mgList(), {next: () => $('level-head'), onPick: k => { SET.mode = k; savePrefs(); markModes(); return false; }});
   markModes(); renderLevels();
-  if(window.UI && UI.leaders) UI.leaders($('leaders'), GAME_ID, S.player);
+  pdLeaders($('leaders'), S.player);
+}
+/* 🏆 pd-3c (Aowu 2026-11-14): ONE PyraDive leaderboard, a column per sport — 🏐 Spike · 🦶 Strike · ⭕ Hoop · ⚡ Spark.
+   Same rows + Leader points as UI.leaders (server getGameLeaders); each player's best per sport comes from `ways`
+   (best score per Theme head = mode icon + name). 👑 = the family's best in that sport. Tap a sport header to rank by it. */
+const SPORT_COLS = [{k: 'spike', icon: '🏐', name: 'Spike'}, {k: 'strike', icon: '🦶', name: 'Strike'}, {k: 'hoop', icon: '⭕', name: 'Hoop'}, {k: 'spark', icon: '⚡', name: 'Spark'}];
+const LB = {data: null, sort: ''};
+function sportOfHead(h){ h = String(h || '').trim(); for(const k in PD.MODES){ const m = PD.MODES[k]; if(h === m.icon + ' ' + m.name) return m; } return null; }
+function sportBests(m){ const out = {}; SPORT_COLS.forEach(c => { out[c.k] = {best: 0, plays: 0, modes: []}; });
+  Object.keys(m.ways || {}).forEach(h => { const md = sportOfHead(h), w = m.ways[h]; if(!md || !out[md.sport]) return; const o = out[md.sport];
+    o.plays += w.plays || 0; if((w.best || 0) > o.best) o.best = w.best || 0; o.modes.push(h + (w.best ? ' 🏆 ' + Number(w.best).toLocaleString() : '') + ' (' + (w.plays || 0) + ')'); });
+  return out; }
+function pdLeaders(el, me){
+  if(!el) return;
+  if(!window.google || !google.script || !google.script.run){ if(window.UI && UI.leaders) UI.leaders(el, GAME_ID, me); return; }
+  if(!el.innerHTML) el.innerHTML = '<div class="uil-card"><div class="uil-h">🏆 Who played PyraDive</div><div class="uil-load"><span class="ui-spin a-bounce">🏐</span> Counting the champions…</div></div>';
+  google.script.run.withSuccessHandler(d => { LB.data = d; LB.me = me; drawLeaders(el); }).withFailureHandler(() => { if(window.UI && UI.leaders) UI.leaders(el, GAME_ID, me); else el.innerHTML = ''; }).getGameLeaders(GAME_ID);
+}
+function drawLeaders(el){
+  const d = LB.data, me = LB.me, esc = UI.esc || (x => String(x));
+  const list = ((d && d.players) || []).map(m => Object.assign({}, m, {sp: sportBests(m)}));
+  if(!list.length){ el.innerHTML = '<div class="uil-card"><div class="uil-h">🏆 Who played PyraDive</div><div class="uil-none">Nobody yet — be the first champion! 🚀</div></div>'; return; }
+  const top = {}; SPORT_COLS.forEach(c => { top[c.k] = Math.max(0, ...list.map(m => m.sp[c.k].best)); });
+  const rows = list.slice(), rankByPts = list.map(m => m.name);
+  if(LB.sort) rows.sort((a, b) => b.sp[LB.sort].best - a.sp[LB.sort].best || b.total - a.total);
+  const head = '<div class="pdl-row pdl-head"><span></span><span></span><span class="pdl-hn">' + (LB.sort ? 'Ranked by ' + SPORT_COLS.find(c => c.k === LB.sort).icon + ' best' : 'Ranked by points') + '</span><span class="pdl-cols">'
+    + SPORT_COLS.map(c => '<button class="pdl-hc' + (LB.sort === c.k ? ' on' : '') + '" data-k="' + c.k + '" data-sound="pop" title="Rank by ' + c.name + '"><b>' + c.icon + '</b>' + c.name + '</button>').join('') + '</span><span class="pdl-hp">points</span></div>';
+  const row = (m, i) => { const pi = rankByPts.indexOf(m.name), medal = LB.sort ? (i + 1) + '.' : (['🥇', '🥈', '🥉'][i] || (i + 1) + '.'), lv = '●'.repeat(Math.min(5, m.levels)) + '○'.repeat(Math.max(0, 5 - m.levels)) + (m.hardcore ? ' 💀' : '');
+    const cells = SPORT_COLS.map(c => { const o = m.sp[c.k], king = o.best > 0 && o.best === top[c.k];
+      return '<span class="pdl-c' + (o.plays ? '' : ' none') + (king ? ' king' : '') + '" data-sport="' + c.k + '" title="' + esc(c.icon + ' ' + c.name + (o.modes.length ? ': ' + o.modes.join(' · ') : ': not played yet')) + '"><b>' + c.icon + '</b>'
+        + (o.best ? Number(o.best).toLocaleString() : o.plays ? '0' : '—') + (king ? '<i>👑</i>' : '') + '</span>'; }).join('');
+    return '<div class="pdl-row uil-row' + (m.name === me ? ' me' : '') + (pi === 0 ? ' lead' : '') + '"><span class="uil-rank">' + medal + '</span><canvas class="uil-av" width="72" height="72" data-n="' + esc(m.name) + '"></canvas>'
+      + '<span class="uil-nm">' + esc(m.name) + (pi === 0 ? ' <b class="uil-crown">👑 Leader</b>' : '') + '<small>' + lv + ' · ' + m.plays + ' game' + (m.plays === 1 ? '' : 's') + '</small></span>'
+      + '<span class="pdl-cols">' + cells + '</span><span class="uil-pts"><b>' + Number(m.total).toLocaleString() + '</b><small>points</small></span></div>'; };
+  el.innerHTML = '<div class="uil-card pdl-card"><div class="uil-h">🏆 Who played PyraDive <small>One board for every sport · 👑 = best in that sport · tap a sport to rank by it</small></div>' + head + rows.map(row).join('') + '</div>';
+  el.querySelectorAll('.pdl-hc').forEach(b => b.onclick = () => { LB.sort = LB.sort === b.dataset.k ? '' : b.dataset.k; drawLeaders(el); });
+  el.querySelectorAll('canvas.uil-av').forEach(c => { const m = list.find(x => x.name === c.dataset.n), g = c.getContext('2d');
+    try { if(typeof drawPreviewCanvas === 'function' && typeof fixAv === 'function'){ const big = document.createElement('canvas'); big.width = 120; big.height = 140; drawPreviewCanvas(big, m.avatar ? Object.assign(fixAv(m.avatar), {eq: {}}) : defaultAvatar(m.name), {name: m.name, t: 1}); g.drawImage(big, 28, 14, 64, 64, 0, 0, 72, 72); return; } } catch(e){}
+    g.fillStyle = '#FF8FB1'; g.beginPath(); g.arc(36, 36, 34, 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = '700 34px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(m.name.charAt(0).toUpperCase(), 36, 38); });
 }
 function markModes(){ $('mode-list').querySelectorAll('.ui-mbtn').forEach(b => b.classList.toggle('on', b.dataset.k === SET.mode)); $('level-head').textContent = 'Pick a level — ' + PD.MODES[SET.mode].icon + ' ' + PD.MODES[SET.mode].name; }
 function renderLevels(){
@@ -2389,4 +2444,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pd-3b) END OF PyraDive.html -->
+<!-- (pd-3c) END OF PyraDive.html -->
