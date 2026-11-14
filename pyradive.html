@@ -107,6 +107,16 @@
   .arena canvas{width:100%;aspect-ratio:4/3;border-radius:12px;display:block;}
   .arena .nm{font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.8rem;}
   html .arena.on, html [data-theme] .arena.on{border-color:#FFC845 !important;box-shadow:0 0 0 3px #FF6B1A !important;}
+  /* 🎨 pd-4c looks: ball · table · party balls (pickers on the setup screen) */
+  .pdk-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .pdk-chip{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:999px;background:var(--panel);color:var(--ink);font-family:inherit;font-weight:800;font-size:.8rem;padding:3px 12px 3px 3px;cursor:pointer;box-shadow:0 2px 0 rgba(0,0,0,0.12);}
+  .pdk-chip canvas{width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,0.08);}
+  .pdk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;max-height:min(56vh,420px);overflow-y:auto;padding:2px;}
+  .pdk-opt{border:3px solid transparent;border-radius:14px;background:var(--panel);color:var(--ink);font-family:inherit;font-weight:700;font-size:.72rem;padding:5px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;}
+  .pdk-opt canvas{width:64px;height:64px;}
+  html .pdk-opt.on, html [data-theme] .pdk-opt.on{border-color:#FFC845 !important;box-shadow:0 0 0 2px #FF6B1A !important;}
+  .pdk-opt.craft{border:2px dashed currentColor;background:transparent;justify-content:center;min-height:96px;}
+  @media (max-height:460px){ .pdk-grid{max-height:48vh;} .pdk-opt canvas{width:48px;height:48px;} }
   .arena.soon{opacity:.55;cursor:default;} .arena.soon .nm::after{content:' · R4';font-size:.7rem;color:var(--ink-soft);}
   .opts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
   .note{font-size:0.78rem;font-weight:800;color:var(--ink-soft);}
@@ -248,6 +258,8 @@
 </style>
 <script src="inc/UiKit.js"></script>
 <script src="inc/BallSkins.js"></script>
+<script src="inc/BombSkins.js"></script>
+<script src="inc/TableSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
 <script src="inc/SpiritBestiary.js"></script>
@@ -286,7 +298,7 @@
       <div class="chips" id="who-row"></div>
       <div id="team-box"></div>
     </div>
-    <div class="box"><h3>🏟️ Arena</h3><div class="arenas" id="arena-list"></div></div>
+    <div class="box"><h3>🏟️ Arena</h3><div class="arenas" id="arena-list"></div><div class="pdk-row" id="look-row"></div></div>
     <div class="box"><h3>⚙️ Extras</h3>
       <div class="opts" id="extra-row">
         <button class="chip" id="aim-chip" data-sound="tap">🎯 Landing marker: on</button>
@@ -312,6 +324,12 @@
 </section>
 <div class="result hidden" id="result"><div class="result-card" id="result-card"></div></div>
 
+<div class="sheet hidden" id="look-sheet"><div class="sheet-card">
+  <h2 id="look-title">🎨 Looks</h2>
+  <div class="note" id="look-note"></div>
+  <div class="pdk-grid" id="look-grid"></div>
+  <div class="go-row" style="margin-top:10px" id="look-btns"><button class="sp-btn sp-primary" data-sound="none" onclick="closeLooks()">Done</button></div>
+</div></div>
 <div class="sheet hidden" id="keys-sheet"><div class="sheet-card">
   <h2>⌨️ Keys on this device</h2>
   <div class="note">Tap a key box, then press the new key. A key that is already used swaps places.</div>
@@ -499,7 +517,9 @@ var PD = (function () {
   function uOf(team, x) { return x * sgn(team); }
   function hyp(a, b) { return Math.sqrt(a * a + b * b); }
   function ev(M, k, o) { var e = o || {}; e.k = k; e.t = Math.round(M.t * 1000) / 1000; M.events.push(e); if (M.log.length > 600) M.log.shift(); M.log.push(e); return e; }
-  function ballG(M) { return 9.8 * M.lv.spd * M.lv.spd * 0.55; }
+  // 🪐 pd-4c theme arenas: the moon court is floaty (less gravity — every shot is still solved with the same g, so aims stay right)
+  var ARENA_GRAV = { moon: 0.7 };
+  function ballG(M) { return 9.8 * M.lv.spd * M.lv.spd * 0.55 * (M.grav || 1); }
   function teamOf(M, t) { return M.players.filter(function (p) { return p.team === t; }); }
   function byId(M, id) { return id == null ? null : M.players[id]; }
   function isPerson(p) { return !!p.human && !p.auto; }
@@ -509,6 +529,7 @@ var PD = (function () {
   // cfg = {mode, level, seed, teams: [[{name, av, human: 0|1|2}], [...]]} — missing seats become 🤖 robots
   function newMatch(cfg) {
     var sp = MODES[cfg.mode] || MODES.beach, lv = LEVELS[clamp(cfg.level | 0, 0, 5)], M = {
+      arena: cfg.arena || 'classic', grav: ARENA_GRAV[cfg.arena] || 1,
       mode: sp.id, sp: sp, level: clamp(cfg.level | 0, 0, 5), lv: lv, rnd: rng(cfg.seed || 7), L: sp.L, W: sp.W, netH: sp.net,
       t: 0, acc: 0, realT: 0, players: [], teams: [], events: [], log: [], phase: 'serve', phaseT: 0,
       ball: { x: 0, y: 0, z: 1, vx: 0, vy: 0, vz: 0, held: null, pyra: null, hitT: -9, trail: [] },
@@ -1625,7 +1646,7 @@ var PD = (function () {
     return { M: M, winner: M.winner, score: M.teams.map(function (t) { return t.score; }), sets: M.teams.map(function (t) { return t.sets; }), t: M.t, events: ev2 };
   }
 
-  return { DT: DT, MODES: MODES, MODE_ORDER: MODE_ORDER, LEVELS: LEVELS, FILL: FILL, PYRA_COST: PYRA_COST, METER_MAX: METER_MAX, ROLE_ICON: ROLE_ICON, ROLE_NAME: ROLE_NAME, STRIKE_NAME: STRIKE_NAME, actName: actName, isStrike: isStrike, ACT_NAME: ACT_NAME,
+  return { DT: DT, ARENA_GRAV: ARENA_GRAV, MODES: MODES, MODE_ORDER: MODE_ORDER, LEVELS: LEVELS, FILL: FILL, PYRA_COST: PYRA_COST, METER_MAX: METER_MAX, ROLE_ICON: ROLE_ICON, ROLE_NAME: ROLE_NAME, STRIKE_NAME: STRIKE_NAME, actName: actName, isStrike: isStrike, ACT_NAME: ACT_NAME,
     pyraName: pyraName, SPIRITS: SPIRITS, SPIRITS_DUO: SPIRITS_DUO, SPIRITS_TRIO: SPIRITS_TRIO, armTeam: armTeam, SPIRIT_COST: SPIRIT_COST, spiritGo: spiritGo, slotOf: slotOf, newMatch: newMatch, step: step, tick: tick, input: input, press: press, release: release, takeEvents: takeEvents, simulate: simulate,
     canReach: canReach, doTouch: doTouch, sparkTouch: sparkTouch, sparkTick: sparkTick, sparkReach: sparkReach, sparkPredict: sparkPredict, SPARK: SPARK, isSpark: isSpark, noHands: noHands, hoopTouch: hoopTouch, hoopTick: hoopTick, hoopReach: hoopReach, HOOP: { Z: HOOP_Z, R: HOOP_R, RING: RING, PTS: HOOP_PTS, NAME: HOOP_NAME, T: HOOP_T }, serve: serve, feedServe: feedServe, jumpServe: jumpServe, botServe: botServe, startServe: startServe, predict: predict, assign: assign, nextNOf: nextNOf, fill: fill, isPerson: isPerson, uOf: uOf, sgn: sgn, baseOf: baseOf, guideFor: guideFor,
     BALL_R: BALL_R, DRILL: DRILL, PARTY: PARTY, zoneRect: zoneRect, drillEnd: drillEnd, partyTick: partyTick, SPIRIT: null };   // 🔥🔥 SPIRIT = R2 hook: Spirit Dive supers (full meter) plug in here
@@ -1711,7 +1732,21 @@ function modeInfo(k){ return k === 'cups' ? CUP_CARD : PD.MODES[k] || CUPS[k] ||
 function pickMode(k){ if(k === 'cups') SET.cup = CUPS[SET.cupKind] ? SET.cupKind : 'cupfour'; else if(CUPS[k]){ SET.cup = k; SET.cupKind = k; } else if(PD.MODES[k]){ SET.cup = ''; SET.mode = k; } savePrefs(); markModes(); renderLevels(); }   // the level cards show the mode's own goal (⏱️ / ❤️ / ⭐ / cup)
 function mgList(){ return PD.MODE_ORDER.map(k => ({k, g: groupOf(PD.MODES[k]), icon: PD.MODES[k].icon, name: PD.MODES[k].name, type: MODE_CARDS[k].type, sub: MODE_CARDS[k].sub, next: '👇 then pick a level'})).concat([{k: 'cups', g: 'train', icon: CUP_CARD.icon, name: CUP_CARD.name, type: CUP_CARD.type, sub: CUP_CARD.sub, next: '👇 then pick a level'}]); }
 /* 🗂️ END MODE GROUPS */
-const ARENAS = [{k: 'classic', icon: '🏟️', name: 'Classic arena'}, {k: 'jungle', icon: '🦖', name: 'Jungle beach', soon: true}, {k: 'coral', icon: '🐙', name: 'Coral court', soon: true}, {k: 'neon', icon: '🪩', name: 'Neon arena', soon: true}];
+// 🏟️ arenas (pd-4c: all 7 open). 🏖️ Beach mode is always on sand; ⭕ Hoop in the Classic arena = a 🛕 Thai temple-fair square; 🪐 the moon court is floaty (engine ARENA_GRAV)
+const ARENAS = [{k: 'classic', icon: '🏟️', name: 'Classic arena'}, {k: 'jungle', icon: '🦖', name: 'Jungle beach'}, {k: 'coral', icon: '🐙', name: 'Coral court'}, {k: 'neon', icon: '🪩', name: 'Neon arena'}, {k: 'robot', icon: '🤖', name: 'Robot gym'}, {k: 'moon', icon: '🪐', name: 'Moon court'}, {k: 'olympus', icon: '☁️', name: 'Olympus'}];
+// sky (3 stops) · stands (2) · crowd dot strength · floor / court / takraw court / ⚡ play zone / line colours (missing = the classic colour) · spot = light beams · deco = scenery painter
+const ARENA_LOOK = {
+  classic: {sky: ['#0A0F26', '#18214A', '#0F1530'], stand: ['#141C44', '#232F66'], crowd: 0.32, spot: 'white'},
+  fair: {sky: ['#2A1446', '#6B2D5C', '#E07A3C'], stand: ['#4A2418', '#6E3A22'], crowd: 0.3, spot: '', deco: 'fair', tk: ['#B5774A', '#A86B40'], floor: '#8C5A36', line: '#FFE7B0'},
+  jungle: {sky: ['#FF8A5B', '#FFC46B', '#9FD8A6'], stand: ['#4E3A1E', '#6B5230'], crowd: 0.22, spot: '', deco: 'jungle', floor: '#D9BE84', court: ['#A39C88', '#958E7B'], tk: ['#8A9A6A', '#7F8E61'], zone: '#C7A86E', line: '#FFFFFF'},
+  coral: {sky: ['#03263B', '#0B4D6E', '#11718D'], stand: ['#0C3A50', '#125269'], crowd: 0.2, spot: 'rays', deco: 'coral', floor: '#1D6A84', court: ['#E9907A', '#DD8270'], tk: ['#3BB3A0', '#33A493'], zone: '#165C75', line: '#E8FBFF'},
+  neon: {sky: ['#090320', '#1A0A3C', '#080316'], stand: ['#150934', '#28105C'], crowd: 0.42, spot: 'neon', deco: 'neon', floor: '#0F0A2A', court: ['#2A1660', '#23124F'], tk: ['#1E1458', '#19104A'], zone: '#120C34', line: '#3CF2FF'},
+  robot: {sky: ['#1B222D', '#2D3745', '#1F252E'], stand: ['#2A323E', '#394351'], crowd: 0.26, spot: 'white', deco: 'robot', floor: '#4A5563', court: ['#6B7686', '#626C7B'], tk: ['#5F7A6E', '#567064'], zone: '#3E4855', line: '#FFD23F'},
+  moon: {sky: ['#010208', '#0A0D20', '#151933'], stand: ['#2A2C3A', '#3B3E52'], crowd: 0.18, spot: '', deco: 'moon', floor: '#85858F', court: ['#B6B6BF', '#ABABB5'], tk: ['#9C9CA8', '#93939F'], zone: '#6C6D7D', line: '#FFFFFF'},
+  olympus: {light: true, sky: ['#6FC0FF', '#B2E0FF', '#EAF6FF'], stand: ['#D9D2C2', '#EDE7D9'], crowd: 0.26, spot: 'sun', deco: 'olympus', floor: '#E6E0D2', court: ['#F5EFDD', '#EEE6D0'], tk: ['#D3E5C2', '#C8DCB5'], zone: '#D3CAB4', line: '#D9A93A'}
+};
+function arenaKey(M){ const k = (M && M.arena) || 'classic'; return k === 'classic' && M && PD.MODES[M.mode] && PD.MODES[M.mode].sport === 'hoop' ? 'fair' : ARENA_LOOK[k] ? k : 'classic'; }
+function arenaLook(M){ return ARENA_LOOK[arenaKey(M)]; }
 const ACTIONS = [['up', '⬆️ Up'], ['down', '⬇️ Down'], ['left', '⬅️ Left'], ['right', '➡️ Right'], ['touch', '🤚 Touch'], ['drive', '💥 Drive / Dunk'], ['dink', '🪶 Dink'], ['jump', '⬆️ Jump / Block'], ['dive', '🤸 Dive'], ['pyra', '🔥 Pyra']];
 const DEFAULT_KEYS = [
   {up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', touch: 'KeyJ', drive: 'KeyK', dink: 'KeyL', jump: 'Space', dive: 'ShiftLeft', pyra: 'KeyF'},
@@ -1743,8 +1778,8 @@ let G = null, lockHandle = null, KEYS = null, RAF = 0;
 const GC_LISTEN = [], GC_LOG = [];
 function store(k){ return 'sp_pyradive_' + k + ':' + (S.player || ''); }
 function ls(k, v){ try{ if(v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }catch(e){ return null; } }
-function loadPrefs(){ try{ const p = JSON.parse(ls(store('prefs')) || '{}'); if(PD.MODES[p.mode]) SET.mode = p.mode; SET.cup = CUPS[p.cup] ? p.cup : ''; SET.cupKind = CUPS[p.cupKind] ? p.cupKind : SET.cup || 'cupfour'; if(CUP_SPORTS.includes(p.cupSport)) SET.cupSport = p.cupSport; if(['robot', 'team', 'duo'].includes(p.who)) SET.who = p.who; if(p.marker === false) SET.marker = false; if(p.p2) SET.p2 = p.p2; }catch(e){} }
-function savePrefs(){ ls(store('prefs'), JSON.stringify({mode: SET.mode, who: SET.who, marker: SET.marker, p2: SET.p2, cup: SET.cup || '', cupKind: SET.cupKind || '', cupSport: SET.cupSport || ''})); }
+function loadPrefs(){ try{ const p = JSON.parse(ls(store('prefs')) || '{}'); if(PD.MODES[p.mode]) SET.mode = p.mode; if(ARENAS.some(a => a.k === p.arena)) SET.arena = p.arena; SET.cup = CUPS[p.cup] ? p.cup : ''; SET.cupKind = CUPS[p.cupKind] ? p.cupKind : SET.cup || 'cupfour'; if(CUP_SPORTS.includes(p.cupSport)) SET.cupSport = p.cupSport; if(['robot', 'team', 'duo'].includes(p.who)) SET.who = p.who; if(p.marker === false) SET.marker = false; if(p.p2) SET.p2 = p.p2; }catch(e){} }
+function savePrefs(){ ls(store('prefs'), JSON.stringify({mode: SET.mode, arena: SET.arena, who: SET.who, marker: SET.marker, p2: SET.p2, cup: SET.cup || '', cupKind: SET.cupKind || '', cupSport: SET.cupSport || ''})); }
 function myAvatar(name){ const a = S.avatars[name]; return a ? fixAv(a) : defaultAvatar(name || 'player'); }
 // 🏐 on court nobody rides a ride-on or holds an item (Aowu 2026-11-14 "remove ride on when play"); pets + trails stay home too
 function playAv(av){ const a = JSON.parse(JSON.stringify(av || {})); a.eq = Object.assign({}, a.eq || {}); delete a.eq.ride; delete a.eq.hand; delete a.eq.pet; delete a.eq.trail; return a; }
@@ -1911,8 +1946,56 @@ function buildArenas(){
   const box = $('arena-list');
   box.innerHTML = ARENAS.map(a => '<button class="arena' + (a.k === SET.arena ? ' on' : '') + (a.soon ? ' soon' : '') + '" data-k="' + a.k + '" data-sound="tap"><canvas width="300" height="225"></canvas><div class="nm">' + a.icon + ' ' + a.name + '</div></button>').join('');
   box.querySelectorAll('.arena').forEach(b => { const a = ARENAS.find(x => x.k === b.dataset.k); paintArenaPreview(b.querySelector('canvas'), a.k);
-    b.onclick = () => { if(a.soon){ UISound.play('error'); UI.toast(a.icon + ' ' + a.name + ' comes in a later round'); return; } SET.arena = a.k; box.querySelectorAll('.arena').forEach(x => x.classList.toggle('on', x === b)); }; });
+    b.onclick = () => { SET.arena = a.k; savePrefs(); box.querySelectorAll('.arena').forEach(x => x.classList.toggle('on', x === b)); if(a.k === 'moon') UI.toast('🪐 Moon court: the ball floats — slow and high!'); }; });
+  buildLooks();
 }
+
+/* ================= 🎨 LOOKS (pd-4c): 🎱 ball · 🏓 table · 💣 party balls — picked per player on this device ================= */
+// ball = BallSkins (Collection 🎱 line, shared with Pinball / SlaBrall / BlasOff) · table = 🆕 TableSkins (Collection 🏓 line) · party balls = BombSkins (your 💣 Soul Bopper bombs)
+// 🏭 Artifactory crafts count too (balls, boards / stands / signs / frames, bowls / lanterns …) — the family shares crafts.
+const LOOKS = {ball: '', table: 'classic', bomb: ''};
+function lookKey(kind, name){ return 'sp_pyradive_' + kind + ':' + (name || S.player); }
+function ownBalls(name){ const n = Math.min((typeof BallSkins !== 'undefined') ? BallSkins.count : 0, Number((S.ballSkins || {})[name]) || 0), out = ['']; for(let i = 0; i < n; i++) out.push(String(i)); if((typeof BallSkins !== 'undefined') && BallSkins.artList) BallSkins.artList().forEach(a => out.push('art:' + a.id)); return out; }
+function ownTables(name){ return (typeof TableSkins !== 'undefined') ? TableSkins.owned(Number((S.tableSkins || {})[name]) || 0) : ['classic']; }
+function ownBombs(name){ if(!(typeof BombSkins !== 'undefined')) return ['']; const b = (S.bombs || {})[name] || {}; return [''].concat(BombSkins.owned({themes: b.themes || {}, extras: b.extras || []})); }
+function lookOwned(kind, name){ return kind === 'ball' ? ownBalls(name) : kind === 'table' ? ownTables(name) : ownBombs(name); }
+function lookGet(kind, name){ name = name || S.player; const own = lookOwned(kind, name), v = ls(lookKey(kind, name)); const def = kind === 'table' ? 'classic' : ''; return v != null && own.indexOf(v) >= 0 ? v : def; }
+function lookSet(kind, v){ ls(lookKey(kind, S.player), v); LOOKS[kind] = v; }
+function loadLooks(){ ['ball', 'table', 'bomb'].forEach(k => { LOOKS[k] = lookGet(k); }); }
+function ballV(v){ return v === '' || v == null ? null : /^\d+$/.test(v) ? Number(v) : v; }
+function lookName(kind, v){
+  if(kind === 'ball'){ const b = ballV(v); if(b == null) return 'Classic'; if(typeof b === 'number') return (BallSkins.NAMES || [])[b] || 'Skin ' + (b + 1); const a = BallSkins.artOf ? BallSkins.artOf(b) : null; return a ? (a.n || 'Crafted ball').replace(/^✨ /, '') : 'Crafted ball'; }
+  if(kind === 'table') return TableSkins.nameOf(v);
+  return v ? BombSkins.nameOf(v) : 'Star balls';
+}
+function paintLook(c, kind, v){
+  const g = c.getContext('2d'), W = c.width, H = c.height; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
+  if(kind === 'table'){ TableSkins.preview(c, v); return; }
+  if(kind === 'ball'){ const b = ballV(v); if(b == null){ const spr = PD.isStrike({sp: PD.MODES[SET.mode]}) ? takrawSprite(W * 0.7) : PD.MODES[SET.mode].sport === 'spark' ? sparkSprite(W * 0.7) : ballSprite(W * 0.7); g.drawImage(spr, (W - spr.width) / 2, (H - spr.height) / 2); } else BallSkins.draw(g, b, W / 2, H / 2, W * 0.36, 1); return; }
+  if(!v){ const spr = partySprite(W * 0.7, 0); g.drawImage(spr, (W - spr.width) / 2, (H - spr.height) / 2); return; }
+  BombSkins.draw(g, v, W / 2, H / 2, W * 0.8, 1);
+}
+const LOOK_KINDS = {ball: ['🎱', 'Ball', 'Your 🎱 ball skins from Pinball, SlaBrall, BlasOff + balls you crafted. Everyone in the match plays with it.'],
+  table: ['🏓', 'Table', 'Play ⚡ PyraSpark to unlock 🏓 table looks (🎒 Collection). Every board, stand, sign or frame you craft in 🏭 Artifactory becomes a table top!'],
+  bomb: ['💣', 'Party balls', 'The extra balls in 🌀 Spark Party wear your 💣 Soul Bopper bombs.']};
+function buildLooks(){
+  const row = $('look-row'); if(!row) return; loadLooks();
+  const sp = PD.MODES[SET.mode] || {}, kinds = ['ball'].concat(sp.sport === 'spark' ? ['table'] : []).concat(SET.mode === 'party' ? ['bomb'] : []);
+  row.innerHTML = kinds.map(k => '<button class="pdk-chip" data-look="' + k + '" data-sound="pop"><canvas width="60" height="60"></canvas>' + LOOK_KINDS[k][0] + ' ' + UI.esc(lookName(k, LOOKS[k])) + '</button>').join('');
+  row.querySelectorAll('[data-look]').forEach(b => { paintLook(b.querySelector('canvas'), b.dataset.look, LOOKS[b.dataset.look]); b.onclick = () => openLooks(b.dataset.look); });
+}
+let LOOK_OPEN = '';
+function openLooks(kind){
+  LOOK_OPEN = kind; const K = LOOK_KINDS[kind], own = lookOwned(kind, S.player), cur = LOOKS[kind];
+  $('look-title').textContent = K[0] + ' ' + K[1] + ' — ' + S.player; $('look-note').textContent = K[2];
+  const grid = $('look-grid');
+  grid.innerHTML = own.map(v => '<button class="pdk-opt' + (v === cur ? ' on' : '') + '" data-v="' + UI.esc(v) + '" data-sound="tap"><canvas width="96" height="96"></canvas>' + UI.esc(lookName(kind, v)) + '</button>').join('')
+    + (kind !== 'bomb' ? '<button class="pdk-opt craft" data-craft="1" data-sound="pop">✨ Craft one in 🏭 Artifactory</button>' : '');
+  grid.querySelectorAll('[data-v]').forEach(b => { paintLook(b.querySelector('canvas'), kind, b.dataset.v); b.onclick = () => { lookSet(kind, b.dataset.v); grid.querySelectorAll('.pdk-opt').forEach(x => x.classList.toggle('on', x === b)); buildLooks(); }; });
+  const cr = grid.querySelector('[data-craft]'); if(cr) cr.onclick = () => kind === 'table' ? TableSkins.craftLink() : BallSkins.craftLink('lathe');
+  $('look-sheet').classList.remove('hidden');
+}
+function closeLooks(){ LOOK_OPEN = ''; $('look-sheet').classList.add('hidden'); }
 
 /* ================= KEYS (per player, per device) ================= */
 function loadKeys(){ try{ const k = JSON.parse(ls('sp_pyradive_keys:' + S.player) || 'null'); if(Array.isArray(k) && k.length === 2) return k.map((s, i) => Object.assign({}, DEFAULT_KEYS[i], s)); }catch(e){} return DEFAULT_KEYS.map(k => Object.assign({}, k)); }
@@ -1936,9 +2019,10 @@ function keyCatch(e){
 function startMatch(){
   hideResult();
   const cfg = SET.cfg || teamsCfg();
-  const cupOn = !!(SET.cupState && !SET.cupState.done), M = PD.newMatch({mode: SET.mode, level: SET.level, seed: (Date.now() % 100000) + 7, teams: cfg, oneSet: cupOn || undefined, target: cupOn ? CUP_TARGET[SET.level] : undefined});
+  const cupOn = !!(SET.cupState && !SET.cupState.done), M = PD.newMatch({mode: SET.mode, level: SET.level, arena: SET.arena, seed: (Date.now() % 100000) + 7, teams: cfg, oneSet: cupOn || undefined, target: cupOn ? CUP_TARGET[SET.level] : undefined});
   G = {M, cup: cupOn, level: SET.level, mode: SET.mode, who: SET.who, over: false, paused: false, held: false, t0: Date.now(), fx: [], words: [], cam: null, shake: 0, setScores: [], q: 1, ema: 16, last: 0, sticks: new Map(), keysDown: new Set(), seen: {}};
   G.locals = M.players.filter(p => p.human);   // people on this device (P1 = human 1)
+  loadLooks(); G.look = {ball: ballV(LOOKS.ball), table: LOOKS.table || 'classic', bomb: LOOKS.bomb || ''};   // 🎨 pd-4c
   BTN = M.drill && isHoop(M) ? BTN_JUGGLE : isHoop(M) ? BTN_HOOP : PD.isSpark(M) ? BTN_SPARK : PD.isStrike(M) ? BTN_STRIKE : BTN_SPIKE;
   GC_LOG.length = 0;
   if(UI.modeTried) UI.modeTried(S.player, GAME_ID, cupOn ? 'cups' : SET.mode);
@@ -2263,18 +2347,19 @@ function drawScene(g, M, o){
   const t = o.t || 0, L = M.L, Wd = M.W;
   drawArena(g, M, t);
   // floor (free zone) + court
-  const sand = M.sp.sand, tk = PD.isStrike(M);   // 🦶 takraw court: green floor, teal court, service circles
-  poly(g, [P(-L - 4.5, -Wd / 2 - 2.6, 0), P(L + 4.5, -Wd / 2 - 2.6, 0), P(L + 4.5, Wd / 2 + 3.4, 0), P(-L - 4.5, Wd / 2 + 3.4, 0)], sand ? '#E9C98A' : tk ? '#1F7A57' : '#2B56B8');
+  const sand = M.sp.sand, tk = PD.isStrike(M), LK = arenaLook(M);   // 🦶 takraw court: green floor, teal court, service circles · 🎪 pd-4c theme colours (🏖️ Beach stays sand)
+  const cA = tk ? (LK.tk ? LK.tk[0] : '#2FA37A') : LK.court ? LK.court[0] : '#E8813A', cB = tk ? (LK.tk ? LK.tk[1] : '#2C9B73') : LK.court ? LK.court[1] : '#E27832';
+  poly(g, [P(-L - 4.5, -Wd / 2 - 2.6, 0), P(L + 4.5, -Wd / 2 - 2.6, 0), P(L + 4.5, Wd / 2 + 3.4, 0), P(-L - 4.5, Wd / 2 + 3.4, 0)], sand ? '#E9C98A' : LK.floor || (tk ? '#1F7A57' : '#2B56B8'));
   const hp = isHoop(M) || PD.isSpark(M);   // ⭕ / ⚡ no court lines
-  if(!hp) poly(g, [P(-L, -Wd / 2, 0), P(0, -Wd / 2, 0), P(0, Wd / 2, 0), P(-L, Wd / 2, 0)], sand ? '#F2D79E' : tk ? '#2FA37A' : '#E8813A');
-  if(!hp) poly(g, [P(0, -Wd / 2, 0), P(L, -Wd / 2, 0), P(L, Wd / 2, 0), P(0, Wd / 2, 0)], sand ? '#F0D398' : tk ? '#2C9B73' : '#E27832');
+  if(!hp) poly(g, [P(-L, -Wd / 2, 0), P(0, -Wd / 2, 0), P(0, Wd / 2, 0), P(-L, Wd / 2, 0)], sand ? '#F2D79E' : cA);
+  if(!hp) poly(g, [P(0, -Wd / 2, 0), P(L, -Wd / 2, 0), P(L, Wd / 2, 0), P(0, Wd / 2, 0)], sand ? '#F0D398' : cB);
   if(isHoop(M)){ drawHoopFloor(g, M); }
   else if(PD.isSpark(M)) drawSparkFloor(g, M);
-  else if(tk){ g.strokeStyle = '#FFFFFF'; g.lineWidth = Math.max(1.5, V.k * 0.06);
+  else if(tk){ g.strokeStyle = LK.line || '#FFFFFF'; g.lineWidth = Math.max(1.5, V.k * 0.06);
     [-1, 1].forEach(sd => { const cu = (L - 2.45) * sd; g.beginPath(); for(let i = 0; i <= 24; i++){ const a = i / 24 * Math.PI * 2, q = P(cu + Math.cos(a) * 0.3, Math.sin(a) * 0.3, 0); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); } g.stroke();
       [-1, 1].forEach(sy => { g.beginPath(); for(let i = 0; i <= 12; i++){ const a = i / 12 * Math.PI / 2, q = P(sd * Math.sin(a) * 0.9, sy * (Wd / 2 - Math.cos(a) * 0.9), 0); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); } g.stroke(); }); }); }
   if(!sand && !tk && !hp){ g.globalAlpha = 0.12; for(let i = -L; i < L; i += 1.5) poly(g, [P(i, -Wd / 2, 0), P(i + 0.75, -Wd / 2, 0), P(i + 0.75, Wd / 2, 0), P(i, Wd / 2, 0)], '#FFFFFF'); g.globalAlpha = 1; }
-  g.strokeStyle = sand ? '#2F7BEA' : '#FFFFFF'; g.lineWidth = Math.max(1.5, V.k * 0.07); g.lineJoin = 'round';
+  g.strokeStyle = sand ? '#2F7BEA' : LK.line || '#FFFFFF'; g.lineWidth = Math.max(1.5, V.k * 0.07); g.lineJoin = 'round';
   if(!hp){ line(g, [P(-L, -Wd / 2, 0), P(L, -Wd / 2, 0), P(L, Wd / 2, 0), P(-L, Wd / 2, 0), P(-L, -Wd / 2, 0)]);
   line(g, [P(0, -Wd / 2, 0), P(0, Wd / 2, 0)]); }
   if(M.sp.n >= 6){ g.globalAlpha = 0.7; line(g, [P(-3, -Wd / 2, 0), P(-3, Wd / 2, 0)]); line(g, [P(3, -Wd / 2, 0), P(3, Wd / 2, 0)]); g.globalAlpha = 1; }
@@ -2296,30 +2381,31 @@ function drawScene(g, M, o){
 }
 // ⚡ PyraSpark: a play zone on the hall floor + the curved table with its low net
 function drawSparkFloor(g, M){
-  const L = M.L, Wd = M.W; poly(g, [P(-L - 0.6, -Wd / 2, 0), P(L + 0.6, -Wd / 2, 0), P(L + 0.6, Wd / 2, 0), P(-L - 0.6, Wd / 2, 0)], '#24408F');
+  const L = M.L, Wd = M.W; poly(g, [P(-L - 0.6, -Wd / 2, 0), P(L + 0.6, -Wd / 2, 0), P(L + 0.6, Wd / 2, 0), P(-L - 0.6, Wd / 2, 0)], arenaLook(M).zone || '#24408F');
   g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = Math.max(1.5, V.k * 0.05); line(g, [P(-L - 0.6, -Wd / 2, 0), P(L + 0.6, -Wd / 2, 0), P(L + 0.6, Wd / 2, 0), P(-L - 0.6, Wd / 2, 0), P(-L - 0.6, -Wd / 2, 0)]);
   const T = PD.SPARK; g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); [P(-T.L, -T.W / 2, 0), P(T.L, -T.W / 2, 0), P(T.L, T.W / 2, 0), P(-T.L, T.W / 2, 0)].forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.fill();
 }
 function drawTable(g, M, t){
   const T = PD.SPARK, Z = T.Z, cz = x => Z - 0.07 * Math.pow(Math.abs(x) / T.L, 2);   // the ends curve down a little
-  [[-T.L * 0.8, -T.W / 2 + 0.15], [T.L * 0.8, -T.W / 2 + 0.15], [-T.L * 0.8, T.W / 2 - 0.15], [T.L * 0.8, T.W / 2 - 0.15]].forEach(([x, y]) => { g.strokeStyle = '#2B2F3A'; g.lineWidth = Math.max(3, V.k * 0.08); line(g, [P(x, y, 0), P(x, y, cz(x) - 0.04)]); });
-  const half = (a, b, col) => { const pts = []; for(let i = 0; i <= 8; i++){ const x = a + (b - a) * i / 8; pts.push(P(x, -T.W / 2, cz(x))); } for(let i = 8; i >= 0; i--){ const x = a + (b - a) * i / 8; pts.push(P(x, T.W / 2, cz(x))); } poly(g, pts, col);
-    const side = []; for(let i = 0; i <= 8; i++){ const x = a + (b - a) * i / 8; side.push(P(x, T.W / 2, cz(x))); } for(let i = 8; i >= 0; i--){ const x = a + (b - a) * i / 8; side.push(P(x, T.W / 2, cz(x) - 0.07)); } poly(g, side, '#1B2A55'); };
-  half(-T.L, 0, '#2F7BEA'); half(0, T.L, '#1E66D0');
+  const TL = (typeof TableSkins !== 'undefined') ? TableSkins.look((G && G.M === M && G.look) ? G.look.table : LOOKS.table || 'classic') : {a: '#2F7BEA', b: '#1E66D0', side: '#1B2A55', line: '#FFFFFF', net: '#DDE6F5', legs: '#2B2F3A'};   // 🏓 pd-4c table look
+  [[-T.L * 0.8, -T.W / 2 + 0.15], [T.L * 0.8, -T.W / 2 + 0.15], [-T.L * 0.8, T.W / 2 - 0.15], [T.L * 0.8, T.W / 2 - 0.15]].forEach(([x, y]) => { g.strokeStyle = TL.legs; g.lineWidth = Math.max(3, V.k * 0.08); line(g, [P(x, y, 0), P(x, y, cz(x) - 0.04)]); });
+  const half = (a, b, hf) => { const pts = []; for(let i = 0; i <= 8; i++){ const x = a + (b - a) * i / 8; pts.push(P(x, -T.W / 2, cz(x))); } for(let i = 8; i >= 0; i--){ const x = a + (b - a) * i / 8; pts.push(P(x, T.W / 2, cz(x))); } if((typeof TableSkins !== 'undefined')) TableSkins.paintHalf(g, pts, TL, hf, t); else poly(g, pts, hf ? TL.b : TL.a);
+    const side = []; for(let i = 0; i <= 8; i++){ const x = a + (b - a) * i / 8; side.push(P(x, T.W / 2, cz(x))); } for(let i = 8; i >= 0; i--){ const x = a + (b - a) * i / 8; side.push(P(x, T.W / 2, cz(x) - 0.07)); } poly(g, side, TL.side); };
+  half(-T.L, 0, 0); half(0, T.L, 1);
   if(M.drill && M.drill.k === 'zone' && M.drill.zone){ const z = M.drill.zone, pts = [];   // 🎯 the glowing zone on the Coach's half
     for(let i = 0; i <= 6; i++){ const x = z.u0 + (z.u1 - z.u0) * i / 6; pts.push(P(x, z.v0, cz(x) + 0.005)); } for(let i = 6; i >= 0; i--){ const x = z.u0 + (z.u1 - z.u0) * i / 6; pts.push(P(x, z.v1, cz(x) + 0.005)); }
     g.globalAlpha = 0.45 + 0.25 * Math.sin(t * 6); poly(g, pts, '#FFE14A'); g.globalAlpha = 1; g.strokeStyle = '#FFF6B0'; g.lineWidth = Math.max(2, V.k * 0.06); g.beginPath(); pts.forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.closePath(); g.stroke();
     const c = P((z.u0 + z.u1) / 2, (z.v0 + z.v1) / 2, Z + 0.02); emo(g, '🎯', c[0], c[1] - V.k * 0.05, Math.max(14, V.k * 0.3), 0.9); }
-  g.strokeStyle = '#FFFFFF'; g.lineWidth = Math.max(1.5, V.k * 0.05); const edge = []; for(let i = 0; i <= 16; i++){ const x = -T.L + 2 * T.L * i / 16; edge.push(P(x, -T.W / 2, cz(x))); } for(let i = 16; i >= 0; i--){ const x = -T.L + 2 * T.L * i / 16; edge.push(P(x, T.W / 2, cz(x))); } edge.push(edge[0]); line(g, edge);
+  g.strokeStyle = TL.line; g.lineWidth = Math.max(1.5, V.k * 0.05); const edge = []; for(let i = 0; i <= 16; i++){ const x = -T.L + 2 * T.L * i / 16; edge.push(P(x, -T.W / 2, cz(x))); } for(let i = 16; i >= 0; i--){ const x = -T.L + 2 * T.L * i / 16; edge.push(P(x, T.W / 2, cz(x))); } edge.push(edge[0]); line(g, edge);
   // the net on the table
-  const nh = M.netH, e = T.W / 2 + 0.06; g.strokeStyle = '#DDE6F5'; g.lineWidth = Math.max(2, V.k * 0.06); line(g, [P(0, -e, Z), P(0, -e, nh)]); line(g, [P(0, e, Z), P(0, e, nh)]);
+  const nh = M.netH, e = T.W / 2 + 0.06; g.strokeStyle = TL.net; g.lineWidth = Math.max(2, V.k * 0.06); line(g, [P(0, -e, Z), P(0, -e, nh)]); line(g, [P(0, e, Z), P(0, e, nh)]);
   g.fillStyle = 'rgba(15,20,40,0.55)'; g.beginPath(); [P(0, -e, Z), P(0, e, Z), P(0, e, nh), P(0, -e, nh)].forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.fill();
-  g.strokeStyle = '#FFFFFF'; g.lineWidth = Math.max(2, V.k * 0.07); line(g, [P(0, -e, nh), P(0, e, nh)]);
+  g.strokeStyle = TL.line; g.lineWidth = Math.max(2, V.k * 0.07); line(g, [P(0, -e, nh), P(0, e, nh)]);
 }
 // ⭕ hoop takraw: the circle on the floor and the hoop hanging from three ropes
 function drawHoopFloor(g, M){
   const H = PD.HOOP, ring = (r, z) => { const pts = []; for(let i = 0; i <= 36; i++){ const a = i / 36 * Math.PI * 2; pts.push(P(Math.cos(a) * r, Math.sin(a) * r, z)); } return pts; };
-  poly(g, ring(H.RING + 0.9, 0), '#2C9B73'); g.strokeStyle = '#FFFFFF'; g.lineWidth = Math.max(1.5, V.k * 0.06); line(g, ring(H.RING + 0.9, 0)); g.globalAlpha = 0.5; line(g, ring(H.RING, 0)); g.globalAlpha = 1;
+  const LK = arenaLook(M); poly(g, ring(H.RING + 0.9, 0), LK.tk ? LK.tk[1] : '#2C9B73'); g.strokeStyle = '#FFFFFF'; g.lineWidth = Math.max(1.5, V.k * 0.06); line(g, ring(H.RING + 0.9, 0)); g.globalAlpha = 0.5; line(g, ring(H.RING, 0)); g.globalAlpha = 1;
   if(!M.sp.noHoop){ g.fillStyle = 'rgba(0,0,0,0.18)'; g.beginPath(); ring(H.R, 0).forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.fill(); }   // the hoop's shadow on the floor (not in 🤹 Keepy-up)
 }
 function drawHoop(g, M, t){
@@ -2335,29 +2421,91 @@ const CROWD = (() => { const a = [], cols = ['#FF6B1A', '#2F7BEA', '#FFC845', '#
 // ⚡ pd-1c: sky + stands + crowd dots are painted once per screen size into 4 pictures (crowd bob in 4 steps) — not 220 dots every frame
 const ARENA_BG = {key: '', c: []};
 function arenaBg(M, W, H, farY, top, ph){
-  const dpr = (G && G.dpr) || 1, key = [Math.round(W), Math.round(H), Math.round(farY), Math.round(top), dpr, V.k.toFixed(2)].join('|');
+  const LK = arenaLook(M), dpr = (G && G.dpr) || 1, key = [arenaKey(M), Math.round(W), Math.round(H), Math.round(farY), Math.round(top), dpr, V.k.toFixed(2)].join('|');
   if(ARENA_BG.key !== key){ ARENA_BG.key = key; ARENA_BG.c = []; }
   let c = ARENA_BG.c[ph]; if(c) return c;
   c = document.createElement('canvas'); c.width = Math.ceil((W + 40) * dpr); c.height = Math.ceil((H + 40) * dpr);
   const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 20 * dpr, 20 * dpr);
-  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#0A0F26'); gr.addColorStop(0.55, '#18214A'); gr.addColorStop(1, '#0F1530'); g.fillStyle = gr; g.fillRect(-20, -20, W + 40, H + 40);
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, LK.sky[0]); gr.addColorStop(0.55, LK.sky[1]); gr.addColorStop(1, LK.sky[2]); g.fillStyle = gr; g.fillRect(-20, -20, W + 40, H + 40);
+  if(LK.deco) arenaDeco(g, LK.deco, W, H, farY, top, ph, 'far');
   // stands: rows of people dots behind the far side (the 📣 CheerSquad crowd comes in front of them later)
   if(farY - top > 10){
-    const sg = g.createLinearGradient(0, top, 0, farY); sg.addColorStop(0, '#141C44'); sg.addColorStop(1, '#232F66'); g.fillStyle = sg; g.fillRect(0, top, W, farY - top);
+    const sg = g.createLinearGradient(0, top, 0, farY); sg.addColorStop(0, LK.stand[0]); sg.addColorStop(1, LK.stand[1]); g.fillStyle = sg; g.globalAlpha = LK.deco ? 0.72 : 1; g.fillRect(0, top, W, farY - top); g.globalAlpha = 1;
+    if(LK.deco) arenaDeco(g, LK.deco, W, H, farY, top, ph, 'near');
     const n = Math.min(CROWD.length, Math.round(W / 9)), r = Math.max(1.4, Math.min(5, V.k * 0.09));
-    g.globalAlpha = 0.32;
+    g.globalAlpha = LK.crowd;
     for(let i = 0; i < n; i++){ const [a, b2, col, phs] = CROWD[i], x = a * W, y = top + 4 + b2 * (farY - top - 8), bob = Math.sin(ph * Math.PI / 2 + phs * 9) * 1.2; g.fillStyle = col; g.beginPath(); g.arc(x, y + bob, r, 0, 7); g.fill(); }
     g.globalAlpha = 1;
   }
+  else if(LK.deco) arenaDeco(g, LK.deco, W, H, farY, top, ph, 'near');
   ARENA_BG.c[ph] = c; return c;
+}
+/* 🎪 pd-4c scenery, painted ONCE per screen size into the 4 cached background pictures (ph = 0..3 = a small animation step).
+   'far' = behind the stands (sky, horizon) · 'near' = on the stands band. Everything sits on the horizon line farY. */
+function arenaDeco(g, d, W, H, farY, top, ph, layer){
+  const hz = farY, sk = Math.max(20, hz), u = Math.max(4, Math.min(W, 1400) / 60), R = (() => { let s = 11 + d.length * 7; return () => (s = (s * 9301 + 49297) % 233280) / 233280; })();
+  const tri = (x0, y0, x1, y1, x2, y2, c) => { g.fillStyle = c; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.lineTo(x2, y2); g.closePath(); g.fill(); };
+  const puff = (x, y, s, c) => { g.fillStyle = c; [[0, 0, 1], [-0.9, 0.15, 0.7], [0.9, 0.2, 0.75], [-0.4, -0.45, 0.65], [0.45, -0.4, 0.6]].forEach(([dx, dy, r]) => { g.beginPath(); g.arc(x + dx * s, y + dy * s, r * s, 0, 7); g.fill(); }); };
+  if(d === 'jungle'){
+    if(layer === 'far'){ const vx = W * 0.7, vh = Math.min(sk * 0.85, H * 0.4); tri(vx - vh * 1.2, hz, vx, hz - vh, vx + vh * 1.2, hz, '#6A4A3A'); tri(vx - vh * 0.22, hz - vh * 0.82, vx, hz - vh, vx + vh * 0.22, hz - vh * 0.82, '#FF6B1A');
+      puff(vx + ph * u * 0.4, hz - vh - u * (1.5 + ph * 0.3), u * 1.2, 'rgba(120,110,110,0.55)'); puff(vx + u * 1.5 + ph * u * 0.5, hz - vh - u * (3.6 + ph * 0.3), u * 0.9, 'rgba(140,130,130,0.4)');
+      g.fillStyle = '#3F7A3A'; for(let i = 0; i < 14; i++){ const x = R() * W, r = u * (1.6 + R() * 1.8); g.beginPath(); g.arc(x, hz, r, Math.PI, 0); g.fill(); } }
+    else { [[0.05, 1], [0.95, -1], [0.18, 1], [0.84, -1]].forEach(([fx, dir], i) => { const x = W * fx, h = Math.min(sk, H * 0.5) * (i < 2 ? 0.95 : 0.7), tx = x + dir * h * 0.18, ty = hz - h;
+        g.strokeStyle = '#7A5230'; g.lineWidth = u * (i < 2 ? 0.9 : 0.65); g.beginPath(); g.moveTo(x, hz); g.quadraticCurveTo(x + dir * h * 0.02, hz - h * 0.5, tx, ty); g.stroke();
+        g.strokeStyle = '#2E8B3A'; g.lineWidth = u * 0.55; for(let k = 0; k < 6; k++){ const a = -Math.PI / 2 + (k - 2.5) * 0.55 + Math.sin(ph * 1.57 + k) * 0.05, L = h * 0.3; g.beginPath(); g.moveTo(tx, ty); g.quadraticCurveTo(tx + Math.cos(a) * L * 0.6, ty + Math.sin(a) * L * 0.6 - L * 0.2, tx + Math.cos(a) * L, ty + Math.sin(a) * L + L * 0.35); g.stroke(); } }); }
+  }
+  else if(d === 'coral'){
+    if(layer === 'far'){ g.fillStyle = 'rgba(255,255,255,0.05)'; for(let i = 0; i < 5; i++){ const x = W * (0.1 + i * 0.2); g.beginPath(); g.moveTo(x, 0); g.lineTo(x + W * 0.06, 0); g.lineTo(x + W * 0.16, hz); g.lineTo(x + W * 0.04, hz); g.closePath(); g.fill(); }
+      g.fillStyle = 'rgba(10,40,60,0.55)'; for(let i = 0; i < 4; i++){ const x = (R() * W + ph * u * 2 * (i % 2 ? 1 : -1) + W) % W, y = hz * (0.2 + R() * 0.5), s = u * (0.8 + R()); g.beginPath(); g.ellipse(x, y, s * 1.4, s * 0.6, 0, 0, 7); g.fill(); tri(x + s * 1.2, y, x + s * 2.2, y - s * 0.7, x + s * 2.2, y + s * 0.7, 'rgba(10,40,60,0.55)'); } }
+    else { const cols = ['#FF7A8A', '#FFB05E', '#C77DFF', '#FF5FA2']; for(let i = 0; i < 9; i++){ const x = W * (i + 0.3 + R() * 0.4) / 9, h = Math.min(sk * 0.6, H * 0.25) * (0.5 + R() * 0.5); g.strokeStyle = cols[i % 4]; g.lineWidth = u * 0.5; g.lineCap = 'round';
+        const br = (x0, y0, a, L, n) => { if(n <= 0 || L < 2) return; const x1 = x0 + Math.cos(a) * L, y1 = y0 + Math.sin(a) * L; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); br(x1, y1, a - 0.45, L * 0.7, n - 1); br(x1, y1, a + 0.4, L * 0.65, n - 1); }; br(x, hz, -Math.PI / 2, h * 0.42, 3); }
+      g.strokeStyle = '#2FAE6A'; g.lineWidth = u * 0.45; for(let i = 0; i < 7; i++){ const x = W * (i + 0.7) / 7, h = Math.min(sk * 0.7, H * 0.3) * (0.6 + R() * 0.4); g.beginPath(); g.moveTo(x, hz); for(let k = 1; k <= 6; k++) g.lineTo(x + Math.sin(k * 1.4 + ph * 1.57 + i) * u * 0.9, hz - h * k / 6); g.stroke(); }
+      g.lineCap = 'butt'; g.strokeStyle = 'rgba(220,250,255,0.7)'; g.lineWidth = 1.2; for(let i = 0; i < 14; i++){ const x = R() * W, y = hz - ((R() * hz + ph * u * 2.2) % Math.max(10, hz)); g.beginPath(); g.arc(x, y, u * (0.18 + R() * 0.3), 0, 7); g.stroke(); } }
+  }
+  else if(d === 'neon'){
+    if(layer === 'far'){ const cols = ['#FF4FD8', '#3CF2FF', '#FFE14A', '#7CFF6B']; g.lineWidth = Math.max(2, u * 0.3);
+      for(let i = 0; i < 3; i++){ g.strokeStyle = cols[(i + ph) % 4]; g.globalAlpha = 0.8; g.beginPath(); g.ellipse(W / 2, hz, W * (0.18 + i * 0.12), Math.min(sk * 0.9, H * 0.45) * (0.5 + i * 0.25), 0, Math.PI, 0); g.stroke(); } g.globalAlpha = 1;
+      g.fillStyle = '#FFFFFF'; for(let i = 0; i < 30; i++){ g.globalAlpha = ((i + ph) % 4) / 5 + 0.1; g.fillRect(R() * W, R() * hz * 0.8, 2, 2); } g.globalAlpha = 1; }
+    else { g.strokeStyle = 'rgba(255,79,216,0.45)'; g.lineWidth = 1.5; for(let i = 0; i <= 16; i++){ const x = W * i / 16; g.beginPath(); g.moveTo(W / 2 + (x - W / 2) * 0.4, top); g.lineTo(x, hz); g.stroke(); } for(let i = 0; i < 4; i++){ const y = top + (hz - top) * (1 - Math.pow(0.6, i + 1)); g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); } }
+  }
+  else if(d === 'robot'){
+    if(layer === 'far'){ g.strokeStyle = '#56616F'; g.lineWidth = Math.max(2, u * 0.35); const ty = Math.max(top * 0.3, 8); g.beginPath(); g.moveTo(0, ty); g.lineTo(W, ty); g.moveTo(0, ty + u * 2); g.lineTo(W, ty + u * 2); g.stroke(); for(let x = 0; x < W; x += u * 4){ g.beginPath(); g.moveTo(x, ty); g.lineTo(x + u * 2, ty + u * 2); g.lineTo(x + u * 4, ty); g.stroke(); }
+      [[0.12, 1], [0.86, -1], [0.5, 1]].forEach(([fx, dir], i) => { const cx = W * fx, cy = hz - Math.min(sk * 0.45, H * 0.22) * (i === 2 ? 1.2 : 1), r = u * (i === 2 ? 2.4 : 3.2), a0 = dir * ph * Math.PI / 16; g.fillStyle = i === 2 ? '#8A96A6' : '#6F7B8A';
+        g.beginPath(); for(let k = 0; k < 24; k++){ const a = a0 + k * Math.PI / 12, rr2 = k % 2 ? r : r * 1.22; g.lineTo(cx + Math.cos(a) * rr2, cy + Math.sin(a) * rr2); } g.closePath(); g.fill(); g.fillStyle = '#2D3745'; g.beginPath(); g.arc(cx, cy, r * 0.38, 0, 7); g.fill(); }); }
+    else { const bh = Math.max(4, u * 0.8); g.save(); g.beginPath(); g.rect(0, hz - bh, W, bh); g.clip(); g.fillStyle = '#FFD23F'; g.fillRect(0, hz - bh, W, bh); g.fillStyle = '#1F252E'; for(let x = -bh * 2 + (ph * bh) % (bh * 2); x < W + bh; x += bh * 2){ g.beginPath(); g.moveTo(x, hz); g.lineTo(x + bh, hz - bh); g.lineTo(x + bh * 2, hz - bh); g.lineTo(x + bh, hz); g.closePath(); g.fill(); } g.restore(); }
+  }
+  else if(d === 'moon'){
+    if(layer === 'far'){ for(let i = 0; i < 90; i++){ const x = R() * W, y = R() * hz, tw = ((i + ph) % 4) / 4; g.fillStyle = 'rgba(255,255,255,' + (0.35 + tw * 0.6).toFixed(2) + ')'; g.fillRect(x, y, i % 9 ? 1.5 : 2.5, i % 9 ? 1.5 : 2.5); }
+      const ex = W * 0.78, ey = Math.max(u * 3, hz * 0.32), er = Math.min(u * 3.2, Math.max(u * 1.4, hz * 0.22)); const eg = g.createRadialGradient(ex - er * 0.3, ey - er * 0.3, er * 0.1, ex, ey, er); eg.addColorStop(0, '#9AD7FF'); eg.addColorStop(1, '#1E5BB8'); g.fillStyle = eg; g.beginPath(); g.arc(ex, ey, er, 0, 7); g.fill();
+      g.fillStyle = '#4CB963'; [[-0.3, -0.2, 0.35], [0.3, 0.25, 0.28], [0.1, -0.5, 0.18]].forEach(([dx, dy, r]) => { g.beginPath(); g.arc(ex + dx * er, ey + dy * er, r * er, 0, 7); g.fill(); }); }
+    else { g.fillStyle = '#6D6E7E'; g.beginPath(); g.moveTo(0, hz); for(let i = 0; i <= 12; i++) g.lineTo(W * i / 12, hz - (hz - top) * (0.25 + 0.2 * Math.sin(i * 1.9))); g.lineTo(W, hz); g.closePath(); g.fill();
+      g.fillStyle = 'rgba(40,40,55,0.35)'; for(let i = 0; i < 8; i++){ const x = R() * W, y = hz - (hz - top) * R() * 0.25, r = u * (0.6 + R() * 1.2); g.beginPath(); g.ellipse(x, y, r, r * 0.35, 0, 0, 7); g.fill(); } }
+  }
+  else if(d === 'olympus'){
+    if(layer === 'far'){ g.fillStyle = 'rgba(255,240,180,0.55)'; g.beginPath(); g.arc(W * 0.15, Math.max(u * 3, hz * 0.25), u * 2.6, 0, 7); g.fill();
+      for(let i = 0; i < 6; i++) puff((R() * W + ph * u * 1.5) % (W + u * 6) - u * 3, hz * (0.15 + R() * 0.55), u * (1.4 + R() * 1.4), 'rgba(255,255,255,0.85)');
+      const ch = Math.min(sk * 0.8, H * 0.38), cw = u * 1.3; [0.06, 0.2, 0.8, 0.94].forEach(fx => { const x = W * fx; g.fillStyle = '#F4EFE3'; g.fillRect(x - cw / 2, hz - ch, cw, ch); g.fillStyle = '#D9D0BC'; for(let k = -1; k <= 1; k++) g.fillRect(x + k * cw * 0.3 - 1, hz - ch, 2, ch); g.fillStyle = '#E8DFC9'; g.fillRect(x - cw * 0.8, hz - ch - u * 0.6, cw * 1.6, u * 0.6); g.fillStyle = '#D9A93A'; g.fillRect(x - cw * 0.8, hz - ch - u * 0.8, cw * 1.6, u * 0.25); }); }
+    else { for(let i = 0; i < 9; i++) puff(W * (i + 0.5) / 9, hz - u * 0.4, u * (1.2 + R() * 0.8), 'rgba(255,255,255,0.9)'); }
+  }
+  else if(d === 'fair'){
+    if(layer === 'far'){ const rx = W * 0.5, rh = Math.min(sk * 0.85, H * 0.42), rw = Math.min(W * 0.32, rh * 1.6);   // 🛕 a temple roof: three tiers, gold edges
+      g.fillStyle = '#3A1A2A'; g.fillRect(rx - rw * 0.42, hz - rh * 0.4, rw * 0.84, rh * 0.4);
+      [[0.4, 1], [0.66, 0.72], [0.88, 0.46]].forEach(([fy, fw]) => { const y = hz - rh * fy, w = rw * fw; tri(rx - w * 0.62, y + rh * 0.08, rx, y - rh * 0.22, rx + w * 0.62, y + rh * 0.08, '#B23A2A'); g.strokeStyle = '#FFC845'; g.lineWidth = Math.max(1.5, u * 0.25); g.beginPath(); g.moveTo(rx - w * 0.62, y + rh * 0.08); g.lineTo(rx, y - rh * 0.22); g.lineTo(rx + w * 0.62, y + rh * 0.08); g.stroke(); });
+      g.strokeStyle = '#FFC845'; g.lineWidth = Math.max(1.5, u * 0.3); g.beginPath(); g.moveTo(rx, hz - rh * 1.1); g.lineTo(rx, hz - rh * 1.3); g.stroke(); }
+    else { const cols = ['#FF5E5E', '#FFC845', '#4CD964', '#5EB0FF', '#FF7AD9'];   // strings of fair lanterns
+      [0.25, 0.55].forEach((fy, j) => { const y0 = top + (hz - top) * fy * 0.6 + 4; g.strokeStyle = 'rgba(40,20,10,0.6)'; g.lineWidth = 1; g.beginPath(); for(let i = 0; i <= 20; i++){ const x = W * i / 20, y = y0 + Math.sin(i / 20 * Math.PI * 4) * u * 0.6; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
+        for(let i = 0; i < 20; i++){ const x = W * (i + 0.5) / 20, y = y0 + Math.sin((i + 0.5) / 20 * Math.PI * 4) * u * 0.6 + u * 0.5; g.fillStyle = cols[(i + j + ph) % 5]; g.globalAlpha = 0.85; g.beginPath(); g.ellipse(x, y, u * 0.38, u * 0.5, 0, 0, 7); g.fill(); } g.globalAlpha = 1; }); }
+  }
 }
 function drawArena(g, M, t){
   const W = V.W, H = V.H, farY = P(0, -M.W / 2 - 2.6, 0)[1];
   const top = Math.max(0, farY - Math.min(V.k * 2.4, farY - 4));
   const bg = arenaBg(M, W, H, farY, top, Math.floor(t * 4) % 4); g.drawImage(bg, -20, -20, W + 40, H + 40);
-  // spotlights
-  g.globalAlpha = 0.09 + 0.03 * Math.sin(t * 1.3); g.fillStyle = '#FFF4D6';
-  [[0.12, 1], [0.88, -1]].forEach(([fx, d]) => { g.beginPath(); g.moveTo(W * fx, 0); g.lineTo(W * fx + d * W * 0.08, 0); g.lineTo(W * 0.5 + d * W * 0.22, H); g.lineTo(W * 0.5 - d * W * 0.05, H); g.closePath(); g.fill(); });
+  // spotlights (🪩 neon = coloured beams that sweep · ☁️ Olympus = warm sun rays · 🐙 / 🦖 / 🪐 none)
+  const LK = arenaLook(M);
+  if(LK.spot === 'white' || LK.spot === 'sun'){ g.globalAlpha = (LK.spot === 'sun' ? 0.16 : 0.09) + 0.03 * Math.sin(t * 1.3); g.fillStyle = LK.spot === 'sun' ? '#FFF1B8' : '#FFF4D6';
+    [[0.12, 1], [0.88, -1]].forEach(([fx, d]) => { g.beginPath(); g.moveTo(W * fx, 0); g.lineTo(W * fx + d * W * 0.08, 0); g.lineTo(W * 0.5 + d * W * 0.22, H); g.lineTo(W * 0.5 - d * W * 0.05, H); g.closePath(); g.fill(); }); }
+  else if(LK.spot === 'neon'){ ['#FF4FD8', '#3CF2FF', '#FFE14A'].forEach((c, i) => { const sw = Math.sin(t * 0.9 + i * 2.1) * W * 0.25, fx = W * (0.2 + i * 0.3); g.globalAlpha = 0.1; g.fillStyle = c; g.beginPath(); g.moveTo(fx - W * 0.015, 0); g.lineTo(fx + W * 0.015, 0); g.lineTo(fx + sw + W * 0.1, H); g.lineTo(fx + sw - W * 0.1, H); g.closePath(); g.fill(); }); }
   g.globalAlpha = 1;
   // big screen (score) when there is room above the stands
   if(top > 150 && G && G.M === M){ const bw = Math.min(220, W * 0.3), bx = W / 2 - bw / 2, by = top - 44;
@@ -2487,7 +2635,7 @@ function drawPlayer(g, M, p, t, o){
   g.fillStyle = 'rgba(0,0,0,0.45)'; g.fillRect(fx - bw / 2, by, bw, bh);
   g.fillStyle = p.meter >= 50 ? '#FFB627' : '#FF6B1A'; g.fillRect(fx - bw / 2, by, bw * Math.min(1, p.meter / 100), bh);
   g.fillStyle = 'rgba(255,255,255,0.8)'; g.fillRect(fx - 0.5, by - 1, 1, bh + 2);
-  if(p.human || M.sp.n <= 3){ g.font = '800 ' + Math.max(10, Math.round(11 * kAv * 1.3)) + 'px Nunito, sans-serif'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,0.6)';
+  if(p.human || M.sp.n <= 3){ g.font = '800 ' + Math.max(10, Math.round(11 * kAv * 1.3)) + 'px Nunito, sans-serif'; g.textAlign = 'center'; g.lineWidth = arenaLook(M).light ? 5 : 3; g.strokeStyle = arenaLook(M).light ? 'rgba(20,20,40,0.85)' : 'rgba(0,0,0,0.6)';   // ☁️ light arenas: a darker outline
     const nm = p.human ? p.name : p.name.slice(0, 9); g.strokeText(nm, fx, top - sz * 0.95); g.fillStyle = p.human ? '#FFE9A8' : '#E6ECFF'; g.fillText(nm, fx, top - sz * 0.95); }
 }
 let BALL_SPR = {};
@@ -2534,10 +2682,19 @@ function partySprite(px, i){   // 🌀 a bouncy party ball: bright with a white 
   g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = Math.max(1, px * 0.06); g.beginPath(); g.arc(0, 0, r, 0, 7); g.stroke();
   return (BALL_SPR[key] = c);
 }
+// 🎱 pd-4c: a BallSkins skin drawn once per size into a picture (skins with gradients would cost too much every frame)
+function skinSprite(v, px){
+  px = Math.max(8, Math.round(px / 2) * 2); const key = 's' + v + ':' + px; if(BALL_SPR[key]) return BALL_SPR[key];
+  const c = document.createElement('canvas'), r = px / 2; c.width = c.height = px + 4; const g = c.getContext('2d');
+  try{ BallSkins.draw(g, v, r + 2, r + 2, r, 1); }catch(e){ return ballSprite(px); }
+  return (BALL_SPR[key] = c);
+}
 function drawExtra(g, M, e, t){
   const [sx, sy, ss] = P(e.x, e.y, 0), sz = V.k * 0.16 * ss * Math.max(0.35, 1 - e.z / 7); g.fillStyle = 'rgba(0,0,0,0.22)'; g.beginPath(); g.ellipse(sx, sy, sz * 1.4, sz * 0.55, 0, 0, 7); g.fill();
   const [x, y, s] = P(e.x, e.y, e.z), r = Math.max(5, V.k * 0.22 * s), spr = partySprite(r * 2, e.i);
   e.trail.forEach((q, i) => { const [tx, ty] = P(q.x, q.y, q.z), f = i / e.trail.length; g.globalAlpha = f * 0.35; g.fillStyle = PARTY_COL[e.i % 3]; g.beginPath(); g.arc(tx, ty, r * f * 0.7, 0, 7); g.fill(); }); g.globalAlpha = 1;
+  const bm = G && G.M === M && G.look ? G.look.bomb : '';
+  if(bm && (typeof BombSkins !== 'undefined')){ BombSkins.draw(g, bm, x, y, r * 2.3, t, 0.2); return; }   // 💣 pd-4c: your Soul Bopper bombs bounce in 🌀 Spark Party
   g.save(); g.translate(x, y); g.rotate((e.x * 4 + e.z * 3) % (Math.PI * 2)); g.drawImage(spr, -spr.width / 2, -spr.height / 2); g.restore();
 }
 function drawBall(g, M, t){
@@ -2551,7 +2708,7 @@ function drawBall(g, M, t){
       else if(fast){ g.globalAlpha = f * 0.25; g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(tx, ty, r * f * 0.8, 0, 7); g.fill(); } });
     g.globalAlpha = 1;
   }
-  const spr = PD.isSpark(M) ? sparkSprite(r * 2) : PD.isStrike(M) ? takrawSprite(r * 2) : ballSprite(r * 2), ang = (b.x * 3 + b.z * 2) % (Math.PI * 2);
+  const bl = G && G.M === M && G.look ? G.look.ball : null, spr = bl != null && (typeof BallSkins !== 'undefined') ? skinSprite(bl, r * 2) : PD.isSpark(M) ? sparkSprite(r * 2) : PD.isStrike(M) ? takrawSprite(r * 2) : ballSprite(r * 2), ang = (b.x * 3 + b.z * 2) % (Math.PI * 2);
   g.fillStyle = 'rgba(255,255,255,0.28)'; g.beginPath(); g.arc(x, y, r * 1.45, 0, 7); g.fill();   // a soft halo so the ball never hides in a crowd
   g.save(); g.translate(x, y); g.rotate(ang); g.drawImage(spr, -spr.width / 2, -spr.height / 2); g.restore();
   if(b.spirit && M.phase === 'rally'){ const c = spiritOf(b.spirit); if(c){   // 🔥🔥 the creature rides the ball
@@ -2569,10 +2726,10 @@ function drawCounters(g, M){
       g.fillStyle = on ? '#FFFFFF' : 'rgba(255,255,255,0.65)'; g.font = '700 ' + Math.round(r * 1.2) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(i + 1, cx, y + 1); g.textBaseline = 'alphabetic'; } });
 }
 function paintArenaPreview(cv, k){
-  const g = cv.getContext('2d'), M = PD.newMatch({mode: SET.mode, level: 0, seed: 3, teams: SET.cfg || [[], []]});
+  const g = cv.getContext('2d'), M = PD.newMatch({mode: SET.mode, level: 0, seed: 3, arena: k, teams: SET.cfg || [[], []]});
   const keep = V; V = makeView(cv.width, cv.height, M, {padT: 6, padB: 4});
   M.phase = 'rally'; M.ball.held = null; M.ball.x = -1.5; M.ball.z = 3.2;
-  try{ drawScene(g, M, {t: 1, live: false}); if(k !== 'classic'){ g.fillStyle = 'rgba(15,21,48,0.55)'; g.fillRect(0, 0, cv.width, cv.height); emo(g, (ARENAS.find(a => a.k === k) || {}).icon || '❓', cv.width / 2, cv.height / 2, cv.height * 0.4); } }catch(e){}
+  try{ drawScene(g, M, {t: 1, live: false}); }catch(e){}
   V = keep;
 }
 
@@ -2789,7 +2946,7 @@ function boot(){
   UI.loading('pyraspike');
   google.script.run.withSuccessHandler(d => {
       UI.loaded();
-      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {};
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {}; S.ballSkins = d.ballSkins || {}; S.tableSkins = d.tableSkins || {}; S.bombs = d.bombs || {};
       UISound.applySettings(S.settings);
       const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
       lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
@@ -2803,4 +2960,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pd-4b) END OF PyraDive.html -->
+<!-- (pd-4c) END OF PyraDive.html -->
