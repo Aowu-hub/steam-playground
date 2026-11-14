@@ -714,6 +714,7 @@ const MODES_ = [
   { game: 'blasoff', id: 'street', icon: '🏙️', name: 'Street 1v1', pitch: 'Nutmeg = a point, first to 5!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Street 1v1 ·', feat: [['blasoff', 'win_1v1']] }, added: '2026-11-14' },   // 🏙️ bo-2b
   { game: 'blasoff', id: 'skills', icon: '🎯', name: 'Skill challenges', pitch: '7 drills, three stars each!', route: 'blasoff', tried: { feat: [['blasoff', 'skills']] }, added: '2026-11-14' },   // 🎯 bo-3a
   { game: 'blasoff', id: 'shootout', icon: '🥅', name: 'Penalty shootout', pitch: 'Kick on the target, dive in goal!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Penalty shootout ·', feat: [['blasoff', 'win_pens']] }, added: '2026-11-14' },
+  { game: 'blasoff', id: 'battle', icon: '🎤', name: 'Tricks Battle', pitch: 'Tricks on the beat, 3 judges!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Tricks Battle ·', feat: [['blasoff', 'win_battle']] }, added: '2026-11-14' },   // 🎤 bo-3b
   { game: 'turbo', id: 'ghost', icon: '👻', name: 'Ghost race', pitch: 'Race the family\'s best rides!', route: 'turbo', tried: null },
   { game: 'turbo', id: 'duo', icon: '👥', name: '2-player race', pitch: 'Race a friend, split screen!', route: 'turbo', tried: null },
   { game: 'word-board', id: 'together', icon: '👨‍👩‍👧', name: 'Lettercraft Play together', pitch: 'Word battle with your family!', route: 'wordboard', tried: { feat: [['word-board', 'togetherGames']] } },
@@ -749,7 +750,7 @@ const MODE_GROUPS_ = {
   'eyes-brain': [{k: 'remember', icon: '🔢', en: 'Ways to remember', th: 'วิธีจำ', modes: ['classic', 'backwards', 'colour', 'letters', 'listen', 'word', 'shapes']}, {k: 'challenge', icon: '🏔️', en: 'Challenge', th: 'ท้าทาย', modes: ['challenge', 'daily']}, {k: 'party', icon: '👥', en: 'Party', th: 'เล่นกันหลายคน', modes: ['chain']}],
   'pyraspike': [{k: 'spike', icon: '🏐', en: 'PyraSpike', th: 'วอลเลย์บอล', modes: ['beach', 'small', 'full']}, {k: 'strike', icon: '🦶', en: 'PyraStrike', th: 'ตะกร้อ', modes: ['strikesolo', 'strikeduo', 'strikeregu', 'hoop']}, {k: 'spark', icon: '⚡', en: 'PyraSpark', th: 'บอลข้ามโต๊ะ', modes: ['sparksolo', 'sparkduo']}],   // 🔥 pd-3a
   'sla-brall': [{k: 'sports', icon: '🏓', en: 'Sports', th: 'กีฬา', modes: ['slashot', 'slapoof', 'slaball', 'slapong', 'slabam', 'slawall']}, {k: 'cup', icon: '🏆', en: 'Cup', th: 'ทัวร์นาเมนต์', modes: ['cup']}, {k: 'link', icon: '📡', en: 'Own devices', th: 'เล่นหลายเครื่อง', modes: ['lhost', 'ljoin']}],   // 📡 p3a: lk-1b's 🔗 Join friends
-  'blasoff': [{k: 'match', icon: '⚽', en: 'Matches', th: 'แข่งฟุตบอล', modes: ['fours', 'sevens', 'elevens']}, {k: 'small', icon: '🏙️', en: 'Futsal + Street', th: 'ฟุตซอล · สตรีท', modes: ['futsal', 'street']}, {k: 'skill', icon: '🎯', en: 'Skills + penalties', th: 'ฝึกทักษะ · จุดโทษ', modes: ['skills', 'shootout']}],   // ⚽ bo-1 · 🌍 bo-2a · 🏙️ bo-2b
+  'blasoff': [{k: 'match', icon: '⚽', en: 'Matches', th: 'แข่งฟุตบอล', modes: ['fours', 'sevens', 'elevens']}, {k: 'small', icon: '🏙️', en: 'Futsal + Street', th: 'ฟุตซอล · สตรีท', modes: ['futsal', 'street']}, {k: 'skill', icon: '🕺', en: 'Tricks + skills', th: 'ลีลา · ทักษะ', modes: ['battle', 'skills', 'shootout']}],   // ⚽ bo-1 · 🌍 bo-2a · 🏙️ bo-2b
   'brawl-buddies': [{k: 'battle', icon: '🥊', en: 'Battle', th: 'ต่อสู้', modes: ['battle']}, {k: 'adv', icon: '🗺️', en: 'Brawenture', th: 'ผจญภัย', modes: ['brawenture']}],
   'georead': [{k: 'sounds', icon: '🔊', en: 'Sounds', th: 'เสียง', modes: ['phonics', 'rhyme', 'say']}, {k: 'words', icon: '🧱', en: 'Words', th: 'คำ', modes: ['build', 'sight', 'case', 'trace']}, {k: 'reading', icon: '📖', en: 'Reading', th: 'อ่าน', modes: ['story', 'types']}, {k: 'journey', icon: '🗺️', en: 'Journey', th: 'ผจญภัย', modes: ['journey']}],
   'pose-party': [{k: 'pose', icon: '🎯', en: 'Pose', th: 'ท่าโพส', modes: ['classic', 'speed', 'copy']}, {k: 'move', icon: '💃', en: 'Move', th: 'ขยับตัว', modes: ['dance', 'statue', 'freeze']}, {k: 'together', icon: '🧑‍🤝‍🧑', en: 'Together', th: 'เล่นด้วยกัน', modes: ['group', 'mirror', 'letters']}, {k: 'calm', icon: '🧘', en: 'Calm', th: 'ยืดเหยียด', modes: ['yoga']}]
@@ -2497,6 +2498,7 @@ const FEAT_DEFS = {
     skillStars: { name: 'Skill Star', icon: '⭐', kind: 'sum', tiers: [10, 50, 150] },
     juggles: { name: 'Keepy-ups', icon: '🦶', kind: 'max', tiers: [10, 25, 50] },
     win_pens: { name: 'Shootout wins', icon: '🥅', kind: 'sum', hidden: true },
+    win_battle: { name: 'Tricks Battle wins', icon: '🎤', kind: 'sum', tiers: [1, 10, 50] },   // 🎤 bo-3b
   },
   // 🔍 Pokadif feats (pk-1)
   'pokadif': {
@@ -2534,6 +2536,7 @@ const FEAT_DEFS = {
   },
   'pokadif-case': {
     stories: { name: 'Cases closed', icon: '📁', kind: 'sum', tiers: [1, 10, 30] },   // 📖 pk-3a
+    casebook: { name: 'Case books closed', icon: '📚', kind: 'max', tiers: [1, 2, 3] },   // 📖 pk-3b
     lessons: { name: 'Lesson cards', icon: '🎓', kind: 'max', tiers: [3, 6, 9] },
     chapters: { name: 'Chapters', icon: '📖', kind: 'sum', hidden: true },
     games: { name: 'Cases started', icon: '🕵️', kind: 'sum', hidden: true },
@@ -2734,6 +2737,7 @@ const TITLE_DEFS = [
   { id: 'pk_blink', name: 'Blink Master', icon: '👁️', hint: 'Find 30 changes in Pokadif Blink', rule: f => featVal_(f, 'pokadif', 'blinks') >= 30 },
   { id: 'pk_arc', name: 'Speed Sleuth', icon: '📸', hint: 'Finish 15 pictures in one Pokadif Arcade run', rule: f => featVal_(f, 'pokadif-arcade', 'pictures') >= 15 },
   { id: 'pk_cp', name: 'Checkpoint Champ', icon: '✅', hint: 'Reach 20 checkpoints in Pokadif Arcade', rule: f => featVal_(f, 'pokadif-arcade', 'checkpoints') >= 20 },
+  { id: 'pk_sleuth', name: 'Master Sleuth', icon: '🕵️', hint: 'Close all 3 Pokadif case books (🧲 🦖 🐙)', rule: f => featVal_(f, 'pokadif-case', 'casebook') >= 3 },
   { id: 'pk_story', name: 'Case Cracker', icon: '📁', hint: 'Close a case in Pokadif Detective Adventure', rule: f => featVal_(f, 'pokadif-case', 'stories') >= 1 },
   { id: 'pk_lesson', name: 'Little Scientist', icon: '🎓', hint: 'Collect 3 lesson cards in Pokadif Detective Adventure', rule: f => featVal_(f, 'pokadif-case', 'lessons') >= 3 },
   { id: 'pk_quick', name: 'Lightning Lens', icon: '⚡', hint: 'Finish a Pokadif picture in 10 seconds', rule: f => { const q = featVal_(f, 'pokadif', 'quick'); return q > 0 && q <= 10; } },
@@ -4606,7 +4610,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
