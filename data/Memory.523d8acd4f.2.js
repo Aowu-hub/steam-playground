@@ -1,0 +1,383 @@
+
+const WEBAPP_URL = SP_TV[0];
+const CURRENT_PLAYER = SP_TV[1]; window.SP_PAGE = SP_TV[2];
+const MODE_LINK = SP_TV[3];   // ✨ modes-3: ?mode=<id> (Code.gs MODES_) — opened once, after the player pick
+UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});   // loader + menus in the player's look before the server answers
+const SESSION_START = Number(SP_TV[4]) || null;
+const DURATION_MIN = Number(SP_TV[5]) || null;
+const GAME_ID = 'memory';
+// 🎛️ p1b: the shared top bar (UiKit UI.gameBar) — ◀ where you came from · 🎚️ Levels · 🏠 | 🃏 Memory Match · level | scoreboard | game buttons ❓ ⚙️
+const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '🃏', name: 'Memory Match', levelId: 'hud-level',
+  levels: () => leavePlay(), playing: () => !!(G && !G.over), onLeave: () => { try{ clearInterval(timerId); }catch(e){} try{ speechSynthesis.cancel(); }catch(e){} },
+  pause: {pause: () => { if(typeof pauseGame === 'function') pauseGame(); }, resume: () => { if(typeof resume === 'function') resume(); }},
+  onFit: () => { if(G && typeof layout === 'function') layout(); },
+  extras: []});
+var NAV_INNER = {setup: ['◀ Memory Match', () => showScreen('menu')]};   // 🧭 inner screens: their top button goes to the main screen
+UI.navBar(document.getElementById('back-btn'), {onclick: false});
+const $ = id => document.getElementById(id);
+const pick = a => a[rnd(a.length)];
+function fmt(ms){ const s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function say(text){ try{ if(!UISound.get().enabled || !window.speechSynthesis) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 1.05; u.pitch = 1.2; speechSynthesis.speak(u); }catch(e){} }
+function shuffle(a){ for(let i = a.length - 1; i > 0; i--){ const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+/* ================= LEVELS + DECKS ================= */
+const LEVELS = [
+  {name: 'Basic', emoji: '🌱', cols: 4, rows: 4, peek: 4, swap: false, blurb: 'Peek at all the cards first'},
+  {name: 'Junior', emoji: '🐣', cols: 4, rows: 4, peek: 0, swap: false, blurb: 'No peeking this time!'},
+  {name: 'Intermediate', emoji: '🔦', cols: 6, rows: 6, peek: 0, swap: false, blurb: 'A big 6×6 board'},
+  {name: 'Hard', emoji: '⚡', cols: 6, rows: 6, peek: 0, swap: true, blurb: 'Miss → two cards swap!'},
+  {name: 'Extreme', emoji: '🌋', cols: 8, rows: 8, peek: 0, swap: true, blurb: '8×8 with swaps'},
+  // 💀 Hardcore: biggest board, solo, no peeking — flip a wrong card when you had ALREADY seen the right one = game over.
+  {name: 'Hardcore', emoji: '💀', cols: 8, rows: 8, peek: 0, swap: false, hardcore: true, blurb: '8×8 — forget a card you already saw and it\'s game over! (×3 points)'}
+];
+const DECKS = {
+  monsters: {name: 'Monsters', icon: '👾', back: 'linear-gradient(135deg,#7B2FF7,#2EC4B6)', mark: '👾', cards: ['👾', '👹', '👺', '👻', '👽', '🤖', '🎃', '🧟', '🧛', '🧙', '🧞', '🧜', '🐉', '🦖', '🦕', '😈', '🤡', '🦄', '🧌', '🕷️', '🦂', '🐙', '🦑', '🐊', '🐍', '🦇', '🐺', '🦉', '🐲', '🦈', '🧚', '🦹']},
+  heroes: {name: 'Heroes', icon: '🦸', back: 'linear-gradient(135deg,#E63946,#FFB703)', mark: '⭐', cards: ['🦸', '🦹', '🧙', '🧚', '🥷', '👸', '🤴', '🧝', '👮', '🧑‍🚒', '🧑‍🚀', '🕵️', '👷', '🧑‍⚕️', '💂', '🤠', '🧞', '🧜‍♀️', '🛡️', '⚔️', '🏹', '🪄', '👑', '🦾', '🚀', '🔱', '🧲', '💎', '🔥', '⚡', '🌟', '🏆']},
+  animals: {name: 'Animals', icon: '🐶', back: 'linear-gradient(135deg,#4CB963,#FFC845)', mark: '🐾', cards: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🦆', '🦉', '🐴', '🦄', '🐝', '🦋', '🐢', '🐙', '🐬', '🐳', '🦒', '🐘', '🦓', '🦔']},
+  people: {name: 'People', icon: '🧑', back: 'linear-gradient(135deg,#FF8FB1,#7B5FE0)', mark: '😊', cards: ['👶', '👧', '🧒', '👦', '👩', '🧑', '👨', '👵', '👴', '🎅', '🤶', '🧑‍🍳', '🧑‍🎨', '🧑‍🏫', '🧑‍🌾', '🧑‍🔬', '🧑‍💻', '🧑‍🎤', '🧑‍✈️', '🙋', '💃', '🕺', '🤹', '🏄', '🚴', '🧗', '⛹️', '🤸', '🧘', '🏊', '🤿', '🛹']},
+  vehicles: {name: 'Vehicles', icon: '🚗', back: 'linear-gradient(135deg,#3A86FF,#06D6A0)', mark: '🛞', cards: ['🚗', '🚕', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🛻', '🚚', '🚛', '🚜', '🛵', '🏍️', '🚲', '🛴', '🚂', '🚆', '🚇', '🚊', '✈️', '🚁', '🛸', '🚀', '⛵', '🚤', '🛳️', '🚢', '🚠', '🛶']},
+  space: {name: 'Space', icon: '🚀', back: 'linear-gradient(135deg,#1A1440,#6B3BE0)', mark: '✨', cards: ['🚀', '🛸', '🌍', '🌕', '🌙', '⭐', '🌟', '☀️', '🪐', '☄️', '🌌', '👽', '🛰️', '🔭', '🧑‍🚀', '🌑', '🌓', '🌠', '💫', '✨', '🌈', '⚡', '🌎', '🌏', '🌛', '🌝', '🌞', '❄️', '🔥', '💧', '🌪️', '🌋']}
+};
+const DECK_KEYS = Object.keys(DECKS);
+const SEAT_COLS = ['#9B5DE5', '#F15BB5', '#00BBF9', '#06D6A0'];
+const AGE_START = {'4-5': 0, '6-7': 1, '8-9': 2, '10+': 3};
+const PRAISE = ['Great memory', 'Super match', 'Wow', 'Brainy', 'Amazing'];
+
+/* ================= STATE ================= */
+let S = {players: [], progress: {}, settings: {}, avatars: {}, player: '', age: ''};
+let G = null, lockHandle = null, deck = 'animals', pendingLvl = 0, SEATS = [], timerId = 0;
+function store(k){ return 'sp_memory_' + k + ':' + (S.player || ''); }
+function loadPrefs(){ try{ const d = localStorage.getItem(store('deck')); if(DECKS[d]) deck = d; }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(store('deck'), deck); }catch(e){} }
+function myAvatar(name){ const a = S.avatars[name || S.player]; return a ? fixAv(a) : defaultAvatar(name || S.player || 'player'); }
+
+/* ================= MENUS ================= */
+function showScreen(name){
+  ['player', 'menu', 'setup', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
+  $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   // 🧭 p1b window.scrollTo(0, 0);
+}
+function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
+function canPlay(i){ const p = progressOf(S.player); if(i === 5) return p.unlocked >= 5; if(i === 4) return p.unlocked >= 4; return i <= Math.max(p.unlocked, AGE_START[S.age] || 0); }
+function renderPlayers(){
+  const box = $('player-list'); box.innerHTML = '';
+  if(!S.players.length){ box.innerHTML = '<div class="empty">No players yet — add one on the Dashboard first.</div>'; return; }
+  S.players.forEach(p => { const b = document.createElement('button'); b.className = 'pick'; b.setAttribute('data-sound', 'pop');
+    const c = document.createElement('canvas'); c.width = 144; c.height = 168; b.appendChild(c);
+    b.insertAdjacentHTML('beforeend', '<div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age ? p.Age + ' yrs' : '') + '</div>');
+    drawPreviewCanvas(c, myAvatar(p.Name), {name: p.Name, t: 1});
+    b.onclick = () => choosePlayer(p.Name); box.appendChild(b); });
+}
+function choosePlayer(name){
+  UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
+  const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : ''; SEATS = [name];
+  loadPrefs(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-3b */ renderLevels(); showScreen('menu');
+}
+function changePlayer(){ renderPlayers(); showScreen('player'); }
+function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">No score yet</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span>' + (b.timeSec ? '<span>⏱ ' + fmt(b.timeSec * 1000) + '</span>' : '') + '<span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
+function renderLevels(){
+  const box = $('level-list'); box.innerHTML = ''; if(window.UI && UI.leaders) UI.leaders($('leaders'), 'memory', S.player); const p = progressOf(S.player), rec = AGE_START[S.age];
+  LEVELS.forEach((L, i) => {
+    const open = canPlay(i), done = p.unlocked > i, b = document.createElement('button');
+    b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (L.hardcore ? ' hardcore' : ''); b.setAttribute('data-sound', open ? 'pop' : 'none');
+    b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">🏅</span>' : open ? '' : '<span class="badge">🔒</span>') +
+      '<div class="big">' + L.emoji + '</div><div class="nm">' + L.name + '</div><div class="learn">🃏 ' + L.cols + '×' + L.rows + ' · ' + (L.cols * L.rows / 2) + ' pairs</div><div class="sub">' + (L.hardcore && !open ? '🔒 Beat Extreme to open 💀 Hardcore' : L.blurb) + '</div>' + bestHtml(p, i);
+    b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore' : i === 4 ? 'Finish Hard to unlock Extreme!' : 'Finish the level before to unlock it'); return; } openSetup(i); };
+    box.appendChild(b);
+  });
+}
+function openSetup(lvl){
+  pendingLvl = lvl; const L = LEVELS[lvl];
+  $('setup-logo').textContent = L.emoji; $('setup-title').textContent = L.name + ' · ' + L.cols + '×' + L.rows; $('setup-sub').textContent = L.blurb;
+  const db = $('deck-list'); db.innerHTML = '';
+  DECK_KEYS.forEach(k => { const D = DECKS[k], b = document.createElement('button'); b.className = 'deck' + (deck === k ? ' on' : ''); b.setAttribute('data-sound', 'tap');
+    b.innerHTML = '<div class="mini">' + D.cards.slice(0, 4).join('') + '</div><div class="nm">' + D.icon + ' ' + D.name + '</div>';
+    b.onclick = () => { deck = k; savePrefs(); openSetup(lvl); }; db.appendChild(b); });
+  const sb = $('seat-list'); sb.innerHTML = '';
+  if(L.hardcore){ SEATS = [S.player]; sb.innerHTML = '<div class="hc-note">💀 Hardcore is a solo challenge: no peeking, and if you flip a wrong card when you had already seen the right one, the game is over.</div>'; $('go-btn').textContent = '💀 Deal the cards!'; $('go-btn').onclick = () => startGame(pendingLvl); showScreen('setup'); return; }
+  S.players.forEach(p => { const i = SEATS.indexOf(p.Name), on = i >= 0, me = p.Name === S.player, b = document.createElement('button');
+    b.className = 'seat' + (on ? ' on' : '') + (me ? ' me' : ''); b.setAttribute('data-sound', me ? 'none' : 'tap'); if(on) b.style.setProperty('--seat', SEAT_COLS[i]);
+    const c = document.createElement('canvas'); c.width = 108; c.height = 126; b.appendChild(c);
+    b.insertAdjacentHTML('beforeend', (on ? '<span class="no">P' + (i + 1) + '</span>' : '') + '<div class="nm">' + UI.esc(p.Name) + (me ? ' (you)' : '') + '</div>');
+    drawPreviewCanvas(c, myAvatar(p.Name), {name: p.Name, t: 1});
+    b.onclick = () => { if(me) return; if(on) SEATS = SEATS.filter(n => n !== p.Name); else { if(SEATS.length >= 4){ UISound.play('error'); UI.toast('Up to 4 players'); return; } SEATS.push(p.Name); } openSetup(lvl); };
+    sb.appendChild(b); });
+  $('go-btn').textContent = SEATS.length > 1 ? '🃏 Deal for ' + SEATS.length + ' players!' : '🃏 Deal the cards!';
+  $('go-btn').onclick = () => startGame(pendingLvl);
+  showScreen('setup');
+}
+
+/* ================= GAME ================= */
+function startGame(lvl){
+  clearInterval(timerId); hideResult();
+  const L = LEVELS[lvl], D = DECKS[deck], pairs = L.cols * L.rows / 2;
+  const faces = shuffle(D.cards.slice()).slice(0, pairs), cards = shuffle(faces.concat(faces).map((f, i) => ({f, id: i, up: false, done: false, by: -1})));
+  G = {lvl, L, D, cards, pairs, open: [], wait: false, over: false, paused: false, t0: 0, pausedTotal: 0, started: false, cursor: 0, seen: {},
+    players: SEATS.map((n, i) => ({name: n, col: SEAT_COLS[i], pairs: 0, score: 0, miss: 0, streak: 0, best: 0})), turn: 0, found: 0, swaps: 0};
+  BAR.level(L.emoji + ' ' + L.name + ' · ' + D.icon);
+  buildBoard(); buildSide(); showScreen('play'); layout(); hud(); cheerMount(); /* 📣 cs-3b */
+  if(L.peek){
+    G.wait = true; G.cards.forEach(c => c.up = true); paintAll(); if(window.Cheer) Cheer.hush(true);   /* 🤫 cs-3b: everyone memorises */ let left = L.peek; $('peek').classList.remove('hidden'); $('peek').textContent = '👀 Remember them! ' + left;
+    say('Look carefully!');
+    const tk = setInterval(() => { if(!G || G.over){ clearInterval(tk); return; } if(G.paused) return; left--; $('peek').textContent = '👀 Remember them! ' + left;
+      if(left <= 0){ clearInterval(tk); $('peek').classList.add('hidden'); G.cards.forEach(c => c.up = false); paintAll(); G.wait = false; go(); } }, 1000);
+  } else go();
+}
+function go(){ G.started = true; cheerGo(); /* 📣 cs-3b */ G.t0 = performance.now(); G.pausedTotal = 0; if(G.players.length > 1) turnCard(0, true); else showBanner('🃏 Find all ' + G.pairs + ' pairs!'); timerId = setInterval(hud, 500); }
+function buildBoard(){
+  const b = $('board'); b.innerHTML = ''; b.style.gridTemplateColumns = 'repeat(' + G.L.cols + ', var(--cs))'; b.style.setProperty('--deck-back', G.D.back);
+  G.cards.forEach((c, i) => { const el = document.createElement('button'); el.className = 'card'; el.dataset.i = i; el.setAttribute('aria-label', 'Card ' + (i + 1)); el.setAttribute('data-sound', 'none');
+    el.innerHTML = '<span class="in"><span class="face back">' + G.D.mark + '</span><span class="face front">' + c.f + '</span></span>';
+    el.addEventListener('click', () => flip(+el.dataset.i)); b.appendChild(el); c.el = el; });
+}
+function buildSide(){
+  const s = $('side'); s.innerHTML = '';
+  G.players.forEach((p, i) => { const d = document.createElement('div'); d.className = 'pl'; d.style.setProperty('--seat', p.col); d.id = 'pl-' + i;
+    const c = document.createElement('canvas'); c.width = 80; c.height = 94; d.appendChild(c);
+    d.insertAdjacentHTML('beforeend', '<div><div class="nm">' + UI.esc(p.name) + '</div><div class="pile" id="pile-' + i + '"></div><div class="mine" id="mine-' + i + '"></div></div><div class="sc" id="sc-' + i + '">0</div>');
+    c.id = 'plav-' + i; drawPreviewCanvas(c, myAvatar(p.name), {name: p.name, t: 1}); s.appendChild(d); });
+  startCheer();
+  $('side').classList.toggle('hidden', G.players.length < 2 && innerWidth < 820);
+}
+function layout(){
+  if(!G) return; const ar = $('arena'), side = $('side'), L = G.L, gap = L.cols >= 8 ? 5 : L.cols >= 6 ? 7 : 10;
+  const row = getComputedStyle(ar).flexDirection === 'row', sw = row && !side.classList.contains('hidden') ? side.offsetWidth + 16 : 0, sh = !row && !side.classList.contains('hidden') ? side.offsetHeight + 8 : 0;
+  const W = ar.clientWidth - 24 - sw, H = ar.clientHeight - 18 - sh;
+  const cs = Math.floor(Math.max(28, Math.min((W - gap * (L.cols - 1)) / L.cols, (H - gap * (L.rows - 1)) / L.rows, 190)));
+  $('board').style.setProperty('--cs', cs + 'px'); $('board').style.setProperty('--gap', gap + 'px');
+}
+window.addEventListener('resize', () => { if(G){ layout(); } });
+function paint(c){ c.el.classList.toggle('up', c.up); c.el.classList.toggle('done', c.done); if(c.done && c.by >= 0){ c.el.style.setProperty('--won-edge', G.players[c.by].col); } }
+function paintAll(){ G.cards.forEach(paint); }
+/* ---------- 🙌 avatars cheer (side panel) + 👉 turn card (11n, 2026-11-06) ---------- */
+const CHEER = {list: [], raf: 0};
+function gestOf(k){ return GESTURES.find(g => g.k === k) || GESTURES[5]; }
+function cheer(i, k, times){ if(!G || !G.players[i]) return; const g = gestOf(k); CHEER.list[i] = {g, t0: performance.now(), d: g.d * (times || 1)}; }
+function drawPl(i, now){ const c = $('plav-' + i); if(!c || !G || !G.players[i]) return; const x = c.getContext('2d'), a = CHEER.list[i], P = G.players[i];
+  let t = a ? (now - a.t0) / 1000 : 0; if(a && t > a.d){ CHEER.list[i] = null; t = 0; }
+  x.clearRect(0, 0, c.width, c.height);
+  const av = myAvatar(P.name), Q = typeof avatarPlace === 'function' ? avatarPlace(av, P.name, c.width, c.height, c.width / 2, c.height - 6, c.height / 118, MEM_MOVES) : {x: c.width / 2, y: c.height - 6, k: c.height / 118};   // r32: never cut off
+  drawAvatar(x, {name: P.name, av, dir: 1, walkT: 0, gest: CHEER.list[i] ? {g: a.g, t: t % a.g.d} : null}, Q.x, Q.y, Q.k, {t: now / 1000, noPet: true}); }
+const MEM_MOVES = ['dance', 'floss', 'backflip', 'shrug', 'think', 'disco', 'cheer', 'clap', 'wave'];
+function startCheer(){ cancelAnimationFrame(CHEER.raf); CHEER.list = []; const tick = now => { if(!G){ return; } G.players.forEach((p, i) => { if(CHEER.list[i] || i === G.turn || G.over) drawPl(i, now); }); CHEER.raf = requestAnimationFrame(tick); }; CHEER.raf = requestAnimationFrame(tick); }
+function turnCard(i, first){ const P = G.players[i], tc = $('turncard'); if(!tc) return;
+  tc.style.setProperty('--seat', P.col); $('turn-name').textContent = (first ? '🎲 ' : '👉 ') + P.name + (first ? ' goes first!' : '\'s turn!'); $('turn-sub').textContent = G.players.length > 2 ? 'Pass it on — find a pair!' : 'Find a pair!';
+  tc.classList.add('on'); clearTimeout(tc._t); say(P.name + (first ? ' goes first!' : '\'s turn'));
+  const c = $('turn-av'), x = c.getContext('2d'), g = gestOf('wave'), t0 = performance.now();
+  (function anim(now){ if(!tc.classList.contains('on')) return; const t = (now - t0) / 1000; x.clearRect(0, 0, c.width, c.height); const av = myAvatar(P.name), Q = typeof avatarPlace === 'function' ? avatarPlace(av, P.name, c.width, c.height, c.width / 2, c.height - 10, c.height / 120, ['wave']) : {x: c.width / 2, y: c.height - 10, k: c.height / 120}; drawAvatar(x, {name: P.name, av, dir: 1, walkT: 0, gest: {g, t: t % g.d}}, Q.x, Q.y, Q.k, {t}); requestAnimationFrame(anim); })(t0);
+  tc._t = setTimeout(() => tc.classList.remove('on'), 1600); }
+function flip(i){
+  if(!G || G.over || G.wait || G.paused || !G.started) return;
+  const c = G.cards[i]; if(!c || c.up || c.done) return;
+  c.up = true; paint(c); UISound.play('tap'); G.open.push(c); G.cursor = i; markCursor();
+  if(G.open.length < 2) return;
+  G.wait = true; const [a, b] = G.open, P = G.players[G.turn];
+  if(a.f === b.f){
+    setTimeout(() => {
+      a.done = b.done = true; a.by = b.by = G.turn; paint(a); paint(b); G.found++; P.pairs++; P.streak++; P.best = Math.max(P.best, P.streak);
+      const gain = 100 + 50 * (P.streak - 1); P.score += gain; UISound.play('success'); sparkle(a.el); sparkle(b.el);
+      const mine = $('mine-' + G.turn); if(mine) mine.insertAdjacentHTML('beforeend', '<i>' + a.f + '</i>');
+      cheer(G.turn, P.streak >= 3 ? pick(['dance', 'floss', 'backflip']) : pick(['cheer', 'clap', 'jump', 'highfive'])); G.players.forEach((o, j) => { if(j !== G.turn) cheer(j, 'clap'); });
+      floatText(b.el, '+' + gain + (P.streak > 1 ? ' 🔥×' + P.streak : '')); cheerSay('goal', G.turn); /* 📣 cs-3b */
+      if(P.streak === 3 || P.streak === 5 || P.streak === 8) showBanner('🔥 ' + P.streak + ' in a row! ' + pick(PRAISE) + '!', 'gold');
+      G.open = []; G.wait = false; hud();
+      if(G.found === G.pairs) setTimeout(finishGame, 500);
+    }, 260);
+  } else {
+    // 💀 Hardcore: a "forgot" = you had already seen the match of your first card, or your second card was one you had seen
+    const partner = G.cards.find(c => c !== a && c.f === a.f), forgot = G.L.hardcore && ((partner && G.seen[partner.id]) || G.seen[b.id]);
+    P.miss++; P.streak = 0; cheerSay('miss', G.turn); /* 📣 cs-3b */ [a, b].forEach(c => { G.seen[c.id] = true; }); cheer(G.turn, pick(['shrug', 'think']));
+    if(forgot){ hardcoreLose(a, b, partner); return; }
+    setTimeout(() => {
+      a.el.classList.add('miss'); b.el.classList.add('miss'); UISound.play('bump');
+      setTimeout(() => {
+        a.up = b.up = false; a.el.classList.remove('miss'); b.el.classList.remove('miss'); paint(a); paint(b); G.open = [];
+        const next = () => { if(G.players.length > 1){ G.turn = (G.turn + 1) % G.players.length; turnCard(G.turn); } G.wait = false; hud(); };
+        if(G.L.swap) swapTwo(next); else next();
+      }, 650);
+    }, 300);
+    hud();
+  }
+}
+// Hard + Extreme: two hidden cards swap places (they glow so sharp eyes can follow them).
+function swapTwo(done){
+  const hidden = G.cards.map((c, i) => i).filter(i => !G.cards[i].done && !G.cards[i].up);
+  if(hidden.length < 3){ done(); return; }
+  const i = pick(hidden); let j = pick(hidden); let guard = 0; while(j === i && guard++ < 10) j = pick(hidden);
+  if(i === j){ done(); return; }
+  const A = G.cards[i], B = G.cards[j], ra = A.el.getBoundingClientRect(), rb = B.el.getBoundingClientRect();
+  A.el.classList.add('swap'); B.el.classList.add('swap'); UISound.play('whoosh'); showBanner('🔀 Two cards swapped places!');
+  A.el.style.transition = B.el.style.transition = 'transform .7s cubic-bezier(.5,0,.3,1)';
+  A.el.style.transform = 'translate(' + (rb.left - ra.left) + 'px,' + (rb.top - ra.top) + 'px)'; B.el.style.transform = 'translate(' + (ra.left - rb.left) + 'px,' + (ra.top - rb.top) + 'px)';
+  setTimeout(() => {
+    if(!G) return;
+    [G.cards[i], G.cards[j]] = [G.cards[j], G.cards[i]]; G.swaps++;
+    const board = $('board'), ea = A.el, eb = B.el, ph = document.createElement('span'); board.replaceChild(ph, ea); board.replaceChild(ea, eb); board.replaceChild(eb, ph);
+    ea.dataset.i = j; eb.dataset.i = i; [ea, eb].forEach(e => { e.style.transition = 'none'; e.style.transform = ''; void e.offsetWidth; e.style.transition = ''; });
+    setTimeout(() => { ea.classList.remove('swap'); eb.classList.remove('swap'); }, 500);
+    done();
+  }, 750);
+}
+function sparkle(el){ const r = el.getBoundingClientRect(); for(let k = 0; k < 7; k++){ const s = document.createElement('div'); s.className = 'spark'; s.textContent = pick(['✨', '⭐', '💫', '🎉']); s.style.left = (r.left + r.width / 2 - 10) + 'px'; s.style.top = (r.top + r.height / 2 - 10) + 'px'; const a = k / 7 * 6.28; s.style.setProperty('--dx', Math.cos(a) * 60 + 'px'); s.style.setProperty('--dy', Math.sin(a) * 60 + 'px'); document.body.appendChild(s); setTimeout(() => s.remove(), 850); } }
+function floatText(el, text){ const r = el.getBoundingClientRect(), s = document.createElement('div'); s.className = 'spark'; s.style.cssText = 'left:' + (r.left + r.width / 2 - 30) + 'px;top:' + r.top + 'px;font-family:Fredoka,sans-serif;font-weight:700;color:#FFD84D;text-shadow:0 2px 0 #000;font-size:1.1rem;white-space:nowrap'; s.style.setProperty('--dx', '0px'); s.style.setProperty('--dy', '-50px'); s.textContent = text; document.body.appendChild(s); setTimeout(() => s.remove(), 850); }
+function elapsed(){ return G.started ? performance.now() - G.t0 - G.pausedTotal - (G.paused ? performance.now() - G.pausedAt : 0) : 0; }
+function hud(){
+  if(!G) return; const P = G.players[G.turn], solo = G.players.length === 1;
+  if(solo) BAR.hide('turn'); else BAR.count('turn', '👉', P.name, 'Whose turn');
+  BAR.score((solo ? P.score : G.players.reduce((s, p) => s + p.score, 0)).toLocaleString());
+  BAR.count('pairs', '🃏', G.found + '/' + G.pairs, 'Pairs found'); BAR.miss(G.players.reduce((s, p) => s + p.miss, 0));
+  BAR.time(fmt(elapsed()));
+  G.players.forEach((p, i) => { const d = $('pl-' + i); if(!d) return; d.classList.toggle('now', i === G.turn && !G.over); $('sc-' + i).textContent = p.pairs; $('pile-' + i).textContent = p.score + ' pts' + (p.streak > 1 ? ' · 🔥' + p.streak : ''); });
+  if(lockHandle){ const left = lockHandle.remainingMs(); BAR.left(left, left < 120000); }
+}
+// Keyboard: arrows move the yellow box, Enter/Space flips.
+function markCursor(){ if(!G) return; G.cards.forEach((c, i) => c.el.classList.toggle('cursor', i === G.cursor && G.kbd)); }
+document.addEventListener('keydown', e => {
+  if(!G || G.over || $('scr-play').classList.contains('hidden')) return;
+  const L = G.L, mv = {ArrowLeft: -1, ArrowRight: 1, ArrowUp: -L.cols, ArrowDown: L.cols}[e.code];
+  if(mv){ e.preventDefault(); G.kbd = true; const n = G.cursor + mv; if(n >= 0 && n < G.cards.length && !(Math.abs(mv) === 1 && Math.floor(n / L.cols) !== Math.floor(G.cursor / L.cols))) G.cursor = n; markCursor(); G.cards[G.cursor].el.focus({preventScroll: true}); return; }
+  if((e.code === 'Enter' || e.code === 'Space') && G.kbd){ e.preventDefault(); flip(G.cursor); }
+});
+function leavePlay(){
+  if(!G || G.over){ backToMenu(); return; }
+  pauseGame();
+  UI.confirm({icon: '◀', title: 'Leave this game?', body: 'This board won\'t be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(!G) return; resume(); if(ok) backToMenu(); });
+}
+function endEarly(){ leavePlay(); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); clearInterval(timerId); G = null; hideResult(); renderLevels(); showScreen('menu'); }
+function pauseGame(){ if(G && !G.paused){ G.paused = true; G.pausedAt = performance.now(); } }
+function resume(){ if(G && G.paused && !G.over){ G.pausedTotal += performance.now() - G.pausedAt; G.paused = false; } }
+
+// 💀 Hardcore: the run ends — show the card you had already seen, then a gentle result card (a lost run is not saved).
+function hardcoreLose(a, b, partner){ cheerEnd(null); /* 📣 cs-3b */
+  G.over = true; clearInterval(timerId); hud();
+  setTimeout(() => {
+    if(!G) return; a.el.classList.add('miss'); b.el.classList.add('miss'); UISound.play('error');
+    if(partner && !partner.done){ partner.up = true; paint(partner); partner.el.classList.add('forgot'); }
+    showBanner('💀 You had already seen that card!', 'bad'); say('Oh no! You had seen that one.');
+  }, 300);
+  const thisGame = G, P = G.players[0];
+  setTimeout(() => {
+    if(G !== thisGame) return;
+    showResult('<div class="big">💀</div><h2>Hardcore over!</h2><p style="margin:-4px 0 0;font-weight:800;color:var(--ink-soft)">You found ' + G.found + ' of ' + G.pairs + ' pairs — the glowing card was one you had already seen.</p>' +
+      '<div class="stats"><span>🃏 ' + G.found + ' pairs</span><span>⏱ ' + fmt(elapsed()) + '</span><span>🔥 best streak ' + P.best + '</span></div>' +
+      '<div class="tip" style="text-align:left">💡 Say the pictures out loud as you flip them — it helps you remember where they are.</div>' +
+      '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Try again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🎚️ Levels</button></div>');
+    $('b-again').onclick = () => startGame(G.lvl); $('b-menu').onclick = () => backToMenu();
+  }, 2200);
+}
+
+/* ================= END + SAVE ================= */
+function starsFor(p, pairs){ return p.miss <= Math.ceil(pairs * 0.5) ? 3 : p.miss <= pairs * 1.2 ? 2 : 1; }
+function finishGame(){
+  if(!G || G.over) return;
+  G.over = true; clearInterval(timerId); hud();
+  const thisGame = G, L = G.L, secs = Math.max(1, Math.round(elapsed() / 1000)), solo = G.players.length === 1, par = G.pairs * 6;
+  const top = Math.max.apply(null, G.players.map(p => p.pairs)), winners = G.players.filter(p => p.pairs === top); cheerEnd(winners); /* 📣 cs-3b */
+  G.players.forEach((p, i) => {
+    if(solo) p.score += Math.max(0, par - secs) * 5 + (p.miss === 0 ? 300 : 0);
+    if(solo && L.hardcore) p.score *= 3;   // 💀 Hardcore ×3
+    const win = solo || winners.includes(p), stars = win ? starsFor(p, G.pairs) : 0;
+    p.stars = stars; p.win = win;
+    const d = $('pl-' + i); if(d) d.classList.toggle('win', win && !solo); cheer(i, win ? pick(['dance', 'floss', 'disco', 'cheer']) : 'clap', 3);
+    saveWin(p.name, G.lvl, {timeSec: secs, stars, score: p.score, theme: deck, cleared: win, stats: {pairs: p.pairs, bestStreak: p.best, perfect: solo && p.miss === 0 ? 1 : 0, wins: !solo && win ? 1 : 0}}, i);
+  });
+  UISound.play('success'); confetti(['🃏', '⭐', '🎉', G.D.icon], 40);
+  say(solo ? 'All pairs found!' : (winners.length > 1 ? 'It\'s a tie!' : winners[0].name + ' wins!'));
+  setTimeout(() => {
+    if(G !== thisGame) return;
+    const me = G.players[0], miss = G.players.reduce((s, p) => s + p.miss, 0);
+    const head = solo ? '<div class="big">🏆</div><h2 class="cheer">All ' + G.pairs + ' pairs!</h2>' : '<div class="big">' + (winners.length > 1 ? '🤝' : '👑') + '</div><h2 class="cheer">' + (winners.length > 1 ? 'A tie!' : UI.esc(winners[0].name) + ' wins!') + '</h2>';
+    const body = solo ? '<div class="rating">' + [0, 1, 2].map(k => '<span class="st' + (k < me.stars ? '' : ' off') + '" style="animation-delay:' + (0.25 + k * 0.25) + 's">⭐</span>').join('') + '</div><div class="score-big">🏆 <span id="score-count">0</span></div>' +
+        '<div class="stats"><span>⏱ ' + fmt(secs * 1000) + '</span><span>❌ ' + me.miss + ' misses</span><span>🔥 best streak ' + me.best + '</span>' + (me.miss === 0 ? '<span>💯 perfect!</span>' : '') + (G.swaps ? '<span>🔀 ' + G.swaps + ' swaps</span>' : '') + '</div>'
+      : '<div class="podium">' + G.players.slice().sort((a, b) => b.pairs - a.pairs || b.score - a.score).map((p, i) => '<div style="border-left:6px solid ' + p.col + '">' + (p.win ? '👑' : ['🥈', '🥉', '🎈'][Math.min(2, i - 1)] || '🎈') + ' ' + UI.esc(p.name) + '<b>' + p.pairs + ' pairs · ' + p.score + '</b></div>').join('') + '</div><div class="stats"><span>⏱ ' + fmt(secs * 1000) + '</span><span>❌ ' + miss + ' misses</span></div>';
+    showResult(head + body + '<div class="save-note" id="save-note"><span class="ui-spin a-pop">✅</span> Saving…</div>' +
+      '<div class="res-btns">' + (me.win && G.lvl < 5 && solo ? '<button class="btn sp-btn sp-primary" id="b-next">' + (G.lvl === 4 ? 'Try 💀 Hardcore ▶' : 'Next level ▶') + '</button>' : '') + '<button class="btn sp-btn ' + (me.win && G.lvl < 5 && solo ? 'soft sp-secondary' : 'sp-primary') + '" id="b-again">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🎚️ Levels</button></div>');
+    if(solo) countUp($('score-count'), me.score, 1100);
+    const lvl = G.lvl;
+    $('b-again').onclick = () => startGame(lvl);
+    $('b-menu').onclick = () => backToMenu();
+    if($('b-next')) $('b-next').onclick = () => { hideResult(); openSetup(lvl + 1); };
+  }, 1200);
+}
+let bannerTimer = 0;
+function showBanner(text, kind){ const b = $('banner'); b.textContent = text; b.classList.toggle('gold', kind === 'gold'); b.classList.toggle('bad', kind === 'bad'); b.classList.add('on'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('on'), 1900); }
+const PENDING_KEY = 'sp_memory_pending';
+const NOTES = [];
+function readPending(){ try{ return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); }catch(e){ return []; } }
+function writePending(list){ try{ localStorage.setItem(PENDING_KEY, JSON.stringify(list.slice(-20))); }catch(e){} }
+function flushPending(){ const list = readPending(); if(!list.length) return; writePending([]); list.forEach(w => google.script.run.withFailureHandler(() => writePending(readPending().concat([w]))).saveLevelResult(GAME_ID, w.name, w.lvl, w.extra)); }
+function putNote(i, html){ NOTES[i] = html; const put = () => { const n = $('save-note'); if(n) n.innerHTML = NOTES.filter(Boolean).join('<br>'); return !!n; }; if(!put()) setTimeout(put, 1500); }
+function saveWin(name, lvlIdx, extra, seat, tries){
+  tries = tries || 0; if(seat === 0) NOTES.length = 0;
+  const p = S.progress[name] || (S.progress[name] = {unlocked: 0, tokens: [], best: []});
+  const who = G && G.players.length > 1 ? UI.esc(name) + ': ' : '';
+  google.script.run.withSuccessHandler(res => {
+      const best = (p.best || [null, null, null, null, null]).slice(); if(res.best) best[lvlIdx] = res.best;
+      S.progress[name] = {unlocked: res.unlocked, tokens: res.tokens, best}; flushPending(); putNote(seat, who + saveText(res));
+    }).withFailureHandler(err => {
+      if(tries < 1){ setTimeout(() => saveWin(name, lvlIdx, extra, seat, tries + 1), 1200); return; }
+      writePending(readPending().concat([{name, lvl: lvlIdx, extra}])); putNote(seat, who + '⚠️ Could not save yet — it will be sent again next time.');
+    }).saveLevelResult(GAME_ID, name, lvlIdx, extra);
+}
+function saveText(res){
+  let h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New high score!' : res.best && res.best.score ? 'Best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Saved';
+  const fe = res.feats; if(fe){ (fe.newTitles || []).forEach(t => { h += '<br><span class="title-new">🏷️ New title: ' + t.icon + ' ' + UI.esc(t.name) + '</span>'; }); (fe.newBadges || []).forEach(b => { h += '<br><span class="feat-new">' + b.medal + ' ' + b.icon + ' ' + UI.esc(b.name) + ' · ' + b.tierName + '</span>'; }); }
+  return h;
+}
+function countUp(el, to, ms){ if(!el) return; const t0 = performance.now(); (function tick(now){ const p = Math.max(0, Math.min(1, (now - t0) / ms)); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))).toLocaleString(); if(p < 1) requestAnimationFrame(tick); })(t0); }
+/* 📣 CHEERSQUAD (cs-3b) START — the crowd beside the board (CheerSquad.html, 📣 Cheer chat; same method as Chess / Checkers). Don't remove: the Cheer chat re-applies it. */
+function cheerTaken(){ return Array.from(document.querySelectorAll('#gbar, #board, #side, #turncard, #peek:not(.hidden), .top-btn')); }
+function cheerMount(){
+  if(!window.Cheer || !G) return; Cheer.unmount(); const box = $('scr-play');
+  Cheer.mount(box, {game: 'memory', players: G.players.map((p, i) => ({name: p.name, side: i, human: true})).concat(G.players.length < 2 ? [{name: 'Shuffles', side: 1, human: false}] : []), me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'overlay',
+    zones: () => Cheer.freeZones(box, cheerTaken), avoid: cheerTaken,
+    clear: b => { const B = box.getBoundingClientRect(), F = $('board').getBoundingClientRect(), l = F.left - B.left, t = F.top - B.top; return !(b.r > l - 3 && b.l < l + F.width + 3 && b.b > t - 3 && b.t < t + F.height + 3); }});
+}
+function cheerGo(){ if(!window.Cheer || !Cheer.active() || !G) return; Cheer.hush(false); Cheer.react('start', {side: 0}); }
+function cheerSay(kind, i){ if(!window.Cheer || !Cheer.active() || !G) return; Cheer.react(kind, {side: i}); }
+function cheerEnd(winners){ if(!window.Cheer || !Cheer.active() || !G) return; Cheer.hush(false);
+  if(!winners) return Cheer.react('lose', {side: G.turn});   /* 💀 hardcore: a card you'd seen */
+  if(winners.length !== 1) return Cheer.react('goal', {side: -1});   /* a tie: everyone claps */
+  Cheer.react('win', {side: G.players.indexOf(winners[0])}); }
+function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  const at = card.querySelector('.res-btns'); if(!at) return; card.insertBefore(c, at); card.insertBefore(cap, at); }, 900); }
+/* 📣 CHEERSQUAD END */
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-3b */ }
+function hideResult(){ $('result').classList.add('hidden'); }
+function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pick(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
+function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
+function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }   // 🧭 p1b: ◀ = where you came from (Gameroom if we don't know)
+
+/* ================= BOOT ================= */
+function boot(){
+  UI.loading('memory');
+  google.script.run.withSuccessHandler(d => {
+      UI.loaded();
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {};
+      UISound.applySettings(S.settings);
+      const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
+      lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
+      flushPending();
+      if(CURRENT_PLAYER && S.players.some(p => p.Name === CURRENT_PLAYER)) choosePlayer(CURRENT_PLAYER); else { renderPlayers(); showScreen('player'); }
+    }).withFailureHandler(() => { UI.loaded(); UI.toast('Could not load players — check the connection', 'err'); renderPlayers(); showScreen('player'); })
+    .getLevelGameData(GAME_ID, CURRENT_PLAYER);
+}
+boot();
+/* ✨ MODE SPOTLIGHT (modes-3): ?mode=<id> opens this game straight in that mode after the player pick · "✨ Also try" on the start page · started modes → UI.modeTried */
+const MS_GAME = 'memory';
+function msOpen(id){
+  if(id !== 'friends') return; MS_WANT = id; UI.toast('👥 Pick a level — then tap your friends to add them');
+}
+function msNow(){ return ''; }
+function msWrap(fn, idOf){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ try{ const id = idOf.apply(this, arguments); if(id && UI.modeTried) UI.modeTried(S.player || CURRENT_PLAYER, MS_GAME, id); }catch(e){} return f.apply(this, arguments); }; }
+function msAfter(fn, after){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ const r = f.apply(this, arguments); try{ after.apply(this, arguments); }catch(e){} return r; }; }
+let MS_WANT = '';
+msAfter('openSetup', () => { if(!MS_WANT) return; MS_WANT = ''; const b = document.getElementById('seat-list'); if(b && !b.querySelector('.hc-note')) UI.modePoint(b); });
+msWrap('startGame', () => SEATS.length > 1 ? 'friends' : '');
+msAfter('choosePlayer', name => {
+  if(!window.UI || !UI.modeLink) return;
+  const id = UI.modeLink(MODE_LINK); if(id) msOpen(id);
+  UI.alsoTry({game: MS_GAME, player: name, current: msNow, at: () => document.querySelector('#scr-menu .title'), open: msOpen});
+});
+/* ✨ END MODE SPOTLIGHT */

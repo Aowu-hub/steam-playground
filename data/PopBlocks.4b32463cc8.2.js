@@ -1,0 +1,612 @@
+
+const WEBAPP_URL = SP_TV[0];
+const CURRENT_PLAYER = SP_TV[1]; window.SP_PAGE = SP_TV[2];
+UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});   // loader + menus in the player's look before the server answers
+const SESSION_START = Number(SP_TV[3]) || null;
+const DURATION_MIN = Number(SP_TV[4]) || null;
+const GAME_ID = 'pop-blocks';
+// 🎛️ p1b: the shared top bar (UiKit UI.gameBar) — ◀ where you came from · 🎚️ Levels · 🏠 | 🫧 Pop Blocks · level | scoreboard | game buttons ❓ ⚙️
+const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '🫧', name: 'Pop Blocks', levelId: 'hud-level',
+  levels: () => leavePlay(), playing: () => !!(G && !G.over), onLeave: () => { try{ clearInterval(timerId); }catch(e){} try{ speechSynthesis.cancel(); }catch(e){} },
+  pause: {pause: () => { if(typeof pauseGame === 'function') pauseGame(); }, resume: () => { if(typeof resume === 'function') resume(); }},
+  onFit: () => { if(G && typeof layout === 'function') layout(); },
+  extras: [{id: 'undo-btn', icon: '↶', label: 'Undo (U)', onClick: () => undo(), keep: true},
+    {id: 'done-btn', icon: '🏁', label: 'Finish now', onClick: () => finishEarly(), keep: true, hidden: true, cls: 'done-btn'},
+    {id: 'voice-btn', icon: '🔈', label: 'Voice', onClick: () => toggleVoice()}]});
+function paintVoice(){ BAR.extra('voice-btn', {icon: voiceOn ? '🔊' : '🔈', label: voiceOn ? 'Voice: on' : 'Voice: off'}); }
+var NAV_INNER = {};   // 🧭 inner screens: their top button goes to the main screen
+UI.navBar(document.getElementById('back-btn'), {onclick: false});
+const $ = id => document.getElementById(id);
+const pick = a => a[rnd(a.length)];
+const randInt = (a, b) => a + rnd(b - a + 1);
+function fmt(ms){ const s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+let voiceOn = true;
+function say(text){ try{ if(!voiceOn || !UISound.get().enabled || !window.speechSynthesis) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 1; u.pitch = 1.25; u.volume = Math.max(0.2, UISound.get().volume); speechSynthesis.speak(u); }catch(e){} }
+function shuffle(a){ for(let i = a.length - 1; i > 0; i--){ const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+/* ================= LEVELS · THEMES ================= */
+// w × h board, K kinds, minG = smallest group, cluster = chance a block copies a neighbour (bigger groups for little ones),
+// ice / crates / locks / chicks / coins = special blocks, missions = how many mission ticks, factor = target vs the
+// computer's own greedy play on THIS board (so every board is winnable), limit = move limit (Hardcore).
+const LEVELS = [
+  {name: 'Basic', emoji: '🌱', w: 6, h: 6, K: 3, minG: 2, cluster: 0.38, ice: 0, crates: 0, locks: 0, chicks: 0, coins: 3, missions: 1, mtypes: ['pop'], factor: 0.45, undo: true, preview: true, blurb: '6 × 6 · 3 kinds · ↶ undo'},
+  {name: 'Junior', emoji: '🐣', w: 7, h: 7, K: 3, minG: 2, cluster: 0.32, ice: 0, crates: 0, locks: 0, chicks: 2, coins: 4, missions: 1, mtypes: ['pop', 'chick'], factor: 0.5, undo: true, preview: true, blurb: '7 × 7 · 3 kinds · bring 🐣 down'},
+  {name: 'Intermediate', emoji: '🔦', w: 8, h: 8, K: 4, minG: 2, cluster: 0.26, ice: 6, crates: 0, locks: 0, chicks: 2, coins: 5, missions: 2, mtypes: ['pop', 'ice', 'chick'], factor: 0.55, preview: true, blurb: '8 × 8 · 4 kinds · 🧊 ice'},
+  {name: 'Hard', emoji: '⚡', w: 10, h: 10, K: 4, minG: 2, cluster: 0.2, ice: 10, crates: 6, locks: 0, chicks: 2, coins: 6, missions: 2, mtypes: ['pop', 'ice', 'crate', 'chick', 'power'], factor: 0.6, preview: true, blurb: '10 × 10 · 4 kinds · 📦 crates'},
+  {name: 'Extreme', emoji: '🌋', w: 12, h: 12, K: 5, minG: 2, cluster: 0.15, ice: 14, crates: 8, locks: 6, chicks: 3, coins: 6, missions: 3, mtypes: ['pop', 'ice', 'crate', 'lock', 'chick', 'power'], factor: 0.65, blurb: '12 × 12 · 5 kinds · 🔒 locks'},
+  {name: 'Hardcore', emoji: '💀', w: 12, h: 12, K: 6, minG: 3, cluster: 0.12, ice: 14, crates: 10, locks: 8, chicks: 3, coins: 6, missions: 3, mtypes: ['pop', 'ice', 'crate', 'lock', 'chick', 'power'], factor: 0.7, limit: true, hardcore: true, blurb: '6 kinds · groups of 3+ · move limit · ×3'}
+];
+// Each theme: 6 kinds (emoji + colour) and how they react when popped.
+const THEMES = {
+  colors:   {name: 'Colour blocks', icon: '🟥', syms: ['●', '▲', '■', '◆', '★', '♥'], col: ['#FF5A5F', '#FFC845', '#4CB963', '#3D8BFD', '#A06CF5', '#FF8A3D'], bg: ['#2B2368', '#5B3BD8'], fx: 'burst', plain: true},
+  animals:  {name: 'Animals', icon: '🐶', syms: ['🐶', '🐱', '🐸', '🐵', '🐷', '🐼'], col: ['#F6B26B', '#FFD966', '#93C47D', '#C9A27E', '#F4A6C1', '#B4C7E7'], bg: ['#1E5E3A', '#4CB963'], fx: 'hop', say: 'Yippee!'},
+  dino:     {name: 'Dino', icon: '🦖', syms: ['🦖', '🦕', '🦎', '🐊', '🐢', '🥚'], col: ['#7BC67E', '#5FB3B3', '#E8C547', '#E07A5F', '#B39DDB', '#F2E3C6'], bg: ['#3E2A14', '#B5651D'], fx: 'roar', say: 'Rawr!'},
+  monsters: {name: 'Alien × Monster', icon: '👽', syms: ['👽', '👾', '🤖', '👻', '👹', '🐙'], col: ['#7CF29A', '#C58CFF', '#9FB6CD', '#E8F1FF', '#FF7B7B', '#FF9ED2'], bg: ['#120C2E', '#3B1F7A'], fx: 'beam', say: 'Beam me up!'},
+  vehicles: {name: 'Vehicles', icon: '🚗', syms: ['🚗', '🚌', '🚒', '🚜', '🚑', '🚲'], col: ['#FF6B6B', '#FFD24C', '#FF8F5A', '#8BCB5E', '#9EC9FF', '#C9B6FF'], bg: ['#2C3E50', '#5D6D7E'], fx: 'zoom', say: 'Beep beep!'},
+  space:    {name: 'Spacecraft', icon: '🚀', syms: ['🚀', '🛸', '🛰️', '🪐', '🌙', '☄️'], col: ['#9EC9FF', '#B9F3C9', '#D7D2FF', '#FFC48C', '#FFF2A8', '#FF9EB5'], bg: ['#05061A', '#1E2A78'], fx: 'launch', say: 'Blast off!'}
+};
+const THEME_KEYS = Object.keys(THEMES);
+const AGE_START = {'4-5': 0, '6-7': 1, '8-9': 2, '10+': 3};
+const PRAISE = ['Pop star', 'Block buster', 'Super popper', 'Brilliant', 'Amazing'];
+const TIPS = [
+  'Tip: pop the small groups first — then the big groups join together for huge points.',
+  'Tip: power blocks are best saved for big crowds of blocks.',
+  'Tip: look at the bottom rows — popping there moves the most blocks.',
+  'Tip: chicks 🐣 only come down when the blocks under them are gone.'
+];
+const MISSION_INFO = {
+  pop:   k => ({icon: k, text: 'Pop'}),
+  ice:   () => ({icon: '🧊', text: 'Break ice'}),
+  crate: () => ({icon: '📦', text: 'Smash crates'}),
+  lock:  () => ({icon: '🔒', text: 'Open locks'}),
+  chick: () => ({icon: '🐣', text: 'Bring chicks down'}),
+  power: () => ({icon: '💥', text: 'Make power blocks'})
+};
+
+let S = {players: [], progress: {}, settings: {}, avatars: {}, player: '', age: ''};
+let G = null, theme = 'colors', timerId = 0, lockHandle = null;
+window.feedbackContext = () => ({page: 'Pop Blocks', game: GAME_ID, level: G ? LEVELS[G.lvl].name + ' · ' + THEMES[G.theme].name : ''});
+function prefKey(){ return 'sp_popblocks_prefs:' + S.player; }
+function loadPrefs(){ try{ const p = JSON.parse(localStorage.getItem(prefKey()) || '{}'); if(THEMES[p.theme]) theme = p.theme; if(p.voice === false) voiceOn = false; }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(prefKey(), JSON.stringify({theme, voice: voiceOn})); }catch(e){} }
+function myAvatar(name){ return (S.avatars && S.avatars[name]) || defaultAvatar(name); }
+
+/* ================= ENGINE (pure: used by the game AND by the computer that sets each board's target) ================= */
+// Board B = {w, h, c: [cell | null]} — index = y * w + x, y = 0 is the top.
+// cell = {id, t: 'n' (normal) | 'crate' | 'chick', k: kind, sp: '' | 'rh' | 'rv' | 'bomb' | 'rain', ice: 0..2, lock: 0|1, coin: bool}
+let NEXT_ID = 1;
+function cellN(k){ return {id: NEXT_ID++, t: 'n', k, sp: '', ice: 0, lock: 0, coin: false}; }
+function cloneB(B){ return {w: B.w, h: B.h, c: B.c.map(x => x ? Object.assign({}, x) : null)}; }
+function makeBoard(L){
+  const w = L.w, h = L.h, B = {w, h, c: new Array(w * h).fill(null)};
+  for(let y = 0; y < h; y++) for(let x = 0; x < w; x++){
+    let k = rnd(L.K);
+    if(Math.random() < L.cluster){ const nb = []; if(x > 0) nb.push(B.c[y * w + x - 1]); if(y > 0) nb.push(B.c[(y - 1) * w + x]); const n = nb.filter(Boolean); if(n.length) k = pick(n).k; }
+    B.c[y * w + x] = cellN(k);
+  }
+  const free = () => { const opts = []; B.c.forEach((c, i) => { if(c && c.t === 'n' && !c.ice && !c.lock && !c.coin && i >= w * 2) opts.push(i); }); return opts; };
+  // chicks start in the top row, crates / ice / locks lower down
+  shuffle([...Array(w).keys()]).slice(0, L.chicks).forEach(x => { B.c[x] = {id: NEXT_ID++, t: 'chick', k: -1, sp: '', ice: 0, lock: 0, coin: false}; });
+  shuffle(free()).slice(0, L.crates).forEach(i => { B.c[i] = {id: NEXT_ID++, t: 'crate', k: -1, sp: '', ice: 0, lock: 0, coin: false}; });
+  shuffle(free()).slice(0, L.ice).forEach((i, n) => { B.c[i].ice = L.hardcore || L.w >= 12 ? (n % 3 === 0 ? 2 : 1) : 1; });
+  shuffle(free()).slice(0, L.locks).forEach(i => { B.c[i].lock = 1; });
+  shuffle(free()).slice(0, L.coins).forEach(i => { B.c[i].coin = true; });
+  return B;
+}
+const tappable = c => c && c.t === 'n' && !c.ice && !c.lock;
+function groupOf(B, i){
+  const c = B.c[i]; if(!tappable(c) || c.sp) return [];
+  const w = B.w, h = B.h, seen = new Set([i]), q = [i];
+  while(q.length){ const j = q.pop(), x = j % w, y = (j / w) | 0;
+    [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]].forEach(([a, b]) => { if(a < 0 || b < 0 || a >= w || b >= h) return; const n = b * w + a, d = B.c[n]; if(!seen.has(n) && tappable(d) && !d.sp && d.k === c.k){ seen.add(n); q.push(n); } }); }
+  return [...seen];
+}
+function canTap(B, i, minG){ const c = B.c[i]; if(!tappable(c)) return false; if(c.sp) return true; return groupOf(B, i).length >= minG; }
+function anyMove(B, minG){ for(let i = 0; i < B.c.length; i++) if(canTap(B, i, minG)) return true; return false; }
+function neighbours(B, i){ const w = B.w, x = i % w, y = (i / w) | 0, out = []; if(x > 0) out.push(i - 1); if(x < w - 1) out.push(i + 1); if(y > 0) out.push(i - w); if(y < B.h - 1) out.push(i + w); return out; }
+function powerFor(n){ return n >= 10 ? 'rain' : n >= 7 ? 'bomb' : n >= 5 ? (Math.random() < 0.5 ? 'rh' : 'rv') : ''; }
+// One tap. Returns what happened (for score, missions and the pictures). Mutates B.
+function doMove(B, i, minG){
+  const ev = {popped: [], blasted: [], ice: 0, crates: 0, locks: 0, chicks: 0, coins: 0, made: '', fired: [], kinds: {}, group: 0, pts: 0, tapped: i};
+  const c = B.c[i]; if(!canTap(B, i, minG)) return null;
+  const hitCell = (j, byBlast) => {   // a pop next to it (or a blast on it) hits ice / crates / locks
+    const d = B.c[j]; if(!d) return;
+    if(d.t === 'crate'){ B.c[j] = null; ev.crates++; ev.blasted.push({i: j, c: d}); return; }
+    if(d.t !== 'n') return;
+    if(d.ice){ d.ice--; ev.ice++; return; }
+    if(d.lock){ d.lock = 0; ev.locks++; return; }
+  };
+  const removeCell = (j, list) => { const d = B.c[j]; if(!d || d.t !== 'n') return; B.c[j] = null; list.push({i: j, c: d}); ev.kinds[d.k] = (ev.kinds[d.k] || 0) + 1; if(d.coin) ev.coins++; };
+  if(c.sp){
+    // fire it (and a touching power block = super blast)
+    const partner = neighbours(B, i).find(j => B.c[j] && B.c[j].t === 'n' && B.c[j].sp && !B.c[j].ice && !B.c[j].lock);
+    const queue = [[i, c.sp, partner != null ? B.c[partner].sp : '']];
+    if(partner != null) B.c[partner] = null;
+    const fired = new Set();
+    while(queue.length){
+      const [at, sp, combo] = queue.shift(); if(fired.has(at + ':' + sp)) continue; fired.add(at + ':' + sp);
+      const w = B.w, h = B.h, ax = at % w, ay = (at / w) | 0, area = new Set();
+      const add = (x, y) => { if(x >= 0 && y >= 0 && x < w && y < h) area.add(y * w + x); };
+      const kinds = combo ? [sp, combo] : [sp];
+      if(kinds.includes('rain')){
+        // rainbow: every block of the most common kind (with a partner: the two most common kinds)
+        const cnt = {}; B.c.forEach(d => { if(d && d.t === 'n' && !d.sp) cnt[d.k] = (cnt[d.k] || 0) + 1; });
+        const top = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]).slice(0, combo ? 2 : 1).map(Number);
+        B.c.forEach((d, j) => { if(d && d.t === 'n' && top.includes(d.k)) area.add(j); });
+      } else if(kinds.length === 2 && kinds.every(k => k === 'bomb')){ for(let dy = -2; dy <= 2; dy++) for(let dx = -2; dx <= 2; dx++) add(ax + dx, ay + dy); }
+      else if(kinds.length === 2 && kinds.includes('bomb')){ for(let d = -1; d <= 1; d++){ for(let x = 0; x < w; x++) add(x, ay + d); for(let y = 0; y < h; y++) add(ax + d, y); } }
+      else if(kinds.length === 2){ for(let x = 0; x < w; x++) add(x, ay); for(let y = 0; y < h; y++) add(ax, y); }
+      else if(sp === 'bomb'){ for(let dy = -1; dy <= 1; dy++) for(let dx = -1; dx <= 1; dx++) add(ax + dx, ay + dy); }
+      else if(sp === 'rh'){ for(let x = 0; x < w; x++) add(x, ay); }
+      else { for(let y = 0; y < h; y++) add(ax, y); }
+      ev.fired.push(sp + (combo ? '+' + combo : ''));
+      area.add(at);
+      area.forEach(j => {
+        const d = B.c[j]; if(!d) return;
+        if(j !== at && d.t === 'n' && d.sp && !d.ice && !d.lock){ queue.push([j, d.sp, '']); }   // chain reaction
+        if(d.t === 'crate' || (d.t === 'n' && (d.ice || d.lock))){ hitCell(j, true); return; }
+        removeCell(j, ev.blasted);
+      });
+    }
+    ev.pts = ev.blasted.length * 15;
+  } else {
+    const g = groupOf(B, i); ev.group = g.length;
+    const hit = new Set(); g.forEach(j => neighbours(B, j).forEach(n => { if(!g.includes(n)) hit.add(n); }));
+    g.forEach(j => removeCell(j, ev.popped));
+    hit.forEach(j => hitCell(j, false));
+    ev.pts = g.length * g.length * 5;
+    const sp = powerFor(g.length);
+    if(sp){ const n = cellN(c.k); n.sp = sp; B.c[i] = n; ev.made = sp; }
+  }
+  ev.pts += ev.crates * 30 + ev.ice * 10 + ev.locks * 20 + ev.coins * 50;
+  settle(B, ev);
+  return ev;
+}
+// Gravity (locked blocks stay put), empty columns slide left, chicks in the bottom row are rescued.
+function settle(B, ev){
+  const w = B.w, h = B.h;
+  for(let round = 0; round < 4; round++){
+    for(let x = 0; x < w; x++){
+      let floor = h - 1;
+      for(let y = h - 1; y >= 0; y--){
+        const d = B.c[y * w + x]; if(!d) continue;
+        if(d.lock){ floor = y - 1; continue; }
+        if(y !== floor){ B.c[floor * w + x] = d; B.c[y * w + x] = null; }
+        floor--;
+      }
+    }
+    const cols = []; for(let x = 0; x < w; x++){ const col = []; let any = false; for(let y = 0; y < h; y++){ col.push(B.c[y * w + x]); if(B.c[y * w + x]) any = true; } if(any) cols.push(col); }
+    for(let x = 0; x < w; x++) for(let y = 0; y < h; y++) B.c[y * w + x] = cols[x] ? cols[x][y] : null;
+    let saved = 0; for(let x = 0; x < w; x++){ const j = (h - 1) * w + x, d = B.c[j]; if(d && d.t === 'chick'){ B.c[j] = null; saved++; if(ev) ev.chicks++; } }
+    if(ev) ev.pts += saved * 100;
+    if(!saved) break;
+  }
+}
+function boardEmpty(B){ return B.c.every(d => !d || d.t === 'crate'); }
+// The computer plays the board: fire power blocks first, otherwise pop the biggest group (ties at random).
+function simulate(B0, L, maxMoves){
+  const B = cloneB(B0), tot = {pts: 0, moves: 0, kinds: {}, ice: 0, crates: 0, locks: 0, chicks: 0, power: 0};
+  while(tot.moves < (maxMoves || 400)){
+    let best = -1, bestN = 0;
+    for(let i = 0; i < B.c.length; i++){ const c = B.c[i]; if(!tappable(c)) continue; if(c.sp){ best = i; bestN = 99; break; }
+      const n = groupOf(B, i).length; if(n >= L.minG && (n > bestN || (n === bestN && Math.random() < 0.3))){ best = i; bestN = n; } }
+    if(best < 0) break;
+    const ev = doMove(B, best, L.minG); if(!ev) break;
+    tot.moves++; tot.pts += ev.pts; Object.keys(ev.kinds).forEach(k => { tot.kinds[k] = (tot.kinds[k] || 0) + ev.kinds[k]; });
+    tot.ice += ev.ice; tot.crates += ev.crates; tot.locks += ev.locks; tot.chicks += ev.chicks; if(ev.made) tot.power++;
+  }
+  if(boardEmpty(B)) tot.pts += 1000;
+  return tot;
+}
+// A new round: board + target + missions, all checked against the computer's play on this very board.
+function makeRound(lvl){
+  const L = LEVELS[lvl];
+  for(let tries = 0; tries < 40; tries++){
+    const B = makeBoard(L);
+    if(!anyMove(B, L.minG)) continue;
+    const runs = [simulate(B, L), simulate(B, L), simulate(B, L)].sort((a, b) => a.pts - b.pts), sim = runs[1];
+    if(sim.moves < Math.min(8, L.w)) continue;
+    const f = L.factor, missions = [];
+    const types = shuffle(L.mtypes.slice());
+    for(const t of types){
+      if(missions.length >= L.missions) break;
+      if(t === 'pop'){ const ks = Object.keys(sim.kinds).filter(k => sim.kinds[k] >= 6); if(!ks.length) continue; const k = Number(pick(ks)); missions.push({type: 'pop', k, need: Math.max(5, Math.round(sim.kinds[k] * f)), got: 0}); }
+      else { const v = sim[t]; if(!v || v < 1) continue; missions.push({type: t, need: Math.max(1, Math.round(v * (t === 'chick' ? 1 : f))), got: 0}); }
+    }
+    if(!missions.length) continue;
+    const target = Math.max(100, Math.round(sim.pts * f / 10) * 10);
+    return {B, target, missions, limit: L.limit ? sim.moves + 2 : 0, sim};
+  }
+  return null;
+}
+
+/* ================= MENUS ================= */
+function showScreen(name){
+  ['player', 'menu', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
+  $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   // 🧭 p1b window.scrollTo(0, 0);
+}
+function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
+function canPlay(i){ const p = progressOf(S.player); if(i === 5) return p.unlocked >= 5; if(i === 4) return p.unlocked >= 4; return i <= Math.max(p.unlocked, AGE_START[S.age] || 0); }
+function renderPlayers(){
+  const box = $('player-list'); box.innerHTML = '';
+  if(!S.players.length){ box.innerHTML = '<div class="empty">No players yet — add one on the Dashboard first.</div>'; return; }
+  S.players.forEach(p => { const b = document.createElement('button'); b.className = 'pick'; b.setAttribute('data-sound', 'pop');
+    const c = document.createElement('canvas'); c.width = 144; c.height = 168; b.appendChild(c);
+    b.insertAdjacentHTML('beforeend', '<div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age ? p.Age + ' yrs' : '') + '</div>');
+    try { drawPreviewCanvas(c, myAvatar(p.Name), {name: p.Name, t: 1}); } catch(e){}
+    b.onclick = () => choosePlayer(p.Name); box.appendChild(b); });
+}
+function choosePlayer(name){
+  UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
+  const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
+  loadPrefs(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4a */ renderMenu(); showScreen('menu');
+}
+function changePlayer(){ renderPlayers(); showScreen('player'); }
+
+// Theme row: built once per menu visit, a tap only moves the highlight (no page jump).
+function renderMenu(){
+  $('theme-list').innerHTML = THEME_KEYS.map(k => '<button class="chip' + (k === theme ? ' on' : '') + '" data-sound="pop" data-theme-key="' + k + '"><span class="ic">' + THEMES[k].syms.slice(0, 4).join('') + '</span>' + THEMES[k].name + '</button>').join('');
+  $('theme-list').querySelectorAll('[data-theme-key]').forEach(b => b.onclick = () => { theme = b.dataset.themeKey; savePrefs(); $('theme-list').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); });
+  renderLevels();
+}
+
+function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">No score yet</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span>' + (b.timeSec ? '<span>⏱ ' + fmt(b.timeSec * 1000) + '</span>' : '') + '<span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
+
+function renderLevels(){
+  const box = $('level-list'); box.innerHTML = ''; if(window.UI && UI.leaders) UI.leaders($('leaders'), GAME_ID, S.player);
+  const p = progressOf(S.player), rec = AGE_START[S.age], T = THEMES[theme];
+  LEVELS.forEach((L, i) => {
+    const open = canPlay(i), done = p.unlocked > i, b = document.createElement('button');
+    b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (L.hardcore ? ' hardcore' : ''); b.setAttribute('data-sound', open ? 'pop' : 'none');
+    const dots = Array.from({length: 8}, (_, k) => '<i style="background:' + T.col[k % L.K] + '"></i>').join('');
+    const extras = [L.chicks ? '🐣' : '', L.ice ? '🧊' : '', L.crates ? '📦' : '', L.locks ? '🔒' : ''].join(' ');
+    b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">🏅</span>' : open ? '' : '<span class="badge">🔒</span>') +
+      '<div class="big">' + L.emoji + '</div><div class="nm">' + L.name + '</div><div class="preview-blocks">' + dots + '</div>' +
+      '<div class="learn">' + L.w + ' × ' + L.h + ' · ' + L.K + ' kinds' + (L.minG > 2 ? ' · groups of 3+' : '') + '</div>' +
+      '<div class="lives">🎯 ' + L.missions + ' mission' + (L.missions > 1 ? 's' : '') + (extras.trim() ? ' · ' + extras : '') + (L.undo ? ' · ↶' : '') + (L.limit ? ' · 👆 limit' : '') + '</div>' +
+      '<div class="sub">' + (L.hardcore && !open ? '🔒 Beat Extreme to open 💀 Hardcore' : L.blurb) + '</div>' + bestHtml(p, i);
+    b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore' : i === 4 ? 'Pass Hard to unlock Extreme!' : 'Pass the level before to unlock it'); return; } startGame(i); };
+    box.appendChild(b);
+  });
+}
+
+/* ================= GAME ================= */
+const cv = $('cv'), ctx = cv.getContext('2d');
+let CS = 40, DPR = 1, raf = 0;
+const SPR = {};   // emoji sprites (drawn once per size)
+function sprite(ch, px){
+  const key = ch + '|' + px; if(SPR[key]) return SPR[key];
+  const c = document.createElement('canvas'); c.width = c.height = Math.ceil(px * 1.3); const g = c.getContext('2d');
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#000'; g.font = px + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  g.fillText(ch, c.width / 2, c.height / 2 + px * 0.06); SPR[key] = c; return c;
+}
+function startGame(lvl, round){ setTimeout(cheerMount, 0); /* 📣 cs-4a */
+  hideResult(); cancelAnimationFrame(raf); clearInterval(timerId);
+  const L = LEVELS[lvl], T = THEMES[theme], R = round || makeRound(lvl);
+  if(!R){ UI.toast('Could not make a board — try again', 'err'); return; }
+  G = {lvl, L, theme, B: R.B, target: R.target, missions: R.missions, limit: R.limit, movesLeft: R.limit, moves: 0, score: 0,
+    combo: 0, lastPop: 0, bestCombo: 0, popped: 0, bigGroup: 0, powers: 0, made: 0, hist: [], fx: [], pos: {}, busyUntil: 0, press: null,
+    over: false, wonShown: false, t0: performance.now(), paused: false, pausedAt: 0, pausedTotal: 0, cleared: false, allClear: false};
+  const sp = $('scr-play'); sp.style.setProperty('--t1', T.bg[0]); sp.style.setProperty('--t2', T.bg[1]);
+  BAR.level(L.emoji + ' ' + L.name + ' · ' + T.icon, L.hardcore ? 'hc' : '');
+  $('undo-btn').classList.toggle('hidden', !L.undo); BAR.hide('moves', !G.limit); $('done-btn').classList.add('hidden');
+  paintVoice();
+  renderMissions(); showScreen('play'); layout(); hud();
+  G.B.c.forEach((c, i) => { if(c) G.pos[c.id] = {x: i % G.B.w, y: ((i / G.B.w) | 0) - G.B.h - 1 - Math.random() * 2, s: 1}; });   // blocks drop in
+  raf = requestAnimationFrame(loop);
+  timerId = setInterval(hud, 500);
+  const first = G.missions.map(m => missionText(m)).join(', ');
+  showBanner(L.hardcore ? '💀 Hardcore: groups of 3+, ' + G.limit + ' taps!' : '🎯 ' + G.target.toLocaleString() + ' points · ' + first, L.hardcore ? 'bad' : 'gold');
+  say(L.hardcore ? 'Hardcore! Groups of three or more.' : 'Pop the blocks! ' + first);
+}
+function missionText(m){ const T = THEMES[G.theme]; if(m.type === 'pop') return 'pop ' + m.need + ' ' + (T.plain ? T.syms[m.k] : T.syms[m.k]); return MISSION_INFO[m.type]().text.toLowerCase() + ' ×' + m.need; }
+function renderMissions(){
+  const T = THEMES[G.theme];
+  $('missions').innerHTML = G.missions.map((m, k) => { const inf = m.type === 'pop' ? {icon: T.plain ? '<b style="color:' + T.col[m.k] + '">' + T.syms[m.k] + '</b>' : T.syms[m.k]} : MISSION_INFO[m.type]();
+    return '<span class="mis' + (m.got >= m.need ? ' done' : '') + '" id="mis-' + k + '" title="' + (inf.text || 'Pop') + '"><span class="ic">' + inf.icon + '</span>' + Math.min(m.got, m.need) + '/' + m.need + '</span>'; }).join('');
+}
+function layout(){
+  if(!G) return;
+  const ar = $('arena'), W = ar.clientWidth - 16, H = ar.clientHeight - 14, B = G.B;
+  CS = Math.max(18, Math.floor(Math.min(W / B.w, H / B.h)));
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(CS * B.w * DPR); cv.height = Math.round(CS * B.h * DPR); cv.style.width = CS * B.w + 'px'; cv.style.height = CS * B.h + 'px';
+}
+window.addEventListener('resize', () => { if(G) layout(); });
+function cellAt(ev){ const r = cv.getBoundingClientRect(), x = Math.floor((ev.clientX - r.left) / CS), y = Math.floor((ev.clientY - r.top) / CS); if(x < 0 || y < 0 || x >= G.B.w || y >= G.B.h) return -1; return y * G.B.w + x; }
+// Press = show the group (glow) · release on it = pop.
+cv.addEventListener('pointerdown', e => { if(!G || G.over) return; e.preventDefault(); const i = cellAt(e); if(i < 0) return; G.press = {i, group: G.B.c[i] && G.B.c[i].sp ? [i] : groupOf(G.B, i)}; });
+cv.addEventListener('pointermove', e => { if(!G || !G.press) return; const i = cellAt(e); if(i >= 0 && !G.press.group.includes(i)) G.press = null; });
+cv.addEventListener('pointerup', e => { if(!G || !G.press) return; const p = G.press; G.press = null; const i = cellAt(e); if(i >= 0 && (i === p.i || p.group.includes(i))) tap(p.i); });
+cv.addEventListener('pointercancel', () => { if(G) G.press = null; });
+function tap(i){
+  if(!G || G.over || performance.now() < G.busyUntil) return;
+  const B = G.B, c = B.c[i];
+  if(!c){ return; }
+  if(c.t === 'chick'){ UISound.play('pop'); showBanner('🐣 Clear the blocks under the chick!', ''); return; }
+  if(c.t === 'crate'){ showBanner('📦 Pop blocks next to the crate to smash it', ''); UISound.play('error'); return; }
+  if(c.ice){ showBanner('🧊 Pop blocks next to the ice to break it', ''); UISound.play('error'); return; }
+  if(c.lock){ showBanner('🔒 Pop blocks next to the lock to open it', ''); UISound.play('error'); return; }
+  if(!canTap(B, i, G.L.minG)){ UISound.play('error'); showBanner(G.L.minG > 2 ? 'Groups of 3 or more!' : 'Find 2 or more the same, touching!', 'bad'); return; }
+  if(G.L.undo) G.hist.push({B: cloneB(B), score: G.score, missions: G.missions.map(m => Object.assign({}, m)), popped: G.popped, moves: G.moves, movesLeft: G.movesLeft});
+  if(G.hist.length > 40) G.hist.shift();
+  const before = {}; B.c.forEach((d, j) => { if(d) before[d.id] = j; });
+  const ev = doMove(B, i, G.L.minG); if(!ev) return;
+  applyEvent(ev, before);
+}
+function applyEvent(ev, before){
+  const L = G.L, T = THEMES[G.theme], now = performance.now();
+  G.moves++; if(G.limit) G.movesLeft--;
+  // combo: another pop within 2.5 s
+  G.combo = now - G.lastPop < 2500 ? G.combo + 1 : 0; G.lastPop = now; G.bestCombo = Math.max(G.bestCombo, G.combo);
+  const mult = 1 + Math.min(G.combo, 3) * 0.5;
+  const gained = Math.round(ev.pts * mult);
+  G.score += gained;
+  const n = ev.popped.length + ev.blasted.filter(b => b.c.t === 'n').length; G.popped += n; G.bigGroup = Math.max(G.bigGroup, ev.group); cheerSay(G.combo >= 2 ? 'big' : ev.group >= 6 ? 'goal' : '', G.combo >= 2 ? 'combo' : 'pop'); /* 📣 cs-4a */
+  if(ev.fired.length) G.powers++; if(ev.made) G.made++;
+  // missions
+  G.missions.forEach((m, k) => {
+    const add = m.type === 'pop' ? (ev.kinds[m.k] || 0) : m.type === 'power' ? (ev.made ? 1 : 0) : m.type === 'crate' ? ev.crates : m.type === 'lock' ? ev.locks : m.type === 'ice' ? ev.ice : ev.chicks;
+    if(add && m.got < m.need){ m.got += add; const el = $('mis-' + k); if(el){ el.classList.remove('bump'); void el.offsetWidth; } }
+  });
+  renderMissions();
+  // pictures: pops, blasts, the theme reaction, floating points
+  const all = ev.popped.concat(ev.blasted);
+  all.forEach((p, k) => { const from = before[p.c.id]; if(from == null) return; G.fx.push({type: p.c.t === 'crate' ? 'crate' : T.fx, x: from % G.B.w, y: (from / G.B.w) | 0, k: p.c.k, t0: now + k * (ev.fired.length ? 12 : 22), coin: p.c.coin}); });
+  const tx = ev.tapped % G.B.w, ty = (ev.tapped / G.B.w) | 0;
+  G.fx.push({type: 'text', x: tx, y: ty, text: '+' + gained + (mult > 1 ? ' 🔥×' + mult : ''), t0: now});
+  if(ev.fired.length) G.fx.push({type: 'flash', t0: now, kind: ev.fired[0]});
+  if(T.say && ev.group >= 6 && T.fx === 'roar') G.fx.push({type: 'text', x: tx, y: ty - 1, text: 'RAWR!', t0: now + 120, big: true});
+  if(T.fx === 'zoom' && ev.group >= 4) G.fx.push({type: 'text', x: tx, y: ty - 1, text: 'BEEP!', t0: now + 100, big: true});
+  if(ev.chicks) G.fx.push({type: 'text', x: G.B.w / 2, y: G.B.h - 1, text: '🐣 Saved! +' + ev.chicks * 100, t0: now + 300, big: true});
+  G.busyUntil = now + 260;
+  // sounds + words
+  if(ev.fired.length){ UISound.play('success'); const f = ev.fired[0]; say(f.includes('+') ? 'Super blast!' : f === 'rain' ? 'Rainbow!' : f === 'bomb' ? 'Boom!' : 'Whoosh!'); showBanner(f.includes('+') ? '💥 SUPER BLAST!' : f === 'rain' ? '🌈 Rainbow pop!' : f === 'bomb' ? '💣 BOOM!' : '🚀 Whoosh!', 'gold'); }
+  else if(ev.made){ UISound.play('success'); const nm = ev.made === 'rain' ? '🌈 Rainbow' : ev.made === 'bomb' ? '💣 Bomb' : '🚀 Rocket'; showBanner(nm + ' block made! Tap it to fire', 'gold'); say(nm.slice(3) + '!'); }
+  else UISound.play(ev.group >= 4 ? 'success' : 'pop');
+  if(G.combo >= 2 && !ev.fired.length && !ev.made) showBanner('🔥 Combo ×' + mult + '!', 'gold');
+  if(ev.group >= 8 && T.say && !ev.made) say(T.say);
+  hud();
+  checkEnd();
+}
+function missionsDone(){ return G.missions.every(m => m.got >= m.need); }
+function checkEnd(){
+  const B = G.B;
+  if(!G.wonShown && G.score >= G.target && missionsDone()){ G.wonShown = true; $('done-btn').classList.remove('hidden'); setTimeout(() => { if(G && !G.over){ showBanner('🎯 You did it! Keep popping for more stars — or tap 🏁', 'gold'); say('You did it! Keep popping for more stars!'); } }, 700); }
+  if(boardEmpty(B)){ G.allClear = true; setTimeout(() => finishGame('clear'), 900); return; }
+  if(G.limit && G.movesLeft === 3) cheerSay('close'); /* 📣 cs-4a */
+  if(G.limit && G.movesLeft <= 0){ setTimeout(() => finishGame('moves'), 900); return; }
+  if(!anyMove(B, G.L.minG)) setTimeout(() => finishGame('stuck'), 900);
+}
+function undo(){
+  if(!G || G.over || !G.L.undo || !G.hist.length) return;
+  const h = G.hist.pop(); G.B = h.B; G.score = h.score; G.missions = h.missions; G.popped = h.popped; G.moves = h.moves; G.movesLeft = h.movesLeft; G.combo = 0;
+  G.B.c.forEach((c, i) => { if(c) G.pos[c.id] = {x: i % G.B.w, y: (i / G.B.w) | 0, s: 1}; });
+  if(G.wonShown && !(G.score >= G.target && missionsDone())){ G.wonShown = false; $('done-btn').classList.add('hidden'); }
+  UISound.play('pop'); renderMissions(); hud();
+}
+function finishEarly(){ if(G && !G.over && G.wonShown) finishGame('done'); }
+
+/* ---------- drawing ---------- */
+function rr(g, x, y, w, h, r){ g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+function loop(now){
+  if(!G) return;
+  raf = requestAnimationFrame(loop);
+  const B = G.B, T = THEMES[G.theme], g = ctx, s = CS, w = B.w, h = B.h;
+  g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, s * w, s * h);
+  g.fillStyle = 'rgba(255,255,255,0.08)'; rr(g, 0, 0, s * w, s * h, 14); g.fill();
+  const glow = G.press && G.press.group.length >= (G.B.c[G.press.i] && G.B.c[G.press.i].sp ? 1 : G.L.minG) && G.L.preview ? new Set(G.press.group) : null;
+  const live = new Set();
+  for(let i = 0; i < B.c.length; i++){
+    const c = B.c[i]; if(!c) continue; live.add(c.id);
+    const tx = i % w, ty = (i / w) | 0, p = G.pos[c.id] || (G.pos[c.id] = {x: tx, y: ty - 1, s: 0.2});
+    p.x += (tx - p.x) * 0.3; p.y += Math.min(0.55, (ty - p.y) * 0.28 + (ty > p.y ? 0.08 : 0)); if(p.y > ty) p.y = ty; if(Math.abs(tx - p.x) < 0.01) p.x = tx; p.s += (1 - p.s) * 0.25;
+    drawCell(g, c, p.x * s, p.y * s, s, p.s, glow && glow.has(i), now, T);
+  }
+  Object.keys(G.pos).forEach(id => { if(!live.has(Number(id))) delete G.pos[id]; });
+  drawFx(g, now, T);
+}
+function drawCell(g, c, x, y, s, sc, lit, now, T){
+  const pad = s * 0.06, m = s * (1 - sc) / 2;
+  g.save(); g.translate(x + m, y + m); g.scale(sc, sc);
+  if(c.t === 'chick'){ const bob = Math.sin(now / 260 + c.id) * s * 0.05; g.drawImage(sprite('🐣', Math.round(s * 0.72)), s * 0.5 - s * 0.47, s * 0.5 - s * 0.47 + bob, s * 0.94, s * 0.94); g.restore(); return; }
+  if(c.t === 'crate'){ g.fillStyle = '#B07A3E'; rr(g, pad, pad, s - pad * 2, s - pad * 2, s * 0.12); g.fill(); g.strokeStyle = '#7A4F22'; g.lineWidth = Math.max(2, s * 0.07); g.stroke();
+    g.beginPath(); g.moveTo(pad * 2, pad * 2); g.lineTo(s - pad * 2, s - pad * 2); g.moveTo(s - pad * 2, pad * 2); g.lineTo(pad * 2, s - pad * 2); g.stroke(); g.restore(); return; }
+  const col = c.sp === 'rain' ? null : T.col[c.k];
+  if(col){ const gr = g.createLinearGradient(0, 0, 0, s); gr.addColorStop(0, shade(col, 1.12)); gr.addColorStop(1, shade(col, 0.86)); g.fillStyle = gr; }
+  else { const gr = g.createLinearGradient(0, 0, s, s); ['#FF5A5F', '#FFC845', '#4CB963', '#3D8BFD', '#A06CF5'].forEach((k, n) => gr.addColorStop(n / 4, k)); g.fillStyle = gr; }
+  rr(g, pad, pad, s - pad * 2, s - pad * 2, s * 0.2); g.fill();
+  g.fillStyle = 'rgba(255,255,255,0.35)'; rr(g, pad * 2, pad * 1.6, s - pad * 4, s * 0.22, s * 0.1); g.fill();   // shine
+  if(lit){ g.strokeStyle = '#FFFFFF'; g.lineWidth = Math.max(2, s * 0.09); rr(g, pad, pad, s - pad * 2, s - pad * 2, s * 0.2); g.stroke(); }
+  if(c.sp === 'rain'){ g.drawImage(sprite('🌈', Math.round(s * 0.6)), s * 0.12, s * 0.12, s * 0.76, s * 0.76); }
+  else if(T.plain){ g.fillStyle = 'rgba(255,255,255,0.85)'; g.font = '700 ' + Math.round(s * 0.42) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(T.syms[c.k], s / 2, s * 0.54); }
+  else g.drawImage(sprite(T.syms[c.k], Math.round(s * 0.56)), s * 0.14, s * 0.14, s * 0.72, s * 0.72);
+  if(c.sp === 'rh' || c.sp === 'rv'){   // rocket stripes + arrows
+    const pulse = 0.6 + 0.4 * Math.sin(now / 160);
+    g.fillStyle = 'rgba(255,255,255,' + (0.55 * pulse) + ')';
+    if(c.sp === 'rh'){ g.fillRect(pad, s * 0.42, s - pad * 2, s * 0.16); } else g.fillRect(s * 0.42, pad, s * 0.16, s - pad * 2);
+    g.fillStyle = '#fff'; g.font = '700 ' + Math.round(s * 0.34) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(c.sp === 'rh' ? '⟷' : '↕', s / 2, s * 0.86);
+    g.drawImage(sprite('🚀', Math.round(s * 0.32)), s * 0.6, s * 0.02, s * 0.4, s * 0.4);
+  }
+  if(c.sp === 'bomb'){ const pulse = 1 + 0.06 * Math.sin(now / 120); g.save(); g.translate(s / 2, s / 2); g.scale(pulse, pulse); g.drawImage(sprite('💣', Math.round(s * 0.5)), -s * 0.32, -s * 0.32, s * 0.64, s * 0.64); g.restore(); }
+  if(c.coin) g.drawImage(sprite('⭐', Math.round(s * 0.26)), s * 0.64, s * 0.62, s * 0.34, s * 0.34);
+  if(c.ice){ g.fillStyle = c.ice > 1 ? 'rgba(200,235,255,0.82)' : 'rgba(210,240,255,0.6)'; rr(g, pad, pad, s - pad * 2, s - pad * 2, s * 0.2); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,0.95)'; g.lineWidth = Math.max(1.5, s * 0.05); g.beginPath(); g.moveTo(s * 0.25, s * 0.3); g.lineTo(s * 0.45, s * 0.5); g.lineTo(s * 0.4, s * 0.7); if(c.ice > 1){ g.moveTo(s * 0.6, s * 0.25); g.lineTo(s * 0.72, s * 0.55); } g.stroke(); }
+  if(c.lock){ g.fillStyle = 'rgba(30,20,50,0.35)'; rr(g, pad, pad, s - pad * 2, s - pad * 2, s * 0.2); g.fill(); g.drawImage(sprite('🔒', Math.round(s * 0.36)), s * 0.52, s * 0.5, s * 0.46, s * 0.46); }
+  g.restore();
+}
+function drawFx(g, now, T){
+  const s = CS;
+  G.fx = G.fx.filter(f => now - f.t0 < (f.type === 'text' ? 1100 : f.type === 'flash' ? 350 : 750));
+  G.fx.forEach(f => {
+    const t = (now - f.t0) / 750; if(t < 0) return;
+    const cx = (f.x + 0.5) * s, cy = (f.y + 0.5) * s, sym = f.k >= 0 ? T.syms[f.k] : '', col = f.k >= 0 ? T.col[f.k] : '#B07A3E';
+    g.save();
+    if(f.type === 'text'){ const tt = (now - f.t0) / 1100; g.globalAlpha = 1 - tt; g.fillStyle = '#fff'; g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 4; g.font = '700 ' + Math.round(s * (f.big ? 0.55 : 0.42)) + 'px Fredoka, sans-serif'; g.textAlign = 'center';
+      g.strokeText(f.text, cx, cy - tt * s * 1.2); g.fillText(f.text, cx, cy - tt * s * 1.2); }
+    else if(f.type === 'flash'){ g.globalAlpha = 0.35 * (1 - (now - f.t0) / 350); g.fillStyle = '#fff'; g.fillRect(0, 0, s * G.B.w, s * G.B.h); }
+    else if(f.type === 'burst' || f.type === 'crate'){ g.globalAlpha = 1 - t; g.fillStyle = col; for(let k = 0; k < 6; k++){ const a = k * 1.047 + f.x, d = t * s * 0.9; g.fillRect(cx + Math.cos(a) * d - s * 0.08, cy + Math.sin(a) * d - s * 0.08, s * 0.16 * (1 - t), s * 0.16 * (1 - t)); } }
+    else if(f.type === 'hop'){ g.globalAlpha = 1 - t * 0.8; const yy = cy - Math.sin(t * Math.PI) * s * 1.1 - t * s * 0.4; g.drawImage(sprite(sym, Math.round(s * 0.56)), cx - s * 0.36, yy - s * 0.36, s * 0.72, s * 0.72); if(t > 0.3) g.drawImage(sprite('❤️', Math.round(s * 0.3)), cx + s * 0.2, yy - s * 0.4, s * 0.3, s * 0.3); }
+    else if(f.type === 'roar'){ g.globalAlpha = 1 - t; const sc = 1 + t * 0.8, sh = Math.sin(now / 25) * s * 0.06; g.drawImage(sprite(sym, Math.round(s * 0.56)), cx - s * 0.36 * sc + sh, cy - s * 0.36 * sc, s * 0.72 * sc, s * 0.72 * sc); }
+    else if(f.type === 'beam'){ g.globalAlpha = (1 - t) * 0.5; g.fillStyle = '#B8FFC6'; g.beginPath(); g.moveTo(cx - s * 0.12, cy - s * 2.5); g.lineTo(cx + s * 0.12, cy - s * 2.5); g.lineTo(cx + s * 0.45, cy + s * 0.4); g.lineTo(cx - s * 0.45, cy + s * 0.4); g.fill();
+      g.globalAlpha = 1 - t; g.drawImage(sprite(sym, Math.round(s * 0.56)), cx - s * 0.36, cy - s * 0.36 - t * s * 2, s * 0.72 * (1 - t * 0.5), s * 0.72 * (1 - t * 0.5)); }
+    else if(f.type === 'zoom'){ g.globalAlpha = 1 - t; const xx = cx + t * t * s * 6; g.drawImage(sprite(sym, Math.round(s * 0.56)), xx - s * 0.36, cy - s * 0.36, s * 0.72, s * 0.72); g.drawImage(sprite('💨', Math.round(s * 0.36)), xx - s * 0.9, cy - s * 0.2, s * 0.4, s * 0.4); }
+    else if(f.type === 'launch'){ g.globalAlpha = 1 - t; const yy = cy - t * t * s * 5; g.drawImage(sprite(sym, Math.round(s * 0.56)), cx - s * 0.36, yy - s * 0.36, s * 0.72, s * 0.72); g.drawImage(sprite('🔥', Math.round(s * 0.34)), cx - s * 0.17, yy + s * 0.3, s * 0.34, s * 0.34); }
+    if(f.coin && f.type !== 'text'){ g.globalAlpha = 1 - t; g.drawImage(sprite('⭐', Math.round(s * 0.34)), cx + s * 0.1, cy - t * s * 1.5, s * 0.36, s * 0.36); }
+    g.restore();
+  });
+}
+
+function elapsed(){ return G ? performance.now() - G.t0 - G.pausedTotal - (G.paused ? performance.now() - G.pausedAt : 0) : 0; }
+function hud(){
+  if(!G) return;
+  BAR.score(G.score.toLocaleString());
+  const mult = 1 + Math.min(G.combo, 3) * 0.5, comboOn = G.combo > 0 && performance.now() - G.lastPop < 2500;
+  if(comboOn) BAR.count('combo', '🔥', '×' + mult, 'Combo', true); else BAR.hide('combo');
+  if(G.limit) BAR.count('moves', '👆', G.movesLeft, 'Moves left', G.movesLeft <= 3);
+  $('undo-btn').disabled = !G.hist.length;
+  const frac = Math.min(1, G.score / (G.target * 1.8));
+  $('target-fill').style.width = (frac * 100).toFixed(1) + '%';
+  $('target-txt').textContent = '🎯 ' + G.target.toLocaleString() + (G.score >= G.target ? ' ✓' : '');
+  const tg = $('target'); if(!tg.querySelector('b')){ [1, 1.4, 1.8].forEach(m => { const b = document.createElement('b'); b.style.left = (m / 1.8 * 100 - 0.6) + '%'; tg.appendChild(b); }); }
+  if(lockHandle){ const l = lockHandle.remainingMs(); BAR.left(l, l < 120000); }
+}
+function toggleVoice(){ voiceOn = !voiceOn; savePrefs(); paintVoice(); if(!voiceOn) try{ speechSynthesis.cancel(); }catch(e){} }
+function pauseGame(){ if(G && !G.paused && !G.over){ G.paused = true; G.pausedAt = performance.now(); } }
+function resume(){ if(G && G.paused && !G.over){ G.pausedTotal += performance.now() - G.pausedAt; G.paused = false; } }
+function leavePlay(){
+  if(!G || G.over){ backToMenu(); return; }
+  pauseGame();
+  UI.confirm({icon: '◀', title: 'Leave this round?', body: 'This round will not be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(ok) backToMenu(); else resume(); });
+}
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); cancelAnimationFrame(raf); clearInterval(timerId); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); renderMenu(); showScreen('menu'); }
+document.addEventListener('keydown', e => {
+  if(!G || G.over || $('scr-play').classList.contains('hidden')) return;
+  if(e.key === 'u' || e.key === 'U' || ((e.ctrlKey || e.metaKey) && e.key === 'z')){ undo(); e.preventDefault(); }
+  if(e.key === 'v' || e.key === 'V') toggleVoice();
+});
+
+/* ================= FINISH ================= */
+function finishGame(why){
+  if(!G || G.over) return;
+  G.over = true; clearInterval(timerId);
+  const g = G, L = g.L, secs = Math.max(1, Math.round(elapsed() / 1000));
+  let bonus = 0; if(why === 'clear') bonus = 1000 * (g.lvl + 1);
+  g.score += bonus;
+  if(L.hardcore) g.score *= 3;
+  const tgt = g.target * (L.hardcore ? 3 : 1), done = missionsDone(), cleared = g.score >= tgt && done;
+  const stars = !cleared ? 0 : (g.allClear || g.score >= tgt * 1.8) ? 3 : g.score >= tgt * 1.4 ? 2 : 1;
+  const stats = {popped: g.popped, bigGroup: g.bigGroup, powers: g.powers, allClear: g.allClear ? 1 : 0, bestCombo: g.bestCombo, rounds: 1};
+  if(g.score > 0) saveWin(S.player, g.lvl, {timeSec: secs, stars, score: g.score, theme: g.theme, cleared, stats});
+  const T = THEMES[g.theme];
+  cheerEnd(cleared); /* 📣 cs-4a */
+  if(cleared){ const pr = pick(PRAISE); party('🎉 ' + pr + ', ' + S.player + '!'); say(pr + ', ' + S.player + '!'); confetti(['🫧', '⭐', '🎉', T.syms[0], T.syms[1], T.syms[2]], 40); UISound.play('success'); }
+  else { UISound.play('pop'); say(why === 'moves' ? 'Out of taps! Good try!' : 'No more groups! Good try!'); }
+  setTimeout(() => {
+    if(G !== g) return;
+    const next = cleared && g.lvl < 5;
+    const title = g.allClear ? 'Board cleared!' : cleared ? (stars === 3 ? 'Super popper!' : 'Level passed!') : why === 'moves' ? 'Out of taps!' : 'No more groups!';
+    const why2 = !cleared ? (g.score < tgt ? '🎯 You needed ' + tgt.toLocaleString() + ' points. ' : '') + (!done ? '✔️ Finish every mission at the top. ' : '') : '';
+    showResult('<div class="big">' + (g.allClear ? '🏆' : cleared ? '🫧' : '😮') + '</div><h2 class="' + (cleared ? 'cheer' : '') + '">' + title + '</h2>' +
+      (cleared ? '<div class="rating">' + [0, 1, 2].map(k => '<span class="st' + (k < stars ? '' : ' off') + '" style="animation-delay:' + (0.25 + k * 0.25) + 's">⭐</span>').join('') + '</div>' : '') +
+      '<div class="score-big">🏆 <span id="score-count">0</span></div>' +
+      '<div class="stats"><span>🫧 ' + g.popped + ' popped</span><span>👆 ' + g.moves + ' taps</span><span>💥 biggest ' + g.bigGroup + '</span>' + (g.powers ? '<span>🚀 ' + g.powers + ' blasts</span>' : '') + (g.bestCombo ? '<span>🔥 combo ×' + (1 + Math.min(g.bestCombo, 3) * 0.5) + '</span>' : '') + (bonus ? '<span>🎉 clear bonus ' + bonus.toLocaleString() + '</span>' : '') + (L.hardcore ? '<span>💀 ×3</span>' : '') + '</div>' +
+      (!cleared ? '<div class="tip">' + why2 + pick(TIPS) + '</div>' : stars < 3 ? '<div class="tip">⭐⭐⭐ = ' + Math.round(tgt * 1.8).toLocaleString() + ' points or clear the whole board. ' + pick(TIPS) + '</div>' : '') +
+      '<div class="save-note" id="save-note">' + (g.score > 0 ? '<span class="ui-spin a-bounce">🫧</span> Saving your score…' : 'Not saved — pop some blocks to get a score.') + '</div>' +
+      '<div class="res-btns">' + (next ? '<button class="btn sp-btn sp-primary" id="b-next">' + (g.lvl === 4 ? '💀 Try Hardcore ▶' : 'Next level ▶') + '</button>' : '') + '<button class="btn sp-btn ' + (next ? 'soft sp-secondary' : 'sp-primary') + '\" id="b-again">🔁 New board</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🎚️ Levels</button></div>');
+    countUp($('score-count'), g.score, 1000);
+    $('b-again').onclick = () => startGame(g.lvl);
+    $('b-menu').onclick = () => backToMenu();
+    if($('b-next')) $('b-next').onclick = () => { const p = progressOf(S.player); p.unlocked = Math.max(p.unlocked, g.lvl + 1); S.progress[S.player] = p; startGame(g.lvl + 1); };
+  }, cleared ? 1700 : 1000);
+}
+function party(text){ const p = document.createElement('div'); p.className = 'praise'; p.textContent = text; document.body.appendChild(p); setTimeout(() => p.remove(), 1600); }
+function sparkle(el){ if(!el) return; const r = el.getBoundingClientRect(); for(let k = 0; k < 7; k++){ const s = document.createElement('div'); s.className = 'spark'; s.textContent = pick(['✨', '⭐', '💫']); const a = Math.random() * 6.28, d = 40 + Math.random() * 40; s.style.cssText = 'left:' + (r.left + r.width / 2) + 'px;top:' + (r.top + r.height / 2) + 'px;--dx:' + Math.cos(a) * d + 'px;--dy:' + Math.sin(a) * d + 'px'; document.body.appendChild(s); setTimeout(() => s.remove(), 850); } }
+let bannerTimer = 0;
+function showBanner(text, kind){ const b = $('banner'); b.textContent = text; b.classList.toggle('gold', kind === 'gold'); b.classList.toggle('bad', kind === 'bad'); b.classList.add('on'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('on'), 2000); }
+
+
+/* ================= SAVE ================= */
+const PENDING_KEY = 'sp_popblocks_pending';
+function readPending(){ try{ return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); }catch(e){ return []; } }
+function writePending(list){ try{ localStorage.setItem(PENDING_KEY, JSON.stringify(list.slice(-20))); }catch(e){} }
+function flushPending(){ const list = readPending(); if(!list.length) return; writePending([]); list.forEach(w => google.script.run.withFailureHandler(() => writePending(readPending().concat([w]))).saveLevelResult(GAME_ID, w.name, w.lvl, w.extra)); }
+function putNote(html){ const put = () => { const n = $('save-note'); if(n) n.innerHTML = html; return !!n; }; if(!put()) setTimeout(put, 1900); }
+function saveWin(name, lvlIdx, extra, tries){
+  tries = tries || 0;
+  const p = S.progress[name] || (S.progress[name] = {unlocked: 0, tokens: [], best: []});
+  if(extra.cleared) p.unlocked = Math.max(p.unlocked, lvlIdx + 1);
+  google.script.run.withSuccessHandler(res => {
+      const best = (p.best || []).slice(); if(res.best) best[lvlIdx] = res.best;
+      S.progress[name] = {unlocked: res.unlocked, tokens: res.tokens, best}; flushPending(); putNote(saveText(res));
+    }).withFailureHandler(err => {
+      if(tries < 1){ setTimeout(() => saveWin(name, lvlIdx, extra, tries + 1), 1200); return; }
+      writePending(readPending().concat([{name, lvl: lvlIdx, extra}])); putNote('⚠️ Could not save yet — it will be sent again next time.');
+    }).saveLevelResult(GAME_ID, name, lvlIdx, extra);
+}
+function saveText(res){
+  let h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New high score!' : res.best && res.best.score ? 'Your best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Score saved';
+  const fe = res.feats; if(fe){ (fe.newTitles || []).forEach(t => { h += '<br><span class="title-new">🏷️ New title: ' + t.icon + ' ' + UI.esc(t.name) + '</span>'; }); (fe.newBadges || []).forEach(b => { h += '<br><span class="feat-new">' + b.medal + ' ' + b.icon + ' ' + UI.esc(b.name) + ' · ' + b.tierName + '</span>'; }); }
+  return h;
+}
+function countUp(el, to, ms){ if(!el) return; const t0 = performance.now(); (function tick(now){ const p = Math.max(0, Math.min(1, (now - t0) / ms)); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))).toLocaleString(); if(p < 1) requestAnimationFrame(tick); })(t0); }
+/* 📣 CHEERSQUAD (cs-4a) START — the crowd beside the board (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+// solo: you = side 0, the 😈 rival = side 1. Fans stand only where the bar, goals, board and controls leave room.
+function cheerTaken(){ return Array.from(document.querySelectorAll('#gbar, .top-btn, .goalbar, #cv')); }
+function cheerMount(){
+  if(!window.Cheer || !G) return; Cheer.unmount(); const box = $('scr-play');
+  Cheer.mount(box, {game: 'popblocks', players: [{name: S.player, side: 0, human: true}, {name: 'Rival', side: 1, human: false}], me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'overlay',
+    zones: () => Cheer.freeZones(box, cheerTaken), avoid: cheerTaken,
+    clear: b => { const B = box.getBoundingClientRect(), F = $('cv').getBoundingClientRect(), l = F.left - B.left, t = F.top - B.top; return !(b.r > l - 3 && b.l < l + F.width + 3 && b.b > t - 3 && b.t < t + F.height + 3); }});
+}
+// small wins get a 1.2 s breather so a cascade isn't a wall of cheers; big ones and the ends always play
+function cheerSay(kind, why){ if(!kind || !window.Cheer || !Cheer.active() || !G) return; const now = performance.now();
+  if(kind === 'goal' && (G.cheerAt || 0) > now - 1200) return; if(kind === 'big' && (G.cheerBig || 0) > now - 900) return;
+  if(kind === 'goal') G.cheerAt = now; if(kind === 'big') G.cheerBig = now; Cheer.react(kind, {side: 0}); }
+function cheerEnd(cleared){ if(window.Cheer && Cheer.active()) Cheer.react(cleared ? 'win' : 'lose', {side: 0}); }
+function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  const at = card.querySelector('.res-btns'); if(!at) return; at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); }, 900); }
+/* 📣 CHEERSQUAD END */
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-4a */ }
+function hideResult(){ $('result').classList.add('hidden'); }
+function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pick(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
+function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
+function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }   // 🧭 p1b: ◀ = where you came from (Gameroom if we don't know)
+
+/* ================= BOOT ================= */
+function boot(){
+  UI.loading(GAME_ID);
+  google.script.run.withSuccessHandler(d => {
+      UI.loaded();
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {};
+      UISound.applySettings(S.settings);
+      const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
+      lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
+      flushPending();
+      if(CURRENT_PLAYER && S.players.some(p => p.Name === CURRENT_PLAYER)) choosePlayer(CURRENT_PLAYER); else { renderPlayers(); showScreen('player'); }
+    }).withFailureHandler(() => { UI.loaded(); UI.toast('Could not load players — check the connection', 'err'); renderPlayers(); showScreen('player'); })
+    .getLevelGameData(GAME_ID, CURRENT_PLAYER);
+}
+/* ================= 🧑 YOUR AVATAR (p6e — ✨ P6 / 11w round 2) =================
+   The player's own avatar beside the game: UI.buddy pictures (cached AvatarActing frames, swapped by a small timer) —
+   nothing is painted in the game loop. It reacts to the game's own moments through the wrappers below (no game logic changes). */
+const HAS_AV = typeof drawAvatar === 'function' && typeof GESTURES !== 'undefined';
+const BD_SAY = {};
+const BD = {on: false, who: null, list: []};
+function bdStart(){
+  BD.list.forEach(b => b && b.stop()); BD.list = []; BD.on = false;
+  const els = ['bd-lg'].map(id => document.getElementById(id)).filter(Boolean);
+  if(!HAS_AV || !UI.buddy || !window.Acting){ els.forEach(e => e.classList.add('hidden')); return; }
+  BD.who = {name: S.player, av: myAvatar(S.player)}; BD.list = els.map((e, i) => UI.buddy(e, BD.who, i ? {fps: 6} : {})).filter(Boolean); BD.on = !!BD.list.length;
+}
+function bdReact(mood, ms){ if(!BD.on) return false; let a = false; BD.list.forEach(b => { const x = b.react(mood, ms); if(x) a = x; });  return a; }
+function bdResultBig(){ const big = document.querySelector('#result-card > .big'); if(!big || !BD.on) return; const won = !!document.querySelector('#result-card h2.cheer'); const c = document.createElement('canvas'); c.className = 'res-av'; c.id = 'res-av'; c.setAttribute('aria-hidden', 'true'); big.replaceWith(c); bdResult('res-av', won); }
+function bdResult(id, won){ if(BD.on && document.getElementById(id)) UI.buddy(document.getElementById(id), BD.who, {hold: won ? 'win' : 'lose'}); }
+const bdBase = {startGame, party, showResult};
+startGame = function(){ const args = arguments;  const r = bdBase.startGame.apply(this, args); bdStart(); return r; };
+party = function(){ const args = arguments;  const r = bdBase.party.apply(this, args); if(BD.on && performance.now() - (BD.last || 0) > 1800){ BD.last = performance.now(); bdReact('happy', 1400); } return r; };
+showResult = function(){ const args = arguments;  const r = bdBase.showResult.apply(this, args); bdResultBig(); return r; };
+/* ================= 🧑 YOUR AVATAR END (p6e) ================= */
+boot();
+
