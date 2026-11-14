@@ -114,6 +114,15 @@
   @keyframes pk-in{0%{transform:scale(.6) rotate(6deg);opacity:0;}100%{transform:none;opacity:1;}}
   .pic.shake{animation:pk-shake .32s;}
   @keyframes pk-shake{25%{transform:translateX(-5px);}75%{transform:translateX(5px);}}
+  .strip{position:relative;}
+  /* ⏱️ Arcade time bar (pk-2b) — sits on the strip's bottom edge, adds no height */
+  .tbar{position:absolute;left:calc(10px + env(safe-area-inset-left));right:calc(10px + env(safe-area-inset-right));bottom:-3px;height:7px;border-radius:5px;background:rgba(255,255,255,0.16);overflow:hidden;pointer-events:none;}
+  .tbar i{display:block;height:100%;width:100%;border-radius:5px;background:linear-gradient(90deg,#22E08A,#FFD66B);transition:width .25s linear;}
+  .tbar.low i{background:linear-gradient(90deg,#FF5F7E,#FF9F1C);animation:pk-low .6s ease-in-out infinite;}
+  @keyframes pk-low{50%{opacity:.55;}}
+  .tpop{position:absolute;right:16px;top:6px;z-index:12;font-family:'Fredoka',sans-serif;font-weight:700;font-size:1.4rem;color:#22E08A;text-shadow:0 2px 0 rgba(0,0,0,.4);pointer-events:none;animation:pk-tpop 1s ease-out forwards;}
+  .tpop.bad{color:#FF5F7E;}
+  @keyframes pk-tpop{0%{transform:translateY(8px) scale(.6);opacity:0;}20%{transform:none;opacity:1;}100%{transform:translateY(-26px);opacity:0;}}
   .pic.bl-off{visibility:hidden;}
   #scr-play[data-mode="blink"] .pic{transition:none;}
   #scr-play[data-mode="blink"] .pic .tag{font-size:0.9rem;padding:1px 10px;background:rgba(75,63,209,0.85);}
@@ -207,6 +216,7 @@
     <li>🌱 Basic: 🎨 colours + ➖➕ missing / extra things · 🐣 Junior adds 📏 size + 🔺 shape · 🔦 Intermediate adds 🔄 turn / flip + 🔢 count.</li>
     <li>🔍 <b>Magnifier</b>: stuck? It shows you one change (a few per picture).</li>
     <li>👁️ <b>Blink</b>: ONE picture flips between A and B — poke what changes. Harder levels put a blank blink in between, so the change hides!</li>
+    <li>⏱️ <b>Photo Hunt Arcade</b>: pictures in a row against the clock — every find adds time, every 5 pictures is a ✅ checkpoint with a big time bonus. From ⚡ Hard a wrong poke costs time. Best run per level!</li>
     <li>🎯 <b>Odd One Out</b>: all the cards are alike but one — poke it. From ⚡ Hard: 🧮 the sum that isn't right, 🔤 the word that doesn't rhyme · 🌋 Extreme: 🌀 the one that breaks the pattern.</li>
     <li>⚡ Hard adds 🧮 sums and 🔤 words on little signs · 🌋 Extreme adds 🌀 bead patterns.</li>
     <li>A wrong poke is just an "oops" — but fewer oops = more ⭐. 💀 Hardcore: no magnifier, 3 oops and the case is lost.</li>
@@ -224,6 +234,7 @@
     <div class="goal" id="goal">🔍 Find the differences!</div>
     <div class="dots" id="dots"></div>
     <button class="sp-btn sp-primary" id="hint-btn" data-sound="none" title="Magnifier: show me one">🔍<small id="hint-left">3</small></button>
+    <div class="tbar hidden" id="tbar" aria-hidden="true"><i></i></div>
   </div>
   <div class="board" id="board">
     <div class="pic" id="pic-a"><canvas id="cv-a"></canvas><span class="tag">A</span></div>
@@ -242,7 +253,7 @@ var PK = (function () {
   // A picture = a 400 × 300 world. Scene = background (theme + deco, the SAME in both pictures) + items (picture A) + items (picture B)
   // + the list of differences between them. Every round gets a fresh seed → a new scene (never the same twice).
   var W = 400, H = 300, GROUND = 232;
-  var MIN_HIT = 26;   // world units: the smallest poke circle (≈ 24 CSS px on a phone held upright, where 1 unit ≈ 0.93 px)
+  var MIN_HIT = 27;   // world units: the smallest poke circle (≈ 24 CSS px on a phone held upright, where 1 unit ≈ 0.93 px)
 
   // ---------- pieces (the painter in the page draws each kind; here: size, which differences it can show) ----------
   // h = looks different when flipped left ↔ right · r = turns (90° / 180°) show · n = [min, max] things to count
@@ -549,6 +560,23 @@ var PK = (function () {
   }
   function oddPoints(level, r) { var p = 100 + Math.max(0, 15 - r.secs) * 8 - r.oops * 15 - r.hints * 40; return Math.max(0, Math.round(p * (1 + level * 0.25) * ((ODD[level] || {}).hardcore ? 3 : 1))); }
 
+  // ---------- ⏱️ PHOTO HUNT ARCADE (pk-2b): pictures in a row against the clock ----------
+  // start s · + s per find · + s per finished picture · ✅ checkpoint every 5 pictures (+ s) · − s per wrong poke (only from ⚡ Hard) · n changes a picture · 🔍 per run
+  var ARCADE = [
+    { start: 60, find: 6, pic: 5, cp: 15, oops: 0, n: 2, hints: 3 },
+    { start: 55, find: 5, pic: 5, cp: 15, oops: 0, n: 3, hints: 2 },
+    { start: 50, find: 5, pic: 4, cp: 15, oops: 0, n: 3, hints: 2 },
+    { start: 45, find: 4, pic: 4, cp: 12, oops: 3, n: 4, hints: 1 },
+    { start: 40, find: 4, pic: 3, cp: 12, oops: 4, n: 4, hints: 1 },
+    { start: 35, find: 3, pic: 3, cp: 10, oops: 5, n: 5, hints: 0, hardcore: true }
+  ];
+  var CHECK_EVERY = 5;
+  function arcadeScore(level, r) {
+    var p = r.found * 100 + r.pictures * 250 + r.checkpoints * 1000;
+    return Math.round(p * (1 + level * 0.25) * (ARCADE[level] && ARCADE[level].hardcore ? 3 : 1));
+  }
+  function arcadeStars(r) { return Math.min(3, r.checkpoints || 0); }   // ⭐ per checkpoint (5 · 10 · 15 pictures); cleared = the first checkpoint
+
   function signature(sc) { return (hash(JSON.stringify([sc.theme, sc.A, sc.B])) >>> 0).toString(36); }
 
   // ---------- poking ----------
@@ -581,7 +609,7 @@ var PK = (function () {
   function nextRank(cleared) { for (var i = 0; i < RANKS.length; i++) if (RANKS[i].at > cleared) return RANKS[i]; return null; }
 
   return { W: W, H: H, GROUND: GROUND, MIN_HIT: MIN_HIT, KINDS: KINDS, SHAPES: SHAPES, THEMES: THEMES, THEME_KEYS: THEME_KEYS, PAL: PAL, TYPES: TYPES, TYPE_INFO: TYPE_INFO,
-    LEVELS: LEVELS, RANKS: RANKS, TYPES6: TYPES6, WORD_SETS: WORD_SETS, RHYMES: RHYMES, ODD: ODD, ODD_ROUNDS: ODD_ROUNDS, makeOdd: makeOdd, oddPoints: oddPoints, makePattern: makePattern, sumText: sumText, rng: rng, newSeed: newSeed, makeScene: makeScene, signature: signature, poke: poke, pokeFound: pokeFound, radiusOf: radiusOf, hitOf: hitOf,
+    LEVELS: LEVELS, RANKS: RANKS, TYPES6: TYPES6, WORD_SETS: WORD_SETS, RHYMES: RHYMES, ODD: ODD, ODD_ROUNDS: ODD_ROUNDS, makeOdd: makeOdd, oddPoints: oddPoints, makePattern: makePattern, sumText: sumText, ARCADE: ARCADE, CHECK_EVERY: CHECK_EVERY, arcadeScore: arcadeScore, arcadeStars: arcadeStars, rng: rng, newSeed: newSeed, makeScene: makeScene, signature: signature, poke: poke, pokeFound: pokeFound, radiusOf: radiusOf, hitOf: hitOf,
     colDist: colDist, picturePoints: picturePoints, starsFor: starsFor, rankOf: rankOf, nextRank: nextRank, fits: fits };
 })();
 if (typeof module !== 'undefined') module.exports = PK;
@@ -719,9 +747,10 @@ UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});
 const SESSION_START = Number(''+__SP("sessionStart")+'') || null;
 const DURATION_MIN = Number(''+__SP("durationMin")+'') || null;
 const GAME_ID = 'pokadif';
+const ARC_ID = 'pokadif-arcade';   // ⏱️ Photo Hunt Arcade has its own board (pk-2b): best per difficulty
 // UiKit lists (loader + ❓ card) are registered here, so UiKit itself is not touched (polish lane) — move them into UiKit when that lane is free
 if(UI.KINDS && !UI.KINDS.pokadif) UI.KINDS.pokadif = ['🔍', 'Opening the detective file', 'peek'];
-if(UI.GAME_HELP && !UI.GAME_HELP.pokadif) UI.GAME_HELP.pokadif = ['Be a little detective! 🖼️ Spot: two pictures, poke every change · 👁️ Blink: one picture flips — what changed? · 🎯 Odd One Out: poke the one that doesn\'t belong.',
+if(UI.GAME_HELP && !UI.GAME_HELP.pokadif) UI.GAME_HELP.pokadif = ['Be a little detective! 🖼️ Spot: two pictures, poke every change · 👁️ Blink: one picture flips — what changed? · 🎯 Odd One Out: poke the one that doesn\'t belong · ⏱️ Arcade: race the clock.',
   'Tap (or click) what is different. 🌱 Basic: colours + missing things. More levels add 📏 size, 🔺 shape, 🔄 turn / flip, 🔢 count, then 🧮 sums, 🔤 words and 🌀 patterns.',
   'Stuck? Tap 🔍 — the magnifier shows you one. Fewer oops = more ⭐. Every picture is brand new!'];
 const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '🔍', name: 'Pokadif', levelId: 'hud-level',
@@ -745,6 +774,7 @@ const LEVEL_UI = [
   {emoji: '🌋', blurb: 'Smaller changes, more things to check.'},
   {emoji: '💀', blurb: 'Tiny changes + look-alikes, no magnifier, 3 oops = case lost. ×3 points.', hardcore: true}
 ];
+const ARC_BLURB = ['60 s, + 6 s a find. Oops cost nothing.', '+ 📏 size + 🔺 shape', '+ 🔄 turn + 🔢 count', 'Oops = − 3 s · + 🧮 sums + 🔤 words', 'Oops = − 4 s · + 🌀 patterns', '35 s start, oops = − 5 s, no magnifier. ×3 points.'];
 const ODD_BLURB = ['🎨 colours + 🔺 shapes, 4 big cards', '+ 📏 bigger / smaller', '+ 🔄 turned + 🔢 counting', '+ 🧮 odd sums + 🔤 odd words', '+ 🌀 patterns, 12 cards', 'Tiny changes, 3 oops = case lost. ×3 points.'];
 const BLINK_BLURB = ['The picture flips A ↔ B — changes pop out', 'A tiny blink between the pictures', 'A longer blink — harder!', 'Long blink, + sums + words', '+ patterns, quick flips', 'Quick flips, long blinks, 3 oops. ×3 points.'];
 const BLINK = [{show: 1300, gap: 0}, {show: 1200, gap: 80}, {show: 1100, gap: 140}, {show: 1000, gap: 180}, {show: 900, gap: 220}, {show: 750, gap: 260}];   // ms each picture shows · the blank blink between (longer = harder to see the change)
@@ -757,12 +787,12 @@ const MODES = [
   {k: 'spot', g: 'spot', icon: '🖼️', name: 'Find the Difference', type: 'A spot-the-difference game', sub: 'Two pictures — poke every change', next: '👇 then pick a level'},
   {k: 'blink', g: 'spot', icon: '👁️', name: 'Blink', type: 'A flicker-and-find game', sub: 'One picture blinks — what changed?', next: '👇 then pick a level'},
   {k: 'odd', g: 'odd', icon: '🎯', name: 'Odd One Out', type: 'A find-the-odd-one game', sub: 'Poke the one that doesn\'t belong', next: '👇 then pick a level'},
-  {k: 'arcade', g: 'endless', icon: '⏱️', name: 'Photo Hunt Arcade', type: 'Round 2b', sub: 'Each find adds time — how far?', soon: true},
+  {k: 'arcade', g: 'endless', icon: '⏱️', name: 'Photo Hunt Arcade', type: 'A race-the-clock game', sub: 'Each find adds time — how far?', next: '👇 then pick a level'},
   {k: 'detective', g: 'next', icon: '🕵️', name: 'Detective Adventure', type: 'Round 3', sub: 'Solve a case: find · read · walk · crack', soon: true},
   {k: 'race', g: 'next', icon: '🏁', name: 'Race', type: 'Round 4', sub: 'Who finds them first?', soon: true}
 ];
-window.MODE_TYPE = {spot: MODES[0].type, blink: MODES[1].type, odd: MODES[2].type};
-const MODE_NAME = {spot: '🖼️ Spot', blink: '👁️ Blink', odd: '🎯 Odd One Out'};   // = the Theme start (Code.gs MODES_ tried.themeStart)
+window.MODE_TYPE = {spot: MODES[0].type, blink: MODES[1].type, odd: MODES[2].type, arcade: MODES[3].type};
+const MODE_NAME = {spot: '🖼️ Spot', blink: '👁️ Blink', odd: '🎯 Odd One Out', arcade: '⏱️ Arcade'};   // = the Theme start (Code.gs MODES_ tried.themeStart)
 /* 🗂️ END MODE GROUPS */
 const HOUSES = [{k: 'mix', icon: '🎲', name: 'Mix'}].concat(PK.THEME_KEYS.map(k => ({k, icon: PK.THEMES[k].icon, name: PK.THEMES[k].name})));
 const FOUND_SAY = {colour: '🎨 A new colour!', missing: '➖ Something is missing!', extra: '➕ Something extra!', bigger: '📏 It got bigger!', smaller: '📏 It got smaller!',
@@ -770,7 +800,7 @@ const FOUND_SAY = {colour: '🎨 A new colour!', missing: '➖ Something is miss
 const PRAISE = ['Great eyes!', 'Super sleuth!', 'You got it!', 'Sharp!', 'Nice poke!', 'Detective skills!'];
 
 /* ================= STATE ================= */
-let S = {players: [], progress: {}, settings: {}, avatars: {}, player: '', age: ''};
+let S = {players: [], progress: {}, progressArc: {}, settings: {}, avatars: {}, player: '', age: ''};
 let SET = {mode: 'spot', level: 0, house: 'mix'};
 let G = null, lockHandle = null, TICK = 0;
 const GC_LISTEN = [], GC_LOG = [];
@@ -799,7 +829,8 @@ function showScreen(name){
   ['player', 'menu', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
   $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER); window.scrollTo(0, 0);
 }
-function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
+function progressOf(name, board){ const P = (board || boardId()) === ARC_ID ? S.progressArc : S.progress; return P[name] || {unlocked: 0, tokens: [], best: []}; }
+function boardId(mode){ return (mode || SET.mode) === 'arcade' ? ARC_ID : GAME_ID; }
 function canPlay(i){ const p = progressOf(S.player); if(i === 5) return p.unlocked >= 5; if(i === 4) return p.unlocked >= 4; return i <= Math.max(p.unlocked, AGE_START[S.age] || 0); }
 function renderPlayers(){
   const box = $('player-list'); box.innerHTML = '';
@@ -825,17 +856,18 @@ function msNow(){ return SET.mode; }
 function msOpen(id){ if(!MODES.some(m => m.k === id && !m.soon)) return; SET.mode = id; markModes(); if(UI.modePoint) UI.modePoint($('level-list')); }
 function msAlso(){ if(UI.alsoTry) UI.alsoTry({player: S.player, game: GAME_ID, at: () => document.querySelector('#scr-menu .title'), current: msNow, noDrop: true, open: msOpen}); }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
-function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">No case solved yet</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span><span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
+function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">' + (SET.mode === 'arcade' ? 'No run yet' : 'No case solved yet') + '</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span><span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
 function renderMenu(){
   const ml = $('mode-list');
   if(!ml.children.length) UI.modeGroups(ml, MODE_GROUPS, MODES.map(m => Object.assign({}, m)), {next: () => $('level-head'), moreText: '👇 Pick a level below',
     onPick: k => { const m = MODES.find(x => x.k === k); if(m && m.soon){ UISound.play('error'); UI.toast('🔜 ' + m.icon + ' ' + m.name + ' comes in Pokadif ' + m.type.toLowerCase() + '!'); return 'stop'; }
       SET.mode = k; markModes(); return false; }});
   markModes(); renderHouses(); renderLevels(); renderFile();
-  if(window.UI && UI.leaders) UI.leaders($('leaders'), GAME_ID, S.player);
+  if(window.UI && UI.leaders) UI.leaders($('leaders'), boardId(), S.player);
 }
 function markModes(){ $('mode-list').querySelectorAll('.ui-mbtn').forEach(b => { const m = MODES.find(x => x.k === b.dataset.k); b.classList.toggle('on', b.dataset.k === SET.mode); b.classList.toggle('soon', !!(m && m.soon)); });
-  const m = MODES.find(x => x.k === SET.mode) || MODES[0]; $('level-head').textContent = 'Pick a level — ' + m.icon + ' ' + m.name; renderLevels(); }
+  const m = MODES.find(x => x.k === SET.mode) || MODES[0]; $('level-head').textContent = 'Pick a level — ' + m.icon + ' ' + m.name; renderLevels();
+  if(window.UI && UI.leaders && $('leaders').dataset.board !== boardId()){ $('leaders').dataset.board = boardId(); UI.leaders($('leaders'), boardId(), S.player); } }
 function renderHouses(){
   const box = $('house-list');
   box.innerHTML = HOUSES.map(h => '<button class="house' + (h.k === SET.house ? ' on' : '') + '" data-k="' + h.k + '" data-sound="tap" title="' + UI.esc(h.name) + '">' + h.icon + ' ' + UI.esc(h.name) + '</button>').join('');
@@ -847,13 +879,13 @@ function renderLevels(){
     const U = LEVEL_UI[i], open = canPlay(i), done = p.unlocked > i, b = document.createElement('button');
     b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (U.hardcore ? ' hardcore' : ''); b.setAttribute('data-sound', open ? 'pop' : 'none'); b.dataset.lv = i;
     b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">' + BADGES[i][0] + '</span>' : open ? '' : '<span class="badge">🔒</span>') +
-      '<div class="big">' + U.emoji + '</div><div class="nm">' + L.name + '</div><div class="learn">' + (SET.mode === 'odd' ? PK.ODD[i].cards + ' cards · ' + PK.ODD_ROUNDS + ' rounds' : L.n + ' changes · ' + L.pics + ' pictures') + '</div><div class="sub">' + (U.hardcore && !open ? '🔒 Beat Extreme to open 💀 Hardcore' : SET.mode === 'odd' ? ODD_BLURB[i] : SET.mode === 'blink' ? BLINK_BLURB[i] : U.blurb) + '</div>' + bestHtml(p, i);
+      '<div class="big">' + U.emoji + '</div><div class="nm">' + L.name + '</div><div class="learn">' + (SET.mode === 'arcade' ? '⏱️ ' + PK.ARCADE[i].start + ' s · ' + PK.ARCADE[i].n + ' a picture' : SET.mode === 'odd' ? PK.ODD[i].cards + ' cards · ' + PK.ODD_ROUNDS + ' rounds' : L.n + ' changes · ' + L.pics + ' pictures') + '</div><div class="sub">' + (U.hardcore && !open ? '🔒 Beat Extreme to open 💀 Hardcore' : SET.mode === 'arcade' ? ARC_BLURB[i] : SET.mode === 'odd' ? ODD_BLURB[i] : SET.mode === 'blink' ? BLINK_BLURB[i] : U.blurb) + '</div>' + bestHtml(p, i);
     b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore' : i === 4 ? 'Solve a Hard case to unlock Extreme!' : 'Solve the level before to unlock it'); return; } startCase(i); };
     box.appendChild(b);
   });
 }
 function renderFile(){
-  const p = progressOf(S.player), n = p.unlocked || 0, r = PK.rankOf(n), nx = PK.nextRank(n);
+  const p = progressOf(S.player, GAME_ID), n = p.unlocked || 0, r = PK.rankOf(n), nx = PK.nextRank(n);
   $('det-file').innerHTML = '<div class="rank">' + r.icon + ' Detective rank: <b>' + r.name + '</b></div>'
     + '<div class="next">' + (nx ? 'Next: ' + nx.icon + ' ' + nx.name + ' — solve ' + PK.LEVELS[nx.at - 1].name + (nx.at === 6 ? ' 💀' : '') : '🏆 The top rank — the whole family calls you!') + '</div>'
     + '<div class="badges">' + BADGES.map((b, i) => '<div class="bdg' + (n > i ? ' on' : '') + '" title="' + UI.esc(b[1]) + '"><span class="i">' + b[0] + '</span>' + UI.esc(b[1]) + '</div>').join('') + '</div>';
@@ -865,17 +897,19 @@ function startCase(lvl){
   stopBlink();
   const mode = MODES.some(m => m.k === SET.mode && !m.soon) ? SET.mode : 'spot', L = PK.LEVELS[lvl], O = PK.ODD[lvl];
   G = {mode, level: lvl, L, O, pic: -1, over: false, paused: false, held: false, secs: 0, last: performance.now(), found: [], marks: [], scene: null, used: {}, lastTheme: '',
-    lives: (mode === 'odd' ? O.lives : L.lives) || 0, rounds: mode === 'odd' ? PK.ODD_ROUNDS : L.pics, total: {found: 0, oops: 0, hints: 0, perfect: 0, quick: 0, points: 0}, pics: [], busy: true, k: 1, dpr: Math.min(2, window.devicePixelRatio || 1)};
+    lives: (mode === 'odd' ? O.lives : mode === 'arcade' ? 0 : L.lives) || 0, rounds: mode === 'odd' ? PK.ODD_ROUNDS : mode === 'arcade' ? 9999 : L.pics,
+    A: mode === 'arcade' ? Object.assign({}, PK.ARCADE[lvl]) : null, timeLeft: mode === 'arcade' ? PK.ARCADE[lvl].start : 0, cps: 0, pics: 0, total: {found: 0, oops: 0, hints: 0, perfect: 0, quick: 0, points: 0}, picLog: [], busy: true, k: 1, dpr: Math.min(2, window.devicePixelRatio || 1)};
   $('scr-play').dataset.mode = mode;
   GC_LOG.length = 0;
   if(UI.modeTried) UI.modeTried(S.player, GAME_ID, SET.mode);
   showScreen('play');
   BAR.level(L.name + (L.hardcore ? ' 💀' : ''));
-  BAR.count('pic', MODE_ICON[mode], '1/' + G.rounds, mode === 'odd' ? 'Round' : 'Picture');
+  BAR.count('pic', MODE_ICON[mode] === '⏱️' ? '📸' : MODE_ICON[mode], mode === 'arcade' ? '0' : '1/' + G.rounds, mode === 'odd' ? 'Round' : mode === 'arcade' ? 'Pictures done' : 'Picture');
   BAR.count('found', '🔎', '0/' + L.n, 'Found'); BAR.hide('found', mode === 'odd');
   BAR.miss(0);
   const hasSlot = k => !!document.querySelector('#scr-play .gb-' + k);   // a slot is only made when this case needs it (old ones from another case are hidden)
-  if(lvl > 0) BAR.time(0); else if(hasSlot('time')) BAR.hide('time', true);
+  if(mode === 'arcade') BAR.time(G.timeLeft); else if(lvl > 0) BAR.time(0); else if(hasSlot('time')) BAR.hide('time', true);
+  $('tbar').classList.toggle('hidden', mode !== 'arcade'); if(mode === 'arcade'){ G.hints = G.A.hints; arcBar(); }
   if(G.lives) BAR.lives(G.lives); else if(hasSlot('lives')) BAR.hide('lives', true);
   BAR.fit();
   bdStart(); layout();
@@ -886,21 +920,23 @@ function nextPicture(){
   if(!G) return;
   G.pic++; const L = G.L;
   let theme = SET.house === 'mix' ? pkPick(PK.THEME_KEYS.filter(k => k !== G.lastTheme)) : SET.house;
-  let sc = null; for(let i = 0; i < 6 && !sc; i++){ const s = PK.newSeed(); sc = PK.makeScene(s, G.level, theme); if(sc && G.used[sc.sig]) sc = null; }
+  let sc = null; for(let i = 0; i < 6 && !sc; i++){ const s = PK.newSeed(); sc = PK.makeScene(s, G.level, theme, G.A ? {n: G.A.n} : null); if(sc && G.used[sc.sig]) sc = null; }
   G.lastTheme = theme; G.used[sc.sig] = 1; G.scene = sc; G.found = sc.diffs.map(() => false); G.pOops = 0; G.pHints = 0; G.pSecs = 0; G.lastFind = performance.now(); G.glowAt = -1;
-  G.hints = L.hints;
-  clearMarks(); BAR.count('pic', MODE_ICON[G.mode], (G.pic + 1) + '/' + G.rounds, 'Picture'); BAR.count('found', '🔎', '0/' + L.n, 'Found');
+  if(G.mode !== 'arcade') G.hints = L.hints;
+  const nN = sc.diffs.length;
+  clearMarks(); if(G.mode === 'arcade') BAR.count('pic', '📸', String(G.pics), 'Pictures done'); else BAR.count('pic', MODE_ICON[G.mode], (G.pic + 1) + '/' + G.rounds, 'Picture'); BAR.count('found', '🔎', '0/' + nN, 'Found');
   $('dots').innerHTML = sc.diffs.map(() => '<i></i>').join('');
   updHint(); layout(true);
   ['pic-a', 'pic-b'].forEach(id => { const e = $(id); e.classList.remove('in'); void e.offsetWidth; e.classList.add('in'); });
-  if(G.mode === 'blink') goal(G.pic === 0 && G.level === 0 ? '👁️ The picture flips A ↔ B. Poke what changes! (' + L.n + ' to find)' : '👁️ Watch it blink — find ' + L.n + ' changes!' + (G.level < 2 ? ' ' + typeTips() : ''));
+  if(G.mode === 'arcade') goal(G.pic === 0 ? '⏱️ Find ' + nN + ' · +' + G.A.find + ' s a find' + (G.level >= 3 ? ' · oops −' + G.A.oops + ' s' : '') + '!' : '📸 Picture ' + (G.pic + 1) + ' — find ' + nN + '!');
+  else if(G.mode === 'blink') goal(G.pic === 0 && G.level === 0 ? '👁️ The picture flips A ↔ B. Poke what changes! (' + L.n + ' to find)' : '👁️ Watch it blink — find ' + L.n + ' changes!' + (G.level < 2 ? ' ' + typeTips() : ''));
   else goal(G.pic === 0 && G.level === 0 ? '👀 Look at A and B. Poke what\'s different! (' + L.n + ' to find)' : '🔍 Find ' + L.n + ' differences!' + (G.level < 2 ? ' ' + typeTips() : ''));
   G.busy = false;
   if(G.mode === 'blink') startBlink();
   if(L.guide && G.pic === 0) guideHand();
   moment('picture', {n: G.pic, theme: sc.theme, seed: sc.seed});
 }
-const MODE_ICON = {spot: '🖼️', blink: '👁️', odd: '🎯'};
+const MODE_ICON = {spot: '🖼️', blink: '👁️', odd: '🎯', arcade: '⏱️'};
 function typeTips(){ return G.L.types.map(t => PK.TYPE_INFO[t].icon).join(' '); }
 function goal(html, cls){ const e = $('goal'); e.innerHTML = html; e.className = 'goal' + (cls ? ' ' + cls : ''); }
 /* layout: two pictures as big as they fit — side by side, or top / bottom on a phone held upright */
@@ -955,13 +991,14 @@ function found(i){
   const d = G.scene.diffs[i]; G.found[i] = true; G.lastFind = performance.now();
   G.marks.filter(m => m.glow === i).forEach(dropMark);
   ['A', 'B'].forEach(s => { const m = mark(s, 'found', d.x, d.y, d.hit); m.found = i; });
-  const n = G.found.filter(Boolean).length, L = G.L;
+  const n = G.found.filter(Boolean).length, L = G.L, N = G.scene.diffs.length;
   const dots = $('dots').children; if(dots[n - 1]) dots[n - 1].classList.add('on');
-  BAR.count('found', '🔎', n + '/' + L.n, 'Found');
+  BAR.count('found', '🔎', n + '/' + N, 'Found');
+  if(G.mode === 'arcade'){ G.timeLeft += G.A.find; G.total.found++; timePop('+' + G.A.find + ' s'); arcBar(); }
   UISound.play('success'); bdReact('happy', 1300);
-  goal((FOUND_SAY[d.sub] || '🎉 Found one!') + ' ' + (n < L.n ? (L.n - n) + ' more to find.' : ''), 'yay');
+  goal((FOUND_SAY[d.sub] || '🎉 Found one!') + ' ' + (n < N ? (N - n) + ' more to find.' : ''), 'yay');
   moment('found', {i, type: d.t, sub: d.sub, n});
-  if(n >= L.n) pictureDone();
+  if(n >= N) pictureDone();
 }
 function oops(side, p){
   G.pOops++; G.total.oops++; BAR.miss(G.total.oops);
@@ -969,6 +1006,10 @@ function oops(side, p){
   const m = mark(side, 'oops', p.x, p.y, 0, '✗'); setTimeout(() => dropMark(m), FX ? 800 : 0);
   const pic = $(side === 'A' ? 'pic-a' : 'pic-b'); pic.classList.remove('shake'); void pic.offsetWidth; pic.classList.add('shake');
   moment('oops', {side, x: Math.round(p.x), y: Math.round(p.y)});
+  if(G.mode === 'arcade'){
+    if(G.A.oops){ G.timeLeft = Math.max(0, G.timeLeft - G.A.oops); timePop('−' + G.A.oops + ' s', true); arcBar(); goal('Oops! −' + G.A.oops + ' s — look closely.', 'oops'); if(G.timeLeft <= 0) timeUp(); return; }
+    goal('Oops! That part is the same in both. Keep looking!', 'oops'); return;
+  }
   if(G.L.lives){
     G.lives--; BAR.lives(Math.max(0, G.lives), G.lives <= 1);
     if(G.lives <= 0){ goal('💀 Out of oops — the case is lost this time.', 'oops'); return caseLost(); }
@@ -978,12 +1019,13 @@ function oops(side, p){
   goal(G.level < 2 ? 'Oops! That part looks the same in both. Look for ' + G.L.types.map(t => PK.TYPE_INFO[t].tip).join(' or ') + '.' : pkPick(['Oops! Same in both — keep looking.', 'Not that one! ' + left + ' left.', 'Oops! Compare A and B again.']), 'oops');
 }
 function pictureDone(){
+  if(G.mode === 'arcade') return arcPictureDone();
   G.busy = true; stopBlink(true); G.marks.filter(m => m.cls === 'glow').forEach(dropMark);
   const secs = Math.round(G.pSecs), L = G.L;
   const pts = PK.picturePoints(G.level, {found: L.n, secs, oops: G.pOops, hints: G.pHints});
   G.total.found += L.n; G.total.points += pts; if(!G.pOops && !G.pHints) G.total.perfect++;
   G.total.quick = G.total.quick ? Math.min(G.total.quick, Math.max(1, secs)) : Math.max(1, secs);
-  G.pics.push({theme: G.scene.theme, secs, oops: G.pOops, hints: G.pHints, pts});
+  G.picLog.push({theme: G.scene.theme, secs, oops: G.pOops, hints: G.pHints, pts});
   bigWord('🎉 ' + pkPick(PRAISE), '+' + pts + ' points'); bdReact('joy', 1800); UISound.play('unlock');
   moment('picdone', {n: G.pic, secs, oops: G.pOops, hints: G.pHints});
   pkWait(1500).then(() => {
@@ -1039,7 +1081,8 @@ function tick(){
   const now = performance.now(), dt = (now - G.last) / 1000; G.last = now;
   if(G.paused || G.held || G.busy || $('scr-play').classList.contains('hidden')) { G.lastFind += dt * 1000; return; }
   G.secs += dt; G.pSecs += dt;
-  if(G.level > 0) BAR.time(Math.floor(G.secs));
+  if(G.mode === 'arcade'){ G.timeLeft = Math.max(0, G.timeLeft - dt); BAR.time(Math.ceil(G.timeLeft), G.timeLeft <= 10); arcBar(); if(G.timeLeft <= 0) return timeUp(); }
+  else if(G.level > 0) BAR.time(Math.floor(G.secs));
   const glowS = G.mode === 'odd' ? G.O.glow : G.L.glow;
   if(G.mode === 'odd'){ if(glowS && now - G.lastFind > glowS * 1000 && G.odd && !G.odd.glow){ oddGlow(); goal('✨ Psst — look where it glows!'); UISound.play('pop'); } return; }
   if(G.L.glow && now - G.lastFind > G.L.glow * 1000){ const i = G.found.findIndex(f => !f); if(i >= 0 && !G.marks.some(m => m.glow === i)){ glowOn(i); goal('✨ Psst — look where it glows!'); UISound.play('pop'); } }
@@ -1055,7 +1098,8 @@ function confetti(list, count){ if(!FX) return; for(let i = 0; i < (count || 24)
 /* ================= RESULT + SAVES ================= */
 function houseLabel(){ const h = HOUSES.find(x => x.k === SET.house) || HOUSES[0]; return h.icon + ' ' + h.name; }
 function finishCase(won){
-  if(!G || G.over) return; G.over = true; stopTicker(); hideHand();
+  if(!G || G.over) return; if(G.mode === 'arcade') return arcFinish();
+  G.over = true; stopTicker(); hideHand();
   stopBlink(); const L = G.L, T = G.total, secs = Math.round(G.secs), hc = !!L.hardcore;
   const cleared = !!won, stars = PK.starsFor({cleared, oops: T.oops, hints: T.hints}), score = cleared ? T.points : Math.round(T.points * 0.5);
   const before = PK.rankOf(progressOf(S.player).unlocked || 0);
@@ -1089,19 +1133,20 @@ const PENDING_KEY = 'sp_pokadif_pending';
 const NOTES = [];
 function readPending(){ try{ return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); }catch(e){ return []; } }
 function writePending(list){ try{ localStorage.setItem(PENDING_KEY, JSON.stringify(list.slice(-20))); }catch(e){} }
-function flushPending(){ const list = readPending(); if(!list.length) return; writePending([]); list.forEach(w => { google.script.run.withFailureHandler(() => writePending(readPending().concat([w]))).saveLevelResult(GAME_ID, w.name, w.lvl, w.extra); }); }
+function flushPending(){ const list = readPending(); if(!list.length) return; writePending([]); list.forEach(w => { google.script.run.withFailureHandler(() => writePending(readPending().concat([w]))).saveLevelResult(w.board || GAME_ID, w.name, w.lvl, w.extra); }); }
 function putNote(i, html){ NOTES[i] = html; const n = $('save-note'); if(n) n.innerHTML = NOTES.filter(Boolean).join('<br>'); }
-function saveWin(name, lvl, extra, before, tries){
-  tries = tries || 0; const p = S.progress[name] || (S.progress[name] = {unlocked: 0, tokens: [], best: []});
+function saveWin(name, lvl, extra, before, tries, board){
+  board = board || GAME_ID; const P = board === ARC_ID ? S.progressArc : S.progress;
+  tries = tries || 0; const p = P[name] || (P[name] = {unlocked: 0, tokens: [], best: []});
   google.script.run.withSuccessHandler(res => {
       const best = (p.best || []).slice(); if(res && res.best) best[lvl] = res.best;
-      S.progress[name] = {unlocked: res ? res.unlocked : p.unlocked, tokens: res ? res.tokens : p.tokens, best}; flushPending();
-      const after = PK.rankOf(S.progress[name].unlocked || 0);
+      P[name] = {unlocked: res ? res.unlocked : p.unlocked, tokens: res ? res.tokens : p.tokens, best}; flushPending();
+      const after = PK.rankOf((S.progress[name] || {}).unlocked || 0);
       putNote(0, saveText(res || {}, extra.cleared) + (before && after.name !== before.name ? '<br><span class="rankup">' + after.icon + ' Rank up: ' + after.name + '!</span>' : ''));
     }).withFailureHandler(() => {
-      if(tries < 1){ setTimeout(() => saveWin(name, lvl, extra, before, tries + 1), 1200); return; }
-      writePending(readPending().concat([{name, lvl, extra}])); putNote(0, '⚠️ Could not save yet — it will be sent again next time.');
-    }).saveLevelResult(GAME_ID, name, lvl, extra);
+      if(tries < 1){ setTimeout(() => saveWin(name, lvl, extra, before, tries + 1, board), 1200); return; }
+      writePending(readPending().concat([{name, lvl, extra, board}])); putNote(0, '⚠️ Could not save yet — it will be sent again next time.');
+    }).saveLevelResult(board, name, lvl, extra);
 }
 function featText(fe, base){ let h = base || ''; if(fe){ (fe.newTitles || []).forEach(t => { h += '<br><span class="title-new">🏷️ New title: ' + t.icon + ' ' + UI.esc(t.name) + '</span>'; }); (fe.newBadges || []).forEach(b => { h += '<br><span class="feat-new">' + b.medal + ' ' + b.icon + ' ' + UI.esc(b.name) + ' · ' + b.tierName + '</span>'; }); } return h; }
 function saveText(res, cleared){
@@ -1184,6 +1229,50 @@ function oddHint(){
   G.hints--; G.pHints++; G.total.hints++; updHint(); UISound.play('whoosh'); oddGlow(); goal('🔍 The magnifier says: look at the glowing card!');
   moment('hint', {type: G.odd.type});
 }
+/* ================= ⏱️ PHOTO HUNT ARCADE (pk-2b): pictures in a row against the clock — + time per find, ✅ checkpoint every 5 pictures ================= */
+function arcBar(){ const e = $('tbar'); if(!e || !G || !G.A) return; const f = Math.max(0, Math.min(1, G.timeLeft / Math.max(G.A.start, 60))); e.firstElementChild.style.width = (f * 100) + '%'; e.classList.toggle('low', G.timeLeft <= 10); }
+function timePop(txt, bad){ if(!FX) return; const e = document.createElement('div'); e.className = 'tpop' + (bad ? ' bad' : ''); e.textContent = txt; $('board').appendChild(e); setTimeout(() => e.remove(), 1000); }
+function arcPictureDone(){
+  G.busy = true; G.pics++; G.timeLeft += G.A.pic; arcBar(); BAR.count('pic', '📸', String(G.pics), 'Pictures done');
+  if(!G.pOops && !G.pHints) G.total.perfect++;
+  G.total.quick = G.total.quick ? Math.min(G.total.quick, Math.max(1, Math.round(G.pSecs))) : Math.max(1, Math.round(G.pSecs));
+  const cp = G.pics % PK.CHECK_EVERY === 0;
+  if(cp){ G.cps++; G.timeLeft += G.A.cp; arcBar(); bigWord('✅ Checkpoint ' + G.cps + '!', '+' + (G.A.cp + G.A.pic) + ' s'); UISound.play('unlock'); bdReact('joy', 1800); confetti(['⏱️', '✅', '⭐'], 14); }
+  else { bigWord('📸 ' + pkPick(PRAISE), '+' + G.A.pic + ' s'); UISound.play('success'); bdReact('happy', 1200); }
+  moment(cp ? 'checkpoint' : 'picdone', {n: G.pics, cps: G.cps, left: Math.round(G.timeLeft)});
+  pkWait(cp ? 1300 : 800).then(() => {
+    if(!G || G.over) return;
+    ['pic-a', 'pic-b'].forEach(id => $(id).classList.add('out'));
+    pkWait(260).then(() => { if(!G || G.over) return; ['pic-a', 'pic-b'].forEach(id => $(id).classList.remove('out')); nextPicture(); });
+  });
+}
+function timeUp(){ if(!G || G.over || G.timeUp) return; G.timeUp = true; G.busy = true; UISound.play('error');
+  G.scene.diffs.forEach((d, i) => { if(!G.found[i]) ['A', 'B'].forEach(s => mark(s, 'miss', d.x, d.y, d.hit)); }); bigWord('⏱️ Time\'s up!'); moment('timeup', {pics: G.pics}); pkWait(1400).then(() => { if(G && !G.over) arcFinish(); }); }
+function arcFinish(){
+  if(!G || G.over) return; G.over = true; stopTicker(); hideHand();
+  const T = G.total, r = {found: T.found, pictures: G.pics, checkpoints: G.cps}, score = PK.arcadeScore(G.level, r), stars = PK.arcadeStars(r), cleared = G.cps >= 1, L = G.L, secs = Math.round(G.secs);
+  NOTES.length = 0;
+  let h = '<div class="res-det" id="res-det"><canvas id="res-av" width="240" height="264"></canvas><svg class="hat" viewBox="0 0 60 30" aria-hidden="true"><path d="M8 23 Q30 1 52 23 Z" fill="#8B5A2B" stroke="#3B2410" stroke-width="2"/><path d="M12 19 Q30 7 48 19" fill="none" stroke="#C99A5B" stroke-width="2" stroke-dasharray="3 3"/><path d="M3 24 H57" stroke="#3B2410" stroke-width="4" stroke-linecap="round"/><circle cx="30" cy="5" r="3" fill="#C99A5B"/></svg><span class="glass">⏱️</span></div>'
+    + '<h2 class="' + (cleared ? 'cheer' : '') + '">' + (cleared ? '⏱️ Great run, detective!' : '⏱️ Time\'s up!') + '</h2>'
+    + '<div class="note">⏱️ Photo Hunt Arcade · ' + L.name + (L.hardcore ? ' 💀' : '') + ' · ' + houseLabel() + '</div>'
+    + '<div class="rating">' + [1, 2, 3].map(i => '<span class="st' + (i <= stars ? '' : ' off') + '">⭐</span>').join('') + '</div><div class="score-big">🏆 ' + score.toLocaleString() + '</div>'
+    + '<div class="stats"><span>📸 ' + G.pics + ' picture' + (G.pics === 1 ? '' : 's') + '</span><span>✅ ' + G.cps + ' checkpoint' + (G.cps === 1 ? '' : 's') + '</span><span>🔎 ' + T.found + ' finds</span><span>❌ ' + T.oops + ' oops</span><span>⏱ ' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0') + '</span></div>';
+  if(!cleared) h += '<div class="note">💡 Reach ✅ checkpoint 1 (' + PK.CHECK_EVERY + ' pictures) to open the next level.</div>';
+  h += '<div class="save-note" id="save-note">' + (S.player ? '💾 Saving…' : '') + '</div>'
+    + '<div class="res-btns" id="res-btns"><button class="sp-btn sp-secondary" id="res-levels" data-sound="tap">🎚️ Levels</button><button class="sp-btn sp-secondary" id="res-again" data-sound="pop">🔁 Play again</button>'
+    + (cleared && G.level < 5 ? '<button class="sp-btn sp-primary" id="res-next" data-sound="pop">Next level ▶</button>' : '') + '</div><div class="comics-slot" id="comic-strip-slot"></div>';
+  showResult(h);
+  if(BD.on) UI.buddy($('res-av'), BD.who, {hold: cleared ? 'win' : 'lose'}); else $('res-det').classList.add('hidden');
+  $('res-levels').onclick = () => leavePlay();
+  $('res-again').onclick = () => startCase(G ? G.level : SET.level);
+  if($('res-next')) $('res-next').onclick = () => startCase(Math.min(5, (G ? G.level : SET.level) + 1));
+  if(cleared){ confetti(['⏱️', '⭐', '🕵️', '🎉'], 22); UISound.play('success'); } else bdReact('lose', 2000);
+  moment(cleared ? 'win' : 'lose', {score, stars, pics: G.pics, cps: G.cps});
+  const stats = {games: 1, pictures: G.pics, checkpoints: G.cps, found: T.found, oops: T.oops, hints: T.hints};
+  if(S.player) saveWin(S.player, G.level, {score, stars, cleared, timeSec: secs, theme: '⏱️ Arcade · ' + houseLabel(), stats}, null, 0, ARC_ID);
+  if(UI.alsoTry) UI.alsoTry({player: S.player, game: GAME_ID, at: () => $('res-btns'), current: SET.mode, open: id => { leavePlay(); msOpen(id); }});
+  SET.level = G.level;
+}
 function oddLost(){ const b = $('ogrid').children[G.odd.odd]; if(b) b.classList.add('missed'); bdReact('lose', 2200); pkWait(1600).then(() => { if(G && !G.over) finishCase(false); }); }
 
 /* ================= 🧑 YOUR AVATAR = the detective (P6 rule: UI.buddy pictures, never painted in a loop) ================= */
@@ -1221,7 +1310,7 @@ function boot(){
   UI.loading('pokadif');
   google.script.run.withSuccessHandler(d => {
       UI.loaded();
-      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {};
+      S.players = d.players || []; S.progress = d.progress || {}; S.progressArc = d.progressArcade || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {};
       UISound.applySettings(S.settings);
       const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
       lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
@@ -1235,4 +1324,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pk-2a) END OF Pokadif.html -->
+<!-- (pk-2a+pk-2b) END OF Pokadif.html -->

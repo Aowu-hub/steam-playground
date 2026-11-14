@@ -692,6 +692,7 @@ const MODES_ = [
   { game: 'pyraspike', id: 'sparksolo', icon: '⚡', name: 'PyraSpark 1v1', pitch: 'Net-table game — one bounce, no hands, EDGE balls!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '⚡ Spark 1v1', feat: [['pyraspike', 'm_sparksolo']] } },
   { game: 'pyraspike', id: 'sparkduo', icon: '🌩️', name: 'PyraSpark Duo 2v2', pitch: 'Pass to your partner, then send it back!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🌩️ Spark Duo 2v2', feat: [['pyraspike', 'm_sparkduo']] } },
   { game: 'pokadif', id: 'spot', icon: '🖼️', name: 'Find the Difference', pitch: 'Two pictures — poke every change!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '🖼️ Spot' } },
+  { game: 'pokadif', id: 'arcade', icon: '⏱️', name: 'Photo Hunt Arcade', pitch: 'Race the clock — every find adds time!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif-arcade' } },
   { game: 'pokadif', id: 'blink', icon: '👁️', name: 'Blink', pitch: 'One picture blinks — what changed?', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '👁️ Blink' } },
   { game: 'pokadif', id: 'odd', icon: '🎯', name: 'Odd One Out', pitch: 'Poke the one that doesn\'t belong!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '🎯 Odd One Out' } },
   { game: 'sciencetory', id: 'mechanic', icon: '⚙️', name: 'Sciencetory Mechanic', pitch: 'Test your crafted things!', route: 'sciencetory', added: '2026-11-14', tried: { board: 'sciencetory', themeStart: '⚙️ Mechanic' } },
@@ -733,7 +734,7 @@ const MODES_ = [
 const MODES_NEW_DAYS_ = 7;
 // 🗂️ mg-1 Mode groups — the same boxes (and order) as each game's start page. A mode not listed here has no group (2-mode games stay flat).
 const MODE_GROUPS_ = {
-  'pokadif': [{k: 'spot', icon: '🖼️', en: 'Spot', th: 'จับผิดภาพ', modes: ['spot', 'blink']}, {k: 'odd', icon: '🎯', en: 'Odd One Out', th: 'หาตัวที่ต่าง', modes: ['odd']}],   // 🔍 pk-2a (pk-2b adds ⏱️ arcade)
+  'pokadif': [{k: 'spot', icon: '🖼️', en: 'Spot', th: 'จับผิดภาพ', modes: ['spot', 'blink']}, {k: 'odd', icon: '🎯', en: 'Odd One Out', th: 'หาตัวที่ต่าง', modes: ['odd']}, {k: 'endless', icon: '⏱️', en: 'Arcade', th: 'อาร์เคด', modes: ['arcade']}],   // 🔍 pk-2a + pk-2b
   'geoscout': [{k: 'numbers', icon: '🧮', en: 'Number play', th: 'เล่นกับตัวเลข', modes: ['scale', 'count', 'tens', 'next']}, {k: 'shapes', icon: '🔷', en: 'Shapes + parts', th: 'รูปทรง · เศษส่วน', modes: ['shape', 'frac', 'wobble']}, {k: 'friends', icon: '⚔️', en: 'With friends', th: 'เล่นกับเพื่อน', modes: ['battle']}, {k: 'story', icon: '📖', en: 'Story', th: 'เนื้อเรื่อง', modes: ['journey']}],   // 🗂️ p3a (F5)
   'artifactory': [{k: 'hall', icon: '⚙️', en: 'Machine Hall', th: 'โรงเครื่องจักร', modes: ['lathe', 'planer', 'weld', 'forge', 'pottery', 'sew', 'light', 'finish']}, {k: 'hand', icon: '🪵', en: 'HandCraft Room', th: 'ห้องงานฝีมือ', modes: ['whittle', 'stone', 'print', 'lab', 'nature']}],   // 🗂️ p3a: the page's own areas
   'wisdeck': [{k: 'quiz', icon: '🧠', en: 'Quiz games', th: 'เกมตอบคำถาม', modes: ['quiz', 'buzz', 'daily']}, {k: 'num', icon: '🔢', en: 'Number games', th: 'เกมตัวเลข', modes: ['count', 'jack']}, {k: 'learn', icon: '📚', en: 'Learn + store', th: 'อ่าน · เรียน · เก็บการ์ด', modes: ['learn']}],
@@ -1271,6 +1272,11 @@ const LEVEL_GAMES = {
     badges: ['Lab Basic', 'Lab Junior', 'Lab Intermediate', 'Lab Hard', 'Lab Extreme', 'Lab Hardcore'],
     levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
   },
+  // ⏱️ Pokadif Photo Hunt Arcade (pk-2b): pictures in a row against the clock; cleared = ✅ checkpoint 1 (5 pictures); Theme = '⏱️ Arcade · <scene>'
+  'pokadif-arcade': {
+    badges: ['Quick Eye', 'Fast Finder', 'Speed Sleuth', 'Turbo Spotter', 'Lightning Detective', 'Arcade Legend'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
   'sla-brall': {
     badges: ['Rally Basic', 'Rally Junior', 'Rally Intermediate', 'Rally Hard', 'Rally Extreme', 'Rally Hardcore'],
     levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
@@ -1382,6 +1388,7 @@ function getLevelGameData(gameId, player) {
   if (gameId === 'wisdeck') { out.wisCards = wisCardRows_(); out.wisDaily = wisDaily_(); const all = activePlayers_(listProfilesFull()); out.wdBack = {}; all.forEach(p => { try { out.wdBack[p.Name] = itemsFor_(p.Name, all).owned.wdback || 0; } catch (e) { out.wdBack[p.Name] = 0; } }); }   // 🃏 sheet-tab cards + 📅 today's family board + 🂠 card backs owned
   if (gameId === 'wisdeck') { out.progressCount = {}; out.progressJack = {}; players.forEach(p => { out.progressCount[p.Name] = levelProgressFor_(p.Name, 'wiscount'); out.progressJack[p.Name] = levelProgressFor_(p.Name, 'wisjack'); }); }   // 🃏 WisDeck page shows all three boards   // 👀🧠 🎯 today's family number + 🏅 brain levels + 🔢 keypad skins owned   // ⬛ field journal + line trails owned   // 👻💣 battle unlocks (+ bomb skins, round 4)
   if (gameId === 'alignext') { out.progressOmni = {}; players.forEach(p => { out.progressOmni[p.Name] = levelProgressFor_(p.Name, 'omnifile'); }); }   // 🔴 Alignext page shows both boards (Drop + ❌⭕ Omnifile)
+  if (gameId === 'pokadif') { out.progressArcade = {}; players.forEach(p => { out.progressArcade[p.Name] = levelProgressFor_(p.Name, 'pokadif-arcade'); }); }   // 🔍 pk-2b: the page shows the ⏱️ Arcade board too
   if (gameId === 'beat-corner') { out.progressPiano = {}; out.progressDrums = {}; players.forEach(p => { out.progressPiano[p.Name] = levelProgressFor_(p.Name, 'beat-piano'); out.progressDrums[p.Name] = levelProgressFor_(p.Name, 'beat-drums'); }); }   // 🎹 🥁 BeatCorner shows the Piano + Drums boards too (plan 11-bc)
   if (gameId === 'beat-corner') out.familySongs = safeFamilySongs_();   // 🎼 Song Maker: every family song (plan 11-bc round 4)
   { const st = out.settings; out.avatars = {}; players.forEach(p => { out.avatars[p.Name] = parseAvatar_(st['Avatar_' + p.Name]); }); }   // 🧑 every level game gets every player's avatar (plan 11w: an avatar in every game)
@@ -1761,7 +1768,7 @@ function recordsFor_(gameId, players) {
 }
 
 // Games shown on the Achievements records board.
-const RECORD_GAMES = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'brawenture', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'beat-piano', 'beat-drums', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'pyraspike', 'pokadif', 'sciencetory'];
+const RECORD_GAMES = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'brawenture', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'beat-piano', 'beat-drums', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'pyraspike', 'pokadif', 'sciencetory', 'pokadif-arcade'];
 // Per level: the fastest finish and the top score among active players.
 function gameRecords_(gameId, players) {
   const names = {};
@@ -2503,6 +2510,15 @@ const FEAT_DEFS = {
     compounds: { name: 'Molecules built', icon: '⚛️', kind: 'max', tiers: [5, 20, 50] },
     chemRounds: { name: 'Chemistry rounds', icon: '⚗️', kind: 'sum', hidden: true },
   },
+  // ⏱️ Pokadif Arcade feats (pk-2b)
+  'pokadif-arcade': {
+    pictures: { name: 'Best Arcade run', icon: '📸', kind: 'max', tiers: [5, 15, 30], unit: ' pictures' },
+    checkpoints: { name: 'Arcade checkpoints', icon: '✅', kind: 'sum', tiers: [3, 20, 100] },
+    found: { name: 'Arcade finds', icon: '🔎', kind: 'sum', tiers: [30, 300, 1500] },
+    games: { name: 'Arcade runs', icon: '⏱️', kind: 'sum', hidden: true },
+    hints: { name: 'Arcade hints', icon: '🔍', kind: 'sum', hidden: true },
+    oops: { name: 'Arcade oops', icon: '❌', kind: 'sum', hidden: true },
+  },
   'sla-brall': {
     wins: { name: 'Match Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
     rally: { name: 'Rally Machine', icon: '🔁', kind: 'max', tiers: [10, 25, 50] },
@@ -2694,6 +2710,8 @@ const TITLE_DEFS = [
   { id: 'pk_case', name: 'Case Closer', icon: '📁', hint: 'Solve 10 Pokadif cases', rule: f => featVal_(f, 'pokadif', 'cases') >= 10 },
   { id: 'pk_odd', name: 'Odd Spotter', icon: '🎯', hint: 'Find 30 odd ones in Pokadif', rule: f => featVal_(f, 'pokadif', 'odd') >= 30 },
   { id: 'pk_blink', name: 'Blink Master', icon: '👁️', hint: 'Find 30 changes in Pokadif Blink', rule: f => featVal_(f, 'pokadif', 'blinks') >= 30 },
+  { id: 'pk_arc', name: 'Speed Sleuth', icon: '📸', hint: 'Finish 15 pictures in one Pokadif Arcade run', rule: f => featVal_(f, 'pokadif-arcade', 'pictures') >= 15 },
+  { id: 'pk_cp', name: 'Checkpoint Champ', icon: '✅', hint: 'Reach 20 checkpoints in Pokadif Arcade', rule: f => featVal_(f, 'pokadif-arcade', 'checkpoints') >= 20 },
   { id: 'pk_quick', name: 'Lightning Lens', icon: '⚡', hint: 'Finish a Pokadif picture in 10 seconds', rule: f => { const q = featVal_(f, 'pokadif', 'quick'); return q > 0 && q <= 10; } },
   { id: 'bo_boot', name: 'Golden Boot', icon: '⚽', hint: 'Score 50 goals in BlasOff', rule: f => featVal_(f, 'blasoff', 'goals') >= 50 },   // ⚽ bo-1
   { id: 'bo_tricks', name: 'Trick Master', icon: '🌀', hint: 'Land 50 tricks in BlasOff', rule: f => featVal_(f, 'blasoff', 'tricks') >= 50 },
@@ -2819,7 +2837,7 @@ function featBadges_(f) {
   return out;
 }
 function titleContext_(name, players) {
-  const cleared = {}, bigGames = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'pyraspike', 'pokadif', 'sciencetory'];
+  const cleared = {}, bigGames = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'pyraspike', 'pokadif', 'sciencetory', 'pokadif-arcade'];
   let allRound = true;
   bigGames.forEach(g => {
     const p = g === 'maze' ? mazeProgressFor_(name) : levelProgressFor_(name, g);
@@ -4564,7 +4582,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
