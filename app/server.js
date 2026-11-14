@@ -2475,6 +2475,8 @@ const FEAT_DEFS = {
     win_5v5: { name: 'Futsal wins', icon: '🥅', kind: 'sum', hidden: true },   // 🏟️ bo-2b
     win_1v1: { name: 'Street wins', icon: '🏙️', kind: 'sum', hidden: true },
     nutmegs: { name: 'Nutmeg King', icon: '🥜', kind: 'sum', tiers: [3, 25, 100] },
+    perfects: { name: 'Perfect Timing', icon: '⚡', kind: 'sum', tiers: [5, 50, 200] },   // ⚡ bo-2c
+    blasts: { name: 'Star Blaster', icon: '🔥', kind: 'sum', tiers: [1, 10, 50] },
   },
   // 🔍 Pokadif feats (pk-1)
   'pokadif': {
@@ -4562,7 +4564,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
