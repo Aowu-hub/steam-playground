@@ -692,6 +692,8 @@ const MODES_ = [
   { game: 'pyraspike', id: 'sparksolo', icon: '⚡', name: 'PyraSpark 1v1', pitch: 'Net-table game — one bounce, no hands, EDGE balls!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '⚡ Spark 1v1', feat: [['pyraspike', 'm_sparksolo']] } },
   { game: 'pyraspike', id: 'sparkduo', icon: '🌩️', name: 'PyraSpark Duo 2v2', pitch: 'Pass to your partner, then send it back!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🌩️ Spark Duo 2v2', feat: [['pyraspike', 'm_sparkduo']] } },
   { game: 'pokadif', id: 'spot', icon: '🖼️', name: 'Find the Difference', pitch: 'Two pictures — poke every change!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '🖼️ Spot' } },
+  { game: 'pokadif', id: 'blink', icon: '👁️', name: 'Blink', pitch: 'One picture blinks — what changed?', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '👁️ Blink' } },
+  { game: 'pokadif', id: 'odd', icon: '🎯', name: 'Odd One Out', pitch: 'Poke the one that doesn\'t belong!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '🎯 Odd One Out' } },
   { game: 'sciencetory', id: 'mechanic', icon: '⚙️', name: 'Sciencetory Mechanic', pitch: 'Test your crafted things!', route: 'sciencetory', added: '2026-11-14', tried: { board: 'sciencetory', themeStart: '⚙️ Mechanic' } },
   { game: 'sla-brall', id: 'slashot', icon: '🏒', name: 'SlaShot', pitch: 'Table hockey — score goals!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaShot ·', feat: [['sla-brall', 'win_slashot']] } },
   { game: 'sla-brall', id: 'slapoof', icon: '🥒', name: 'SlaPoof', pitch: 'Pickleball — mind the kitchen!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaPoof ·', feat: [['sla-brall', 'win_slapoof']] } },
@@ -730,6 +732,7 @@ const MODES_ = [
 const MODES_NEW_DAYS_ = 7;
 // 🗂️ mg-1 Mode groups — the same boxes (and order) as each game's start page. A mode not listed here has no group (2-mode games stay flat).
 const MODE_GROUPS_ = {
+  'pokadif': [{k: 'spot', icon: '🖼️', en: 'Spot', th: 'จับผิดภาพ', modes: ['spot', 'blink']}, {k: 'odd', icon: '🎯', en: 'Odd One Out', th: 'หาตัวที่ต่าง', modes: ['odd']}],   // 🔍 pk-2a (pk-2b adds ⏱️ arcade)
   'geoscout': [{k: 'numbers', icon: '🧮', en: 'Number play', th: 'เล่นกับตัวเลข', modes: ['scale', 'count', 'tens', 'next']}, {k: 'shapes', icon: '🔷', en: 'Shapes + parts', th: 'รูปทรง · เศษส่วน', modes: ['shape', 'frac', 'wobble']}, {k: 'friends', icon: '⚔️', en: 'With friends', th: 'เล่นกับเพื่อน', modes: ['battle']}, {k: 'story', icon: '📖', en: 'Story', th: 'เนื้อเรื่อง', modes: ['journey']}],   // 🗂️ p3a (F5)
   'artifactory': [{k: 'hall', icon: '⚙️', en: 'Machine Hall', th: 'โรงเครื่องจักร', modes: ['lathe', 'planer', 'weld', 'forge', 'pottery', 'sew', 'light', 'finish']}, {k: 'hand', icon: '🪵', en: 'HandCraft Room', th: 'ห้องงานฝีมือ', modes: ['whittle', 'stone', 'print', 'lab', 'nature']}],   // 🗂️ p3a: the page's own areas
   'wisdeck': [{k: 'quiz', icon: '🧠', en: 'Quiz games', th: 'เกมตอบคำถาม', modes: ['quiz', 'buzz', 'daily']}, {k: 'num', icon: '🔢', en: 'Number games', th: 'เกมตัวเลข', modes: ['count', 'jack']}, {k: 'learn', icon: '📚', en: 'Learn + store', th: 'อ่าน · เรียน · เก็บการ์ด', modes: ['learn']}],
@@ -2477,6 +2480,8 @@ const FEAT_DEFS = {
     cases: { name: 'Cases closed', icon: '📁', kind: 'sum', tiers: [3, 30, 100] },
     perfect: { name: 'Perfect pictures', icon: '🦅', kind: 'sum', tiers: [5, 50, 200] },
     quick: { name: 'Fastest picture', icon: '⚡', kind: 'min', tiers: [40, 20, 10], unit: 's' },
+    odd: { name: 'Odd ones found', icon: '🎯', kind: 'sum', tiers: [10, 100, 500] },   // pk-2a
+    blinks: { name: 'Blink finds', icon: '👁️', kind: 'sum', tiers: [10, 100, 500] },
     games: { name: 'Pokadif cases', icon: '🔍', kind: 'sum', hidden: true },
     hints: { name: 'Magnifier hints', icon: '🔍', kind: 'sum', hidden: true },
     oops: { name: 'Oops pokes', icon: '❌', kind: 'sum', hidden: true },
@@ -2678,6 +2683,8 @@ const TITLE_DEFS = [
   { id: 'pk_eyes', name: 'Sharp Eyes', icon: '👀', hint: 'Find 50 differences in Pokadif', rule: f => featVal_(f, 'pokadif', 'found') >= 50 },
   { id: 'pk_eagle', name: 'Eagle Eye', icon: '🦅', hint: 'Finish 10 Pokadif pictures with no oops and no hint', rule: f => featVal_(f, 'pokadif', 'perfect') >= 10 },
   { id: 'pk_case', name: 'Case Closer', icon: '📁', hint: 'Solve 10 Pokadif cases', rule: f => featVal_(f, 'pokadif', 'cases') >= 10 },
+  { id: 'pk_odd', name: 'Odd Spotter', icon: '🎯', hint: 'Find 30 odd ones in Pokadif', rule: f => featVal_(f, 'pokadif', 'odd') >= 30 },
+  { id: 'pk_blink', name: 'Blink Master', icon: '👁️', hint: 'Find 30 changes in Pokadif Blink', rule: f => featVal_(f, 'pokadif', 'blinks') >= 30 },
   { id: 'pk_quick', name: 'Lightning Lens', icon: '⚡', hint: 'Finish a Pokadif picture in 10 seconds', rule: f => { const q = featVal_(f, 'pokadif', 'quick'); return q > 0 && q <= 10; } },
   { id: 'bo_boot', name: 'Golden Boot', icon: '⚽', hint: 'Score 50 goals in BlasOff', rule: f => featVal_(f, 'blasoff', 'goals') >= 50 },   // ⚽ bo-1
   { id: 'bo_tricks', name: 'Trick Master', icon: '🌀', hint: 'Land 50 tricks in BlasOff', rule: f => featVal_(f, 'blasoff', 'tricks') >= 50 },
@@ -4548,7 +4555,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */

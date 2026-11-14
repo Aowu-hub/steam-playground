@@ -114,6 +114,27 @@
   @keyframes pk-in{0%{transform:scale(.6) rotate(6deg);opacity:0;}100%{transform:none;opacity:1;}}
   .pic.shake{animation:pk-shake .32s;}
   @keyframes pk-shake{25%{transform:translateX(-5px);}75%{transform:translateX(5px);}}
+  .pic.bl-off{visibility:hidden;}
+  #scr-play[data-mode="blink"] .pic{transition:none;}
+  #scr-play[data-mode="blink"] .pic .tag{font-size:0.9rem;padding:1px 10px;background:rgba(75,63,209,0.85);}
+  /* 🎯 Odd One Out grid (pk-2a) */
+  .ogrid{position:absolute;inset:0;display:grid;justify-content:center;align-content:center;padding:4px;}
+  .oc{position:relative;border:none;border-radius:18px;background:#FFFFFF;box-shadow:0 5px 0 rgba(0,0,0,0.25),0 0 0 3px rgba(255,255,255,0.35);cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;
+    animation:pk-deal .45s cubic-bezier(.2,1.5,.4,1) both;touch-action:manipulation;transition:transform .12s,opacity .3s,filter .3s;}
+  .oc > canvas{width:calc(100% - 4px);height:calc(100% - 4px);pointer-events:none;}
+  .oc.txt{background:linear-gradient(160deg,#FFFBEA,#FFF0C2);}
+  .ogrid[data-type="pattern"] .oc{background:#F3EEFF;}
+  .oc:active{transform:translateY(3px);}
+  @keyframes pk-deal{0%{transform:scale(.3) rotate(-12deg);opacity:0;}100%{transform:none;opacity:1;}}
+  .oc.right{box-shadow:0 0 0 5px #22E08A,0 0 22px #22E08A;animation:pk-win .6s cubic-bezier(.2,1.8,.4,1) both;z-index:2;}
+  .oc.right::after{content:'✓';position:absolute;right:-8px;top:-10px;width:28px;height:28px;border-radius:50%;background:#22B573;color:#fff;font-weight:900;font-size:17px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 0 rgba(0,0,0,.3);}
+  @keyframes pk-win{0%{transform:scale(1);}40%{transform:scale(1.18) rotate(4deg);}100%{transform:scale(1.06);}}
+  .oc.dim{opacity:.35;filter:grayscale(.6);}
+  .oc.nope{box-shadow:0 0 0 4px #FF5F7E,0 5px 0 rgba(0,0,0,.25);}
+  .oc.shake{animation:pk-shake .32s;}
+  .oc.glow{box-shadow:0 0 0 4px #FFD66B,0 0 24px 8px rgba(255,214,107,0.7);animation:pk-cglow 1.2s ease-in-out infinite;}
+  @keyframes pk-cglow{50%{transform:scale(1.06);}}
+  .oc.missed{box-shadow:0 0 0 5px #FF5F7E,0 0 18px #FF5F7E;}
   .mk{position:absolute;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;}
   .mk.found{border:4px solid #22E08A;box-shadow:0 0 0 3px rgba(255,255,255,0.85),0 0 16px #22E08A;animation:pk-ring .45s cubic-bezier(.2,1.8,.4,1) both;}
   .mk.found::after{content:'✓';position:absolute;right:-8px;top:-10px;width:22px;height:22px;border-radius:50%;background:#22B573;color:#fff;font-weight:900;font-size:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 0 rgba(0,0,0,.3);}
@@ -185,6 +206,9 @@
     <li><b>Two pictures</b> look the same — but a few things changed. <b>Poke</b> each change, in either picture.</li>
     <li>🌱 Basic: 🎨 colours + ➖➕ missing / extra things · 🐣 Junior adds 📏 size + 🔺 shape · 🔦 Intermediate adds 🔄 turn / flip + 🔢 count.</li>
     <li>🔍 <b>Magnifier</b>: stuck? It shows you one change (a few per picture).</li>
+    <li>👁️ <b>Blink</b>: ONE picture flips between A and B — poke what changes. Harder levels put a blank blink in between, so the change hides!</li>
+    <li>🎯 <b>Odd One Out</b>: all the cards are alike but one — poke it. From ⚡ Hard: 🧮 the sum that isn't right, 🔤 the word that doesn't rhyme · 🌋 Extreme: 🌀 the one that breaks the pattern.</li>
+    <li>⚡ Hard adds 🧮 sums and 🔤 words on little signs · 🌋 Extreme adds 🌀 bead patterns.</li>
     <li>A wrong poke is just an "oops" — but fewer oops = more ⭐. 💀 Hardcore: no magnifier, 3 oops and the case is lost.</li>
     <li>Every picture is new — made up on the spot, never the same twice!</li>
   </ul></details>
@@ -204,6 +228,7 @@
   <div class="board" id="board">
     <div class="pic" id="pic-a"><canvas id="cv-a"></canvas><span class="tag">A</span></div>
     <div class="pic" id="pic-b"><canvas id="cv-b"></canvas><span class="tag">B</span></div>
+    <div class="ogrid hidden" id="ogrid"></div>
     <div class="hand hidden" id="hand">👆</div>
     <div id="bigword-host"></div>
   </div>
@@ -228,7 +253,9 @@ var PK = (function () {
     house:    { s: 1.05, h: true, n: [1, 4] },  rocket: { s: 1.05, r: [90, 180] },  mushroom: { s: 1, n: [1, 5] },
     ladybug:  { s: 0.95, r: [90, 180], n: [2, 6] },  balloon: { s: 1 },  cloud: { s: 1.1 },  dice: { s: 0.9, n: [1, 6] },
     crystal:  { s: 1 },  planet: { s: 1, h: true },  boat: { s: 1.05, h: true },  snail: { s: 1, h: true },  gear: { s: 0.95 },
-    shell:    { s: 0.95, r: [180], n: [3, 7] },  leaf: { s: 1, r: [90] }
+    shell:    { s: 0.95, r: [180], n: [3, 7] },  leaf: { s: 1, r: [90] },
+    // R2 (pk-2a): a little sign with a sum or a word · a string of beads in a pattern (only used for those change types)
+    sign:     { s: 1, txt: true },  beads: { s: 1, pat: true }
   };
   var SHAPES = ['circle', 'square', 'triangle', 'star', 'heart', 'diamond', 'hexagon'];
 
@@ -247,25 +274,46 @@ var PK = (function () {
 
   // ---------- difference types ----------
   // colour · gone (➖ missing / ➕ extra) · size · shape · turn (🔄 turn / flip) · count
-  var TYPES = ['colour', 'gone', 'size', 'shape', 'turn', 'count'];
+  var TYPES6 = ['colour', 'gone', 'size', 'shape', 'turn', 'count'];
+  // R2 (pk-2a): 🧮 a sum on a sign changes · 🔤 a word on a sign changes · 🌀 one bead breaks the pattern
+  var TYPES = TYPES6.concat(['equation', 'word', 'pattern']);
   var TYPE_INFO = {
     colour: { icon: '🎨', name: 'Colour', tip: 'a different colour' },
     gone:   { icon: '➖➕', name: 'Missing / extra', tip: 'something missing or something extra' },
     size:   { icon: '📏', name: 'Size', tip: 'something bigger or smaller' },
     shape:  { icon: '🔺', name: 'Shape', tip: 'a different shape' },
     turn:   { icon: '🔄', name: 'Turn / flip', tip: 'something turned or flipped' },
-    count:  { icon: '🔢', name: 'Count', tip: 'more or fewer spots, petals or dots' }
+    count:  { icon: '🔢', name: 'Count', tip: 'more or fewer spots, petals or dots' },
+    equation: { icon: '🧮', name: 'Odd equation', tip: 'a sum on a sign that changed' },
+    word:   { icon: '🔤', name: 'Odd word', tip: 'a word on a sign that changed' },
+    pattern: { icon: '🌀', name: 'Pattern break', tip: 'a bead that breaks its pattern' }
   };
   // levels (plan §8): n = differences in a picture · items · r = item size · mag = how big a change is (1 = huge, smaller = subtler)
   // hints = 🔍 magnifier per picture · glow = soft glow on a missed difference after s seconds (0 = never) · lives = oops allowed (0 = no limit)
   var LEVELS = [
     { name: 'Basic',        n: 3, items: 8,  r: 31, mag: 1.0,  types: ['colour', 'gone'], hints: 3, glow: 10, pics: 3, lives: 0, guide: true },
     { name: 'Junior',       n: 4, items: 10, r: 28, mag: 0.85, types: ['colour', 'gone', 'size', 'shape'], hints: 2, glow: 20, pics: 3, lives: 0 },
-    { name: 'Intermediate', n: 5, items: 12, r: 26, mag: 0.7,  types: TYPES, hints: 2, glow: 0, pics: 3, lives: 0 },
-    { name: 'Hard',         n: 6, items: 14, r: 24, mag: 0.6,  types: TYPES, hints: 1, glow: 0, pics: 3, lives: 0 },
+    { name: 'Intermediate', n: 5, items: 12, r: 26, mag: 0.7,  types: TYPES6, hints: 2, glow: 0, pics: 3, lives: 0 },
+    { name: 'Hard',         n: 6, items: 14, r: 24, mag: 0.6,  types: TYPES6.concat(['equation', 'word']), hints: 1, glow: 0, pics: 3, lives: 0 },
     { name: 'Extreme',      n: 7, items: 16, r: 22, mag: 0.5,  types: TYPES, hints: 1, glow: 0, pics: 3, lives: 0 },
     { name: 'Hardcore',     n: 7, items: 18, r: 21, mag: 0.4,  types: TYPES, hints: 0, glow: 0, pics: 3, lives: 3, hardcore: true, decoys: true }
   ];
+
+  // ---------- signs: sums + words (pk-2a) ----------
+  var WORD_SETS = [['CAT', 'HAT', 'BAT', 'RAT', 'MAT'], ['DOG', 'DIG', 'DUG', 'LOG', 'FOG'], ['SUN', 'RUN', 'BUN', 'FUN'], ['PIG', 'BIG', 'WIG', 'FIG'], ['HEN', 'PEN', 'TEN', 'MEN'],
+    ['TOP', 'MOP', 'HOP', 'POP'], ['BUG', 'RUG', 'HUG', 'MUG', 'JUG'], ['MAP', 'CAP', 'TAP', 'NAP'], ['FIN', 'PIN', 'TIN', 'BIN'], ['BOX', 'FOX', 'BOY', 'TOY'], ['CUP', 'PUP', 'PUT', 'CUT']];
+  // rhyme families for 🎯 Odd One Out (one word comes from another family)
+  var RHYMES = [['CAT', 'HAT', 'BAT', 'MAT', 'RAT', 'SAT', 'PAT', 'FAT', 'FLAT', 'CHAT', 'THAT', 'SPLAT'], ['DOG', 'LOG', 'FOG', 'HOG', 'JOG', 'FROG', 'BOG', 'COG', 'CLOG', 'SMOG', 'BLOG', 'SLOG'],
+    ['PIG', 'BIG', 'DIG', 'FIG', 'WIG', 'JIG', 'TWIG', 'RIG', 'GIG', 'ZIG', 'SWIG', 'BRIG'], ['SUN', 'RUN', 'FUN', 'BUN', 'NUN', 'SPUN', 'STUN', 'DONE', 'ONE', 'TON', 'WON', 'GUN'],
+    ['TOP', 'MOP', 'HOP', 'POP', 'SHOP', 'STOP', 'DROP', 'CHOP', 'FLOP', 'CROP', 'PLOP', 'SLOP'], ['BUG', 'RUG', 'HUG', 'MUG', 'JUG', 'TUG', 'DUG', 'PLUG', 'SNUG', 'SLUG', 'SHRUG', 'DRUG'],
+    ['HEN', 'PEN', 'TEN', 'MEN', 'DEN', 'THEN', 'WHEN', 'WREN', 'GLEN', 'KEN', 'ZEN', 'YEN'], ['CAKE', 'LAKE', 'MAKE', 'BAKE', 'TAKE', 'RAKE', 'SNAKE', 'SHAKE', 'WAKE', 'FAKE', 'FLAKE', 'BRAKE']];
+  function makeSum(R, level) {
+    var minus = level >= 4 && R() < 0.45, a, b, c;
+    if (minus) { a = 5 + Math.floor(R() * (level >= 5 ? 15 : 10)); b = 1 + Math.floor(R() * (a - 1)); c = a - b; }
+    else { a = 1 + Math.floor(R() * 9); b = 1 + Math.floor(R() * 9); c = a + b; }
+    return { a: a, b: b, op: minus ? '−' : '+', c: c };
+  }
+  function sumText(e) { return e.a + e.op + e.b + '=' + e.c; }
 
   // ---------- helpers ----------
   function rng(seed) { var s = (seed >>> 0) || 1; return function () { s = (s * 1664525 + 1013904223) >>> 0; var t = s ^ (s >>> 15); t = Math.imul(t, 2246822519) >>> 0; return ((t ^ (t >>> 13)) >>> 0) / 4294967296; }; }
@@ -334,6 +382,19 @@ var PK = (function () {
       if (K.h && (!K.r || R() < 0.5)) { b.fl = -a.fl; d.sub = 'flip'; }
       else if (K.r) { b.rot = (a.rot + pick(R, K.r)) % 360; d.sub = 'turn'; }
       else return null;
+    } else if (type === 'equation') {
+      if (a.k !== 'sign' || a.tt !== 'eq') return null;
+      var e = { a: a.eq.a, b: a.eq.b, op: a.eq.op, c: a.eq.c }, st = mag >= 0.7 ? 2 : 1;
+      if (R() < 0.5) e.c = e.c + (R() < 0.5 || e.c <= st ? st : -st); else { e.b = e.b + (e.b <= st ? st : (R() < 0.5 ? st : -st)); }
+      b.eq = e; b.txt = sumText(e); if (b.txt === a.txt) return null; d.sub = 'sum';
+    } else if (type === 'word') {
+      if (a.k !== 'sign' || a.tt !== 'word') return null;
+      var set = null; WORD_SETS.forEach(function (ws) { if (ws.indexOf(a.txt) >= 0) set = ws; });
+      if (!set) return null; b.txt = pick(R, set.filter(function (w) { return w !== a.txt; })); d.sub = 'word';
+    } else if (type === 'pattern') {
+      if (a.k !== 'beads') return null;
+      var bi = 2 + Math.floor(R() * 4), cur = a.pat[bi], alt = PAL.filter(function (c) { return c !== cur && colDist(c, cur) >= 110 && a.pat.indexOf(c) < 0; });
+      if (!alt.length) return null; b.pat = a.pat.slice(); b.pat[bi] = pick(R, alt); d.sub = 'pattern';
     } else if (type === 'count') {
       if (!K.n || radiusOf(a) < 24) return null;
       var step = mag >= 0.7 ? 2 : 1, n2 = a.n + (R() < 0.5 ? step : -step);
@@ -352,7 +413,9 @@ var PK = (function () {
     return room;
   }
   // can this item carry this type at all? (so the scene gets the right kind of item for it)
-  function fits(type, k) { var K = KINDS[k]; if (type === 'turn') return !!(K.h || K.r); if (type === 'count') return !!K.n; return true; }
+  function fits(type, k) { var K = KINDS[k]; if (type === 'equation' || type === 'word') return k === 'sign'; if (type === 'pattern') return k === 'beads';
+    if (k === 'sign' || k === 'beads') return type === 'colour' || type === 'gone';
+    if (type === 'turn') return !!(K.h || K.r); if (type === 'count') return !!K.n; return true; }
 
   // ---------- a whole scene ----------
   // makeScene(seed, level, theme, {force: type, n}) → {seed, level, theme, A: [items], B: [items], diffs: [...], deco: [...]}
@@ -383,13 +446,16 @@ var PK = (function () {
         if (!kk.length) kk = sc.kinds.filter(function (k) { return fits(ty, k); });
         if (!kk.length) kk = Object.keys(KINDS).filter(function (k) { return fits(ty, k); });
         var k = pick(R, kk), r = L.r * (0.88 + R() * 0.24);
-        if (KINDS[k].n) r = Math.max(r, 27);   // things you can count (spots, petals, pips, windows) are big enough to count on a phone
+        if (KINDS[k].n) r = Math.max(r, 27);
+        if (k === 'sign' || k === 'beads') r = Math.max(r, 31);   // words, sums and beads big enough to read on a phone   // things you can count (spots, petals, pips, windows) are big enough to count on a phone
         var p = freeSpot(R, sc.A, sc.deco, r * KINDS[k].s);
         if (!p) continue;
         var c = cols ? pick(R, cols) : colourFor(R, used);
         used[c] = (used[c] || 0) + 1;
         var it = { id: 'i' + j, k: k, x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, r: Math.round(r * 10) / 10, c: c, rot: 0, fl: R() < 0.5 ? 1 : -1, n: countOf(R, k) };
         if (KINDS[k].r && R() < 0.3) it.rot = 90;
+        if (k === 'sign') { it.fl = 1; if (ty === 'word') { var ws = pick(R, WORD_SETS); it.txt = pick(R, ws); it.tt = 'word'; } else { it.eq = makeSum(R, level); it.txt = sumText(it.eq); it.tt = 'eq'; } }
+        if (k === 'beads') { it.fl = 1; it.pat = makePattern(R, level, 6).seq; }
         sc.A.push(it);
       }
       // apply the differences (to copies in B) — spaced so poke circles never overlap
@@ -414,6 +480,75 @@ var PK = (function () {
     }
     return null;
   }
+  // ---------- 🌀 patterns (beads in a scene + 🎯 Odd One Out rows) ----------
+  var UNITS = [[0, 1], [0, 0, 1], [0, 1, 2], [0, 1, 1], [0, 0, 1, 1], [0, 1, 2, 1]];
+  function makePattern(R, level, len) {
+    var units = UNITS.slice(0, level >= 4 ? 6 : level >= 3 ? 4 : 2), u = pick(R, units), cols = shuffle(R, PAL).slice(0, 3), seq = [];
+    for (var i = 0; i < len; i++) seq.push(cols[u[i % u.length]]);
+    return { unit: u, cols: cols, seq: seq };
+  }
+
+  // ---------- 🎯 ODD ONE OUT (pk-2a): a grid of cards, all alike but one ----------
+  // ODD[level]: cards on the grid · types that can show up · mag (how big the odd change is) · hints per case · glow s · lives
+  var ODD = [
+    { cards: 4,  types: ['colour', 'shape'], mag: 1, hints: 3, glow: 10, lives: 0, guide: true },
+    { cards: 6,  types: ['colour', 'shape', 'size'], mag: 0.85, hints: 2, glow: 20, lives: 0 },
+    { cards: 8,  types: ['colour', 'shape', 'size', 'turn', 'count'], mag: 0.7, hints: 2, glow: 0, lives: 0 },
+    { cards: 9,  types: ['colour', 'shape', 'size', 'turn', 'count', 'equation', 'word'], mag: 0.6, hints: 1, glow: 0, lives: 0 },
+    { cards: 12, types: ['colour', 'size', 'turn', 'count', 'equation', 'word', 'pattern'], mag: 0.5, hints: 1, glow: 0, lives: 0 },
+    { cards: 12, types: ['colour', 'size', 'turn', 'count', 'equation', 'word', 'pattern'], mag: 0.4, hints: 0, glow: 0, lives: 3, hardcore: true }
+  ];
+  var ODD_ROUNDS = 6;
+  // makeOdd(seed, level, theme, {force}) → {type, sub, cards: [...], odd, goal, say, sig}
+  //   picture cards: {k, c, r, rot, fl, n} drawn in a 100 × 100 card · sum cards: {txt, v} · word cards: {txt} · pattern cards: {k, c}
+  function makeOdd(seed, level, theme, opt) {
+    opt = opt || {};
+    var O = ODD[level] || ODD[0], T = THEMES[theme] ? theme : THEME_KEYS[seed % 6], TH = THEMES[T], R = rng(seed), n = O.cards;
+    var type = opt.force || pick(R, O.types), out = { seed: seed, level: level, theme: T, type: type, cards: [], odd: 0 };
+    var oddAt = Math.floor(R() * n);
+    if (type === 'equation') {
+      var tgt = level >= 4 ? 8 + Math.floor(R() * 10) : 5 + Math.floor(R() * 8), seen = {};
+      var ways = [];
+      for (var a = 0; a <= 20; a++) { var b = tgt - a; if (a >= 1 && b >= 1) ways.push(a + '+' + b); if (level >= 4 && a > tgt && a - tgt >= 1 && a <= 20) ways.push(a + '−' + (a - tgt)); }
+      ways = shuffle(R, ways);
+      var off = (R() < 0.5 ? 1 : -1) * (O.mag >= 0.6 ? 1 + Math.floor(R() * 2) : 1), bad = tgt + off, oa = Math.max(1, Math.min(bad - 1, 1 + Math.floor(R() * (bad - 1))));
+      for (var i = 0; i < n; i++) out.cards.push(i === oddAt ? { txt: oa + '+' + (bad - oa), v: bad } : { txt: ways[i % ways.length], v: tgt });
+      out.goal = 'Poke the one that isn\'t ' + tgt; out.say = '🧮 ' + out.cards[oddAt].txt + ' makes ' + bad + ', not ' + tgt + '!'; out.target = tgt;
+    } else if (type === 'word') {
+      var fams = shuffle(R, RHYMES), F = fams[0], G = fams[1], ws = shuffle(R, F.slice(0, Math.max(F.length, n)));
+      var other = pick(R, G.filter(function (w) { return F.indexOf(w) < 0; }));
+      for (var j = 0; j < n; j++) out.cards.push({ txt: j === oddAt ? other : ws[j % ws.length] });
+      // no duplicate words when the family is big enough
+      out.goal = 'Which word doesn\'t rhyme?'; out.say = '🔤 ' + other + ' doesn\'t rhyme with ' + F[0] + '!'; out.family = F[0];
+    } else if (type === 'pattern') {
+      var P = makePattern(R, Math.max(level, 3), n), U = P.unit.length;
+      oddAt = 2 * U + Math.floor(R() * Math.max(1, n - 2 * U));
+      if (oddAt >= n) oddAt = n - 1;
+      var kinds = shuffle(R, SHAPES.filter(function (k) { return k !== 'triangle' && k !== 'heart' && k !== 'diamond'; })), want = P.seq[oddAt];
+      var alt = P.cols.filter(function (c) { return c !== want; }).concat(PAL.filter(function (c) { return P.cols.indexOf(c) < 0 && colDist(c, want) >= 110; }));
+      var symK = {}; P.cols.forEach(function (c, i) { symK[c] = kinds[i % kinds.length]; });
+      for (var q = 0; q < n; q++) { var c = q === oddAt ? alt[0] : P.seq[q]; out.cards.push({ k: symK[c] || kinds[3], c: c, r: 34 }); }
+      out.goal = 'Which one breaks the pattern?'; out.say = '🌀 That one breaks the pattern!'; out.unit = P.unit;
+    } else {
+      // pictures: one kind + colour; the odd card has one change
+      var kk = TH.kinds.filter(function (k) { return fits(type, k) && k !== 'sign' && k !== 'beads'; });
+      if (!kk.length) kk = Object.keys(KINDS).filter(function (k) { return fits(type, k) && k !== 'sign' && k !== 'beads'; });
+      var k0 = pick(R, kk), base = { k: k0, c: pick(R, PAL), r: 28, rot: 0, fl: 1, n: countOf(R, k0) }, odd = clone(base), mag = O.mag;
+      if (KINDS[k0].n && base.n === KINDS[k0].n[1]) base.n--;
+      odd.n = base.n;
+      if (type === 'colour') { var need = 110 + 110 * mag; odd.c = shuffle(R, PAL).filter(function (c) { return colDist(c, base.c) >= need; })[0] || pick(R, PAL.filter(function (c) { return c !== base.c; })); out.sub = 'colour'; }
+      else if (type === 'shape') { odd.k = pick(R, TH.kinds.concat(SHAPES).filter(function (k) { return k !== k0 && !sameLook(k, k0) && k !== 'sign' && k !== 'beads'; })); odd.n = countOf(R, odd.k); out.sub = 'shape'; }
+      else if (type === 'size') { var up = R() < 0.5; odd.r = base.r * (up ? 1 + 0.2 + 0.3 * mag : 1 / (1 + 0.2 + 0.3 * mag)); out.sub = up ? 'bigger' : 'smaller'; }
+      else if (type === 'turn') { var K = KINDS[k0]; if (K.h && (!K.r || R() < 0.5)) { odd.fl = -1; out.sub = 'flip'; } else { odd.rot = pick(R, K.r); out.sub = 'turn'; } }
+      else if (type === 'count') { var stp = mag >= 0.7 ? 2 : 1, nn = base.n + stp; if (nn > KINDS[k0].n[1]) nn = base.n - stp; if (nn < KINDS[k0].n[0]) nn = base.n + 1; odd.n = nn; out.sub = nn > base.n ? 'more' : 'fewer'; }
+      for (var z = 0; z < n; z++) out.cards.push(z === oddAt ? odd : clone(base));
+      out.goal = 'Which one is different?';
+    }
+    out.odd = oddAt; out.sig = (hash(JSON.stringify([T, type, out.cards])) >>> 0).toString(36);
+    return out;
+  }
+  function oddPoints(level, r) { var p = 100 + Math.max(0, 15 - r.secs) * 8 - r.oops * 15 - r.hints * 40; return Math.max(0, Math.round(p * (1 + level * 0.25) * ((ODD[level] || {}).hardcore ? 3 : 1))); }
+
   function signature(sc) { return (hash(JSON.stringify([sc.theme, sc.A, sc.B])) >>> 0).toString(36); }
 
   // ---------- poking ----------
@@ -446,7 +581,7 @@ var PK = (function () {
   function nextRank(cleared) { for (var i = 0; i < RANKS.length; i++) if (RANKS[i].at > cleared) return RANKS[i]; return null; }
 
   return { W: W, H: H, GROUND: GROUND, MIN_HIT: MIN_HIT, KINDS: KINDS, SHAPES: SHAPES, THEMES: THEMES, THEME_KEYS: THEME_KEYS, PAL: PAL, TYPES: TYPES, TYPE_INFO: TYPE_INFO,
-    LEVELS: LEVELS, RANKS: RANKS, rng: rng, newSeed: newSeed, makeScene: makeScene, signature: signature, poke: poke, pokeFound: pokeFound, radiusOf: radiusOf, hitOf: hitOf,
+    LEVELS: LEVELS, RANKS: RANKS, TYPES6: TYPES6, WORD_SETS: WORD_SETS, RHYMES: RHYMES, ODD: ODD, ODD_ROUNDS: ODD_ROUNDS, makeOdd: makeOdd, oddPoints: oddPoints, makePattern: makePattern, sumText: sumText, rng: rng, newSeed: newSeed, makeScene: makeScene, signature: signature, poke: poke, pokeFound: pokeFound, radiusOf: radiusOf, hitOf: hitOf,
     colDist: colDist, picturePoints: picturePoints, starsFor: starsFor, rankOf: rankOf, nextRank: nextRank, fits: fits };
 })();
 if (typeof module !== 'undefined') module.exports = PK;
@@ -532,6 +667,13 @@ const PK_PAINT = {
   shell(g, r, c, n){ n = n || 5; g.beginPath(); g.moveTo(-r * 0.2, r * 0.72); g.arc(0, r * 0.72, r * 0.95, Math.PI * 1.08, Math.PI * 1.92); g.lineTo(r * 0.2, r * 0.72); g.closePath(); pkFill(g, c, r);
     for(let i = 1; i < n; i++){ const a = Math.PI * (1.08 + 0.84 * i / n); g.beginPath(); g.moveTo(0, r * 0.68); g.lineTo(Math.cos(a) * r * 0.9, r * 0.72 + Math.sin(a) * r * 0.9); g.lineWidth = r * 0.09; g.strokeStyle = pkTone(c, 0.6); g.stroke(); }
     pkRR(g, -r * 0.24, r * 0.6, r * 0.48, r * 0.26, r * 0.08); pkFill(g, pkTone(c, 0.8), r * 0.6); },
+  sign(g, r, c, n, it){ g.beginPath(); g.moveTo(0, r * 0.2); g.lineTo(0, r * 0.98); g.lineWidth = r * 0.14; g.strokeStyle = '#7A4A22'; g.stroke();
+    pkRR(g, -r * 0.98, -r * 0.62, r * 1.96, r * 0.92, r * 0.16); pkFill(g, c, r); pkRR(g, -r * 0.84, -r * 0.5, r * 1.68, r * 0.68, r * 0.1); g.fillStyle = '#FFFBEA'; g.fill();
+    const t = (it && it.txt) || '?'; g.fillStyle = '#26203F'; g.textAlign = 'center'; g.textBaseline = 'middle'; let fs = r * 0.6; g.font = '700 ' + fs + 'px Fredoka, Nunito, sans-serif';
+    const w = g.measureText(t).width; if(w > r * 1.56){ fs *= r * 1.56 / w; g.font = '700 ' + fs + 'px Fredoka, Nunito, sans-serif'; } g.fillText(t, 0, -r * 0.15); },
+  beads(g, r, c, n, it){ const pat = (it && it.pat) || [c, c, c, c, c, c], m = pat.length, sp = r * 1.8 / (m - 1);
+    g.beginPath(); g.moveTo(-r * 1.0, -r * 0.1); g.quadraticCurveTo(0, r * 0.35, r * 1.0, -r * 0.1); g.lineWidth = r * 0.05; g.strokeStyle = PK_INK; g.stroke();
+    pat.forEach((col, i) => { const x = -r * 0.9 + i * sp, y = -r * 0.08 + Math.sin(Math.PI * i / (m - 1)) * r * 0.32; g.beginPath(); g.arc(x, y, r * 0.2, 0, 7); pkFill(g, col, r * 0.6); pkShine(g, x - r * 0.06, y - r * 0.07, r * 0.05); }); },
   leaf(g, r, c){ g.beginPath(); g.moveTo(0, r * 0.95); g.lineTo(0, r * 0.6); g.lineWidth = r * 0.1; g.strokeStyle = '#6B4423'; g.stroke();
     g.beginPath(); g.moveTo(0, r * 0.65); g.bezierCurveTo(-r * 0.8, r * 0.3, -r * 0.5, -r * 0.6, 0, -r); g.bezierCurveTo(r * 0.5, -r * 0.6, r * 0.8, r * 0.3, 0, r * 0.65); g.closePath(); pkFill(g, c, r);
     g.beginPath(); g.moveTo(0, r * 0.6); g.lineTo(0, -r * 0.8); g.moveTo(0, r * 0.1); g.lineTo(-r * 0.3, -r * 0.15); g.moveTo(0, -r * 0.2); g.lineTo(r * 0.28, -r * 0.45); g.lineWidth = r * 0.05; g.strokeStyle = pkTone(c, 0.6); g.stroke(); }
@@ -553,7 +695,7 @@ function pkItem(g, it){
   const K = PK.KINDS[it.k] || {s: 1}, r = it.r * K.s, P = PK_PAINT[it.k] || PK_PAINT.circle;
   g.save(); g.translate(it.x, it.y);
   g.fillStyle = 'rgba(0,0,0,0.16)'; g.beginPath(); g.ellipse(0, r * 0.92, r * 0.66, r * 0.14, 0, 0, 7); g.fill();
-  g.rotate((it.rot || 0) * Math.PI / 180); g.scale(it.fl || 1, 1); P(g, r, it.c, it.n); g.restore();
+  g.rotate((it.rot || 0) * Math.PI / 180); g.scale(it.fl || 1, 1); P(g, r, it.c, it.n, it); g.restore();
 }
 // paint picture 'A' or 'B' of a scene; k = CSS pixels per world unit, dpr = device pixels per CSS pixel
 function pkPaint(cv, sc, side, k, dpr){
@@ -562,6 +704,13 @@ function pkPaint(cv, sc, side, k, dpr){
   pkBackground(g, sc);
   (side === 'B' ? sc.B : sc.A).slice().sort((a, b) => a.y - b.y || (a.id < b.id ? -1 : 1)).forEach(it => pkItem(g, it));
   g.setTransform(1, 0, 0, 1, 0, 0);
+}
+// 🎯 one Odd One Out card: a picture card (one piece in a 100 × 100 card) or a text card (sum / word)
+function pkCard(cv, card, px, dpr){
+  const g = cv.getContext('2d'); cv.width = cv.height = Math.round(px * dpr); g.setTransform(px * dpr / 100, 0, 0, px * dpr / 100, 0, 0); g.clearRect(0, 0, 100, 100);
+  if(card.txt != null){ g.fillStyle = '#26203F'; g.textAlign = 'center'; g.textBaseline = 'middle'; let fs = 30; g.font = '700 ' + fs + 'px Fredoka, Nunito, sans-serif';
+    const w = g.measureText(card.txt).width; if(w > 86){ fs *= 86 / w; g.font = '700 ' + fs + 'px Fredoka, Nunito, sans-serif'; } g.fillText(card.txt, 50, 52); g.setTransform(1, 0, 0, 1, 0, 0); return; }
+  pkItem(g, Object.assign({x: 50, y: 48, rot: 0, fl: 1}, card)); g.setTransform(1, 0, 0, 1, 0, 0);
 }
 const WEBAPP_URL = ''+__SP("webAppUrl")+'';
 const CURRENT_PLAYER = ''+__SP("player")+''; window.SP_PAGE = 'pokadif';
@@ -572,9 +721,9 @@ const DURATION_MIN = Number(''+__SP("durationMin")+'') || null;
 const GAME_ID = 'pokadif';
 // UiKit lists (loader + ❓ card) are registered here, so UiKit itself is not touched (polish lane) — move them into UiKit when that lane is free
 if(UI.KINDS && !UI.KINDS.pokadif) UI.KINDS.pokadif = ['🔍', 'Opening the detective file', 'peek'];
-if(UI.GAME_HELP && !UI.GAME_HELP.pokadif) UI.GAME_HELP.pokadif = ['Be a little detective! Two pictures look the same, but a few things changed. Poke every change — in either picture.',
-  'Tap (or click) the thing that is different. 🌱 Basic: colours + missing things. More levels add 📏 size, 🔺 shape, 🔄 turn / flip and 🔢 count.',
-  'Stuck? Tap 🔍 — the magnifier shows you one change. Fewer oops = more ⭐. Every picture is brand new!'];
+if(UI.GAME_HELP && !UI.GAME_HELP.pokadif) UI.GAME_HELP.pokadif = ['Be a little detective! 🖼️ Spot: two pictures, poke every change · 👁️ Blink: one picture flips — what changed? · 🎯 Odd One Out: poke the one that doesn\'t belong.',
+  'Tap (or click) what is different. 🌱 Basic: colours + missing things. More levels add 📏 size, 🔺 shape, 🔄 turn / flip, 🔢 count, then 🧮 sums, 🔤 words and 🌀 patterns.',
+  'Stuck? Tap 🔍 — the magnifier shows you one. Fewer oops = more ⭐. Every picture is brand new!'];
 const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '🔍', name: 'Pokadif', levelId: 'hud-level',
   levels: () => leavePlay(), playing: () => !!(G && !G.over), onLeave: () => stopTicker(),
   pause: {pause: () => setPaused(true), resume: () => setPaused(false)}, pauseButton: true,
@@ -596,20 +745,24 @@ const LEVEL_UI = [
   {emoji: '🌋', blurb: 'Smaller changes, more things to check.'},
   {emoji: '💀', blurb: 'Tiny changes + look-alikes, no magnifier, 3 oops = case lost. ×3 points.', hardcore: true}
 ];
+const ODD_BLURB = ['🎨 colours + 🔺 shapes, 4 big cards', '+ 📏 bigger / smaller', '+ 🔄 turned + 🔢 counting', '+ 🧮 odd sums + 🔤 odd words', '+ 🌀 patterns, 12 cards', 'Tiny changes, 3 oops = case lost. ×3 points.'];
+const BLINK_BLURB = ['The picture flips A ↔ B — changes pop out', 'A tiny blink between the pictures', 'A longer blink — harder!', 'Long blink, + sums + words', '+ patterns, quick flips', 'Quick flips, long blinks, 3 oops. ×3 points.'];
+const BLINK = [{show: 1300, gap: 0}, {show: 1200, gap: 80}, {show: 1100, gap: 140}, {show: 1000, gap: 180}, {show: 900, gap: 220}, {show: 750, gap: 260}];   // ms each picture shows · the blank blink between (longer = harder to see the change)
 const BADGES = [['🔍', 'Rookie Eye'], ['🔎', 'Sharp Spotter'], ['🧐', 'Clue Finder'], ['🎖️', 'Keen Inspector'], ['🌟', 'Super Sleuth'], ['👑', 'Master Detective']];   // = Code.gs LEVEL_GAMES.pokadif.badges
 const AGE_START = {'4-5': 0, '6-7': 0, '8-9': 1, '10+': 2};
 /* 🗂️ MODE GROUPS (mg-1) — fixed order; R1 plays 🖼️ Find the Difference, the others come in R2–R4 (shown as 🔜) */
-const MODE_GROUPS = [{k: 'spot', icon: '🖼️', en: 'Spot', th: 'จับผิดภาพ', c: '#4B3FD1'}, {k: 'endless', icon: '⏱️', en: 'Arcade', th: 'อาร์เคด', c: '#FF8A3D'},
-  {k: 'story', icon: '📖', en: 'Stories', th: 'นิทานนักสืบ', c: '#22B573'}, {k: 'friends', icon: '👥', en: 'With friends', th: 'เล่นกับเพื่อน', c: '#E5486F'}];
+const MODE_GROUPS = [{k: 'spot', icon: '🖼️', en: 'Spot', th: 'จับผิดภาพ', c: '#4B3FD1'}, {k: 'odd', icon: '🎯', en: 'Odd One Out', th: 'หาตัวที่ต่าง', c: '#22B573'},
+  {k: 'endless', icon: '⏱️', en: 'Arcade', th: 'อาร์เคด', c: '#FF8A3D'}, {k: 'next', icon: '🔜', en: 'Coming next', th: 'เร็ว ๆ นี้', c: '#E5486F'}];
 const MODES = [
   {k: 'spot', g: 'spot', icon: '🖼️', name: 'Find the Difference', type: 'A spot-the-difference game', sub: 'Two pictures — poke every change', next: '👇 then pick a level'},
-  {k: 'blink', g: 'spot', icon: '👁️', name: 'Blink', type: 'Round 2', sub: 'The picture blinks — what changed?', soon: true},
-  {k: 'odd', g: 'spot', icon: '🎯', name: 'Odd One Out', type: 'Round 2', sub: 'Poke the one that doesn\'t belong', soon: true},
-  {k: 'arcade', g: 'endless', icon: '⏱️', name: 'Photo Hunt Arcade', type: 'Round 2', sub: 'Each find adds time — how far?', soon: true},
-  {k: 'detective', g: 'story', icon: '🕵️', name: 'Detective Adventure', type: 'Round 3', sub: 'Solve a case: find · read · walk · crack', soon: true},
-  {k: 'race', g: 'friends', icon: '🏁', name: 'Race', type: 'Round 4', sub: 'Who finds them first?', soon: true}
+  {k: 'blink', g: 'spot', icon: '👁️', name: 'Blink', type: 'A flicker-and-find game', sub: 'One picture blinks — what changed?', next: '👇 then pick a level'},
+  {k: 'odd', g: 'odd', icon: '🎯', name: 'Odd One Out', type: 'A find-the-odd-one game', sub: 'Poke the one that doesn\'t belong', next: '👇 then pick a level'},
+  {k: 'arcade', g: 'endless', icon: '⏱️', name: 'Photo Hunt Arcade', type: 'Round 2b', sub: 'Each find adds time — how far?', soon: true},
+  {k: 'detective', g: 'next', icon: '🕵️', name: 'Detective Adventure', type: 'Round 3', sub: 'Solve a case: find · read · walk · crack', soon: true},
+  {k: 'race', g: 'next', icon: '🏁', name: 'Race', type: 'Round 4', sub: 'Who finds them first?', soon: true}
 ];
-window.MODE_TYPE = {spot: MODES[0].type};
+window.MODE_TYPE = {spot: MODES[0].type, blink: MODES[1].type, odd: MODES[2].type};
+const MODE_NAME = {spot: '🖼️ Spot', blink: '👁️ Blink', odd: '🎯 Odd One Out'};   // = the Theme start (Code.gs MODES_ tried.themeStart)
 /* 🗂️ END MODE GROUPS */
 const HOUSES = [{k: 'mix', icon: '🎲', name: 'Mix'}].concat(PK.THEME_KEYS.map(k => ({k, icon: PK.THEMES[k].icon, name: PK.THEMES[k].name})));
 const FOUND_SAY = {colour: '🎨 A new colour!', missing: '➖ Something is missing!', extra: '➕ Something extra!', bigger: '📏 It got bigger!', smaller: '📏 It got smaller!',
@@ -664,10 +817,10 @@ function choosePlayer(name){
   const ml = UI.modeLink ? UI.modeLink(MODE_LINK) : '';
   if(ml && MODES.some(m => m.k === ml && !m.soon)) SET.mode = ml;
   renderMenu(); showScreen('menu'); msAlso();
-  if(ml && MODES.some(m => m.k === ml && !m.soon)){ UI.toast('🖼️ Find the Difference — now pick a level'); if(UI.modePoint) UI.modePoint($('level-list')); }
+  if(ml && MODES.some(m => m.k === ml && !m.soon)){ const m = MODES.find(x => x.k === ml); UI.toast(m.icon + ' ' + m.name + ' — now pick a level'); if(UI.modePoint) UI.modePoint($('level-list')); }
 }
 /* ✨ MODE SPOTLIGHT (built in, pk-1): ?mode=<id> opens that mode ONCE (UI.modeLink, in choosePlayer) · ✨ Also try banner under the
-   title · UI.modeTried when a case starts (startCase). MODES_ rows in Code.gs: pokadif spot (R2 adds blink / odd / arcade). */
+   title · UI.modeTried when a case starts (startCase). MODES_ rows in Code.gs: pokadif spot · blink · odd (pk-2a), arcade (pk-2b). */
 function msNow(){ return SET.mode; }
 function msOpen(id){ if(!MODES.some(m => m.k === id && !m.soon)) return; SET.mode = id; markModes(); if(UI.modePoint) UI.modePoint($('level-list')); }
 function msAlso(){ if(UI.alsoTry) UI.alsoTry({player: S.player, game: GAME_ID, at: () => document.querySelector('#scr-menu .title'), current: msNow, noDrop: true, open: msOpen}); }
@@ -682,7 +835,7 @@ function renderMenu(){
   if(window.UI && UI.leaders) UI.leaders($('leaders'), GAME_ID, S.player);
 }
 function markModes(){ $('mode-list').querySelectorAll('.ui-mbtn').forEach(b => { const m = MODES.find(x => x.k === b.dataset.k); b.classList.toggle('on', b.dataset.k === SET.mode); b.classList.toggle('soon', !!(m && m.soon)); });
-  $('level-head').textContent = 'Pick a level — 🖼️ Find the Difference'; }
+  const m = MODES.find(x => x.k === SET.mode) || MODES[0]; $('level-head').textContent = 'Pick a level — ' + m.icon + ' ' + m.name; renderLevels(); }
 function renderHouses(){
   const box = $('house-list');
   box.innerHTML = HOUSES.map(h => '<button class="house' + (h.k === SET.house ? ' on' : '') + '" data-k="' + h.k + '" data-sound="tap" title="' + UI.esc(h.name) + '">' + h.icon + ' ' + UI.esc(h.name) + '</button>').join('');
@@ -694,7 +847,7 @@ function renderLevels(){
     const U = LEVEL_UI[i], open = canPlay(i), done = p.unlocked > i, b = document.createElement('button');
     b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (U.hardcore ? ' hardcore' : ''); b.setAttribute('data-sound', open ? 'pop' : 'none'); b.dataset.lv = i;
     b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">' + BADGES[i][0] + '</span>' : open ? '' : '<span class="badge">🔒</span>') +
-      '<div class="big">' + U.emoji + '</div><div class="nm">' + L.name + '</div><div class="learn">' + L.n + ' changes · ' + L.pics + ' pictures</div><div class="sub">' + (U.hardcore && !open ? '🔒 Beat Extreme to open 💀 Hardcore' : U.blurb) + '</div>' + bestHtml(p, i);
+      '<div class="big">' + U.emoji + '</div><div class="nm">' + L.name + '</div><div class="learn">' + (SET.mode === 'odd' ? PK.ODD[i].cards + ' cards · ' + PK.ODD_ROUNDS + ' rounds' : L.n + ' changes · ' + L.pics + ' pictures') + '</div><div class="sub">' + (U.hardcore && !open ? '🔒 Beat Extreme to open 💀 Hardcore' : SET.mode === 'odd' ? ODD_BLURB[i] : SET.mode === 'blink' ? BLINK_BLURB[i] : U.blurb) + '</div>' + bestHtml(p, i);
     b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore' : i === 4 ? 'Solve a Hard case to unlock Extreme!' : 'Solve the level before to unlock it'); return; } startCase(i); };
     box.appendChild(b);
   });
@@ -709,22 +862,25 @@ function renderFile(){
 /* ================= PLAY ================= */
 function startCase(lvl){
   hideResult(); stopTicker();
-  const L = PK.LEVELS[lvl];
-  G = {level: lvl, L, pic: -1, over: false, paused: false, held: false, secs: 0, last: performance.now(), found: [], marks: [], scene: null, used: {}, lastTheme: '',
-    lives: L.lives || 0, total: {found: 0, oops: 0, hints: 0, perfect: 0, quick: 0, points: 0}, pics: [], busy: true, k: 1, dpr: Math.min(2, window.devicePixelRatio || 1)};
+  stopBlink();
+  const mode = MODES.some(m => m.k === SET.mode && !m.soon) ? SET.mode : 'spot', L = PK.LEVELS[lvl], O = PK.ODD[lvl];
+  G = {mode, level: lvl, L, O, pic: -1, over: false, paused: false, held: false, secs: 0, last: performance.now(), found: [], marks: [], scene: null, used: {}, lastTheme: '',
+    lives: (mode === 'odd' ? O.lives : L.lives) || 0, rounds: mode === 'odd' ? PK.ODD_ROUNDS : L.pics, total: {found: 0, oops: 0, hints: 0, perfect: 0, quick: 0, points: 0}, pics: [], busy: true, k: 1, dpr: Math.min(2, window.devicePixelRatio || 1)};
+  $('scr-play').dataset.mode = mode;
   GC_LOG.length = 0;
   if(UI.modeTried) UI.modeTried(S.player, GAME_ID, SET.mode);
   showScreen('play');
   BAR.level(L.name + (L.hardcore ? ' 💀' : ''));
-  BAR.count('pic', '🖼️', '1/' + L.pics, 'Picture');
-  BAR.count('found', '🔎', '0/' + L.n, 'Found');
+  BAR.count('pic', MODE_ICON[mode], '1/' + G.rounds, mode === 'odd' ? 'Round' : 'Picture');
+  BAR.count('found', '🔎', '0/' + L.n, 'Found'); BAR.hide('found', mode === 'odd');
   BAR.miss(0);
-  if(lvl > 0) BAR.time(0);
-  if(L.lives) BAR.lives(L.lives);
+  const hasSlot = k => !!document.querySelector('#scr-play .gb-' + k);   // a slot is only made when this case needs it (old ones from another case are hidden)
+  if(lvl > 0) BAR.time(0); else if(hasSlot('time')) BAR.hide('time', true);
+  if(G.lives) BAR.lives(G.lives); else if(hasSlot('lives')) BAR.hide('lives', true);
   BAR.fit();
   bdStart(); layout();
-  moment('start', {level: lvl});
-  startTicker(); nextPicture();
+  moment('start', {level: lvl, mode});
+  startTicker(); if(mode === 'odd') nextOdd(); else nextPicture();
 }
 function nextPicture(){
   if(!G) return;
@@ -733,15 +889,18 @@ function nextPicture(){
   let sc = null; for(let i = 0; i < 6 && !sc; i++){ const s = PK.newSeed(); sc = PK.makeScene(s, G.level, theme); if(sc && G.used[sc.sig]) sc = null; }
   G.lastTheme = theme; G.used[sc.sig] = 1; G.scene = sc; G.found = sc.diffs.map(() => false); G.pOops = 0; G.pHints = 0; G.pSecs = 0; G.lastFind = performance.now(); G.glowAt = -1;
   G.hints = L.hints;
-  clearMarks(); BAR.count('pic', '🖼️', (G.pic + 1) + '/' + L.pics, 'Picture'); BAR.count('found', '🔎', '0/' + L.n, 'Found');
+  clearMarks(); BAR.count('pic', MODE_ICON[G.mode], (G.pic + 1) + '/' + G.rounds, 'Picture'); BAR.count('found', '🔎', '0/' + L.n, 'Found');
   $('dots').innerHTML = sc.diffs.map(() => '<i></i>').join('');
   updHint(); layout(true);
   ['pic-a', 'pic-b'].forEach(id => { const e = $(id); e.classList.remove('in'); void e.offsetWidth; e.classList.add('in'); });
-  goal(G.pic === 0 && G.level === 0 ? '👀 Look at A and B. Poke what\'s different! (' + L.n + ' to find)' : '🔍 Find ' + L.n + ' differences!' + (G.level < 2 ? ' ' + typeTips() : ''));
+  if(G.mode === 'blink') goal(G.pic === 0 && G.level === 0 ? '👁️ The picture flips A ↔ B. Poke what changes! (' + L.n + ' to find)' : '👁️ Watch it blink — find ' + L.n + ' changes!' + (G.level < 2 ? ' ' + typeTips() : ''));
+  else goal(G.pic === 0 && G.level === 0 ? '👀 Look at A and B. Poke what\'s different! (' + L.n + ' to find)' : '🔍 Find ' + L.n + ' differences!' + (G.level < 2 ? ' ' + typeTips() : ''));
   G.busy = false;
+  if(G.mode === 'blink') startBlink();
   if(L.guide && G.pic === 0) guideHand();
   moment('picture', {n: G.pic, theme: sc.theme, seed: sc.seed});
 }
+const MODE_ICON = {spot: '🖼️', blink: '👁️', odd: '🎯'};
 function typeTips(){ return G.L.types.map(t => PK.TYPE_INFO[t].icon).join(' '); }
 function goal(html, cls){ const e = $('goal'); e.innerHTML = html; e.className = 'goal' + (cls ? ' ' + cls : ''); }
 /* layout: two pictures as big as they fit — side by side, or top / bottom on a phone held upright */
@@ -751,6 +910,11 @@ function layout(force){
   const W = bd.clientWidth, H = bd.clientHeight; if(W < 20 || H < 20) return;
   const key = W + 'x' + H; if(!force && key === LAST_LAY && G.k) { return; } LAST_LAY = key;
   const gap = Math.max(8, Math.min(16, Math.round(Math.min(W, H) * 0.025))), ar = PK.W / PK.H;
+  $('ogrid').classList.toggle('hidden', G.mode !== 'odd'); ['pic-a', 'pic-b'].forEach(id => $(id).classList.toggle('hidden', G.mode === 'odd'));
+  if(G.mode === 'odd') return layoutOdd(W, H, gap);
+  if(G.mode === 'blink'){ const w = Math.floor(Math.min(W - gap * 2, (H - gap) * ar, 900)), h = Math.floor(w / ar), left = (W - w) / 2, top = Math.max(gap / 2, (H - h) / 2);
+    G.vert = false; G.k = w / PK.W; [$('pic-a'), $('pic-b')].forEach(p => Object.assign(p.style, {width: w + 'px', height: h + 'px', left: left + 'px', top: top + 'px'}));
+    paintPics(); G.marks.forEach(placeMark); return; }
   const side = Math.min((W - gap * 3) / 2, (H - gap * 2) * ar), stack = Math.min(W - gap * 2, ((H - gap * 3) / 2) * ar);
   const vert = stack > side, w = Math.floor(Math.min(vert ? stack : side, 780)), h = Math.floor(w / ar);
   G.vert = vert; G.k = w / PK.W;
@@ -761,7 +925,7 @@ function layout(force){
   paintPics(); G.marks.forEach(placeMark);
 }
 function paintPics(){
-  if(!G || !G.scene) return; const w = parseFloat($('pic-a').style.width) || 0; if(!w) return;
+  if(!G || !G.scene || G.mode === 'odd') return; const w = parseFloat($('pic-a').style.width) || 0; if(!w) return;
   [['cv-a', 'A'], ['cv-b', 'B']].forEach(([id, side]) => { const cv = $(id), pw = Math.round(w * G.dpr), ph = Math.round(w / (PK.W / PK.H) * G.dpr);
     if(cv.width !== pw || cv.height !== ph){ cv.width = pw; cv.height = ph; } pkPaint(cv, G.scene, side, G.k, G.dpr); });
 }
@@ -814,7 +978,7 @@ function oops(side, p){
   goal(G.level < 2 ? 'Oops! That part looks the same in both. Look for ' + G.L.types.map(t => PK.TYPE_INFO[t].tip).join(' or ') + '.' : pkPick(['Oops! Same in both — keep looking.', 'Not that one! ' + left + ' left.', 'Oops! Compare A and B again.']), 'oops');
 }
 function pictureDone(){
-  G.busy = true; G.marks.filter(m => m.cls === 'glow').forEach(dropMark);
+  G.busy = true; stopBlink(true); G.marks.filter(m => m.cls === 'glow').forEach(dropMark);
   const secs = Math.round(G.pSecs), L = G.L;
   const pts = PK.picturePoints(G.level, {found: L.n, secs, oops: G.pOops, hints: G.pHints});
   G.total.found += L.n; G.total.points += pts; if(!G.pOops && !G.pHints) G.total.perfect++;
@@ -824,18 +988,19 @@ function pictureDone(){
   moment('picdone', {n: G.pic, secs, oops: G.pOops, hints: G.pHints});
   pkWait(1500).then(() => {
     if(!G || G.over) return;
-    if(G.pic + 1 >= L.pics) return finishCase(true);
+    if(G.pic + 1 >= G.rounds) return finishCase(true);
     ['pic-a', 'pic-b'].forEach(id => $(id).classList.add('out'));
     pkWait(320).then(() => { if(!G || G.over) return; ['pic-a', 'pic-b'].forEach(id => $(id).classList.remove('out')); nextPicture(); });
   });
 }
-function caseLost(){ G.busy = true; G.scene.diffs.forEach((d, i) => { if(!G.found[i]) ['A', 'B'].forEach(s => mark(s, 'miss', d.x, d.y, d.hit)); }); bdReact('lose', 2200); pkWait(1600).then(() => { if(G && !G.over) finishCase(false); }); }
+function caseLost(){ G.busy = true; stopBlink(true); if(G.mode === 'odd') return oddLost(); G.scene.diffs.forEach((d, i) => { if(!G.found[i]) ['A', 'B'].forEach(s => mark(s, 'miss', d.x, d.y, d.hit)); }); bdReact('lose', 2200); pkWait(1600).then(() => { if(G && !G.over) finishCase(false); }); }
 
 /* ---------- 🔍 magnifier + soft glow + 👆 guide ---------- */
 function updHint(){ const b = $('hint-btn'), n = G ? G.hints : 0; $('hint-left').textContent = n; b.disabled = !G || n <= 0; b.classList.toggle('hidden', !!(G && G.L.hardcore)); }
 function useHint(){
   if(!G || G.over || G.busy || G.paused) return;
   if(G.hints <= 0){ UISound.play('error'); UI.toast(G.L.hardcore ? '💀 No magnifier in Hardcore' : '🔍 No magnifier left for this picture'); return; }
+  if(G.mode === 'odd') return oddHint();
   const i = G.found.findIndex(f => !f); if(i < 0) return;
   G.hints--; G.pHints++; G.total.hints++; updHint(); UISound.play('whoosh');
   const d = G.scene.diffs[i]; showLens(d); glowOn(i);
@@ -844,6 +1009,7 @@ function useHint(){
 }
 function showLens(d){
   document.querySelectorAll('.lens, .lens-h').forEach(e => e.remove());
+  if(G.mode === 'blink') blinkShow('B', true);
   const pic = $('pic-b'), k = G.k, size = Math.max(84, Math.min(170, d.hit * 2.8 * k)), zoom = 1.7;
   const L = document.createElement('div'); L.className = 'lens'; L.style.width = L.style.height = size + 'px'; L.style.left = (d.x * k) + 'px'; L.style.top = (d.y * k) + 'px';
   const c = document.createElement('canvas'); c.width = c.height = Math.round(size * G.dpr); L.appendChild(c); pic.appendChild(L);
@@ -858,7 +1024,7 @@ let HAND_T = 0;
 function guideHand(){
   const h = $('hand'), A = $('pic-a'), B = $('pic-b'), bd = $('board').getBoundingClientRect();
   const at = (p, fx, fy) => { const r = p.getBoundingClientRect(); return [r.left - bd.left + r.width * fx, r.top - bd.top + r.height * fy]; };
-  const spots = [at(A, 0.5, 0.5), at(B, 0.5, 0.5), at(A, 0.5, 0.5), at(B, 0.5, 0.5)];
+  const og = $('ogrid'), spots = G.mode === 'odd' ? [...og.children].slice(0, 4).map(c => at(c, 0.5, 0.55)) : G.mode === 'blink' ? [at(A, 0.3, 0.4), at(A, 0.7, 0.4), at(A, 0.3, 0.7), at(A, 0.7, 0.7)] : [at(A, 0.5, 0.5), at(B, 0.5, 0.5), at(A, 0.5, 0.5), at(B, 0.5, 0.5)];
   h.classList.remove('hidden'); let i = 0; clearInterval(HAND_T);
   const go = () => { if(!G || i >= spots.length){ hideHand(); return; } h.style.left = spots[i][0] + 'px'; h.style.top = spots[i][1] + 'px'; h.classList.remove('tap'); void h.offsetWidth; h.classList.add('tap'); i++; };
   go(); HAND_T = setInterval(go, 1100);   // looks only — the game never waits for the hand
@@ -874,11 +1040,13 @@ function tick(){
   if(G.paused || G.held || G.busy || $('scr-play').classList.contains('hidden')) { G.lastFind += dt * 1000; return; }
   G.secs += dt; G.pSecs += dt;
   if(G.level > 0) BAR.time(Math.floor(G.secs));
+  const glowS = G.mode === 'odd' ? G.O.glow : G.L.glow;
+  if(G.mode === 'odd'){ if(glowS && now - G.lastFind > glowS * 1000 && G.odd && !G.odd.glow){ oddGlow(); goal('✨ Psst — look where it glows!'); UISound.play('pop'); } return; }
   if(G.L.glow && now - G.lastFind > G.L.glow * 1000){ const i = G.found.findIndex(f => !f); if(i >= 0 && !G.marks.some(m => m.glow === i)){ glowOn(i); goal('✨ Psst — look where it glows!'); UISound.play('pop'); } }
 }
 function setPaused(on){ if(G){ G.paused = !!on; G.last = performance.now(); } }
 function pauseGame(){ setPaused(true); }
-function leavePlay(){ stopTicker(); if(G) G.over = true; hideResult(); clearMarks(); renderMenu(); showScreen('menu'); }
+function leavePlay(){ stopTicker(); stopBlink(); if(G) G.over = true; hideResult(); clearMarks(); renderMenu(); showScreen('menu'); }
 
 /* ---------- words + confetti ---------- */
 function bigWord(txt, small){ if(!FX) return; const e = document.createElement('div'); e.className = 'big-word'; e.innerHTML = UI.esc(txt) + (small ? '<small>' + UI.esc(small) + '</small>' : ''); $('bigword-host').appendChild(e); setTimeout(() => e.remove(), 1300); }
@@ -888,16 +1056,17 @@ function confetti(list, count){ if(!FX) return; for(let i = 0; i < (count || 24)
 function houseLabel(){ const h = HOUSES.find(x => x.k === SET.house) || HOUSES[0]; return h.icon + ' ' + h.name; }
 function finishCase(won){
   if(!G || G.over) return; G.over = true; stopTicker(); hideHand();
-  const L = G.L, T = G.total, secs = Math.round(G.secs), hc = !!L.hardcore;
+  stopBlink(); const L = G.L, T = G.total, secs = Math.round(G.secs), hc = !!L.hardcore;
   const cleared = !!won, stars = PK.starsFor({cleared, oops: T.oops, hints: T.hints}), score = cleared ? T.points : Math.round(T.points * 0.5);
   const before = PK.rankOf(progressOf(S.player).unlocked || 0);
   NOTES.length = 0;
   let h = '<div class="res-det" id="res-det"><canvas id="res-av" width="240" height="264"></canvas><svg class="hat" viewBox="0 0 60 30" aria-hidden="true"><path d="M8 23 Q30 1 52 23 Z" fill="#8B5A2B" stroke="#3B2410" stroke-width="2"/><path d="M12 19 Q30 7 48 19" fill="none" stroke="#C99A5B" stroke-width="2" stroke-dasharray="3 3"/><path d="M3 24 H57" stroke="#3B2410" stroke-width="4" stroke-linecap="round"/><circle cx="30" cy="5" r="3" fill="#C99A5B"/></svg><span class="glass">🔍</span></div>'
     + '<h2 class="' + (cleared ? 'cheer' : '') + '">' + (cleared ? '📁 Case closed!' : 'So close, detective!') + '</h2>'
-    + '<div class="note">🖼️ Find the Difference · ' + L.name + (hc ? ' 💀' : '') + ' · ' + houseLabel() + '</div>';
+    + '<div class="note">' + (MODES.find(m => m.k === G.mode) || MODES[0]).icon + ' ' + (MODES.find(m => m.k === G.mode) || MODES[0]).name + ' · ' + L.name + (hc ? ' 💀' : '') + ' · ' + houseLabel() + '</div>';
   h += '<div class="rating">' + [1, 2, 3].map(i => '<span class="st' + (i <= stars ? '' : ' off') + '">⭐</span>').join('') + '</div><div class="score-big">🏆 ' + score.toLocaleString() + '</div>';
   const pl = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
-  h += '<div class="stats"><span>🔎 ' + pl(T.found + (cleared ? 0 : G.found.filter(Boolean).length), 'find') + '</span><span>❌ ' + pl(T.oops, 'oops') .replace('oopss', 'oops') + '</span><span>🔍 ' + pl(T.hints, 'hint') + '</span><span>🦅 ' + T.perfect + ' perfect</span>' + (G.level > 0 ? '<span>⏱ ' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0') + '</span>' : '') + '</div>';
+  const finds = G.mode === 'odd' ? T.found : T.found + (cleared ? 0 : G.found.filter(Boolean).length);
+  h += '<div class="stats"><span>' + (G.mode === 'odd' ? '🎯 ' + pl(finds, 'odd one') : '🔎 ' + pl(finds, 'find')) + '</span><span>❌ ' + pl(T.oops, 'oops') .replace('oopss', 'oops') + '</span><span>🔍 ' + pl(T.hints, 'hint') + '</span><span>🦅 ' + T.perfect + ' perfect</span>' + (G.level > 0 ? '<span>⏱ ' + Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0') + '</span>' : '') + '</div>';
   if(!cleared) h += '<div class="note">💡 ' + pkPick(['Look at one corner of A, then the same corner of B.', 'Check colours first, then count the spots and petals.', 'Things can also be turned around or flipped!', 'Take your time — Hardcore only counts the oops.']) + '</div>';
   h += '<div class="save-note" id="save-note">' + (S.player ? '💾 Saving…' : '') + '</div>';
   h += '<div class="res-btns" id="res-btns"><button class="sp-btn sp-secondary" id="res-levels" data-sound="tap">🎚️ Levels</button><button class="sp-btn sp-secondary" id="res-again" data-sound="pop">🔁 Play again</button>'
@@ -909,9 +1078,10 @@ function finishCase(won){
   if($('res-next')) $('res-next').onclick = () => startCase(Math.min(5, (G ? G.level : SET.level) + 1));
   if(cleared){ confetti(['🔍', '⭐', '🕵️', '🎉', '✨'], 26); UISound.play('success'); } else bdReact('lose', 2000);
   moment(cleared ? 'win' : 'lose', {score, stars, secs});
-  const stats = {games: 1, cases: cleared ? 1 : 0, found: T.found + (cleared ? 0 : G.found.filter(Boolean).length), perfect: T.perfect, hints: T.hints, oops: T.oops};
-  if(cleared && T.quick) stats.quick = T.quick;
-  if(S.player) saveWin(S.player, G.level, {score, stars, cleared, timeSec: secs, theme: '🖼️ Spot · ' + houseLabel(), stats}, before);
+  const stats = {games: 1, cases: cleared ? 1 : 0, found: finds, perfect: T.perfect, hints: T.hints, oops: T.oops};
+  if(G.mode === 'odd') stats.odd = finds; else if(G.mode === 'blink') stats.blinks = finds;
+  if(cleared && T.quick && G.mode !== 'odd') stats.quick = T.quick;
+  if(S.player) saveWin(S.player, G.level, {score, stars, cleared, timeSec: secs, theme: MODE_NAME[G.mode] + ' · ' + houseLabel(), stats}, before);
   if(UI.alsoTry) UI.alsoTry({player: S.player, game: GAME_ID, at: () => $('res-btns'), current: SET.mode, open: id => { leavePlay(); msOpen(id); }});
   SET.level = G.level;
 }
@@ -943,6 +1113,78 @@ function hideResult(){ $('result').classList.add('hidden'); }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
 function goBack(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
 window.feedbackContext = () => ({page: 'Pokadif', game: GAME_ID, level: G ? G.level : SET.level, mode: SET.mode});
+
+/* ================= 👁️ BLINK (pk-2a): ONE picture that flips A ↔ B — with a blank blink between on harder levels (the change hides!) =================
+   Both picture boxes sit on the same spot (layout); the one on top takes the pokes. Looks only — the clock + rules are the same as Spot. */
+let BLINK_T = 0;
+function blinkShow(side, hold){ const A = $('pic-a'), B = $('pic-b'); A.classList.toggle('bl-off', side !== 'A'); B.classList.toggle('bl-off', side !== 'B'); if(G) G.blinkSide = side; if(hold){ clearTimeout(BLINK_T); BLINK_T = setTimeout(() => { if(G && G.mode === 'blink' && !G.busy && !G.over) blinkStep(); }, 2600); } }
+function blinkStep(){
+  clearTimeout(BLINK_T); if(!G || G.mode !== 'blink' || G.over) return;
+  const P = BLINK[G.level] || BLINK[0];
+  if(G.paused || G.held){ BLINK_T = setTimeout(blinkStep, 200); return; }
+  const next = G.blinkSide === 'A' ? 'B' : 'A';
+  if(P.gap){ blinkShow('none'); BLINK_T = setTimeout(() => { blinkShow(next); BLINK_T = setTimeout(blinkStep, P.show); }, P.gap); }
+  else { blinkShow(next); BLINK_T = setTimeout(blinkStep, P.show); }
+}
+function startBlink(){ clearTimeout(BLINK_T); blinkShow('A'); BLINK_T = setTimeout(blinkStep, (BLINK[G.level] || BLINK[0]).show); }
+function stopBlink(keep){ clearTimeout(BLINK_T); BLINK_T = 0; if(!keep){ ['pic-a', 'pic-b'].forEach(id => $(id).classList.remove('bl-off')); } }
+
+/* ================= 🎯 ODD ONE OUT (pk-2a): a grid of cards — all alike but one. 6 rounds a case. ================= */
+const ODD_SAY = {colour: '🎨 It\'s a different colour!', shape: '🔺 It\'s a different shape!', bigger: '📏 It\'s bigger!', smaller: '📏 It\'s smaller!', flip: '🔄 It\'s flipped!', turn: '🔄 It\'s turned!', more: '🔢 It has more!', fewer: '🔢 It has fewer!'};
+function nextOdd(){
+  if(!G) return; G.pic++;
+  const theme = SET.house === 'mix' ? pkPick(PK.THEME_KEYS.filter(k => k !== G.lastTheme)) : SET.house;
+  let od = null; for(let i = 0; i < 6 && !od; i++){ od = PK.makeOdd(PK.newSeed(), G.level, theme); if(od && G.used[od.sig]) od = null; }
+  G.lastTheme = theme; G.used[od.sig] = 1; G.odd = od; G.pOops = 0; G.pHints = 0; G.pSecs = 0; G.lastFind = performance.now();
+  if(G.pic === 0) G.hints = G.O.hints;
+  BAR.count('pic', '🎯', (G.pic + 1) + '/' + G.rounds, 'Round');
+  if(G.pic === 0) $('dots').innerHTML = Array.from({length: G.rounds}, () => '<i></i>').join('');
+  const box = $('ogrid'); box.innerHTML = ''; box.dataset.kind = od.type === 'equation' || od.type === 'word' ? 'txt' : 'pic'; box.dataset.type = od.type;
+  od.cards.forEach((c, i) => { const b = document.createElement('button'); b.className = 'oc'; b.dataset.i = i; b.type = 'button'; b.setAttribute('data-sound', 'none');
+    b.style.animationDelay = (i * 0.04) + 's'; b.appendChild(document.createElement('canvas')); b.addEventListener('pointerdown', e => onOdd(i, e)); box.appendChild(b); });
+  updHint(); layout(true);
+  goal(G.pic === 0 && G.level === 0 ? '🎯 One card is different. Poke it!' : '🎯 ' + od.goal + (od.type === 'pattern' ? ' 🌀' : ''));
+  G.busy = false;
+  if(G.O.guide && G.pic === 0) guideHand();
+  moment('picture', {n: G.pic, theme, type: od.type});
+}
+function layoutOdd(W, H, gap){
+  const box = $('ogrid'), n = G.odd ? G.odd.cards.length : 0; if(!n) return;
+  let best = {s: 0, cols: 1};
+  for(let cols = 1; cols <= n; cols++){ const rows = Math.ceil(n / cols), s = Math.min((W - gap * (cols + 1)) / cols, (H - gap * (rows + 1)) / rows); if(s > best.s) best = {s, cols, rows}; }
+  const s = Math.floor(Math.min(best.s, 190)); G.cardPx = s;
+  Object.assign(box.style, {gridTemplateColumns: 'repeat(' + best.cols + ', ' + s + 'px)', gap: gap + 'px'});
+  [...box.children].forEach((b, i) => { b.style.width = b.style.height = s + 'px'; const c = G.odd.cards[i]; pkCard(b.querySelector('canvas'), c, s - 8, G.dpr); b.classList.toggle('txt', c.txt != null); });
+}
+function onOdd(i, e){
+  if(!G || G.over || G.busy || G.paused || G.held || G.mode !== 'odd') return;
+  if(e && e.isPrimary === false) return; if(e) e.preventDefault(); hideHand();
+  const b = $('ogrid').children[i], od = G.odd;
+  if(i === od.odd){
+    G.busy = true; G.lastFind = performance.now(); b.classList.add('right'); [...$('ogrid').children].forEach((x, j) => { if(j !== i) x.classList.add('dim'); });
+    const secs = Math.round(G.pSecs), pts = PK.oddPoints(G.level, {secs, oops: G.pOops, hints: G.pHints});
+    G.total.found++; G.total.points += pts; if(!G.pOops && !G.pHints) G.total.perfect++;
+    const dots = $('dots').children; if(dots[G.pic]) dots[G.pic].classList.add('on');
+    UISound.play('success'); bdReact('joy', 1400);
+    goal((od.say || ODD_SAY[od.sub] || '🎉 Found it!') + ' +' + pts, 'yay'); bigWord('🎯 ' + pkPick(PRAISE), '+' + pts);
+    moment('found', {i, type: od.type, sub: od.sub, n: G.total.found});
+    pkWait(1300).then(() => { if(!G || G.over) return; if(G.pic + 1 >= G.rounds) return finishCase(true); nextOdd(); });
+    return;
+  }
+  G.pOops++; G.total.oops++; BAR.miss(G.total.oops); UISound.play('error'); bdReact('miss', 1400);
+  b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake', 'nope'); setTimeout(() => b.classList.remove('nope'), FX ? 700 : 0);
+  moment('oops', {i});
+  if(G.lives){ G.lives--; BAR.lives(Math.max(0, G.lives), G.lives <= 1); if(G.lives <= 0){ goal('💀 Out of oops — the case is lost this time.', 'oops'); return caseLost(); } goal('Oops! ❤️ ' + G.lives + ' left.', 'oops'); return; }
+  const why = {equation: 'That sum makes ' + (od.target || '') + ' — look for the one that doesn\'t.', word: 'That word rhymes with the others.', pattern: 'That one fits the pattern — say the pattern out loud!'};
+  goal(G.level < 2 ? 'Oops! That one is the same as most. Look at colour, shape and size.' : 'Oops! ' + (why[od.type] || 'That one matches the others.'), 'oops');
+}
+function oddGlow(){ const b = $('ogrid').children[G.odd.odd]; if(b) b.classList.add('glow'); G.odd.glow = true; moment('glow', {}); }
+function oddHint(){
+  if(G.hints <= 0){ UISound.play('error'); UI.toast(G.O.hardcore ? '💀 No magnifier in Hardcore' : '🔍 No magnifier left in this case'); return; }
+  G.hints--; G.pHints++; G.total.hints++; updHint(); UISound.play('whoosh'); oddGlow(); goal('🔍 The magnifier says: look at the glowing card!');
+  moment('hint', {type: G.odd.type});
+}
+function oddLost(){ const b = $('ogrid').children[G.odd.odd]; if(b) b.classList.add('missed'); bdReact('lose', 2200); pkWait(1600).then(() => { if(G && !G.over) finishCase(false); }); }
 
 /* ================= 🧑 YOUR AVATAR = the detective (P6 rule: UI.buddy pictures, never painted in a loop) ================= */
 const BD = {on: false, who: null, list: []};
@@ -993,4 +1235,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pk-1) END OF Pokadif.html -->
+<!-- (pk-2a) END OF Pokadif.html -->
