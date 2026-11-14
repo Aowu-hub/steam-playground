@@ -311,6 +311,7 @@
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-2c: the cheering crowd (CheerSquad.html) replaces the old ringside crowd -->
 <script src="inc/ComicKit.js"></script>   <!-- 💥 ck-2b comics (wired by ComicKit through window.GameComic) -->
 </head>
 <body ontouchstart="">
@@ -327,6 +328,7 @@
   <div class="modes" id="mode-list"></div>   <!-- 🗂️ mg-1: 🥊 Battle · 🗺️ Brawenture -->
   <div class="section-head">Pick a level — 🤖 a random family member in a robot helmet; the helmet evolves and gets tougher</div>
   <div class="levels" id="level-list"></div>
+  <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd behind the ring">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-2c -->
   <div class="comics-slot" id="comics-slot-menu"></div>   <!-- 💥 room for the 💬 Comics On / Off chip (Comics chat) -->
   <details class="rules" id="how"><summary>📖 How to play</summary>
     <ul>
@@ -2149,7 +2151,7 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
-  loadPrefs(); KEYS = loadKeys(); $('who-name').textContent = name; renderMenu(); showScreen('menu');
+  loadPrefs(); KEYS = loadKeys(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); }   /* 📣 cs-2c */ renderMenu(); showScreen('menu');
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">No win yet</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span><span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
@@ -2299,6 +2301,7 @@ function startMatch(){
     avs: raw.map(fightAv), winAvs: raw, cam: {cx: 0, w: 9}, shake: 0, hitstop: 0, t: 0, startAt: performance.now(), pads: [null, null], dance: null, hpShow: [1, 1]};
   M.sq.forEach((tm, i) => tm.forEach(p => { p.seatKeys = duo ? [KEYS[i]] : (i === 0 ? [KEYS[0], KEYS[1]] : []); }));
   G.crowd = crowdFor(M); G.faceKey = ['', ''];
+  cheerMount();   /* 📣 cs-2c */
   $('n0').textContent = M.f[0].name; $('n1').textContent = (duo ? '' : '🤖 ') + M.f[1].name;
   ['pips0', 'pips1'].forEach(id => { $(id).innerHTML = '<i></i>'.repeat(M.need); });
   showScreen('play'); layoutPlay(); hud();
@@ -2377,6 +2380,7 @@ window.addEventListener('resize', () => { if(G && !$('scr-play').classList.conta
 function frame(now){
   if(!G) return;
   const dt = Math.min(0.05, Math.max(0, (now - G.last) / 1000)); G.last = now;
+  if(window.Cheer) Cheer.pause(!!(G && G.paused));   /* 📣 cs-2c */
   if(!G.paused && !G.hold){
     if(!G.M.done){
       readInputs();
@@ -2396,7 +2400,7 @@ function leavePlay(){
   if(!G) return; const was = G.paused; G.paused = true;
   UI.confirm({icon: '◀', title: 'Leave this brawl?', body: 'This brawl won\'t be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(!G) return; G.paused = was; if(ok) backToMenu(); });
 }
-function backToMenu(){ if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); $('bottom').innerHTML = ''; document.querySelectorAll('#arena .ctl').forEach(e => e.remove()); renderMenu(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); $('bottom').innerHTML = ''; document.querySelectorAll('#arena .ctl').forEach(e => e.remove()); renderMenu(); showScreen('menu'); }
 
 /* ---------- input ---------- */
 document.addEventListener('keydown', e => {
@@ -2430,6 +2434,7 @@ function boing(freq, len, type, vol){
 }
 function handleEvents(list){
   GameComic._feed('brawl', list);   // 💥 ck-room: log + listeners
+  cheerEvents(list);   /* 📣 cs-2c */
   const M = G.M, T = THEMES[G.theme];
   list.forEach(e => {
     if(e.k === 'hit'){
@@ -2531,6 +2536,41 @@ function hud(){
 }
 
 /* ================= DRAWING ================= */
+/* 📣 CHEERSQUAD (cs-2c) START — the crowd behind the ring (CheerSquad.html, 📣 Cheer chat). Replaces drawCrowd in the 🥊 ring. Don't remove: the Cheer chat re-applies it. */
+// sides: 0 = left (you / player 1), 1 = right (🤖 or player 2); fighters in either team are not in the crowd
+function cheerMount(){
+  if(!window.Cheer || !G) return; Cheer.unmount(); const M = G.M, duo = G.mode === 'duo' || !!(M.f[1] && M.f[1].human);
+  const inRing = new Set(M.sq[0].concat(M.sq[1]).map(f => f.name));
+  Cheer.mount($('stage'), {game: 'brawl', players: [{name: M.f[0].name, side: 0, human: true}, {name: M.f[1].name, side: 1, human: duo}], me: {name: S.player},
+    family: (S.players || []).map(p => p.Name).filter(n => !inRing.has(n)), avatars: S.avatars || {}, mode: 'scene', ref: $('cv'),
+    avoid: () => Array.from(document.querySelectorAll('#gbar, #fhud, .top-btn')), clear: () => true});   /* the stand is behind the ring: fans may stand behind the fighters */
+}
+// the stand behind the ring: world slots every 0.9 m that scroll with the camera like the old crowd. true = CheerSquad drew (or Off: nobody)
+function cheerScene(g, W, H, V, st, t){
+  if(st !== G || st.preview) return false; if(!Cheer.active()) return true;
+  const feet = V.floorY - V.s * 0.62, k = V.s * 0.84 / 100 * (Cheer.stats().size === 'party' ? 1 : 0.9), cands = [];
+  g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(-20, feet - 2, W + 40, V.s * 0.62 + 4);   /* the stand they are on */
+  for(let i = -16; i <= 16; i++){ const wx = i * 0.9, x = W / 2 + (wx - V.cx * 0.7) * V.s * 0.72; if(x < -40 || x > W + 40) continue; cands.push({id: 's' + i, x, y: feet, k, half: wx < 0 ? 0 : 1}); }
+  cands.sort((a, b) => Math.abs(a.x - W / 2) - Math.abs(b.x - W / 2));
+  Cheer.place(g, cands, {key: 'main', w: W, h: H}); return true;
+}
+function cheerEvents(list){ if(!window.Cheer || !Cheer.active() || !G) return; const M = G.M, now = performance.now();
+  list.forEach(e => { const p = e.p;
+    if(e.k === 'fight') Cheer.react('start', {side: 0});
+    else if(e.k === 'match'){ const w = e.winner, duo = M.f[1] && M.f[1].human; if(w == null || w < 0) Cheer.react('goal', {side: -1}); else if(duo || w === 0) Cheer.react('win', {side: w}); else Cheer.react('lose', {side: 0}); }
+    else if(e.k === 'roundEnd'){ if(e.winner >= 0) Cheer.react('big', {side: e.winner}); else Cheer.react('close', {side: -1}); }
+    else if(p !== 0 && p !== 1) return;   /* 🗺️ Brawenture events (h: seat) — not wired yet */
+    else if(e.k === 'hit'){ const big = ['bonk', 'jbonk', 'power', 'jpower', 'upper', 'lowbonk', 'dbonk', 'fly', 'gbreak'].indexOf(e.move) >= 0;
+      if((big || e.combo >= 3) && (G.cheerAt || 0) < now - 1200){ G.cheerAt = now; Cheer.react(e.combo >= 5 ? 'big' : 'goal', {side: p}); } }
+    else if(e.k === 'sky' || e.k === 'slam') Cheer.react('big', {side: p});
+    else if(e.k === 'gbreak' || e.k === 'tag') Cheer.react('goal', {side: p});
+    else if(e.k === 'tech') Cheer.react('close', {side: p});
+    else if(e.k === 'out' || e.k === 'ko') Cheer.react('miss', {side: p});
+  }); }
+function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  const at = card.querySelector('.res-btns'); if(!at) return; at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); }, 900); }
+/* 📣 CHEERSQUAD END */
 // 📣 ringside crowd: family members who are not fighting (topped up with fans) cheer, clap and gasp
 const CROWD_G = {cheer: ['cheer', 'clap', 'jump', 'starjump', 'flex'], gasp: ['think', 'shrug', 'peekaboo'], win: ['dance', 'cheer', 'floss', 'disco', 'clap'], idle: ['wave', 'clap', 'hop']};
 function crowdFor(M){
@@ -2607,7 +2647,7 @@ function drawScene(g, W, H, st, still){
   g.globalAlpha = 0.25; g.strokeStyle = T.edge; g.lineWidth = 2;
   for(let x = -BB.ARENA; x <= BB.ARENA; x += 1){ const px = V.X(x); g.beginPath(); g.moveTo(px, V.floorY + 3); g.lineTo(W / 2 + (px - W / 2) * 1.5, H); g.stroke(); }
   g.globalAlpha = 1;
-  drawCrowd(g, W, V, st, t);
+  if(!(window.Cheer && cheerScene(g, W, H, V, st, t))) drawCrowd(g, W, V, st, t);   /* 📣 cs-2c */
   // arena posts + rope at the edges
   [-1, 1].forEach(sd => { const x = V.X(sd * (BB.ARENA + 0.45)); g.fillStyle = T.post; g.fillRect(x - V.s * 0.09, V.Y(1.5), V.s * 0.18, V.s * 1.5); g.beginPath(); g.arc(x, V.Y(1.55), V.s * 0.14, 0, 7); g.fill(); });
   g.lineWidth = Math.max(2, V.s * 0.05); g.lineCap = 'round';
@@ -2943,7 +2983,7 @@ function saveText(res, cleared){
   const h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New high score!' : cleared ? (res.best && res.best.score ? 'Best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Saved') : '✅ Feats saved — win to unlock the next level';
   return featText(res.feats, h);
 }
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces();   /* 📣 cs-2c */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pickOne(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
@@ -3840,4 +3880,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.themes', {rows: 2}); }</script>
 </body>
 </html>
-<!-- (11i-I+back-1+r35+modes-3+mg-1+ck-room+p1c+p2+p3a+ck-2b) END OF BrawlBuddies.html -->
+<!-- (11i-I+back-1+r35+modes-3+mg-1+ck-room+p1c+p2+p3a+ck-2b+cs-2c) END OF BrawlBuddies.html -->
