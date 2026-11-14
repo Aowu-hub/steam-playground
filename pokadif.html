@@ -271,6 +271,7 @@
   <details class="rules"><summary>📖 How to play</summary><ul>
     <li><b>Two pictures</b> look the same — but a few things changed. <b>Poke</b> each change, in either picture.</li>
     <li>🌱 Basic: 🎨 colours + ➖➕ missing / extra things · 🐣 Junior adds 📏 size + 🔺 shape · 🔦 Intermediate adds 🔄 turn / flip + 🔢 count.</li>
+    <li>📸 <b>Family trip</b> scene: YOUR family's avatars pose for a photo at 7 trip places (🐘 jungle temple, 🌸 cherry mountain, 🐪 pyramids, ❄️ northern lights, 🌋 lava isles, 🌊 coral coast, 🚀 moon base) — find the 🕺 new pose, 😉 new face, 🔄 turned person, and the changed suitcases, cameras and ice creams.</li>
     <li>🔍 <b>Magnifier</b>: stuck? It shows you one change (a few per picture).</li>
     <li>👁️ <b>Blink</b>: ONE picture flips between A and B — poke what changes. Harder levels put a blank blink in between, so the change hides!</li>
     <li>⏱️ <b>Photo Hunt Arcade</b>: a speed run — race through 10 to 15 pictures to the 🏁 finish. The clock counts up, every 5 pictures is a ✅ checkpoint split, from ⚡ Hard a wrong poke adds seconds, and on 🌋 / 💀 every find gives ⏳ +3 s more time left. Beat your best time for ⭐⭐⭐!</li>
@@ -340,6 +341,16 @@ var PK = (function () {
     sky:   { name: 'Cloud Temple', icon: '☁️', top: '#4FA3E0', bot: '#CDEBFF', ground: '#F4F8FF', hill: '#DDEBFB', deco: ['🌈', '🕊️', '🏛️', '☀️', '🪁'], kinds: ['cloud', 'bird', 'balloon', 'house', 'tree', 'flower', 'heart', 'star', 'leaf', 'boat'] }
   };
   var THEME_KEYS = ['dino', 'sea', 'disco', 'robot', 'space', 'sky'];
+  // 📸 pk-4a Family Photo Hunt: 7 trip places (the 🧳 Avatraveller regions) — a painted landmark behind the family (painter: pkTrip)
+  var TRIP_PROPS = ['suitcase', 'camera', 'icecream', 'balloon', 'flower', 'heart', 'star', 'bird'];
+  THEMES.trip_jungle = { name: 'Elephant Jungle', icon: '🐘', top: '#2F7A4A', bot: '#BFE6A0', ground: '#8A6A3F', hill: '#4E8C3A', deco: ['🌴', '🦜', '🌺'], kinds: TRIP_PROPS.concat(['leaf', 'tree']), mark: 'temple' };
+  THEMES.trip_cherry = { name: 'Cherry Mountain', icon: '🌸', top: '#7EB8F0', bot: '#FFE3F0', ground: '#8FBF6A', hill: '#F3B5CE', deco: ['🌸', '🎏', '🍡'], kinds: TRIP_PROPS.concat(['leaf', 'cloud']), mark: 'mountain' };
+  THEMES.trip_pyramid = { name: 'Pyramid Sands', icon: '🐪', top: '#F7A84A', bot: '#FFE6A8', ground: '#E2B86A', hill: '#D9A85A', deco: ['🌵', '☀️', '🦂'], kinds: TRIP_PROPS.concat(['crystal', 'diamond']), mark: 'pyramids' };
+  THEMES.trip_aurora = { name: 'Aurora North', icon: '❄️', top: '#0B1D3A', bot: '#2E6F8E', ground: '#EAF4FF', hill: '#CFE3F5', deco: ['❄️', '🦌', '⛄'], kinds: TRIP_PROPS.concat(['crystal', 'star']), mark: 'aurora' };
+  THEMES.trip_lava = { name: 'Lava Isles', icon: '🌋', top: '#3B1020', bot: '#F07A3A', ground: '#4A3530', hill: '#6A4038', deco: ['🔥', '🌴', '🦎'], kinds: TRIP_PROPS.concat(['crystal', 'diamond']), mark: 'volcano' };
+  THEMES.trip_coral = { name: 'Coral Coast', icon: '🌊', top: '#38B6FF', bot: '#BDF0FF', ground: '#F5DC9A', hill: '#3AA7D6', deco: ['🐚', '🦀', '⛱️'], kinds: TRIP_PROPS.concat(['shell', 'fish']), mark: 'beach' };
+  THEMES.trip_moon = { name: 'Moon Base', icon: '🚀', top: '#05061F', bot: '#2A2680', ground: '#9A9DB0', hill: '#7D8096', deco: ['⭐', '🛰️', '☄️'], kinds: TRIP_PROPS.concat(['planet', 'rocket']), mark: 'moon' };
+  var TRIP_KEYS = ['trip_jungle', 'trip_cherry', 'trip_pyramid', 'trip_aurora', 'trip_lava', 'trip_coral', 'trip_moon'];
   // bright colours that stand out on every background
   var PAL = ['#E63946', '#FF8C1A', '#FFD23F', '#8BD346', '#22B573', '#1FB5C4', '#3A6FE8', '#8E5BE8', '#FF5FA8', '#9B5B2E'];
 
@@ -841,6 +852,84 @@ var PK = (function () {
   function clueMatch(k, p) { return { boot: p.boot === k.thief.boot, drop: p.drop === k.thief.drop }; }
   function storyPoints(level, r) { var p = 260 - r.oops * 30 - r.hints * 50 + Math.max(0, 40 - r.secs) * 3; return Math.max(40, Math.round(p * (1 + level * 0.25) * ((STORY[level] || {}).hardcore ? 3 : 1))); }
   function caseBonus(level) { return Math.round(1000 * (1 + level * 0.25) * ((STORY[level] || {}).hardcore ? 3 : 1)); }
+
+  // ================= 📸 FAMILY PHOTO HUNT (pk-4a, Aowu 16:32) =================
+  // The family's own avatars pose at a trip place; every person = {k: 'person', who (family index), act}. Acts = our own 🎭 BLOCK pokadif photo acts
+  // (pose + face mixes) + the shared 🤳 selfie. Changes: 🕺 pose (another photo act) · 😉 face (same pose, another face, ⚡+) · 🔄 turned round (🔦+, lopsided poses only)
+  // · 🎨 prop colour · ➖ prop gone · ➕ extra prop. One change per person / prop, never two.
+  var PHOTO_ACTS = {   // = BLOCK pokadif in AvatarActing (keep in step) — [pose, face, lopsided?]
+    'pk.tada': ['arms-up', 'joy', 0], 'pk.jump-shot': ['cheer-jump', 'excited', 0], 'pk.look-there': ['point', 'amazed', 1], 'pk.strong': ['flex', 'proud', 0],
+    'pk.hello-bow': ['bow', 'happy', 1], 'pk.wonder': ['think-chin', 'curious', 1], 'pk.wink-wave': ['wave', 'wink', 1], 'pk.big-hug': ['hug', 'love', 0],
+    'pk.oh-well': ['shrug', 'silly', 0], 'pk.we-did-it': ['fist-pump', 'laugh', 1], 'pk.cool-pose': ['ready', 'cool', 0]
+  };
+  var PHOTO_FACES = ['shock', 'cool', 'love', 'star-eyes', 'silly'];   // only BOLD faces: a face swap must change ≥ 45 pixels (pixel test)
+  var SELFIE = 'cheer.selfie';
+  var PHOTO_TYPES = [['pose', 'colour', 'gone'], ['pose', 'colour', 'gone', 'extra'], ['pose', 'colour', 'gone', 'extra', 'flip'],
+    ['pose', 'colour', 'gone', 'extra', 'flip', 'face'], ['pose', 'colour', 'gone', 'extra', 'flip', 'face'], ['pose', 'colour', 'gone', 'extra', 'flip', 'face']];
+  function photoAct(pose, face) { return 'pkp.' + pose + '.' + face; }   // a face-swap act the page registers on the fly
+  function actOf(p) { return p.face ? photoAct(PHOTO_ACTS[p.base] ? PHOTO_ACTS[p.base][0] : 'idle', p.face) : p.base; }
+  function lopsided(p) { return p.base === SELFIE || (PHOTO_ACTS[p.base] && PHOTO_ACTS[p.base][2] === 1); }
+  function makePhoto(seed, level, place, opt) {
+    opt = opt || {};
+    var L = LEVELS[level] || LEVELS[0], T = THEMES[place] ? place : TRIP_KEYS[seed % TRIP_KEYS.length], TH = THEMES[T];
+    var acts = (opt.acts || Object.keys(PHOTO_ACTS)).filter(function (a) { return PHOTO_ACTS[a]; }), np = Math.max(2, Math.min(4, opt.people || 3));
+    var n = opt.n || L.n, pool = opt.force ? [opt.force] : PHOTO_TYPES[level] || PHOTO_TYPES[0];
+    for (var attempt = 0; attempt < 40; attempt++) {
+      var R = rng(seed + attempt * 7919), id = 0;
+      var sc = { seed: seed, level: level, theme: T, photo: true, W: W, H: H, ground: GROUND, kinds: TH.kinds.slice(), deco: [], A: [], B: [], diffs: [], people: np };
+      for (var i = 0; i < 3; i++) { var side = i % 2 === 0; sc.deco.push({ ch: pick(R, TH.deco), x: side ? 16 + R() * 26 : W - 16 - R() * 26, y: 24 + R() * 70, r: 14, sz: 20 + R() * 6 }); }
+      // 👨‍👩‍👧 the family in a row on the ground (one may take a 🤳 selfie)
+      var pr = np <= 2 ? 60 : np === 3 ? 54 : 46, gap = (W - 40) / np, used = {}, sel = R() < 0.6 ? Math.floor(R() * np) : -1;
+      for (var q = 0; q < np; q++) {
+        var a = sel === q ? SELFIE : pick(R, acts.filter(function (x) { return !used[x]; }).length ? acts.filter(function (x) { return !used[x]; }) : acts); used[a] = 1;
+        sc.A.push({ id: 'p' + q, k: 'person', who: q, base: a, face: null, x: 20 + gap * (q + 0.5) + (R() - 0.5) * gap * 0.14, y: H - 16 - pr * 1.08, r: pr, c: '#ffffff', rot: 0, fl: R() < 0.5 ? -1 : 1, n: 0 });
+      }
+      // 🎒 trip props in the free space (sky, sides, between legs never — freeSpot keeps clear of people)
+      var nprops = Math.max(4, n + 3 - np + 1);
+      for (var j = 0; j < nprops * 3 && sc.A.filter(function (x) { return x.k !== 'person'; }).length < nprops; j++) {
+        var k = pick(R, TH.kinds), r = L.r * (0.88 + R() * 0.24) * (k === 'suitcase' || k === 'camera' || k === 'icecream' ? 1 : 0.95), sp = freeSpot(R, sc.A, sc.deco, r * (KINDS[k] ? KINDS[k].s : 1));
+        if (!sp) continue;
+        sc.A.push({ id: 'i' + (id++), k: k, x: sp.x, y: sp.y, r: r, c: pick(R, PAL), rot: 0, fl: 1, n: KINDS[k] && KINDS[k].n ? KINDS[k].n[0] + Math.floor(R() * (KINDS[k].n[1] - KINDS[k].n[0] + 1)) : 0 });
+      }
+      sc.B = sc.A.map(clone);
+      // the changes
+      var types = []; while (types.length < n) types = types.concat(shuffle(R, pool)); types = types.slice(0, n);
+      var taken = {}, ok = true;
+      for (var t = 0; t < types.length && ok; t++) {
+        var ty = types[t], d = null;
+        var people = sc.A.filter(function (x) { return x.k === 'person' && !taken[x.id]; }), props = sc.A.filter(function (x) { return x.k !== 'person' && !taken[x.id]; });
+        if (ty === 'flip') people = people.filter(lopsided);
+        if (ty === 'face') people = pr >= 54 ? people.filter(function (x) { return x.base !== SELFIE; }) : [];   // faces only on big people (≤ 3 in the photo)
+        if ((ty === 'pose' || ty === 'flip' || ty === 'face') && !people.length) ty = props.length ? pick(R, ['colour', 'gone']) : 'extra';
+        if ((ty === 'colour' || ty === 'gone') && !props.length) ty = 'extra';
+        if (ty === 'pose' || ty === 'flip' || ty === 'face') {
+          var P = pick(R, people), Bp = sc.B.filter(function (x) { return x.id === P.id; })[0]; taken[P.id] = 1;
+          if (ty === 'pose') { var others = acts.filter(function (x) { return x !== P.base && PHOTO_ACTS[x][0] !== (PHOTO_ACTS[P.base] || [])[0]; }); Bp.base = pick(R, others); }
+          else if (ty === 'flip') Bp.fl = -P.fl;
+          else { var f0 = (PHOTO_ACTS[P.base] || [])[1]; Bp.face = pick(R, PHOTO_FACES.filter(function (f) { return f !== f0; })); }
+          d = { t: ty, sub: ty, idA: P.id, idB: P.id, x: P.x, y: P.y, r: P.r };
+        } else if (ty === 'colour' || ty === 'gone') {
+          var Q = pick(R, props), Bq = sc.B.filter(function (x) { return x.id === Q.id; })[0]; taken[Q.id] = 1;
+          if (ty === 'colour') { var cs = shuffle(R, PAL).filter(function (c) { return colDist(c, Q.c) >= 180; }); if (!cs.length) { ok = false; break; } Bq.c = cs[0]; d = { t: 'colour', sub: 'colour', idA: Q.id, idB: Q.id, x: Q.x, y: Q.y, r: radiusOf(Q) }; }
+          else { var gi = sc.B.indexOf(Bq); if (R() < 0.5) { sc.B.splice(gi, 1); d = { t: 'gone', sub: 'missing', idA: Q.id, idB: null, x: Q.x, y: Q.y, r: radiusOf(Q) }; }
+            else { var ai = sc.A.indexOf(Q); sc.A.splice(ai, 1); d = { t: 'gone', sub: 'extra', idA: null, idB: Q.id, x: Q.x, y: Q.y, r: radiusOf(Q) }; } }
+        } else {   // ➕ a brand-new prop only in B
+          var k2 = pick(R, TH.kinds), r2 = L.r, sp2 = freeSpot(R, sc.A.concat(sc.B), sc.deco, r2 * (KINDS[k2] ? KINDS[k2].s : 1)); if (!sp2) { ok = false; break; }
+          var nw = { id: 'x' + (id++), k: k2, x: sp2.x, y: sp2.y, r: r2, c: pick(R, PAL), rot: 0, fl: 1, n: KINDS[k2] && KINDS[k2].n ? KINDS[k2].n[0] : 0 }; sc.B.push(nw); taken[nw.id] = 1;
+          d = { t: 'extra', sub: 'extra', idA: null, idB: nw.id, x: nw.x, y: nw.y, r: radiusOf(nw) };
+        }
+        d.hit = hitOf(d); sc.diffs.push(d);
+      }
+      if (!ok || sc.diffs.length < n) continue;
+      // fair: poke circles never overlap
+      var clash = false; for (var u = 0; u < sc.diffs.length && !clash; u++) for (var v = u + 1; v < sc.diffs.length; v++) if (Math.hypot(sc.diffs[u].x - sc.diffs[v].x, sc.diffs[u].y - sc.diffs[v].y) < sc.diffs[u].hit + sc.diffs[v].hit - 4) { clash = true; break; }
+      if (clash) continue;
+      sc.A.concat(sc.B).forEach(function (x) { if (x.k === 'person') x.act = actOf(x); });
+      sc.sig = signature(sc);
+      return sc;
+    }
+    return null;
+  }
   function starsFor(c) { if (!c.cleared) return 0; if (c.oops <= 1 && c.hints === 0) return 3; if (c.oops <= 4 && c.hints <= 1) return 2; return 1; }
   // 🕵️ rank from how many levels are cleared (progress.unlocked)
   var RANKS = [{ at: 0, icon: '🕵️', name: 'Rookie' }, { at: 1, icon: '🔎', name: 'Sleuth' }, { at: 3, icon: '🎖️', name: 'Inspector' }, { at: 6, icon: '👑', name: 'Master Detective' }];
@@ -848,7 +937,7 @@ var PK = (function () {
   function nextRank(cleared) { for (var i = 0; i < RANKS.length; i++) if (RANKS[i].at > cleared) return RANKS[i]; return null; }
 
   return { W: W, H: H, GROUND: GROUND, MIN_HIT: MIN_HIT, KINDS: KINDS, SHAPES: SHAPES, THEMES: THEMES, THEME_KEYS: THEME_KEYS, PAL: PAL, TYPES: TYPES, TYPE_INFO: TYPE_INFO,
-    LEVELS: LEVELS, RANKS: RANKS, TYPES6: TYPES6, WORD_SETS: WORD_SETS, RHYMES: RHYMES, ODD: ODD, ODD_ROUNDS: ODD_ROUNDS, makeOdd: makeOdd, oddPoints: oddPoints, makePattern: makePattern, sumText: sumText, ARCADE: ARCADE, CHECK_EVERY: CHECK_EVERY, arcadeScore: arcadeScore, arcadeStars: arcadeStars, mmss: mmss, STORY: STORY, BOOTS: BOOTS, VERBS: VERBS, CASES: CASES, caseById: caseById, makeCase: makeCase, makeWalk: makeWalk, makeDigit: makeDigit, bfs: bfs, clueMatch: clueMatch, storyPoints: storyPoints, caseBonus: caseBonus, rng: rng, newSeed: newSeed, makeScene: makeScene, signature: signature, poke: poke, pokeFound: pokeFound, radiusOf: radiusOf, hitOf: hitOf,
+    LEVELS: LEVELS, RANKS: RANKS, TYPES6: TYPES6, WORD_SETS: WORD_SETS, RHYMES: RHYMES, ODD: ODD, ODD_ROUNDS: ODD_ROUNDS, makeOdd: makeOdd, oddPoints: oddPoints, makePattern: makePattern, sumText: sumText, ARCADE: ARCADE, CHECK_EVERY: CHECK_EVERY, arcadeScore: arcadeScore, arcadeStars: arcadeStars, mmss: mmss, TRIP_KEYS: TRIP_KEYS, PHOTO_ACTS: PHOTO_ACTS, PHOTO_FACES: PHOTO_FACES, SELFIE: SELFIE, photoAct: photoAct, makePhoto: makePhoto, STORY: STORY, BOOTS: BOOTS, VERBS: VERBS, CASES: CASES, caseById: caseById, makeCase: makeCase, makeWalk: makeWalk, makeDigit: makeDigit, bfs: bfs, clueMatch: clueMatch, storyPoints: storyPoints, caseBonus: caseBonus, rng: rng, newSeed: newSeed, makeScene: makeScene, signature: signature, poke: poke, pokeFound: pokeFound, radiusOf: radiusOf, hitOf: hitOf,
     colDist: colDist, picturePoints: picturePoints, starsFor: starsFor, rankOf: rankOf, nextRank: nextRank, fits: fits };
 })();
 if (typeof module !== 'undefined') module.exports = PK;
@@ -869,6 +958,24 @@ function pkDot(g, x, y, r, c){ g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0,
 const PK_DICE = {1: [[0, 0]], 2: [[-1, -1], [1, 1]], 3: [[-1, -1], [0, 0], [1, 1]], 4: [[-1, -1], [1, -1], [-1, 1], [1, 1]], 5: [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]], 6: [[-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]]};
 const PK_SPOTS = [[-0.35, -0.05], [0.35, -0.05], [-0.3, 0.42], [0.3, 0.42], [-0.55, 0.2], [0.55, 0.2]];
 const PK_PAINT = {
+  // 📸 pk-4a trip props: 🧳 suitcase · 📷 camera · 🍦 ice cream (colour = the changeable part)
+  suitcase(g, r, c){ g.beginPath(); g.roundRect(-r * 0.62, -r * 0.42, r * 1.24, r * 0.98, r * 0.16); pkFill(g, c, r * 0.6);
+    g.strokeStyle = 'rgba(0,0,0,0.45)'; g.lineWidth = r * 0.1; g.beginPath(); g.moveTo(-r * 0.2, -r * 0.42); g.lineTo(-r * 0.2, -r * 0.62); g.lineTo(r * 0.2, -r * 0.62); g.lineTo(r * 0.2, -r * 0.42); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,0.75)'; g.fillRect(-r * 0.62, -r * 0.02, r * 1.24, r * 0.12); g.beginPath(); g.arc(-r * 0.36, r * 0.6, r * 0.09, 0, 7); g.arc(r * 0.36, r * 0.6, r * 0.09, 0, 7); g.fillStyle = '#26203F'; g.fill(); },
+  camera(g, r, c){ g.beginPath(); g.roundRect(-r * 0.66, -r * 0.36, r * 1.32, r * 0.86, r * 0.14); pkFill(g, c, r * 0.6); g.beginPath(); g.roundRect(-r * 0.24, -r * 0.56, r * 0.48, r * 0.22, r * 0.06); pkFill(g, c, r * 0.5);
+    g.beginPath(); g.arc(0, r * 0.08, r * 0.3, 0, 7); pkFill(g, '#2B2D42', r * 0.5); g.beginPath(); g.arc(0, r * 0.08, r * 0.16, 0, 7); g.fillStyle = '#8EC5FF'; g.fill(); pkShine(g, -r * 0.08, 0, r * 0.06);
+    g.fillStyle = '#FFE066'; g.beginPath(); g.arc(r * 0.44, -r * 0.18, r * 0.08, 0, 7); g.fill(); },
+  icecream(g, r, c){ g.beginPath(); g.moveTo(-r * 0.32, -r * 0.05); g.lineTo(r * 0.32, -r * 0.05); g.lineTo(0, r * 0.82); g.closePath(); pkFill(g, '#E0A458', r * 0.5);
+    g.strokeStyle = 'rgba(120,70,20,0.45)'; g.lineWidth = r * 0.04; for(let i = -1; i <= 1; i++){ g.beginPath(); g.moveTo(i * r * 0.18 - r * 0.1, -r * 0.02); g.lineTo(i * r * 0.18 + r * 0.12, r * 0.4); g.stroke(); }
+    g.beginPath(); g.arc(0, -r * 0.24, r * 0.38, 0, 7); pkFill(g, c, r * 0.6); g.beginPath(); g.arc(-r * 0.12, -r * 0.56, r * 0.24, 0, 7); pkFill(g, c, r * 0.5); pkShine(g, -r * 0.18, -r * 0.36, r * 0.08); },
+  // 🧑 a family member (pk-4a): drawn by 🎭 Acting at ONE size for every act, so only the pose / face / turn changes between A and B
+  person(g, r, c, n, it){
+    const fam = window.PK_FAMILY || [], who = fam[it.who % Math.max(1, fam.length)], w = r * 2, h = r * 2.2;
+    if(!who || !window.Acting){ emo(g, '🧑', 0, 0, r * 1.5, 1); return; }
+    pkPersonAct(it.act);
+    const f = Acting.fit(who, PK_FIT_ACTS(), w, h, {t: 0, variant: 0});
+    Acting.draw(g, who, -w / 2 + f.x, -h / 2 + f.y, f.k, it.act, {t: 0, variant: 0, noPet: true});
+  },
   // 📖 pk-3b story pieces: 🦴 a bone (dino clutter) · 🪙 a coin (sea clutter)
   bone(g, r){ g.fillStyle = '#F4EBD6'; g.beginPath(); g.rect(-r * 0.55, -r * 0.14, r * 1.1, r * 0.28); g.fill(); pkOut(g, r * 0.4);
     [[-0.6, -0.16], [-0.6, 0.16], [0.6, -0.16], [0.6, 0.16]].forEach(p => { g.beginPath(); g.arc(r * p[0], r * p[1], r * 0.2, 0, 7); pkFill(g, '#F4EBD6', r * 0.4); }); },
@@ -957,6 +1064,31 @@ const PK_PAINT = {
     g.beginPath(); g.moveTo(0, r * 0.6); g.lineTo(0, -r * 0.8); g.moveTo(0, r * 0.1); g.lineTo(-r * 0.3, -r * 0.15); g.moveTo(0, -r * 0.2); g.lineTo(r * 0.28, -r * 0.45); g.lineWidth = r * 0.05; g.strokeStyle = pkTone(c, 0.6); g.stroke(); }
 };
 // the background (the SAME in both pictures)
+
+// 📸 pk-4a: face-swap acts ('pkp.<pose>.<face>') are made on the fly from the pose + a new face; the fit box covers every photo act so all share one size
+function pkPersonAct(act){ if(!window.Acting || !/^pkp\./.test(act) || Acting.has('acts', act)) return; const m = act.split('.'); Acting.add({acts: {[act]: {pose: m[1], face: m.slice(2).join('.'), ride: 'keep', tags: ['photo']}}}, {by: '🔍 Pokadif', block: 'pokadif-run', game: 'pokadif'}); }
+let PK_FIT_LIST = null;
+function PK_FIT_ACTS(){ if(!PK_FIT_LIST) PK_FIT_LIST = Object.keys(PK.PHOTO_ACTS).concat([PK.SELFIE]).filter(a => window.Acting && Acting.has('acts', a)); return PK_FIT_LIST.length ? PK_FIT_LIST : ['idle']; }
+// 🗺️ the trip landmark behind the family (same in A and B)
+function pkTrip(g, sc, R){
+  const T = PK.THEMES[sc.theme], W = PK.W, G = PK.GROUND, m = T.mark;
+  const tri = (x, y, w, h, c) => { g.fillStyle = c; g.beginPath(); g.moveTo(x - w / 2, y); g.lineTo(x, y - h); g.lineTo(x + w / 2, y); g.closePath(); g.fill(); };
+  if(m === 'temple'){ g.fillStyle = 'rgba(30,60,30,0.35)'; for(let i = 0; i < 7; i++){ g.beginPath(); g.arc(30 + i * 60, G - 10, 30 + (i % 3) * 8, Math.PI, 0); g.fill(); }
+    g.fillStyle = '#E8C46A'; g.fillRect(W * 0.62, G - 70, 70, 70); tri(W * 0.62 + 35, G - 70, 86, 60, '#D9A441'); tri(W * 0.62 + 35, G - 118, 30, 40, '#F2D27A'); g.fillStyle = '#7A4A1A'; g.fillRect(W * 0.62 + 27, G - 34, 16, 34);
+    g.fillStyle = '#8A8FA0'; g.beginPath(); g.ellipse(W * 0.22, G - 30, 34, 24, 0, 0, 7); g.fill(); g.beginPath(); g.arc(W * 0.22 - 34, G - 40, 16, 0, 7); g.fill(); g.fillRect(W * 0.22 - 52, G - 40, 8, 34); [-22, -6, 10, 24].forEach(x => g.fillRect(W * 0.22 + x, G - 14, 9, 16)); }
+  if(m === 'mountain'){ tri(W * 0.5, G, 300, 150, '#6F7FA8'); tri(W * 0.5, G - 105, 66, 45, '#FFFFFF'); [40, 90, 320, 365].forEach((x, i) => { g.fillStyle = '#7A4A2A'; g.fillRect(x - 3, G - 38, 6, 38); g.fillStyle = i % 2 ? '#F7A8C8' : '#FFC2DA'; g.beginPath(); g.arc(x, G - 46, 20, 0, 7); g.fill(); }); }
+  if(m === 'pyramids'){ g.fillStyle = 'rgba(255,240,180,0.9)'; g.beginPath(); g.arc(W * 0.82, 50, 24, 0, 7); g.fill(); tri(W * 0.32, G, 210, 120, '#D49A4A'); tri(W * 0.62, G, 150, 86, '#E0AE5E'); tri(W * 0.84, G, 90, 50, '#C98E40');
+    g.strokeStyle = 'rgba(120,70,20,0.25)'; g.lineWidth = 1.5; for(let y = 20; y < 120; y += 20){ g.beginPath(); g.moveTo(W * 0.32 - 105 * (y / 120), G - 120 + y); g.lineTo(W * 0.32 + 105 * (y / 120), G - 120 + y); g.stroke(); } }
+  if(m === 'aurora'){ ['rgba(80,255,170,0.35)', 'rgba(120,180,255,0.3)', 'rgba(200,120,255,0.25)'].forEach((c, i) => { g.strokeStyle = c; g.lineWidth = 16 - i * 3; g.beginPath(); for(let x = 0; x <= W; x += 20) g.lineTo(x, 50 + i * 22 + Math.sin(x * 0.02 + i) * 18); g.stroke(); });
+    g.fillStyle = '#F4FAFF'; g.beginPath(); g.arc(W * 0.7, G, 48, Math.PI, 0); g.fill(); g.strokeStyle = 'rgba(120,160,200,0.6)'; g.lineWidth = 1.5; for(let a = 1; a < 4; a++){ g.beginPath(); g.arc(W * 0.7, G, 48 * a / 4, Math.PI, 0); g.stroke(); } g.fillStyle = '#2E4A6A'; g.beginPath(); g.arc(W * 0.7, G, 14, Math.PI, 0); g.fill(); }
+  if(m === 'volcano'){ tri(W * 0.45, G, 280, 140, '#5A3A3A'); g.fillStyle = '#FF7A1A'; g.beginPath(); g.moveTo(W * 0.45 - 20, G - 130); g.lineTo(W * 0.45 + 20, G - 130); g.lineTo(W * 0.45 + 40, G - 60); g.lineTo(W * 0.45 + 10, G - 90); g.lineTo(W * 0.45 - 30, G - 50); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(80,60,60,0.5)'; [0, 1, 2].forEach(i => { g.beginPath(); g.arc(W * 0.45 + i * 14 - 10, G - 150 - i * 18, 14 + i * 5, 0, 7); g.fill(); }); }
+  if(m === 'beach'){ g.fillStyle = '#2E9BDA'; g.fillRect(0, G - 40, W, 44); g.fillStyle = 'rgba(255,255,255,0.6)'; for(let x = 10; x < W; x += 40){ g.beginPath(); g.ellipse(x, G - 30 + (x % 3) * 8, 12, 2.5, 0, 0, 7); g.fill(); }
+    g.fillStyle = '#FFE680'; g.beginPath(); g.arc(W * 0.16, 52, 26, 0, 7); g.fill(); g.strokeStyle = '#8A5A2A'; g.lineWidth = 7; g.beginPath(); g.moveTo(W * 0.86, G); g.quadraticCurveTo(W * 0.84, G - 60, W * 0.8, G - 110); g.stroke();
+    g.fillStyle = '#3FA34D'; [[-1, 0.2], [1, 0.2], [-0.6, -0.6], [0.6, -0.6]].forEach(v => { g.beginPath(); g.ellipse(W * 0.8 + v[0] * 26, G - 112 + v[1] * 10, 30, 8, v[0] * 0.5, 0, 7); g.fill(); }); }
+  if(m === 'moon'){ g.fillStyle = '#3A7BD5'; g.beginPath(); g.arc(W * 0.8, 60, 30, 0, 7); g.fill(); g.fillStyle = '#4CB050'; g.beginPath(); g.ellipse(W * 0.79, 52, 12, 8, 0.4, 0, 7); g.ellipse(W * 0.83, 72, 9, 6, -0.3, 0, 7); g.fill();
+    g.fillStyle = 'rgba(220,235,255,0.55)'; g.beginPath(); g.arc(W * 0.3, G, 54, Math.PI, 0); g.fill(); g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = 2; g.stroke(); g.fillStyle = '#7D8096'; [[60, 12], [150, 8], [330, 10]].forEach(c => { g.beginPath(); g.ellipse(c[0], G + 26, c[1], c[1] * 0.35, 0, 0, 7); g.fill(); }); }
+}
 function pkBackground(g, sc){
   const T = PK.THEMES[sc.theme], R = PK.rng(sc.seed ^ 0x5bd1e995);
   const gr = g.createLinearGradient(0, 0, 0, PK.GROUND); gr.addColorStop(0, T.top); gr.addColorStop(1, T.bot); g.fillStyle = gr; g.fillRect(0, 0, PK.W, PK.H);
@@ -965,7 +1097,8 @@ function pkBackground(g, sc){
   if(sc.theme === 'sky'){ g.fillStyle = 'rgba(255,255,255,0.35)'; for(let i = 0; i < 3; i++){ const x = R() * PK.W, y = 20 + R() * 80; g.beginPath(); g.ellipse(x, y, 40 + R() * 30, 9, 0, 0, 7); g.fill(); } }
   if(sc.theme === 'robot'){ g.strokeStyle = 'rgba(160,220,255,0.12)'; g.lineWidth = 1; for(let x = 20; x < PK.W; x += 40){ g.beginPath(); g.moveTo(x, 0); g.lineTo(x, PK.GROUND); g.stroke(); } for(let y = 20; y < PK.GROUND; y += 40){ g.beginPath(); g.moveTo(0, y); g.lineTo(PK.W, y); g.stroke(); } }
   if(sc.theme === 'dino'){ g.fillStyle = 'rgba(20,40,10,0.25)'; g.beginPath(); g.moveTo(0, PK.GROUND); for(let x = 0; x <= PK.W; x += 25) g.lineTo(x, PK.GROUND - 30 - Math.sin(x * 0.03 + sc.seed % 7) * 18); g.lineTo(PK.W, PK.GROUND); g.fill(); }
-  g.fillStyle = T.hill; g.beginPath(); g.ellipse(PK.W * 0.25, PK.GROUND + 8, PK.W * 0.42, 26, 0, 0, 7); g.ellipse(PK.W * 0.8, PK.GROUND + 12, PK.W * 0.36, 22, 0, 0, 7); g.fill();
+  if(T.mark){ if(sc.theme === 'trip_aurora' || sc.theme === 'trip_moon'){ for(let i = 0; i < 22; i++){ g.fillStyle = 'rgba(255,255,255,' + (0.3 + R() * 0.5) + ')'; g.beginPath(); g.arc(R() * PK.W, R() * PK.GROUND * 0.6, 0.6 + R() * 1.3, 0, 7); g.fill(); } } pkTrip(g, sc, R); }
+  else { g.fillStyle = T.hill; g.beginPath(); g.ellipse(PK.W * 0.25, PK.GROUND + 8, PK.W * 0.42, 26, 0, 0, 7); g.ellipse(PK.W * 0.8, PK.GROUND + 12, PK.W * 0.36, 22, 0, 0, 7); g.fill(); }
   g.fillStyle = T.ground; g.fillRect(0, PK.GROUND + 4, PK.W, PK.H - PK.GROUND);
   if(typeof emo === 'function') sc.deco.forEach(d => emo(g, d.ch, d.x, d.y, d.sz, 0.55));
 }
@@ -1044,8 +1177,18 @@ const MODES = [
 window.MODE_TYPE = {spot: MODES[0].type, blink: MODES[1].type, odd: MODES[2].type, arcade: MODES[3].type, detective: MODES[4].type};
 const MODE_NAME = {spot: '🖼️ Spot', blink: '👁️ Blink', odd: '🎯 Odd One Out', arcade: '⏱️ Arcade', detective: '📖'};   // = the Theme start (Code.gs MODES_ tried.themeStart)
 /* 🗂️ END MODE GROUPS */
-const HOUSES = [{k: 'mix', icon: '🎲', name: 'Mix'}].concat(PK.THEME_KEYS.map(k => ({k, icon: PK.THEMES[k].icon, name: PK.THEMES[k].name})));
-const FOUND_SAY = {foot: '👣 A thief footprint!', colour: '🎨 A new colour!', missing: '➖ Something is missing!', extra: '➕ Something extra!', bigger: '📏 It got bigger!', smaller: '📏 It got smaller!',
+const HOUSES = [{k: 'mix', icon: '🎲', name: 'Mix'}].concat(PK.THEME_KEYS.map(k => ({k, icon: PK.THEMES[k].icon, name: PK.THEMES[k].name}))).concat([{k: 'trip', icon: '📸', name: 'Family trip'}]);   // 📸 pk-4a
+// 📸 Family Photo Hunt (pk-4a): your family's own avatars pose at a trip place. Family = you first, then the others (max 4); a small family gets 🧑 friends.
+function familyList(){ const names = [S.player].concat((S.players || []).map(p => p.Name).filter(n => n && n !== S.player)).slice(0, 4);
+  while(names.length < 2) names.push('Friend ' + names.length);
+  return names.map(n => ({name: n, av: myAvatar(n)})); }
+function photoActs(){ return Object.keys(PK.PHOTO_ACTS).filter(a => !window.Acting || Acting.has('acts', a)); }
+function makePicture(theme, opt){   // a Spot / Blink / Arcade picture: a normal scene, or a 📸 family photo when the 📸 Family trip scene is picked
+  if(theme !== 'trip') return PK.makeScene(PK.newSeed(), G.level, theme, opt);
+  window.PK_FAMILY = familyList(); const place = pkPick(PK.TRIP_KEYS.filter(k => k !== G.lastPlace)); G.lastPlace = place;
+  return PK.makePhoto(PK.newSeed(), G.level, place, Object.assign({people: window.PK_FAMILY.length, acts: photoActs()}, opt || {}));
+}
+const FOUND_SAY = {pose: '🕺 A new pose!', face: '😉 A new face!', foot: '👣 A thief footprint!', colour: '🎨 A new colour!', missing: '➖ Something is missing!', extra: '➕ Something extra!', bigger: '📏 It got bigger!', smaller: '📏 It got smaller!',
   shape: '🔺 A different shape!', flip: '🔄 It flipped!', turn: '🔄 It turned!', more: '🔢 There are more!', fewer: '🔢 There are fewer!'};
 const PRAISE = ['Great eyes!', 'Super sleuth!', 'You got it!', 'Sharp!', 'Nice poke!', 'Detective skills!'];
 
@@ -1172,7 +1315,7 @@ function nextPicture(){
   if(!G) return;
   G.pic++; const L = G.L;
   let theme = SET.house === 'mix' ? pkPick(PK.THEME_KEYS.filter(k => k !== G.lastTheme)) : SET.house;
-  let sc = null; for(let i = 0; i < 6 && !sc; i++){ const s = PK.newSeed(); sc = PK.makeScene(s, G.level, theme, G.A ? {n: G.A.n} : null); if(sc && G.used[sc.sig]) sc = null; }
+  let sc = null; for(let i = 0; i < 12 && !sc; i++){ sc = makePicture(theme, G.A ? {n: G.A.n} : null); if(sc && G.used[sc.sig]) sc = null; }
   G.lastTheme = theme; G.used[sc.sig] = 1; G.scene = sc; G.found = sc.diffs.map(() => false); G.pOops = 0; G.pHints = 0; G.pSecs = 0; G.lastFind = performance.now(); G.glowAt = -1;
   if(G.mode !== 'arcade') G.hints = L.hints;
   const nN = sc.diffs.length;
@@ -1355,7 +1498,7 @@ function bigWord(txt, small){ if(!FX) return; const e = document.createElement('
 function confetti(list, count){ if(!FX) return; for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pkPick(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 
 /* ================= RESULT + SAVES ================= */
-function houseLabel(){ const h = HOUSES.find(x => x.k === SET.house) || HOUSES[0]; return h.icon + ' ' + h.name; }
+function houseLabel(){ const h = HOUSES.find(x => x.k === SET.house) || HOUSES[0]; return h.icon + ' ' + h.name + (h.k === 'trip' && G && G.lastPlace ? ' · ' + PK.THEMES[G.lastPlace].icon + ' ' + PK.THEMES[G.lastPlace].name : ''); }
 function finishCase(won){
   if(!G || G.over) return; if(G.mode === 'arcade') return arcFinish(); if(G.mode === 'detective') return finishStory(won);
   G.over = true; stopTicker(); hideHand();
@@ -1437,7 +1580,7 @@ function stopBlink(keep){ clearTimeout(BLINK_T); BLINK_T = 0; if(!keep){ ['pic-a
 const ODD_SAY = {colour: '🎨 It\'s a different colour!', shape: '🔺 It\'s a different shape!', bigger: '📏 It\'s bigger!', smaller: '📏 It\'s smaller!', flip: '🔄 It\'s flipped!', turn: '🔄 It\'s turned!', more: '🔢 It has more!', fewer: '🔢 It has fewer!'};
 function nextOdd(){
   if(!G) return; G.pic++;
-  const theme = SET.house === 'mix' ? pkPick(PK.THEME_KEYS.filter(k => k !== G.lastTheme)) : SET.house;
+  const theme = SET.house === 'mix' || SET.house === 'trip' ? pkPick(PK.THEME_KEYS.filter(k => k !== G.lastTheme)) : SET.house;   // 📸 trip = picture modes only
   let od = null; for(let i = 0; i < 6 && !od; i++){ od = PK.makeOdd(PK.newSeed(), G.level, theme); if(od && G.used[od.sig]) od = null; }
   G.lastTheme = theme; G.used[od.sig] = 1; G.odd = od; G.pOops = 0; G.pHints = 0; G.pSecs = 0; G.lastFind = performance.now();
   if(G.pic === 0) G.hints = G.O.hints;
@@ -1891,4 +2034,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d) END OF Pokadif.html -->
+<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d+pk-4a) END OF Pokadif.html -->
