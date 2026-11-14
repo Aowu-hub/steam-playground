@@ -1,0 +1,1 @@
+/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.af-bag', {rows: 2}); UI.pageRows('.af-tiles', {rows: 2}); }
