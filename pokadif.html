@@ -239,6 +239,11 @@
   .lessons{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:6px 0;}
   .lc{font-size:.72rem;font-weight:800;padding:4px 8px;border-radius:999px;background:var(--panel);color:var(--ink-soft);opacity:.55;}
   .lc.on{opacity:1;background:#CFF5E2;color:#0F6B43;}
+  /* ===== 🔍💤 boot watchdog card (pk-3c) ===== */
+  .boot-stuck{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;background:rgba(14,10,34,.72);padding:16px;box-sizing:border-box;}
+  .boot-stuck .bs-in{max-width:420px;width:100%;background:linear-gradient(170deg,#FFFDF5,#FFF1CF);color:#26203F;border-radius:22px;padding:18px;text-align:center;box-shadow:0 14px 40px rgba(0,0,0,.45);animation:pk-in .4s cubic-bezier(.2,1.6,.4,1) both;}
+  .boot-stuck .bs-ic{font-size:2.4rem;} .boot-stuck h3{margin:6px 0 4px;font-family:'Fredoka',sans-serif;} .boot-stuck p{margin:0 0 12px;font-weight:700;color:#5a5378;}
+  .boot-stuck .bs-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
 </style>
 <script src="inc/UiKit.js"></script>
 <script src="inc/BallSkins.js"></script>
@@ -1837,9 +1842,29 @@ if(window.ResizeObserver) new ResizeObserver(() => { const b = $('board'), k = b
 window.addEventListener('resize', () => { if(G && !$('scr-play').classList.contains('hidden')) layout(); });
 
 /* ================= BOOT ================= */
-function boot(){
-  UI.loading('pokadif');
+/* ---------- boot with a watchdog (pk-3c, Aowu 14:27 "stuck sometime in loading"): a phone can lose a server answer
+   (5G ↔ Wi-Fi, app in the background) — then neither handler ever runs and the loader spins forever.
+   No answer after BOOT_WAIT → ask again quietly (twice); still nothing → a card with 🔄 Try again + ◀ Gameroom. Late answers are ignored once one has landed. ---------- */
+const BOOT_WAIT = () => window.PK_BOOT_WAIT || 10000;
+let BOOT_DONE = false, BOOT_SEQ = 0;
+function bootStuck(on){
+  let c = document.getElementById('boot-stuck');
+  if(!on){ if(c) c.remove(); return; }
+  if(c) return;
+  c = document.createElement('div'); c.id = 'boot-stuck'; c.className = 'boot-stuck';
+  c.innerHTML = '<div class="bs-in"><div class="bs-ic">🔍💤</div><h3>The detective file is taking too long</h3><p>The connection may have dropped for a moment.</p><div class="bs-btns"><button class="sp-btn sp-primary" id="bs-again" data-sound="pop">🔄 Try again</button><button class="sp-btn sp-secondary" id="bs-back" data-sound="tap">' + UI.esc(UI.backLabel ? UI.backLabel() : '◀ Gameroom') + '</button></div></div>';
+  document.body.appendChild(c);
+  document.getElementById('bs-again').onclick = () => { bootStuck(false); boot(0); };
+  document.getElementById('bs-back').onclick = () => { if(UI.back) UI.back(WEBAPP_URL + '?page=gameroom'); else UI.go(WEBAPP_URL + '?page=gameroom'); };
+}
+function boot(tries){
+  tries = tries || 0;
+  if(!tries){ BOOT_DONE = false; UI.loading('pokadif'); }
+  const seq = ++BOOT_SEQ; let answered = false;
+  const timer = setTimeout(() => { if(answered || BOOT_DONE || seq !== BOOT_SEQ) return;
+    if(tries < 2){ UI.toast('⏳ Still opening — asking again…'); boot(tries + 1); } else { UI.loaded(); bootStuck(true); } }, BOOT_WAIT());
   google.script.run.withSuccessHandler(d => {
+      answered = true; clearTimeout(timer); if(BOOT_DONE) return; BOOT_DONE = true; bootStuck(false);
       UI.loaded();
       S.players = d.players || []; S.progress = d.progress || {}; S.progressArc = d.progressArcade || {}; S.progressCase = d.progressCase || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {};
       UISound.applySettings(S.settings);
@@ -1848,11 +1873,14 @@ function boot(){
       flushPending();
       if(CURRENT_PLAYER && S.players.some(p => p.Name === CURRENT_PLAYER)) choosePlayer(CURRENT_PLAYER); else { renderPlayers(); showScreen('player'); }
       if(UI.guideOnce) UI.guideOnce('pokadif', [UI.gameHelp(GAME_ID, 'Pokadif', '🔍')].filter(Boolean));
-    }).withFailureHandler(() => { UI.loaded(); UI.toast('Could not load players — check the connection', 'err'); renderPlayers(); showScreen('player'); })
+    }).withFailureHandler(() => {
+      answered = true; clearTimeout(timer); if(BOOT_DONE) return;
+      if(tries < 2 && seq === BOOT_SEQ){ setTimeout(() => { if(!BOOT_DONE) boot(tries + 1); }, 800); return; }
+      BOOT_DONE = true; UI.loaded(); UI.toast('Could not load players — check the connection', 'err'); renderPlayers(); showScreen('player'); })
     .getLevelGameData(GAME_ID, CURRENT_PLAYER);
 }
 boot();
 </script>
 </body>
 </html>
-<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b) END OF Pokadif.html -->
+<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c) END OF Pokadif.html -->
