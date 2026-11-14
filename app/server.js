@@ -4517,6 +4517,22 @@ function saveWordJournal(name, words) {
   return { ok: true, count: Math.min(300, list.length) };
 }
 
+// 📖 SpiritBestiary (pd-3b, PyraDive plan §8): ONE Settings row per player — "Bestiary_<Name>" = {<creature key>: [times called, first day, game]}.
+// Any game can add creatures (SpiritBestiary.add → saveBestiary a moment later); the book merges this row with the device's copy.
+function saveBestiary(name, add, game) {
+  if (!activePlayers_(listProfilesFull()).some(p => p.Name === name)) throw new Error('Unknown player.');
+  if (!add || typeof add !== 'object' || Array.isArray(add)) throw new Error('Bad data.');
+  const key = 'Bestiary_' + name, today = today_(); let d = {};
+  try { d = JSON.parse(getSettings()[key] || '{}') || {}; } catch (e) { d = {}; }
+  game = String(game || '').replace(/[^a-z0-9-]/g, '').slice(0, 24);
+  Object.keys(add).slice(0, 60).forEach(k => { if (!/^[a-z]{2,24}$/.test(k)) return; const n = Math.max(1, Math.min(50, Number(add[k]) || 1));
+    d[k] = d[k] ? [(Number(d[k][0]) || 0) + n, d[k][1] || today, d[k][2] || game] : [n, today, game]; });
+  if (Object.keys(d).length > 120) throw new Error('Too big.');
+  saveSetting(key, JSON.stringify(d));
+  return { ok: true, n: Object.keys(d).length };
+}
+function getBestiary(name) { let d = {}; try { d = JSON.parse(getSettings()['Bestiary_' + name] || '{}') || {}; } catch (e) { d = {}; } return d; }
+
 // 🧬 SkillKit saves (td-1, plan "TD-Stories — full plan.md" §6): ONE Settings row per player per game — "SkillTree_<game>_<Name>" =
 // {ch: chapters done (only grows), last: {<hero>: SkillKit tree.save()}, lastForms} — picks + evolve forms, never a log.
 const SKILL_TREE_GAMES_ = ['td-draprincess'];
@@ -4532,7 +4548,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -6022,6 +6038,8 @@ return {"include": typeof include === 'function' ? include : undefined,
 "saveRacket": typeof saveRacket === 'function' ? saveRacket : undefined,
 "saveBatstick": typeof saveBatstick === 'function' ? saveBatstick : undefined,
 "saveWordJournal": typeof saveWordJournal === 'function' ? saveWordJournal : undefined,
+"saveBestiary": typeof saveBestiary === 'function' ? saveBestiary : undefined,
+"getBestiary": typeof getBestiary === 'function' ? getBestiary : undefined,
 "saveSkillTree": typeof saveSkillTree === 'function' ? saveSkillTree : undefined,
 "startPoseSession": typeof startPoseSession === 'function' ? startPoseSession : undefined,
 "doPost": typeof doPost === 'function' ? doPost : undefined,
