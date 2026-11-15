@@ -4730,6 +4730,36 @@ function savePyraLooks(name, looks) {
 // 🧬 SkillKit saves (td-1, plan "TD-Stories — full plan.md" §6): ONE Settings row per player per game — "SkillTree_<game>_<Name>" =
 // {ch: chapters done (only grows), last: {<hero>: SkillKit tree.save()}, lastForms} — picks + evolve forms, never a log.
 const SKILL_TREE_GAMES_ = ['td-draprincess'];
+// 💾 b1c (🧱 Game Baseline §5): shared save files — 3 per player per game, one Settings row each (+ ⭐ main). GameFrame `GF.saves()` keeps a device
+// copy too (instant, offline) and sends a file here at checkpoints / when leaving. A file = {meta: {title, chapter, level, playSec, av…}, data: {…}, at}.
+const SAVE_SLOTS_ = 3, SAVE_MAX_ = 40000;
+const SAVE_GAMES_ = ['avateer', 'avatarealm', 'td-draprincess', 'brawenture', 'pokadif-case', 'snaketale', 'savetest'];   // games with a mid-run state (add yours)
+function saveCheck_(name, game, slot) {
+  if (SAVE_GAMES_.indexOf(game) < 0) throw new Error('Unknown game.');
+  if (!activePlayers_(listProfilesFull()).some(p => p.Name === name)) throw new Error('Unknown player.');
+  const n = Number(slot); if (!(n >= 1 && n <= SAVE_SLOTS_ && Math.floor(n) === n)) throw new Error('Bad slot.');
+  return 'Save_' + game + '_' + name + '_' + n;
+}
+function saveGameFile(name, game, slot, json) {
+  const key = saveCheck_(name, game, slot); json = String(json || '');
+  if (json.length > SAVE_MAX_) throw new Error('Too big — this save is ' + json.length + ' characters (max ' + SAVE_MAX_ + ').');
+  let d; try { d = JSON.parse(json); } catch (e) { throw new Error('Bad data.'); }
+  if (!d || typeof d !== 'object' || Array.isArray(d) || typeof d.data !== 'object') throw new Error('Bad data.');
+  const old = loadGameFile_(key); if (old && Number(old.at) > Number(d.at || 0)) return { ok: true, kept: 'newer', at: old.at };   // a newer copy (other device) wins
+  d.at = Number(d.at) || Date.now(); d.v = 1;
+  saveSetting(key, JSON.stringify(d));
+  return { ok: true, at: d.at };
+}
+function loadGameFile_(key) { try { const v = getSettings()[key]; return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+function getGameFiles(name, game) {   // the 3 file cards (meta only, no data) + ⭐ main
+  saveCheck_(name, game, 1); const st = getSettings(), files = [];
+  for (let i = 1; i <= SAVE_SLOTS_; i++) { let f = null; try { f = st['Save_' + game + '_' + name + '_' + i] ? JSON.parse(st['Save_' + game + '_' + name + '_' + i]) : null; } catch (e) { f = null; }
+    files.push(f ? { slot: i, meta: f.meta || {}, at: Number(f.at) || 0, size: JSON.stringify(f).length } : { slot: i, empty: true }); }
+  return { game: game, files: files, main: Number(st['SaveMain_' + game + '_' + name]) || 0 };
+}
+function loadGameFile(name, game, slot) { const f = loadGameFile_(saveCheck_(name, game, slot)); return f ? { slot: Number(slot), meta: f.meta || {}, data: f.data || {}, at: Number(f.at) || 0 } : null; }
+function deleteGameFile(name, game, slot) { saveSetting(saveCheck_(name, game, slot), ''); return { ok: true }; }
+function setMainGameFile(name, game, slot) { saveCheck_(name, game, slot); saveSetting('SaveMain_' + game + '_' + name, String(Number(slot))); return { ok: true, main: Number(slot) }; }
 function saveSkillTree(name, game, json) {
   if (SKILL_TREE_GAMES_.indexOf(game) < 0) throw new Error('Unknown game.');
   if (!activePlayers_(listProfilesFull()).some(p => p.Name === name)) throw new Error('Unknown player.');
@@ -4742,8 +4772,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1) END OF Code.gs
-
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c) END OF Code.gs
 ;
 /* ===== PosePartyCode.gs ===== */
 // PosePartyCode.gs — 📷 Pose Party server (plan 11j S2). Separate file so it doesn't clash with other chats in Code.gs.
@@ -6313,6 +6342,11 @@ return {"include": typeof include === 'function' ? include : undefined,
 "saveBestiaryPins": typeof saveBestiaryPins === 'function' ? saveBestiaryPins : undefined,
 "getBestiaryAll": typeof getBestiaryAll === 'function' ? getBestiaryAll : undefined,
 "savePyraLooks": typeof savePyraLooks === 'function' ? savePyraLooks : undefined,
+"saveGameFile": typeof saveGameFile === 'function' ? saveGameFile : undefined,
+"getGameFiles": typeof getGameFiles === 'function' ? getGameFiles : undefined,
+"loadGameFile": typeof loadGameFile === 'function' ? loadGameFile : undefined,
+"deleteGameFile": typeof deleteGameFile === 'function' ? deleteGameFile : undefined,
+"setMainGameFile": typeof setMainGameFile === 'function' ? setMainGameFile : undefined,
 "saveSkillTree": typeof saveSkillTree === 'function' ? saveSkillTree : undefined,
 "startPoseSession": typeof startPoseSession === 'function' ? startPoseSession : undefined,
 "doPost": typeof doPost === 'function' ? doPost : undefined,
