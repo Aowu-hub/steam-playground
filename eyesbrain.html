@@ -1296,6 +1296,20 @@ function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&playe
 function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
 window.feedbackContext = () => ({page: 'EyesBrainRiot', game: GAME_ID, level: G ? G.M.level : SET.level, way: SET.way});
 window.addEventListener('resize', () => { if(G && !$('scr-play').classList.contains('hidden')){ G.sw = 0; layout(); if(G.coachEl) coachAt(G.coachEl, G.coachTxt); } });
+(function(){   // 📱 ls-1b OWN SIDEWAYS GUARD (✨ polish chat): iPhone sideways can skip the last 'resize' → watch the play box itself
+  if(!window.ResizeObserver) return;
+  const box = id => { const e = document.getElementById(id); return e ? e.clientWidth + 'x' + e.clientHeight : '-'; };
+  const watch = (scr, boxes, ok, run) => { let last = null, n = 0, t0 = 0, later = 0;
+    const check = () => { const s = document.getElementById(scr);
+      if(!s || s.classList.contains('hidden') || !ok()){ last = null; return; }          // only while that screen is open
+      const k = [scr].concat(boxes).map(box).join('|'); if(k === last) return;                          // same size → nothing (no loops)
+      const now = Date.now(); if(now - t0 > 1000){ t0 = now; n = 0; }
+      if(++n > 4){ if(!later) later = setTimeout(() => { later = 0; check(); }, 1000); return; }   // safety net: ≤ 4 runs a second
+      last = k; const R = window.LS1B_RUNS || (window.LS1B_RUNS = {}); R[scr] = (R[scr] || 0) + 1;   // run count per screen (tests + device checks)
+      try{ run(); }catch(e){ if(window.console) console.warn('ls-1b', scr, e); } };
+    const ro = new ResizeObserver(check); [scr].concat(boxes).forEach(id => { const e = document.getElementById(id); if(e) ro.observe(e); }); };
+  watch('scr-play', [], () => !!G, () => { G.sw = 0; layout(); if(G.coachEl) coachAt(G.coachEl, G.coachTxt); });
+})();   // 📱 ls-1b END
 
 /* ================= SHEETS ================= */
 function openSheet(html){ $('sheet-card').innerHTML = html; $('sheet').classList.remove('hidden'); }
@@ -1569,4 +1583,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (ebr-4+back-1+modes-3+mg-1+ebr-6+ebr-7+p1d+p3a+cs-4c+ebr-8) END OF EyesBrainRiot.html -->
+<!-- (ebr-4+back-1+modes-3+mg-1+ebr-6+ebr-7+p1d+p3a+cs-4c+ebr-8+ls-1b) END OF EyesBrainRiot.html -->

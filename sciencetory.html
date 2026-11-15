@@ -2312,6 +2312,29 @@ function goBack(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'room
 function pauseGame(){ if(G) G.held = true; }
 window.feedbackContext = () => ({page: 'Sciencetory', game: GAME_ID, level: G ? G.lv : SET.level, mode: SET.sec, test: SET.test});
 window.addEventListener('resize', () => { if(G && !$('scr-play').classList.contains('hidden')) resize(); chemResize(); if(AG && !$('scr-atom').classList.contains('hidden')) drawAtomNow(); if(WG && !$('scr-glow').classList.contains('hidden')) drawGlow(); if(CG && !$('scr-cat').classList.contains('hidden')) layoutCats(); if(LG && !$('scr-led').classList.contains('hidden')) ledPlace(); if(XG && !$('scr-exp').classList.contains('hidden')) drawBench(); if(KG && !$('scr-qk').classList.contains('hidden')) drawQk(); if(CLG && !$('scr-col').classList.contains('hidden')) drawCol(); if(!$('scr-pzoo').classList.contains('hidden')) renderZoo(); });
+(function(){   // 📱 ls-1b OWN SIDEWAYS GUARD (✨ polish chat): iPhone sideways can skip the last 'resize' → watch the play box itself
+  if(!window.ResizeObserver) return;
+  const box = id => { const e = document.getElementById(id); return e ? e.clientWidth + 'x' + e.clientHeight : '-'; };
+  const watch = (scr, boxes, ok, run) => { let last = null, n = 0, t0 = 0, later = 0;
+    const check = () => { const s = document.getElementById(scr);
+      if(!s || s.classList.contains('hidden') || !ok()){ last = null; return; }          // only while that screen is open
+      const k = [scr].concat(boxes).map(box).join('|'); if(k === last) return;                          // same size → nothing (no loops)
+      const now = Date.now(); if(now - t0 > 1000){ t0 = now; n = 0; }
+      if(++n > 4){ if(!later) later = setTimeout(() => { later = 0; check(); }, 1000); return; }   // safety net: ≤ 4 runs a second
+      last = k; const R = window.LS1B_RUNS || (window.LS1B_RUNS = {}); R[scr] = (R[scr] || 0) + 1;   // run count per screen (tests + device checks)
+      try{ run(); }catch(e){ if(window.console) console.warn('ls-1b', scr, e); } };
+    const ro = new ResizeObserver(check); [scr].concat(boxes).forEach(id => { const e = document.getElementById(id); if(e) ro.observe(e); }); };
+  watch('scr-play', [], () => !!G, () => resize());                 // ⚙️ the test rig
+  ['scr-hunt', 'scr-table', 'scr-formula'].forEach(s => watch(s, [], () => true, () => chemResize()));   // ⚗️ chemistry
+  watch('scr-atom', [], () => !!AG, () => drawAtomNow());
+  watch('scr-glow', [], () => !!WG, () => drawGlow());
+  watch('scr-cat', [], () => !!CG, () => layoutCats());
+  watch('scr-led', [], () => !!LG, () => ledPlace());
+  watch('scr-exp', [], () => !!XG, () => drawBench());
+  watch('scr-qk', [], () => !!KG, () => drawQk());
+  watch('scr-col', [], () => !!CLG, () => drawCol());
+  watch('scr-pzoo', [], () => true, () => renderZoo());
+})();   // 📱 ls-1b END
 function huntClueOff(){ const cl = $('hunt-clue'); if(cl){ cl.classList.remove('ingap'); cl.removeAttribute('style'); } }
 
 /* ================= BOOT ================= */
@@ -2333,4 +2356,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (sc-1+sc-2a+sc-2a2+sc-2b+sc-2b2+sc-2c+sc-2d) END OF Sciencetory.html -->
+<!-- (sc-1+sc-2a+sc-2a2+sc-2b+sc-2b2+sc-2c+sc-2d+ls-1b) END OF Sciencetory.html -->

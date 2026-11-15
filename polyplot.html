@@ -1919,6 +1919,20 @@ function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&playe
 function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
 window.feedbackContext = () => ({page: 'Polyplot', game: GAME_ID, level: G ? G.M.level : SET.level, mode: SET.mode});
 window.addEventListener('resize', () => { if(G && !$('scr-play').classList.contains('hidden')){ const keep = G.ver; layoutPlay(); buildCards(); } });
+(function(){   // 📱 ls-1b OWN SIDEWAYS GUARD (✨ polish chat): iPhone sideways can skip the last 'resize' → watch the play box itself
+  if(!window.ResizeObserver) return;
+  const box = id => { const e = document.getElementById(id); return e ? e.clientWidth + 'x' + e.clientHeight : '-'; };
+  const watch = (scr, boxes, ok, run) => { let last = null, n = 0, t0 = 0, later = 0;
+    const check = () => { const s = document.getElementById(scr);
+      if(!s || s.classList.contains('hidden') || !ok()){ last = null; return; }          // only while that screen is open
+      const k = [scr].concat(boxes).map(box).join('|'); if(k === last) return;                          // same size → nothing (no loops)
+      const now = Date.now(); if(now - t0 > 1000){ t0 = now; n = 0; }
+      if(++n > 4){ if(!later) later = setTimeout(() => { later = 0; check(); }, 1000); return; }   // safety net: ≤ 4 runs a second
+      last = k; const R = window.LS1B_RUNS || (window.LS1B_RUNS = {}); R[scr] = (R[scr] || 0) + 1;   // run count per screen (tests + device checks)
+      try{ run(); }catch(e){ if(window.console) console.warn('ls-1b', scr, e); } };
+    const ro = new ResizeObserver(check); [scr].concat(boxes).forEach(id => { const e = document.getElementById(id); if(e) ro.observe(e); }); };
+  watch('scr-play', [], () => !!G, () => { layoutPlay(); buildCards(); });
+})();   // 📱 ls-1b END
 
 /* ================= SHEETS: 🛒 shop + 📖 journal ================= */
 function openSheet(html){ $('sheet-card').innerHTML = html; $('sheet').classList.remove('hidden'); }
@@ -2002,4 +2016,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.themes', {rows: 2}); UI.pageRows('.maps', {rows: 2}); UI.pageRows('.trails', {rows: 2}); }</script>
 </body>
 </html>
-<!-- (pp-5+back-1+modes-3+mg-1+p1d+p2+p3a+cs-3c) END OF Polyplot.html -->
+<!-- (pp-5+back-1+modes-3+mg-1+p1d+p2+p3a+cs-3c+ls-1b) END OF Polyplot.html -->
