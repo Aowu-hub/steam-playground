@@ -192,6 +192,13 @@
   @keyframes sh-in{from{transform:scale(0);}to{transform:scale(1);}} @keyframes sh-pulse{50%{transform:scale(1.08);}}
   .shout-kb{position:absolute;left:50%;top:44px;transform:translateX(-50%);z-index:13;pointer-events:none;background:linear-gradient(135deg,#FF9F1C,#FF2E7E);border-radius:14px;padding:6px 12px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.9rem;white-space:nowrap;animation:sh-pulse .7s ease-in-out infinite;}
   .stick.solo{left:calc(var(--edge) + env(safe-area-inset-left));bottom:calc(var(--edge) + env(safe-area-inset-bottom));}
+  /* 🎮 bo-5c-3 battle: the left thumb's 4 body moves sit where the stick was — a diamond, buttons --gap apart (pz) */
+  .bodypad{position:absolute;--r:calc((var(--btn) + var(--gap)) * 0.7072);width:calc(var(--r) * 2 + var(--btn));height:calc(var(--r) * 2 + var(--btn));pointer-events:none;display:none;}
+  .pads.battle .bodypad{display:block;}
+  .bodypad .bbtn{position:absolute;left:var(--r);top:var(--r);} .bodypad .b-hop{top:0;} .bodypad .b-drop{top:calc(var(--r) * 2);} .bodypad .b-spin{left:0;} .bodypad .b-show{left:calc(var(--r) * 2);}
+  .bbtn.b-hop{--rim:#3D7BFF;} .bbtn.b-drop{--rim:#2DBE6C;} .bbtn.b-spin{--rim:#C77DFF;} .bbtn.b-show{--rim:#FFB020;}
+  .bodypad.solo{left:calc(var(--edge) + env(safe-area-inset-left));bottom:calc(var(--edge) + env(safe-area-inset-bottom));}
+  .bodypad.lside{left:calc(10px + env(safe-area-inset-left));bottom:calc(var(--safe-b, 18px) + 4px);} .bodypad.rside{right:calc(10px + env(safe-area-inset-right));bottom:calc(var(--safe-b, 18px) + 4px);}
   .btnpad.solo{right:calc(var(--edge) + env(safe-area-inset-right));bottom:calc(var(--edge) + env(safe-area-inset-bottom));}
   .stick.lside{left:calc(10px + env(safe-area-inset-left));bottom:calc(var(--safe-b, 18px) + 4px);}
   .btnpad.lside{left:calc(10px + env(safe-area-inset-left));top:8px;}
@@ -366,6 +373,9 @@ var BO = (function () {
     trapt:  [{n: 'ready', ms: 0}, {n: 'anticipation', ms: 0}, {n: 'contact', ms: 80, go: 1}, {n: 'follow', ms: 180}, {n: 'settle', ms: 100}],
     traps:  [{n: 'ready', ms: 0}, {n: 'anticipation', ms: 0}, {n: 'contact', ms: 80, go: 1}, {n: 'follow', ms: 180}, {n: 'settle', ms: 100}]
   };
+  /* 🕺 bo-5c tricks + keepy-ups: the game part happens on the trick press (people: the 0.14 s chord wait = the wind-up, robots: a short wind-up) → contact → follow-through */
+  (function () { var T = {stepover: [80, 260, 120], elastico: [70, 240, 110], roulette: [80, 300, 120], rainbow: [70, 280, 140], nutmeg: [60, 220, 110], heel: [60, 200, 110], nolook: [60, 200, 110], rabona: [80, 280, 160], jfoot: [60, 160, 80], jknee: [60, 160, 80], jhead: [60, 180, 90]};
+    Object.keys(T).forEach(function (k) { var v = T[k]; ACT_BEATS[k] = [{n: 'ready', ms: 0}, {n: 'anticipation', ms: 100}, {n: 'contact', ms: v[0], go: 1, kick: 1}, {n: 'follow', ms: v[1]}, {n: 'settle', ms: v[2]}]; }); })();
   var KICK_MIN = {pass: 0.09, shot: 0.15};   // a tap shorter than this still shows its back-lift (contact ≤ 0.15 s after the release)
   var WIND = [0.2, 0.18, 0.16, 0.14, 0.11, 0.08];   // 🤖 robots: committed wind-up (s) per level before the contact
   // 🦘 jump height (m) per action (Aowu 00:48: "a header needs a higher jump, a spinning kick a higher jump + spin, a jump dodge over a slide…")
@@ -482,7 +492,7 @@ var BO = (function () {
   function key(M, ci, k, down) {
     var c = M.ctrls[ci]; if (!c || M.done) return; var t = M.t, p = M.players[c.pi];
     if (M.phase === 'pens') { pensKey(M, c, k, down); return; }
-    if (M.battle) { if (k === 'J') c.J = down ? 1 : 0; if (k === 'K') c.K = down ? 1 : 0; if (p) { if (down && (k === 'J' || k === 'K' || k === 'SP')) p.kickT = 0.3; if (down && k === 'L') p.flip = 0.45; } battleKey(M, c, k, down); return; }
+    if (M.battle) { if (k === 'J') c.J = down ? 1 : 0; if (k === 'K') c.K = down ? 1 : 0; battleKey(M, c, k, down); return; }
     var mine = p && M.ball.owner === p.i, restart = (M.phase === 'restart' || M.phase === 'kickoff') && M.rs && M.rs.taker === (p ? p.i : -2);
     if (k === 'C') { if (down) switchNearest(M, c, true); return; }
     if (k === 'SP') {
@@ -594,7 +604,7 @@ var BO = (function () {
         if (Math.abs(ux) > 0.01) room = Math.min(room, ((ux > 0 ? M.S.Lh : -M.S.Lh) - p.x) / ux); if (Math.abs(uy) > 0.01) room = Math.min(room, ((uy > 0 ? M.S.Wh : -M.S.Wh) - p.y) / uy);
         room = Math.max(4, room - 2); speed = Math.min(speed, Math.sqrt(2 * (M.S.fric || 3.6) * room)); } }   /* 🧤 a goal kick never flies out */
     var dx = tx - p.x, dy = ty - p.y, dm = hyp(dx, dy) || 1;
-    p.kickAs = loft ? 'loft' : 'pass';
+    p.kickAs = o.trick ? (heel ? 'heel' : 'nolook') : loft ? 'loft' : 'pass';
     if (loft) { var dd = dm, tt = clamp(dd / 16, 0.6, 1.4); kickBall(M, p, dx / tt * 0.82, dy / tt * 0.82, GRAV * tt * 0.5, o.spin || 0); }
     else kickBall(M, p, dx / dm * speed, dy / dm * speed, 0, o.spin || 0);
     kickShow(M, p);
@@ -638,7 +648,7 @@ var BO = (function () {
     var hk = Math.min(1, S.goalH / 2);   /* small goals (street cage) = lower shots */
     tz = kind === 'chip' ? S.goalH - Math.min(0.55, S.goalH * 0.35) : clamp((0.25 + power * 1.3 + (help === 0 && o.human ? power * power * 1.2 : 0)) * hk, 0.15, help >= 2 ? S.goalH - 0.4 * hk : 3.2 * hk);
     vz = kind === 'chip' ? GRAV * tt * 0.5 + (tz - 0) / tt : (tz - Math.max(0.1, b.z)) / tt + GRAV * tt * 0.5 * 0.92;
-    p.kickAs = o.flip ? (p.fx * dirOf(p.side, M) < -0.2 ? 'bicycle' : 'flip') : o.volley ? 'volley' : kind === 'blast' ? 'blast' : kind === 'chip' ? 'chip' : (o.spin || kind === 'curl') ? 'curl' : 'shot';
+    p.kickAs = o.flip ? (p.fx * dirOf(p.side, M) < -0.2 ? 'bicycle' : 'flip') : kind === 'rabona' ? 'rabona' : o.volley ? 'volley' : kind === 'blast' ? 'blast' : kind === 'chip' ? 'chip' : (o.spin || kind === 'curl') ? 'curl' : 'shot';
     kickBall(M, p, dx / tt, dy / tt, vz, kind === 'rabona' ? -side * 5 : (o.spin || 0));
     kickShow(M, p);
     if (kind === 'rabona') b.vy += side * 5 * tt * 0.5;   // curve back in on the way
@@ -663,10 +673,18 @@ var BO = (function () {
     else if (name === 'roulette') { p.fx = -p.fx; p.fy = -p.fy; p.burst = 0.3; }
     else if (name === 'rainbow') { b.owner = -1; b.x = p.x; b.y = p.y; b.z = 0.4; b.vx = p.fx * 6.5 + p.vx * 0.4; b.vy = p.fy * 6.5 + p.vy * 0.4; b.vz = 6.2; b.last = p.i; b.lastSide = p.side; b.lock = p.i; b.lockT = 0.55; p.immune = 1.2; }
     else p.burst = 0.4;
+    p.kickAs = name; kickShow(M, p);
     trickDone(M, p, name);
   }
   // 🎤 bo-3b Tricks Battle: turns of tricks ON the beat, 3 judges (🎵 timing · 🌈 variety · ✨ style), best of 3 rounds
-  var BTRICK = {J: ['stepover', '🦶 Stepover', 10], K: ['rainbow', '🌈 Rainbow', 20], L: ['atw', '🌀 Around the world', 25], SP: ['knee', '🦵 Knee juggle', 10], JK: ['neck', '🧢 Neck stall', 35]};
+  var BTRICK = {J: ['stepover', '🦶 Stepover', 10], K: ['rainbow', '🌈 Rainbow', 20], L: ['atw', '🌀 Around the world', 25], SP: ['knee', '🦵 Knee juggle', 10], JK: ['neck', '🧢 Neck stall', 35],
+    // 🎮 bo-5c-3 two thumbs: the LEFT thumb = body moves (U hop · D drop · LF spin · RT show-off), the RIGHT = ball tricks; both on the same beat = a COMBO
+    U: ['hop', '⬆️ Hop', 8], D: ['drop', '⬇️ Drop', 8], LF: ['spin', '🔄 Spin', 12], RT: ['show', '😎 Show-off', 8],
+    'LF+J': ['spinover', '🌪️ Spin-over', 35], 'LF+K': ['spinbow', '🎡 Rainbow spin', 45], 'LF+L': ['spinatw', '🌀 Double around', 50], 'LF+SP': ['spinknee', '🔄 Knee spin', 30],
+    'U+J': ['scissor', '✂️ Scissor hop', 35], 'U+K': ['skybow', '🦘 Sky rainbow', 45], 'U+L': ['hopatw', '🛸 Hop the world', 50], 'U+SP': ['kneehead', '🙆 Knee to head', 35],
+    'D+J': ['sitover', '🪑 Sit-down stepover', 30], 'D+K': ['backroll', '🐢 Back roll', 40], 'D+L': ['lowatw', '🪐 Low orbit', 45], 'D+SP': ['kneeslide', '🧎 Knee slide', 35],
+    'RT+J': ['solestop', '🦶 Sole stop', 30], 'RT+K': ['neckcatch', '🧢 Rainbow to neck', 50], 'RT+L': ['crown', '👑 Head stall', 45], 'RT+SP': ['shoulder', '🤷 Shoulder roll', 40]};
+  var B_BODY = ['U', 'D', 'LF', 'RT'], B_BALL = ['J', 'K', 'L', 'SP'], B_CHORD = 0.13;   // 2 keys this close = pressed together
   var BPM = [80, 88, 96, 104, 112, 120], B_PERF = [0.12, 0.1, 0.085, 0.075, 0.065, 0.06], B_GOOD = [0.24, 0.2, 0.17, 0.15, 0.13, 0.12];
   var B_ROBOT = [[0.45, 0.2], [0.55, 0.3], [0.66, 0.4], [0.75, 0.52], [0.84, 0.62], [0.9, 0.72]];   // robot dancer per level: hit chance, perfect share
   function battleStart(M, o) {
@@ -684,6 +702,7 @@ var BO = (function () {
   function battleHit(M, key, off) {
     var B = M.battle, C = B.cur, lv = M.level, k = Math.round(B.phaseT / B.beat), tr = BTRICK[key];
     if (k === C.lastBeat) { C.miss++; C.combo = 0; ev(M, 'bmiss', {side: C.side, why: 'one trick a beat'}); return; }
+    C.snap = {pts: C.pts, perfect: C.perfect, good: C.good, combo: C.combo, maxCombo: C.maxCombo, used: Object.assign({}, C.used), last: C.last.slice(), key: key, off: off, beat: k, t: M.t};   // 🎮 a 2nd thumb on the same beat upgrades this hit
     C.lastBeat = k;
     var a = Math.abs(off), grade = a <= B_PERF[lv] ? 'perfect' : a <= B_GOOD[lv] ? 'good' : 'miss';
     if (grade === 'miss') { C.miss++; C.combo = 0; ev(M, 'bmiss', {side: C.side, why: off < 0 ? 'early' : 'late', trick: tr[0]}); return; }
@@ -692,15 +711,30 @@ var BO = (function () {
     if (grade === 'perfect') C.perfect++; else C.good++;
     var pts = Math.round(tr[2] * (grade === 'perfect' ? 1 : 0.6) * Math.min(5, 1 + Math.floor(C.combo / 2)));
     C.pts += pts; B.last = {side: C.side, trick: tr[0], t: M.t};
-    ev(M, 'btrick', {side: C.side, trick: tr[0], label: tr[1], grade: grade, pts: pts, combo: C.combo});
+    ev(M, 'btrick', {side: C.side, trick: tr[0], label: tr[1], grade: grade, pts: pts, combo: C.combo, key: key, up: !!C.upgrade});   // up = a 2nd thumb turned the last hit into this combo
   }
   function battleKey(M, c, k, down) {
     var B = M.battle; if (!B || B.phase !== 'turn' || B.cur.side !== c.side || !down) return;
-    if (k !== 'J' && k !== 'K' && k !== 'L' && k !== 'SP') return;
-    var key = (k === 'K' && c.J) || (k === 'J' && c.K) ? 'JK' : k;
-    var tb = B.phaseT, off = tb - Math.round(tb / B.beat) * B.beat;
-    if (key === 'JK' && B.cur.lastBeat === Math.round(tb / B.beat) && B.last && B.last.side === c.side) { B.cur.lastBeat = -1; B.cur.pts = Math.max(0, B.cur.pts - 10); }   // the 2nd key of a chord turns the trick into a neck stall
-    battleHit(M, key, off);
+    if (B_BALL.indexOf(k) < 0 && B_BODY.indexOf(k) < 0) return;
+    var C = B.cur, tb = B.phaseT, off = tb - Math.round(tb / B.beat) * B.beat, S = C.snap, key = chordKey(S && M.t - S.t <= B_CHORD && S.beat === Math.round(tb / B.beat) ? S.key : null, k);
+    if (key && S) {   // 🎮 the 2nd key of a chord: undo the first hit, score the combo at the FIRST press's timing
+      C.pts = S.pts; C.perfect = S.perfect; C.good = S.good; C.combo = S.combo; C.maxCombo = S.maxCombo; C.used = S.used; C.last = S.last; C.lastBeat = -1; C.snap = null;
+      C.upgrade = 1; battleHit(M, key, S.off); C.upgrade = 0; if (C.snap) C.snap.t = -9; return;
+    }
+    battleHit(M, k, off);
+  }
+  function chordKey(a, b) {   // two keys pressed together → the combo key (or null)
+    if (!a || a === b) return null;
+    if ((a === 'J' && b === 'K') || (a === 'K' && b === 'J')) return 'JK';
+    var body = B_BODY.indexOf(a) >= 0 ? a : B_BODY.indexOf(b) >= 0 ? b : null, ball = B_BALL.indexOf(a) >= 0 ? a : B_BALL.indexOf(b) >= 0 ? b : null;
+    return body && ball && BTRICK[body + '+' + ball] ? body + '+' + ball : null;
+  }
+  function robotPick(M, C) {   // 🤖 picked a beat early, so the page can show the right wind-up
+    var lv = M.level, r = M.rnd();
+    if (lv < 2 && r < 0.5) return C.last[C.last.length - 1] === 'stepover' ? 'J' : 'SP';
+    if (lv >= 2 && r < (lv >= 4 ? 0.5 : 0.3)) return B_BODY[Math.floor(M.rnd() * 4)] + '+' + B_BALL[Math.floor(M.rnd() * 4)];
+    var keys = lv >= 3 ? ['J', 'K', 'L', 'SP', 'JK', 'U', 'D', 'LF', 'RT'] : lv >= 1 ? ['J', 'K', 'L', 'SP', 'U', 'D', 'LF', 'RT'] : ['J', 'K', 'L', 'SP'];
+    return keys[Math.floor(M.rnd() * keys.length)];
   }
   function battleCards(M) {
     var B = M.battle, C = B.cur, beats = Math.max(1, Math.floor(B.turnLen / B.beat)), kinds = Object.keys(C.used).length;
@@ -712,12 +746,14 @@ var BO = (function () {
   }
   function battleRobot(M, dt) {   // a robot dancer: one trick per beat, aiming at the beat with level-based accuracy
     var B = M.battle, C = B.cur, R = B_ROBOT[M.level], k = Math.round(B.phaseT / B.beat), tNext = (C.beats + 1) * B.beat;
+    C.nextAt = tNext + (C.robotNext || 0);   // 🎤 bo-5c: the page starts the robot's wind-up just before this
+    if (!C.nextPick) C.nextPick = robotPick(M, C);
     if (B.phaseT >= tNext + (C.robotNext || 0)) {
       C.beats++;
       var off = M.rnd() < R[0] ? (M.rnd() < R[1] ? (M.rnd() - 0.5) * B_PERF[M.level] : (M.rnd() < 0.5 ? -1 : 1) * (B_PERF[M.level] + M.rnd() * (B_GOOD[M.level] - B_PERF[M.level]) * 0.9)) : (M.rnd() < 0.5 ? -1 : 1) * (B_GOOD[M.level] + 0.05);
-      var keys = ['J', 'K', 'L', 'SP', 'JK'], pick = M.level < 2 && M.rnd() < 0.5 ? (C.last[C.last.length - 1] === 'stepover' ? 'J' : 'SP') : keys[Math.floor(M.rnd() * (M.level >= 3 ? 5 : 4))];
+      var pick = C.nextPick || robotPick(M, C);
       battleHit(M, pick, off);
-      C.robotNext = 0;
+      C.robotNext = 0; C.nextPick = robotPick(M, C);
     }
   }
   function battleStep(M, dt) {
@@ -792,7 +828,8 @@ var BO = (function () {
   function drillDead(M, why) { var d = M.drill; if (d.deadT > 0) return; d.deadT = M.t; d.why = why; M.ball.shot = null; if (why === 'out') { M.ball.vx = M.ball.vy = M.ball.vz = 0; } }
   function juggle(M, p) {
     var b = M.ball, d = M.drill; if (b.owner >= 0 || b.z > 1.1 || hyp(b.x - p.x, b.y - p.y) > 1.5 || d.deadT) return;
-    b.vz = 4.0 + M.rnd() * 0.6; b.vx = (p.x - b.x) * 0.8 + (M.rnd() - 0.5) * 1.2; b.vy = (p.y - b.y) * 0.8 + (M.rnd() - 0.5) * 1.2; p.kickT = 0.25;
+    var jz = b.z; b.vz = 4.0 + M.rnd() * 0.6; b.vx = (p.x - b.x) * 0.8 + (M.rnd() - 0.5) * 1.2; b.vy = (p.y - b.y) * 0.8 + (M.rnd() - 0.5) * 1.2; p.kickT = 0.25;
+    p.kickAs = jz > 0.85 ? 'jhead' : jz > 0.4 ? 'jknee' : 'jfoot'; p.act = null; kickShow(M, p);   /* 🎯 keepy-ups: foot · knee · head by the ball's height */
     d.score++; ev(M, 'juggle', {n: d.score}); if (d.score % 5 === 0) starAdd(M, M.ctrls[0], 0.05);
   }
   function drillRunner(M, p, dt) {   // 🏃 the teammate for the long pass: runs up the far side; chases a ball that comes near
@@ -889,6 +926,7 @@ var BO = (function () {
     b.last = p.i; b.lastSide = p.side; b.lock = q.i; b.lockT = 0.75; b.held = 0; b.offside = null; b.shot = null;
     p.immune = 0.8; p.burst = 0.7; p.role = 'chase'; p.aiT = 0.6; q.st = 'stumble'; q.stT = 0.35;
     M.nut = {by: p.i, on: q.i, t: M.t, x: q.x, y: q.y, dx: dx / d, dy: dy / d};
+    p.kickAs = 'nutmeg'; kickShow(M, p);
     trickDone(M, p, 'nutmeg');
     return true;
   }
@@ -1389,7 +1427,7 @@ var BO = (function () {
       }
       if (!front && M.rnd() < 0.18 * L.passAcc) { var tg2 = bestPass(M, p, d, 0, 1.0); if (tg2 && (tg2.x - p.x) * d > 4) { robotKick(M, p, 'pass', function () { pass(M, p, {power: 0.4, ax: tg2.x - p.x, ay: tg2.y - p.y, aimHelp: 3, acc: L.passAcc}); }); return; } }
       var nq = L.trickFail > 0 && S.nutPoint ? nutTarget(M, p) : null;   /* robots nutmeg only in the street (keeps the bo-1b level feel) */ if (nq && M.rnd() < (S.nutPoint ? 0.35 + M.level * 0.05 : 0.05)) { nutmeg(M, p, nq); return; }
-      if (front && L.trickFail > 0 && M.rnd() < 0.08 + M.level * 0.02) trick(M, p, null);
+      if (front && L.trickFail > 0 && M.rnd() < 0.08 + M.level * 0.02) { if (M.fast || M.drill) trick(M, p, null); else kickAct(M, p, 'stepover', function () { trick(M, p, null); }, 0.1); }   // 🕺 robots wind up a trick too
       p.weave = (M.rnd() - 0.5) * 6;
     }
     var ty = clamp(p.y * 0.6 + (p.weave || 0), -S.Wh + 2, S.Wh - 2), tx = gx - d * Math.max(4, dist * 0.2);
@@ -1631,7 +1669,7 @@ var BO = (function () {
   }
   return {DT: DT, SIZES: SIZES, LEVELS: LEVELS, TRICKS: TRICKS, newMatch: newMatch, step: step, input: input, key: key, shout: shout, takeEvents: takeEvents, simulate: simulate,
     hint: hint, bestPass: bestPass, keeperOf: keeperOf, dirOf: dirOf, restart: restart, kickoffSetup: kickoffSetup, startPens: startPens, homeOf: homeOf, addCtrl: addCtrl, setCtrl: setCtrl,
-    throwTo: throwTo, MO_WIN: MO_WIN, DRILLS: DRILLS, battleStart: battleStart, BTRICK: BTRICK, BPM: BPM, B_PERF: B_PERF, B_GOOD: B_GOOD, CONE_STARS: CONE_STARS, drill: drill, TWISTS: TWISTS, PARTY: PARTY, inMud: inMud, inZone: inZone, ACT_BEATS: ACT_BEATS, JUMPS: JUMPS, WIND: WIND, KICK_MIN: KICK_MIN,
+    throwTo: throwTo, MO_WIN: MO_WIN, DRILLS: DRILLS, battleStart: battleStart, BTRICK: BTRICK, B_BODY: B_BODY, B_BALL: B_BALL, B_CHORD: B_CHORD, chordKey: chordKey, BPM: BPM, B_PERF: B_PERF, B_GOOD: B_GOOD, CONE_STARS: CONE_STARS, drill: drill, TWISTS: TWISTS, PARTY: PARTY, inMud: inMud, inZone: inZone, ACT_BEATS: ACT_BEATS, JUMPS: JUMPS, WIND: WIND, KICK_MIN: KICK_MIN,
     _: {kickAct: kickAct, winding: winding, kickShow: kickShow, startAct: startAct, actTick: actTick, jumpNow: jumpNow, jumpV: jumpV, airTime: airTime, threatened: threatened, askBall: askBall, kickBall: kickBall, pass: pass, shoot: shoot, trick: trick, nutmeg: nutmeg, nutTarget: nutTarget, momentOf: momentOf, moments: moments, starAdd: starAdd, lift: lift, standTackle: standTackle, slide: slide, isOffside: isOffside, foul: foul, endMatch: endMatch}};
 })();
 // ENGINE END
@@ -2009,7 +2047,7 @@ function openSetup(lvl){
   const KD = SET.kind || 'match'; $('drill-box').classList.toggle('hidden', KD !== 'skills'); $('form-box').classList.toggle('hidden', KD !== 'match' && KD !== 'party'); buildPartySizes(); $('who-box').classList.toggle('hidden', KD === 'skills');
   $('go-btn').textContent = KD === 'skills' ? '🎯 Start the challenge' : KD === 'shootout' ? '🥅 Start the shootout' : '⚽ Kick off!';
   if(KD === 'skills'){ SET.who = 'robot'; buildDrills(); $('setup-logo').textContent = '🎯'; $('setup-title').textContent = '🎯 Skill challenges · ' + L.name; }
-  if(KD === 'battle'){ $('setup-logo').textContent = '🎤'; $('setup-title').textContent = '🎤 Tricks Battle · ' + L.name; $('setup-sub').textContent = 'Your turn: 20 s of tricks ON the beat (the ring closes on you = now!) — J 🦶 stepover · K 🌈 rainbow · L 🌀 around the world · Space 🦵 knee · J + K 🧢 neck stall. A different trick each time builds the combo. 3 judges score 🎵 timing · 🌈 variety · ✨ style — best of 3 rounds. ' + BO.BPM[lvl] + ' beats a minute.'; $('go-btn').textContent = '🎤 Start the battle'; }
+  if(KD === 'battle'){ $('setup-logo').textContent = '🎤'; $('setup-title').textContent = '🎤 Tricks Battle · ' + L.name; $('setup-sub').textContent = 'Your turn: 20 s of tricks ON the beat (the ring closes on you = now!) — J 🦶 stepover · K 🌈 rainbow · L 🌀 around the world · Space 🦵 knee · J + K 🧢 neck stall. 🎮 Left thumb (arrows / WASD): ⬆️ hop · ⬇️ drop · 🔄 spin · 😎 show-off — press one WITH a trick on the same beat = a COMBO (16 of them, big points). A different trick each time builds the combo. 3 judges score 🎵 timing · 🌈 variety · ✨ style — best of 3 rounds. ' + BO.BPM[lvl] + ' beats a minute.'; $('go-btn').textContent = '🎤 Start the battle'; }
   if(KD === 'party'){ $('setup-logo').textContent = '🎉'; $('setup-title').textContent = '🎉 Party ball · ' + SZ_NAME[SET.size] + ' · ' + L.name; $('setup-sub').textContent = '🎉 A wild bomb ball: it bounces like crazy (anything can happen!) and a goal pops it into confetti. ' + $('setup-sub').textContent; }
   if(KD === 'shootout'){ $('setup-logo').textContent = '🥅'; $('setup-title').textContent = '🥅 Penalty shootout · ' + L.name; $('setup-sub').textContent = '5 kicks each, then sudden death. Your kick: shoot (K / 💥) when the sliding 🎯 is where you want. Their kick: dive with Q / E (or ⬅️ ➡️) — or stay in the middle!'; }
   buildWho(); buildForms(); buildLooks(); buildBalls();
@@ -2134,7 +2172,7 @@ function startMatch(){
   G = {party: kind === 'party' ? partySkin(M) : null, M, L, Sz, size, level: lv, kind, drill: kind === 'skills' ? SET.drill : null, theme: SET.theme, night: SET.theme === 'classic' && SET.night, ball: SET.ball, humans, mode: SET.who, tn: [teamName(0), teamName(1)],
     avs: M.players.map(p => { const h = humans.find(x => x.name === p.name && x.side === p.side); return kitAv(h ? myAvatar(h.name === 'Guest' ? 'Guest' : h.name) : defaultAvatar(p.name + '·robo' + p.side), p.side, p.gk); }),
     spr: M.players.map(() => ({})), t0: performance.now(), last: performance.now(), acc: 0, paused: false, over: false, raf: 0, held: new Set(), sticks: new Map(), btn: new Map(),
-    cam: null, anim: 0, sq: kind === 'battle' ? Math.min(5, Math.max(2.4, (window.devicePixelRatio || 1) * 1.7)) : size === 11 ? 1.0 : size === 1 ? 1.6 : 1.3,   /* 🎤 bo-5a: the battle dancers are drawn big → sharper pictures (Aowu's iPhone 16:27: blurry) */ zoom: ls(store('zoom' + size)) === '1', startAt: performance.now(), shoutShow: [0, 0], guideHand: true, lastScore: '', endAt: 0, help: L.guided, floatQ: []};
+    cam: null, anim: 0, sq: size === 11 ? 1.0 : size === 1 ? 1.6 : 1.3,   /* 🎤 the battle dancers are drawn live (bo-5c) — sharp without big pictures */ zoom: ls(store('zoom' + size)) === '1', startAt: performance.now(), shoutShow: [0, 0], guideHand: true, lastScore: '', endAt: 0, help: L.guided, floatQ: []};
   G.view = viewMode();
   GameComic._reset();
   G.lvFull = (kind === 'skills' ? BO.DRILLS[SET.drill].name : kind === 'shootout' ? '🥅 Penalties' : kind === 'battle' ? '🎤 Tricks Battle' : kind === 'party' ? '🎉 Party ' + SZ_NAME[size] : (SZ_LOGO[size] || '⚽') + ' ' + SZ_NAME[size]) + ' · ' + LEVEL_UI[lv].emoji + ' ' + L.name;
@@ -2176,6 +2214,20 @@ function resize(){
 function barLevel(){ if(!G || !G.lvFull) return; const L = G.L; BAR.level(phoneLand() ? G.lvShort : G.lvFull, L && L.hardcore ? 'hc' : ''); }   /* 📱 Aowu 16:28: sideways phone = short level chip ("🎉 7v7 · 🐣") so the score stays in the ONE top row */
 function phoneLand(){ return innerHeight < 520 && innerWidth > innerHeight; }
 window.addEventListener('resize', () => { if(G){ resize(); buildPads(); checkTurn(); } });
+(function(){   // 📱 ls-1b OWN SIDEWAYS GUARD (pattern from the ✨ polish chat): iPhone sideways can skip the last 'resize' → watch the play screen itself
+  if(!window.ResizeObserver) return;
+  const box = id => { const e = document.getElementById(id); return e ? e.clientWidth + 'x' + e.clientHeight : '-'; };
+  const watch = (scr, boxes, ok, run) => { let last = null, n = 0, t0 = 0, later = 0;
+    const check = () => { const s = document.getElementById(scr);
+      if(!s || s.classList.contains('hidden') || !ok()){ last = null; return; }          // only while that screen is open
+      const k = [scr].concat(boxes).map(box).join('|'); if(k === last) return;                          // same size → nothing (no loops)
+      const now = Date.now(); if(now - t0 > 1000){ t0 = now; n = 0; }
+      if(++n > 4){ if(!later) later = setTimeout(() => { later = 0; check(); }, 1000); return; }   // safety net: ≤ 4 runs a second
+      last = k; const R = window.LS1B_RUNS || (window.LS1B_RUNS = {}); R[scr] = (R[scr] || 0) + 1;
+      try{ run(); }catch(e){ if(window.console) console.warn('ls-1b', scr, e); } };
+    const ro = new ResizeObserver(check); [scr].concat(boxes).forEach(id => { const e = document.getElementById(id); if(e) ro.observe(e); }); };
+  watch('scr-play', [], () => !!G, () => { resize(); buildPads(); checkTurn(); });
+})();   // 📱 ls-1b END
 const NEAR = 0.4;
 function makeView(W, H, box, eye, look, fovMode){
   const iw = Math.max(40, W - box.l - box.r), ih = Math.max(40, H - box.t - box.b), cx = box.l + iw / 2, cy = box.t + ih / 2;
@@ -2366,7 +2418,7 @@ function drawLookPreview(c, k){
 const SPR_W = 150, SPR_H = 160, SPR_FX = 75, SPR_FY = 140;
 /* 🎬 bo-5a real actions: the engine's beat (p.act · p.bi · p.bq) → the pose of 🎭 BLOCK blasoff (AvatarActing) at that moment.
    One timeline per act (the engine is the clock, the timeline only gives the pose); pictures cached per (player, act, beat, ¼ step), ≤ 600, oldest out. */
-const ACT_RUN = {}, SPR_LRU = [], SPR_CAP = 600, GK_POSE = {gkr0: 'bo.gk-ready', gkr1: 'bo.gk-shuffle', prep: 'bo.trap-open', shield: 'bo.shield', touch: 'bo.dribble-touch', hsnap: 'bo.head-snap'};   /* still poses (bo-5a/b) */
+const ACT_RUN = {}, SPR_LRU = [], SPR_CAP = 600, GK_POSE = {gkr0: 'bo.gk-ready', gkr1: 'bo.gk-shuffle', prep: 'bo.trap-open', shield: 'bo.shield', touch: 'bo.dribble-touch', hsnap: 'bo.head-snap', tload: 'bo.trick-load'};   /* still poses (bo-5a/b) */
 function actRun(key){
   if(ACT_RUN[key] !== undefined) return ACT_RUN[key]; let r = null;
   try{ if(window.Acting && Acting.act && Acting.act('blasoff.' + key)) r = Acting.play({name: ''}, 'blasoff.' + key, {t0: 0}); }catch(e){ r = null; }
@@ -2406,6 +2458,7 @@ function playerKey(p){
   if(p.z > 0.05 && M.t - (p.hitT || -9) < 0.16) return 'hsnap';   /* 🗣️ the head snaps forward at the touch */
   if(!p.gk && p.st === 'ok' && p.z <= 0.05){
     if(b.owner < 0 && b.passTo === p.i){ const d = Math.hypot(b.x - p.x, b.y - p.y), bv = Math.hypot(b.vx, b.vy); if(bv > 1 && d / bv < 0.45) return 'prep'; }   /* 🫳 open up for the first touch */
+    if(b.owner === p.i && p.ctrl >= 0 && (M.ctrls.find(x => x.pi === p.i) || {}).trickPend >= 0) return 'tload';   /* 🕺 the trick's wind-up while L is held for its 0.14 s chord wait */
     if(b.owner === p.i){ if(sp < 3.5 && M.players.some(o => o.side !== p.side && !o.gk && Math.hypot(o.x - p.x, o.y - p.y) < 1.6)) return 'shield';   /* 🛡️ side-on, arm out */
       if(sp > 1.5){ const f = Math.floor(p.run * 1.7); if(f % 8 === 0) return 'touch'; } }   /* ⚽ a little touch every few steps */
   }
@@ -2432,7 +2485,8 @@ function drawPlayer(g, p, t){
   if(tilt) g.rotate((p.dive || 1) * dir * 0.9 * tilt);
   if(dh){ const hc = s * 0.5; g.translate(0, -hc); g.rotate(dir * 1.25 * dh); g.translate(0, hc); }
   if(p.flip > 0){ const hc = s * 0.95; g.translate(0, -hc); g.rotate(-dir * Math.PI * 2 * (p.flipDir || 1) * (1 - p.flip / (p.flipD || 0.62))); g.translate(0, hc); }   // 🌀 flip volley: one full spin in the air · 🚲 bicycle: half a spin backwards (bo-5b)
-  g.scale(dir * k / G.sq, k / G.sq); g.drawImage(img, -SPR_FX * G.sq, -SPR_FY * G.sq); g.restore();
+  const turn = p.act === 'roulette' && p.bi === 3 ? Math.cos(Math.PI * 2 * p.bq) : 1, tw = Math.sign(turn || 1) * Math.max(0.18, Math.abs(turn));   /* 🌀 roulette: a real full turn (the picture turns round and back) */
+  g.scale(dir * tw * k / G.sq, k / G.sq); g.drawImage(img, -SPR_FX * G.sq, -SPR_FY * G.sq); g.restore();
   if(p.cards && G.M.L.cards){ g.fillStyle = '#FFD23F'; g.fillRect(f[0] + s * 0.35, f[1] - s * 1.9 - lift, s * 0.18, s * 0.26); }
   if(c){   // name + a triangle over the person you steer
     const top = f[1] - s * 2.35 - lift, fs = Math.max(10, Math.min(15, s * 0.42)); g.font = '700 ' + fs + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'bottom';
@@ -2488,8 +2542,50 @@ function ballAt(trick, u, fx, fy, s){   // where the ball is during a trick (u =
   if(trick === 'atw') return [fx + Math.cos(u * Math.PI * 2) * s * 0.45, fy - s * 0.25 - Math.sin(u * Math.PI * 2) * s * 0.18];
   if(trick === 'knee') return [fx + s * 0.15, fy - Math.sin(u * Math.PI) * s * 0.95];
   if(trick === 'neck') return [fx, fy - s * (u < 0.3 ? u / 0.3 * 1.7 : 1.7)];
-  if(trick === 'stepover') return [fx + Math.sin(u * Math.PI * 2) * s * 0.3, fy];
+  if(trick === 'stepover' || trick === 'spinover' || trick === 'sitover') return [fx + Math.sin(u * Math.PI * 2) * s * 0.3, fy];
+  // 🎮 bo-5c-3 combos: the ball follows the ball half of the combo, lifted / lowered with the body
+  const hop = Math.sin(u * Math.PI) * s * 0.6, up = (a, h) => [a[0], a[1] - h];
+  if(trick === 'spinbow') return ballAt('rainbow', u, fx, fy, s);
+  if(trick === 'skybow') return [fx + (-0.5 + u) * s * 0.9, fy - Math.sin(u * Math.PI) * s * 2.9];
+  if(trick === 'spinatw') return ballAt('atw', (u * 2) % 1, fx, fy, s);   /* twice round */
+  if(trick === 'hopatw') return up(ballAt('atw', u, fx, fy, s), hop);
+  if(trick === 'lowatw') return [fx + Math.cos(u * Math.PI * 2) * s * 0.45, fy - s * 0.08 - Math.sin(u * Math.PI * 2) * s * 0.08];
+  if(trick === 'spinknee' || trick === 'kneeslide') return ballAt('knee', u, fx, fy, s);
+  if(trick === 'scissor') return up(ballAt('stepover', u, fx, fy, s), hop * 0.6);
+  if(trick === 'kneehead') return [fx + s * 0.1 * (1 - u), fy - (u < 0.4 ? Math.sin(u / 0.4 * Math.PI / 2) * s * 0.95 : s * (0.95 + (u - 0.4) / 0.6 * 1.0))];
+  if(trick === 'crown') return [fx, fy - s * (u < 0.35 ? u / 0.35 * 1.95 : 1.95)];
+  if(trick === 'neckcatch') return u < 0.55 ? [fx + (-0.5 + u / 0.55 * 0.5) * s * 0.9, fy - Math.sin(u / 0.55 * Math.PI * 0.75) * s * 2.3] : [fx, fy - s * 1.7];
+  if(trick === 'backroll') return [fx - s * 0.12 * u, fy - s * 1.6 * (1 - u)];   /* rolls down the back */
+  if(trick === 'shoulder') return [fx + (0.3 - u * 0.6) * s * 0.5, fy - s * (u < 0.3 ? u / 0.3 * 1.45 : 1.45)];
+  if(trick === 'solestop') return [fx + s * 0.25 * (1 - u * 0.4), fy];
+  if(trick === 'hop') return [fx + s * 0.25, fy - hop];
   return [fx + s * 0.25, fy];
+}
+/* 🎤 bo-5c DANCE-OFF: the two dancers are drawn LIVE with Acting.draw (sharp on any screen, no picture cache) — groove on the beat,
+   battle tricks as real moves (contact = the beat you hit), robot wind-up just before its beat, entrance, freeze on the turn's end,
+   the waiting dancer reacts (😮 wow · 🤭 laugh · 🫴 bring it), 🏆 mic drop for the winner, 👏 clap for the other. */
+const GROOVE = ['bo.groove-a', 'bo.groove-b', 'bo.groove-a', 'bo.toprock'], GROOVE_WAIT = ['bo.groove-wait', 'bo.groove-a'];
+function btDur(tr){ const R = actRun('bt-' + tr); return R ? (R.start[R.start.length - 1] + R.D[R.D.length - 1].ms - R.start[2]) / 1000 : 0.45; }   /* contact → end of settle */
+const isSpin = tr => tr === 'spin' || /^spin/.test(tr);   /* 🔄 the body turns all the way round during the follow-through */
+function spinTurn(R, ms){ const u = Math.max(0, Math.min(1, (ms - R.start[2]) / (R.D[2].ms + R.D[3].ms))), c = Math.cos(Math.PI * 2 * (0.5 - 0.5 * Math.cos(Math.PI * u))); return Math.sign(c || 1) * Math.max(0.16, Math.abs(c)); }
+const POSE_ONE = {sx: 1, sy: 1, headSc: 1};   /* scale keys rest at 1, not 0 (a missing sy squashed the robot flat) */
+function lerpPose(a, b, u){ const o = {}; new Set(Object.keys(a).concat(Object.keys(b))).forEach(k => { if(typeof a[k] === 'number' || typeof b[k] === 'number'){ const d = POSE_ONE[k] != null ? POSE_ONE[k] : 0, x = typeof a[k] === 'number' ? a[k] : d, y = typeof b[k] === 'number' ? b[k] : d; o[k] = x + (y - x) * u; } }); return o; }   /* numbers only (a pose also carries labels) */
+function danceFrame(sd, act, beatPh, B, M, t){
+  if(!window.Acting || !Acting.pose) return null;
+  const at = (name, ms) => { const R = actRun(name); if(!R) return null; const end = R.start[R.start.length - 1] + R.D[R.D.length - 1].ms; if(ms > end) return null; const f = R.at(Math.max(0, ms) / 1000); return f && f.pose ? f : null; }, rx = G.brx && G.brx[sd];   /* past its end / no pose → the groove */
+  if(M.done){ const w = M.score[0] > M.score[1] ? 0 : 1, R = actRun(sd === w ? 'bt-win' : 'bt-clap'); if(R){ const tot = R.start[4] + R.D[4].ms, f = at(sd === w ? 'bt-win' : 'bt-clap', (t * 1000) % (tot + 400)); if(f) return f; } }
+  const L = B.last && B.last.side === sd ? B.last : null;
+  if(L && M.t - L.t < btDur(L.trick)){ const R = actRun('bt-' + L.trick); if(R){ const ms = R.start[2] + (M.t - L.t) * 1000, f = at('bt-' + L.trick, ms); if(f) return isSpin(L.trick) ? Object.assign({turn: spinTurn(R, ms)}, f) : f; } }   /* the trick: contact = the beat you hit */
+  if(act && B.phase === 'turn' && B.cur){ const human = M.ctrls.some(c => c.side === sd), pk = !human && B.cur.nextPick && BO.BTRICK[B.cur.nextPick], tr = pk ? pk[0] : 'stepover', R = actRun('bt-' + tr);
+    if(R){ const win = R.D[1].ms / 1000, left = human ? B.beat - (B.phaseT % B.beat) : B.cur.nextAt != null ? B.cur.nextAt - B.phaseT : -1;   /* 🤖 the wind-up of the trick it picked · 🧒 a load into every beat of your turn (anticipation) */
+      if(left > 0 && left < win){ const f = at('bt-' + tr, R.start[1] + (1 - left / win) * R.D[1].ms); if(f) return f; } } }
+  if(rx && M.t - rx.t < 0.8){ const f = at('bt-' + rx.a, (M.t - rx.t) * 1000); if(f) return f; }
+  if(B.phase === 'intro' && B.turn === sd && B.phaseT < 1.0){ const f = at('bt-enter', B.phaseT * 1000); if(f) return f; }
+  if(B.phase === 'cards' && B.turn === sd){ const P = Acting.pose('bo.freeze'); if(P) return {pose: Object.assign({}, P, {dy: (P.dy || 0) + Math.sin(t * 3) * 0.6}), face: 'proud'}; }
+  const list = act ? GROOVE : GROOVE_WAIT, k = Math.floor((B.phase === 'turn' ? B.phaseT : t) / B.beat), u = 0.5 - 0.5 * Math.cos(beatPh * Math.PI);
+  const A = Acting.pose(list[k % list.length]), Bq = Acting.pose(list[(k + 1) % list.length]); if(!A || !Bq) return null;
+  const P = lerpPose(A, Bq, u); P.dy = (P.dy || 0) + (act ? 3 : 1.5) * Math.pow(1 - beatPh, 3);   /* a dip on every beat */
+  return {pose: P, face: act ? (beatPh < 0.5 ? 'joy' : 'cheeky') : 'happy'};
 }
 function drawBattle(g, t, Lk){
   const M = G.M, B = M.battle, W = G.W, H = G.H, top = G.box ? G.box.t : 60, bot = H - (G.box ? G.box.b * 0.35 : 40);
@@ -2503,21 +2599,25 @@ function drawBattle(g, t, Lk){
   g.font = '800 ' + Math.max(11, dj * 0.32) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.fillStyle = '#FFD23F'; g.fillText('🎵 ' + BO.BPM[M.level] + ' BPM · round ' + B.round + ' of 3', W / 2, top + 8 + dj * 1.45);
   const dancers = [0, 1].map(sd => M.players.find(p => p.side === sd && p.ctrl >= 0) || M.players.filter(p => p.side === sd && !p.gk).slice(-1)[0]);
   const s = Math.min(H * (phoneLand() ? 0.2 : 0.26), W * 0.16), fy = H * 0.76;   /* 📱 sideways phone: heads stay below the DJ booth */
-  dancers.forEach((p, sd) => { if(!p) return; const act = B.turn === sd && B.phase !== 'cards', fx = W * (sd ? 0.68 : 0.32), k = s * 1.75 / 74 / 1.05;
+  let lo = 0, hi = W; if(phoneLand()){ const bp = document.querySelector('#pads .btnpad'), dp = document.querySelector('#pads .bodypad'), sr = $('stage').getBoundingClientRect(); if(bp){ const r = bp.getBoundingClientRect(); if(r.width) hi = Math.min(W, r.left - sr.left - 8); } if(dp){ const r = dp.getBoundingClientRect(); if(r.width) lo = Math.max(0, r.right - sr.left + 4); } }   /* 📱 sideways phone: the dancers stand between the two thumbs' buttons (pz sizes) */
+  dancers.forEach((p, sd) => { if(!p) return; const act = B.turn === sd && B.phase !== 'cards', fx = hi < W || lo > 0 ? lo + (hi - lo) * (sd ? 0.78 : 0.24) : W * (sd ? 0.68 : 0.32), k = s * 1.75 / 74 / 1.05;
     if(act){ const sp = g.createRadialGradient(fx, fy, 2, fx, fy, s * 1.4); sp.addColorStop(0, 'rgba(255,240,180,0.45)'); sp.addColorStop(1, 'rgba(255,240,180,0)'); g.fillStyle = sp; g.beginPath(); g.ellipse(fx, fy, s * 1.4, s * 0.45, 0, 0, 7); g.fill(); }
     if(act && B.phase === 'turn'){ const r0 = s * 0.42; g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = 3; g.beginPath(); g.ellipse(fx, fy, r0, r0 * 0.32, 0, 0, 7); g.stroke();   // 🎯 the target ring
       const rr = r0 * (1 + 1.6 * (1 - beatPh)); g.strokeStyle = beatPh > 0.85 || beatPh < 0.08 ? '#3DDC97' : '#FFD23F'; g.lineWidth = 3 + pulse * 5; g.globalAlpha = 0.35 + 0.65 * (1 - Math.abs(0.5 - beatPh) * 0.6); g.beginPath(); g.ellipse(fx, fy, rr, rr * 0.32, 0, 0, 7); g.stroke(); g.globalAlpha = 1; }
     const bounce = act ? Math.abs(Math.sin(beatPh * Math.PI)) * s * 0.06 : 0, key = p.kickT > 0.05 ? 'kick' : act ? (beatPh < 0.5 ? 'stand' : 'run1') : 'stand';
-    g.save(); g.globalAlpha = act || B.phase === 'cards' ? 1 : 0.55; g.translate(fx, fy - bounce); if(p.flip > 0){ g.translate(0, -s * 0.5); g.rotate(Math.PI * 2 * (1 - p.flip / 0.45)); g.translate(0, s * 0.5); }
-    const kq = k * 1.6 / G.sq; g.scale(sd ? -kq : kq, kq); g.drawImage(sprite(p.i, key), -SPR_FX * G.sq, -SPR_FY * G.sq); g.restore();   /* same size as before, sharper picture */
-    const L = B.last && B.last.side === sd ? B.last : null, u = L ? Math.min(1, (M.t - L.t) / 0.45) : 1, bp = ballAt(L && u < 1 ? L.trick : '', u, fx, fy - s * 0.1, s);
+    g.save(); g.globalAlpha = act || B.phase === 'cards' || M.done ? 1 : 0.85; g.translate(fx, fy - bounce);   /* the waiting dancer stays visible — it reacts */ if(p.flip > 0){ g.translate(0, -s * 0.5); g.rotate(Math.PI * 2 * (1 - p.flip / 0.45)); g.translate(0, s * 0.5); }
+    const DF = danceFrame(sd, act, beatPh, B, M, t); let drawn = false;
+    if(DF){ g.save(); try{ g.scale((sd ? -1 : 1) * (DF.turn || 1), 1); Acting.draw(g, {name: p.name, av: G.avs[p.i]}, 0, 0, k * 1.6, DF, {t, dir: 1}); drawn = true; }catch(e){ drawn = false; G.dfErr = String(e && e.stack || e).slice(0, 300); } g.restore(); }
+    if(!drawn){ const kq = k * 1.6 / G.sq; g.scale(sd ? -kq : kq, kq); g.drawImage(sprite(p.i, key), -SPR_FX * G.sq, -SPR_FY * G.sq); }
+    g.restore();
+    const L = B.last && B.last.side === sd ? B.last : null, u = L ? Math.min(1, (M.t - L.t) / Math.max(0.3, btDur(L.trick) - 0.12)) : 1, bp = ballAt(L && u < 1 ? L.trick : '', u, fx, fy - s * 0.1, s);
     drawSoccerBall(g, bp[0] + (sd ? -1 : 1) * (L && u < 1 ? 0 : s * 0.05), bp[1] - (act && !(L && u < 1) ? Math.abs(Math.sin(beatPh * Math.PI)) * s * 0.12 : 0), Math.max(5, s * 0.1), t * 4);
     g.font = '800 ' + Math.max(12, s * 0.13) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.fillStyle = sd ? '#FF8FA3' : '#8FD3FF'; g.fillText(G.tn[sd] + (B.wins[sd] ? ' ' + '🏆'.repeat(B.wins[sd]) : ''), fx, fy + s * 0.32);
     if(act && B.cur && B.cur.combo > 1){ g.fillStyle = '#FFD23F'; g.font = '900 ' + Math.max(14, s * 0.16) + 'px Fredoka, sans-serif'; g.fillText('×' + Math.min(5, 1 + Math.floor(B.cur.combo / 2)) + ' combo · ' + B.cur.pts, fx, fy - s * 1.25); } });
   // 3 judges at their table, cards up after each turn
   const J = judgesOf(), js = Math.min(H * 0.13, W * 0.07), jy = Math.min(bot, H * 0.98) - js * 0.2;
   g.fillStyle = 'rgba(8,16,40,0.8)'; g.fillRect(W / 2 - js * 2.4, jy - js * 0.35, js * 4.8, js * 0.45);
-  J.forEach((n, i) => { const x = W / 2 + (i - 1) * js * 1.5, k = js * 1.5 / 160; g.save(); g.translate(x, jy - js * 0.2); g.scale(k, k); g.drawImage(judgeSprite(n), -SPR_FX, -SPR_FY); g.restore();
+  J.forEach((n, i) => { const x = W / 2 + (i - 1) * js * 1.5, k = js * 1.5 / 160; g.save(); g.translate(x, jy - js * 0.2 + pulse * js * 0.05); g.rotate(Math.sin((t / B.beat + i * 0.33) * Math.PI) * 0.035); g.scale(k, k);   /* 🧑‍⚖️ the judges nod on the beat */ g.drawImage(judgeSprite(n), -SPR_FX, -SPR_FY); g.restore();
     if(B.phase === 'cards' && B.cards){ const up = Math.min(1, B.phaseT / 0.4) * (1 + 0 * i), cy = jy - js * (1.4 + up * 0.25); g.fillStyle = '#fff'; g.fillRect(x - js * 0.32, cy - js * 0.42, js * 0.64, js * 0.5); g.fillStyle = '#13254A'; g.font = '900 ' + Math.max(12, js * 0.34) + 'px Fredoka, sans-serif'; g.fillText(B.cards[i], x, cy - js * 0.06); g.font = '700 ' + Math.max(8, js * 0.16) + 'px Fredoka, sans-serif'; g.fillStyle = '#fff'; g.fillText(['🎵 timing', '🌈 variety', '✨ style'][i], x, cy + js * 0.22); } });
   if(B.phase === 'intro'){ const n = Math.max(1, 3 - Math.floor(B.phaseT / 0.8)); g.font = '900 ' + Math.max(40, s * 0.6) + 'px Fredoka, sans-serif'; g.fillStyle = '#FFD23F'; g.strokeStyle = '#13254A'; g.lineWidth = 6; g.strokeText(n, W * (B.turn ? 0.68 : 0.32), H * 0.4); g.fillText(n, W * (B.turn ? 0.68 : 0.32), H * 0.4); }
 }
@@ -2666,14 +2766,14 @@ function updateSetPiece(){
     else if(rs.kind === 'free') txt = '🟢 Free kick: 🎯 aim · <b>' + k('shoot') + '</b> shoot (hold = power) · <b>' + k('pass') + '</b> pass · <b>' + k('trick') + '</b> bend ' + bend + (rs.wall ? ' round the 🧱' : '');
     else if(rs.kind === 'throw') txt = '🙌 Throw-in: aim + <b>' + k('pass') + '</b> · ' + hi.replace('flip pass', 'flip throw (over the head)') + (M.level >= 2 ? ' · 👆 or tap a teammate' : '');
     else if(rs.kind === 'kickin') txt = '🦶 Kick-in: aim + <b>' + k('pass') + '</b> · ' + hi + ' · <b>' + k('trick') + '</b> bend ' + bend;
-  } else if(M.battle && M.battle.phase !== 'cards' && !(isTouch() && phoneLand()) && M.ctrls.some(x => x.side === M.battle.turn && x.seat <= 1)){ const K2 = keySetsOf(M.ctrls.find(x => x.side === M.battle.turn))[0], kk = a => touch ? {pass: '🦶', shoot: '🌈', trick: '🌀', jump: '🦵'}[a] : keyName(K2[a]); txt = '🎵 ON the beat: <b>' + kk('pass') + '</b> stepover · <b>' + kk('shoot') + '</b> rainbow · <b>' + kk('trick') + '</b> around · <b>' + kk('jump') + '</b> knee · <b>' + kk('pass') + '+' + kk('shoot') + '</b> 🧢 neck';
+  } else if(M.battle && M.battle.phase !== 'cards' && !(isTouch() && phoneLand()) && M.ctrls.some(x => x.side === M.battle.turn && x.seat <= 1)){ const K2 = keySetsOf(M.ctrls.find(x => x.side === M.battle.turn))[0], kk = a => touch ? {pass: '🦶', shoot: '🌈', trick: '🌀', jump: '🦵'}[a] : keyName(K2[a]); txt = '🎵 ON the beat: <b>' + kk('pass') + '</b> stepover · <b>' + kk('shoot') + '</b> rainbow · <b>' + kk('trick') + '</b> around · <b>' + kk('jump') + '</b> knee · <b>' + kk('pass') + '+' + kk('shoot') + '</b> 🧢 neck · 🎮 <b>' + (touch ? '⬆️🔄😎⬇️' : ['up', 'left', 'right', 'down'].map(d => keyName(K2[d])).join('')) + '</b> + a trick = combo'; { const tp = comboTip(M); if(tp) txt += ' · try <b>' + tp.label + '</b>'; }
   } else if(M.phase === 'pens' && M.pens && M.pens.step === 'set' && M.ctrls.some(x => x.side === M.pens.turn && x.seat <= 1)) txt = '🎯 Watch the target slide — <b>' + k('shoot') + '</b> when it is where you want!';
   if(txt){ if(el.innerHTML !== txt) el.innerHTML = txt; el.classList.remove('hidden'); $('kb-hint').classList.add('hidden'); } else el.classList.add('hidden');
 }
 function updateHints(now){
   const M = G.M, me = M.ctrls[0], gl = $('goal-line');
   const showGoal = G.help >= 1 && M.score[0] + M.score[1] === 0 && !G.over && M.phase !== 'pens';
-  if(M.battle){ const bt = isTouch() && phoneLand() && !G.over && M.battle.phase === 'turn' && M.ctrls.some(x => x.side === M.battle.turn && x.seat <= 1) ? '🎵 Tap a trick when the ring closes on you — mix them up!' : '';   /* 🎤 not the match goal line (Aowu's iPhone 16:27) */
+  if(M.battle){ const bt = isTouch() && phoneLand() && !G.over && M.battle.phase === 'turn' && M.ctrls.some(x => x.side === M.battle.turn && x.seat <= 1) ? (comboTip(M) ? '🎮 Try ' + comboTip(M).label + ' — both thumbs on the beat!' : '🎵 Tap a trick when the ring closes on you — left + right together = a COMBO!') : '';   /* 🎤 not the match goal line (Aowu's iPhone 16:27) */
     if(bt){ if(gl.innerHTML !== bt) gl.innerHTML = bt; gl.classList.remove('hidden'); } else gl.classList.add('hidden'); }
   else if(showGoal){ const vm = G.view.mode, where = vm === 'behind' ? 'at the top' : vm === 'side' ? (me && BO.dirOf(me.side, M) > 0 ? 'on the right ▶' : '◀ on the left') : (me && BO.dirOf(me.side, M) > 0 ? 'on the right ▶' : '◀ on the left');
     const txt = M.ball.owner === (me ? me.pi : -2) ? '⚽ Shoot with <b>' + (isTouch() ? '💥' : 'K') + '</b> — the 🥅 is ' + where + '!' + (G.Sz.nokeeper ? ' Or 🥜 <b>' + (isTouch() ? '🌀' : 'L') + '</b> when they stand in front = nutmeg!' : G.help >= 2 ? ' Or pass to the <b>glowing</b> friend' : '') : '⚽ Get the ball and score in the 🥅 ' + where + '!';
@@ -2695,12 +2795,21 @@ function updateHints(now){
   // touch buttons: labels for attack / defence, glow Shoot when the goal is close (Basic)
   $('pads').classList.toggle('notip', !(G.level === 0 && M.t < 10));   // 📱 the stick's "run · push far = sprint" tip: only the first 10 s of 🌱 Basic on phones
   G.btn.forEach((B, ci) => { const c = M.ctrls[ci], p = M.players[c.pi], has = p && b.owner === p.i, ask = M.phase === 'restart' && M.rs && M.rs.ask && M.rs.side === c.side, mode = ask ? 'ask' : has ? 'att' : 'def';
-    if(M.battle){ if(B.mode !== 'battle'){ B.mode = 'battle'; setBtn(B.pass, ['🦶', 'Stepover']); setBtn(B.shoot, ['🌈', 'Rainbow']); setBtn(B.trick, ['🌀', 'Around']); setBtn(B.jump, ['🦵', 'Knee']); } return; }   // 🎤 battle buttons
+    if(M.battle){ if(B.mode !== 'battle'){ B.mode = 'battle'; setBtn(B.pass, ['🦶', 'Stepover']); setBtn(B.shoot, ['🌈', 'Rainbow']); setBtn(B.trick, ['🌀', 'Around']); setBtn(B.jump, ['🦵', 'Knee']); }   // 🎤 battle buttons
+      const tp = c.side === M.battle.turn ? comboTip(M) : null, rb = {J: B.pass, K: B.shoot, L: B.trick, SP: B.jump}; Object.keys(rb).forEach(k => rb[k].classList.toggle('glow', !!tp && tp.ball === k));
+      $('pads').querySelectorAll('.bodypad .bbtn').forEach(el => el.classList.toggle('glow', !!tp && tp.body === el.dataset.k && el.closest('.bodypad').classList.contains(B.where || 'solo'))); return; }
     if(B.mode !== mode && mode === 'ask'){ B.mode = mode; setBtn(B.pass, ['🙋', 'To me!']); setBtn(B.shoot, ['💥', 'Shoot']); setBtn(B.trick, ['🌀', 'Trick']); }   // 🙋 our goal kick: Pass = ask the keeper
     if(B.mode !== mode){ B.mode = mode; setBtn(B.pass, has ? ['⚽', 'Pass'] : ['🦶', 'Tackle']); setBtn(B.shoot, has ? ['💥', 'Shoot'] : M.L.slide ? ['🛝', 'Slide'] : ['🦶', 'Tackle']); setBtn(B.trick, has ? ['🌀', 'Trick'] : ['📣', 'Help!']); }
     const h = has && G.help >= 1 ? BO.hint(M, ci) : null; B.shoot.classList.toggle('glow', !!(h && h.shoot)); B.pass.classList.toggle('glow', ask || !!(h && !h.shoot && h.pass >= 0 && G.help >= 2));
     const at = c.kAt >= 0 ? c.kAt : c.jAt, el = c.kAt >= 0 ? B.shoot : B.pass, pw = at >= 0 && has ? Math.min(1, (M.t - at) / 0.75) : 0; [B.pass, B.shoot].forEach(x => x.style.setProperty('--p', x === el ? pw.toFixed(2) : 0)); });
 }
+function comboTip(M){   // 🌱 Basic / 🌿 Junior: a combo to try (glows on the buttons), a new one every 4 beats, one you haven't done this turn
+  const B = M.battle; if(!B || B.phase !== 'turn' || G.level > 1 || !M.ctrls.some(c => c.side === B.turn && c.seat <= 1)) return null;
+  const all = Object.keys(BO.BTRICK).filter(k => k.indexOf('+') > 0), fresh = all.filter(k => !(B.cur.used || {})[BO.BTRICK[k][0]]), list = fresh.length ? fresh : all, k = list[Math.floor(B.phaseT / B.beat / 4) % list.length];
+  const [b, r] = k.split('+'), bk = BODY_KEY.find(x => x[1] === b), ri = {J: '🦶', K: '🌈', L: '🌀', SP: '🦵'}[r];
+  return {key: k, body: b, ball: r, label: bk[2] + ' + ' + ri + ' = ' + BO.BTRICK[k][1]};
+}
+const BODY_KEY = [['up', 'U', '⬆️', 'Hop', 'hop'], ['left', 'LF', '🔄', 'Spin', 'spin'], ['right', 'RT', '😎', 'Show', 'show'], ['down', 'D', '⬇️', 'Drop', 'drop']];   // 🎮 bo-5c-3 the left thumb in the battle
 function setBtn(el, [ic, nm]){ el.querySelector('.ic').textContent = ic; el.querySelector('.nm').textContent = nm; }
 function shoutLabels(){ return G.view.mode === 'side' ? ['⬆️ far side', '⬇️ near side'] : ['⬅️ left', '➡️ right']; }
 // a screen arrow → which way along the goal line (world y) for this camera
@@ -2721,6 +2830,7 @@ document.addEventListener('keydown', e => {
   G.M.ctrls.forEach(c => keySetsOf(c).forEach(K => {
     Object.keys(LOGIC).forEach(a => { if(K[a] === e.code) BO.key(G.M, c.ci, LOGIC[a], true); });
     if(K.sw === e.code) BO.key(G.M, c.ci, 'C', true);
+    if(G.M.battle){ const bk = BODY_KEY.find(([d]) => K[d] === e.code); if(bk) BO.key(G.M, c.ci, bk[1], true); }   // 🎮 battle: the move keys = body moves
     if(K.shoutL === e.code) BO.shout(G.M, c.ci, shoutWorld(-1));
     if(K.shoutR === e.code) BO.shout(G.M, c.ci, shoutWorld(1));
   }));
@@ -2761,7 +2871,7 @@ function buildPads(){
     const mk = (cls, ic, nm, key) => '<button class="bbtn ' + cls + '" data-a="' + cls.slice(2) + '"><span class="pw"></span><span class="ic">' + ic + '</span><span class="nm">' + nm + '</span><small>' + UI.esc(keyName(key)) + '</small></button>';
     pad.innerHTML = mk('b-trick', '🌀', 'Trick', K.trick) + mk('b-shoot', '💥', 'Shoot', K.shoot) + mk('b-jump', '🦘', 'Jump', K.jump) + mk('b-pass', '⚽', 'Pass', K.pass);
     const sw = document.createElement('button'); sw.className = 'swbtn'; sw.textContent = '🔄'; sw.title = 'Switch player (' + keyName(K.sw) + ')';
-    const B = {pass: pad.querySelector('.b-pass'), shoot: pad.querySelector('.b-shoot'), trick: pad.querySelector('.b-trick'), jump: pad.querySelector('.b-jump'), mode: '', trickAt: -1, trickTimer: 0, comboL: false};
+    const B = {pass: pad.querySelector('.b-pass'), shoot: pad.querySelector('.b-shoot'), trick: pad.querySelector('.b-trick'), jump: pad.querySelector('.b-jump'), mode: '', trickAt: -1, trickTimer: 0, comboL: false, where};
     G.btn.set(c.ci, B);
     const press = (el, down) => { el.classList.toggle('down', down); if(down && navigator.vibrate) try{ navigator.vibrate(8); }catch(e){} };
     const has = () => { const p = G.M.players[c.pi]; return p && G.M.ball.owner === p.i; };
@@ -2780,6 +2890,13 @@ function buildPads(){
     B.jump.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); press(B.jump, true); if(G && !G.paused) BO.key(G.M, c.ci, 'SP', true); });
     ['pointerup', 'pointercancel'].forEach(k => B.jump.addEventListener(k, () => { press(B.jump, false); if(G) BO.key(G.M, c.ci, 'SP', false); }));
     sw.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if(G && !G.paused){ BO.key(G.M, c.ci, 'C', true); UISound.play('tap'); } });
+    if(G.kind === 'battle'){   // 🎮 bo-5c-3: the left thumb gets 4 body moves where the stick was — press one WITH a trick = a combo
+      const bp = document.createElement('div'); bp.className = 'bodypad ' + where;
+      bp.innerHTML = BODY_KEY.map(([d, L, ic, nm, cl]) => '<button class="bbtn b-' + cl + '" data-k="' + L + '"><span class="ic">' + ic + '</span><span class="nm">' + nm + '</span><small>' + UI.esc(keyName(K[d])) + '</small></button>').join('');
+      bp.querySelectorAll('.bbtn').forEach(el => { el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); try{ el.setPointerCapture(e.pointerId); }catch(err){} press(el, true); $('pads').classList.remove('kbd'); if(G && !G.paused) BO.key(G.M, c.ci, el.dataset.k, true); });
+        ['pointerup', 'pointercancel'].forEach(k => el.addEventListener(k, () => { press(el, false); if(G) BO.key(G.M, c.ci, el.dataset.k, false); })); });
+      box.appendChild(bp);
+    }
     // 📣 shout arrows (pop up when a shot is coming)
     const sh = document.createElement('div'); sh.className = 'shouts hidden'; sh.dataset.side = c.side; const lab = () => shoutLabels();
     sh.innerHTML = '<button class="shout" data-d="-1">' + lab()[0].split(' ')[0] + '<small>📣 shout</small></button><button class="shout" data-d="1">' + lab()[1].split(' ')[0] + '<small>📣 shout</small></button>';
@@ -2803,7 +2920,7 @@ function buildPads(){
 /* ---------- events → sounds, words, banners ---------- */
 function banner(text, cls){ const b = $('banner'); b.textContent = text; b.className = 'banner on ' + (cls || ''); clearTimeout(banner.t); banner.t = setTimeout(() => b.classList.remove('on'), 2200); }
 function bigWord(text){ if(!FX) return; const h = $('bigword-host'); h.innerHTML = ''; const e = document.createElement('div'); e.className = 'big-word'; e.textContent = text; h.appendChild(e); setTimeout(() => e.remove(), 1200); }
-function floatAt(p, text){ if(!FX || !V) return; const f = V.P(p.x, p.y, 2.3); if(!f) return; const e = document.createElement('div'); e.className = 'float-tag'; e.textContent = text; e.style.left = f[0] + 'px'; e.style.top = f[1] + 'px'; $('float-host').appendChild(e); setTimeout(() => e.remove(), 1100); }
+function floatAt(p, text){ if(!FX || !V) return; const f = V.P(p.x, p.y, 2.3); if(!f) return; const e = document.createElement('div'); e.className = 'float-tag'; e.textContent = text; e.style.left = f[0] + 'px'; e.style.top = f[1] + 'px'; $('float-host').appendChild(e); setTimeout(() => e.remove(), 1100); return e; }
 const COACH = ['Pass to a friend who has space — the robots can\'t run as fast as the ball!', 'Shoot at the far corner — keepers find it hardest.', 'Hold K a little longer for a harder shot.', 'Shout Q / E when they shoot — your keeper will listen!', 'Use the 🔄 switch to pick the player nearest the ball.', 'Try Space, Space then K for a volley!'];
 function isMine(side){ return G.humans.some(h => h.side === side); }
 function handleEvents(evs){
@@ -2819,9 +2936,11 @@ function handleEvents(evs){
       case 'nutmeg': sfx('ooh', 0.9); bigWord('🥜 NUTMEG!'); if(e.point) banner('🥜 ' + (P(e.by).name || '?') + ' nutmegs ' + (P(e.on).name || '?') + ' — a point!', isMine(e.side) ? 'gold' : 'bad'); else floatAt(P(e.by), '🥜 through the legs!'); if(FX && isMine(e.side)) confetti(['🥜', '⭐', '✨'], 14); break;
       case 'wall': if(e.set){ if(isMine(1 - e.side)) banner('🧱 They make a wall — bend it round with L!', 'good'); } else sfx('thud', 0.35); break;
       case 'bturn': banner('🎤 ' + G.tn[e.side] + "'s turn — " + (e.human ? 'tricks ON the beat!' : 'watch the robot dance…'), e.side === 0 ? 'good' : ''); break;
-      case 'bgo': bigWord('🎵 GO!'); break;
-      case 'btrick': { const pl = M.players.find(p => p.side === e.side && p.ctrl >= 0) || M.players.filter(p => p.side === e.side && !p.gk).slice(-1)[0]; UISound.play(e.grade === 'perfect' ? 'success' : 'tap'); floatAt(pl, (e.grade === 'perfect' ? '✨ ' : '👍 ') + e.label + ' +' + e.pts); break; }
-      case 'bmiss': if(M.ctrls.some(c => c.side === e.side)) floatAt(M.players.find(p => p.side === e.side && p.ctrl >= 0) || {}, '❌ ' + (e.why || 'off beat')); break;
+      case 'bgo': bigWord('🎵 GO!'); G.brx = G.brx || [null, null]; G.brx[1 - e.side] = {a: 'bring', t: M.t}; break;
+      case 'btrick': { if(e.grade === 'perfect' && (e.combo >= 3 || e.trick === 'neck' || e.trick === 'atw')){ G.brx = G.brx || [null, null]; G.brx[1 - e.side] = {a: 'wow', t: M.t}; }
+        const pl = M.players.find(p => p.side === e.side && p.ctrl >= 0) || M.players.filter(p => p.side === e.side && !p.gk).slice(-1)[0]; G.btFloat = G.btFloat || []; if(e.up && G.btFloat[e.side]) G.btFloat[e.side].remove();   /* 🎮 the first thumb's label makes way for the combo */
+        UISound.play(e.grade === 'perfect' ? 'success' : 'tap'); G.btFloat[e.side] = floatAt(pl, (e.grade === 'perfect' ? '✨ ' : '👍 ') + e.label + ' +' + e.pts); if(e.key && e.key.indexOf('+') > 0){ banner('🎮 COMBO · ' + e.label + ' +' + e.pts, 'gold'); sfx('ooh', 0.6);   /* a small chip at the top — the move itself stays in view */ } break; }
+      case 'bmiss': G.brx = G.brx || [null, null]; if(!G.brx[1 - e.side] || M.t - G.brx[1 - e.side].t > 1.2) G.brx[1 - e.side] = {a: 'laugh', t: M.t}; if(M.ctrls.some(c => c.side === e.side)) floatAt(M.players.find(p => p.side === e.side && p.ctrl >= 0) || {}, '❌ ' + (e.why || 'off beat')); break;
       case 'bcards': sfx('ooh', 0.7); banner('🃏 Judges: ' + e.cards.join(' · ') + ' = ' + e.total + ' for ' + G.tn[e.side], 'gold'); break;
       case 'bround': bigWord('🏆 ' + G.tn[e.winner] + ' wins round ' + e.round + '!'); if(FX && isMine(e.winner)) confetti(['🎵', '⭐', '✨'], 16); break;
       case 'drill': banner(e.name + ' — ' + e.about, 'good'); say(e.name.replace(/^\S+\s/, '')); break;
@@ -3019,4 +3138,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a+bo-5b+bo-pz) END OF BlasOff.html -->
+<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a+bo-5b+bo-pz+bo-5c) END OF BlasOff.html -->
