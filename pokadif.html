@@ -402,6 +402,10 @@ var PK = (function () {
   // 📖 pk-4c: two scenes only for case books (not houses): 🌱 Greenhouse · ⏰ Clock Tower
   THEMES.garden = { name: 'Greenhouse', icon: '🌱', top: '#7CC6A0', bot: '#E8F7D8', ground: '#6B4A2E', hill: '#8BC86A', deco: ['🌻', '🪴', '🐝', '🦋', '🌷'], kinds: ['flower', 'leaf', 'tree', 'mushroom', 'ladybug', 'snail', 'circle', 'heart', 'star', 'balloon'], caseOnly: true };
   THEMES.clock = { name: 'Clock Tower', icon: '⏰', top: '#3A2A4A', bot: '#B98A5A', ground: '#5A4030', hill: '#7A5A40', deco: ['🔔', '⚙️', '🕯️', '🦉', '🗝️'], kinds: ['gear', 'circle', 'star', 'house', 'diamond', 'hexagon', 'square', 'bird', 'crystal', 'dice'], caseOnly: true };
+  // 📖 pk-6b: three more case-only scenes: 🍰 Bakery · 🌋 Volcano Village · 🌼 Sunny Farm
+  THEMES.bakery = { name: 'Bakery', icon: '🍰', top: '#E9A97E', bot: '#FFEAD2', ground: '#9C6A42', hill: '#B98258', deco: ['🥐', '🧁', '🥖', '🍪', '🎂'], kinds: ['cupcake', 'donut', 'cherry', 'apple', 'mug', 'teapot', 'circle', 'heart', 'star', 'lollipop', 'icecream', 'banana', 'gift', 'cat', 'crown', 'carrot'], caseOnly: true };
+  THEMES.volcano = { name: 'Volcano Village', icon: '🌋', top: '#3A1D2E', bot: '#E08A4A', ground: '#4A3A34', hill: '#5E4A40', deco: ['🌋', '🔥', '🪨', '♨️', '🌴'], kinds: ['crystal', 'house', 'tree', 'mushroom', 'star', 'diamond', 'hexagon', 'circle', 'cactus', 'sun', 'turtle', 'gear', 'crab', 'anchor', 'key', 'owl'], caseOnly: true };
+  THEMES.farm = { name: 'Sunny Farm', icon: '🌼', top: '#7FCBF0', bot: '#E6F7C9', ground: '#6FB14E', hill: '#8FCB6A', deco: ['🌼', '🚜', '🐄', '🌾', '🏡'], kinds: ['flower', 'bee', 'butterfly', 'apple', 'tree', 'carrot', 'house', 'heart', 'duck', 'owl', 'sun', 'cherry', 'frog', 'mushroom', 'cat', 'bus'], caseOnly: true };
   // 🧩 pk-5b: every scene gets ~10 of the new pieces (+ 3 random guests from any scene per picture)
   THEMES.dino.kinds = THEMES.dino.kinds.concat(['cactus', 'turtle', 'frog', 'butterfly', 'bee', 'apple', 'banana', 'carrot', 'owl', 'crab']);
   THEMES.sea.kinds = THEMES.sea.kinds.concat(['whale', 'crab', 'turtle', 'duck', 'anchor', 'umbrella', 'penguin', 'icecream', 'lollipop', 'kite']);
@@ -581,7 +585,7 @@ var PK = (function () {
     if (ib < 0) return null;
     var b = clone(a), d = { t: type, idA: a.id, idB: a.id, x: a.x, y: a.y, r: radiusOf(a) };
     var mag = L.mag, K = KINDS[a.k];
-    if (isUnder(a, sc.A) && (FRAGILE.indexOf(type) >= 0 || (L.quiet && type === 'stretch') || visFrac(a, sc.A) < (type === 'tone' || type === 'colour' ? 0.7 : 0.55))) return null;   // 🥞 pk-5c: half-hidden pieces keep their change visible
+    if (isUnder(a, sc.A) && (FRAGILE.indexOf(type) >= 0 || (L.quiet && type === 'stretch') || visFrac(a, sc.A) < (type === 'tone' || type === 'colour' ? 0.85 : 0.55) || ((type === 'tone' || type === 'colour') && (THIN.indexOf(a.k) >= 0 || radiusOf(a) < 22)))) return null;   // pk-6b: a shade on a half-hidden piece needs a full-bodied piece   // 🥞 pk-5c: half-hidden pieces keep their change visible
     if (type === 'colour') {
       if (a.k === 'beads') return null;
       if (L.quiet) { if (!toneOk(a.k)) return null; var nb = hueShift(a.c, 90, R() < 0.5 ? 1 : -1) || hueShift(a.c, 90, 1) || hueShift(a.c, 90, -1); if (!nb) return null; b.c = nb; d.sub = 'colour'; B[ib] = b; return d; }   // 🤫 a neighbour colour
@@ -651,9 +655,8 @@ var PK = (function () {
       if (!tn || tn === a.c) return null; b.c = tn; d.sub = 'tone';
     } else if (type === 'line') {   // ✏️ a thin line across the piece, added or gone
       if (!lineOk(a.k) || radiusOf(a) < 22 || a.dt || a.lk) return null;   // stripes OR dots on a piece, never both (a dot would hide the line)
-      if (L.quiet) {   // 🤫 pk-5d: only on a piece that already has stripes — one stripe more / less, or the stripes turned 15°
+      if (L.quiet) {   // 🤫 pk-5d: only on a piece that already has stripes — one stripe more / less (pk-6b: the 15° turn was too faint on some pieces)
         if (!a.ln) return null;
-        if (radiusOf(a) >= 24 && R() < 0.4) { b.la = ((a.la || 0) + (R() < 0.5 ? 15 : -15)); d.sub = 'line~'; B[ib] = b; return d; }
       }
       if (a.ln && R() < 0.5) b.ln = a.ln - 1; else if ((a.ln || 0) < 3) b.ln = (a.ln || 0) + 1; else b.ln = a.ln - 1;
       if (b.la == null) b.la = 0;   // (never touch picture A)
@@ -1110,7 +1113,73 @@ var PK = (function () {
         yes: [['⏰', 'alarm clock'], ['⌚', 'watch'], ['⏳', 'sand timer'], ['🕰️', 'old clock'], ['📅', 'calendar'], ['⏱️', 'stopwatch']],
         no: [['🥄', 'spoon'], ['🧸', 'teddy bear'], ['🍎', 'apple'], ['👟', 'shoe'], ['🎈', 'balloon'], ['📚', 'book'], ['🧦', 'sock'], ['🪨', 'rock']],
         trick: [['🧭', 'compass'], ['🌡️', 'thermometer']], why: { yes: 'helps us tell the time!', no: 'does not tell the time.' } },
-      solved: 'The golden key is back — tick, tock, the Clock Tower runs forwards again! ⏰✨' }
+      solved: 'The golden key is back — tick, tock, the Clock Tower runs forwards again! ⏰✨' },
+    // 🍰 pk-6b
+    { id: 'cake', n: 9, icon: '🍰', name: 'The Great Cake Caper', theme: 'bakery', topic: 'Measuring + fractions', place: 'the Bakery', owner: 'Baker Bella', thing: 'prize-winning cake', walkTo: 'pantry', dropAt: 'by the big oven',
+      open: '🍰 Baker Bella\'s prize-winning cake has vanished from the counter — just before the big contest! Floury footprints lead across the kitchen…',
+      suspects: [['🐭', 'Nibbles the Mouse'], ['🐻', 'Honey the Bear'], ['🦊', 'Rusty the Fox'], ['🐷', 'Pinky the Pig'], ['🐒', 'Cheeky the Monkey']],
+      drops: [['🍓', 'a strawberry'], ['🍫', 'a chocolate chip'], ['🧈', 'a pat of butter'], ['🥚', 'an eggshell'], ['🍒', 'a cherry'], ['🥄', 'a sticky spoon']],
+      clutter: ['cupcake', 'donut', 'cherry', 'apple', 'mug', 'teapot', 'circle', 'heart'],
+      count: '🧁',
+      chapters: [
+        { title: 'The empty cake stand', icon: '🎂', say: 'The cake stand is empty — and the floury floor is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
+        { title: 'Through the kitchen', icon: '🥐', say: 'The prints go past the ovens. Find the way to the pantry — then check the kitchen camera!', steps: ['walk', 'spot'] },
+        { title: 'The locked pantry', icon: '🔐', say: 'The pantry door is locked… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
+      ],
+      lessons: [
+        { icon: '⚖️', title: 'Measuring', text: 'Bakers measure with scales, cups and spoons. The right amount of each thing makes the cake come out just right!' },
+        { icon: '🍕', title: 'Halves and quarters', text: 'Cut a cake into 2 equal parts: each is a half. Cut it into 4 equal parts: each is a quarter. Equal means the same size!' },
+        { icon: '🔥', title: 'Heat changes food', text: 'In the oven, runny batter turns into soft, spongy cake. Heat changed it — and it can\'t change back!' }
+      ],
+      quiz: { ask: 'Baker Bella asks: which one helps us MEASURE?', nope: 'Which one can NOT measure anything?',
+        yes: [['⚖️', 'kitchen scale'], ['📏', 'ruler'], ['⏲️', 'timer'], ['🌡️', 'thermometer'], ['🥄', 'measuring spoon']],
+        no: [['🎈', 'balloon'], ['🧸', 'teddy bear'], ['🎨', 'paint'], ['🍭', 'lollipop'], ['🧦', 'sock'], ['🎵', 'song'], ['🌸', 'flower'], ['🪁', 'kite']],
+        trick: [['👀', 'just looking'], ['✋', 'a handful']], why: { yes: 'helps us measure, so the cake comes out right!', no: 'can\'t measure — a scale, a spoon, a ruler or a timer can!' } },
+      solved: 'The prize cake is back on its stand — and it wins first prize! 🍰🏆' },
+    // 🌋 pk-6b
+    { id: 'volcano', n: 10, icon: '🌋', name: 'The Rumbling Mountain', theme: 'volcano', topic: 'Volcanoes + Earth layers', place: 'Volcano Village', owner: 'Professor Magma', thing: 'golden rumble-meter', walkTo: 'lookout hut', dropAt: 'by the hot spring',
+      open: '🌋 The mountain is rumbling — and Professor Magma\'s golden rumble-meter is gone! Without it nobody knows if the volcano will wake up. Ashy footprints lead up the path…',
+      suspects: [['🦎', 'Lizzy the Lizard'], ['🐐', 'Billy the Goat'], ['🦅', 'Sky the Eagle'], ['🐗', 'Tusk the Boar'], ['🐢', 'Shelly the Tortoise']],
+      drops: [['🪨', 'a black pebble'], ['🌶️', 'a red chili'], ['🪶', 'a brown feather'], ['🍠', 'a sweet potato'], ['🧭', 'a little compass'], ['🥥', 'a coconut shell']],
+      clutter: ['crystal', 'house', 'tree', 'mushroom', 'star', 'diamond', 'hexagon', 'circle'],
+      count: '🔥',
+      chapters: [
+        { title: 'The empty desk', icon: '📟', say: 'The rumble-meter\'s desk is empty — and the ashy floor is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
+        { title: 'Up the mountain path', icon: '🥾', say: 'The prints climb the mountain path. Find the way to the lookout hut — then check the village camera!', steps: ['walk', 'spot'] },
+        { title: 'The locked hut', icon: '🔐', say: 'The lookout hut is locked… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
+      ],
+      lessons: [
+        { icon: '🌍', title: 'Layers of the Earth', text: 'The Earth has layers like a peach: a thin crust on the outside, a hot thick mantle under it, and a core in the middle.' },
+        { icon: '🌋', title: 'What is a volcano?', text: 'Deep down, rock is so hot it melts — that is magma. When it pushes up through a crack and comes out, we call it lava.' },
+        { icon: '🏝️', title: 'Volcanoes make land', text: 'Lava cools down and turns into new rock. Some islands were made by volcanoes, one eruption at a time!' }
+      ],
+      quiz: { ask: 'Professor Magma asks: which one comes OUT of a volcano?', nope: 'Which one does NOT come out of a volcano?',
+        yes: [['🔥', 'hot lava'], ['💨', 'ash and smoke'], ['🪨', 'rocks'], ['♨️', 'steam'], ['🌫️', 'gas']],
+        no: [['🍦', 'ice cream'], ['🧸', 'teddy bears'], ['🎈', 'balloons'], ['🍫', 'chocolate'], ['🐟', 'fish'], ['📚', 'books'], ['🌈', 'rainbows'], ['🎁', 'presents']],
+        trick: [['❄️', 'snow'], ['💧', 'rain']], why: { yes: 'can come out of a volcano when it erupts!', no: 'does not come out of a volcano — lava, ash, rocks and steam do!' } },
+      solved: 'The rumble-meter is back — it says the mountain is only snoring. Volcano Village can sleep again! 🌋😴' },
+    // 🐝 pk-6b
+    { id: 'bees', n: 11, icon: '🐝', name: 'Where Did the Bees Go?', theme: 'farm', topic: 'Pollination', place: 'Sunny Farm', owner: 'Farmer Fern', thing: 'golden honey pot', walkTo: 'big red barn', dropAt: 'by the beehives',
+      open: '🐝 The bees of Sunny Farm have flown away — someone took Farmer Fern\'s golden honey pot, and now the flowers have no visitors! Sticky footprints lead across the field…',
+      suspects: [['🐻', 'Bruno the Bear'], ['🦨', 'Stinky the Skunk'], ['🐦', 'Caw the Crow'], ['🦡', 'Bandit the Badger'], ['🐸', 'Hoppy the Frog']],
+      drops: [['🌻', 'a sunflower seed'], ['🍯', 'a drop of honey'], ['🌾', 'a wheat stalk'], ['🥚', 'an egg'], ['🍎', 'an apple core'], ['🌼', 'a yellow petal']],
+      clutter: ['flower', 'bee', 'butterfly', 'apple', 'tree', 'carrot', 'house', 'heart'],
+      count: '🌻',
+      chapters: [
+        { title: 'The silent hives', icon: '🍯', say: 'The honey pot is gone and the hives are quiet — the muddy yard is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
+        { title: 'Across the fields', icon: '🌾', say: 'The prints cross the wheat field. Find the way to the big red barn — then check the farm camera!', steps: ['walk', 'spot'] },
+        { title: 'The locked barn', icon: '🔐', say: 'The barn door is locked… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
+      ],
+      lessons: [
+        { icon: '🌸', title: 'Flowers make seeds', text: 'To make seeds and fruit, a flower needs pollen — a yellow dust — from another flower of the same kind.' },
+        { icon: '🐝', title: 'Bees carry pollen', text: 'When a fuzzy bee drinks nectar, pollen sticks to its body. At the next flower some of it rubs off. That is pollination!' },
+        { icon: '🍎', title: 'No bees, no apples', text: 'Apples, strawberries and many other fruits only grow because bees and other visitors carry pollen between their flowers.' }
+      ],
+      quiz: { ask: 'Farmer Fern asks: which one helps carry POLLEN?', nope: 'Which one does NOT carry pollen?',
+        yes: [['🐝', 'bee'], ['🦋', 'butterfly'], ['🐦', 'hummingbird'], ['🪲', 'beetle'], ['🦇', 'fruit bat']],
+        no: [['🐟', 'fish'], ['🚗', 'car'], ['🧸', 'teddy bear'], ['🪨', 'rock'], ['📺', 'TV'], ['🍕', 'pizza'], ['🎈', 'balloon'], ['🧦', 'sock']],
+        trick: [['🕷️', 'spider'], ['🐛', 'caterpillar']], why: { yes: 'visits flowers and carries pollen from one to the next!', no: 'does not carry pollen — bees, butterflies and hummingbirds do!' } },
+      solved: 'The golden honey pot is home — the bees come buzzing back and the orchard is full of blossom! 🐝🌸' }
   ];
   function caseById(id) { for (var i = 0; i < CASES.length; i++) if (CASES[i].id === id) return CASES[i]; return CASES[0]; }
   // 🔐 one code digit + where it hides
@@ -1207,7 +1276,8 @@ var PK = (function () {
   // ================= 🎲 MIX = 5 random layers (pk-5c, Aowu 2026-11-15 01:52 "1 scenery · 2 people · 3 props · 4 particles · 5 others") =================
   // Every Mix picture = a new combo: 🏞️ any scene (6 houses · 🌱 · ⏰ · 7 trip places) + 1–2 big scenery pieces behind · 🧑 1–3 of the family (real avatars)
   // · 🎒 pieces from the whole box (61 kinds) · ✨ a swarm of one particle kind · 🎲 others (signs, beads, a framed picture, ants). A change can land in ANY layer.
-  var MIX_SCENES = THEME_KEYS.concat(['garden', 'clock']).concat(TRIP_KEYS);
+  var CASE_SCENES = ['garden', 'clock', 'bakery', 'volcano', 'farm'];   // 📖 case-only scenes (pk-4c, pk-6b) — 🎲 Mix uses them too
+  var MIX_SCENES = THEME_KEYS.concat(CASE_SCENES).concat(TRIP_KEYS);
   var SCENERY = ['tree', 'cloud', 'house', 'sun', 'planet', 'whale', 'boat', 'snowman', 'bus', 'rocket', 'kite', 'umbrella'];
   var PARTICLES = { confetti: 1, bubble: 0, sparkle: 0, snow: 1, drop: 0, leaflet: 1, star: 1 };   // 1 = can take a 🌗 shade change (thin ✨ sparkles / 💧 drops: too few pixels)
   var PT_KEYS = Object.keys(PARTICLES);
@@ -1444,7 +1514,7 @@ var PK = (function () {
   function nextRank(cleared) { for (var i = 0; i < RANKS.length; i++) if (RANKS[i].at > cleared) return RANKS[i]; return null; }
 
   return { W: W, H: H, GROUND: GROUND, MIN_HIT: MIN_HIT, KINDS: KINDS, SHAPES: SHAPES, THEMES: THEMES, THEME_KEYS: THEME_KEYS, PAL: PAL, TYPES: TYPES, TYPE_INFO: TYPE_INFO, SUBTLE: SUBTLE, NEW_KINDS: NEW_KINDS, PIECES: PIECES, LAYOUTS: LAYOUTS, toneShift: toneShift, rgbSum: rgbSum,
-    LEVELS: LEVELS, RANKS: RANKS, TYPES6: TYPES6, WORD_SETS: WORD_SETS, RHYMES: RHYMES, ODD: ODD, ODD_ROUNDS: ODD_ROUNDS, makeOdd: makeOdd, oddPoints: oddPoints, makePattern: makePattern, sumText: sumText, ARCADE: ARCADE, CHECK_EVERY: CHECK_EVERY, arcadeScore: arcadeScore, arcadeStars: arcadeStars, mmss: mmss, TRIP_KEYS: TRIP_KEYS, PHOTO_ACTS: PHOTO_ACTS, PHOTO_FACES: PHOTO_FACES, SELFIE: SELFIE, photoAct: photoAct, makePhoto: makePhoto, makeMix: makeMix, hueShift: hueShift, LOOK_GROUPS: LOOK_GROUPS, lookMates: lookMates, POSE_NEAR: POSE_NEAR, MIX_SCENES: MIX_SCENES, MIX_LAYERS: MIX_LAYERS, MIX_LAYER_INFO: MIX_LAYER_INFO, PARTICLES: PARTICLES, SCENERY: SCENERY, visFrac: visFrac, isUnder: isUnder, STORY: STORY, BOOTS: BOOTS, VERBS: VERBS, CASES: CASES, caseById: caseById, makeCase: makeCase, makeWalk: makeWalk, makeDigit: makeDigit, bfs: bfs, clueMatch: clueMatch, storyPoints: storyPoints, caseBonus: caseBonus, rng: rng, newSeed: newSeed, makeScene: makeScene, signature: signature, poke: poke, pokeFound: pokeFound, radiusOf: radiusOf, hitOf: hitOf,
+    LEVELS: LEVELS, RANKS: RANKS, TYPES6: TYPES6, WORD_SETS: WORD_SETS, RHYMES: RHYMES, ODD: ODD, ODD_ROUNDS: ODD_ROUNDS, makeOdd: makeOdd, oddPoints: oddPoints, makePattern: makePattern, sumText: sumText, ARCADE: ARCADE, CHECK_EVERY: CHECK_EVERY, arcadeScore: arcadeScore, arcadeStars: arcadeStars, mmss: mmss, TRIP_KEYS: TRIP_KEYS, PHOTO_ACTS: PHOTO_ACTS, PHOTO_FACES: PHOTO_FACES, SELFIE: SELFIE, photoAct: photoAct, makePhoto: makePhoto, makeMix: makeMix, CASE_SCENES: CASE_SCENES, hueShift: hueShift, LOOK_GROUPS: LOOK_GROUPS, lookMates: lookMates, POSE_NEAR: POSE_NEAR, MIX_SCENES: MIX_SCENES, MIX_LAYERS: MIX_LAYERS, MIX_LAYER_INFO: MIX_LAYER_INFO, PARTICLES: PARTICLES, SCENERY: SCENERY, visFrac: visFrac, isUnder: isUnder, STORY: STORY, BOOTS: BOOTS, VERBS: VERBS, CASES: CASES, caseById: caseById, makeCase: makeCase, makeWalk: makeWalk, makeDigit: makeDigit, bfs: bfs, clueMatch: clueMatch, storyPoints: storyPoints, caseBonus: caseBonus, rng: rng, newSeed: newSeed, makeScene: makeScene, signature: signature, poke: poke, pokeFound: pokeFound, radiusOf: radiusOf, hitOf: hitOf,
     colDist: colDist, picturePoints: picturePoints, starsFor: starsFor, rankOf: rankOf, nextRank: nextRank, fits: fits };
 })();
 if (typeof module !== 'undefined') module.exports = PK;
@@ -1742,6 +1812,12 @@ function pkBackground(g, sc){
     g.lineWidth = 2; for(let i = 0; i < 12; i++){ const a = i * Math.PI / 6; g.beginPath(); g.moveTo(cx + Math.cos(a) * 60, cy + Math.sin(a) * 60); g.lineTo(cx + Math.cos(a) * 68, cy + Math.sin(a) * 68); g.stroke(); }
     g.lineWidth = 4; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx - 26, cy - 30); g.moveTo(cx, cy); g.lineTo(cx + 44, cy + 8); g.stroke();
     g.fillStyle = 'rgba(255,220,160,0.12)'; [[30, 40, 26], [PK.W - 34, 54, 32]].forEach(c => { g.beginPath(); for(let k = 0; k < 16; k++){ const a = k * Math.PI / 8, r = k % 2 ? c[2] : c[2] * 0.78; g.lineTo(c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r); } g.closePath(); g.fill(); }); }   // ⏰ pk-4c clock face + gears
+  if(sc.theme === 'bakery'){ g.fillStyle = 'rgba(120,70,40,0.22)'; [64, 128].forEach(y => g.fillRect(0, y, PK.W, 6)); g.fillStyle = 'rgba(255,255,255,0.28)'; [[22, 58], [58, 56], [300, 58], [340, 60], [40, 122], [330, 120]].forEach(([x, y]) => { g.beginPath(); g.roundRect ? g.roundRect(x, y - 22, 20, 22, 4) : g.rect(x, y - 22, 20, 22); g.fill(); });
+    g.fillStyle = 'rgba(80,40,20,0.10)'; for(let x = 0; x < PK.W; x += 28) for(let y = PK.GROUND; y < PK.H; y += 14) if(((x / 28) + (y - PK.GROUND) / 14) % 2 < 1) g.fillRect(x, y, 28, 14); }   // 🍰 pk-6b shelves with jars + checked floor
+  if(sc.theme === 'volcano'){ g.fillStyle = 'rgba(40,20,20,0.45)'; g.beginPath(); g.moveTo(80, PK.GROUND); g.lineTo(175, 70); g.lineTo(225, 70); g.lineTo(320, PK.GROUND); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(255,140,40,0.35)'; g.beginPath(); g.ellipse(200, 70, 26, 7, 0, 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,0.12)'; [[205, 46, 14], [214, 26, 18], [226, 8, 22]].forEach(([x, y, r]) => { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }); }   // 🌋 pk-6b mountain + glow + smoke
+  if(sc.theme === 'farm'){ g.fillStyle = 'rgba(180,60,50,0.28)'; g.beginPath(); g.moveTo(318, PK.GROUND); g.lineTo(318, 160); g.lineTo(349, 132); g.lineTo(380, 160); g.lineTo(380, PK.GROUND); g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,0.45)'; g.lineWidth = 3; for(let x = 6; x < 300; x += 26){ g.beginPath(); g.moveTo(x, PK.GROUND); g.lineTo(x, PK.GROUND - 22); g.stroke(); } g.beginPath(); g.moveTo(0, PK.GROUND - 15); g.lineTo(300, PK.GROUND - 15); g.stroke(); }   // 🌼 pk-6b barn + fence
   if(T.mark){ if(sc.theme === 'trip_aurora' || sc.theme === 'trip_moon'){ for(let i = 0; i < 22; i++){ g.fillStyle = 'rgba(255,255,255,' + (0.3 + R() * 0.5) + ')'; g.beginPath(); g.arc(R() * PK.W, R() * PK.GROUND * 0.6, 0.6 + R() * 1.3, 0, 7); g.fill(); } } pkTrip(g, sc, R); }
   else { g.fillStyle = T.hill; g.beginPath(); g.ellipse(PK.W * 0.25, PK.GROUND + 8, PK.W * 0.42, 26, 0, 0, 7); g.ellipse(PK.W * 0.8, PK.GROUND + 12, PK.W * 0.36, 22, 0, 0, 7); g.fill(); }
   g.fillStyle = T.ground; g.fillRect(0, PK.GROUND + 4, PK.W, PK.H - PK.GROUND);
@@ -2374,7 +2450,7 @@ function caseOf(){ return PK.caseById(SET.caseId || 'magnet'); }
 function caseSeen(){ try{ return JSON.parse(localStorage.getItem(CASE_KEY + ':' + (S.player || '')) || '{}'); }catch(e){ return {}; } }
 function caseSeenSave(o){ try{ localStorage.setItem(CASE_KEY + ':' + (S.player || ''), JSON.stringify(o)); }catch(e){} }
 function lessonCount(){ return Object.keys(caseSeen()).filter(k => /^L:/.test(k)).length; }
-const CASE_SHELF = [{id: 'magnet'}, {id: 'dino'}, {id: 'ship'}, {id: 'disco'}, {id: 'moon'}, {id: 'cloud'}, {id: 'garden'}, {id: 'clock'}];   // pk-3b: 3 case books · pk-4b: + 🪩 🪐 · pk-4c: + ☁️ 🌱 ⏰
+const CASE_SHELF = [{id: 'magnet'}, {id: 'dino'}, {id: 'ship'}, {id: 'disco'}, {id: 'moon'}, {id: 'cloud'}, {id: 'garden'}, {id: 'clock'}, {id: 'cake'}, {id: 'volcano'}, {id: 'bees'}];   // pk-6b: + 🍰 🌋 🐝   // pk-3b: 3 case books · pk-4b: + 🪩 🪐 · pk-4c: + ☁️ 🌱 ⏰
 function renderCases(){
   const box = $('house-list'), seen = caseSeen();
   box.innerHTML = CASE_SHELF.map(c => { const C = c.soon ? c : PK.caseById(c.id), on = (SET.caseId || 'magnet') === c.id;
@@ -2851,4 +2927,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d+pk-4a+pk-4b+pk-4c+pk-4d+pk-5a+pk-5b+pk-5c+pk-5d+pk-6a) END OF Pokadif.html -->
+<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d+pk-4a+pk-4b+pk-4c+pk-4d+pk-5a+pk-5b+pk-5c+pk-5d+pk-6a+pk-6b) END OF Pokadif.html -->
