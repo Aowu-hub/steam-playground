@@ -222,6 +222,9 @@
   .save-note{font-size:0.78rem;font-weight:700;color:var(--ink-soft);min-height:18px;}
   .res-btns > #b-menu, .res-btns > #tg-x, .res-btns > #btn-levels, .res-btns > #btn-hc-levels{order:-1;} .res-btns > #b-next, .res-btns > #btn-next{order:2;}   /* 🔘 p1b: exit left, main action right */
   .res-btns{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:4px;}
+  /* 🧱 b3w1: one-page setup — ▶ Start floats at the bottom, always in reach (the picked look = GameFrame's GF.pick) */
+  .b3-start{position:sticky;bottom:0;z-index:5;display:flex;justify-content:center;padding:10px 0 calc(env(safe-area-inset-bottom, 0px) + 14px);margin-top:12px;pointer-events:none;}
+  .b3-start .sp-btn{min-width:min(420px,92%);min-height:56px;font-size:1.15rem;pointer-events:auto;box-shadow:0 8px 22px rgba(0,0,0,.28);}
   .btn{font-family:'Fredoka',sans-serif;font-weight:600;font-size:0.95rem;border:none;border-radius:14px;cursor:pointer;
     padding:11px 16px;color:#fff;background:linear-gradient(135deg,var(--blue),var(--violet));box-shadow:0 4px 0 rgba(0,0,0,0.12);}
   .btn.soft{background:var(--panel);color:var(--ink);}
@@ -240,6 +243,9 @@
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>   <!-- 🧑 p6: BallSkins + AvatarKit + AvatarActing -->
 <script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-4c: the cheering crowd (CheerSquad.html) -->
+<script src="inc/GameFrame.js"></script>
+<script src="inc/GameCovers.js"></script>
+<script src="inc/CardArt.js"></script>   <!-- 🧱 b3w1: 🎬 cover + 🏁 result card (GameFrame + GameCovers + CardArt) -->
 </head>
 <body ontouchstart="">
 
@@ -256,16 +262,16 @@
     <p>Plan the moves, press ▶ Run, and fix your code if it goes wrong!</p>
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div>
   </div>
-  <div class="section-head">Pick a level</div>
+  <div class="section-head">🎚️ 1. Pick a level</div>   <!-- 🧱 b3w1: ONE setup page -->
   <div class="levels" id="level-list"></div>
+  <div class="section-head" id="world-head">🌍 2. Pick a world</div>
+  <div class="pick-grid" id="world-list"></div>
+  <div class="section-head" id="opt-head">⚙️ 3. Options</div>
   <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the play">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-4c -->
-  <div class="ui-leaders" id="leaders"></div>
+  <div class="b3-start"><button class="btn sp-btn sp-primary" id="btn-start" data-sound="pop" onclick="startSetup()">▶ Start</button></div>   <!-- 🧱 b3w1: 🏆 leaders live on the cover -->
 </section>
 
-<section class="screen hidden" id="scr-theme">
-  <div class="title"><div class="logo" id="theme-logo">🌍</div><h1 id="theme-title">Pick a world</h1><p>Every board is brand new</p></div>
-  <div class="pick-grid" id="theme-list"></div>
-  </section>
+<!-- 🧱 b3w1: the old "Pick a world" screen is now section 2 of the setup page -->
 
 <section class="hidden" id="scr-play">
   <div class="hud" id="gbar"></div>   <!-- 🎛️ p1b: UI.gameBar fills this -->
@@ -310,7 +316,7 @@ const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '�
   pause: {pause: () => { if(typeof pauseGame === 'function') pauseGame(); }, resume: () => { if(typeof resume === 'function') resume(); }},
   onFit: () => { if(G && typeof layout === 'function') layout(); },
   extras: [{id: 'new-board-btn', html: '🔄<span class="gt"> New board</span>', label: 'A brand-new board', onClick: () => newBoard(), keep: true}]});
-var NAV_INNER = {theme: ['◀ Code the Robot', () => showScreen('levels')]};   // 🧭 inner screens: their top button goes to the main screen
+var NAV_INNER = {levels: ['◀ Code the Robot', () => openCover()]};   // 🧱 b3w1: the setup's top button goes back to the 🎬 cover   // 🧭 inner screens: their top button goes to the main screen
 UI.navBar(document.getElementById('back-btn'), {onclick: false});
 
 /* ================= LEVELS ================= */
@@ -728,11 +734,13 @@ function hardcoreOver(e){
   const g = G; G.over = true; cheerEnd(false); /* 📣 cs-4c */
   setTimeout(() => {
     if(G !== g) return;
-    showResult((BD.on ? '<canvas class="res-av" id="res-av" aria-hidden="true"></canvas>' : '<div class="big">💀</div>') + '<h2>' + UI.esc(FAIL_TEXT[e.why] || 'Oops!') + '</h2><p style="margin:0;font-weight:700;color:var(--ink-soft)">💀 Hardcore ends on the first mistake — try again!</p>' +
-      '<div class="res-btns"><button class="btn sp-btn sp-primary" id="btn-hc-same">🔁 Same board</button><button class="btn soft sp-btn sp-secondary" id="btn-hc-new">🎲 New board</button><button class="btn soft sp-btn sp-secondary" id="btn-hc-levels">🎚️ Levels</button></div>');
-    $('btn-hc-same').onclick = () => { hideResult(); G.over = false; G.failInfo = null; G.badChip = -1; G.fails = 0; G.doneChips = new Set(); resetRobot(true); renderProgram(); updateHud(); };
-    $('btn-hc-new').onclick = () => newBoard();
-    $('btn-hc-levels').onclick = () => { hideResult(); leavePlay(); };
+    GF.result({wrap: $('result'), card: $('result-card'), win: false, icon: '💀', title: FAIL_TEXT[e.why] || 'Oops!', sub: '💀 Hardcore ends on the first mistake — try again!',   /* 🧱 b3w1: the shared 🏁 card */
+      buddy: (window.Acting && typeof myAvatar === "function") ? {name: S.player, av: myAvatar(S.player)} : null,
+      levels: () => { hideResult(); leavePlay(); },
+      again: () => { hideResult(); G.over = false; G.failInfo = null; G.badChip = -1; G.fails = 0; G.doneChips = new Set(); resetRobot(true); renderProgram(); updateHud(); }, againText: '🔁 Same board',
+      extra: [{text: '🎲 New board', id: 'btn-hc-new', fn: () => newBoard()}]});
+    [['btn-levels', 'btn-hc-levels'], ['btn-again', 'btn-hc-same']].forEach(([a, b]) => { const x = $(a); if(x) x.id = b; });   // the old ids
+    cheerFaces();   /* 📣 cs-4c */
   }, 1300);
 }
 function updateRunBtn(){
@@ -1149,6 +1157,7 @@ function renderLegend(){
 
 /* ================= START / WIN ================= */
 function startGame(lvlIdx, worldKey){
+  if(RobotCover) RobotCover.hide();   /* 🧱 b3w1 */
   if(worldKey === 'surprise') worldKey = pick(Object.keys(WORLDS));
   const L = LEVELS[lvlIdx];
   UI.loading('robot-adventure');
@@ -1197,20 +1206,15 @@ function win(){
   setTimeout(() => {
     if(!G || !G.over) return;
     pr.classList.add('hidden');
-    showResult((BD.on ? '<canvas class="res-av" id="res-av" aria-hidden="true"></canvas>' : '<div class="big">🤖</div>') + '<h2 class="cheer">' + UI.esc(praise) + '!</h2>' +
-      '<p style="margin:-4px 0 0;font-weight:800;color:var(--ink-soft)">Your code used ' + used + ' block' + (used === 1 ? '' : 's') + (G.limit < 99 ? ' · best is ' + best : '') + '</p>' +
-      '<div class="rating">' + starHtml + '</div>' +
-      '<div class="score-big">🏆 <span id="score-count">0</span></div>' +
-      '<div class="stats"><span>' + G.L.emoji + ' ' + G.L.name + '</span><span>⏱ ' + fmt(G.finishMs) + '</span><span>' + W.star + ' ' + G.got.size + '/' + G.B.stars.length + '</span>' + (G.fails ? '<span>🛠️ ' + G.fails + ' fix' + (G.fails === 1 ? '' : 'es') + '</span>' : '') + '</div>' +
-      (G.hintUsed ? '<div style="font-size:0.78rem;font-weight:700;color:var(--ink-soft)">💡 Hint used — 2 ⭐ at most</div>' : (used > best && G.limit < 99 ? '<div style="font-size:0.78rem;font-weight:700;color:var(--ink-soft)">Can you do it in ' + best + ' blocks for 3 ⭐?</div>' : '')) +
-      '<div class="save-note" id="save-note"><span class="ui-spin">✅</span> Saving your progress…</div>' +
-      '<div class="res-btns">' + (nextOk ? '<button class="btn sp-btn sp-primary" id="btn-next">Next level ▶</button>' : '') +
-      '<button class="btn soft sp-btn sp-secondary" id="btn-again">🔁 Same board</button><button class="btn soft sp-btn sp-secondary" id="btn-new">🔄 New board</button><button class="btn soft sp-btn sp-secondary" id="btn-levels">🎚️ Levels</button></div>');
-    countUp($('score-count'), score, 900);
-    $('btn-again').onclick = () => { hideResult(); G.over = false; G.finishMs = 0; G.prog = []; G.sel = -1; G.hintUsed = false; G.fails = 0; G.t0 = performance.now(); G.pausedTotal = 0; codeChanged(); };
-    $('btn-new').onclick = () => newBoard();
-    $('btn-levels').onclick = () => { hideResult(); leavePlay(); };
-    if(nextOk) $('btn-next').onclick = () => { if(!canPlay(lvlIdx + 1)){ UI.toast('Clear this level to unlock the next one', 'err'); return; } startGame(lvlIdx + 1, G.worldKey); };
+    GF.result({wrap: $('result'), card: $('result-card'), win: true, icon: '🤖', title: praise + '!', stars,   /* 🧱 b3w1: the shared 🏁 result card */
+      sub: 'Your code used ' + used + ' block' + (used === 1 ? '' : 's') + (G.limit < 99 ? ' · best is ' + best : '') + (G.hintUsed ? ' · 💡 hint used (2 ⭐ at most)' : used > best && G.limit < 99 ? ' · can you do it in ' + best + ' for 3 ⭐?' : ''),
+      score, stats: [[G.L.emoji, G.L.name], ['⏱', fmt(G.finishMs)], [W.star, G.got.size + '/' + G.B.stars.length]].concat(G.fails ? [['🛠️', G.fails + ' fix' + (G.fails === 1 ? '' : 'es')]] : []),
+      save: 'Saving your progress…', buddy: (window.Acting && typeof myAvatar === "function") ? {name: S.player, av: myAvatar(S.player)} : null, confetti: false,
+      levels: () => { hideResult(); leavePlay(); },
+      again: () => { hideResult(); G.over = false; G.finishMs = 0; G.prog = []; G.sel = -1; G.hintUsed = false; G.fails = 0; G.t0 = performance.now(); G.pausedTotal = 0; codeChanged(); }, againText: '🔁 Same board',
+      extra: [{text: '🔄 New board', id: 'btn-new', fn: () => newBoard()}],
+      next: nextOk ? () => { if(!canPlay(lvlIdx + 1)){ UI.toast('Clear this level to unlock the next one', 'err'); return; } startGame(lvlIdx + 1, G.worldKey); } : null, nextText: 'Next level ▶'});
+    cheerFaces();   /* 📣 cs-4c: the crowd's faces on the card */
   }, REDUCED ? 300 : 1500);
   saveWin(lvlIdx, {timeSec: secs, stars, theme: G.B.worldKey, score});
 }
@@ -1280,7 +1284,7 @@ function confetti(list, count){
 /* ================= MENUS ================= */
 function showScreen(name){
   if(name !== 'play' && window.Cheer) Cheer.unmount(); /* 📣 cs-4c */
-  ['player', 'levels', 'theme', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
+  ['player', 'levels', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
   $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   // 🧭 p1b
   window.scrollTo(0, 0);
 }
@@ -1297,7 +1301,7 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
-  $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4c */ renderLevels(); showScreen('levels');
+  $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4c */ renderLevels(); showScreen('levels'); openCover();   /* 🧱 b3w1: the 🎬 cover first */
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 function bestHtml(p, i){
@@ -1311,6 +1315,7 @@ function renderLevels(){
   LEVELS.forEach((L, i) => {
     const open = canPlay(i), done = p.unlocked > i;
     const b = document.createElement('button');
+    b.dataset.i = i;   /* 🧱 b3w1 */
     b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (L.hardcore ? ' hardcore' : '');
     b.setAttribute('data-sound', open ? 'pop' : 'none');
     b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">🏅</span>' : (open ? '' : '<span class="badge">🔒</span>')) +
@@ -1318,19 +1323,43 @@ function renderLevels(){
     b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore!' : i === 4 ? 'Clear Hard to unlock Extreme!' : 'Clear the level before this one to unlock it'); return; } chooseLevel(i); };
     box.appendChild(b);
   });
+  { let i = -1; try{ i = Number(localStorage.getItem(pickKey('lv'))); }catch(e){} if(!(i >= 0 && canPlay(i))) i = canPlay(rec) ? rec : Math.max(0, [0, 1, 2, 3, 4, 5].filter(canPlay).pop() || 0);
+    chosenLevel = i; } renderWorlds(); markPicks();   /* 🧱 b3w1 */
 }
-let chosenLevel = 0;
-function chooseLevel(i){
-  chosenLevel = i;
-  $('theme-title').textContent = 'Pick a world for ' + LEVELS[i].name; $('theme-logo').textContent = LEVELS[i].emoji;
-  const box = $('theme-list'); box.innerHTML = '';
-  const sur = document.createElement('button'); sur.className = 'pick surprise'; sur.setAttribute('data-sound', 'pop');
-  sur.innerHTML = '<div class="big">🎲</div><div class="nm">Surprise me!</div><div class="sub">Any world</div>';
-  sur.onclick = () => startGame(chosenLevel, 'surprise'); box.appendChild(sur);
-  Object.keys(WORLDS).forEach(k => { const W = WORLDS[k], b = document.createElement('button'); b.className = 'pick'; b.setAttribute('data-sound', 'pop');
-    b.innerHTML = '<div class="big">' + W.icon + '</div><div class="nm">' + W.name + '</div><div class="sub">' + W.movers.slice(0, 3).join('') + '</div>';
-    b.onclick = () => startGame(chosenLevel, k); box.appendChild(b); });
-  showScreen('theme');
+/* 🧱 b3w1 (Game Baseline): ONE setup page — 🎚️ level → 🌍 world → ⚙️ options → ▶ Start; the picks are remembered per player */
+const gfPick = (el, on) => { if(window.GF && GF.pick) GF.pick(el, on); };   /* ✓ the ONE picked look (GameFrame) */
+let chosenLevel = 0, chosenWorld = 'surprise';
+const pickKey = k => 'sp_robot_' + k + ':' + (S.player || '');
+function chooseLevel(i, quiet){
+  chosenLevel = i; try{ localStorage.setItem(pickKey('lv'), String(i)); }catch(e){}
+  markPicks(); if(!quiet){ const w = $('world-head'); if(w && w.scrollIntoView) w.scrollIntoView({behavior: REDUCED ? 'auto' : 'smooth', block: 'start'}); }
+}
+function chooseWorld(k){ chosenWorld = k; try{ localStorage.setItem(pickKey('world'), k); }catch(e){} markPicks(); }
+function renderWorlds(){
+  const box = $('world-list'); box.innerHTML = '';
+  const mk = (k, big, nm, sub) => { const b = document.createElement('button'); b.className = 'pick' + (k === 'surprise' ? ' surprise' : ''); b.dataset.k = k; b.setAttribute('data-sound', 'pop');
+    b.innerHTML = '<div class="big">' + big + '</div><div class="nm">' + nm + '</div><div class="sub">' + sub + '</div>'; b.onclick = () => chooseWorld(k); box.appendChild(b); };
+  mk('surprise', '🎲', 'Surprise me!', 'Any world');
+  Object.keys(WORLDS).forEach(k => { const W = WORLDS[k]; mk(k, W.icon, W.name, W.movers.slice(0, 3).join('')); });
+  let w = 'surprise'; try{ w = localStorage.getItem(pickKey('world')) || 'surprise'; }catch(e){} chosenWorld = (w === 'surprise' || WORLDS[w]) ? w : 'surprise';
+}
+function markPicks(){
+  document.querySelectorAll('#level-list .lvl').forEach(b => { const on = Number(b.dataset.i) === chosenLevel; b.classList.toggle('sel', on); gfPick(b, on); });
+  document.querySelectorAll('#world-list .pick').forEach(b => { const on = b.dataset.k === chosenWorld; b.classList.toggle('sel', on); gfPick(b, on); });
+  const L = LEVELS[chosenLevel], W = WORLDS[chosenWorld], st = $('btn-start');
+  if(st && L) st.textContent = '▶ Start · ' + L.emoji + ' ' + L.name + ' · ' + (W ? W.icon + ' ' + W.name : '🎲 Surprise');
+}
+function startSetup(){ if(!canPlay(chosenLevel)){ UISound.play('error'); UI.toast('Pick a level that is open 🔓'); return; } startGame(chosenLevel, chosenWorld); }
+// 🎬 the cover (GameFrame): who's here + champions + how to play; ▶ Play opens the setup page
+let RobotCover = null;
+const ROBOT_VERSION = '2.1';   /* 🧱 b3w1: shown on the cover footer — bump with each Code Robot round */
+function openCover(){
+  if(!window.GF){ showScreen('levels'); return; }
+  if(RobotCover && RobotCover.who !== S.player){ RobotCover.destroy(); RobotCover = null; }
+  if(!RobotCover){ RobotCover = GF.cover(document.body, {game: 'robot-adventure', title: 'Code the Robot', icon: '🤖', version: ROBOT_VERSION, me: S.player, players: S.players, avatarOf: myAvatar, seats: {min: 1, max: 1},
+      acts: ['beat.wave', 'beat.cast'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms',
+      onPlay: () => { RobotCover.hide(); showScreen('levels'); } }); RobotCover.who = S.player; }
+  RobotCover.show();
 }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
 function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }   // 🧭 p1b: ◀ = where you came from (Gameroom if we don't know)
@@ -1389,4 +1418,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (r9+emoji+back-1+p1b+p2+p6b+cs-4c) END OF CodeRobot.html -->
+<!-- (r9+emoji+back-1+p1b+p2+p6b+cs-4c+b3w1) END OF CodeRobot.html -->
