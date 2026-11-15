@@ -645,6 +645,11 @@ function pauseGame(){ if(G && !G.pausedAt) G.pausedAt = performance.now(); }
 /* ================= DRAWING ================= */
 const cv = $('cv'), ctx = cv.getContext('2d');
 let CS = 20, DPR = 1, staticLayer = null, staticKey = '';
+// 🧑 mz-head: a frame around the maze INSIDE the canvas, so the avatar's head (bounce, jump, waving arms) never leaves it on the top row
+// (all four sides — 🌀 spin levels turn the maze). OFF = the frame in px; the maze is drawn from (OFF, OFF); 0.5 cell = standing, walking, waving fit on every edge.
+const MZ_PAD = 0.5; let OFF = 0;
+// a hop / win jump lifts the avatar up the CANVAS (before the maze turn): near the top edge it is lifted only as high as the frame allows.
+function mzClampLift(H, hy){ const a = -G.rot * Math.PI / 2 + (H.rot || 0), c = Math.cos(a), r = Math.max(0.74 * H.sy * c, -0.5 * H.sy * c, 0) + 0.42 * H.sx * Math.abs(Math.sin(a)); const top = hy + OFF + H.oy - r * CS; if(top < 1) H.oy += 1 - top; return H; }   // r = how far the avatar reaches up the canvas (head, feet or side, maze turn + spin)
 function resizeStage(){
   if(!G) return;
   const wrap = $('stage-wrap');
@@ -653,7 +658,7 @@ function resizeStage(){
   st.style.width = side + 'px'; st.style.height = side + 'px';
   DPR = Math.min(window.devicePixelRatio || 1, 2);
   cv.width = side * DPR; cv.height = side * DPR;
-  CS = side / G.lv.n;
+  CS = side / (G.lv.n + 2 * MZ_PAD); OFF = MZ_PAD * CS;   // 🧑 mz-head
   staticKey = '';
 }
 window.addEventListener('resize', resizeStage);
@@ -774,6 +779,10 @@ function drawStatic(){
   const g = staticLayer.getContext('2d');
   g.scale(DPR, DPR);
   const st = WALL_STYLES[lv.wallStyle] || WALL_STYLES.blocks;
+  // 🧑 mz-head: the frame = a thick outer wall in the world's wall colour, then the maze inside it
+  g.fillStyle = st.base; g.fillRect(0, 0, cv.width / DPR, cv.height / DPR);
+  g.fillStyle = 'rgba(0,0,0,0.14)'; g.fillRect(OFF * 0.55, OFF * 0.55, n * CS + OFF * 0.9, n * CS + OFF * 0.9);
+  g.translate(OFF, OFF);
   const floor = st.floor ? st.floor[0] : lv.floor, tint = st.floor ? st.floor[1] : lv.tint;
   g.fillStyle = floor; g.fillRect(0, 0, n * CS, n * CS);
   // soft checker tint so the grid is readable
@@ -820,6 +829,7 @@ function drawHeroAvatar(now, hx, hy, H, blink){
   else if(now < G.bonkUntil) pose = {eyes: 'closed', mouth: 'open', armL: 0.4, armR: 2.75};   // 🤕 bonk: hand on the head
   else a.gest = idleGesture(now);
   const k = CS / 90;
+  mzClampLift(H, hy);   // 🧑 mz-head: a jump on the top row stays inside the frame
   ctx.save();
   ctx.globalAlpha = (blink ? 0.35 : 1) * H.alpha;
   ctx.translate(hx + H.ox, hy + H.oy); ctx.rotate(-G.rot * Math.PI / 2); ctx.rotate(H.rot); ctx.scale(-H.sx, H.sy);   // heroPose: face 1 = left, the avatar's dir 1 = right
@@ -914,7 +924,7 @@ function draw(now){
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.drawImage(staticLayer, 0, 0);
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.setTransform(DPR, 0, 0, DPR, OFF * DPR, OFF * DPR);   // 🧑 mz-head: the maze sits inside its frame
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   // liquid
   if(G.liquidLevel >= 0){
@@ -992,7 +1002,7 @@ function draw(now){
   if(G.L.light){
     ctx.save();
     ctx.fillStyle = 'rgba(12,16,34,0.9)';
-    ctx.beginPath(); ctx.rect(0, 0, n * CS, n * CS);
+    ctx.beginPath(); ctx.rect(-OFF, -OFF, n * CS + 2 * OFF, n * CS + 2 * OFF);   // 🧑 mz-head: the frame is dark too
     const rad = G.L.light * CS;
     ctx.arc(hx, hy, rad, 0, Math.PI * 2, true);
     ctx.fill('evenodd');
@@ -1339,4 +1349,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (11w-1+emoji+r33+back-1+p1b+p3e+cs-4c+b2+b2fix+b2fix2) END OF Maze.html -->
+<!-- (11w-1+emoji+r33+back-1+p1b+p3e+cs-4c+b2+b2fix+b2fix2+mz-head) END OF Maze.html -->
