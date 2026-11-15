@@ -759,6 +759,8 @@ const MODES_ = [
   { game: 'math-quest', id: 'wordth', icon: '🐘', name: 'Math Quest เลขคำไทย', pitch: 'Sums in Thai words — อ่านเป็นคำ!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':wordth', feat: [['math-quest', 'thaiRight']] } },   // ➗ mq-w1
   { game: 'math-quest', id: 'storyen', icon: '📖', name: 'Math Quest Story Problems', pitch: 'Real-life maths stories — 1 to 3 steps!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':storyen' } },   // ➗ mq-w2
   { game: 'math-quest', id: 'storyth', icon: '📜', name: 'Math Quest โจทย์ปัญหา', pitch: 'Story sums in Thai — โจทย์ปัญหา!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':storyth' } },   // ➗ mq-w2
+  { game: 'math-quest', id: 'tricken', icon: '🤔', name: 'Math Quest Trick Questions', pitch: 'The quick answer is a trap!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':tricken' } },   // ➗ mq-w3
+  { game: 'math-quest', id: 'trickth', icon: '🙃', name: 'Math Quest คำถามหลอก', pitch: 'Thai trick questions — คิดสองรอบ!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':trickth' } },   // ➗ mq-w3
   { game: 'double-up', id: 'challenge', icon: '🏔️', name: 'Double Up Challenge', pitch: 'Tiny 3×3 board — reach 1024!', route: 'doubleup', tried: { feat: [['double-up', 'chTile']] } },
   { game: 'memory', id: 'friends', icon: '👥', name: 'Memories with friends', pitch: 'Take turns — most pairs wins!', route: 'memory', tried: { feat: [['memory', 'wins']] } },
   { game: 'memory', id: 'time', icon: '⏱️', name: 'Memories Time attack', pitch: 'Beat the clock — find every pair fast!', route: 'memory', added: '2026-11-15', tried: { board: 'memory', theme: 'Time attack' } },
@@ -2738,6 +2740,7 @@ const FEAT_DEFS = {
     thaiRight: { name: 'Thai Number Reader', icon: '🐘', kind: 'sum', tiers: [25, 100, 400] },   // ➗ mq-w1: right answers in 🐘 เลขคำไทย
     typedRight: { name: 'Pad Pro', icon: '⌨️', kind: 'sum', tiers: [25, 100, 400] },   // ➗ mq-w1: answers typed on the number pad
     storyRight: { name: 'Story Solver', icon: '📖', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-w2: right answers in 📖 Story Problems / 📜 โจทย์ปัญหา
+    trickRight: { name: 'Trick Spotter', icon: '🕵️', kind: 'sum', tiers: [10, 25, 100] },   // ➗ mq-w3: tricks spotted in 🤔 Trick Questions / 🙃 คำถามหลอก
   },
   memory: {
     pairs: { name: 'Pair Finder', icon: '🃏', kind: 'sum', tiers: [50, 250, 1000] },
@@ -2921,6 +2924,7 @@ const TITLE_DEFS = [
   { id: 'mq_thai', name: 'Thai Number Reader', icon: '🐘', hint: 'Get 100 Math Quest เลขคำไทย sums right', rule: f => featVal_(f, 'math-quest', 'thaiRight') >= 100 },   // ➗ mq-w1
   { id: 'mq_typer', name: 'Pad Pro', icon: '⌨️', hint: 'Type 100 right answers on the Math Quest number pad', rule: f => featVal_(f, 'math-quest', 'typedRight') >= 100 },   // ➗ mq-w1
   { id: 'mq_story', name: 'Story Solver', icon: '📖', hint: 'Solve 50 Math Quest story problems (📖 English or 📜 ไทย)', rule: f => featVal_(f, 'math-quest', 'storyRight') >= 50 },   // ➗ mq-w2
+  { id: 'mq_trick', name: 'Trick Spotter', icon: '🕵️', hint: 'Spot 25 Math Quest trick questions (🤔 English or 🙃 ไทย)', rule: f => featVal_(f, 'math-quest', 'trickRight') >= 25 },   // ➗ mq-w3
 ];
 function featVal_(f, g, s) { return Number(((f || {})[g] || {})[s]) || 0; }
 function featsSheet_() {
@@ -4772,6 +4776,8 @@ function saveMathPrefs(name, prefs) {
     if (!/^[a-z]{2,12}:[0-5]$/.test(k) || !Array.isArray(rec[k])) return;
     out.recent[k] = rec[k].slice(-3).map(r => Array.isArray(r) ? r.slice(0, 30).map(x => String(x)).filter(x => /^[a-z0-9_-]{1,40}$/i.test(x)) : []);
   });
+  const tk = prefs.tricks && typeof prefs.tricks === 'object' && !Array.isArray(prefs.tricks) ? prefs.tricks : {};   // ➗ mq-w3: 🤔 tricks this player has seen
+  out.tricks = {}; ['en', 'th'].forEach(l => { if (Array.isArray(tk[l])) out.tricks[l] = tk[l].slice(-200).map(x => String(x)).filter(x => /^[a-z0-9_-]{1,20}$/i.test(x)); });
   let s = JSON.stringify(out);
   while (s.length > 20000 && Object.keys(out.recent).length) { delete out.recent[Object.keys(out.recent)[0]]; s = JSON.stringify(out); }
   saveSetting('MathQuest_' + name, s);
@@ -4822,7 +4828,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
