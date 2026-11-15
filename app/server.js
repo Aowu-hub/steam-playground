@@ -766,6 +766,7 @@ const MODES_ = [
   { game: 'double-up', id: 'challenge', icon: '🏔️', name: 'Double Up Challenge', pitch: 'Tiny 3×3 board — reach 1024!', route: 'doubleup', tried: { feat: [['double-up', 'chTile']] } },
   { game: 'memory', id: 'friends', icon: '👥', name: 'Memories with friends', pitch: 'Take turns — most pairs wins!', route: 'memory', tried: { feat: [['memory', 'wins']] } },
   { game: 'memory', id: 'time', icon: '⏱️', name: 'Memories Time attack', pitch: 'Beat the clock — find every pair fast!', route: 'memory', added: '2026-11-15', tried: { board: 'memory', theme: 'Time attack' } },
+  { game: 'memory', id: 'steam', icon: '🔗', name: 'Memories STEAM pairs', pitch: 'Match cards that belong together!', route: 'memory', added: '2026-11-16', tried: { board: 'memory', theme: 'STEAM pairs' } },
   { game: 'chess', id: 'duo', icon: '👫', name: 'Chess for 2', pitch: 'Play chess with a friend!', route: 'chess', tried: null },
   { game: 'checkers', id: 'duo', icon: '👫', name: 'Checkers for 2', pitch: 'Play checkers with a friend!', route: 'checkers', tried: null },
   { game: 'pose-party', id: 'classic', icon: '🎯', name: 'Classic', pitch: 'Copy each pose — 3, 2, 1, snap!', route: 'poseparty', tried: { board: 'pose-party' } },
@@ -782,6 +783,7 @@ const MODES_ = [
 const MODES_NEW_DAYS_ = 7;
 // 🗂️ mg-1 Mode groups — the same boxes (and order) as each game's start page. A mode not listed here has no group (2-mode games stay flat).
 const MODE_GROUPS_ = {
+  'memory': [{k: 'match', icon: '🃏', en: 'Match', th: 'จับคู่', modes: ['friends', 'steam']}, {k: 'race', icon: '⏱️', en: 'Race', th: 'แข่งเวลา', modes: ['time']}],   // 🗂️ mm-5
   'math-quest': [{k: 'numbers', icon: '🔢', en: 'Numbers', th: 'ตัวเลข', modes: ['classic', 'minute', 'sign', 'fix', 'clock']}, {k: 'english', icon: '🔤', en: 'English', th: 'ภาษาอังกฤษ', modes: ['worden', 'storyen', 'tricken', 'testen', 'listenen']}, {k: 'thai', icon: '🐘', en: 'Thai', th: 'ภาษาไทย', modes: ['wordth', 'storyth', 'trickth', 'testth', 'listenth']}],   // ➗ mq-t1 📝   // ➗ mq-w1
   'sciencetory': [{k: 'matter', icon: '⚗️', en: 'Matter', th: 'สสาร', modes: ['chem', 'quantum', 'particle']}, {k: 'forces', icon: '⚙️', en: 'Forces & Energy', th: 'แรงและพลังงาน', modes: ['mechanic', 'thermo', 'electro']}, {k: 'waves', icon: '🌈', en: 'Waves & Space', th: 'คลื่นและอวกาศ', modes: ['optics', 'acoustics', 'cosmic']}, {k: 'earth', icon: '🌍', en: 'Earth & Life', th: 'โลกและชีวิต', modes: ['geo', 'bio']}],   // 🔬 sc-2b (same boxes as the page)
   'pokadif': [{k: 'spot', icon: '🖼️', en: 'Spot', th: 'จับผิดภาพ', modes: ['spot', 'blink']}, {k: 'odd', icon: '🎯', en: 'Odd One Out', th: 'หาตัวที่ต่าง', modes: ['odd']}, {k: 'endless', icon: '⏱️', en: 'Arcade', th: 'อาร์เคด', modes: ['arcade']}, {k: 'stories', icon: '📖', en: 'Stories', th: 'นักสืบผจญภัย', modes: ['detective']}],   // 🔍 pk-2a + pk-2b + pk-3a
@@ -4832,7 +4834,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
