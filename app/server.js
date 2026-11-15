@@ -712,7 +712,7 @@ const MODES_ = [
   { game: 'pyraspike', id: 'small', icon: '🏫', name: 'PyraSpike Small 3v3', pitch: 'Drive, Dink, Dunk — 3 a side!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🏫 Small 3v3', feat: [['pyraspike', 'm_small']] } },
   { game: 'pyraspike', id: 'full', icon: '🏟️', name: 'PyraSpike Full 6v6', pitch: 'The big arena — 6 a side!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🏟️ Full 6v6', feat: [['pyraspike', 'm_full']] } },
   { game: 'pyraspike', id: 'strikesolo', icon: '🦶', name: 'PyraStrike 1v1', pitch: 'Sepak takraw — feet only, 3 touches!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🦶 Strike 1v1', feat: [['pyraspike', 'm_strikesolo']] } },
-  { game: 'pyraspike', id: 'strikeduo', icon: '🦵', name: 'PyraStrike Duo 2v2', pitch: 'Trap, head it, ROLL SPIKE!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🦵 Strike Duo 2v2', feat: [['pyraspike', 'm_strikeduo']] } },
+  { game: 'pyraspike', id: 'strikeduo', icon: '🦵', name: 'PyraStrike Duo 2v2', pitch: 'Trap, head it, ROLL STRIKE!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🦵 Strike Duo 2v2', feat: [['pyraspike', 'm_strikeduo']] } },
   { game: 'pyraspike', id: 'strikeregu', icon: '🧶', name: 'PyraStrike Regu 3v3', pitch: 'Team takraw — bicycle kicks!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🧶 Strike Regu 3v3', feat: [['pyraspike', 'm_strikeregu']] } },
   { game: 'pyraspike', id: 'hoop', icon: '⭕', name: 'Hoop Takraw', pitch: 'Kick it through the hanging hoop!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '⭕ Hoop Takraw', feat: [['pyraspike', 'm_hoop']] } },
   { game: 'pyraspike', id: 'sparksolo', icon: '⚡', name: 'PyraSpark 1v1', pitch: 'Net-table: one bounce, no hands, EDGE!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '⚡ Spark 1v1', feat: [['pyraspike', 'm_sparksolo']] } },
@@ -4822,7 +4822,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
