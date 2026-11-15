@@ -174,6 +174,8 @@
   .mapc .grid i{border-radius:2px;background:rgba(255,255,255,.9);}
   .mapc .pairs{font-size:.74rem;font-weight:800;color:var(--ink-soft);}
   .mapc .mult{font-size:.7rem;font-weight:800;background:var(--panel);border-radius:10px;padding:2px 8px;}
+  .modes{grid-template-columns:repeat(2,1fr);max-width:620px;margin:0 auto;}
+  .modec .big{font-size:2rem;} .modec.off{opacity:.55;}
   .mapc.big .grid{background:linear-gradient(135deg,#FF8A3D,#E5484D);}
   .decks{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
   .deck{position:relative;}
@@ -219,11 +221,13 @@
 <section class="screen hidden" id="scr-menu">
   <div class="title"><div class="logo">🃏</div><h1>Memories Match</h1><p>Flip two cards — find the pairs!</p>
     <div class="who" id="who-line"><span id="who-name"></span> <button data-sound="none" onclick="openCover()">change</button></div></div>
-  <div class="section-head" id="map-head">🗺️ 1. Pick a map</div>
+  <div class="section-head" id="mode-head">🎮 1. Pick a way to play</div>
+  <div class="maps modes" id="mode-list"></div>
+  <div class="section-head" id="map-head">🗺️ 2. Pick a map</div>
   <div class="maps" id="map-list"></div>
-  <div class="section-head" id="level-head">🎚️ 2. Pick a level</div>
+  <div class="section-head" id="level-head">🎚️ 3. Pick a level</div>
   <div class="levels" id="level-list"></div>
-  <div class="section-head" id="opt-head">⚙️ 3. Options</div>
+  <div class="section-head" id="opt-head">⚙️ 4. Options</div>
   <div class="box"><h3>🎴 Deck</h3><div class="decks" id="deck-list"></div></div>
   <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the board">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-3b -->
   <div class="b2-start"><button class="btn sp-btn sp-primary" id="btn-start" data-sound="pop" onclick="startSetup()">▶ Start</button></div>
@@ -249,7 +253,7 @@ UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});   // loader + me
 const SESSION_START = Number(''+__SP("sessionStart")+'') || null;
 const DURATION_MIN = Number(''+__SP("durationMin")+'') || null;
 const GAME_ID = 'memory';
-const MM_VERSION = '3.1';   // 🃏 mm-1: shown on the cover footer — bump with each Memories Match round
+const MM_VERSION = '3.2';   // 🃏 mm-1: shown on the cover footer — bump with each Memories Match round
 // 🎛️ p1b: the shared top bar (UiKit UI.gameBar) — ◀ where you came from · 🎚️ Levels · 🏠 | 🃏 Memories Match · level | scoreboard | game buttons ❓ ⚙️
 const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '🃏', name: 'Memories Match', levelId: 'hud-level',
   levels: () => leavePlay(), playing: () => !!(G && !G.over), onLeave: () => { try{ clearInterval(timerId); }catch(e){} try{ speechSynthesis.cancel(); }catch(e){} },
@@ -412,11 +416,15 @@ const mapOk = M => !(M.big && isPhone());
 /* ================= STATE ================= */
 let S = {players: [], progress: {}, settings: {}, avatars: {}, player: '', age: ''};
 let G = null, lockHandle = null, SEATS = [], timerId = 0;
-const PICK = {map: '4', lvl: 0, deck: 'mix'};
+const PICK = {map: '4', lvl: 0, deck: 'mix', mode: 'classic'};
+// 🎮 mm-3: ways to play — 🃏 Classic (1–4 players) · ⏱️ Time attack (solo: beat the map's par time before the clock runs out)
+const MODES = [{k: 'classic', icon: '🃏', name: 'Classic', sub: 'Find all the pairs — 1 to 4 players'}, {k: 'time', icon: '⏱️', name: 'Time attack', sub: 'Beat the clock — on your own'}];
+const TA_LIMIT = [2.0, 1.8, 1.6, 1.5, 1.4, 1.3];   // ⏱️ the clock = the map's par time × this (🌱 → 💀); ⭐⭐⭐ = under par, ⭐⭐ = under par × 1.4
 function store(k){ return 'sp_memory_' + k + ':' + (S.player || ''); }
 function loadPrefs(){ try{ const d = localStorage.getItem(store('deck')), m = localStorage.getItem(store('map')), l = localStorage.getItem(store('lv'));
+    PICK.mode = localStorage.getItem(store('mode')) === 'time' ? 'time' : 'classic';
     PICK.deck = DECKS[d] ? d : 'mix'; PICK.map = MAPS.some(x => x.k === m) ? m : '4'; PICK.lvl = l != null && l !== '' ? Number(l) : -1; }catch(e){} }
-function savePrefs(){ try{ localStorage.setItem(store('deck'), PICK.deck); localStorage.setItem(store('map'), PICK.map); localStorage.setItem(store('lv'), String(PICK.lvl)); }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(store('mode'), PICK.mode); localStorage.setItem(store('deck'), PICK.deck); localStorage.setItem(store('map'), PICK.map); localStorage.setItem(store('lv'), String(PICK.lvl)); }catch(e){} }
 function myAvatar(name){ const a = S.avatars[name || S.player]; return a ? fixAv(a) : defaultAvatar(name || S.player || 'player'); }
 const mapOf = k => MAPS.find(m => m.k === k) || MAPS[0];
 
@@ -449,6 +457,11 @@ const gfPick = (el, on) => { el.classList.toggle('sel', !!on); if(window.GF && G
 function renderSetup(){
   // 👥 who's playing (from the cover's lineup)
   $('who-name').innerHTML = (SEATS.length > 1 ? '👥 ' : '👤 ') + SEATS.map(n => UI.esc(n)).join(' + ');
+  // 🎮 ways to play (⏱️ Time attack = one player)
+  const md = $('mode-list'); md.innerHTML = ''; if(SEATS.length > 1 && PICK.mode === 'time') PICK.mode = 'classic';
+  MODES.forEach(m => { const off = m.k === 'time' && SEATS.length > 1, b = document.createElement('button'); b.className = 'pick modec' + (off ? ' off' : ''); b.dataset.k = m.k; b.setAttribute('data-sound', off ? 'none' : 'pop');
+    b.innerHTML = '<div class="big">' + m.icon + '</div><div class="nm">' + m.name + '</div><div class="sub">' + (off ? '👤 for one player — remove friends on the cover' : m.sub) + '</div>';
+    b.onclick = () => { if(off){ UISound.play('error'); UI.toast('⏱️ Time attack is for one player'); return; } PICK.mode = m.k; savePrefs(); markPicks(); }; md.appendChild(b); });
   // 🗺️ maps
   const mb = $('map-list'); mb.innerHTML = '';
   if(!mapOk(mapOf(PICK.map))) PICK.map = '8';
@@ -475,16 +488,17 @@ function renderSetup(){
   markPicks();
 }
 function markPicks(){
+  document.querySelectorAll('#mode-list .modec').forEach(b => gfPick(b, b.dataset.k === PICK.mode));
   document.querySelectorAll('#map-list .mapc').forEach(b => gfPick(b, b.dataset.k === PICK.map));
   document.querySelectorAll('#level-list .lvl').forEach(b => gfPick(b, Number(b.dataset.i) === PICK.lvl));
   document.querySelectorAll('#deck-list .deck').forEach(b => gfPick(b, b.dataset.k === PICK.deck));
   const M = mapOf(PICK.map), L = LEVELS[PICK.lvl] || LEVELS[0], D = DECKS[PICK.deck];
-  $('btn-start').textContent = '▶ Start · ' + M.name + ' · ' + L.emoji + ' ' + L.name + ' · ' + D.icon + (SEATS.length > 1 ? ' · 👥 ' + SEATS.length : '');
+  $('btn-start').textContent = '▶ Start · ' + (PICK.mode === 'time' ? '⏱️ ' : '') + M.name + ' · ' + L.emoji + ' ' + L.name + ' · ' + D.icon + (SEATS.length > 1 ? ' · 👥 ' + SEATS.length : '');
 }
 function startSetup(){ if(!canPlay(PICK.lvl)){ UISound.play('error'); UI.toast('Pick a level that is open 🔓'); return; } startGame(PICK.lvl); }
 // 🎬 the cover (GameFrame): who's here (you + up to 3 friends on this device) + champions + how to play; ▶ Play opens the setup page
 let MemCover = null;
-const MM_HELP = ['Flip two cards — find the matching **pairs**! A pair stays up and you go again.', 'Pick a 🗺️ **map** (4×4 up to 10×10), then a 🎚️ **level**: peeks, look-alike cards, 🔀 swaps…', '💀 **Hardcore**: see every card, then watch them 🌀 scramble — and 2 cards swap after every miss!', 'Up to 4 players take turns: a pair = go again, the most pairs wins. Fewer misses = more ⭐.'];
+const MM_HELP = ['Flip two cards — find the matching **pairs**! A pair stays up and you go again.', 'Pick a 🗺️ **map** (4×4 up to 10×10), then a 🎚️ **level**: peeks, look-alike cards, 🔀 swaps…', '💀 **Hardcore**: see every card, then watch them 🌀 scramble — and 2 cards swap after every miss!', 'Up to 4 players take turns: a pair = go again, the most pairs wins. Fewer misses = more ⭐.', '⏱️ **Time attack** (one player): find every pair before the clock runs out — under the par time = ⭐⭐⭐.'];
 function openCover(){
   if(!window.GF){ showScreen('menu'); return; }
   if(MemCover && MemCover.who !== S.player){ MemCover.destroy(); MemCover = null; }
@@ -500,9 +514,10 @@ function startGame(lvl){
   clearInterval(timerId); hideResult();
   const L = LEVELS[lvl], M = mapOf(PICK.map), map = mapOk(M) ? M : mapOf('8'), D = DECKS[PICK.deck] || DECKS.mix, n = map.n, pairs = n * n / 2;
   const faces = dealFor(D, pairs, L.look), cards = shuffle(faces.concat(faces).map((f, i) => ({f, id: i, up: false, done: false, by: -1, seen: false})));
-  G = {lvl, L, M: map, D, n, cards, pairs, open: [], wait: false, over: false, paused: false, t0: 0, pausedTotal: 0, started: false, cursor: 0, missRow: 0, guide: L.guide ? 1 : 0,
+  const timeMode = PICK.mode === 'time' && SEATS.length === 1;   /* ⏱️ mm-3 */
+  G = {lvl, L, M: map, D, n, cards, pairs, mode: timeMode ? 'time' : 'classic', limit: timeMode ? Math.round(map.par * TA_LIMIT[lvl]) * 1000 : 0, open: [], wait: false, over: false, paused: false, t0: 0, pausedTotal: 0, started: false, cursor: 0, missRow: 0, guide: L.guide ? 1 : 0,
     mult: map.mult * L.mult, players: SEATS.map((nm, i) => ({name: nm, col: SEAT_COLS[i], pairs: 0, score: 0, miss: 0, streak: 0, best: 0})), turn: 0, found: 0, swaps: 0};
-  BAR.level(L.emoji + ' ' + L.name + ' · ' + map.name + ' · ' + D.icon);
+  BAR.level((timeMode ? '⏱️ ' : '') + L.emoji + ' ' + L.name + ' · ' + map.name + ' · ' + D.icon);
   buildBoard(); buildSide(); showScreen('play'); layout(); hud(); cheerMount(); /* 📣 cs-3b */
   if(L.reveal) revealScramble();
   else if(L.peek) peekFirst(L.peek + (L.guide ? Math.max(0, (n - 4) / 2) : 0));
@@ -531,7 +546,7 @@ async function revealScramble(){
   }
   G.scrambled = true; await wait(250); if(G !== tg) return; G.wait = false; go();
 }
-function go(){ G.started = true; cheerGo(); /* 📣 cs-3b */ G.t0 = performance.now(); G.pausedTotal = 0; if(G.players.length > 1) turnCard(0, true); else showBanner('🃏 Find all ' + G.pairs + ' pairs!'); timerId = setInterval(hud, 500); guideStep(); }
+function go(){ G.started = true; cheerGo(); /* 📣 cs-3b */ G.t0 = performance.now(); G.pausedTotal = 0; if(G.players.length > 1) turnCard(0, true); else showBanner(G.mode === 'time' ? '⏱️ Beat the clock — ' + fmt(G.limit) + ' to find ' + G.pairs + ' pairs!' : '🃏 Find all ' + G.pairs + ' pairs!'); timerId = setInterval(hud, 500); guideStep(); }
 function buildBoard(){
   const b = $('board'); b.innerHTML = ''; b.style.gridTemplateColumns = 'repeat(' + G.n + ', var(--cs))'; b.style.setProperty('--deck-back', G.D.back); b.classList.toggle('dots', !!G.L.seen);
   G.cards.forEach((c, i) => { const el = document.createElement('button'); el.className = 'card'; el.dataset.i = i; el.setAttribute('aria-label', 'Card ' + (i + 1)); el.setAttribute('data-sound', 'none');
@@ -662,7 +677,8 @@ function hud(){
   if(solo) BAR.hide('turn'); else BAR.count('turn', '👉', P.name, 'Whose turn');
   BAR.score((solo ? P.score : G.players.reduce((s, p) => s + p.score, 0)).toLocaleString());
   BAR.count('pairs', '🃏', G.found + '/' + G.pairs, 'Pairs found'); BAR.miss(G.players.reduce((s, p) => s + p.miss, 0));
-  BAR.time(fmt(elapsed()));
+  if(G.mode === 'time'){ const left = G.limit - elapsed(); BAR.time(fmt(Math.max(0, left + 999)), left < 15000); if(left <= 0 && G.started && !G.over) timeUp(); }   /* ⏱️ mm-3: counts down */
+  else BAR.time(fmt(elapsed()));
   G.players.forEach((p, i) => { const d = $('pl-' + i); if(!d) return; d.classList.toggle('now', i === G.turn && !G.over); $('sc-' + i).textContent = p.pairs; $('pile-' + i).textContent = p.score + ' pts' + (p.streak > 1 ? ' · 🔥' + p.streak : ''); });
   if(lockHandle){ const left = lockHandle.remainingMs(); BAR.left(left, left < 120000); }
 }
@@ -691,10 +707,10 @@ function finishGame(){
   G.over = true; clearInterval(timerId); hud(); $('hand').classList.add('hidden');
   const thisGame = G, L = G.L, M = G.M, secs = Math.max(1, Math.round(elapsed() / 1000)), solo = G.players.length === 1;
   const top = Math.max.apply(null, G.players.map(p => p.pairs)), winners = G.players.filter(p => p.pairs === top); cheerEnd(winners); /* 📣 cs-3b */
-  const theme = M.name + ' · Classic · ' + G.D.name;   // 🗺️ the map in the Theme column → leaders per map
+  const ta = G.mode === 'time', theme = M.name + ' · ' + (ta ? 'Time attack' : 'Classic') + ' · ' + G.D.name;   // 🗺️ the map in the Theme column → leaders per map
   G.players.forEach((p, i) => {
-    if(solo) p.score += Math.round((Math.max(0, M.par - secs) * 5 + (p.miss === 0 ? 300 : 0)) * G.mult);
-    const win = solo || winners.includes(p), stars = win ? starsFor(p, G.pairs) : 0;
+    if(solo) p.score += Math.round(((ta ? Math.max(0, Math.round((G.limit - elapsed()) / 1000)) * 20 : 0) + Math.max(0, M.par - secs) * 5 + (p.miss === 0 ? 300 : 0)) * G.mult);
+    const win = solo || winners.includes(p), stars = !win ? 0 : ta ? (secs <= M.par ? 3 : secs <= M.par * 1.4 ? 2 : 1) : starsFor(p, G.pairs);
     p.stars = stars; p.win = win;
     const d = $('pl-' + i); if(d) d.classList.toggle('win', win && !solo); cheer(i, win ? pick(['dance', 'floss', 'disco', 'cheer']) : 'clap', 3);
     saveWin(p.name, G.lvl, {timeSec: secs, stars, score: p.score, theme, cleared: win, stats: {pairs: p.pairs, bestStreak: p.best, perfect: solo && p.miss === 0 ? 1 : 0, wins: !solo && win ? 1 : 0}}, i);
@@ -707,7 +723,7 @@ function finishGame(){
     const base = {wrap: $('result'), card: $('result-card'), save: 'Saving…', confetti: ['🃏', '⭐', '🎉', G.D.icon],
       levels: () => backToMenu(), again: () => startGame(lvl), againText: '🔄 Play again'};
     if(solo){
-      GF.result(Object.assign(base, {win: true, icon: '🏆', title: 'All ' + G.pairs + ' pairs!', sub: M.name + ' · ' + L.emoji + ' ' + L.name, stars: me.stars,
+      GF.result(Object.assign(base, {win: true, icon: '🏆', title: G.mode === 'time' ? '⏱️ Beat the clock!' : 'All ' + G.pairs + ' pairs!', sub: (G.mode === 'time' ? 'Time attack · par ' + fmt(M.par * 1000) + ' · ' : '') + M.name + ' · ' + L.emoji + ' ' + L.name, stars: me.stars,
         stats: [['🏆', me.score.toLocaleString()], ['⏱', fmt(secs * 1000)], ['❌', me.miss + ' misses'], ['🔥', 'best streak ' + me.best]].concat(me.miss === 0 ? [['💯', 'perfect!']] : []).concat(G.swaps ? [['🔀', G.swaps + ' swaps']] : []),
         buddy: {name: me.name, av: myAvatar(me.name)},
         next: nextOk ? () => { if(!canPlay(lvl + 1)){ UI.toast('Saving… try again in a moment', 'err'); return; } PICK.lvl = lvl + 1; savePrefs(); startGame(lvl + 1); } : null,
@@ -722,6 +738,20 @@ function finishGame(){
     }
     putNote(-1, ''); cheerFaces();   /* 📣 cs-3b: the crowd's faces on the card */
   }, FAST() ? 0 : 1200);
+}
+// ⏰ Time attack: the clock ran out — the board ends, what you found still counts (no level cleared)
+function timeUp(){
+  if(!G || G.over) return; G.over = true; G.wait = true; clearInterval(timerId); $('hand').classList.add('hidden');
+  const thisGame = G, me = G.players[0], M = G.M, L = G.L, secs = Math.round(G.limit / 1000), lvl = G.lvl;
+  UISound.play('bump'); say('Time is up!'); showBanner('⏰ Time\'s up!', 'bad'); cheerEnd([]);
+  G.cards.forEach(c => { if(!c.done){ c.up = true; paint(c); } });   // show where the rest were
+  me.stars = 0; me.win = false;
+  saveWin(me.name, lvl, {timeSec: secs, stars: 0, score: me.score, theme: M.name + ' · Time attack · ' + G.D.name, cleared: false, stats: {pairs: me.pairs, bestStreak: me.best}}, 0);
+  setTimeout(() => { if(G !== thisGame) return;
+    GF.result({wrap: $('result'), card: $('result-card'), win: false, icon: '⏰', title: 'Time\'s up!', sub: me.pairs + ' of ' + G.pairs + ' pairs · ' + M.name + ' · ' + L.emoji + ' ' + L.name,
+      stats: [['🃏', me.pairs + '/' + G.pairs + ' pairs'], ['🏆', me.score.toLocaleString()], ['❌', me.miss + ' misses']], save: 'Saving…', buddy: {name: me.name, av: myAvatar(me.name)},
+      levels: () => backToMenu(), again: () => startGame(lvl), againText: '🔄 Try again'});
+    putNote(-1, ''); cheerFaces(); }, FAST() ? 0 : 1500);
 }
 let bannerTimer = 0;
 function showBanner(text, kind){ const b = $('banner'); b.textContent = text; b.classList.toggle('gold', kind === 'gold'); b.classList.toggle('bad', kind === 'bad'); b.classList.add('on'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('on'), 1900); }
@@ -789,14 +819,15 @@ boot();
 const MS_GAME = 'memory';
 let MS_WANT = '';
 function msOpen(id){
+  if(id === 'time'){ MS_WANT = id; PICK.mode = 'time'; savePrefs(); renderSetup(); UI.toast('⏱️ Time attack picked — ▶ Play, then ▶ Start'); return; }   /* ⏱️ mm-3 */
   if(id !== 'friends') return; MS_WANT = id;   // 🧱 mm-1: friends = the cover's 👥 Same device → tap ➕ to add them
   if(MemCover && MemCover.setMode){ MemCover.show(); MemCover.setMode('same'); }
   UI.toast('👥 Tap ➕ on the cover to add your friends');
 }
-function msNow(){ return ''; }
+function msNow(){ return PICK.mode === 'time' ? 'time' : ''; }
 function msWrap(fn, idOf){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ try{ const id = idOf.apply(this, arguments); if(id && UI.modeTried) UI.modeTried(S.player || CURRENT_PLAYER, MS_GAME, id); }catch(e){} return f.apply(this, arguments); }; }
 function msAfter(fn, after){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ const r = f.apply(this, arguments); try{ after.apply(this, arguments); }catch(e){} return r; }; }
-msWrap('startGame', () => SEATS.length > 1 ? 'friends' : '');
+msWrap('startGame', () => SEATS.length > 1 ? 'friends' : PICK.mode === 'time' ? 'time' : '');
 msAfter('choosePlayer', name => {
   if(!window.UI || !UI.modeLink) return;
   const id = UI.modeLink(MODE_LINK); if(id) msOpen(id);
@@ -806,4 +837,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11n+r32+back-1+modes-3+p1b+p1d+cs-3b+mm-1+mm-2) END OF Memory.html -->
+<!-- (11n+r32+back-1+modes-3+p1b+p1d+cs-3b+mm-1+mm-2+mm-3) END OF Memory.html -->
