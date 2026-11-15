@@ -185,18 +185,21 @@
   .tb.skl.cool{opacity:.5;}
   @keyframes tb-glow{50%{box-shadow:0 0 16px #FFC845;}}
   .corner{position:absolute;z-index:16;display:flex;align-items:center;gap:6px;pointer-events:auto;}
-  .corner .tpad{--d:clamp(84px,17vmin,120px);}
-  .corner .tb{--b:clamp(44px,8vmin,56px);}
+  .corner .tpad{--d:calc(var(--pad-stick, 150px) * 0.72);}   /* 🕹️ pz-1 PADS: sizes from UiKit --pad-* (corners = up to 4 players, a bit smaller) */
+  .corner .tb{--b:56px;} .corner{gap:calc(var(--pad-gap, 18px) * 0.6);}
   .corner.c0{left:6px;bottom:6px;} .corner.c1{right:6px;top:6px;flex-direction:row-reverse;transform:rotate(180deg);} .corner.c2{left:6px;top:6px;transform:rotate(180deg) scaleX(-1);} .corner.c3{right:6px;bottom:6px;flex-direction:row-reverse;}
   .corner.c0 .tpad{border-color:var(--p1);} .corner.c1 .tpad{border-color:var(--p2);} .corner.c2 .tpad{border-color:var(--p3);} .corner.c3 .tpad{border-color:var(--p4);}
   /* landscape touch: pad + buttons beside the field */
   #scr-play.side .arena{flex-direction:row;}
   #scr-play.side .ctl-side{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:10px;padding:6px 8px var(--safe-b, 18px);flex:0 0 auto;}
-  #scr-play.side .tpad{--d:clamp(100px,30vh,140px);} #scr-play.side .tb{--b:clamp(48px,13vh,60px);}
+  #scr-play.side .tpad{--d:var(--pad-stick, 150px);} #scr-play.side .tb{--b:var(--pad-btn, 68px);}
+  #scr-play.side .ctl-side.pz-l{padding:6px 0 calc(var(--pad-edge) + var(--pad-safe-b)) calc(var(--pad-edge) + var(--pad-safe-l));} #scr-play.side .ctl-side.pz-r{padding:0;align-items:flex-end;}
+  .ctl-wrap.pz-wrap{padding:4px 0 0 calc(var(--pad-edge) + var(--pad-safe-l));align-items:flex-end;} .ctl-wrap.pz-wrap > .tpad{margin-bottom:calc(var(--pad-edge) + var(--pad-safe-b));}
   /* phones upright (grid modes): square field right under the HUD, the pad below it */
   #scr-play.port .arena{flex:0 0 auto;height:min(calc(100vw - 4px), calc(100dvh - 194px - var(--gbh, 46px)));}   /* 🎛️ p1c: room = the shared bar's real height */
   #scr-play.port #bottom{flex:1 0 auto;display:flex;flex-direction:column;justify-content:center;min-height:0;}
-  #scr-play.port .tpad{--d:clamp(120px,36vw,170px);} #scr-play.port .tb{--b:clamp(58px,17vw,74px);}
+  #scr-play.port .tpad{--d:var(--pad-stick, 160px);} #scr-play.port .tb{--b:var(--pad-btn, 74px);}
+  .tpad{--d:var(--pad-stick, 150px);} .tb{--b:var(--pad-btn, 68px);}
   /* result */
   .result{position:fixed;inset:0;z-index:400;display:flex;align-items:center;flex-direction:column;justify-content:flex-start;padding:20px;background:rgba(10,40,25,0.6);overflow-y:auto;}
   .result::after{content:'';flex:0 0 var(--safe-b, 18px);}
@@ -2030,13 +2033,18 @@ function buildControls(){
   if(!touch){ bottom.innerHTML = legend; if(skillsOn()) bottom.insertAdjacentHTML('beforeend', ''); return; }
   if(hs > 1){ for(let i = 0; i < hs; i++) corners.appendChild(makeCtl(i, true)); return; }
   const side = window.innerWidth > window.innerHeight && window.innerHeight < 620;
-  if(side){ play.classList.add('side'); const L = document.createElement('div'); L.className = 'ctl-side'; L.appendChild(makePad(0)); const R = document.createElement('div'); R.className = 'ctl-side'; R.appendChild(makeBtns(0));
-    $('arena').insertBefore(L, $('stage')); $('arena').appendChild(R); return; }
-  const wrap = document.createElement('div'); wrap.className = 'ctl-wrap'; wrap.appendChild(makePad(0)); wrap.appendChild(makeBtns(0)); bottom.appendChild(wrap);
+  if(side){ play.classList.add('side'); const L = document.createElement('div'); L.className = 'ctl-side pz-l'; L.appendChild(makePad(0)); const R = document.createElement('div'); R.className = 'ctl-side pz-r'; R.appendChild(pzRing(makeBtns(0)));
+    $('arena').insertBefore(L, $('stage')); $('arena').appendChild(R); if(window.UI && UI.pad) UI.pad.arcAll(play); return; }
+  const wrap = document.createElement('div'); wrap.className = 'ctl-wrap pz-wrap'; wrap.appendChild(makePad(0)); wrap.appendChild(pzRing(makeBtns(0))); bottom.appendChild(wrap); if(window.UI && UI.pad) UI.pad.arcAll(play);
 }
+// 🕹️ pz-1 PADS (✨ polish chat): one player = the shared look + the 🌼 ring (💨 Boost main in Snakigate, else ⚡ Skill)
+function pzRing(box){ if(!(window.UI && UI.pad) || !box) return box; const sk = box.querySelector('.tb.skl'), bs = box.querySelector('.tb.bst');
+  if(sk){ UI.pad.dress(sk, null, null, '#FFC845'); const sm = sk.querySelector('small'); if(sm) sm.outerHTML = '<span class="nm">Skill</span>'; }
+  if(bs) UI.pad.dress(bs, '💨', 'Boost', '#7CC8FF'); const main = bs || sk; if(!main) return box; main.classList.add('pz-main');
+  box.querySelectorAll('.tb').forEach(b => b.style.removeProperty('--b')); return UI.pad.fan(box, main, [bs && sk].filter(Boolean)) || box; }
 function makeCtl(si, corner){ const d = document.createElement('div'); d.className = 'corner c' + si; d.appendChild(makePad(si)); d.appendChild(makeBtns(si)); return d; }
 function makeBtns(si){
-  const d = document.createElement('div'); d.className = 'tbtns';
+  const d = document.createElement('div'); d.className = 'tbtns'; d.style.gap = 'var(--pad-gap, 18px)';
   if(skillsOn()) d.insertAdjacentHTML('beforeend', '<button class="tb skl" data-seat="' + si + '" data-sound="none"><span class="ic">⚡</span><span class="n"></span><small>skill</small></button>');
   if(G.mode === 'gate') d.insertAdjacentHTML('beforeend', '<button class="tb bst" data-seat="' + si + '" data-sound="none">💨<small>boost</small></button>');
   d.querySelectorAll('.tb').forEach(b => {
@@ -2452,4 +2460,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.themes', {rows: 2}); UI.pageRows('.skins', {rows: 2}); }</script>
 </body>
 </html>
-<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a+p3e+cs-2b+ck-2c) END OF Snakize.html -->
+<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a+p3e+cs-2b+ck-2c+pz-1) END OF Snakize.html -->

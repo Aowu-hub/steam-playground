@@ -172,6 +172,14 @@
   .legend .kk{background:rgba(255,255,255,0.14);color:#fff;}
   .legend b{color:#FFC845;}
   /* touch controls: one round thumb pad + 4 round buttons per player */
+  .tbtns.pz-fan{display:block;position:relative;flex:0 0 auto;}   /* 🕹️ pz-1 PADS: UI.pad.arc sizes this box + places 👊 + the arc */
+  .tb.pz-btn .ic{font-size:calc(var(--sz) * 0.4);} .tb.pz-btn.down{transform:translateY(4px) scale(.93);filter:brightness(1.3);}
+  .tb.pz-btn .pz-hold{position:absolute;top:-4px;right:-4px;width:30px;height:30px;border-radius:50%;background:#1C2A4A;box-shadow:0 0 0 2px #6EE7F9;font-size:16px;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+  .tb.pz-btn.pz-shield{--rim:#6EE7F9;filter:brightness(1.25);} .tb.pz-btn.pz-shield .pz-hold{transform:scale(1.25);box-shadow:0 0 0 3px #6EE7F9,0 0 16px #6EE7F9;}
+  #scr-play.side .ctl.pz-l{padding:0 0 calc(var(--pad-edge) + var(--pad-safe-b)) calc(var(--pad-edge) + var(--pad-safe-l));} #scr-play.side .ctl.pz-r{padding:0;justify-content:flex-end;}
+  .ctl-wrap.pz-wrap{padding:4px 0 0 calc(var(--pad-edge) + var(--pad-safe-l));align-items:flex-end;gap:var(--pad-gap);} .ctl-wrap.adv-wrap{gap:var(--pad-gap);padding-left:calc(var(--pad-edge) + var(--pad-safe-l));padding-right:0;} .ctl-wrap.pz-wrap .ctl{padding:0;} .ctl-wrap.pz-wrap .ctl:first-child{padding-bottom:calc(var(--pad-edge) + var(--pad-safe-b));}
+  .actl.pz-r{padding:0;} .actl.l:not(.pz-r){padding-left:calc(var(--pad-edge) + var(--pad-safe-l));padding-bottom:calc(var(--pad-edge) + var(--pad-safe-b));}
+  .adv-wrap .actl.pz-r{padding:0;}
   .ctl{display:flex;align-items:center;justify-content:center;gap:10px;flex:0 0 auto;padding:6px 8px;touch-action:none;user-select:none;-webkit-user-select:none;}
   .ctl-wrap{display:flex;flex:0 0 auto;justify-content:space-between;align-items:center;gap:8px;padding:4px 10px var(--safe-b, 18px);}
   .tpad{--d:clamp(104px,30vw,146px);width:var(--d);height:var(--d);border-radius:50%;position:relative;flex:0 0 auto;touch-action:none;
@@ -2318,20 +2326,48 @@ function layoutPlay(){
   if(!touch){ bottom.innerHTML = legendHtml(); }
   else if(side){
     if(two){ arena.insertBefore(ctlEl(0, 'pad+btn'), arena.firstChild); arena.appendChild(ctlEl(1, 'pad+btn')); }
-    else { arena.insertBefore(ctlEl(0, 'pad'), arena.firstChild); arena.appendChild(ctlEl(0, 'btn')); }
+    else { const L = ctlEl(0, 'pad'), R = ctlEl(0, 'btn'); arena.insertBefore(L, arena.firstChild); arena.appendChild(R);
+      if(window.UI && UI.pad){ L.classList.add('pz-l'); R.classList.add('pz-r'); pzFan(R.querySelector('.tbtns'), pzRingOrder(), on => { if(G) G.tbBlk[0] = on; }); } }
   } else {
     const w = document.createElement('div'); w.className = 'ctl-wrap';
     if(two){ w.appendChild(ctlEl(0, 'pad+btn')); w.appendChild(ctlEl(1, 'btn+pad')); }
-    else { w.appendChild(ctlEl(0, 'pad')); w.appendChild(ctlEl(0, 'btn')); }
+    else { const L = ctlEl(0, 'pad'), R = ctlEl(0, 'btn'); w.appendChild(L); w.appendChild(R); if(window.UI && UI.pad){ w.classList.add('pz-wrap'); pzFan(R.querySelector('.tbtns'), pzRingOrder(), on => { if(G) G.tbBlk[0] = on; }); pzFitStick(L, 4); } }
     bottom.appendChild(w);
   }
+  pzArcAll($('scr-play'));
   requestAnimationFrame(resize); resize();
 }
+function pzRingOrder(){ return G && G.M.sq[0].length > 1 ? ['bonk', 'grab', 'power', 'tag'] : ['bonk', 'grab', 'power', 'dodge']; }   // 🕹️ pz-1: 🤼 Grab = its own one-tap button · 3v3 → 🔁 Tag takes 💨 Dodge's spot (dodge = → → / ← ← on the stick) · 🛡️ = hold 👊 or walk back
 function legendHtml(){
   const duo = G.M.duo, A = KEYS[0], B = KEYS[1];
   const set = (K, who) => '<span><b>' + who + '</b> ' + kk(K.left) + kk(K.right) + ' move · ' + kk(K.jump) + ' jump · ' + kk(K.duck) + ' duck · ' + kk(K.boop) + '👊 ' + kk(K.bonk) + '💥 ' + kk(K.power) + '🌀 ' + kk(K.dodge) + '💨</span>';
   return '<div class="legend">' + set(A, duo ? '🟥' : '⌨️') + (duo ? set(B, '🟦') : '') + '<span>walk back or 👊+💥 = 🛡️ block · then 👊 / 💥 = ⚡ counter · → → dash · 💥+🌀 = 🤼 grab · hold 💥 = 🔨 breaker · Esc = pause</span></div>';
 }
+/* 🕹️ pz-1 PADS (✨ polish chat): the UiKit pad rule — sizes from --pad-*, 👉 one thumb arc, shared button look. */
+const PZ_LOOK = {boop: ['👊', 'Boop', '#FF4D6D'], bonk: ['💥', 'Bonk', '#FF9F1C'], block: ['🛡️', 'Block', '#6EE7F9'], power: ['🌀', 'Power', '#FFC845'],
+  dodge: ['💨', 'Dodge', '#7CC8FF'], tag: ['🔁', 'Tag', '#6EE7F9'], jump: ['⤴️', 'Jump', '#7CF29C'], grab: ['🤼', 'Grab', '#7CF29C']};
+function pzSize(d, two){   // stick + buttons from the shared vars (2 players on one screen: a bit smaller, never under 56 px)
+  if(!(window.UI && UI.pad)) return;
+  d.querySelectorAll('.tpad').forEach(p => p.style.setProperty('--d', two ? 'calc(var(--pad-stick) * 0.78)' : 'var(--pad-stick)'));
+  d.querySelectorAll('.tb').forEach(b => b.style.setProperty('--b', two ? 'max(56px, calc(var(--pad-btn) * 0.84))' : 'var(--pad-btn)'));
+  d.querySelectorAll('.tbtns').forEach(t => t.style.gap = two ? 'calc(var(--pad-gap) * 0.45)' : 'var(--pad-gap)');
+  if(two) d.querySelectorAll('.tb.grab').forEach(b => { b.style.fontSize = '13px'; b.style.padding = '0 8px'; });   // 2 players on one phone: the 🛡️ / 🤼 pills stay narrow
+}
+function pzFan(box, order, blk){   // box = .tbtns → 👊 main + the ring (most used first); buttons not in the order leave the screen · blk(on) = 🛡️ while 👊 is held
+  if(!box || !(window.UI && UI.pad)) return null;
+  box.classList.add('pz-fan'); box.style.gap = '';
+  box.querySelectorAll('.tb').forEach(b => { const L = PZ_LOOK[b.dataset.a]; if(!L) return; b.classList.remove('grab', 'half', 'blk'); b.classList.add('pz-btn'); b.style.removeProperty('--b'); b.style.setProperty('--rim', L[2]);
+    b.innerHTML = '<span class="ic">' + L[0] + '</span><span class="nm">' + L[1] + '</span>'; });
+  const B = a => box.querySelector('.tb[data-a="' + a + '"]'), main = B('boop'); if(!main) return null; main.classList.add('pz-main');
+  main.insertAdjacentHTML('beforeend', '<span class="pz-hold" title="Hold to block">🛡️</span>');   // 🛡️ hold 👊 = block (one thumb, no two-button press)
+  if(blk){ let t = 0; const off = () => { clearTimeout(t); t = 0; blk(false); main.classList.remove('pz-shield'); };
+    main.addEventListener('pointerdown', e => { try{ main.setPointerCapture(e.pointerId); }catch(err){} clearTimeout(t); t = setTimeout(() => { blk(true); main.classList.add('pz-shield'); }, 260); });
+    main.addEventListener('pointerup', off); main.addEventListener('pointercancel', off); }
+  const others = order.map(B).filter(Boolean); box.querySelectorAll('.tb').forEach(b => { if(b !== main && others.indexOf(b) < 0) b.remove(); });
+  box.__pzArc = () => UI.pad.arc(box, main, others, {fit: true}); return box;
+}
+function pzFitStick(el, n){ if(!el || !(window.UI && UI.pad)) return; const k = UI.pad.stickFor(innerWidth, UI.pad.geo(innerWidth, innerHeight, n).w); el.querySelectorAll('.tpad').forEach(p => p.style.setProperty('--d', k + 'px')); }   // the stick never touches the 👉 ring (upright phones)
+function pzArcAll(root){ (root || document).querySelectorAll('.tbtns.pz-fan').forEach(b => { if(b.__pzArc) b.__pzArc(); }); }
 // one round thumb pad (◀ ▶ move, ▲ jump, ▼ duck — diagonals work: down-back = sitting block) + 4 buttons
 function ctlEl(pi, parts){
   const d = document.createElement('div'); d.className = 'ctl p' + (pi + 1); d.dataset.p = pi;
@@ -2341,6 +2377,7 @@ function ctlEl(pi, parts){
     + (G && G.M.sq[pi].length > 1 ? '<button class="tb grab tag" data-a="tag" data-p="' + pi + '" aria-label="Tag a buddy in">🔁 Tag</button>' : '') + '</div>';
   d.innerHTML = parts.split('+').map(x => x === 'pad' ? pad : btn).join('');
   d.querySelectorAll('.tpad').forEach(el => bindPad(el, pi));
+  const pzTwo = !!(G && G.M.f.filter(p => p.human).length > 1); pzSize(d, pzTwo);   // 🕹️ pz-1
   d.querySelectorAll('.tb').forEach(b => {
     b.addEventListener('pointerdown', e => { e.preventDefault(); if(!G || G.paused || G.over || G.hold) return; b.classList.add('down'); setTimeout(() => b.classList.remove('down'), 140);
       if(navigator.vibrate) try{ navigator.vibrate(8); }catch(err){}
@@ -3154,9 +3191,10 @@ function layoutAdv(){
   if(!touch){ $('adv-bottom').innerHTML = advLegend(); }
   else if(H > W * 1.05){ const w = document.createElement('div'); w.className = 'ctl-wrap adv-wrap';   // tall screen: pads under the picture
     if(humans.length > 1){ w.appendChild(advCtl(0, 'l', true)); w.appendChild(advCtl(1, 'r', true)); } else { w.appendChild(advCtl(0, 'l', false, 'pad')); w.appendChild(advCtl(0, 'r', false, 'btn')); }
-    $('adv-bottom').appendChild(w); }
+    $('adv-bottom').appendChild(w); if(humans.length === 1) pzFitStick(w, ADV.macro ? 4 : 3); }
   else if(humans.length > 1){ arena.appendChild(advCtl(0, 'l', true)); arena.appendChild(advCtl(1, 'r', true)); }
   else { arena.appendChild(advCtl(0, 'l', false, 'pad')); arena.appendChild(advCtl(0, 'r', false, 'btn')); }
+  pzArcAll($('scr-advplay'));
   requestAnimationFrame(advResize); advResize();
   if(AV.M && !AV.M.t) AV.M.view = advViewW();
 }
@@ -3172,6 +3210,8 @@ function advCtl(pi, side, both, only){
     (ADV.macro ? '<button class="tb grab half blk" data-a="block" aria-label="Block (hold)">🛡️ Block</button><button class="tb grab half" data-a="grab" aria-label="Grab">🤼 Grab</button>' : '') + '</div>';
   d.innerHTML = only === 'pad' ? pad : only === 'btn' ? btn : (side === 'l' ? pad + btn : btn + pad);
   d.querySelectorAll('.tpad').forEach(el => advBindPad(el, pi));
+  pzSize(d, !!both);   // 🕹️ pz-1
+  if(only === 'btn' && window.UI && UI.pad){ d.classList.add('pz-r'); pzFan(d.querySelector('.tbtns'), ['bonk', 'jump', 'power'].concat(ADV.macro ? ['grab'] : []), (on) => { if(AV) AV.tbBlk[pi] = on; }); }
   d.querySelectorAll('.tb').forEach(b => { const a = b.dataset.a;
     b.addEventListener('pointerdown', e => { e.preventDefault(); if(!AV || AV.paused || AV.over || AV.hold) return; b.classList.add('down'); setTimeout(() => b.classList.remove('down'), 140); if(navigator.vibrate) try{ navigator.vibrate(8); }catch(err){}
       if(a === 'block' || a === 'bonk'){ (a === 'block' ? AV.tbBlk : AV.tbG)[pi] = true; try{ b.setPointerCapture(e.pointerId); }catch(err){} }   // 🛡️ hold = block · 💥 hold = 🔨 breaker
@@ -3908,4 +3948,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.themes', {rows: 2}); }</script>
 </body>
 </html>
-<!-- (11i-I+back-1+r35+modes-3+mg-1+ck-room+p1c+p2+p3a+ck-2b+cs-2c+ls-1b) END OF BrawlBuddies.html -->
+<!-- (11i-I+back-1+r35+modes-3+mg-1+ck-room+p1c+p2+p3a+ck-2b+cs-2c+ls-1b+pz-1) END OF BrawlBuddies.html -->
