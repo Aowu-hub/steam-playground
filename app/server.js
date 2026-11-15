@@ -40,7 +40,7 @@ function ss_() {
 // head with a raw print scriptlet calling include('UiKit').
 // 🚪 AS-1 one door: include('AvatarKit') also brings the files listed here (same order), so no page has to change when the avatar family grows.
 // Keep each list on ONE line — the test harness (gasmock.js) and the 📲 offline builder (build.js) read these two lines from this file.
-const INCLUDE_ALSO_ = {AvatarKit: ['AvatarActing']};
+const INCLUDE_ALSO_ = {AvatarKit: ['AvatarActing'], GameFrame: ['GameCovers', 'CardArt']};   // 🧱 b1b: one line brings the 🎬 cover frame + cover art + flip-books
 const INCLUDE_GROUPS_ = {avatar: ['BallSkins', 'AvatarKit']};
 // 📦 size-1 → sm-0 (2026-11-14): includes that are NOT in this project (Apps Script refuses to save a project over ≈ 10.45 MB)
 // load from the family site instead. WHICH ones is steam-source tools/remote.json; the file names + sha384 fingerprints are in
@@ -1840,7 +1840,28 @@ function getGameLeaders(gameId) {
     .sort((a, b) => b.total - a.total || b.levels - a.levels || a.name.localeCompare(b.name));
   const st = getSettings();
   out.forEach(m => { m.avatar = parseAvatar_(st['Avatar_' + m.name]); });
-  return { game: gameId, players: out, byScore: rows.some(r => r.score > 0) };
+  const byScore = rows.some(r => r.score > 0);
+  return { game: gameId, players: out, byScore: byScore, boards: coverBoards_(rows, out, byScore) };   // 🧱 b1b: + the cover's boards
+}
+// 🧱 b1b (Game Baseline): the 🎬 cover takes turns between boards — 🏆 best (= players order) · 📅 this week's best · 📈 most improved
+// (most new personal bests, any level, last 7 days — Aowu 2026-11-15) · 🎮 most played. Top 3 each: {name, v (number), t (label)}.
+function coverBoards_(rows, out, byScore) {
+  const day = 864e5, d0 = new Date(Date.now() - 7 * day);
+  let cut; try { cut = Utilities.formatDate(d0, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'); } catch (e) { cut = d0.toISOString().slice(0, 16).replace('T', ' '); }
+  const val = r => byScore ? r.score : (r.stars * 100000 - Math.min(99999, r.timeSec > 0 ? r.timeSec : 99999));
+  const best = {}, wk = {}, imp = {}, wkN = {};
+  rows.slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0).forEach(r => {
+    const k = r.name + '|' + r.level, v = val(r), recent = r.date >= cut;
+    if (recent) { wkN[r.name] = (wkN[r.name] || 0) + 1; if (byScore && (!(r.name in wk) || r.score > wk[r.name])) wk[r.name] = r.score; if (!(k in best) || v > best[k]) imp[r.name] = (imp[r.name] || 0) + 1; }
+    if (!(k in best) || v > best[k]) best[k] = v;
+  });
+  const top = (m, t) => Object.keys(m).filter(n => m[n] > 0).sort((a, b) => m[b] - m[a] || a.localeCompare(b)).slice(0, 3).map(n => ({ name: n, v: m[n], t: t(m[n]) }));
+  const played = {}; out.forEach(m => { if (m.plays) played[m.name] = m.plays; });
+  return {
+    week: byScore ? top(wk, v => '🏆 ' + v) : top(wkN, v => v + ' finish' + (v === 1 ? '' : 'es')),
+    improved: top(imp, v => v + ' new best' + (v === 1 ? '' : 's')),
+    played: top(played, v => v + ' game' + (v === 1 ? '' : 's'))
+  };
 }
 
 // Achievement Archive leaderboards: for every game and level, each player's best run, ranked.
