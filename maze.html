@@ -170,6 +170,11 @@
   .save-note{font-size:0.78rem;font-weight:700;color:var(--ink-soft);min-height:18px;}
   .res-btns > #b-menu, .res-btns > #tg-x, .res-btns > #btn-levels, .res-btns > #btn-hc-levels{order:-1;} .res-btns > #b-next, .res-btns > #btn-next{order:2;}   /* 🔘 p1b: exit left, main action right */
   .res-btns{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:4px;}
+  /* 🧱 b2: one-page setup — the picked level + world glow; ▶ Start sits at the bottom, always in reach */
+  .pick.sel{outline:4px solid var(--game-a,#4FD1A5);outline-offset:2px;transform:translateY(-2px);}
+  .pick.sel::after{content:'✓';position:absolute;top:6px;right:8px;font:700 1rem var(--font-display,'Fredoka',sans-serif);color:var(--game-a,#2FA36B);}
+  .b2-start{position:sticky;bottom:0;z-index:5;display:flex;justify-content:center;padding:10px 0 calc(var(--safe-b, 12px) + 4px);margin-top:12px;background:linear-gradient(transparent,var(--bg,#E9F7F2) 35%);}
+  .b2-start .sp-btn{min-width:min(420px,92%);min-height:56px;font-size:1.15rem;}
   .btn{
     font-family:'Fredoka',sans-serif;font-weight:600;font-size:0.95rem;border:none;border-radius:14px;cursor:pointer;
     padding:11px 16px;color:#fff;background:linear-gradient(135deg,var(--purple),var(--teal));box-shadow:0 4px 0 rgba(0,0,0,0.12);
@@ -192,6 +197,9 @@
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
 <script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-4c: the cheering crowd (CheerSquad.html) -->
+<script src="inc/GameFrame.js"></script>
+<script src="inc/GameCovers.js"></script>
+<script src="inc/CardArt.js"></script>   <!-- 🧱 b2: 🎬 cover + 🏁 result card (GameFrame + GameCovers + CardArt) -->
 </head>
 <!-- ontouchstart="" lets iOS show :active press effects -->
 <body ontouchstart="">
@@ -215,18 +223,14 @@
   <div class="maps" id="map-list"></div>
   <div class="section-head" id="level-head">🎚️ 2. Pick a difficulty</div>
   <div class="levels" id="level-list"></div>
+  <div class="section-head" id="world-head">🌍 3. Pick a world</div>   <!-- 🧱 b2: the world picker is part of the one-page setup -->
+  <div class="pick-grid theme-grid" id="world-list"></div>
+  <div class="section-head" id="opt-head">⚙️ 4. Options</div>
   <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the play">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-4c -->
-  <div class="ui-leaders" id="leaders"></div>
+  <div class="b2-start"><button class="btn sp-btn sp-primary" id="btn-start" data-sound="pop" onclick="startSetup()">▶ Start</button></div>   <!-- 🧱 b2 -->
 </section>
 
-<!-- THEME -->
-<section class="screen hidden" id="scr-theme">
-  <div class="title">
-    <div class="logo" id="theme-logo">🌍</div><h1 id="theme-title">Pick a world</h1>
-    <p>Your explorer, the goal and the treasures change every time</p>
-  </div>
-  <div class="pick-grid theme-grid" id="theme-list"></div>
-  </section>
+<!-- 🧱 b2: the old "Pick a world" screen is now section 3 of the setup page -->
 
 <!-- PLAY -->
 <section class="hidden" id="scr-play">
@@ -259,7 +263,7 @@ const BAR = UI.gameBar(document.getElementById('gbar'), {game: 'maze', icon: '�
   pause: {pause: () => { if(typeof pauseGame === 'function') pauseGame(); }, resume: () => { if(typeof resume === 'function') resume(); }},
   onFit: () => { if(G && typeof layout === 'function') layout(); },
   extras: [{id: 'new-maze-btn', html: '🔄<span class="gt"> New maze</span>', label: 'A brand-new maze', onClick: () => newMaze(), keep: true}]});
-var NAV_INNER = {theme: ['◀ Maze', () => showScreen('levels')]};   // 🧭 inner screens: their top button goes to the main screen
+var NAV_INNER = {levels: ['◀ Maze', () => openCover()]};   // 🧱 b2: the setup's top button goes back to the 🎬 cover   // 🧭 inner screens: their top button goes to the main screen
 UI.navBar(document.getElementById('back-btn'), {onclick: false});
 UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});   // loader + menus in the player's look before the server answers
 const SESSION_START = Number(''+__SP("sessionStart")+'') || null;
@@ -468,6 +472,7 @@ let lockHandle = null;
 function effectsOn(){ return !REDUCED && !(S.settings.MazeEffects === 'FALSE' || S.settings.MazeEffects === false); }
 
 function startGame(lvlIdx, themeKey){ setTimeout(cheerMount, 0); /* 📣 cs-4c */
+  if(MazeCover) MazeCover.hide();   /* 🧱 b2 */
   const L = levelFor(lvlIdx);   /* 🗺️ p3e: this difficulty on the picked maze size */
   if(themeKey === 'surprise') themeKey = pick(Object.keys(THEMES));
   const lv = buildLevel(lvlIdx, themeKey, L);
@@ -1039,25 +1044,14 @@ function showWin(){
   const ms = G.finishMs || elapsed(), r = rating(ms), lvlIdx = G.lv.lvlIdx, L = G.L;
   confetti([G.lv.hero, G.lv.goalIcon, '⭐', '🎉', G.lv.collectIcon]);
   const nextOk = lvlIdx < LEVELS.length - 1;
-  showResult(
-    '<div class="big">' + UI.esc(G.lv.goalIcon) + '</div><h2>You made it!</h2>' +
-    '<div class="rating">' + '⭐'.repeat(r) + '<span style="opacity:.25">' + '⭐'.repeat(3 - r) + '</span></div>' +
-    '<div class="stats"><span>' + L.emoji + ' ' + L.name + '</span><span>🗺️ ' + L.size + ' × ' + L.size + '</span><span>⏱ ' + fmt(ms) + '</span><span>🏆 ' + mazeScore(L, lvlIdx, ms, r) + (L.mult > 1 ? ' (×' + L.mult + ')' : '') + '</span>' +
-    (G.lv.stars.size ? '<span>' + UI.esc(G.lv.collectIcon) + ' ' + G.stars + '/' + G.lv.stars.size + '</span>' : '') + '</div>' +
-    '<div class="save-note" id="save-note"><span class="ui-spin">✅</span> Saving your progress…</div>' +
-    '<div class="res-btns">' +
-      (nextOk ? '<button class="btn sp-btn sp-primary" id="btn-next">Next level ▶</button>' : '') +
-      '<button class="btn soft sp-btn sp-secondary" id="btn-again">🔄 New maze</button>' +
-      '<button class="btn soft sp-btn sp-secondary" id="btn-theme">🌍 New world</button>' +
-      '<button class="btn soft sp-btn sp-secondary" id="btn-levels">🎚️ Levels</button>' +
-    '</div>');
-  $('btn-again').onclick = () => { hideResult(); startGame(lvlIdx, G.lv.themeKey); };
-  $('btn-theme').onclick = () => { hideResult(); chooseLevel(lvlIdx); };
-  $('btn-levels').onclick = () => { hideResult(); leavePlay(); };
-  if(nextOk) $('btn-next').onclick = () => {
-    if(!canPlay(lvlIdx + 1)){ UI.toast('Clear this level to unlock the next one', 'err'); return; }
-    hideResult(); startGame(lvlIdx + 1, G.lv.themeKey);
-  };
+  const card = GF.result({wrap: $('result'), card: $('result-card'), win: true, icon: G.lv.goalIcon, title: 'You made it!', stars: r,   /* 🧱 b2: the shared 🏁 result card */
+    stats: [[L.emoji, L.name], ['🗺️', L.size + ' × ' + L.size], ['⏱', fmt(ms)], ['🏆', mazeScore(L, lvlIdx, ms, r) + (L.mult > 1 ? ' (×' + L.mult + ')' : '')]].concat(G.lv.stars.size ? [[G.lv.collectIcon, G.stars + '/' + G.lv.stars.size]] : []),
+    save: 'Saving your progress…', buddy: HAS_AV ? {name: S.player, av: myAvatar(S.player)} : null, confetti: false,
+    levels: () => { hideResult(); leavePlay(); },
+    again: () => { hideResult(); startGame(lvlIdx, G.lv.themeKey); }, againText: '🔄 New maze',
+    extra: [{text: '🌍 New world', id: 'btn-theme', fn: () => { hideResult(); leavePlay(); chooseLevel(lvlIdx); }}],
+    next: nextOk ? () => { if(!canPlay(lvlIdx + 1)){ UI.toast('Clear this level to unlock the next one', 'err'); return; } hideResult(); startGame(lvlIdx + 1, G.lv.themeKey); } : null, nextText: 'Next level ▶'});
+  cheerFaces();   /* 📣 cs-4c: the crowd's faces on the card */
   // Save (the server merges, so progress never goes backwards).
   const p = S.progress[S.player] || (S.progress[S.player] = {unlocked: 0, tokens: [], best: []});
   p.unlocked = Math.max(p.unlocked, lvlIdx + 1);
@@ -1118,11 +1112,13 @@ function lose(now, why, msg){
 function showLose(){
   const hc = G.L.hardcore, why = G.loseWhy;
   const head = why === 'wall' ? '<div class="big">💀</div><h2>Bump! That was a wall</h2>' : why === 'trap' ? '<div class="big">💀</div><h2>' + UI.esc(G.loseMsg || 'A trap got you!') + '</h2>' : '<div class="big">🌋</div><h2>The lava got you!</h2>';
-  showResult(head + '<p style="margin:0;font-weight:700;color:var(--ink-soft)">' + (hc ? '💀 Hardcore ends on the first mistake — try again! You know the way now.' : 'Try the same maze again — you know the way now.') + '</p>' +
-    '<div class="res-btns"><button class="btn sp-btn sp-primary" id="btn-retry">Try again</button><button class="btn soft sp-btn sp-secondary" id="btn-again">🔄 New maze</button><button class="btn soft sp-btn sp-secondary" id="btn-levels">🎚️ Levels</button></div>');
-  $('btn-retry').onclick = () => retrySame();
-  $('btn-again').onclick = () => { hideResult(); newMazeFromOver(); };
-  $('btn-levels').onclick = () => { hideResult(); leavePlay(); };
+  const icon = why === 'wall' || why === 'trap' ? '💀' : '🌋', title = why === 'wall' ? 'Bump! That was a wall' : why === 'trap' ? (G.loseMsg || 'A trap got you!') : 'The lava got you!';   /* 🧱 b2: the shared 🏁 card */
+  GF.result({wrap: $('result'), card: $('result-card'), win: false, icon, title, sub: hc ? '💀 Hardcore ends on the first mistake — try again! You know the way now.' : 'Try the same maze again — you know the way now.',
+    buddy: HAS_AV ? {name: S.player, av: myAvatar(S.player)} : null,
+    levels: () => { hideResult(); leavePlay(); }, again: () => retrySame(), againText: '🔄 Try again',
+    extra: [{text: '🗺️ New maze', id: 'btn-new', fn: () => { hideResult(); newMazeFromOver(); }}]});
+  const tr = $('btn-again'); if(tr) tr.id = 'btn-retry';   // same ids as before: Try again = btn-retry
+  cheerFaces();   /* 📣 cs-4c */
 }
 function newMazeFromOver(){ const k = G.lv; startGame(k.lvlIdx, k.themeKey); }
 /* 📣 CHEERSQUAD (cs-4c) START — the crowd beside the play (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
@@ -1210,7 +1206,7 @@ if(!HAS_TOUCH){ document.body.classList.add('no-touch'); $('play-hint').textCont
 /* ================= MENUS ================= */
 function showScreen(name){
   if(name !== 'play' && window.Cheer) Cheer.unmount(); /* 📣 cs-4c */
-  ['player', 'levels', 'theme', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
+  ['player', 'levels', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
   $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   // 🧭 p1b
   window.scrollTo(0, 0);
 }
@@ -1240,16 +1236,17 @@ function choosePlayer(name){
   const p = S.players.find(x => x.Name === name);
   S.player = name; S.age = p ? p.Age : ''; loadSize();   /* 🗺️ p3e */
   $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4c */
-  renderLevels(); showScreen('levels');
+  renderLevels(); showScreen('levels'); openCover();   /* 🧱 b2: the 🎬 cover first */
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 function renderLevels(){
-  const box = $('level-list'); box.innerHTML = ''; if(window.UI && UI.leaders) UI.leaders($('leaders'), 'maze', S.player);
+  const box = $('level-list'); box.innerHTML = '';   /* 🧱 b2: 🏆 leaders live on the cover */
   renderMaps();   /* 🗺️ p3e */
   const p = progressOf(S.player), rec = AGE_RECOMMEND[S.age];
   LEVELS.map((D, i) => levelFor(i)).forEach((L, i) => {
     const b = document.createElement('button');
     const open = canPlay(i), done = p.unlocked > i;
+    b.dataset.i = i;   /* 🧱 b2 */
     b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (L.hardcore ? ' hardcore' : '');
     b.setAttribute('data-sound', open ? 'pop' : 'none');
     b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">🏅</span>' : (open ? '' : '<span class="badge">🔒</span>')) +
@@ -1261,6 +1258,8 @@ function renderLevels(){
     };
     box.appendChild(b);
   });
+  { let i = -1; try{ i = Number(localStorage.getItem(pickKey('lv'))); }catch(e){} if(!(i >= 0 && canPlay(i))) i = canPlay(rec) ? rec : Math.max(0, [0, 1, 2, 3, 4, 5].filter(canPlay).pop() || 0);
+    chosenLevel = i; } renderWorlds(); markPicks();   /* 🧱 b2 */
 }
 // Best finish time + stars for this level, and the family record holder.
 function bestHtml(p, i){
@@ -1270,25 +1269,38 @@ function bestHtml(p, i){
   if(rec) h += '<div class="rec">🏆 Record: ' + UI.esc(rec.name) + ' ' + fmt(rec.timeSec * 1000) + '</div>';
   return h;
 }
-let chosenLevel = 0;
-function chooseLevel(i){
-  chosenLevel = i;
-  $('theme-title').textContent = 'Pick a world for ' + LEVELS[i].name + ' · ' + levelFor(i).size + ' × ' + levelFor(i).size;
-  $('theme-logo').textContent = LEVELS[i].emoji;
-  const box = $('theme-list'); box.innerHTML = '';
-  const sur = document.createElement('button');
-  sur.className = 'pick surprise'; sur.setAttribute('data-sound', 'pop');
-  sur.innerHTML = '<div class="big">🎲</div><div class="nm">Surprise me!</div><div class="sub">Any world</div>';
-  sur.onclick = () => startGame(chosenLevel, 'surprise');
-  box.appendChild(sur);
-  Object.keys(THEMES).forEach(k => {
-    const T = THEMES[k], b = document.createElement('button');
-    b.className = 'pick'; b.setAttribute('data-sound', 'pop');
-    b.innerHTML = '<div class="big">' + T.icon + '</div><div class="nm">' + T.name + '</div><div class="sub">' + T.heroes.slice(0, 4).join('') + '</div>';
-    b.onclick = () => startGame(chosenLevel, k);
-    box.appendChild(b);
-  });
-  showScreen('theme');
+/* 🧱 b2 (Game Baseline pilot): ONE setup page — the picks are remembered per player; ▶ Start plays them */
+let chosenLevel = 0, chosenWorld = 'surprise';
+const pickKey = k => 'sp_maze_' + k + ':' + (S.player || '');
+function chooseLevel(i, quiet){
+  chosenLevel = i; try{ localStorage.setItem(pickKey('lv'), String(i)); }catch(e){}
+  markPicks(); if(!quiet){ const w = $('world-head'); if(w && w.scrollIntoView) w.scrollIntoView({behavior: REDUCED ? 'auto' : 'smooth', block: 'start'}); }
+}
+function chooseWorld(k){ chosenWorld = k; try{ localStorage.setItem(pickKey('world'), k); }catch(e){} markPicks(); }
+function renderWorlds(){
+  const box = $('world-list'); box.innerHTML = '';
+  const mk = (k, big, nm, sub) => { const b = document.createElement('button'); b.className = 'pick' + (k === 'surprise' ? ' surprise' : ''); b.dataset.k = k; b.setAttribute('data-sound', 'pop');
+    b.innerHTML = '<div class="big">' + big + '</div><div class="nm">' + nm + '</div><div class="sub">' + sub + '</div>'; b.onclick = () => chooseWorld(k); box.appendChild(b); };
+  mk('surprise', '🎲', 'Surprise me!', 'Any world');
+  Object.keys(THEMES).forEach(k => { const T = THEMES[k]; mk(k, T.icon, T.name, T.heroes.slice(0, 4).join('')); });
+  let w = 'surprise'; try{ w = localStorage.getItem(pickKey('world')) || 'surprise'; }catch(e){} chosenWorld = (w === 'surprise' || THEMES[w]) ? w : 'surprise';
+}
+function markPicks(){
+  document.querySelectorAll('#level-list .lvl').forEach(b => b.classList.toggle('sel', Number(b.dataset.i) === chosenLevel));
+  document.querySelectorAll('#world-list .pick').forEach(b => b.classList.toggle('sel', b.dataset.k === chosenWorld));
+  const L = LEVELS[chosenLevel], T = THEMES[chosenWorld], st = $('btn-start');
+  if(st && L) st.textContent = '▶ Start · ' + L.emoji + ' ' + L.name + ' · ' + (T ? T.icon + ' ' + T.name : '🎲 Surprise');
+}
+function startSetup(){ if(!canPlay(chosenLevel)){ UISound.play('error'); UI.toast('Pick a level that is open 🔓'); return; } startGame(chosenLevel, chosenWorld); }
+// 🎬 the cover (GameFrame): who's here + champions + how to play; ▶ Play opens the setup page
+let MazeCover = null;
+function openCover(){
+  if(!window.GF){ showScreen('levels'); return; }
+  if(MazeCover && MazeCover.who !== S.player){ MazeCover.destroy(); MazeCover = null; }
+  if(!MazeCover){ MazeCover = GF.cover(document.body, {game: 'maze', title: 'Maze Explorer', icon: '🧭', me: S.player, players: S.players, avatarOf: myAvatar, seats: {min: 1, max: 1},
+      acts: ['beat.run-start', 'beat.skid'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms',
+      onPlay: () => { MazeCover.hide(); showScreen('levels'); } }); MazeCover.who = S.player; }
+  MazeCover.show();
 }
 function sessionQuery(){
   let q = '';
@@ -1326,4 +1338,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (11w-1+emoji+r33+back-1+p1b+p3e+cs-4c) END OF Maze.html -->
+<!-- (11w-1+emoji+r33+back-1+p1b+p3e+cs-4c+b2) END OF Maze.html -->
