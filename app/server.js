@@ -761,6 +761,8 @@ const MODES_ = [
   { game: 'math-quest', id: 'storyth', icon: '📜', name: 'Math Quest โจทย์ปัญหา', pitch: 'Story sums in Thai — โจทย์ปัญหา!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':storyth' } },   // ➗ mq-w2
   { game: 'math-quest', id: 'tricken', icon: '🤔', name: 'Math Quest Trick Questions', pitch: 'The quick answer is a trap!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':tricken' } },   // ➗ mq-w3
   { game: 'math-quest', id: 'trickth', icon: '🙃', name: 'Math Quest คำถามหลอก', pitch: 'Thai trick questions — คิดสองรอบ!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':trickth' } },   // ➗ mq-w3
+  { game: 'math-quest', id: 'testen', icon: '📝', name: 'Math Quest Test Practice', pitch: 'School-style maths tests, grade 1–12!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':testen' } },   // ➗ mq-t1
+  { game: 'math-quest', id: 'testth', icon: '📝', name: 'Math Quest ข้อสอบ', pitch: 'Thai school tests — ข้อสอบ ป.1–ม.6!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':testth' } },   // ➗ mq-t1
   { game: 'double-up', id: 'challenge', icon: '🏔️', name: 'Double Up Challenge', pitch: 'Tiny 3×3 board — reach 1024!', route: 'doubleup', tried: { feat: [['double-up', 'chTile']] } },
   { game: 'memory', id: 'friends', icon: '👥', name: 'Memories with friends', pitch: 'Take turns — most pairs wins!', route: 'memory', tried: { feat: [['memory', 'wins']] } },
   { game: 'memory', id: 'time', icon: '⏱️', name: 'Memories Time attack', pitch: 'Beat the clock — find every pair fast!', route: 'memory', added: '2026-11-15', tried: { board: 'memory', theme: 'Time attack' } },
@@ -780,7 +782,7 @@ const MODES_ = [
 const MODES_NEW_DAYS_ = 7;
 // 🗂️ mg-1 Mode groups — the same boxes (and order) as each game's start page. A mode not listed here has no group (2-mode games stay flat).
 const MODE_GROUPS_ = {
-  'math-quest': [{k: 'numbers', icon: '🔢', en: 'Numbers', th: 'ตัวเลข', modes: ['classic', 'minute', 'sign', 'fix', 'clock']}, {k: 'english', icon: '🔤', en: 'English', th: 'ภาษาอังกฤษ', modes: ['worden', 'storyen', 'tricken', 'listenen']}, {k: 'thai', icon: '🐘', en: 'Thai', th: 'ภาษาไทย', modes: ['wordth', 'storyth', 'trickth', 'listenth']}],   // ➗ mq-w1
+  'math-quest': [{k: 'numbers', icon: '🔢', en: 'Numbers', th: 'ตัวเลข', modes: ['classic', 'minute', 'sign', 'fix', 'clock']}, {k: 'english', icon: '🔤', en: 'English', th: 'ภาษาอังกฤษ', modes: ['worden', 'storyen', 'tricken', 'testen', 'listenen']}, {k: 'thai', icon: '🐘', en: 'Thai', th: 'ภาษาไทย', modes: ['wordth', 'storyth', 'trickth', 'testth', 'listenth']}],   // ➗ mq-t1 📝   // ➗ mq-w1
   'sciencetory': [{k: 'matter', icon: '⚗️', en: 'Matter', th: 'สสาร', modes: ['chem', 'quantum', 'particle']}, {k: 'forces', icon: '⚙️', en: 'Forces & Energy', th: 'แรงและพลังงาน', modes: ['mechanic', 'thermo', 'electro']}, {k: 'waves', icon: '🌈', en: 'Waves & Space', th: 'คลื่นและอวกาศ', modes: ['optics', 'acoustics', 'cosmic']}, {k: 'earth', icon: '🌍', en: 'Earth & Life', th: 'โลกและชีวิต', modes: ['geo', 'bio']}],   // 🔬 sc-2b (same boxes as the page)
   'pokadif': [{k: 'spot', icon: '🖼️', en: 'Spot', th: 'จับผิดภาพ', modes: ['spot', 'blink']}, {k: 'odd', icon: '🎯', en: 'Odd One Out', th: 'หาตัวที่ต่าง', modes: ['odd']}, {k: 'endless', icon: '⏱️', en: 'Arcade', th: 'อาร์เคด', modes: ['arcade']}, {k: 'stories', icon: '📖', en: 'Stories', th: 'นักสืบผจญภัย', modes: ['detective']}],   // 🔍 pk-2a + pk-2b + pk-3a
   'geoscout': [{k: 'numbers', icon: '🧮', en: 'Number play', th: 'เล่นกับตัวเลข', modes: ['scale', 'count', 'tens', 'next']}, {k: 'shapes', icon: '🔷', en: 'Shapes + parts', th: 'รูปทรง · เศษส่วน', modes: ['shape', 'frac', 'wobble']}, {k: 'friends', icon: '⚔️', en: 'With friends', th: 'เล่นกับเพื่อน', modes: ['battle']}, {k: 'story', icon: '📖', en: 'Story', th: 'เนื้อเรื่อง', modes: ['journey']}],   // 🗂️ p3a (F5)
@@ -2741,6 +2743,7 @@ const FEAT_DEFS = {
     typedRight: { name: 'Pad Pro', icon: '⌨️', kind: 'sum', tiers: [25, 100, 400] },   // ➗ mq-w1: answers typed on the number pad
     storyRight: { name: 'Story Solver', icon: '📖', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-w2: right answers in 📖 Story Problems / 📜 โจทย์ปัญหา
     trickRight: { name: 'Trick Spotter', icon: '🕵️', kind: 'sum', tiers: [10, 25, 100] },   // ➗ mq-w3: tricks spotted in 🤔 Trick Questions / 🙃 คำถามหลอก
+    testRight: { name: 'Test Ace', icon: '📝', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-t1: right answers in 📝 Test Practice / 📝 ข้อสอบ
   },
   memory: {
     pairs: { name: 'Pair Finder', icon: '🃏', kind: 'sum', tiers: [50, 250, 1000] },
@@ -2925,6 +2928,7 @@ const TITLE_DEFS = [
   { id: 'mq_typer', name: 'Pad Pro', icon: '⌨️', hint: 'Type 100 right answers on the Math Quest number pad', rule: f => featVal_(f, 'math-quest', 'typedRight') >= 100 },   // ➗ mq-w1
   { id: 'mq_story', name: 'Story Solver', icon: '📖', hint: 'Solve 50 Math Quest story problems (📖 English or 📜 ไทย)', rule: f => featVal_(f, 'math-quest', 'storyRight') >= 50 },   // ➗ mq-w2
   { id: 'mq_trick', name: 'Trick Spotter', icon: '🕵️', hint: 'Spot 25 Math Quest trick questions (🤔 English or 🙃 ไทย)', rule: f => featVal_(f, 'math-quest', 'trickRight') >= 25 },   // ➗ mq-w3
+  { id: 'mq_test', name: 'Test Ace', icon: '📝', hint: 'Get 50 Math Quest test questions right (📝 Test Practice or 📝 ข้อสอบ)', rule: f => featVal_(f, 'math-quest', 'testRight') >= 50 },   // ➗ mq-t1
 ];
 function featVal_(f, g, s) { return Number(((f || {})[g] || {})[s]) || 0; }
 function featsSheet_() {
@@ -4828,7 +4832,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
