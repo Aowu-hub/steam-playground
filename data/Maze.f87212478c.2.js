@@ -1,0 +1,1081 @@
+
+const WEBAPP_URL = SP_TV[0];
+const CURRENT_PLAYER = SP_TV[1]; window.SP_PAGE = SP_TV[2];
+// 🎛️ p1b: the shared top bar (UiKit UI.gameBar) — ◀ where you came from · 🎚️ Levels · 🏠 | 🧭 Maze · level | scoreboard | game buttons ❓ ⚙️
+const BAR = UI.gameBar(document.getElementById('gbar'), {game: 'maze', icon: '🧭', name: 'Maze', levelId: 'hud-level',
+  levels: () => leavePlay(), playing: () => !!(G && !G.over), onLeave: () => { try{ clearInterval(timerId); }catch(e){} try{ speechSynthesis.cancel(); }catch(e){} },
+  pause: {pause: () => { if(typeof pauseGame === 'function') pauseGame(); }, resume: () => { if(typeof resume === 'function') resume(); }},
+  onFit: () => { if(G && typeof layout === 'function') layout(); },
+  extras: [{id: 'new-maze-btn', html: '🔄<span class="gt"> New maze</span>', label: 'A brand-new maze', onClick: () => newMaze(), keep: true}]});
+var NAV_INNER = {levels: ['◀ Maze', () => openCover()]};   // 🧱 b2: the setup's top button goes back to the 🎬 cover   // 🧭 inner screens: their top button goes to the main screen
+UI.navBar(document.getElementById('back-btn'), {onclick: false});
+UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});   // loader + menus in the player's look before the server answers
+const SESSION_START = Number(SP_TV[3]) || null;
+const DURATION_MIN = Number(SP_TV[4]) || null;
+
+/* ================= LEVELS & THEMES ================= */
+const LEVELS = [
+  {name:'Basic', emoji:'🌱', size:7, braid:0.08, stars:0, keys:0, light:0, spikes:0, gates:0, blocks:0, checkpoints:0, liquid:null, smoke:false, shake:false, spin:false,
+   blurb:'Easy to follow — just a bit of exploring'},
+  {name:'Junior', emoji:'🐣', size:11, braid:0.12, stars:3, keys:0, light:0, spikes:0, gates:0, blocks:0, checkpoints:0, liquid:null, smoke:false, shake:false, spin:false,
+   blurb:'Twisty paths and 3 stars to grab'},
+  {name:'Intermediate', emoji:'🔦', size:15, braid:0.15, stars:3, keys:2, light:4.6, spikes:0, gates:0, blocks:0, checkpoints:0, liquid:null, smoke:false, shake:false, spin:false,
+   blurb:'Keys, locked doors and only a flashlight'},
+  {name:'Hard', emoji:'⚡', size:19, braid:0.22, stars:3, keys:1, light:0, spikes:12, gates:5, blocks:9, checkpoints:2, liquid:null, smoke:false, shake:false, spin:false,
+   blurb:'Spikes, gates and blocked paths — traps send you back to a flag'},
+  {name:'Extreme', emoji:'🌋', size:23, braid:0.25, stars:3, keys:2, light:3.6, spikes:16, gates:7, blocks:11, checkpoints:3, liquid:'random', smoke:true, shake:true, spin:true,
+   blurb:'Lava or flood, smoke, shaking and a spinning screen!'},
+  {name:'Hardcore', emoji:'💀', size:25, braid:0.25, stars:3, keys:2, light:3.4, spikes:18, gates:8, blocks:12, checkpoints:0, liquid:'random', smoke:true, shake:true, spin:true, hardcore:true,
+   blurb:'One mistake ends it: bump a wall or touch a trap and it is over. No flags!'}
+];
+/* 🗺️ MAZE SIZE × 🎚️ DIFFICULTY (p3e — Aowu 2026-11-13: pick the map size, then the difficulty) */
+const MAZE_SIZES = [{k: 'auto', icon: '🎚️', name: 'Level size', sub: 'grows with the level'}, {k: 's', icon: '🟩', name: 'Small', n: 9}, {k: 'm', icon: '🟨', name: 'Medium', n: 13},
+  {k: 'l', icon: '🟧', name: 'Large', n: 17}, {k: 'xl', icon: '🟥', name: 'Huge', n: 21}, {k: 'xxl', icon: '🟪', name: 'Giant', n: 25}];
+let MAZE_SIZE = 'auto';
+function sizeMult(n){ return n <= 9 ? 1 : n <= 13 ? 1.25 : n <= 17 ? 1.5 : n <= 21 ? 1.75 : 2; }
+function sizeOf(k){ return MAZE_SIZES.find(z => z.k === (k || MAZE_SIZE)) || MAZE_SIZES[0]; }
+function sizeStore(){ return 'sp_maze_size_' + (S.player || ''); }
+function loadSize(){ try{ const k = localStorage.getItem(sizeStore()); MAZE_SIZE = MAZE_SIZES.some(z => z.k === k) ? k : 'auto'; }catch(e){ MAZE_SIZE = 'auto'; } }
+function saveSize(){ try{ localStorage.setItem(sizeStore(), MAZE_SIZE); }catch(e){} }
+// a difficulty on the picked size: the same traps PER SQUARE, so a small maze is not crowded and a big one not empty
+function levelFor(i, k){
+  const D = LEVELS[i], z = sizeOf(k), n = z.n || D.size;
+  if(n === D.size) return Object.assign({}, D, {mult: sizeMult(n), sizeKey: z.k, std: true});
+  const a = (n * n) / (D.size * D.size), r = n / D.size, sc = (v, f) => v ? Math.max(1, Math.round(v * f)) : 0;
+  return Object.assign({}, D, {size: n, spikes: sc(D.spikes, a), gates: sc(D.gates, a), blocks: sc(D.blocks, a), checkpoints: sc(D.checkpoints, r), mult: sizeMult(n), sizeKey: z.k, std: false});
+}
+function renderMaps(){
+  const box = $('map-list'); if(!box) return; const cur = sizeOf().k;
+  box.innerHTML = MAZE_SIZES.map(z => '<button class="mapc' + (z.k === cur ? ' on' : '') + '" data-k="' + z.k + '" data-sound="tap"><div class="ic">' + z.icon + '</div><div class="nm">' + z.name + '</div>' +
+    '<div class="sub">' + (z.n ? z.n + ' × ' + z.n : z.sub) + '</div><div class="x">' + (z.n ? '×' + sizeMult(z.n) : '×1 → ×2') + '</div></button>').join('');
+  box.querySelectorAll('.mapc').forEach(b => b.onclick = () => { MAZE_SIZE = b.dataset.k; saveSize(); renderLevels(); });
+}
+// 🏆 points for a finish (p3e): level + stars + time left on the par, × Hardcore 3, × the size
+function mazeScore(L, lvlIdx, ms, r){
+  const par = (G.lv.pathLen * 0.33 + 6 + G.lv.doors.size * 10 + G.lv.stars.size * 3), secs = ms / 1000;
+  return Math.round((200 * (lvlIdx + 1) + r * 150 + Math.max(0, par * 1.8 - secs) * 5) * (L.hardcore ? 3 : 1) * (L.mult || 1));
+}
+/* 🗺️ END MAZE SIZE */
+const THEMES = {
+  animal: {name:'Animals', icon:'🐾', heroes:['🐶','🐱','🐰','🦊','🐼','🐨','🐯','🐵','🐸'], goals:['🦴','🏡','🧺','🍖'], collect:['🥕','🍎','🍌','🐟','🧀'], blocks:['🪵','🪨','🌳'],
+           walls:['jungle'], palettes:[['#FFF4DE','#8D6E63','#F6E2C0'],['#EAF7E1','#5B8C51','#D7EDCB'],['#FDEDE4','#B5644A','#F7D9C8']]},
+  insect: {name:'Bugs', icon:'🐞', heroes:['🐝','🐞','🦋','🐜','🐛','🦗'], goals:['🌻','🌺','🍯','🌼'], collect:['🍃','💧','🌸','🍀'], blocks:['🍄','🪨','🌵'],
+           walls:['garden'], palettes:[['#F3FBE9','#4E8F3A','#E1F3D0'],['#FFF8E1','#A1772C','#F7E8B9'],['#F0F7FF','#3D7AB8','#DDEBFA']]},
+  vehicle:{name:'Vehicles', icon:'🚗', heroes:['🚗','🚕','🚌','🚒','🚓','🚜','🏎️','🚲','🛵'], goals:['🏁','🅿️','🏠','⛽'], collect:['🪙','🔧','⭐','🛞'], blocks:['🚧','🛢️','📦'],
+           walls:['barrier'], palettes:[['#EEF1F5','#4A5568','#DDE3EA'],['#FFF5E6','#C05621','#FBE3C7'],['#EAF4FF','#2B6CB0','#D3E6FB']]},
+  house:  {name:'House', icon:'🏠', heroes:['🧒','👧','🧑','🐕','🐈'], goals:['🛏️','🚪','🏠','🧸'], collect:['🔑','🍪','🎈','🧦'], blocks:['📦','🪑','🛋️'],
+           walls:['wood','concrete'], palettes:[['#FFF7F0','#9C5B3B','#F5E2D3'],['#F6F2FF','#6B4FB8','#E6DEFB'],['#F2FBF8','#2F8F7A','#DAF1EA']]},
+  shape:  {name:'Shapes', icon:'🔷', heroes:['🔴','🔷','🟢','🟣','🟡','🔶'], goals:['⭐','🏁','🎯'], collect:['🔺','🟦','🟩','🔸','🟪'], blocks:['⬛','🟫','🔲'],
+           walls:['blocks'], palettes:[['#F7F7FF','#5A4FCF','#E6E4FF'],['#FFF8F0','#E07A2F','#FCE6D2'],['#F0FFF7','#1F9D6B','#D5F5E6']]},
+  space:  {name:'Space', icon:'🚀', heroes:['🚀','🛸','👽','🧑‍🚀'], goals:['🪐','🌍','🌙'], collect:['⭐','☄️','💫','🌟'], blocks:['🪨','🛰️','🌑'],
+           walls:['metal'], palettes:[['#1E2346','#8C8FFF','#272D5A'],['#14213D','#FCA311','#1C2C50'],['#2A1B3D','#E56B6F','#36254D']]},
+  ocean:  {name:'Ocean', icon:'🐠', heroes:['🐠','🐙','🐢','🐬','🦀','🐳'], goals:['🐚','🏝️','🪸'], collect:['🫧','💎','🐚','⭐'], blocks:['🪨','🪸','⚓'],
+           walls:['coral'], palettes:[['#E6F7FF','#1C7ED6','#CDEBFB'],['#E8FBF6','#0B8A7A','#CFF2E9'],['#EEF2FF','#3B5BDB','#D7DFFD']]},
+  dino:   {name:'Dinos', icon:'🦖', heroes:['🦖','🦕','🐊','🦎'], goals:['🥚','🌋','🦴'], collect:['🌿','🍖','🦴','🍃'], blocks:['🪨','🌴','🌵'],
+           walls:['rock'], palettes:[['#F4F9E8','#6B8E23','#E3EFC9'],['#FFF3E6','#A0522D','#F6DFC7'],['#EFF6EE','#3E7B4F','#D8EBDA']]}
+};
+const AGE_START = {'4-5':0, '6-7':1, '8-9':2, '10+':3}; // levels open from age; Extreme always needs Hard cleared, 💀 Hardcore needs Extreme
+const AGE_RECOMMEND = {'4-5':0, '6-7':1, '8-9':2, '10+':3};
+
+/* ================= SMALL HELPERS ================= */
+const $ = id => document.getElementById(id);
+// rnd + EMOJI_FONT come from AvatarKit (same as before) — never declare them again here
+const pick = a => a[rnd(a.length)];
+function shuffle(a){ for(let i = a.length - 1; i > 0; i--){ const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ================= MAZE GENERATION ================= */
+// Cells hold wall bits: N=1 E=2 S=4 W=8. A "perfect" maze is carved with a
+// randomized depth-first search (one path between any two cells), then
+// "braided": some dead ends get opened up so there are loops. Every maze
+// is new; it is always solvable because carving connects every cell.
+const DIRS = [{dx:0,dy:-1,b:1,o:4},{dx:1,dy:0,b:2,o:8},{dx:0,dy:1,b:4,o:1},{dx:-1,dy:0,b:8,o:2}];
+function carve(n, braid){
+  const N = n * n, walls = new Uint8Array(N).fill(15), seen = new Uint8Array(N);
+  const stack = [rnd(N)]; seen[stack[0]] = 1;
+  while(stack.length){
+    const c = stack[stack.length - 1], x = c % n, y = (c / n) | 0;
+    const opts = [];
+    DIRS.forEach((d, i) => { const nx = x + d.dx, ny = y + d.dy; if(nx >= 0 && ny >= 0 && nx < n && ny < n && !seen[ny * n + nx]) opts.push(i); });
+    if(!opts.length){ stack.pop(); continue; }
+    const d = DIRS[pick(opts)], nc = (y + d.dy) * n + (x + d.dx);
+    walls[c] &= ~d.b; walls[nc] &= ~d.o; seen[nc] = 1; stack.push(nc);
+  }
+  for(let c = 0; c < N; c++){
+    if(openCount(walls, c) !== 1 || Math.random() >= braid) continue;
+    const x = c % n, y = (c / n) | 0;
+    const closed = DIRS.map((d, i) => i).filter(i => {
+      const d = DIRS[i], nx = x + d.dx, ny = y + d.dy;
+      return (walls[c] & d.b) && nx >= 0 && ny >= 0 && nx < n && ny < n;
+    });
+    if(!closed.length) continue;
+    const d = DIRS[pick(closed)], nc = (y + d.dy) * n + (x + d.dx);
+    walls[c] &= ~d.b; walls[nc] &= ~d.o;
+  }
+  return walls;
+}
+function openCount(walls, c){ let k = 0; for(const d of DIRS) if(!(walls[c] & d.b)) k++; return k; }
+function stepFrom(n, c, dir){ const x = c % n + DIRS[dir].dx, y = ((c / n) | 0) + DIRS[dir].dy; return (x < 0 || y < 0 || x >= n || y >= n) ? -1 : y * n + x; }
+// Breadth-first search; `blocked` cells can't be entered.
+function bfs(n, walls, from, blocked){
+  const dist = new Int32Array(n * n).fill(-1), prev = new Int32Array(n * n).fill(-1);
+  const q = [from]; dist[from] = 0;
+  for(let h = 0; h < q.length; h++){
+    const c = q[h];
+    for(let i = 0; i < 4; i++){
+      if(walls[c] & DIRS[i].b) continue;
+      const nc = stepFrom(n, c, i);
+      if(nc < 0 || dist[nc] !== -1 || (blocked && blocked.has(nc))) continue;
+      dist[nc] = dist[c] + 1; prev[nc] = c; q.push(nc);
+    }
+  }
+  return {dist, prev};
+}
+function pathTo(prev, goal){ const p = []; for(let c = goal; c !== -1; c = prev[c]) p.unshift(c); return p; }
+
+// Builds one full level: maze + start/goal + all items, checked for fairness.
+function buildLevel(lvlIdx, themeKey, Lx){
+  const L = Lx || levelFor(lvlIdx), T = THEMES[themeKey], n = L.size;   /* 🗺️ p3e: the picked size */
+  const walls = carve(n, L.braid);
+  // Start in a random corner, goal = the cell farthest away (so it takes some work).
+  const corners = [0, n - 1, n * (n - 1), n * n - 1];
+  const start = pick(corners);
+  let r = bfs(n, walls, start);
+  let goal = 0; for(let c = 0; c < n * n; c++) if(r.dist[c] > r.dist[goal]) goal = c;
+  const special = new Set([start, goal]);
+  const pal = pick(T.palettes);
+  const lv = {
+    lvlIdx, themeKey, n, walls, start, goal, hero: pick(T.heroes), goalIcon: pick(T.goals), collectIcon: pick(T.collect),
+    blockIcon: pick(T.blocks), floor: pal[0], wall: pal[1], tint: pal[2], wallStyle: pick(T.walls),
+    blocks: new Set(), stars: new Set(), keys: new Map(), doors: new Map(), spikes: new Map(), gates: new Map(), flags: [],
+    liquid: L.liquid === 'random' ? pick(['lava', 'flood']) : L.liquid
+  };
+  // 1. Blockages: anywhere, as long as start -> goal is still reachable.
+  const cells = shuffle(Array.from({length: n * n}, (_, i) => i).filter(c => !special.has(c)));
+  for(const c of cells){
+    if(lv.blocks.size >= L.blocks) break;
+    lv.blocks.add(c);
+    if(bfs(n, walls, start, lv.blocks).dist[goal] === -1) lv.blocks.delete(c);
+  }
+  r = bfs(n, walls, start, lv.blocks);
+  const path = pathTo(r.prev, goal);
+  lv.pathLen = path.length;
+  const onPath = new Set(path);
+  // 2. Checkpoint flags spaced along the route.
+  for(let k = 1; k <= L.checkpoints; k++){ const c = path[Math.floor(path.length * k / (L.checkpoints + 1))]; lv.flags.push(c); special.add(c); }
+  // 3. Locked doors on the route, each with its OWN coloured key (a key can
+  // only open the door of its colour, so a key can never be "wasted" on
+  // the wrong door). Key j is always reachable with doors 0..j-1 open and
+  // door j and later still shut, so the order always works out.
+  const doorCells = [];
+  for(let k = 1; k <= L.keys; k++){
+    const c = path[Math.floor(path.length * (0.3 + 0.55 * k / (L.keys + 1)))];
+    if(!special.has(c) && !lv.blocks.has(c)){ doorCells.push(c); special.add(c); }
+  }
+  doorCells.forEach((door, j) => {
+    const later = new Set(lv.blocks); doorCells.slice(j).forEach(d => later.add(d));
+    const reach = bfs(n, walls, start, later).dist;
+    let pool = [];
+    for(let c = 0; c < n * n; c++) if(reach[c] > 2 && !special.has(c) && !lv.blocks.has(c)) pool.push(c);
+    const offPath = pool.filter(c => !onPath.has(c));
+    if(offPath.length) pool = offPath;
+    if(pool.length){ const c = pick(pool); lv.keys.set(c, j); lv.doors.set(door, j); special.add(c); }
+    else special.delete(door); // nowhere fair to hide its key: no door here
+  });
+  // 4. Stars: prefer dead ends (worth a detour).
+  const free = c => !special.has(c) && !lv.blocks.has(c) && r.dist[c] > 0;
+  const deadEnds = shuffle(cells.filter(c => free(c) && openCount(walls, c) === 1));
+  const others = shuffle(cells.filter(c => free(c)));
+  for(const c of deadEnds.concat(others)){ if(lv.stars.size >= L.stars) break; if(!lv.stars.has(c)){ lv.stars.add(c); special.add(c); } }
+  // 5. Timed hazards (they open up again, so they never make it unsolvable).
+  const nearStart = c => r.dist[c] >= 0 && r.dist[c] < 3;
+  for(const c of shuffle(cells.slice())){
+    if(lv.spikes.size >= L.spikes) break;
+    if(free(c) && !nearStart(c) && !lv.gates.has(c)) lv.spikes.set(c, Math.random() * 2400);
+  }
+  const corridors = shuffle(cells.filter(c => free(c) && !lv.spikes.has(c) && !nearStart(c) && openCount(walls, c) === 2));
+  for(const c of corridors){ if(lv.gates.size >= L.gates) break; lv.gates.set(c, Math.random() * 3200); }
+  // Distances from the start, used by rising lava / flood water.
+  lv.startDist = bfs(n, walls, start, lv.blocks).dist;
+  return lv;
+}
+// Hazard timing (ms): spikes up 45% of a 2.4 s cycle, gates shut 40% of 3.2 s.
+const KEY_COLORS = [{name:'red', fill:'#E5484D'}, {name:'blue', fill:'#3B82F6'}, {name:'green', fill:'#22A55E'}];
+const spikeUp = (lv, c, t) => ((t + lv.spikes.get(c)) % 2400) < 1080;
+const spikeSoon = (lv, c, t) => { const p = (t + lv.spikes.get(c)) % 2400; return p > 2100; };
+const gateShut = (lv, c, t) => ((t + lv.gates.get(c)) % 3200) < 1280;
+
+/* ================= GAME STATE ================= */
+let S = { players: [], progress: {}, settings: {}, avatars: {}, player: '', age: '' };
+let G = null;          // the running game
+let rafId = 0;
+let heldDir = -1;      // screen direction held (keyboard / d-pad / drag)
+let autoDir = -1;      // world direction for a flick "run to the next junction"
+let lockHandle = null;
+
+function effectsOn(){ return !REDUCED && !(S.settings.MazeEffects === 'FALSE' || S.settings.MazeEffects === false); }
+
+function startGame(lvlIdx, themeKey){ setTimeout(cheerMount, 0); /* 📣 cs-4c */
+  if(MazeCover) MazeCover.hide();   /* 🧱 b2 */
+  const L = levelFor(lvlIdx);   /* 🗺️ p3e: this difficulty on the picked maze size */
+  if(themeKey === 'surprise') themeKey = pick(Object.keys(THEMES));
+  const lv = buildLevel(lvlIdx, themeKey, L);
+  G = {
+    L, lv, pos: lv.start, from: lv.start, moveT0: 0, moveDur: 0, moving: false,
+    keys: new Set(), stars: 0, opened: new Set(), gotStars: new Set(), gotKeys: new Set(), flag: lv.start, reached: new Set(),
+    t0: performance.now(), pausedAt: 0, pausedTotal: 0, over: false, invulnUntil: 0, bumpUntil: 0,
+    rot: 0, nextShake: 0, nextSpin: 0, liquidLevel: -1, liquidNext: 0, smoke: [], lastSec: -1,
+    face: 1, faceFrom: 1, turnT0: 0, anim: null, fx: [], frozenUntil: 0,
+    av: HAS_AV ? myAvatar(S.player) : null, idle: null, idleSince: performance.now(), bonkUntil: 0, walkT: 0, lastNow: 0
+  };
+  if(G.av){ G.face = -1; G.faceFrom = -1; }   // the avatar starts facing right (the emoji explorer faced left)
+  G.nextShake = G.t0 + 6000 + Math.random() * 4000;
+  G.nextSpin = G.t0 + 12000 + Math.random() * 6000;
+  G.liquidNext = Infinity; // lava/flood starts 8 s after the first move
+  if(L.smoke) for(let i = 0; i < 7; i++) G.smoke.push({x: Math.random() * lv.n, y: Math.random() * lv.n, r: 1.5 + Math.random() * 2.2, vx: (Math.random() - .5) * .35, vy: (Math.random() - .5) * .35});
+  heldDir = -1; autoDir = -1;
+  $('stage').style.transform = 'rotate(0deg)';
+  BAR.level(L.emoji + ' ' + L.name + (L.std ? '' : ' · ' + L.size + '×' + L.size));
+  BAR.hide('stars', !L.stars);
+  BAR.hide('keys', !lv.doors.size);
+  updateHud();
+  showScreen('play');
+  resizeStage();
+  if(lv.liquid === 'lava') showBanner('🌋 Lava rises soon — hurry to the ' + lv.goalIcon + '!');
+  else if(lv.liquid === 'flood') showBanner('🌊 A flood is coming — water slows you down!');
+  else if(lv.doors.size) showBanner('🔑 Find the keys to open the doors!');
+  else if(L.stars) showBanner('⭐ Grab the ' + lv.collectIcon + ' and reach the ' + lv.goalIcon + '!');
+  else showBanner('Find the ' + lv.goalIcon + '!');
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(loop);
+}
+function newMaze(){ if(G) startGame(G.lv.lvlIdx, G.lv.themeKey); }
+function retrySame(){
+  if(!G) return;
+  const lv = G.lv;
+  startGameFromLevel(lv);
+}
+// Replay the exact same maze (after lava): same layout, everything reset.
+function startGameFromLevel(lv){
+  const L = LEVELS[lv.lvlIdx];
+  G = Object.assign({}, G, {pos: lv.start, from: lv.start, moving: false, keys: new Set(), stars: 0, opened: new Set(), gotStars: new Set(), gotKeys: new Set(),
+    flag: lv.start, reached: new Set(), t0: performance.now(), pausedAt: 0, pausedTotal: 0, over: false, invulnUntil: 0,
+    liquidLevel: -1, liquidNext: Infinity, rot: 0, anim: null, fx: [], frozenUntil: 0, finishMs: 0});
+  $('stage').style.transform = 'rotate(0deg)';
+  hideResult(); updateHud(); showScreen('play'); resizeStage();
+  cancelAnimationFrame(rafId); rafId = requestAnimationFrame(loop);
+}
+function leavePlay(){ cancelAnimationFrame(rafId); G = null; showScreen('levels'); renderLevels(); }
+
+/* ================= MOVEMENT ================= */
+const STEP_MS = 125;
+function worldDir(screenDir){ return ((screenDir - G.rot) % 4 + 4) % 4; }
+function blockedReason(c, t){
+  const lv = G.lv;
+  if(lv.blocks.has(c)) return 'block';
+  if(lv.gates.has(c) && gateShut(lv, c, t)) return 'gate';
+  if(lv.doors.has(c) && !G.opened.has(c)) return G.keys.has(lv.doors.get(c)) ? '' : 'door';
+  return '';
+}
+function tryMove(dir, now){
+  const lv = G.lv;
+  if(lv.walls[G.pos] & DIRS[dir].b){ bump(now); if(G.L.hardcore) lose(now, 'wall'); return false; }
+  const nc = stepFrom(lv.n, G.pos, dir);
+  if(nc < 0){ bump(now); if(G.L.hardcore) lose(now, 'wall'); return false; }
+  const why = blockedReason(nc, now);
+  if(why){
+    bump(now);
+    if(why === 'door') showBanner('🔒 Locked! Find the ' + KEY_COLORS[lv.doors.get(nc)].name + ' 🔑 first');
+    return false;
+  }
+  if(lv.doors.has(nc) && !G.opened.has(nc)){ G.keys.delete(lv.doors.get(nc)); G.opened.add(nc); UISound.play('unlock'); showBanner('🔓 Door opened!'); updateHud(); }
+  if(lv.liquid && G.liquidNext === Infinity){ G.liquidNext = now + 8000; showBanner(lv.liquid === 'lava' ? '🌋 8 seconds until the lava rises!' : '🌊 8 seconds until the flood!'); }
+  const dx = DIRS[dir].dx;
+  if(dx){ const f = dx > 0 ? -1 : 1; if(f !== G.face){ G.faceFrom = G.face; G.face = f; G.turnT0 = now; } }
+  G.from = G.pos; G.pos = nc; G.moving = true; G.moveT0 = now; G.idle = null; G.idleSince = now;
+  G.moveDur = (lv.liquid === 'flood' && inLiquid(nc)) ? STEP_MS * 2.6 : STEP_MS;
+  return true;
+}
+function bump(now){
+  autoDir = -1;
+  if(now > G.bumpUntil){
+    UISound.play('bump'); G.bumpUntil = now + 260;
+    if(!G.anim) G.anim = {type: 'bump', t0: now, dur: 240};
+    burst(G.pos, ['💨'], 1, 0.25, 0.35);
+    if(G.av){ G.bonkUntil = now + 700; G.idle = null; G.idleSince = now; burst(G.pos, ['💫', '⭐'], 2, 0.35, 0.26); }   // 🧑 bonk: hand on the head, eyes shut, stars
+  }
+}
+function arrive(now){
+  const lv = G.lv, c = G.pos;
+  if(lv.stars.has(c) && !G.gotStars.has(c)){ G.gotStars.add(c); G.stars++; cheerSay(G.stars >= lv.stars.size ? 'big' : 'goal', 'star'); /* 📣 cs-4c */ UISound.play('pop'); updateHud(); G.anim = {type: 'happy', t0: now, dur: 560}; burst(c, ['✨', '⭐', lv.collectIcon], 6, 0.9); floatText(c, '+1'); }
+  if(lv.keys.has(c) && !G.gotKeys.has(c)){ G.gotKeys.add(c); G.keys.add(lv.keys.get(c)); cheerSay('goal', 'key'); /* 📣 cs-4c */ UISound.play('success'); G.anim = {type: 'happy', t0: now, dur: 560}; burst(c, ['✨', '🔑'], 6, 0.9); showBanner('🔑 Got the ' + KEY_COLORS[lv.keys.get(c)].name + ' key!'); updateHud(); }
+  if(lv.flags.indexOf(c) !== -1 && !G.reached.has(c)){ G.reached.add(c); G.flag = c; cheerSay('goal', 'flag'); /* 📣 cs-4c */ UISound.play('drop'); G.anim = {type: 'spin', t0: now, dur: 620}; burst(c, ['🎉', '✨'], 5, 0.8); showBanner('🚩 Checkpoint!'); }
+  if(c === lv.goal){ win(now); return; }
+  // Flick-run: keep going along a corridor until a junction or something interesting.
+  if(autoDir !== -1){
+    const opens = DIRS.map((d, i) => i).filter(i => !(lv.walls[c] & DIRS[i].b));
+    const back = (autoDir + 2) % 4;
+    const ahead = opens.filter(i => i !== back);
+    const interesting = lv.stars.has(c) || lv.keys.has(c) || lv.flags.indexOf(c) !== -1;
+    if(opens.length === 2 && ahead.length === 1 && !interesting) autoDir = ahead[0];
+    else autoDir = -1;
+  }
+}
+// Ouch: the explorer squashes flat with stars spinning round its head, then
+// pops back at the last flag. Controls pause for that moment.
+function hit(now, why){
+  if(now < G.invulnUntil || G.over || now < G.frozenUntil) return;
+  if(G.L.hardcore){ lose(now, 'trap', why); return; }   // 💀 Hardcore: no flags, the first trap ends the run
+  UISound.play('error');
+  autoDir = -1; heldDir = -1;
+  if(G.moving){ G.moving = false; G.from = G.pos; }
+  cheerSay('miss', 'hit'); /* 📣 cs-4c */
+  G.anim = {type: 'hurt', t0: now, dur: REDUCED ? 150 : 750, why: why};
+  G.frozenUntil = now + G.anim.dur;
+  burst(G.pos, ['💥'], 1, 0.1, 0.5);
+  if(effectsOn()) shake();
+}
+function finishHurt(now){
+  const why = G.anim.why;
+  burst(G.pos, ['💨'], 3, 0.5);
+  G.pos = G.flag; G.from = G.flag; G.moving = false;
+  G.invulnUntil = now + 1200;
+  G.anim = {type: 'appear', t0: now, dur: 420};
+  burst(G.flag, ['✨'], 4, 0.6);
+  showBanner(why + (G.flag === G.lv.start ? ' Back to the start!' : ' Back to your 🚩!'));
+}
+function inLiquid(c){ return G.liquidLevel >= 0 && G.lv.startDist[c] >= 0 && G.lv.startDist[c] <= G.liquidLevel; }
+
+/* ================= GAME LOOP ================= */
+function loop(now){
+  if(!G || G.over){ return; }
+  if(G.pausedAt){ rafId = requestAnimationFrame(loop); return; }
+  const lv = G.lv, L = G.L;
+  // movement
+  if(G.moving && now - G.moveT0 >= G.moveDur){ G.moving = false; arrive(now); if(G.over) { draw(now); return; } }
+  if(G.anim && G.anim.type === 'hurt' && now >= G.frozenUntil) finishHurt(now);
+  if(!G.moving && now >= G.frozenUntil){
+    if(autoDir !== -1) tryMove(autoDir, now);
+    else if(heldDir !== -1) tryMove(worldDir(heldDir), now);
+  }
+  // hazards on the current cell
+  const here = G.moving && (now - G.moveT0) < G.moveDur * 0.5 ? G.from : G.pos;
+  if(lv.spikes.has(here) && spikeUp(lv, here, now)) hit(now, 'Ouch, spikes!');
+  // rising lava / flood
+  if(lv.liquid && now >= G.liquidNext){
+    G.liquidLevel++;
+    G.liquidNext = now + (lv.liquid === 'lava' ? 1250 : 800);
+    if(G.liquidLevel === 0) showBanner(lv.liquid === 'lava' ? '🌋 The lava is rising!' : '🌊 Here comes the water!');
+  }
+  if(lv.liquid === 'lava' && inLiquid(G.pos) && !G.moving){ lose(now); return; }
+  if(lv.liquid === 'flood' && inLiquid(G.pos) && Math.random() < 0.04) burst(G.pos, ['💦'], 1, 0.4, 0.4);
+  // screen effects (Extreme only, parents can switch off)
+  if(L.shake && effectsOn() && now >= G.nextShake){ shake(); UISound.play('bump'); G.nextShake = now + 6000 + Math.random() * 5000; }
+  if(L.spin && effectsOn() && now >= G.nextSpin){
+    G.rot = (G.rot + (Math.random() < 0.5 ? 1 : 3)) % 4;
+    $('stage').style.transform = 'rotate(' + (G.rot * 90) + 'deg)';
+    UISound.play('whoosh');
+    showBanner('🌀 The maze is spinning! Controls follow the screen');
+    G.nextSpin = now + 13000 + Math.random() * 7000;
+  }
+  if(G.smoke.length) G.smoke.forEach(p => { p.x += p.vx / 60; p.y += p.vy / 60; if(p.x < -2 || p.x > lv.n + 2) p.vx *= -1; if(p.y < -2 || p.y > lv.n + 2) p.vy *= -1; });
+  const sec = Math.floor((now - G.t0 - G.pausedTotal) / 1000);
+  if(sec !== G.lastSec){ G.lastSec = sec; updateHud(); }
+  draw(now);
+  rafId = requestAnimationFrame(loop);
+}
+function shake(){ const s = $('shaker'); s.classList.remove('shake'); void s.offsetWidth; s.classList.add('shake'); }
+function pauseGame(){ if(G && !G.pausedAt) G.pausedAt = performance.now(); }
+
+/* ================= DRAWING ================= */
+const cv = $('cv'), ctx = cv.getContext('2d');
+let CS = 20, DPR = 1, staticLayer = null, staticKey = '';
+function resizeStage(){
+  if(!G) return;
+  const wrap = $('stage-wrap');
+  const side = Math.max(120, Math.floor(Math.min(wrap.clientWidth, wrap.clientHeight) - 4));
+  const st = $('stage');
+  st.style.width = side + 'px'; st.style.height = side + 'px';
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = side * DPR; cv.height = side * DPR;
+  CS = side / G.lv.n;
+  staticKey = '';
+}
+window.addEventListener('resize', resizeStage);
+if(window.ResizeObserver) new ResizeObserver(resizeStage).observe($('stage-wrap'));
+
+/* ----- Walls and floors that match the world ----- */
+// Every world draws its walls its own way: jungle vines, a hedge of grass,
+// red-and-white road barriers, wooden planks or concrete (House picks one),
+// toy blocks, riveted metal, coral or lumpy rock.
+const WALL_STYLES = {
+  jungle:  {w:0.26, base:'#2E6B2E', top:'#62AE4C', floor:['#EAF5DC','#DDEDC9'], fdeco:'tufts'},
+  garden:  {w:0.24, base:'#3D7A2A', top:'#86C95F', floor:['#F3F9E8','#E6F2D5'], fdeco:'flowers'},
+  barrier: {w:0.22, base:'#D8383A', top:'#FFFFFF', floor:['#E4E7EB','#D9DDE2'], fdeco:'asphalt'},
+  wood:    {w:0.26, base:'#7A4A2A', top:'#B07A4C', floor:['#F4E4CD','#ECD7BA'], fdeco:'boards'},
+  concrete:{w:0.26, base:'#77808B', top:'#A9B0B9', floor:['#EEEFF1','#E3E5E8'], fdeco:'tiles'},
+  blocks:  {w:0.26, base:'#5A4FCF', top:'#FFFFFF', floor:null, fdeco:'none'},
+  metal:   {w:0.22, base:'#46506E', top:'#9AA8D6', floor:null, fdeco:'stars'},
+  coral:   {w:0.24, base:'#DE5579', top:'#FF9EAD', floor:['#E2F3FB','#D2EBF6'], fdeco:'sand'},
+  rock:    {w:0.28, base:'#6B5F56', top:'#9C8E82', floor:['#F3ECDF','#E8DECD'], fdeco:'cracks'}
+};
+const BLOCK_COLS = ['#EF476F','#FFD166','#06D6A0','#118AB2','#8E7CC3','#F78C6B'];
+function wallSegments(lv){
+  const n = lv.n, segs = [];
+  for(let c = 0; c < n * n; c++){
+    const x = (c % n) * CS, y = ((c / n) | 0) * CS, w = lv.walls[c];
+    if(w & 1) segs.push([x, y, x + CS, y]);
+    if(w & 8) segs.push([x, y, x, y + CS]);
+    if((w & 2) && (c % n === n - 1)) segs.push([x + CS, y, x + CS, y + CS]);
+    if((w & 4) && (((c / n) | 0) === n - 1)) segs.push([x, y + CS, x + CS, y + CS]);
+  }
+  return segs;
+}
+function strokeSegs(g, segs, color, width, dash){
+  g.strokeStyle = color; g.lineWidth = width; g.setLineDash(dash || []);
+  g.beginPath(); segs.forEach(q => { g.moveTo(q[0], q[1]); g.lineTo(q[2], q[3]); }); g.stroke(); g.setLineDash([]);
+}
+function along(q, step, fn){ // fn(x, y, k, horizontal) at points along a wall
+  const len = Math.hypot(q[2] - q[0], q[3] - q[1]), m = Math.max(1, Math.round(len / step));
+  for(let k = 0; k <= m; k++){ const t = k / m; fn(q[0] + (q[2] - q[0]) * t, q[1] + (q[3] - q[1]) * t, k, q[1] === q[3]); }
+}
+function drawFloorDeco(g, lv, st){
+  const n = lv.n, R = Math.random;
+  for(let c = 0; c < n * n; c++){
+    const x = (c % n) * CS, y = ((c / n) | 0) * CS;
+    if(st.fdeco === 'tufts' && R() < 0.35){
+      g.strokeStyle = 'rgba(70,130,50,0.35)'; g.lineWidth = Math.max(1, CS * 0.03);
+      const bx = x + CS * (0.2 + R() * 0.6), by = y + CS * (0.3 + R() * 0.5);
+      g.beginPath(); g.moveTo(bx - CS * .06, by); g.lineTo(bx - CS * .1, by - CS * .12); g.moveTo(bx, by); g.lineTo(bx, by - CS * .15); g.moveTo(bx + CS * .06, by); g.lineTo(bx + CS * .1, by - CS * .12); g.stroke();
+    }
+    if(st.fdeco === 'flowers' && R() < 0.22){
+      const fx = x + CS * (0.25 + R() * 0.5), fy = y + CS * (0.25 + R() * 0.5);
+      g.fillStyle = pick(['rgba(255,120,160,0.45)','rgba(255,200,60,0.5)','rgba(160,120,255,0.4)']);
+      for(let k = 0; k < 5; k++){ const a = k * 1.256; g.beginPath(); g.arc(fx + Math.cos(a) * CS * .05, fy + Math.sin(a) * CS * .05, CS * .04, 0, 7); g.fill(); }
+    }
+    if(st.fdeco === 'asphalt'){ g.fillStyle = 'rgba(80,90,100,0.12)'; for(let k = 0; k < 3; k++) g.fillRect(x + R() * CS, y + R() * CS, CS * .03, CS * .03); }
+    if(st.fdeco === 'boards'){
+      g.strokeStyle = 'rgba(150,100,60,0.22)'; g.lineWidth = Math.max(1, CS * 0.02);
+      const off = ((c / n) | 0) % 2 ? .3 : .7;
+      g.beginPath(); g.moveTo(x, y + CS * .5); g.lineTo(x + CS, y + CS * .5);
+      g.moveTo(x + CS * off, y); g.lineTo(x + CS * off, y + CS * .5); g.moveTo(x + CS * (1 - off), y + CS * .5); g.lineTo(x + CS * (1 - off), y + CS); g.stroke();
+    }
+    if(st.fdeco === 'tiles'){ g.strokeStyle = 'rgba(120,128,140,0.18)'; g.lineWidth = 1; g.strokeRect(x + .5, y + .5, CS - 1, CS - 1); }
+    if(st.fdeco === 'stars' && R() < 0.3){ g.fillStyle = 'rgba(255,255,255,' + (0.25 + R() * 0.4) + ')'; g.beginPath(); g.arc(x + R() * CS, y + R() * CS, CS * (0.015 + R() * 0.02), 0, 7); g.fill(); }
+    if(st.fdeco === 'sand' && R() < 0.5){ g.fillStyle = 'rgba(30,120,180,0.10)'; g.beginPath(); g.arc(x + R() * CS, y + R() * CS, CS * 0.06, 0, 7); g.fill(); }
+    if(st.fdeco === 'cracks' && R() < 0.15){
+      g.strokeStyle = 'rgba(120,100,80,0.25)'; g.lineWidth = Math.max(1, CS * 0.02);
+      let cx = x + R() * CS, cy = y + R() * CS; g.beginPath(); g.moveTo(cx, cy);
+      for(let k = 0; k < 3; k++){ cx += (R() - .5) * CS * .3; cy += (R() - .3) * CS * .25; g.lineTo(cx, cy); } g.stroke();
+    }
+  }
+}
+function drawWalls(g, lv, st){
+  const segs = wallSegments(lv), W = Math.max(3, CS * st.w), R = Math.random;
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  // soft shadow so the walls stand up from the floor
+  g.save(); g.translate(CS * 0.04, CS * 0.06); strokeSegs(g, segs, 'rgba(0,0,0,0.16)', W); g.restore();
+  if(lv.wallStyle === 'blocks'){
+    g.lineCap = 'butt';
+    segs.forEach((q, k) => strokeSegs(g, [q], BLOCK_COLS[k % BLOCK_COLS.length], W));
+    strokeSegs(g, segs, 'rgba(255,255,255,0.35)', W * 0.25);
+    g.lineCap = 'round';
+    return;
+  }
+  strokeSegs(g, segs, st.base, W);
+  if(lv.wallStyle === 'barrier'){ g.lineCap = 'butt'; strokeSegs(g, segs, st.top, W * 0.8, [W * 0.9, W * 0.9]); g.lineCap = 'round'; return; }
+  strokeSegs(g, segs, st.top, W * 0.38);
+  segs.forEach(q => {
+    if(lv.wallStyle === 'jungle') along(q, CS * 0.42, (x, y, k, hz) => {
+      const side = k % 2 ? 1 : -1, ang = hz ? side * 0.5 + Math.PI / 2 : (side > 0 ? 0.4 : Math.PI - 0.4);
+      g.fillStyle = k % 3 ? '#4C9A3A' : '#2F7D2A';
+      g.save(); g.translate(x + (hz ? 0 : side * W * 0.45), y + (hz ? side * W * 0.45 : 0)); g.rotate(ang);
+      g.beginPath(); g.ellipse(W * 0.35, 0, W * 0.5, W * 0.24, 0, 0, 7); g.fill(); g.restore();
+      if(R() < 0.12){ g.fillStyle = pick(['#FF6F91','#FFC75F','#F9F871']); g.beginPath(); g.arc(x, y, W * 0.28, 0, 7); g.fill(); }
+    });
+    if(lv.wallStyle === 'garden') along(q, CS * 0.18, (x, y, k, hz) => {
+      g.strokeStyle = '#5DA841'; g.lineWidth = Math.max(1, W * 0.12);
+      g.beginPath(); g.moveTo(x, y - (hz ? W * 0.3 : 0)); g.lineTo(x + (R() - .5) * W * 0.4, y - W * (hz ? 0.75 : 0.45)); g.stroke();
+    });
+    if(lv.wallStyle === 'wood') along(q, CS * 0.5, (x, y) => { g.fillStyle = '#4E2E19'; g.beginPath(); g.arc(x, y, W * 0.12, 0, 7); g.fill(); });
+    if(lv.wallStyle === 'concrete') along(q, CS * 0.12, (x, y) => { if(R() < 0.6){ g.fillStyle = 'rgba(60,64,70,0.35)'; g.fillRect(x + (R() - .5) * W * .6, y + (R() - .5) * W * .6, W * .1, W * .1); } });
+    if(lv.wallStyle === 'metal') along(q, CS * 0.33, (x, y) => { g.fillStyle = '#D6DEF7'; g.beginPath(); g.arc(x, y, W * 0.13, 0, 7); g.fill(); });
+    if(lv.wallStyle === 'coral') along(q, CS * 0.3, (x, y, k) => {
+      g.fillStyle = k % 2 ? '#F07B8E' : '#FFB3A7'; g.beginPath(); g.arc(x + (R() - .5) * W * .4, y + (R() - .5) * W * .4, W * (0.32 + R() * 0.2), 0, 7); g.fill();
+      if(R() < 0.25){ g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = 1; g.beginPath(); g.arc(x + W * 0.5, y - W * 0.7, W * 0.18, 0, 7); g.stroke(); }
+    });
+    if(lv.wallStyle === 'rock') along(q, CS * 0.26, (x, y, k) => {
+      g.fillStyle = k % 2 ? '#857669' : '#5E534B'; g.beginPath(); g.ellipse(x + (R() - .5) * W * .3, y + (R() - .5) * W * .3, W * (0.5 + R() * 0.2), W * (0.42 + R() * 0.15), R() * 3, 0, 7); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.18)'; g.beginPath(); g.arc(x - W * .15, y - W * .15, W * 0.14, 0, 7); g.fill();
+    });
+  });
+}
+function drawStatic(){
+  const lv = G.lv, n = lv.n, key = cv.width + ':' + lv.walls.length + ':' + lv.start + ':' + lv.goal + ':' + lv.wallStyle;
+  if(staticKey === key && staticLayer) return;
+  staticKey = key;
+  staticLayer = document.createElement('canvas');
+  staticLayer.width = cv.width; staticLayer.height = cv.height;
+  const g = staticLayer.getContext('2d');
+  g.scale(DPR, DPR);
+  const st = WALL_STYLES[lv.wallStyle] || WALL_STYLES.blocks;
+  const floor = st.floor ? st.floor[0] : lv.floor, tint = st.floor ? st.floor[1] : lv.tint;
+  g.fillStyle = floor; g.fillRect(0, 0, n * CS, n * CS);
+  // soft checker tint so the grid is readable
+  g.fillStyle = tint;
+  for(let y = 0; y < n; y++) for(let x = 0; x < n; x++) if((x + y) % 2) g.fillRect(x * CS, y * CS, CS, CS);
+  drawFloorDeco(g, lv, st);
+  // start pad
+  const sx = lv.start % n, sy = (lv.start / n) | 0;
+  g.fillStyle = 'rgba(46,196,182,0.35)'; g.fillRect(sx * CS, sy * CS, CS, CS);
+  drawWalls(g, lv, st);
+  // blockages
+  lv.blocks.forEach(c => emo(g, lv.blockIcon, (c % n + 0.5) * CS, (((c / n) | 0) + 0.5) * CS, CS * 0.72));   // cached emoji pictures (AvatarKit emo) — typing emoji every frame lags
+}
+/* ----- explorer animation ----- */
+// One pose per frame: offset, squash/stretch, turn, see-through, extras.
+/* ================= 🧑 YOUR AVATAR IN THE MAZE (plan 11w, 2026-11-06) =================
+   The player's own avatar (AvatarKit) walks the maze instead of the theme emoji: walks with swinging legs, faces the way it
+   goes, does a random move when it stands still for a moment, bonks its head on walls (hand on the head + stars), waves
+   at the exit. All the old explorer moves (happy jump, spin, squash, lava) still wrap it through heroPose(). */
+const HAS_AV = typeof drawAvatar === 'function' && typeof GESTURES !== 'undefined';
+function myAvatar(name){ const a = S.avatars && S.avatars[name || S.player]; return a ? fixAv(a) : defaultAvatar(name || S.player || 'player'); }
+const IDLE_MOVES = ['wave', 'dance', 'cheer', 'clap', 'spin', 'jump', 'yawn', 'floss', 'dab', 'flex', 'penguin', 'tapdance', 'peekaboo', 'hop', 'robot', 'disco', 'shuffle', 'laugh', 'magictrick', 'hulahoop'];
+const gestByKey = k => HAS_AV ? GESTURES.find(g => g.k === k) : null;
+function idleGesture(now){
+  if(G.moving || now < G.frozenUntil || heldDir !== -1 || autoDir !== -1){ G.idle = null; return null; }
+  if(!G.idle && now - G.idleSince > 2600){
+    const list = IDLE_MOVES.map(gestByKey).filter(g => g && g !== G.lastIdle);
+    if(list.length){ G.idle = {g: pick(list), t0: now}; G.lastIdle = G.idle.g; }
+  }
+  if(!G.idle) return null;
+  const t = (now - G.idle.t0) / 1000, len = G.idle.g.d < 1.6 ? G.idle.g.d * 2 : G.idle.g.d;
+  if(t > len){ G.idle = null; G.idleSince = now + Math.random() * 2500; return null; }
+  return {g: G.idle.g, t: t % G.idle.g.d};
+}
+// The avatar is drawn in the explorer's frame (centre of the cell, kept upright while the maze spins, scaled by heroPose).
+function drawHeroAvatar(now, hx, hy, H, blink){
+  if(G.moving) G.walkT += Math.max(0, Math.min(0.05, (now - (G.lastNow || now)) / 1000));
+  G.lastNow = now;
+  const A = G.anim, a = {name: S.player, av: G.av, dir: 1, walkT: G.moving ? G.walkT + 0.01 : 0, gest: null};
+  let pose = null;
+  if(A && A.type === 'win') a.gest = {g: gestByKey('wave') || GESTURES[0], t: (now - A.t0) / 1000};   // 👋 waves at the exit
+  else if(A && (A.type === 'hurt' || A.type === 'burn' || A.type === 'ko')) pose = {eyes: 'closed', mouth: 'open', armL: 2.3, armR: 2.3};
+  else if(A && A.type === 'happy') pose = {armL: 2.8, armR: 2.8, mouth: 'open', eyes: 'happy'};
+  else if(now < G.bonkUntil) pose = {eyes: 'closed', mouth: 'open', armL: 0.4, armR: 2.75};   // 🤕 bonk: hand on the head
+  else a.gest = idleGesture(now);
+  const k = CS / 90;
+  ctx.save();
+  ctx.globalAlpha = (blink ? 0.35 : 1) * H.alpha;
+  ctx.translate(hx + H.ox, hy + H.oy); ctx.rotate(-G.rot * Math.PI / 2); ctx.rotate(H.rot); ctx.scale(-H.sx, H.sy);   // heroPose: face 1 = left, the avatar's dir 1 = right
+  let okDraw = true;
+  try { drawAvatar(ctx, a, 0, CS * 0.4, k, {t: now / 1000, pose}); } catch(e){ okDraw = false; }
+  ctx.restore();
+  return okDraw;
+}
+function heroPose(now, t){
+  const H = {ox: 0, oy: 0, sx: 1, sy: 1, rot: 0, alpha: 1, shadow: 1, dizzy: false, burn: false};
+  if(G.moving){
+    const w = Math.sin(t * Math.PI);
+    H.oy -= w * CS * 0.16; H.sy = 1 + w * 0.1; H.sx = 1 - w * 0.06; H.rot = REDUCED ? 0 : Math.sin(t * Math.PI * 2) * 0.12; H.shadow = 1 - w * 0.3;
+  } else if(!REDUCED){
+    const b = Math.sin(now / 320); H.sy = 1 + b * 0.035; H.sx = 1 - b * 0.02;
+  }
+  if(G.lv.liquid === 'flood' && inLiquid(G.pos)) H.oy += Math.sin(now / 200) * CS * 0.05;
+  // facing: flips through thin when turning around
+  let face = G.face;
+  if(now - G.turnT0 < 170){ const k = (now - G.turnT0) / 170; face = G.faceFrom + (G.face - G.faceFrom) * k; if(Math.abs(face) < 0.15) face = 0.15 * Math.sign(G.face); }
+  const A = G.anim;
+  if(A){
+    const p = Math.min(1, (now - A.t0) / A.dur), up = Math.sin(p * Math.PI);
+    if(A.type === 'bump'){ H.ox += Math.sin(p * Math.PI * 4) * CS * 0.06 * (1 - p); H.sx *= 1 + 0.16 * (1 - p); H.sy *= 1 - 0.12 * (1 - p); }
+    if(A.type === 'happy'){ H.oy -= up * CS * 0.45; H.rot += REDUCED ? 0 : p * Math.PI * 2; H.sx *= 1 + up * 0.25; H.sy *= 1 + up * 0.25; H.shadow *= 1 - up * 0.5; }
+    if(A.type === 'spin'){ H.oy -= up * CS * 0.25; H.rot += REDUCED ? 0 : p * Math.PI * 2; }
+    if(A.type === 'hurt'){ const q = Math.min(1, p * 4); H.sy *= 1 - 0.55 * q; H.sx *= 1 + 0.35 * q; H.oy += q * CS * 0.18; H.dizzy = p > 0.2; }
+    if(A.type === 'appear'){ const k = p < 0.7 ? p / 0.7 * 1.15 : 1.15 - (p - 0.7) / 0.3 * 0.15; H.sx *= k; H.sy *= k; }
+    if(A.type === 'win'){ H.oy -= Math.abs(Math.sin(p * Math.PI * 2)) * CS * 0.6; H.rot += REDUCED ? 0 : Math.max(0, Math.min(1, (p - 0.3) / 0.4)) * Math.PI * 2; H.sx *= 1 + p * 0.3; H.sy *= 1 + p * 0.3; H.shadow *= 0.7; }
+    if(A.type === 'ko'){ const tip = Math.max(0, Math.min(1, (p - 0.35) / 0.3)); H.rot += REDUCED ? 0 : (tip ? tip * 1.45 : Math.sin(p * Math.PI * 9) * 0.16); H.oy += tip * CS * 0.12; H.dizzy = true; }
+    if(A.type === 'burn'){ H.oy += p * CS * 0.25; H.sx *= 1 - 0.6 * p; H.sy *= 1 - 0.6 * p; H.alpha = 1 - p * 0.85; H.burn = p < 0.85; }
+    if(p >= 1 && (A.type === 'bump' || A.type === 'happy' || A.type === 'spin' || A.type === 'appear')) G.anim = null;
+  }
+  H.sx *= face;
+  return H;
+}
+// Little effects: sparkles, dust, splashes, "+1". dx/dy in cells.
+function burst(c, list, count, spread, size){
+  if(REDUCED && count > 1) count = 1;
+  const [x, y] = cellXY(c), now = performance.now();
+  for(let k = 0; k < count; k++){
+    const a = Math.random() * Math.PI * 2, r = (spread || 0.6) * (0.5 + Math.random() * 0.5);
+    G.fx.push({ch: pick(list), x, y, dx: Math.cos(a) * r, dy: Math.sin(a) * r - 0.2, t0: now, dur: 650 + Math.random() * 300, size: size || 0.34, front: true});
+  }
+}
+function floatText(c, text){
+  const [x, y] = cellXY(c);
+  G.fx.push({text, x, y, dx: 0, dy: -0.8, t0: performance.now(), dur: 800, size: 0.38, front: true});
+}
+function drawFx(now, front){
+  if(!G.fx.length) return;
+  G.fx = G.fx.filter(f => now - f.t0 < f.dur);
+  G.fx.forEach(f => {
+    if(!!f.front !== front) return;
+    const p = (now - f.t0) / f.dur, e = 1 - Math.pow(1 - p, 2);
+    ctx.globalAlpha = 1 - p;
+    const x = f.x + f.dx * e * CS, y = f.y + f.dy * e * CS;
+    if(f.text){
+      ctx.font = '700 ' + Math.floor(CS * f.size) + "px 'Fredoka',sans-serif";
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.strokeText(f.text, x, y); ctx.fillStyle = '#7B4DFF'; ctx.fillText(f.text, x, y);
+    } else {
+      emo(ctx, f.ch, x, y, CS * f.size * (1 + p * 0.3));
+    }
+  });
+  ctx.globalAlpha = 1;
+}
+// Plays the explorer's ending (a winning jump-and-spin, or sinking in lava),
+// then calls done(). Runs on its own frames because the game loop has stopped.
+function playOutro(type, dur, done){
+  const g = G, t0 = performance.now();
+  G.anim = {type, t0, dur};
+  (function step(now){
+    if(G !== g) return; // left the game meanwhile
+    draw(now);
+    if(now - t0 < dur) requestAnimationFrame(step); else done();
+  })(t0);
+}
+function cellXY(c){ const n = G.lv.n; return [(c % n + 0.5) * CS, (((c / n) | 0) + 0.5) * CS]; }
+function emoji(ch, c, scale, alpha){
+  const [x, y] = cellXY(c);
+  ctx.globalAlpha = 1; emo(ctx, ch, x, y, CS * (scale || 0.72), alpha);
+}
+function disc(c, color, r){
+  const [x, y] = cellXY(c);
+  ctx.fillStyle = color; ctx.globalAlpha = 0.85;
+  ctx.beginPath(); ctx.arc(x, y, CS * r, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+function draw(now){
+  const lv = G.lv, n = lv.n;
+  drawStatic();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(staticLayer, 0, 0);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  // liquid
+  if(G.liquidLevel >= 0){
+    ctx.fillStyle = lv.liquid === 'lava' ? 'rgba(255,90,40,0.72)' : 'rgba(40,140,255,0.45)';
+    for(let c = 0; c < n * n; c++) if(inLiquid(c)){ const x = (c % n) * CS, y = ((c / n) | 0) * CS; ctx.fillRect(x, y, CS, CS); }
+    if(lv.liquid === 'lava'){
+      ctx.fillStyle = 'rgba(255,210,60,0.55)';
+      for(let c = 0; c < n * n; c++) if(lv.startDist[c] === G.liquidLevel){ const x = (c % n) * CS, y = ((c / n) | 0) * CS; ctx.fillRect(x, y + CS * 0.6, CS, CS * 0.4); }
+    }
+  }
+  // spikes and gates
+  lv.spikes.forEach((off, c) => {
+    const [x, y] = cellXY(c), up = spikeUp(lv, c, now), soon = spikeSoon(lv, c, now);
+    ctx.fillStyle = up ? '#5B6574' : (soon ? 'rgba(229,72,77,0.55)' : 'rgba(91,101,116,0.35)');
+    const s = CS * (up ? 0.36 : 0.14);
+    for(const [ox, oy] of [[-0.18, 0.12], [0.18, 0.12], [0, -0.14]]){
+      ctx.beginPath(); ctx.moveTo(x + ox * CS - s / 2, y + oy * CS + s / 2); ctx.lineTo(x + ox * CS, y + oy * CS - s / 2); ctx.lineTo(x + ox * CS + s / 2, y + oy * CS + s / 2); ctx.fill();
+    }
+  });
+  lv.gates.forEach((off, c) => {
+    const [x, y] = cellXY(c);
+    if(gateShut(lv, c, now)){
+      ctx.fillStyle = '#7B4A2B';
+      for(let i = -1; i <= 1; i++) ctx.fillRect(x + i * CS * 0.24 - CS * 0.05, y - CS * 0.42, CS * 0.1, CS * 0.84);
+      ctx.fillRect(x - CS * 0.4, y - CS * 0.06, CS * 0.8, CS * 0.12);
+    } else {
+      ctx.fillStyle = 'rgba(123,74,43,0.3)'; ctx.fillRect(x - CS * 0.4, y - CS * 0.42, CS * 0.8, CS * 0.08);
+    }
+  });
+  // items
+  lv.doors.forEach((col, c) => { if(!G.opened.has(c)){ disc(c, KEY_COLORS[col].fill, 0.46); emoji('🔒', c, 0.6); } });
+  lv.keys.forEach((col, c) => { if(!G.gotKeys.has(c)){ disc(c, KEY_COLORS[col].fill, 0.4); emoji('🔑', c, 0.58); } });
+  lv.stars.forEach(c => { if(!G.gotStars.has(c)) emoji(lv.collectIcon, c, 0.66); });
+  lv.flags.forEach(c => emoji(G.reached.has(c) ? '✅' : '🚩', c, 0.6));
+  emoji(lv.goalIcon, lv.goal, 0.8);
+  // particles (sparkles, dust, splashes) behind the explorer's head
+  drawFx(now, false);
+  // explorer: walks with a bounce, faces the way it goes, reacts to things
+  let hx, hy;
+  {
+    const [ax, ay] = cellXY(G.from), [bx, by] = cellXY(G.pos);
+    const t = G.moving ? Math.min(1, (now - G.moveT0) / G.moveDur) : 1;
+    hx = ax + (bx - ax) * t; hy = ay + (by - ay) * t;
+    const H = heroPose(now, t);
+    const blink = now < G.invulnUntil && Math.floor(now / 120) % 2;
+    if(G.av && drawHeroAvatar(now, hx, hy, H, blink)){ /* 🧑 the player's own avatar walks the maze (11w) */ }
+    else {
+    // shadow on the floor (smaller when in the air)
+    ctx.fillStyle = 'rgba(0,0,0,0.16)';
+    ctx.beginPath(); ctx.ellipse(hx, hy + CS * 0.3, CS * 0.26 * H.shadow, CS * 0.08 * H.shadow, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = (blink ? 0.35 : 1) * H.alpha;
+    ctx.font = Math.floor(CS * 0.82) + 'px ' + EMOJI_FONT;
+    ctx.fillStyle = '#000'; // colour emoji take the fill's transparency: keep it solid
+    // keep the explorer upright while the maze spins
+    ctx.save(); ctx.translate(hx + H.ox, hy + H.oy); ctx.rotate(-G.rot * Math.PI / 2); ctx.rotate(H.rot); ctx.scale(H.sx, H.sy);
+    emo(ctx, lv.hero, 0, 0, CS * 0.82);
+    ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+    if(G.av && now < G.bonkUntil) H.dizzy = true;
+    ctx.fillStyle = '#000';
+    if(H.dizzy){ // stars circling the head after a trap
+      const sy = G.av ? hy - CS * 0.4 : hy - CS * 0.3; for(let k = 0; k < 3; k++){ const a = now / 160 + k * 2.1; emo(ctx, '⭐', hx + Math.cos(a) * CS * 0.36, sy + Math.sin(a) * CS * 0.12, CS * 0.3); }
+    }
+    if(H.burn) emo(ctx, '🔥', hx + Math.sin(now / 60) * CS * 0.08, hy - CS * 0.1, CS * 0.5);
+  }
+  drawFx(now, true);
+  // smoke puffs
+  G.smoke.forEach(p => {
+    const gr = ctx.createRadialGradient(p.x * CS, p.y * CS, 0, p.x * CS, p.y * CS, p.r * CS);
+    gr.addColorStop(0, 'rgba(120,120,130,0.55)'); gr.addColorStop(1, 'rgba(120,120,130,0)');
+    ctx.fillStyle = gr; ctx.fillRect((p.x - p.r) * CS, (p.y - p.r) * CS, p.r * 2 * CS, p.r * 2 * CS);
+  });
+  // flashlight darkness
+  if(G.L.light){
+    ctx.save();
+    ctx.fillStyle = 'rgba(12,16,34,0.9)';
+    ctx.beginPath(); ctx.rect(0, 0, n * CS, n * CS);
+    const rad = G.L.light * CS;
+    ctx.arc(hx, hy, rad, 0, Math.PI * 2, true);
+    ctx.fill('evenodd');
+    const gr = ctx.createRadialGradient(hx, hy, rad * 0.55, hx, hy, rad);
+    gr.addColorStop(0, 'rgba(12,16,34,0)'); gr.addColorStop(1, 'rgba(12,16,34,0.9)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(hx, hy, rad, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // the goal glows through the dark so there's always a direction
+    emoji(lv.goalIcon, lv.goal, 0.8, 0.55);
+  }
+}
+
+/* ================= HUD / BANNERS ================= */
+function fmt(ms){ const s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function elapsed(){ return G ? (performance.now() - G.t0 - G.pausedTotal) : 0; }
+function updateHud(){
+  if(!G) return;
+  BAR.time(fmt(elapsed()));
+  if(G.lv.stars.size) BAR.count('stars', G.lv.collectIcon, G.stars + '/' + G.lv.stars.size, 'Stars'); else BAR.hide('stars');
+  const held = Array.from(G.keys).map(k => '<i style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' + KEY_COLORS[k].fill + '"></i>').join('');
+  if(G.lv.doors.size){ BAR.count('keys', '🔑', G.keys.size, 'Keys'); const kb = BAR.el.querySelector('.gb-cnt[title="Keys"] b'); if(kb && held) kb.innerHTML = held; } else BAR.hide('keys');
+  if(lockHandle){
+    const left = lockHandle.remainingMs();
+    BAR.left(left, left < 120000);
+  }
+}
+let bannerTimer = 0;
+function showBanner(text){
+  const b = $('banner'); b.textContent = text; b.classList.add('on');
+  clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('on'), 2200);
+}
+
+/* ================= WIN / LOSE ================= */
+function rating(ms){
+  const par = (G.lv.pathLen * 0.33 + 6 + G.lv.doors.size * 10 + G.lv.stars.size * 3) * 1000;
+  return ms <= par ? 3 : ms <= par * 1.8 ? 2 : 1;
+}
+function win(now){
+  if(G.over) return;
+  cheerEnd(true); /* 📣 cs-4c */
+  G.finishMs = elapsed();
+  G.over = true; cancelAnimationFrame(rafId);
+  UISound.play('success');
+  burst(G.pos, ['⭐', '🎉', '✨', G.lv.collectIcon], 10, 1.4, 0.4);
+  playOutro('win', REDUCED ? 200 : 1100, showWin);
+}
+function showWin(){
+  const ms = G.finishMs || elapsed(), r = rating(ms), lvlIdx = G.lv.lvlIdx, L = G.L;
+  confetti([G.lv.hero, G.lv.goalIcon, '⭐', '🎉', G.lv.collectIcon]);
+  const nextOk = lvlIdx < LEVELS.length - 1;
+  const card = GF.result({wrap: $('result'), card: $('result-card'), win: true, icon: G.lv.goalIcon, title: 'You made it!', stars: r,   /* 🧱 b2: the shared 🏁 result card */
+    stats: [[L.emoji, L.name], ['🗺️', L.size + ' × ' + L.size], ['⏱', fmt(ms)], ['🏆', mazeScore(L, lvlIdx, ms, r) + (L.mult > 1 ? ' (×' + L.mult + ')' : '')]].concat(G.lv.stars.size ? [[G.lv.collectIcon, G.stars + '/' + G.lv.stars.size]] : []),
+    save: 'Saving your progress…', buddy: HAS_AV ? {name: S.player, av: myAvatar(S.player)} : null, confetti: false,
+    levels: () => { hideResult(); leavePlay(); },
+    again: () => { hideResult(); startGame(lvlIdx, G.lv.themeKey); }, againText: '🔄 New maze',
+    extra: [{text: '🌍 New world', id: 'btn-theme', fn: () => { hideResult(); leavePlay(); chooseLevel(lvlIdx); }}],
+    next: nextOk ? () => { if(!canPlay(lvlIdx + 1)){ UI.toast('Clear this level to unlock the next one', 'err'); return; } hideResult(); startGame(lvlIdx + 1, G.lv.themeKey); } : null, nextText: 'Next level ▶'});
+  cheerFaces();   /* 📣 cs-4c: the crowd's faces on the card */
+  // Save (the server merges, so progress never goes backwards).
+  const p = S.progress[S.player] || (S.progress[S.player] = {unlocked: 0, tokens: [], best: []});
+  p.unlocked = Math.max(p.unlocked, lvlIdx + 1);
+  const secs = Math.max(1, Math.round(ms / 1000));
+  const extra = {stars: r, score: mazeScore(L, lvlIdx, ms, r), theme: L.size + '×' + L.size + ' · ' + G.lv.themeKey};   /* 🗺️ p3e: points × size; the size in the Archive */
+  if(L.std) extra.timeSec = secs;   // ⏱️ best times + family records only on the level's own size (fair)
+  saveWin(lvlIdx, extra, p, r);
+}
+// Wins that could not reach the sheet wait in this browser and are sent
+// again on the next win or the next visit (so "your next win will save it"
+// is really true). The note shows the server's own error text to help fix it.
+const PENDING_KEY = 'sp_maze_pending';
+function readPending(){ try{ return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); }catch(e){ return []; } }
+function writePending(list){ try{ localStorage.setItem(PENDING_KEY, JSON.stringify(list.slice(-20))); }catch(e){} }
+function flushPending(){
+  const list = readPending(); if(!list.length) return;
+  writePending([]);
+  list.forEach(w => google.script.run
+    .withSuccessHandler(res => { if(S.progress[w.name]) S.progress[w.name].unlocked = Math.max(S.progress[w.name].unlocked || 0, res.unlocked); })
+    .withFailureHandler(() => writePending(readPending().concat([w])))
+    .saveMazeResult(w.name, w.lvl, w.extra));
+}
+function saveWin(lvlIdx, extra, p, r, tries){
+  tries = tries || 0;
+  google.script.run
+    .withSuccessHandler(res => {
+      const best = (p.best || [null, null, null, null, null]).slice();
+      if(res.best) best[lvlIdx] = res.best;
+      S.progress[S.player] = {unlocked: res.unlocked, tokens: res.tokens, best: best};
+      const rec = (S.records || [])[lvlIdx];
+      if(res.timeSec && (!rec || res.timeSec < rec.timeSec)){ (S.records = S.records || [])[lvlIdx] = {name: S.player, timeSec: res.timeSec, stars: r}; }
+      flushPending(); // the connection works again: send any wins that were waiting
+      const note = $('save-note'); if(!note) return;
+      const parts = [];
+      if(res.newBadge) parts.push('<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>');
+      if(res.newHighScore && !res.firstTime && !res.personalBest) parts.push('<span class="new-best">🏆 New high score!</span>');
+      if(res.personalBest && !res.firstTime) parts.push('<span class="new-best">🎉 New best time!</span>');
+      else if(res.best && res.best.timeSec && !res.personalBest) parts.push('Your best: ⏱ ' + fmt(res.best.timeSec * 1000));
+      note.innerHTML = parts.length ? parts.join(' ') : '✅ Progress saved';
+    })
+    .withFailureHandler(err => {
+      if(tries < 1){ setTimeout(() => saveWin(lvlIdx, extra, p, r, tries + 1), 1200); return; } // one quiet retry
+      writePending(readPending().concat([{name: S.player, lvl: lvlIdx, extra: extra}]));
+      const note = $('save-note'); if(!note) return;
+      note.innerHTML = '⚠️ Could not save yet — it will be sent again next time.<br><small style="opacity:.7">' +
+        UI.esc((err && err.message) ? err.message : 'No answer from the server') + '</small>';
+    })
+    .saveMazeResult(S.player, lvlIdx, extra);
+}
+function lose(now, why, msg){
+  if(G.over) return;
+  G.over = true; cancelAnimationFrame(rafId); G.loseWhy = why || 'lava'; G.loseMsg = msg || ''; cheerEnd(false); /* 📣 cs-4c */
+  UISound.play('error');
+  if(G.loseWhy === 'wall' && G.av){ burst(G.pos, ['💫', '⭐', '💥'], 6, 0.7, 0.36); playOutro('ko', REDUCED ? 200 : 1000, showLose); return; }   // 💀 bonked out: wobble and tip over
+  burst(G.pos, ['🔥', '💨', '🔥'], 6, 0.7, 0.42);
+  playOutro('burn', REDUCED ? 200 : 1000, showLose);
+}
+function showLose(){
+  const hc = G.L.hardcore, why = G.loseWhy;
+  const head = why === 'wall' ? '<div class="big">💀</div><h2>Bump! That was a wall</h2>' : why === 'trap' ? '<div class="big">💀</div><h2>' + UI.esc(G.loseMsg || 'A trap got you!') + '</h2>' : '<div class="big">🌋</div><h2>The lava got you!</h2>';
+  const icon = why === 'wall' || why === 'trap' ? '💀' : '🌋', title = why === 'wall' ? 'Bump! That was a wall' : why === 'trap' ? (G.loseMsg || 'A trap got you!') : 'The lava got you!';   /* 🧱 b2: the shared 🏁 card */
+  GF.result({wrap: $('result'), card: $('result-card'), win: false, icon, title, sub: hc ? '💀 Hardcore ends on the first mistake — try again! You know the way now.' : 'Try the same maze again — you know the way now.',
+    buddy: HAS_AV ? {name: S.player, av: myAvatar(S.player)} : null,
+    levels: () => { hideResult(); leavePlay(); }, again: () => retrySame(), againText: '🔄 Try again',
+    extra: [{text: '🗺️ New maze', id: 'btn-new', fn: () => { hideResult(); newMazeFromOver(); }}]});
+  const tr = $('btn-again'); if(tr) tr.id = 'btn-retry';   // same ids as before: Try again = btn-retry
+  cheerFaces();   /* 📣 cs-4c */
+}
+function newMazeFromOver(){ const k = G.lv; startGame(k.lvlIdx, k.themeKey); }
+/* 📣 CHEERSQUAD (cs-4c) START — the crowd beside the play (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+// fans stand only where the bar, the play area and the controls leave room; 🙂 Calm by default
+function cheerTaken(){ return Array.from(document.querySelectorAll('#gbar, #shaker, #banner, #scr-play .controls > *')); }
+function cheerMount(){
+  if(!window.Cheer) return; Cheer.unmount(); const box = $('scr-play'); if(!G || !box || box.classList.contains('hidden')) return;
+  Cheer.mount(box, {game: 'maze', players: [{name: S.player, side: 0, human: true}, {name: 'Rival', side: 1, human: false}], me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'overlay',
+    zones: () => Cheer.freeZones(box, cheerTaken, {}), avoid: cheerTaken,
+    clear: b => { const B = box.getBoundingClientRect(); return !cheerTaken().some(e => { const r = e.getBoundingClientRect(); if(r.width < 2 || r.height < 2) return false; const l = r.left - B.left, t = r.top - B.top; return b.r > l - 3 && b.l < l + r.width + 3 && b.b > t - 3 && b.t < t + r.height + 3; }); }});
+  clearInterval(window.__cheerHushT); window.__cheerHushT = setInterval(() => { if(!window.Cheer || !Cheer.active()){ clearInterval(window.__cheerHushT); return; } Cheer.hush(false); }, 150);
+}
+// small wins / misses get a 1.2 s breather; big ones and the ends always play. side: whose moment (default you = 0)
+function cheerSay(kind, why, side){ if(!kind || !window.Cheer || !Cheer.active() || !G) return; const now = performance.now();
+  if((kind === 'goal' || kind === 'miss') && (G.cheerAt || 0) > now - 1200) return; if(kind === 'big' && (G.cheerBig || 0) > now - 900) return;
+  if(kind === 'goal' || kind === 'miss') G.cheerAt = now; if(kind === 'big') G.cheerBig = now; Cheer.react(kind, {side: side || 0}); }
+function cheerEnd(won){ if(window.Cheer && Cheer.active()){ Cheer.hush(false); Cheer.react(won ? 'win' : 'lose', {side: 0}); } }
+function cheerFaces(n){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces')) return;
+  const at = card.querySelector('.res-btns'); if($('result').classList.contains('hidden') || !at){ if((n || 0) < 12) cheerFaces((n || 0) + 1); return; }   /* the card can come late (Stack It!) */
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); }, n ? 350 : 900); }
+/* 📣 CHEERSQUAD END */
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-4c */ }
+function hideResult(){ $('result').classList.add('hidden'); }
+function confetti(list){
+  if(REDUCED) return;
+  for(let i = 0; i < 26; i++){
+    const e = document.createElement('div');
+    e.className = 'confetti'; e.textContent = pick(list);
+    e.style.left = Math.random() * 100 + 'vw';
+    e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's';
+    e.style.animationDelay = (Math.random() * 0.5) + 's';
+    document.body.appendChild(e);
+    setTimeout(() => e.remove(), 3800);
+  }
+}
+
+/* ================= INPUT ================= */
+// All directions are SCREEN directions; worldDir() undoes any maze spin.
+const KEY_DIR = {ArrowUp:0, KeyW:0, ArrowRight:1, KeyD:1, ArrowDown:2, KeyS:2, ArrowLeft:3, KeyA:3};
+document.addEventListener('keydown', e => {
+  if(!G || G.over || $('scr-play').classList.contains('hidden')) return;
+  const d = KEY_DIR[e.code];
+  if(d === undefined) return;
+  e.preventDefault();
+  autoDir = -1; heldDir = d;
+});
+document.addEventListener('keyup', e => { if(KEY_DIR[e.code] === heldDir) heldDir = -1; });
+window.addEventListener('blur', () => { heldDir = -1; });
+
+document.querySelectorAll('#dpad button').forEach(b => {
+  const d = Number(b.dataset.dir);
+  b.addEventListener('pointerdown', e => { e.preventDefault(); UISound.play('key'); autoDir = -1; heldDir = d; b.classList.add('held'); try{ b.setPointerCapture(e.pointerId); }catch(x){} });
+  const up = () => { if(heldDir === d) heldDir = -1; b.classList.remove('held'); };
+  b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
+});
+
+// Drag on the maze = hold a direction; a quick flick = run to the next junction.
+(function(){
+  const st = $('stage');
+  let sx = 0, sy = 0, ax = 0, ay = 0, t0 = 0, active = false, moved = false;
+  function dirOf(dx, dy){ return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0); }
+  // Pointer coordinates are on screen, so they are already screen directions.
+  st.addEventListener('pointerdown', e => { if(!G || G.over) return; active = true; moved = false; sx = ax = e.clientX; sy = ay = e.clientY; t0 = performance.now(); try{ st.setPointerCapture(e.pointerId); }catch(x){} });
+  // r33: steer after 10 px (was 22), and the anchor follows the finger on a 26 px leash — turning = a short slide, not back across the screen
+  UI.onFastMove(st, e => {
+    if(!active) return;
+    let dx = e.clientX - ax, dy = e.clientY - ay, d = Math.hypot(dx, dy);
+    if(d > 26){ ax = e.clientX - dx / d * 26; ay = e.clientY - dy / d * 26; dx = e.clientX - ax; dy = e.clientY - ay; d = 26; }
+    if(d > 10){ moved = true; autoDir = -1; heldDir = dirOf(dx, dy); }
+  });
+  function end(e){
+    if(!active) return;
+    active = false;
+    const dx = e.clientX - sx, dy = e.clientY - sy, quick = performance.now() - t0 < 260;
+    heldDir = -1;
+    if(G && !G.over && quick && Math.hypot(dx, dy) > 24){ autoDir = worldDir(dirOf(dx, dy)); UISound.play('whoosh'); }
+  }
+  st.addEventListener('pointerup', end); st.addEventListener('pointercancel', end);
+})();
+// The on-screen pad shows on any device with a touch screen (touch laptops too).
+const HAS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
+if(!HAS_TOUCH){ document.body.classList.add('no-touch'); $('play-hint').textContent = 'Use the arrow keys or W A S D'; }
+
+/* ================= MENUS ================= */
+function showScreen(name){
+  if(name !== 'play' && window.Cheer) Cheer.unmount(); /* 📣 cs-4c */
+  ['player', 'levels', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
+  $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   // 🧭 p1b
+  window.scrollTo(0, 0);
+}
+function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
+function starRow(n){ return '<span class="s">' + '⭐'.repeat(n) + '<i>' + '⭐'.repeat(3 - n) + '</i></span>'; }
+function canPlay(i){
+  const p = progressOf(S.player);
+  if(i === 5) return p.unlocked >= 5;
+  if(i === 4) return p.unlocked >= 4;
+  return i <= Math.max(p.unlocked, AGE_START[S.age] || 0);
+}
+function renderPlayers(){
+  const box = $('player-list'); box.innerHTML = '';
+  if(!S.players.length){ box.innerHTML = '<div class="empty">No players yet — add one on the Dashboard first.</div>'; return; }
+  S.players.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'pick'; b.setAttribute('data-sound', 'pop');
+    if(HAS_AV){ const c = document.createElement('canvas'); c.width = 144; c.height = 168; b.appendChild(c); b.insertAdjacentHTML('beforeend', '<div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age || '') + '</div>'); drawPreviewCanvas(c, myAvatar(p.Name), {name: p.Name, t: 1}); }
+    else b.innerHTML = '<div class="big">' + UI.esc(p.Name.charAt(0).toUpperCase()) + '</div><div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age || '') + '</div>';
+    b.onclick = () => choosePlayer(p.Name);
+    box.appendChild(b);
+  });
+}
+function choosePlayer(name){
+  // Loaders and pop-ups follow this player's look; the game keeps its own art.
+  UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
+  const p = S.players.find(x => x.Name === name);
+  S.player = name; S.age = p ? p.Age : ''; loadSize();   /* 🗺️ p3e */
+  $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4c */
+  renderLevels(); showScreen('levels'); openCover();   /* 🧱 b2: the 🎬 cover first */
+}
+function changePlayer(){ renderPlayers(); showScreen('player'); }
+function renderLevels(){
+  const box = $('level-list'); box.innerHTML = '';   /* 🧱 b2: 🏆 leaders live on the cover */
+  renderMaps();   /* 🗺️ p3e */
+  const p = progressOf(S.player), rec = AGE_RECOMMEND[S.age];
+  LEVELS.map((D, i) => levelFor(i)).forEach((L, i) => {
+    const b = document.createElement('button');
+    const open = canPlay(i), done = p.unlocked > i;
+    b.dataset.i = i;   /* 🧱 b2 */
+    b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (L.hardcore ? ' hardcore' : '');
+    b.setAttribute('data-sound', open ? 'pop' : 'none');
+    b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">🏅</span>' : (open ? '' : '<span class="badge">🔒</span>')) +
+      '<div class="big">' + L.emoji + '</div><div class="nm">' + L.name + '</div><div class="learn">🗺️ ' + L.size + ' × ' + L.size + ' · ×' + L.mult + ' points</div><div class="sub">' + L.blurb + '</div>' +
+      bestHtml(p, i);
+    b.onclick = () => {
+      if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore!' : i === 4 ? 'Clear Hard to unlock Extreme!' : 'Clear the level before this one to unlock it'); return; }
+      chooseLevel(i);
+    };
+    box.appendChild(b);
+  });
+  { let i = -1; try{ i = Number(localStorage.getItem(pickKey('lv'))); }catch(e){} if(!(i >= 0 && canPlay(i))) i = canPlay(rec) ? rec : Math.max(0, [0, 1, 2, 3, 4, 5].filter(canPlay).pop() || 0);
+    chosenLevel = i; } renderWorlds(); markPicks();   /* 🧱 b2 */
+}
+// Best finish time + stars for this level, and the family record holder.
+function bestHtml(p, i){
+  const b = (p.best || [])[i], rec = (S.records || [])[i];
+  let h = b && (b.timeSec || b.score) ? '<div class="best">' + (b.timeSec ? '<span class="t">⏱ ' + fmt(b.timeSec * 1000) + '</span>' : '') + (b.score ? '<span class="t">🏆 ' + b.score + '</span>' : '') + starRow(b.stars) + '</div>'
+    : '<div class="best none">' + (p.unlocked > i ? 'Finished!' : 'Not finished yet') + '</div>';
+  if(rec) h += '<div class="rec">🏆 Record: ' + UI.esc(rec.name) + ' ' + fmt(rec.timeSec * 1000) + '</div>';
+  return h;
+}
+/* 🧱 b2 (Game Baseline pilot): ONE setup page — the picks are remembered per player; ▶ Start plays them */
+let chosenLevel = 0, chosenWorld = 'surprise';
+const pickKey = k => 'sp_maze_' + k + ':' + (S.player || '');
+function chooseLevel(i, quiet){
+  chosenLevel = i; try{ localStorage.setItem(pickKey('lv'), String(i)); }catch(e){}
+  markPicks(); if(!quiet){ const w = $('world-head'); if(w && w.scrollIntoView) w.scrollIntoView({behavior: REDUCED ? 'auto' : 'smooth', block: 'start'}); }
+}
+function chooseWorld(k){ chosenWorld = k; try{ localStorage.setItem(pickKey('world'), k); }catch(e){} markPicks(); }
+function renderWorlds(){
+  const box = $('world-list'); box.innerHTML = '';
+  const mk = (k, big, nm, sub) => { const b = document.createElement('button'); b.className = 'pick' + (k === 'surprise' ? ' surprise' : ''); b.dataset.k = k; b.setAttribute('data-sound', 'pop');
+    b.innerHTML = '<div class="big">' + big + '</div><div class="nm">' + nm + '</div><div class="sub">' + sub + '</div>'; b.onclick = () => chooseWorld(k); box.appendChild(b); };
+  mk('surprise', '🎲', 'Surprise me!', 'Any world');
+  Object.keys(THEMES).forEach(k => { const T = THEMES[k]; mk(k, T.icon, T.name, T.heroes.slice(0, 4).join('')); });
+  let w = 'surprise'; try{ w = localStorage.getItem(pickKey('world')) || 'surprise'; }catch(e){} chosenWorld = (w === 'surprise' || THEMES[w]) ? w : 'surprise';
+}
+function markPicks(){
+  document.querySelectorAll('#level-list .lvl').forEach(b => b.classList.toggle('sel', Number(b.dataset.i) === chosenLevel));
+  document.querySelectorAll('#world-list .pick').forEach(b => b.classList.toggle('sel', b.dataset.k === chosenWorld));
+  const L = LEVELS[chosenLevel], T = THEMES[chosenWorld], st = $('btn-start');
+  if(st && L) st.textContent = '▶ Start · ' + L.emoji + ' ' + L.name + ' · ' + (T ? T.icon + ' ' + T.name : '🎲 Surprise');
+}
+function startSetup(){ if(!canPlay(chosenLevel)){ UISound.play('error'); UI.toast('Pick a level that is open 🔓'); return; } startGame(chosenLevel, chosenWorld); }
+// 🎬 the cover (GameFrame): who's here + champions + how to play; ▶ Play opens the setup page
+let MazeCover = null;
+function openCover(){
+  if(!window.GF){ showScreen('levels'); return; }
+  if(MazeCover && MazeCover.who !== S.player){ MazeCover.destroy(); MazeCover = null; }
+  if(!MazeCover){ MazeCover = GF.cover(document.body, {game: 'maze', title: 'Maze Explorer', icon: '🧭', me: S.player, players: S.players, avatarOf: myAvatar, seats: {min: 1, max: 1},
+      acts: ['beat.run-start', 'beat.skid'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms',
+      onPlay: () => { MazeCover.hide(); showScreen('levels'); } }); MazeCover.who = S.player; }
+  MazeCover.show();
+}
+function sessionQuery(){
+  let q = '';
+  if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER);
+  if(SESSION_START) q += '&sessionStart=' + SESSION_START;
+  if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN;
+  return q;
+}
+function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }   // 🧭 p1b: ◀ = where you came from (Gameroom if we don't know)
+
+/* ================= BOOT ================= */
+function boot(){
+  UI.loading('maze');
+  google.script.run
+    .withSuccessHandler(d => {
+      UI.loaded();
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.records = d.records || []; S.avatars = d.avatars || {};
+      UISound.applySettings(S.settings);
+      const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
+      lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn,
+        homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
+      if(lockHandle) setInterval(updateHud, 1000);
+      flushPending();
+      if(CURRENT_PLAYER && S.players.some(p => p.Name === CURRENT_PLAYER)) choosePlayer(CURRENT_PLAYER);
+      else { renderPlayers(); showScreen('player'); }
+    })
+    .withFailureHandler(() => {
+      UI.loaded();
+      UI.toast('Could not load players — check the connection', 'err');
+      renderPlayers(); showScreen('player');
+    })
+    .getMazeData(CURRENT_PLAYER);
+}
+boot();
