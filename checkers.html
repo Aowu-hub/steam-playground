@@ -1479,6 +1479,7 @@ msAfter('choosePlayer', name => {
    every move by the sender's seat and passes it on to the other player; ▶ Start / 🔁 Play again also from the first player's device (Link.ask). */
 const LX = {wired: false, lobby: null, pending: null, cfg: null, autoT: 0, games: 0, thinkT: 0, sayT: 0, side: 0};
 const LX_AUTO_MS = window.LX_AUTO_MS || 20000;
+const LX_BOT_MS = window.LX_BOT_MS || 700;   // 📺 lk-5g: the TV robot's short pause before it moves
 const LX_TALK = ['Hmm… 🤔', 'I see a jump… 👀', 'Which piece… 🔴', 'Don’t rush me! ⏳', 'Ooh, tricky! 🤯', 'King me soon! 👑', 'Hello everyone! 👋', 'Shh, thinking… 🤫',
   'Double jump coming? 🌟', 'Is that a trap? 🧐', 'Almost ready!', 'Hop hop hop! 🐸', 'Guard my back row! 🛡️', 'Where to go… 🗺️', 'You’ll see! 😎', 'Tick tock… 🕰️'];
 function lxV(sq){ return G && G.flip ? G.n * G.n - 1 - sq : sq; }   // board square → where it shows on this device
@@ -1508,17 +1509,17 @@ function lxChoose(){
 }
 async function lxOpenHost(tv){   // 📺 lk-5b: tv = Room hostess (no colour on this device)
   lxWire(); lxCloseLobby(); lxIdle();
-  $('lx-sub').textContent = tv ? '📺 This screen is the Room hostess — two players tap 🔗 Join a friend on their own devices' : 'Your friend taps 🔗 Join a friend on their own phone or tablet — same Wi-Fi or 🌍 anywhere'; showScreen('link');
+  $('lx-sub').textContent = tv ? '📺 This screen is the Room hostess — players tap 🔗 Join a friend on their own devices · 1 player plays the 🤖 robot (level for their age)' : 'Your friend taps 🔗 Join a friend on their own phone or tablet — same Wi-Fi or 🌍 anywhere'; showScreen('link');
   const el = $('lx-lobby'); el.innerHTML = '<div class="lk"><div class="lk-msg"><span class="ui-spin a-bob">' + (tv ? '📺' : '📡') + '</span> Opening the room<span class="lk-dots"></span></div></div>';
   try{ await Link.host({game: 'Checkers', name: S.player, seats: 2, hostess: !!tv, page: 'checkers', label: '🔴 Checkers · 2 players' + (tv ? ' · 📺 on the TV' : '')}); }
   catch(e){ UISound.play('error'); el.innerHTML = '<div class="lk"><div class="lk-msg bad">😕 ' + UI.esc((e && e.message) || 'Could not open the room') + '</div></div>'; return; }
   if($('scr-link').classList.contains('hidden')) return;
-  LX.lobby = Link.lobby(el, {title: '🔴 Checkers · 2 players', url: WEBAPP_URL + '?page=checkers', minPlayers: 2, name: S.player, drawAvatar: lxAv, kind: 'checkers', onStart: lxHostGo});
+  LX.lobby = Link.lobby(el, {title: '🔴 Checkers · ' + (tv ? '1–2 players' : '2 players'), url: WEBAPP_URL + '?page=checkers', minPlayers: 2, soloBot: !!tv, name: S.player, drawAvatar: lxAv, kind: 'checkers', onStart: lxHostGo});   // 📺 lk-5g: soloBot
 }
 function lxJoin(code){
   lxWire(); lxCloseLobby(); lxIdle();
   $('lx-sub').textContent = 'Same Wi-Fi as the host — or 🌍 anywhere'; showScreen('link');
-  LX.lobby = Link.lobby($('lx-lobby'), {title: '🔴 Checkers', name: S.player, drawAvatar: lxAv, code: code || undefined, kind: 'checkers', onJoined: () => UISound.play('success')});
+  LX.lobby = Link.lobby($('lx-lobby'), {title: '🔴 Checkers', name: S.player, drawAvatar: lxAv, soloBot: true, code: code || undefined, kind: 'checkers', onJoined: () => UISound.play('success')});   // 📺 lk-5g: soloBot counts only in a Room hostess room
 }
 function lxExit(){
   lxIdle(); lxCloseLobby(); clearTimeout(LX.autoT); lxThink(0); LX.cfg = null;
@@ -1543,9 +1544,12 @@ function lxNewGame(){
 function lxHostGo(){
   const tv = Link.hostess && Link.hostess();
   const list = Link.players().filter(p => p.name && p.on && !p.screen).sort((a, b) => a.seat - b.seat);
-  let names = {}, seats = {}, hostSide = 0;
-  if(tv){   // 📺 lk-5b: both colours are guests — the colours swap every game
-    if(list.length < 2){ UISound.play('error'); UI.toast('📺 Wait for 2 players to join'); return; }
+  let names = {}, seats = {}, hostSide = 0, bot = null;
+  if(tv && list.length === 1){   // 📺 lk-5g: ONE player + the TV → the 🤖 robot takes the other colour (level for the player's age); colours swap every game
+    const ps = LX.games++ % 2 === 0 ? 1 : -1, bl = lxBotLvl(list[0].name), L = LEVELS[bl];
+    names[ps] = list[0].name; names[-ps] = '🤖 ' + L.bot; seats[ps] = list[0].seat; seats[-ps] = 'bot'; bot = {side: -ps, lvl: bl};
+  } else if(tv){   // 📺 lk-5b: both colours are guests — the colours swap every game
+    if(list.length < 2){ UISound.play('error'); UI.toast('📺 Wait for a player to join'); return; }
     const w = LX.games++ % 2 === 0 ? 0 : 1, a = list[w], b = list[1 - w];
     names = {1: a.name, '-1': b.name}; seats = {1: a.seat, '-1': b.seat};
   } else {
@@ -1554,14 +1558,14 @@ function lxHostGo(){
     hostSide = LX.games++ % 2 === 0 ? 1 : -1;   // the bottom-start side moves first — the colours swap every game
     names[hostSide] = me.name; names[-hostSide] = fr.name; seats[hostSide] = 'host'; seats[-hostSide] = fr.seat;
   }
-  LX.cfg = {id: Date.now().toString(36), host: S.player, tv: !!tv, names, hostSide, guest: seats[-hostSide || -1]};
+  LX.cfg = {id: Date.now().toString(36), host: S.player, tv: !!tv, names, hostSide, guest: seats[-hostSide || -1], bot};
   lxCloseLobby(); hideResult(); const o = document.querySelector('.lx-over'); if(o) o.remove();
-  LX.pending = {role: 'host', me: hostSide, id: LX.cfg.id, names, seats, guest: LX.cfg.guest, away: {}, tv: !!tv};
+  LX.pending = {role: 'host', me: hostSide, id: LX.cfg.id, names, seats, guest: LX.cfg.guest, away: {}, tv: !!tv, bot};
   startGame({mode: 'duo', lvl: 1, friend: names[-1]});   // the true game lives here; G.lx comes from LX.pending
   lxSendGo();
 }
 function lxState(){ return {id: G.lx.id, b: G.b, ids: G.ids, turn: G.turn, plies: G.plies, quiet: G.quiet, last: G.last, takenBy: G.takenBy, end: G.lx.end || null}; }
-function lxGuestSeats(){ return [1, -1].filter(sd => G.lx.seats && G.lx.seats[sd] != null && G.lx.seats[sd] !== 'host').map(sd => ({side: sd, seat: G.lx.seats[sd]})); }
+function lxGuestSeats(){ return [1, -1].filter(sd => G.lx.seats && G.lx.seats[sd] != null && G.lx.seats[sd] !== 'host' && G.lx.seats[sd] !== 'bot').map(sd => ({side: sd, seat: G.lx.seats[sd]})); }   // 📺 lk-5g: 'bot' = the TV's robot
 function lxSendGo(only){ if(G && G.lx && G.lx.role === 'host' && G.busy){ setTimeout(() => lxSendGo(only), 150); return; }   // a move is hopping: send the game once it is in
   if(!(G && G.lx && G.lx.role === 'host')) return;
   lxGuestSeats().forEach(g => { if(only == null || only === g.seat) Link.send('ckgo', {cfg: LX.cfg, you: g.side, st: lxState()}, {sure: true, to: g.seat}); }); }
@@ -1569,12 +1573,25 @@ function lxTurn(){
   const mine = G.turn === G.lx.me;
   lxThink(mine ? 0 : G.turn);
   clearTimeout(LX.autoT);
-  if(G.lx.role === 'host' && !mine && G.lx.away && G.lx.away[G.turn]) LX.autoT = setTimeout(lxAuto, LX_AUTO_MS);
+  if(G.lx.role === 'host' && G.lx.bot && G.turn === G.lx.bot.side) LX.autoT = setTimeout(lxBot, LX_BOT_MS);   // 📺 lk-5g
+  else if(G.lx.role === 'host' && !mine && G.lx.away && G.lx.away[G.turn]) LX.autoT = setTimeout(lxAuto, LX_AUTO_MS);
+}
+function lxPick(side, L){   // 🤖 a move for EITHER colour (botChoice only plays the bottom-start side's opponent, -1)
+  const moves = genMoves(G.b, G.n, side); if(!moves.length) return null;
+  if(Math.random() < L.random) return pick(moves);
+  return bestMove(G.b, G.n, side, Math.max(1, L.think), L.ms || 0, L.think <= 3 ? 30 : 0);
 }
 function lxAuto(){   // 🤖 plays for a player whose device dropped out
   if(!G || !G.lx || G.over || !G.lx.away || !G.lx.away[G.turn] || G.turn === G.lx.me || G.busy) return;
   showBanner('🤖 Robot moves for ' + G.names[G.turn], 'warn');
-  const m = botChoice(G.b, G.n, LEVELS[1]); if(m) playMove(m);
+  const m = lxPick(G.turn, LEVELS[1]); if(m) playMove(m);   // lk-5g: the right colour (was always -1)
+}
+// 📺 lk-5g: the TV's 🤖 robot (one player + the Room hostess) — level = the recommended level for the player's age (no 💀; until Checkers gets the 🧱 one-page setup)
+function lxBotLvl(name){ const p = S.players.find(x => x.Name === name); const r = AGE_RECOMMEND[p ? p.Age : '']; return r != null ? Math.min(4, r) : 1; }
+function lxBot(){
+  if(!G || !G.lx || G.over || !G.lx.bot || G.turn !== G.lx.bot.side) return;
+  if(G.busy){ LX.autoT = setTimeout(lxBot, 150); return; }
+  const m = lxPick(G.lx.bot.side, LEVELS[G.lx.bot.lvl] || LEVELS[1]); if(m) playMove(m);
 }
 // ---- both devices ----
 function lxSendMove(m){ Link.send('ckmove', {id: G.lx.id, tn: G.plies, path: m.path}, {sure: true}); }   // host → every player · guest → the host
@@ -1597,7 +1614,7 @@ function lxGotMove(d, tries, seat){
 // ---- guest ----
 function lxGuestStart(d){
   LX.cfg = d.cfg; lxCloseLobby(); hideResult(); const o = document.querySelector('.lx-over'); if(o) o.remove();
-  LX.pending = {role: 'guest', me: d.you != null ? d.you : -d.cfg.hostSide, id: d.cfg.id, names: d.cfg.names, tv: !!d.cfg.tv};
+  LX.pending = {role: 'guest', me: d.you != null ? d.you : -d.cfg.hostSide, id: d.cfg.id, names: d.cfg.names, tv: !!d.cfg.tv, bot: d.cfg.bot || null};
   startGame({mode: 'duo', lvl: 1, friend: d.cfg.host});
   lxApply(d.st);
 }
@@ -1691,4 +1708,4 @@ msAfter('choosePlayer', () => lxUrlCode(c => { c = String(c || '').replace(/[^0-
 </script>
 </body>
 </html>
-<!-- (11w-1+11x-4+r32+back-1+modes-3+p1b+cs-3a+lk-3c+lk-5a+lk-5b+lk-5f) END OF Checkers.html -->
+<!-- (11w-1+11x-4+r32+back-1+modes-3+p1b+cs-3a+lk-3c+lk-5a+lk-5b+lk-5f+lk-5g) END OF Checkers.html -->
