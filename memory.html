@@ -191,6 +191,12 @@
   @keyframes handbob{50%{transform:translate(-30%,10%);}}
   .podium{margin:2px 0 4px;}
   .card.swap{animation:swapglow 1.2s ease;}
+  /* 📸 mm-2: family cards = a picture of the family's avatars */
+  .card .front.fam{padding:0;overflow:hidden;background:#FFF6D6;}
+  .card .front.fam canvas{width:100%;height:100%;display:block;border-radius:inherit;}
+  .card.popping{z-index:7;animation:none;}
+  .mine img.famthumb{width:1.4em;height:1.4em;border-radius:5px;vertical-align:middle;}
+  .deck.fam{background:linear-gradient(135deg,#FFE5EC,#FFF6D6,#E3FCEC);}
 </style>
 <script src="inc/UiKit.js"></script>
 <script src="inc/BallSkins.js"></script>
@@ -243,7 +249,7 @@ UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});   // loader + me
 const SESSION_START = Number(''+__SP("sessionStart")+'') || null;
 const DURATION_MIN = Number(''+__SP("durationMin")+'') || null;
 const GAME_ID = 'memory';
-const MM_VERSION = '3.0';   // 🃏 mm-1: shown on the cover footer — bump with each Memories Match round
+const MM_VERSION = '3.1';   // 🃏 mm-1: shown on the cover footer — bump with each Memories Match round
 // 🎛️ p1b: the shared top bar (UiKit UI.gameBar) — ◀ where you came from · 🎚️ Levels · 🏠 | 🃏 Memories Match · level | scoreboard | game buttons ❓ ⚙️
 const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '🃏', name: 'Memories Match', levelId: 'hud-level',
   levels: () => leavePlay(), playing: () => !!(G && !G.over), onLeave: () => { try{ clearInterval(timerId); }catch(e){} try{ speechSynthesis.cancel(); }catch(e){} },
@@ -306,7 +312,78 @@ const DECKS = {
   const inG = new Set(); Object.keys(DECKS).forEach(k => DECKS[k].like.forEach(g => { const m = g.filter(f => !inG.has(f)); if(m.length >= 2){ m.forEach(f => inG.add(f)); like.push(m); } }));
   DECKS.mix = {name: 'Mix', icon: '🎲', back: 'linear-gradient(135deg,#9B5DE5,#F15BB5 50%,#00BBF9)', mark: '🃏', cards, like, mix: true};
 })();
-const DECK_KEYS = ['mix', 'monsters', 'heroes', 'animals', 'people', 'vehicles', 'space'];
+const DECK_KEYS = ['mix', 'family', 'monsters', 'heroes', 'animals', 'people', 'vehicles', 'space'];
+/* ================= 📸 FAMILY MEMORIES deck (mm-2) — the family's REAL avatars on the cards (🎭 Acting) =================
+   faces are strings like the emoji: 'fam|<name>|<act>' (one person in a pose) · 'grp|<kind>|<a>,<b>…' (2–4 people: 🤗 hug · ✋ high-five · 🤳 selfie · 🎉 party).
+   🌱 🐣 never two near-poses of one person (look-alike groups), 🔦+ some. Everyone in the family is in it (not only today's players). */
+const FAM_SOLO = ['gest.read', 'gest.juggle', 'gest.snack', 'gest.yoga', 'gest.dab', 'gest.bubbles', 'cheer.sign', 'gest.sing', 'gest.hulahoop', 'gest.peekaboo', 'sig.flower-twirl', 'cheer.pompom', 'gest.robot', 'pk.jump-shot'];
+const FAM_NEAR = [['gest.selfie', 'cheer.selfie'], ['gest.dance', 'gest.disco'], ['victory', 'sig.superstar'], ['sleepy', 'gest.yawn'], ['think', 'sig.genius'], ['gest.flex', 'pk.strong'], ['gest.penguin', 'cheer.penguin'], ['gest.chicken', 'cheer.chicken'], ['gest.heart', 'cheer.heart', 'love'], ['gest.guitar', 'sig.rockstar']];
+const FAM_GROUP_ACT = {hug: () => 'pk.big-hug', highfive: () => 'gest.highfive', selfie: i => i === 0 ? 'gest.selfie' : 'cheer.lean-in', party: i => ['cheer.pompom', 'gest.dance', 'cheer.hop', 'gest.cheer'][i % 4]};
+const FAM_BG = [['#FFE5EC', '#FFF6D6'], ['#E0F2FF', '#F3E8FF'], ['#E3FCEC', '#FFF6D6'], ['#FFF1E0', '#FFE5EC'], ['#EDE7FF', '#E0F7FA'], ['#FFF6D6', '#E3FCEC']];
+const FAM_RING = ['#9B5DE5', '#F15BB5', '#00BBF9', '#06D6A0', '#FF8A3D', '#E5484D', '#3A86FF', '#FFB703'];
+const famHash = s => { let h = 2166136261; for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+const isFam = f => typeof f === 'string' && (f.indexOf('fam|') === 0 || f.indexOf('grp|') === 0);
+const actOk = k => !!(window.Acting && Acting.has('acts', k));
+function buildFamily(){
+  const names = S.players.map(p => p.Name).filter(Boolean), cards = [], like = [];
+  names.forEach(nm => {
+    FAM_SOLO.filter(actOk).forEach(a => cards.push('fam|' + nm + '|' + a));
+    FAM_NEAR.forEach(pair => { const ok = pair.filter(actOk); ok.forEach(a => cards.push('fam|' + nm + '|' + a)); if(ok.length >= 2) like.push(ok.map(a => 'fam|' + nm + '|' + a)); });
+  });
+  // group cards: pairs (🤗 ✋ 🤳 — a look-alike group per pair), threes (🤳 🎉), the first four (🎉 🤳)
+  const pairs = []; for(let i = 0; i < names.length; i++) for(let j = i + 1; j < names.length; j++) pairs.push([names[i], names[j]]);
+  pairs.slice(0, 10).forEach(p => { const g = ['hug', 'highfive', 'selfie'].map(k => 'grp|' + k + '|' + p.join(',')); g.forEach(x => cards.push(x)); like.push(g); });
+  for(let i = 0; i + 2 < names.length && i < 4; i++){ const t = names.slice(i, i + 3).join(','); cards.push('grp|selfie|' + t, 'grp|party|' + t); }
+  if(names.length >= 4){ const q = names.slice(0, 4).join(','); cards.push('grp|party|' + q, 'grp|selfie|' + q); }
+  DECKS.family = {name: 'Family', icon: '📸', back: 'linear-gradient(135deg,#FF8FB1,#FFC845 55%,#6BCB77)', mark: '📸', cards, like, fam: true};
+}
+// who is on a family card + how they stand: [{name, act, dir}]
+function famPeople(f){
+  const p = f.split('|'); if(p[0] === 'fam') return [{name: p[1], act: p[2], dir: 1}];
+  const names = p[2].split(','), n = names.length, A = FAM_GROUP_ACT[p[1]] || FAM_GROUP_ACT.party;
+  return names.map((nm, i) => ({name: nm, act: A(i), dir: p[1] === 'party' ? 1 : (i < n / 2 ? 1 : -1)}));
+}
+// paint a family card (px × px CSS) at time t — small cards = 📷 close-up (head + shoulders), big cards = whole body; a colour ring per person
+function famPaint(g, f, px, t){
+  const P = famPeople(f), n = P.length, close = px < 70, bg = FAM_BG[famHash(f.split('|').slice(0, 2).join('|')) % FAM_BG.length];
+  const gr = g.createLinearGradient(0, 0, 0, px); gr.addColorStop(0, bg[0]); gr.addColorStop(1, bg[1]); g.fillStyle = gr; g.fillRect(0, 0, px, px);
+  const k0 = close ? px * 0.92 / 70 : px * 0.88 / 96, k = n === 1 ? k0 : k0 * [1, 1, 0.8, 0.66, 0.56][n] * (close ? 1.12 : 1);
+  const feet = close ? px * 0.07 + 112 * k : px * 0.96, span = px * (n === 2 ? 0.5 : 0.76);
+  P.forEach((q, i) => { const x = n === 1 ? px / 2 : px / 2 + (i - (n - 1) / 2) * span / (n - 1 || 1);
+    try{ Acting.draw(g, {name: q.name, av: myAvatar(q.name)}, x, feet, k, q.act, {t, dir: q.dir, noPet: true}); }catch(e){} });
+  g.save(); g.lineWidth = Math.max(2, px * 0.035);
+  if(n === 1){ g.strokeStyle = FAM_RING[famHash(P[0].name) % FAM_RING.length]; g.strokeRect(g.lineWidth / 2, g.lineWidth / 2, px - g.lineWidth, px - g.lineWidth); }
+  else P.forEach((q, i) => { g.strokeStyle = FAM_RING[famHash(q.name) % FAM_RING.length]; const w = px / n; g.beginPath(); g.moveTo(i * w + 2, px - g.lineWidth / 2); g.lineTo((i + 1) * w - 2, px - g.lineWidth / 2); g.stroke(); });
+  g.restore();
+}
+const FAMC = {};
+function famCanvas(f, px){
+  const dpr = Math.min(2, window.devicePixelRatio || 1), key = f + '|' + px + '|' + dpr; if(FAMC[key]) return FAMC[key];
+  const c = document.createElement('canvas'); c.width = c.height = Math.round(px * dpr); const g = c.getContext('2d'); g.scale(dpr, dpr); famPaint(g, f, px, 0.45);
+  return (FAMC[key] = c);
+}
+// put the right picture on every family card of the board (after layout — the card size decides close-up / whole body)
+function paintFamCards(){
+  if(!G) return; const px = Math.round(parseFloat(getComputedStyle($('board')).getPropertyValue('--cs')) || 60);
+  G.cards.forEach(c => { if(!isFam(c.f)) return; const cv = c.el.querySelector('.front canvas'); if(!cv || (cv._px === px && !cv._live)) return;
+    const src = famCanvas(c.f, px); cv.width = src.width; cv.height = src.height; cv.getContext('2d').drawImage(src, 0, 0); cv._px = px; });
+}
+const famThumb = f => { try{ return '<img class="famthumb" alt="" src="' + famCanvas(f, 40).toDataURL() + '">'; }catch(e){ return '📸'; } };
+// 🎉 a matched family pair comes alive — 3–5 beats on the card (ready → anticipation squash → CONTACT pop → follow-through overshoot → settle)
+// while the avatars play their own action; sound + sparkle + points float fire on contact
+const POP_BEATS = [{ms: 60, s: 1, r: 0}, {ms: 180, s: 0.9, r: -3}, {ms: 90, s: 1.2, r: 4, contact: true}, {ms: 280, s: 0.96, r: -2}, {ms: 200, s: 1, r: 0}];
+function famPop(cards, onContact){
+  if(FAST()){ onContact(); return; }
+  const total = POP_BEATS.reduce((n, b) => n + b.ms, 0), contactAt = POP_BEATS.slice(0, 2).reduce((n, b) => n + b.ms, 0) + POP_BEATS[2].ms * 0.4;
+  let off = 0; const kf = POP_BEATS.map(b => { off += b.ms; return {transform: 'scale(' + b.s + ') rotate(' + b.r + 'deg)', offset: off / total}; }); kf.unshift({transform: 'scale(1)', offset: 0});
+  cards.forEach(c => { c.el.classList.add('popping'); c.el.animate(kf, {duration: total, easing: 'ease-out'}); });
+  setTimeout(onContact, contactAt);
+  const t0 = performance.now(), px = Math.round(parseFloat(getComputedStyle($('board')).getPropertyValue('--cs')) || 60), tg = G;
+  (function live(now){ if(G !== tg) return; const tt = (now - t0) / 1000;
+    cards.forEach(c => { const cv = c.el.querySelector('.front canvas'); if(!cv) return; cv._live = true; const g = cv.getContext('2d'), dpr = cv.width / px; g.setTransform(dpr, 0, 0, dpr, 0, 0); famPaint(g, c.f, px, 0.45 + tt); });
+    if(tt * 1000 < total + 400) requestAnimationFrame(live); else cards.forEach(c => { c.el.classList.remove('popping'); const cv = c.el.querySelector('.front canvas'); if(cv){ cv._live = false; cv._px = 0; } paintFamCards(); }); })(t0);
+}
+
 const SEAT_COLS = ['#9B5DE5', '#F15BB5', '#00BBF9', '#06D6A0'];
 const AGE_START = {'4-5': 0, '6-7': 1, '8-9': 2, '10+': 3};
 const PRAISE = ['Great memory', 'Super match', 'Wow', 'Brainy', 'Amazing'];
@@ -321,6 +398,13 @@ function dealFaces(D, pairs, look){
   shuffle(D.cards.filter(f => !inG.has(f)).concat(singles)).forEach(f => { if(out.length < pairs) out.push(f); });
   shuffle(D.cards.filter(f => !out.includes(f))).forEach(f => { if(out.length < pairs) out.push(f); });   // tiny deck: anything left
   return out.slice(0, pairs);
+}
+// 🎲 Mix = picture cards + about a third 📸 family cards · a small family is topped up with picture cards (mm-2)
+function dealFor(D, pairs, look){
+  const F = DECKS.family;
+  if(D.mix && F && F.cards.length){ const a = dealFaces(F, Math.min(Math.round(pairs * 0.35), F.cards.length), look); return a.concat(dealFaces(D, pairs - a.length, look)); }
+  let f = dealFaces(D, pairs, look); if(f.length < pairs) f = f.concat(dealFaces(DECKS.mix, pairs - f.length, look));
+  return f.slice(0, pairs);
 }
 const isPhone = () => Math.min(innerWidth, innerHeight) < 600 && Math.max(innerWidth, innerHeight) < 1000;
 const mapOk = M => !(M.big && isPhone());
@@ -355,7 +439,7 @@ function renderPlayers(){
 }
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
-  const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : ''; SEATS = [name];
+  const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : ''; SEATS = [name]; buildFamily();   /* 📸 mm-2 */
   loadPrefs(); if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-3b */
   renderSetup(); showScreen('menu'); openCover();   /* 🧱 mm-1: the 🎬 cover first */
 }
@@ -385,8 +469,8 @@ function renderSetup(){
   if(!(PICK.lvl >= 0 && canPlay(PICK.lvl))) PICK.lvl = canPlay(rec) ? rec : Math.max(0, [0, 1, 2, 3, 4, 5].filter(canPlay).pop() || 0);
   // 🎴 decks
   const db = $('deck-list'); db.innerHTML = '';
-  DECK_KEYS.forEach(k => { const D = DECKS[k], b = document.createElement('button'); b.className = 'deck' + (D.mix ? ' mix' : ''); b.dataset.k = k; b.setAttribute('data-sound', 'tap');
-    b.innerHTML = '<div class="mini">' + (D.mix ? ['👾', '🐶', '🚀', '🦸'] : D.cards.slice(0, 4)).join('') + '</div><div class="nm">' + D.icon + ' ' + D.name + '</div>';
+  DECK_KEYS.forEach(k => { const D = DECKS[k], b = document.createElement('button'); b.className = 'deck' + (D.mix ? ' mix' : '') + (D.fam ? ' fam' : ''); b.dataset.k = k; b.setAttribute('data-sound', 'tap');
+    b.innerHTML = '<div class="mini">' + (D.mix ? ['👾', '🐶', '📸', '🦸'] : D.fam ? ['🤳', '🤗', '✋', '🎉'] : D.cards.slice(0, 4)).join('') + '</div><div class="nm">' + D.icon + ' ' + D.name + '</div>';
     b.onclick = () => { PICK.deck = k; savePrefs(); markPicks(); }; db.appendChild(b); });
   markPicks();
 }
@@ -415,7 +499,7 @@ function startGame(lvl){
   if(MemCover) MemCover.hide();   /* 🧱 mm-1 */
   clearInterval(timerId); hideResult();
   const L = LEVELS[lvl], M = mapOf(PICK.map), map = mapOk(M) ? M : mapOf('8'), D = DECKS[PICK.deck] || DECKS.mix, n = map.n, pairs = n * n / 2;
-  const faces = dealFaces(D, pairs, L.look), cards = shuffle(faces.concat(faces).map((f, i) => ({f, id: i, up: false, done: false, by: -1, seen: false})));
+  const faces = dealFor(D, pairs, L.look), cards = shuffle(faces.concat(faces).map((f, i) => ({f, id: i, up: false, done: false, by: -1, seen: false})));
   G = {lvl, L, M: map, D, n, cards, pairs, open: [], wait: false, over: false, paused: false, t0: 0, pausedTotal: 0, started: false, cursor: 0, missRow: 0, guide: L.guide ? 1 : 0,
     mult: map.mult * L.mult, players: SEATS.map((nm, i) => ({name: nm, col: SEAT_COLS[i], pairs: 0, score: 0, miss: 0, streak: 0, best: 0})), turn: 0, found: 0, swaps: 0};
   BAR.level(L.emoji + ' ' + L.name + ' · ' + map.name + ' · ' + D.icon);
@@ -451,7 +535,7 @@ function go(){ G.started = true; cheerGo(); /* 📣 cs-3b */ G.t0 = performance.
 function buildBoard(){
   const b = $('board'); b.innerHTML = ''; b.style.gridTemplateColumns = 'repeat(' + G.n + ', var(--cs))'; b.style.setProperty('--deck-back', G.D.back); b.classList.toggle('dots', !!G.L.seen);
   G.cards.forEach((c, i) => { const el = document.createElement('button'); el.className = 'card'; el.dataset.i = i; el.setAttribute('aria-label', 'Card ' + (i + 1)); el.setAttribute('data-sound', 'none');
-    el.innerHTML = '<span class="in"><span class="face back">' + G.D.mark + '</span><span class="face front">' + c.f + '</span></span>';
+    el.innerHTML = '<span class="in"><span class="face back">' + G.D.mark + '</span>' + (isFam(c.f) ? '<span class="face front fam"><canvas></canvas></span>' : '<span class="face front">' + c.f + '</span>') + '</span>';
     el.addEventListener('click', () => flip(+el.dataset.i)); b.appendChild(el); c.el = el; });
 }
 function buildSide(){
@@ -470,6 +554,7 @@ function layout(){
   const cs = Math.floor(Math.max(24, Math.min((W - gap * (n - 1)) / n, (H - gap * (n - 1)) / n, 190)));
   $('board').style.setProperty('--cs', cs + 'px'); $('board').style.setProperty('--gap', gap + 'px');
   if(G.guideAt != null) guideStep();
+  paintFamCards();   /* 📸 mm-2 */
 }
 window.addEventListener('resize', () => { if(G){ layout(); } });
 function paint(c){ c.el.classList.toggle('up', c.up); c.el.classList.toggle('done', c.done); c.el.classList.toggle('seen', !!c.seen); if(c.done && c.by >= 0){ c.el.style.setProperty('--won-edge', G.players[c.by].col); } }
@@ -512,10 +597,12 @@ function flip(i){
     setTimeout(() => {
       if(G !== tg) return;
       a.done = b.done = true; a.by = b.by = G.turn; paint(a); paint(b); G.found++; P.pairs++; P.streak++; P.best = Math.max(P.best, P.streak); G.missRow = 0;
-      const gain = Math.round((100 + 50 * (P.streak - 1)) * G.mult); P.score += gain; UISound.play('success'); sparkle(a.el); sparkle(b.el);
-      const mine = $('mine-' + G.turn); if(mine) mine.insertAdjacentHTML('beforeend', '<i>' + a.f + '</i>');
+      const gain = Math.round((100 + 50 * (P.streak - 1)) * G.mult); P.score += gain;
+      const fx = () => { UISound.play('success'); sparkle(a.el); sparkle(b.el); floatText(b.el, '+' + gain + (P.streak > 1 ? ' 🔥×' + P.streak : '')); };
+      if(isFam(a.f)) famPop([a, b], fx); else fx();   /* 📸 mm-2: the avatars come alive — sound + points on the contact beat */
+      const mine = $('mine-' + G.turn); if(mine) mine.insertAdjacentHTML('beforeend', '<i>' + (isFam(a.f) ? famThumb(a.f) : a.f) + '</i>');
       cheer(G.turn, P.streak >= 3 ? pick(['dance', 'floss', 'backflip']) : pick(['cheer', 'clap', 'jump', 'highfive'])); G.players.forEach((o, j) => { if(j !== G.turn) cheer(j, 'clap'); });
-      floatText(b.el, '+' + gain + (P.streak > 1 ? ' 🔥×' + P.streak : '')); cheerSay('goal', G.turn); /* 📣 cs-3b */
+      cheerSay('goal', G.turn); /* 📣 cs-3b */
       if(P.streak === 3 || P.streak === 5 || P.streak === 8) showBanner('🔥 ' + P.streak + ' in a row! ' + pick(PRAISE) + '!', 'gold');
       G.open = []; G.wait = false; hud();
       if(G.found === G.pairs) setTimeout(finishGame, FAST() ? 0 : 500);
@@ -719,4 +806,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (11n+r32+back-1+modes-3+p1b+p1d+cs-3b+mm-1) END OF Memory.html -->
+<!-- (11n+r32+back-1+modes-3+p1b+p1d+cs-3b+mm-1+mm-2) END OF Memory.html -->
