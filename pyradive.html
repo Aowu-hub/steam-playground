@@ -47,6 +47,15 @@
   @media (max-height:560px){ #scr-menu .title .logo{display:none;} #scr-menu .title{flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px 14px;margin-bottom:2px;} #scr-menu .title h1{font-size:1.6rem;line-height:1.1;} #scr-menu .who{margin-top:0;padding:2px 10px;} #scr-menu .who button{min-height:26px;} #scr-menu .who .bestiary-btn{padding:2px 10px;min-height:26px;font-size:.8rem;} }   /* pd-4b: phones held sideways — the player row sits beside the title so all 5 mode boxes fit */
   .cup-br{flex-basis:100%;height:0;}   /* pd-4a: 5 mode boxes must fit the first phone screen */
   .title .logo{font-size:2.8rem;line-height:1;animation:pd-flame 1.4s ease-in-out infinite;transform-origin:50% 90%;}
+  /* 🏷️ pd-7 logos drawn in code (PyraLogo) — the emoji stays as the fallback */
+  .pd-wordmark{display:block;height:74px;width:auto;max-width:94vw;animation:pd-logo-in .6s cubic-bezier(.2,1.4,.4,1) both;}
+  .title.has-logo > .logo{display:none;} .title.has-logo > h1{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+  .ui-mg-h .pd-badge{display:inline-block;align-self:center;height:1.9em;width:auto;margin:-.45em 0 -.45em -.1em;}
+  #setup-logo canvas.pd-badge{height:72px;width:auto;display:block;}
+  .result-card{position:relative;} .result-card .pd-rbadge{position:absolute;top:10px;right:12px;height:58px;width:auto;pointer-events:none;animation:pd-logo-in .6s .15s cubic-bezier(.2,1.4,.4,1) both;}
+  @keyframes pd-logo-in{from{transform:scale(.6) rotate(-6deg);opacity:0;}to{transform:none;opacity:1;}}
+  @media (max-width:640px){ .pd-wordmark{height:58px;} #setup-logo canvas.pd-badge{height:56px;} .result-card .pd-rbadge{height:46px;top:8px;right:8px;} }
+  @media (max-height:560px){ .pd-wordmark{height:36px;} #setup-logo canvas.pd-badge{height:40px;} }
   @keyframes pd-flame{0%,100%{transform:scale(1) rotate(-4deg);}50%{transform:scale(1.12,1.18) rotate(4deg);}}
   .tagline{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:2px;}
   .tagline span{background:var(--card);border-radius:12px;padding:3px 10px;font-weight:900;font-size:0.82rem;box-shadow:0 3px 0 rgba(0,0,0,0.06);animation:pd-pop .5s cubic-bezier(.2,1.6,.4,1) both;}
@@ -1744,6 +1753,220 @@ function modeInfo(k){ return k === 'cups' ? CUP_CARD : PD.MODES[k] || CUPS[k] ||
 function pickMode(k){ if(k === 'cups') SET.cup = CUPS[SET.cupKind] ? SET.cupKind : 'cupfour'; else if(CUPS[k]){ SET.cup = k; SET.cupKind = k; } else if(PD.MODES[k]){ SET.cup = ''; SET.mode = k; } savePrefs(); markModes(); renderLevels(); }   // the level cards show the mode's own goal (⏱️ / ❤️ / ⭐ / cup)
 function mgList(){ return PD.MODE_ORDER.map(k => ({k, g: groupOf(PD.MODES[k]), icon: PD.MODES[k].icon, name: PD.MODES[k].name, type: MODE_CARDS[k].type, sub: MODE_CARDS[k].sub, next: '👇 then pick a level'})).concat([{k: 'cups', g: 'train', icon: CUP_CARD.icon, name: CUP_CARD.name, type: CUP_CARD.type, sub: CUP_CARD.sub, next: '👇 then pick a level'}]); }
 /* 🗂️ END MODE GROUPS */
+/* 🏷️ PyraLogo (pd-7): the PyraDive logo + 🏐 Spike · 🦶 Strike · ⚡ Spark badges, drawn in code (Aowu 2026-11-15) */
+/* 🔥 PyraLogo (pd-7 draft) — the PyraDive logo + the 3 sport badges, drawn in code (no picture files).
+   PyraLogo.pic(kind, arena, px) → cached canvas · PyraLogo.url(kind, arena, px) → data URL for <img> · PyraLogo.draw(g, kind, x, y, px, arena)
+   kind: 'main' | 'wide' (title-row wordmark) | 'spike' | 'strike' | 'spark' · arena: PyraDive arena key (recolours glow + rim), unknown → classic. */
+const PyraLogo = (() => {
+  const SPORT = {
+    spike: {name: 'Spike', ac: '#FF6A1A', ball: 'volley', court: 'net'},
+    strike: {name: 'Strike', ac: '#FFC21A', ball: 'takraw', court: 'net'},
+    spark: {name: 'Spark', ac: '#3CC8FF', ball: 'spark', court: 'table'}
+  };
+  const THEME = {   // glow · rim (2 metal stops) · back (centre, edge) · fire (tip, mid, base)
+    classic: {glow: '#FF7A1A', rim: ['#FFE08A', '#B8741E'], back: ['#2A1208', '#07040A'], fire: ['#FFF3A0', '#FF8A1E', '#C2180A']},
+    fair:    {glow: '#FFB347', rim: ['#FFE7B0', '#9C5A2A'], back: ['#3A1A30', '#120612'], fire: ['#FFF3A0', '#FF9A3C', '#B8301A']},
+    jungle:  {glow: '#9BE15D', rim: ['#F6E7A0', '#7A6A2A'], back: ['#1E2A10', '#070A04'], fire: ['#FFF3A0', '#FF9A2A', '#C2380A']},
+    coral:   {glow: '#3BE0D0', rim: ['#E8FBFF', '#3A8AA0'], back: ['#06324A', '#020C14'], fire: ['#E8FFFF', '#3BE0D0', '#E9707A']},
+    neon:    {glow: '#FF2BD6', rim: ['#B8F3FF', '#3C5CFF'], back: ['#1A0A3C', '#05020E'], fire: ['#FFFFFF', '#3CF2FF', '#FF2BD6']},
+    robot:   {glow: '#FFD23F', rim: ['#E6ECF2', '#5A6676'], back: ['#232B36', '#0A0D12'], fire: ['#FFF7C0', '#FFD23F', '#E0601A']},
+    moon:    {glow: '#B8C6FF', rim: ['#FFFFFF', '#7A7C90'], back: ['#151933', '#010208'], fire: ['#FFFFFF', '#B8C6FF', '#5B4EFF']},
+    olympus: {glow: '#FFC94A', rim: ['#FFF4C8', '#C9962A'], back: ['#2C5A8C', '#0E2440'], fire: ['#FFFFFF', '#FFD86A', '#E08A1A']}
+  };
+  const FONT = (w, px) => w + ' ' + px + 'px Fredoka, Nunito, "Arial Rounded MT Bold", sans-serif';
+  const cache = {}; let SC = 1;   // SC = current scale (shadow blur is not scaled by the canvas transform)
+  const lin = (g, x0, y0, x1, y1, st) => { const q = g.createLinearGradient(x0, y0, x1, y1); st.forEach((c, i) => q.addColorStop(i / (st.length - 1), c)); return q; };
+  const rad = (g, x, y, r, st) => { const q = g.createRadialGradient(x, y - r * 0.35, r * 0.05, x, y, r); st.forEach((c, i) => q.addColorStop(i / (st.length - 1), c)); return q; };
+
+  function shield(g){   // unit shield: 200 wide, 240 tall, centre (0,0)
+    g.beginPath(); g.moveTo(-100, -104); g.lineTo(-28, -104); g.quadraticCurveTo(0, -122, 28, -104); g.lineTo(100, -104);
+    g.lineTo(100, 4); g.quadraticCurveTo(96, 80, 0, 120); g.quadraticCurveTo(-96, 80, -100, 4); g.closePath();
+  }
+  function flames(g, T, y0, w, h, n, seed){   // a row of flame tongues standing on y0
+    g.fillStyle = lin(g, 0, y0 - h, 0, y0, [T.fire[0], T.fire[1], T.fire[2]]);
+    g.beginPath(); g.moveTo(-w / 2, y0);
+    for(let i = 0; i < n; i++){
+      const a = -w / 2 + w * i / n, b = a + w / n, m = (a + b) / 2, hh = h * (0.55 + 0.45 * Math.abs(Math.sin(i * 1.7 + seed))), lean = (i % 2 ? 1 : -1) * w / n * 0.35;
+      g.quadraticCurveTo(a, y0 - hh * 0.5, m + lean, y0 - hh); g.quadraticCurveTo(b, y0 - hh * 0.45, b, y0);
+    }
+    g.closePath(); g.fill();
+  }
+  function rays(g, T, r, n){ g.save(); g.globalAlpha = 0.13; g.fillStyle = T.glow; for(let i = 0; i < n; i++){ const a = i * Math.PI * 2 / n; g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, r, a, a + Math.PI / n * 0.5); g.closePath(); g.fill(); } g.restore(); }
+  function trail(g, T, x, y, r){   // fire trail behind a flying ball (up-left)
+    g.save(); g.translate(x, y); g.rotate(-2.4);
+    [[2.6, 1, T.fire[2]], [2.1, 0.78, T.fire[1]], [1.5, 0.5, T.fire[0]]].forEach(([L, W, c]) => {
+      g.fillStyle = c; g.beginPath(); g.moveTo(0, -r * W);
+      g.quadraticCurveTo(r * L * 0.5, -r * W * 1.2, r * L, -r * 0.2); g.quadraticCurveTo(r * L * 0.7, 0, r * L * 1.05, r * 0.35);
+      g.quadraticCurveTo(r * L * 0.5, r * W * 1.2, 0, r * W); g.closePath(); g.fill();
+    });
+    g.restore();
+  }
+  function ball(g, kind, x, y, r){
+    g.save(); g.translate(x, y);
+    g.beginPath(); g.arc(0, 0, r, 0, 7); g.save(); g.clip();
+    if(kind === 'volley'){
+      g.fillStyle = rad(g, 0, 0, r, ['#FFFFFF', '#FFF2D0', '#E8C27A']); g.fillRect(-r, -r, 2 * r, 2 * r);
+      g.fillStyle = '#FF8A1E'; g.beginPath(); g.moveTo(-r, -r * 0.1); g.quadraticCurveTo(0, -r * 0.05, r * 0.25, -r); g.lineTo(-r, -r); g.closePath(); g.fill();
+      g.fillStyle = '#2C6BFF'; g.beginPath(); g.moveTo(r, r * 0.05); g.quadraticCurveTo(r * 0.05, r * 0.05, -r * 0.2, r); g.lineTo(r, r); g.closePath(); g.fill();
+      g.strokeStyle = '#5A3A1A'; g.lineWidth = r * 0.07; g.lineCap = 'round';
+      [[-r, -r * 0.1, 0, -r * 0.05, r * 0.25, -r], [r, r * 0.05, r * 0.05, r * 0.05, -r * 0.2, r], [-r * 0.15, -r * 0.08, r * 0.1, r * 0.4, r * 0.75, r * 0.7]].forEach(([a, b, c, d, e, f]) => { g.beginPath(); g.moveTo(a, b); g.quadraticCurveTo(c, d, e, f); g.stroke(); });
+    } else if(kind === 'takraw'){   // woven rattan: a lattice of 5-sided holes
+      g.fillStyle = rad(g, 0, 0, r, ['#FFE3A0', '#E8A94A', '#9C5A1A']); g.fillRect(-r, -r, 2 * r, 2 * r);
+      g.fillStyle = 'rgba(70,32,6,.85)'; const s = r * 0.42;
+      for(let j = -3; j <= 3; j++) for(let i = -3; i <= 3; i++){
+        const cx = i * s + (j % 2 ? s / 2 : 0), cy = j * s * 0.87, d = Math.hypot(cx, cy) / r; if(d > 1.05) continue;
+        const k = 1 - d * d * 0.55, hr = s * 0.3 * k;   // holes shrink toward the edge (round look)
+        g.beginPath(); for(let q = 0; q < 5; q++){ const a = q * Math.PI * 2 / 5 - Math.PI / 2; g.lineTo(cx * (0.92 + 0.08 * k) + Math.cos(a) * hr, cy * (0.92 + 0.08 * k) + Math.sin(a) * hr); } g.fill();
+      }
+    } else if(kind === 'spark'){   // white with blue lightning bands
+      g.fillStyle = rad(g, 0, 0, r, ['#FFFFFF', '#F2F7FF', '#B8CCE8']); g.fillRect(-r, -r, 2 * r, 2 * r);
+      g.strokeStyle = '#1E6BFF'; g.lineWidth = r * 0.16; g.lineJoin = 'miter';
+      [-0.42, 0.38].forEach((oy, n) => { g.beginPath(); for(let q = 0; q <= 6; q++){ const px = -r + q * r / 3, py = r * oy + (q % 2 ? -1 : 1) * r * 0.16 + (n ? r * 0.1 : 0); q ? g.lineTo(px, py) : g.moveTo(px, py); } g.stroke(); });
+      g.strokeStyle = '#9FE8FF'; g.lineWidth = r * 0.05; g.stroke();
+    } else {   // 'fire' — the PyraDive fireball
+      g.fillStyle = rad(g, 0, 0, r, ['#FFFFFF', '#FFF07A', '#FF9A1E', '#D2280A']); g.fillRect(-r, -r, 2 * r, 2 * r);
+      g.fillStyle = 'rgba(255,255,255,.55)'; g.beginPath(); g.arc(-r * 0.3, -r * 0.35, r * 0.28, 0, 7); g.fill();
+    }
+    g.restore();
+    g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(-r * 0.35, -r * 0.45, r * 0.22, r * 0.12, -0.6, 0, 7); g.fill();   // shine
+    g.lineWidth = r * 0.06; g.strokeStyle = 'rgba(40,16,4,.8)'; g.beginPath(); g.arc(0, 0, r, 0, 7); g.stroke();
+    g.restore();
+  }
+  function court(g, T, kind){
+    g.save();
+    if(kind === 'net'){   // net band across the shield with a white tape on top
+      g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 1.6;
+      for(let x = -100; x <= 100; x += 9){ g.beginPath(); g.moveTo(x, 16); g.lineTo(x, 50); g.stroke(); }
+      for(let y = 16; y <= 50; y += 8.5){ g.beginPath(); g.moveTo(-100, y); g.lineTo(100, y); g.stroke(); }
+      g.fillStyle = '#FFFFFF'; g.fillRect(-100, 11, 200, 6);
+    } else {   // curved net-table (top view from the side): an arch with a low net
+      g.fillStyle = lin(g, 0, 22, 0, 54, ['#2C6BFF', '#123A9C']); g.beginPath(); g.moveTo(-86, 52); g.quadraticCurveTo(0, 6, 86, 52); g.lineTo(86, 58); g.quadraticCurveTo(0, 14, -86, 58); g.closePath(); g.fill();
+      g.strokeStyle = '#FFFFFF'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(-86, 52); g.quadraticCurveTo(0, 6, 86, 52); g.stroke();
+      g.fillStyle = 'rgba(255,255,255,.75)'; g.fillRect(-2, 18, 4, 14);
+    }
+    g.restore();
+  }
+  function word(g, x, y, px, a, b, acFill, ink, align){   // "Pyra" + name, one word, two colours
+    g.font = FONT('900 italic', px); g.textBaseline = 'middle'; g.lineJoin = 'round';
+    const wa = g.measureText(a).width, wb = g.measureText(b).width, x0 = align === 'left' ? x : x - (wa + wb) / 2;
+    g.lineWidth = px * 0.26; g.strokeStyle = ink; g.strokeText(a, x0, y); g.strokeText(b, x0 + wa, y);
+    g.fillStyle = '#FFFFFF'; g.fillText(a, x0, y); g.fillStyle = acFill; g.fillText(b, x0 + wa, y);
+    return wa + wb;
+  }
+
+  function badge(g, T, sp, small){   // small = icon only (name sits next to it), bigger ball   // drawn in the unit box (≈ 220 × 260)
+    g.save(); g.shadowColor = T.glow; g.shadowBlur = 26 * SC; shield(g); g.lineWidth = 10; g.strokeStyle = T.glow; g.stroke(); g.restore();
+    shield(g); g.fillStyle = rad(g, 0, -10, 150, [T.back[0], T.back[1]]); g.fill();
+    g.save(); shield(g); g.clip();
+    rays(g, T, 170, 22);
+    g.globalAlpha = 0.9; flames(g, T, 124, 220, 92, 9, 1); g.globalAlpha = 1;
+    court(g, T, sp.court);
+    const by = small ? -14 : -42, br = small ? 54 : 40; trail(g, T, 6, by, br); ball(g, sp.ball, 6, by, br);
+    g.restore();
+    shield(g); g.lineWidth = 6; g.strokeStyle = lin(g, 0, -120, 0, 120, [T.rim[0], T.rim[1], T.rim[0], T.rim[1]]); g.stroke();
+    if(small) return;
+    // ribbon with the name
+    g.save(); g.fillStyle = lin(g, 0, 62, 0, 100, ['#2A0E06', '#100404']);
+    g.beginPath(); g.moveTo(-112, 66); g.lineTo(112, 66); g.lineTo(104, 82); g.lineTo(112, 98); g.lineTo(-112, 98); g.lineTo(-104, 82); g.closePath(); g.fill();
+    g.lineWidth = 3; g.strokeStyle = T.rim[0]; g.stroke(); g.restore();
+    const px = 34; g.font = FONT('900 italic', px); const w = g.measureText('Pyra' + sp.name).width, sc = Math.min(1, 196 / w);
+    g.save(); g.translate(0, 82); g.scale(sc, sc); word(g, 0, 1, px, 'Pyra', sp.name, lin(g, 0, -16, 0, 16, ['#FFFFFF', sp.ac, sp.ac]), '#1A0602'); g.restore();
+  }
+
+  function tri(g, T){   // the pyramid + fireball, centred near (0, -14): top -112, base 84
+    g.save(); g.beginPath(); g.moveTo(0, -112); g.lineTo(120, 84); g.lineTo(-120, 84); g.closePath(); g.fillStyle = rad(g, 0, 20, 140, [T.back[0], T.back[1]]); g.fill(); g.clip();
+    rays(g, T, 180, 26); flames(g, T, 88, 260, 110, 9, 2); g.restore();
+    g.save(); g.shadowColor = T.glow; g.shadowBlur = 30 * SC; g.lineJoin = 'round'; g.lineWidth = 12;
+    g.strokeStyle = lin(g, -120, -112, 120, 84, [T.rim[0], T.glow, T.rim[1]]); g.beginPath(); g.moveTo(0, -112); g.lineTo(120, 84); g.lineTo(-120, 84); g.closePath(); g.stroke(); g.restore();
+    [[-120, 84], [120, 84], [0, -112]].forEach(([x, y]) => { g.fillStyle = T.rim[0]; g.beginPath(); g.arc(x, y, 7, 0, 7); g.fill(); });
+    trail(g, T, 0, 16, 44); ball(g, 'fire', 0, 16, 44);
+  }
+  const fireWord = (g, T, y0, y1) => lin(g, 0, y0, 0, y1, [T.fire[0], T.fire[1], T.fire[2]]);
+  function wide(g, T){   // the title-row wordmark (≈ 760 × 190): pyramid left, "PyraDive" right
+    g.save(); g.translate(-268, 4); g.scale(0.7, 0.7); tri(g, T); g.restore();
+    const px = 112; g.font = FONT('900 italic', px); const w = g.measureText('PyraDive').width, sc = Math.min(1, 530 / w);
+    g.save(); g.translate(-180, 6); g.scale(sc, sc);
+    g.save(); g.shadowColor = T.glow; g.shadowBlur = 18 * SC; word(g, 0, 0, px, 'Pyra', 'Dive', fireWord(g, T, -40, 40), '#1A0602', 'left'); g.restore();
+    word(g, 0, 0, px, 'Pyra', 'Dive', fireWord(g, T, -40, 40), '#1A0602', 'left');
+    g.restore();
+  }
+  function main(g, T, small){   // drawn in the unit box (≈ 480 × 360): pyramid + fireball + "PyraDive" + tagline
+    g.save(); g.translate(0, -40); tri(g, T); g.restore();
+    const ink = '#1A0602';
+    g.save(); g.shadowColor = T.glow; g.shadowBlur = 18 * SC; word(g, 0, 98, 78, 'Pyra', 'Dive', lin(g, 0, 70, 0, 128, [T.fire[0], T.fire[1], T.fire[2]]), ink); g.restore();
+    word(g, 0, 98, 78, 'Pyra', 'Dive', lin(g, 0, 70, 0, 128, [T.fire[0], T.fire[1], T.fire[2]]), ink);
+    if(small) return;   // tagline only where it can be read
+    g.font = FONT('800', 22); const parts = [['volley', 'SPIKE'], ['takraw', 'STRIKE'], ['spark', 'SPARK']], gap = 26;
+    const ws = parts.map(([, t]) => g.measureText(t).width), tot = ws.reduce((a, b) => a + b, 0) + parts.length * 26 + gap * (parts.length - 1);
+    let x = -tot / 2; g.textBaseline = 'middle';
+    parts.forEach(([b, t], i) => { ball(g, b, x + 10, 146, 10); g.lineWidth = 5; g.strokeStyle = ink; g.strokeText(t, x + 24, 147); g.fillStyle = '#FFFFFF'; g.fillText(t, x + 24, 147); x += 26 + ws[i] + gap; });
+  }
+
+  const BOX = {main: [480, 360], wide: [760, 190], spike: [272, 300], strike: [272, 300], spark: [272, 300]};   // room for the glow
+  function draw(g, kind, x, y, px, arena){   // px = width on screen
+    const T = THEME[arena] || THEME.classic, [bw] = BOX[kind] || BOX.spike, s = px / bw; SC = s;
+    g.save(); g.translate(x, y); g.scale(s, s);
+    kind === 'main' ? main(g, T, px < 260) : kind === 'wide' ? wide(g, T) : badge(g, T, SPORT[kind] || SPORT.spike, px < 110);
+    g.restore();
+  }
+  function pic(kind, arena, px){
+    const key = kind + ':' + (arena || 'classic') + ':' + px; if(cache[key]) return cache[key];
+    const [bw, bh] = BOX[kind] || BOX.spike, c = document.createElement('canvas'); c.width = px; c.height = Math.round(px * bh / bw);
+    draw(c.getContext('2d'), kind, px / 2, c.height / 2 + (kind === 'main' && px < 260 ? px * 0.06 : 0), px, arena);
+    return (cache[key] = c);
+  }
+  const url = (kind, arena, px) => pic(kind, arena, px).toDataURL('image/png');
+  const clear = () => { for(const k in cache) delete cache[k]; };   // after the web fonts arrive
+  return {draw, pic, url, clear, SPORT, THEME, BOX};
+})();
+if(typeof window !== 'undefined') window.PyraLogo = PyraLogo;
+/* 🏷️ pd-7 page helpers: every logo follows the picked arena (SET.arena; a match uses arenaKey(M)) */
+const PD_LOGO_GROUPS = ['spike', 'strike', 'spark'];
+function pdLogoCanvas(kind, arena, cssH, cls){   // a fresh <canvas> copy of the cached picture (one cached picture can't sit in two places)
+  const B = PyraLogo.BOX[kind], dpr = Math.min(3, window.devicePixelRatio || 1), w = Math.round(cssH * B[0] / B[1] * dpr);
+  const pic = PyraLogo.pic(kind, arena, w), c = document.createElement('canvas');
+  c.width = pic.width; c.height = pic.height; c.getContext('2d').drawImage(pic, 0, 0);
+  c.className = cls; c.dataset.pdlogo = kind; c.dataset.arena = arena; c.setAttribute('role', 'img');
+  c.setAttribute('aria-label', kind === 'wide' || kind === 'main' ? 'PyraDive' : 'Pyra' + PyraLogo.SPORT[kind].name);
+  return c;
+}
+function pdLogoSwap(old, kind, arena, cssH, cls){ const c = pdLogoCanvas(kind, arena, cssH, cls); old.replaceWith(c); return c; }
+function pdLogos(){   // title rows (player + menu) + mode-box headers, in the picked arena's colours
+  try{
+    const ar = SET.arena || 'classic';
+    ['scr-player', 'scr-menu'].forEach(id => { const t = document.querySelector('#' + id + ' .title'); if(!t) return;
+      const old = t.querySelector('.pd-wordmark');
+      if(old && old.dataset.arena === ar) return;
+      const c = pdLogoCanvas('wide', ar, 80, 'pd-wordmark');
+      old ? old.replaceWith(c) : t.insertBefore(c, t.querySelector('h1')); t.classList.add('has-logo'); });
+    PD_LOGO_GROUPS.forEach(g => { const h = document.querySelector('#mode-list .ui-mgroup[data-g="' + g + '"] .ui-mg-h'); if(!h) return;
+      const old = h.querySelector('.pd-badge');
+      if(old){ if(old.dataset.arena !== ar) pdLogoSwap(old, g, ar, 40, 'pd-badge'); return; }
+      const c = pdLogoCanvas(g, ar, 40, 'pd-badge'), tn = h.firstChild;   // draw first: if it fails the emoji stays
+      if(tn && tn.nodeType === 3) tn.textContent = tn.textContent.replace(/^\s*\S+\s+/, ' ');   // drop the emoji, keep "PyraSpike"
+      h.insertBefore(c, h.firstChild); });
+  }catch(e){ console.warn('🏷️ logo', e); }   // the emoji title + icons stay
+}
+function pdSetupBadge(){   // the sport badge as the setup screen's logo (🏆 cups + 🎯 drills keep their emoji)
+  try{
+    const box = $('setup-logo'), m = PD.MODES[SET.mode], g = m && !SET.cup ? groupOf(m) : '';
+    if(!PD_LOGO_GROUPS.includes(g)) return;
+    const ar = m.sport === 'hoop' && (SET.arena || 'classic') === 'classic' ? 'fair' : SET.arena || 'classic';
+    const c = pdLogoCanvas(g, ar, 80, 'pd-badge'); box.textContent = ''; box.appendChild(c);   // draw first: if it fails the emoji stays
+  }catch(e){ console.warn('🏷️ logo', e); }
+}
+function pdResultBadge(){   // the sport badge in the result card's corner (match or cup)
+  try{
+    const card = $('result-card'), cs = SET.cupState, mid = cs && SET.cup ? cs.sport : (G && G.M ? G.M.mode : SET.mode), m = PD.MODES[mid], g = m ? groupOf(m) : '';
+    if(!PD_LOGO_GROUPS.includes(g) || !card) return;
+    const ar = G && G.M ? arenaKey(G.M) : SET.arena || 'classic';
+    card.insertBefore(pdLogoCanvas(g, ar, 64, 'pd-rbadge'), card.firstChild);
+  }catch(e){ console.warn('🏷️ logo', e); }
+}
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(() => {   // redraw once Fredoka has arrived
+  try{ PyraLogo.clear(); document.querySelectorAll('canvas[data-pdlogo]').forEach(c => { c.dataset.arena = ''; }); pdLogos(); if(!$('scr-setup').classList.contains('hidden')) pdSetupBadge(); }catch(e){}
+});
+/* 🏷️ END PyraLogo (pd-7) */
 // 🏟️ arenas (pd-4c: all 7 open). 🏖️ Beach mode is always on sand; ⭕ Hoop in the Classic arena = a 🛕 Thai temple-fair square; 🪐 the moon court is floaty (engine ARENA_GRAV)
 const ARENAS = [{k: 'classic', icon: '🏟️', name: 'Classic arena'}, {k: 'jungle', icon: '🦖', name: 'Jungle beach'}, {k: 'coral', icon: '🐙', name: 'Coral court'}, {k: 'neon', icon: '🪩', name: 'Neon arena'}, {k: 'robot', icon: '🤖', name: 'Robot gym'}, {k: 'moon', icon: '🪐', name: 'Moon court'}, {k: 'olympus', icon: '☁️', name: 'Olympus'}];
 // sky (3 stops) · stands (2) · crowd dot strength · floor / court / takraw court / ⚡ play zone / line colours (missing = the classic colour) · spot = light beams · deco = scenery painter
@@ -1817,6 +2040,7 @@ function showScreen(name){
 function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
 function canPlay(i){ const p = progressOf(S.player); if(i === 5) return p.unlocked >= 5; if(i === 4) return p.unlocked >= 4; return i <= Math.max(p.unlocked, AGE_START[S.age] || 0); }
 function renderPlayers(){
+  pdLogos();   // 🏷️ pd-7
   const box = $('player-list'); box.innerHTML = '';
   if(!S.players.length){ box.innerHTML = '<div class="empty">No players yet — add one on the Dashboard first.</div>'; return; }
   S.players.forEach(p => { const b = document.createElement('button'); b.className = 'pick'; b.setAttribute('data-sound', 'pop');
@@ -1846,7 +2070,7 @@ function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return 
 function renderMenu(){
   const ml = $('mode-list');
   if(!ml.children.length) UI.modeGroups(ml, MODE_GROUPS, mgList(), {next: () => $('level-head'), onPick: k => { pickMode(k); return false; }});
-  markModes(); renderLevels();
+  markModes(); renderLevels(); pdLogos();   // 🏷️ pd-7
   pdLeaders($('leaders'), S.player);
 }
 /* 🏆 pd-3c (Aowu 2026-11-14): ONE PyraDive leaderboard, a column per sport — 🏐 Spike · 🦶 Strike · ⭕ Hoop · ⚡ Spark.
@@ -1915,7 +2139,7 @@ function openSetup(lvl){
   if(LEVEL_UI[lvl].hardcore) SET.who = 'robot';
   if(SET.who !== 'robot' && !others().length) SET.who = 'robot';
   if(!SET.p2 || !others().includes(SET.p2)) SET.p2 = others()[0] || '';
-  $('setup-logo').textContent = sp.icon; $('setup-title').textContent = sp.name + ' · ' + L.name;
+  $('setup-logo').textContent = sp.icon; $('setup-title').textContent = sp.name + ' · ' + L.name; pdSetupBadge();   // 🏷️ pd-7
   $('setup-sub').textContent = sp.drill ? DRILL_GOAL[sp.drill] + ' · ' + levelGoal(SET.mode, lvl) : sp.party ? '🌀 ' + levelGoal(SET.mode, lvl) + ' · every ball that lands on their half counts · ' + LEVEL_UI[lvl].blurb : (L.sets === 3 ? 'Best of 3 sets to ' + L.target : 'First to ' + L.target) + ' points · 3 touches a side · ' + LEVEL_UI[lvl].blurb;
   buildWho(); buildTeams(); buildArenas();
   const mc = () => { $('aim-chip').textContent = '🎯 Landing marker: ' + (SET.marker ? 'on' : 'off'); $('aim-chip').classList.toggle('on', SET.marker); };
@@ -1959,7 +2183,7 @@ function buildArenas(){
   const box = $('arena-list');
   box.innerHTML = ARENAS.map(a => '<button class="arena' + (a.k === SET.arena ? ' on' : '') + (a.soon ? ' soon' : '') + '" data-k="' + a.k + '" data-sound="tap"><canvas width="300" height="225"></canvas><div class="nm">' + a.icon + ' ' + a.name + '</div></button>').join('');
   box.querySelectorAll('.arena').forEach(b => { const a = ARENAS.find(x => x.k === b.dataset.k); paintArenaPreview(b.querySelector('canvas'), a.k);
-    b.onclick = () => { SET.arena = a.k; savePrefs(); box.querySelectorAll('.arena').forEach(x => x.classList.toggle('on', x === b)); if(a.k === 'moon') UI.toast('🪐 Moon court: the ball floats — slow and high!'); }; });
+    b.onclick = () => { SET.arena = a.k; savePrefs(); pdSetupBadge(); pdLogos(); /* 🏷️ pd-7 */ box.querySelectorAll('.arena').forEach(x => x.classList.toggle('on', x === b)); if(a.k === 'moon') UI.toast('🪐 Moon court: the ball floats — slow and high!'); }; });
   buildLooks();
 }
 
@@ -3106,7 +3330,7 @@ function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!car
   const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
   const at = card.querySelector('.res-btns'); if(at) { at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); } else { card.appendChild(cap); card.appendChild(c); } }, 900); }
 /* 📣 CHEERSQUAD END */
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-pd */ }
+function showResult(html){ $('result-card').innerHTML = html; pdResultBadge(); /* 🏷️ pd-7 */ $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-pd */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pdPick(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
@@ -3133,4 +3357,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pd-4c+cs-pd+ck-2d+pd-4e+pd-5a) END OF PyraDive.html -->
+<!-- (pd-4c+cs-pd+ck-2d+pd-4e+pd-5a+pd-7) END OF PyraDive.html -->
