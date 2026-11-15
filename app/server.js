@@ -246,6 +246,7 @@ function doGet(e) {
     artifactory: 'Artifactory',   // 🏭 Artifactory: the maker app (server in ArtifactoryCode.gs) — keep on its own line
     tdstories: 'TDStories',   // 🏰 TD-Stories: tower-defence story books (+ 🧬 SkillKit shared library) — keep on its own line
     sciencetory: 'Sciencetory',   // 🔬 Sciencetory: the science lab for your crafted things (server in SciencetoryCode.gs, sc-1) — keep on its own line
+    isotest: 'IsoTest',   // 🧱 IsoKit test page (iso-1, hidden — not in the Gameroom): diamond map, 40 walkers, minimap, speed meter — keep on its own line
     workshop: 'Artifactory',   // 🔨 old Workshop address → Artifactory's Furniture Workshop area (af-1)
     room: 'Room',
     collection: 'Collection',
