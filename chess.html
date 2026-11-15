@@ -319,7 +319,7 @@
   /* 🧱 b2: one-page setup — picked mode / board / level glow; ▶ Start sits at the bottom, always in reach */
   .b2-modes{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:760px;margin:0 auto 10px;} .b2-modes .duo{margin:0;width:100%;}
   @media (max-width:520px){ .b2-modes{grid-template-columns:1fr;} }
-  .duo.on,.pick.sel{outline:4px solid var(--red,#E2554F);outline-offset:2px;}
+  /* b2fix: the picked look = GameFrame's GF.pick (.gf-picked + ✓), visible on every theme */
   .b2-start{position:sticky;bottom:0;z-index:5;display:flex;justify-content:center;padding:10px 0 calc(var(--safe-b, 12px) + 4px);margin-top:12px;background:linear-gradient(transparent,var(--bg,#F3EEE6) 35%);}
   .b2-start .sp-btn{min-width:min(420px,92%);min-height:56px;font-size:1.15rem;}
   .b2-hide{display:none !important;}
@@ -770,21 +770,22 @@ function miniBoard(key){
   return '<div class="mini" data-design="' + key + '">' + h + '</div>';
 }
 /* 🧱 b2 (Game Baseline pilot): ONE setup page — mode, board, level, pieces, options, ▶ Start */
+const gfPick = (el, on) => { if(window.GF && GF.pick) GF.pick(el, on); };   /* ✓ b2fix: the ONE picked look (GameFrame) */
 const CH = {mode: 'bot', lvl: -1, friend: ''};
 function chooseDesign(opts){ if(ChessCover) ChessCover.hide(); CH.mode = opts.mode; if(opts.lvl != null && opts.mode === 'bot') CH.lvl = opts.lvl; if(opts.friend) CH.friend = opts.friend; renderSetup(); showScreen('menu'); }   // old entry point: open the setup with these picks
 function setMode(m){ if(m === 'duo' && !CH.friend){ chooseFriend(); return; } CH.mode = m; renderSetup(); }
 function renderSetup(){
   if(!$('design-list')) return;
-  $('mode-bot').classList.toggle('on', CH.mode === 'bot'); $('mode-duo').classList.toggle('on', CH.mode === 'duo');
+  $('mode-bot').classList.toggle('on', CH.mode === 'bot'); $('mode-duo').classList.toggle('on', CH.mode === 'duo'); gfPick($('mode-bot'), CH.mode === 'bot'); gfPick($('mode-duo'), CH.mode === 'duo');   /* ✓ b2fix */
   $('duo-sub').textContent = CH.friend ? S.player + ' vs ' + CH.friend + ' · tap to change' : 'Take turns on this screen';
   $('mode-duo').onclick = () => { if(CH.mode === 'duo' && CH.friend) chooseFriend(); else setMode('duo'); };
   ['level-head', 'level-list'].forEach(id => $(id).classList.toggle('b2-hide', CH.mode !== 'bot'));
-  document.querySelectorAll('#level-list .lvl').forEach(b => b.classList.toggle('sel', CH.mode === 'bot' && Number(b.dataset.i) === CH.lvl));
+  document.querySelectorAll('#level-list .lvl').forEach(b => { const on = CH.mode === 'bot' && Number(b.dataset.i) === CH.lvl; b.classList.toggle('sel', on); gfPick(b, on); });   /* ✓ b2fix */
   const box = $('design-list'); box.innerHTML = '';
   Object.keys(DESIGNS).forEach(k => { const D = DESIGNS[k], b = document.createElement('button');
     b.className = 'design' + (k === design ? ' cur' : ''); b.setAttribute('data-sound', 'pop');
     b.innerHTML = miniBoard(k) + '<div style="display:flex;flex-direction:column;align-items:center;gap:2px"><div class="nm">' + D.icon + ' ' + D.name + '</div><div class="sub">' + D.sub + '</div></div>';
-    b.onclick = () => { design = k; saveDesign(); document.body.setAttribute('data-design', design); renderSetup(); }; box.appendChild(b); });
+    b.onclick = () => { design = k; saveDesign(); document.body.setAttribute('data-design', design); renderSetup(); }; box.appendChild(b); gfPick(b, k === design); });   /* ✓ b2fix: the picked board */
   const sp = $('skin-pick'); sp.innerHTML = '';
   if(window.PieceSkins) [S.player].concat(CH.mode === 'duo' && CH.friend ? [CH.friend] : []).forEach(name => {
     sp.insertAdjacentHTML('beforeend', '<div class="section-head sub-head">♟️ ' + UI.esc(name) + '\'s pieces</div>');
@@ -1767,4 +1768,4 @@ msAfter('choosePlayer', () => lxUrlCode(c => { c = String(c || '').replace(/[^0-
 </script>
 </body>
 </html>
-<!-- (11w-1+11x-3+r32+back-1+modes-3+p1b+cs-3a+lk-3b+lk-3c+lk-5a+lk-5f+b2) END OF Chess.html -->
+<!-- (11w-1+11x-3+r32+back-1+modes-3+p1b+cs-3a+lk-3b+lk-3c+lk-5a+lk-5f+b2+b2fix) END OF Chess.html -->
