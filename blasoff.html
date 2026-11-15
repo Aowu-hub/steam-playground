@@ -340,8 +340,25 @@ var BO = (function () {
     hop:    [{n: 'ready', ms: 30}, {n: 'anticipation', ms: 120}, {n: 'contact', ms: 60, go: 1}, {n: 'follow', air: 1}, {n: 'settle', ms: 120}],
     dodge:  [{n: 'ready', ms: 0}, {n: 'anticipation', ms: 70}, {n: 'contact', ms: 60, go: 1}, {n: 'follow', air: 1}, {n: 'settle', ms: 100}],
     gkhigh: [{n: 'ready', ms: 60}, {n: 'anticipation', ms: 150}, {n: 'contact', ms: 80, go: 1}, {n: 'follow', air: 1}, {n: 'settle', ms: 150}],
-    gkdive: [{n: 'ready', ms: 40}, {n: 'anticipation', ms: 150}, {n: 'contact', ms: 100, go: 1}, {n: 'follow', air: 1}, {n: 'settle', ms: 200}]
+    gkdive: [{n: 'ready', ms: 40}, {n: 'anticipation', ms: 150}, {n: 'contact', ms: 100, go: 1}, {n: 'follow', air: 1}, {n: 'settle', ms: 200}],
+    /* ⚽ bo-5b kicks: the anticipation = holding J / K (people) or a short committed wind-up (robots, short taps); ready is part of it */
+    pass:   [{n: 'ready', ms: 0}, {n: 'anticipation', ms: 90}, {n: 'contact', ms: 60, go: 1, kick: 1}, {n: 'follow', ms: 180}, {n: 'settle', ms: 120}],
+    loft:   [{n: 'ready', ms: 0}, {n: 'anticipation', ms: 120}, {n: 'contact', ms: 60, go: 1, kick: 1}, {n: 'follow', ms: 220}, {n: 'settle', ms: 120}],
+    shot:   [{n: 'ready', ms: 0}, {n: 'anticipation', ms: 150}, {n: 'contact', ms: 90, go: 1, kick: 1}, {n: 'follow', ms: 280}, {n: 'settle', ms: 160}],
+    curl:   [{n: 'ready', ms: 0}, {n: 'anticipation', ms: 150}, {n: 'contact', ms: 90, go: 1, kick: 1}, {n: 'follow', ms: 280}, {n: 'settle', ms: 160}],
+    chip:   [{n: 'ready', ms: 0}, {n: 'anticipation', ms: 100}, {n: 'contact', ms: 60, go: 1, kick: 1}, {n: 'follow', ms: 160}, {n: 'settle', ms: 100}],
+    blast:  [{n: 'ready', ms: 0}, {n: 'anticipation', ms: 250}, {n: 'contact', ms: 90, go: 1, kick: 1}, {n: 'follow', air: 1}, {n: 'settle', ms: 160}],
+    volley: [{n: 'ready', ms: 0}, {n: 'anticipation', ms: 150}, {n: 'contact', ms: 80, go: 1, kick: 1}, {n: 'follow', ms: 250}, {n: 'settle', ms: 150}],
+    flip:   [{n: 'ready', ms: 0}, {n: 'anticipation', ms: 0}, {n: 'contact', ms: 100, go: 1, kick: 1}, {n: 'follow', air: 1}, {n: 'settle', ms: 200}],
+    bicycle:[{n: 'ready', ms: 0}, {n: 'anticipation', ms: 0}, {n: 'contact', ms: 100, go: 1, kick: 1}, {n: 'follow', air: 1}, {n: 'settle', ms: 200}],
+    header: [{n: 'ready', ms: 40}, {n: 'anticipation', ms: 140}, {n: 'contact', ms: 80, go: 1}, {n: 'follow', air: 1}, {n: 'settle', ms: 150}],
+    dheader:[{n: 'ready', ms: 0}, {n: 'anticipation', ms: 100}, {n: 'contact', ms: 80, go: 1}, {n: 'follow', air: 1}, {n: 'settle', ms: 220}],
+    trapc:  [{n: 'ready', ms: 0}, {n: 'anticipation', ms: 0}, {n: 'contact', ms: 80, go: 1}, {n: 'follow', ms: 180}, {n: 'settle', ms: 100}],
+    trapt:  [{n: 'ready', ms: 0}, {n: 'anticipation', ms: 0}, {n: 'contact', ms: 80, go: 1}, {n: 'follow', ms: 180}, {n: 'settle', ms: 100}],
+    traps:  [{n: 'ready', ms: 0}, {n: 'anticipation', ms: 0}, {n: 'contact', ms: 80, go: 1}, {n: 'follow', ms: 180}, {n: 'settle', ms: 100}]
   };
+  var KICK_MIN = {pass: 0.09, shot: 0.15};   // a tap shorter than this still shows its back-lift (contact ≤ 0.15 s after the release)
+  var WIND = [0.2, 0.18, 0.16, 0.14, 0.11, 0.08];   // 🤖 robots: committed wind-up (s) per level before the contact
   // 🦘 jump height (m) per action (Aowu 00:48: "a header needs a higher jump, a spinning kick a higher jump + spin, a jump dodge over a slide…")
   var JUMPS = {hop: 0.5, dodge: 0.7, header: 1.0, dheader: 0.4, bicycle: 1.1, flip: 1.1, flippass: 0.5, blast: 0.3, gkhigh: 1.0, gkdive: 0.5};
   var MO_WIN = [1.8, 1.5, 1.25, 1.05, 0.85, 0.7], MO_KEY = {beat: 'L', air: 'K', oneone: 'K'}, PEN_SPD = [1.5, 1.9, 2.4, 3.0, 3.6, 4.2];
@@ -430,7 +447,7 @@ var BO = (function () {
       var d = dirOf(p.side, M), h;
       if (p.gk) h = {x: -d * (S.Lh - 0.9), y: 0};
       else { var f = S.forms[M.forms[p.side]][p.slot]; h = {x: d * Math.min(-0.05, f[0] * 0.95) * S.Lh, y: f[1] * S.Wh * 0.85}; if (h.x * d > -2.2 && Math.abs(h.y) < S.boxW * 0.5 && p.side !== side) h.x = -d * Math.max(S.boxW * 0.5, 2.2); }
-      p.x = h.x; p.y = h.y; p.z = 0; p.vx = p.vy = p.vz = 0; p.st = 'ok'; p.stT = 0; p.fx = d; p.fy = 0; p.dive = 0; p.diveT = 0; p.holdT = 0; p.celebrate = 0; p.pressT = 0; p.immune = 0; p.act = null; p.beat = ''; p.bi = 0; p.bq = 0;
+      p.x = h.x; p.y = h.y; p.z = 0; p.vx = p.vy = p.vz = 0; p.st = 'ok'; p.stT = 0; p.fx = d; p.fy = 0; p.dive = 0; p.diveT = 0; p.holdT = 0; p.celebrate = 0; p.pressT = 0; p.immune = 0; p.act = null; p.beat = ''; p.bi = 0; p.bq = 0; p.kickAs = null; p.hitT = -9; p.flipD = 0;
     });
     // the kick-off taker stands by the ball
     var taker = nearestOf(M, side, 0, 0, true);
@@ -503,11 +520,14 @@ var BO = (function () {
       var power = clamp((t - at) / 0.75, 0, 1);
       if (restart) { takeRestart(M, p, c, J ? 'pass' : 'shot', power, null, trick); return; }
       if (!mine) return;
-      if (J) pass(M, p, {power: power, ax: c.ax, ay: c.ay, aimHelp: M.L.aim, trick: trick, human: true});
+      if (winding(p)) return;
+      var held = t - at, rest = Math.max(0, (J ? KICK_MIN.pass : KICK_MIN.shot) - held); if (M.drill || M.fast) rest = 0;   /* 🎬 a short tap still swings: contact ≤ 0.15 s after the release */
+      if (J) { var oJ = {power: power, ax: c.ax, ay: c.ay, aimHelp: M.L.aim, trick: trick, human: true}; if (rest) kickAct(M, p, 'pass', function () { oJ.ax = c.ax; oJ.ay = c.ay; pass(M, p, oJ); }, rest); else pass(M, p, oJ); }
       else {
         var perf = c.mo && c.mo.kind === 'oneone'; if (perf) perfect(M, c, p);
         var blast = c.star >= 1 && !trick; if (blast) { c.star = 0; c.blasts++; }   // 🔥 a full star meter = the next shot is a BLAST
-        shoot(M, p, {power: power, ax: c.ax, ay: c.ay, aimHelp: M.L.aim, trick: trick, human: true, perfect: perf, blast: blast});
+        var oK = {power: power, ax: c.ax, ay: c.ay, aimHelp: M.L.aim, trick: trick, human: true, perfect: perf, blast: blast};
+        if (rest) kickAct(M, p, blast ? 'blast' : 'shot', function () { oK.ax = c.ax; oK.ay = c.ay; shoot(M, p, oK); }, rest); else shoot(M, p, oK);
       }
       if (trick) c.trickPend = -1;
     }
@@ -544,7 +564,7 @@ var BO = (function () {
     var b = M.ball, S = M.S; b.owner = -1; b.x = p.x + p.fx * 0.35; b.y = p.y + p.fy * 0.35; b.z = Math.max(b.z, 0.05);
     b.y = clamp(b.y, -S.Wh + 0.3, S.Wh - 0.3); if (Math.abs(b.y) > S.goalW) b.x = clamp(b.x, -S.Lh + 0.3, S.Lh - 0.3);   /* a set piece on the line never starts outside */
     b.vx = vx; b.vy = vy; b.vz = vz; b.spin = spin || 0;
-    b.last = p.i; b.lastSide = p.side; b.lock = p.i; b.lockT = 0.22; b.held = 0; p.kickT = 0.3; b.offside = null; b.fk = null;
+    b.last = p.i; b.lastSide = p.side; b.lock = p.i; b.lockT = 0.22; b.held = 0; p.kickT = 0.3; b.offside = null; b.fk = null; if (!p.kickAs) p.kickAs = vz > 2.5 ? 'loft' : 'pass';
     if (M.twist === 'neon') powerKick(M, p);
   }
   function pass(M, p, o) {
@@ -565,8 +585,10 @@ var BO = (function () {
         if (Math.abs(ux) > 0.01) room = Math.min(room, ((ux > 0 ? M.S.Lh : -M.S.Lh) - p.x) / ux); if (Math.abs(uy) > 0.01) room = Math.min(room, ((uy > 0 ? M.S.Wh : -M.S.Wh) - p.y) / uy);
         room = Math.max(4, room - 2); speed = Math.min(speed, Math.sqrt(2 * (M.S.fric || 3.6) * room)); } }   /* 🧤 a goal kick never flies out */
     var dx = tx - p.x, dy = ty - p.y, dm = hyp(dx, dy) || 1;
+    p.kickAs = loft ? 'loft' : 'pass';
     if (loft) { var dd = dm, tt = clamp(dd / 16, 0.6, 1.4); kickBall(M, p, dx / tt * 0.82, dy / tt * 0.82, GRAV * tt * 0.5, o.spin || 0); }
     else kickBall(M, p, dx / dm * speed, dy / dm * speed, 0, o.spin || 0);
+    kickShow(M, p);
     b.passer = p.i; b.passT = M.t; b.passTo = tgt ? tgt.i : -1; M.stats[p.side].passes++; p.g.passes++;
     // offside: who is the pass meant for, and were they off when it was played?
     if (tgt && M.L.offside && !M.noOffside && isOffside(M, tgt, p)) b.offside = {i: tgt.i, x: tgt.x, y: tgt.y, side: p.side};
@@ -607,7 +629,9 @@ var BO = (function () {
     var hk = Math.min(1, S.goalH / 2);   /* small goals (street cage) = lower shots */
     tz = kind === 'chip' ? S.goalH - Math.min(0.55, S.goalH * 0.35) : clamp((0.25 + power * 1.3 + (help === 0 && o.human ? power * power * 1.2 : 0)) * hk, 0.15, help >= 2 ? S.goalH - 0.4 * hk : 3.2 * hk);
     vz = kind === 'chip' ? GRAV * tt * 0.5 + (tz - 0) / tt : (tz - Math.max(0.1, b.z)) / tt + GRAV * tt * 0.5 * 0.92;
+    p.kickAs = o.flip ? (p.fx * dirOf(p.side, M) < -0.2 ? 'bicycle' : 'flip') : o.volley ? 'volley' : kind === 'blast' ? 'blast' : kind === 'chip' ? 'chip' : (o.spin || kind === 'curl') ? 'curl' : 'shot';
     kickBall(M, p, dx / tt, dy / tt, vz, kind === 'rabona' ? -side * 5 : (o.spin || 0));
+    kickShow(M, p);
     if (kind === 'rabona') b.vy += side * 5 * tt * 0.5;   // curve back in on the way
     b.shot = {side: p.side, by: p.i, t: M.t, kind: kind, decided: false, power: power, perfect: !!o.perfect, blast: !!o.blast, fk: !!o.fk};
     M.stats[p.side].shots++; p.g.shots++;
@@ -878,27 +902,44 @@ var BO = (function () {
         if (p.z <= 0 && p.vz <= 0 && p.bt > 30) { p.bi++; p.bt = 0; } else break;
       } else { var L = beatLen(p, p.bi); p.bq = L > 0 ? Math.min(1, p.bt / L) : 1; if (p.bt >= L) { p.bt -= L; p.bi++; } else break; }
       if (p.bi >= B.length) { p.act = null; p.beat = ''; p.bi = 0; return; }
-      if (B[p.bi].go) actContact(M, p);
+      if (B[p.bi].go) { actContact(M, p); if (!p.act) return; B = ACT_BEATS[p.act]; }
     }
     p.beat = B[p.bi] ? B[p.bi].n : '';
   }
   // 💥 THE CONTACT MOMENT — take-off / dive / catch happen here (events too)
   function actContact(M, p) {
-    var k = p.act, h = JUMPS[k];
+    var k = p.act, h = JUMPS[k], o = p.actO || {};
+    if (o.fire) { var f = o.fire; o.fire = null; if (M.ball.owner === p.i && p.st === 'ok') { p.kickAs = null; f(); if (p.kickAs && ACT_BEATS[p.kickAs]) { p.act = k = p.kickAs; } } else { ev(M, 'whiff', {by: p.i}); p.act = null; p.beat = ''; return; } }
+    if (k === 'header' || k === 'dheader') { p.vz = Math.max(p.vz, jumpV(M, h)); p.actAir = airTime(M, h) * 1000; if (k === 'dheader') { p.vx += p.fx * 4; p.vy += p.fy * 4; } ev(M, 'jump', {by: p.i, kind: k}); return; }
+    if (k === 'blast') { p.vz = Math.max(p.vz, jumpV(M, h)); p.actAir = airTime(M, h) * 1000; return; }
+    if (k === 'flip' || k === 'bicycle') { var fh = JUMPS[k]; p.vz = jumpV(M, Math.max(0.2, fh - Math.max(0, p.z)));   /* apex = the table height even when it starts mid-hop */ p.actAir = airTime(M, fh) * 1000; p.flipD = airTime(M, fh) * 0.9; p.flip = p.flipD; p.flipDir = k === 'bicycle' ? -0.5 : 1; return; }
     if (k === 'hop' || k === 'dodge' || k === 'gkhigh') { p.vz = Math.max(p.vz, jumpV(M, h)); p.actAir = airTime(M, h) * 1000; ev(M, 'jump', {by: p.i, kind: k}); }
     else if (k === 'gkdive') { var a = airTime(M, h); p.vz = Math.max(p.vz, jumpV(M, h)); p.actAir = a * 1000; p.st = 'dive'; p.stT = 0.01; p.diveT = a + 0.08; ev(M, 'jump', {by: p.i, kind: k}); }   /* the game state stays as before (down 0.4 s, sims: win rates unchanged) — the page draws the flight toward diveY */
   }
+  // ⚽ bo-5b: a kick that came WITHOUT a wind-up (set pieces, volleys, headers …) still shows contact → follow-through → settle
+  function kickShow(M, p) {
+    var k = p.kickAs; if (!k || !ACT_BEATS[k]) return;
+    if (p.act && p.actO && p.actO.kicking) return;   // the wind-up path (actContact) switches the act itself
+    var air = p.z > 0.05 && p.act && ACT_BEATS[p.act] && ACT_BEATS[p.act][3].air;
+    startAct(M, p, k, {antic: 0}); if (p.bi < 2) { p.bi = 2; p.bt = 0; } p.beat = 'contact'; if (air && !ACT_BEATS[k][3].air) p.actAir = 0;
+  }
+  // ⚽ wind-up → contact: the kick happens when the anticipation ends AND the player still has the ball (else a whiff)
+  function kickAct(M, p, key, fire, sec) {
+    startAct(M, p, key, {antic: Math.round((sec || 0) * 1000), fire: fire, kicking: true});
+  }
+  function winding(p) { return !!(p.act && p.actO && p.actO.kicking && p.bi < 2); }
   // a jump still in its anticipation → take off NOW (a K / volley right after Space)
-  function jumpNow(M, p) { if ((p.act === 'hop' || p.act === 'dodge') && p.bi < 2) { p.bi = 2; p.bt = 0; actContact(M, p); p.beat = 'contact'; } }
-  function rising(p) { return p.z > 0.02 || p.vz > 0 || ((p.act === 'hop' || p.act === 'dodge') && p.bi < 3); }
+  function jumpNow(M, p) { if ((p.act === 'hop' || p.act === 'dodge' || p.act === 'header' || p.act === 'dheader') && p.bi < 2) { p.bi = 2; p.bt = 0; actContact(M, p); p.beat = 'contact'; } }
+  function rising(p) { return p.z > 0.02 || p.vz > 0 || ((p.act === 'hop' || p.act === 'dodge' || p.act === 'header' || p.act === 'dheader') && p.bi < 3); }
   // 🛝 a jump dodge (hurdle) when a slide comes or a leg is in the way, else a hop
   function threatened(M, p) {
     for (var i = 0; i < M.players.length; i++) { var q = M.players[i]; if (q.side === p.side) continue; var d = hyp(q.x - p.x, q.y - p.y); if ((q.st === 'slide' && d < 4.5) || (q.st === 'ok' && !q.gk && d < 1.4)) return true; }
     return false;
   }
   function jump(M, p) {
-    if (p.z > 0.02 || p.st !== 'ok' || p.gk || p.act === 'hop' || p.act === 'dodge') return;
-    var kind = threatened(M, p) ? 'dodge' : 'hop', B = ACT_BEATS[kind];
+    if (p.z > 0.02 || p.st !== 'ok' || p.gk || p.act === 'hop' || p.act === 'dodge' || p.act === 'header' || p.act === 'dheader' || winding(p)) return;
+    var b = M.ball, bd = hyp(b.x - p.x, b.y - p.y), ahead = (b.x - p.x) * p.fx + (b.y - p.y) * p.fy, run = hyp(p.vx, p.vy);
+    var kind = threatened(M, p) ? 'dodge' : (b.owner < 0 && b.z > 0.9 && bd < 4.5) ? 'header' : (b.owner < 0 && b.z > 0.3 && b.z <= 0.9 && b.vz <= 0.5 && bd < 2.6 && ahead > 0.6 && run > 2.5) ? 'dheader' : 'hop', B = ACT_BEATS[kind];
     p.immune = Math.max(p.immune, (B[0].ms + B[1].ms + B[2].ms) / 1000 + airTime(M, JUMPS[kind]) * 0.85);   // safe from the press on: the sliding leg passes under
     startAct(M, p, kind);
   }
@@ -913,7 +954,7 @@ var BO = (function () {
     if (what === 'pass') pass(M, p, {power: 0.85, ax: c.ax, ay: c.ay, aimHelp: 3, human: true});
     else { var fl = plain ? rising(p) : (!perf || b.z > 1.1); if (fl) jumpNow(M, p);   // Space Space then K = 🌀 a spinning flip volley (Aowu 2026-11-14: "volley need to do a flip")
       shoot(M, p, {power: 0.85, ax: c.ax || dirOf(p.side, M), ay: c.ay, aimHelp: Math.max(perf ? 2 : 1, M.L.aim), human: true, volley: true, trick: c.Lk && !fl, flip: fl, perfect: !!perf});
-      if (fl) { p.flip = FLIP_T; p.vz = Math.max(p.vz, 3.4); p.immune = Math.max(p.immune, 0.7); trickDone(M, p, 'flip'); } }
+      if (fl) { p.immune = Math.max(p.immune, 0.9); if (!p.flip) { p.flipD = FLIP_T; p.flip = FLIP_T; } trickDone(M, p, 'flip'); } }
     ev(M, 'volley', {by: p.i, kind: what, side: p.side});
   }
   function standTackle(M, p) {
@@ -982,7 +1023,7 @@ var BO = (function () {
   function flipPass(M, p, kind) {
     var b = M.ball; if (b.owner >= 0 || b.vz <= 0) return;
     var k = 1.6; b.vz *= k; b.vx /= k; b.vy /= k;
-    if (p.z <= 0) { p.flip = FLIP_T; p.vz = Math.max(p.vz, 2.6); }
+    if (p.z <= 0) { p.flip = FLIP_T; p.flipD = FLIP_T; p.flipDir = 1; p.vz = Math.max(p.vz, 2.6); }
     trickDone(M, p, 'flippass');
     ev(M, 'highball', {by: p.i, side: p.side, kind: kind, flip: true});
   }
@@ -1321,21 +1362,23 @@ var BO = (function () {
     M.players.forEach(function (o) { if (o.side === p.side || o.gk || o === owner) return; if (o.x * -d < -M.S.Lh * 0.1 && o.x * d > 0) return; var dd = hyp(o.x - p.x, o.y - p.y); if (dd < bd) { bd = dd; best = o; } });
     return best;
   }
+  function robotKick(M, p, key, fire) { var w = WIND[M.level] * (key === 'pass' ? 0.75 : 1); if (M.fast || M.drill) fire(); else kickAct(M, p, key, fire, w); }
   function aiCarrier(M, p, dt) {
     var b = M.ball, S = M.S, L = M.L, d = dirOf(p.side, M), gx = d * S.Lh;
     var press = M.players.filter(function (o) { return o.side !== p.side && !o.gk && hyp(o.x - p.x, o.y - p.y) < 2.6; });
     var front = press.filter(function (o) { return (o.x - p.x) * d > -0.3; }).length;
     var dist = hyp(gx - p.x, p.y);
     p.aiT -= dt;
-    if (p.aiT <= 0) {
+    var wnd = winding(p);   // 🎬 the wind-up is committed: no new decision, but the robot keeps running with the ball (sims: keeps the level's win rate)
+    if (p.aiT <= 0 && !wnd) {
       p.aiT = L.react * (0.9 + M.rnd() * 0.6);
       var ang = Math.abs(Math.atan2(p.y, (gx - p.x) * d));
-      if (dist < L.range * (S.rangeK || 1) && ang < 0.95 && M.rnd() < 0.75) { shoot(M, p, {power: clamp(0.4 + (dist / 25) + M.rnd() * 0.3, 0, 1), ax: d, ay: (M.rnd() - 0.5), aimHelp: 2, acc: L.shotAcc}); return; }
+      if (dist < L.range * (S.rangeK || 1) && ang < 0.95 && M.rnd() < 0.75) { var oS = {power: clamp(0.4 + (dist / 25) + M.rnd() * 0.3, 0, 1), ax: d, ay: (M.rnd() - 0.5), aimHelp: 2, acc: L.shotAcc}; robotKick(M, p, 'shot', function () { shoot(M, p, oS); }); return; }
       if (front && M.rnd() < 0.35 + L.passAcc * 0.5) {
         var tg = bestPass(M, p, d, 0, 1.9);
-        if (tg) { pass(M, p, {power: 0.3 + M.rnd() * 0.4, ax: tg.x - p.x, ay: tg.y - p.y, aimHelp: 3, acc: L.passAcc}); return; }
+        if (tg) { var oP = {power: 0.3 + M.rnd() * 0.4, ax: tg.x - p.x, ay: tg.y - p.y, aimHelp: 3, acc: L.passAcc}; robotKick(M, p, 'pass', function () { oP.ax = tg.x - p.x; oP.ay = tg.y - p.y; pass(M, p, oP); }); return; }
       }
-      if (!front && M.rnd() < 0.18 * L.passAcc) { var tg2 = bestPass(M, p, d, 0, 1.0); if (tg2 && (tg2.x - p.x) * d > 4) { pass(M, p, {power: 0.4, ax: tg2.x - p.x, ay: tg2.y - p.y, aimHelp: 3, acc: L.passAcc}); return; } }
+      if (!front && M.rnd() < 0.18 * L.passAcc) { var tg2 = bestPass(M, p, d, 0, 1.0); if (tg2 && (tg2.x - p.x) * d > 4) { robotKick(M, p, 'pass', function () { pass(M, p, {power: 0.4, ax: tg2.x - p.x, ay: tg2.y - p.y, aimHelp: 3, acc: L.passAcc}); }); return; } }
       var nq = L.trickFail > 0 && S.nutPoint ? nutTarget(M, p) : null;   /* robots nutmeg only in the street (keeps the bo-1b level feel) */ if (nq && M.rnd() < (S.nutPoint ? 0.35 + M.level * 0.05 : 0.05)) { nutmeg(M, p, nq); return; }
       if (front && L.trickFail > 0 && M.rnd() < 0.08 + M.level * 0.02) trick(M, p, null);
       p.weave = (M.rnd() - 0.5) * 6;
@@ -1397,7 +1440,9 @@ var BO = (function () {
         if (M.S.nutPoint && M.phase === 'play') { b.last = p.i; b.lastSide = p.side; b.passer = -1; b.shot = {kind: 'nutmeg'}; goal(M, p.side); return; }
       }
     }
-    var prev = b.last;
+    var prev = b.last, bsp = hyp(b.vx, b.vy), tz = b.z;
+    /* 🫳 bo-5b first touch by ball height: chest (lean back) · thigh (knee up) · sole (foot on top of a fast ground ball) */
+    if (!p.gk && p.st === 'ok' && !p.act) { var tk = tz > 0.55 ? 'trapc' : tz > 0.25 ? 'trapt' : bsp > 7 ? 'traps' : null; if (tk) startAct(M, p, tk, {antic: 0}); }
     b.owner = p.i; b.last = p.i; b.lastSide = p.side; b.shot = null; b.offside = null; b.vz = 0;
     if (prev >= 0 && M.players[prev].side !== p.side) ev(M, 'win', {by: p.i, side: p.side});
     ev(M, 'control', {by: p.i, side: p.side});
@@ -1409,7 +1454,7 @@ var BO = (function () {
     var tx = near ? gx : p.x + d * 12, ty = near ? (M.rnd() - 0.5) * S.goalW * 1.6 : p.y * 0.5, dx = tx - b.x, dy = ty - b.y, dm = hyp(dx, dy) || 1, sp = near ? 15 : 11;
     b.vx = dx / dm * sp; b.vy = dy / dm * sp; b.vz = near ? 1.2 : 3.5; b.last = p.i; b.lastSide = p.side; b.lock = p.i; b.lockT = 0.25; b.offside = null;
     if (near) { b.shot = {side: p.side, by: p.i, t: M.t, kind: 'header', decided: false, power: 0.6}; M.stats[p.side].shots++; p.g.shots++; }
-    p.g.headers++; ev(M, 'header', {by: p.i, side: p.side, shot: near});
+    p.g.headers++; p.hitT = M.t; ev(M, 'header', {by: p.i, side: p.side, shot: near});
   }
   // keep players from walking through each other (light push)
   function separate(M) {
@@ -1577,8 +1622,8 @@ var BO = (function () {
   }
   return {DT: DT, SIZES: SIZES, LEVELS: LEVELS, TRICKS: TRICKS, newMatch: newMatch, step: step, input: input, key: key, shout: shout, takeEvents: takeEvents, simulate: simulate,
     hint: hint, bestPass: bestPass, keeperOf: keeperOf, dirOf: dirOf, restart: restart, kickoffSetup: kickoffSetup, startPens: startPens, homeOf: homeOf, addCtrl: addCtrl, setCtrl: setCtrl,
-    throwTo: throwTo, MO_WIN: MO_WIN, DRILLS: DRILLS, battleStart: battleStart, BTRICK: BTRICK, BPM: BPM, B_PERF: B_PERF, B_GOOD: B_GOOD, CONE_STARS: CONE_STARS, drill: drill, TWISTS: TWISTS, PARTY: PARTY, inMud: inMud, inZone: inZone, ACT_BEATS: ACT_BEATS, JUMPS: JUMPS,
-    _: {startAct: startAct, actTick: actTick, jumpNow: jumpNow, jumpV: jumpV, airTime: airTime, threatened: threatened, askBall: askBall, kickBall: kickBall, pass: pass, shoot: shoot, trick: trick, nutmeg: nutmeg, nutTarget: nutTarget, momentOf: momentOf, moments: moments, starAdd: starAdd, lift: lift, standTackle: standTackle, slide: slide, isOffside: isOffside, foul: foul, endMatch: endMatch}};
+    throwTo: throwTo, MO_WIN: MO_WIN, DRILLS: DRILLS, battleStart: battleStart, BTRICK: BTRICK, BPM: BPM, B_PERF: B_PERF, B_GOOD: B_GOOD, CONE_STARS: CONE_STARS, drill: drill, TWISTS: TWISTS, PARTY: PARTY, inMud: inMud, inZone: inZone, ACT_BEATS: ACT_BEATS, JUMPS: JUMPS, WIND: WIND, KICK_MIN: KICK_MIN,
+    _: {kickAct: kickAct, winding: winding, kickShow: kickShow, startAct: startAct, actTick: actTick, jumpNow: jumpNow, jumpV: jumpV, airTime: airTime, threatened: threatened, askBall: askBall, kickBall: kickBall, pass: pass, shoot: shoot, trick: trick, nutmeg: nutmeg, nutTarget: nutTarget, momentOf: momentOf, moments: moments, starAdd: starAdd, lift: lift, standTackle: standTackle, slide: slide, isOffside: isOffside, foul: foul, endMatch: endMatch}};
 })();
 // ENGINE END
 /* 🏷️ BlasLogo (bo-6, Aowu 2026-11-15 12:33 OK): the BlasOff logo + mode badges drawn in code — plan claude/blasoff-logo-plan.md */
@@ -2312,15 +2357,15 @@ function drawLookPreview(c, k){
 const SPR_W = 150, SPR_H = 160, SPR_FX = 75, SPR_FY = 140;
 /* 🎬 bo-5a real actions: the engine's beat (p.act · p.bi · p.bq) → the pose of 🎭 BLOCK blasoff (AvatarActing) at that moment.
    One timeline per act (the engine is the clock, the timeline only gives the pose); pictures cached per (player, act, beat, ¼ step), ≤ 600, oldest out. */
-const ACT_RUN = {}, SPR_LRU = [], SPR_CAP = 600, GK_POSE = {gkr0: 'bo.gk-ready', gkr1: 'bo.gk-shuffle'};
+const ACT_RUN = {}, SPR_LRU = [], SPR_CAP = 600, GK_POSE = {gkr0: 'bo.gk-ready', gkr1: 'bo.gk-shuffle', prep: 'bo.trap-open', shield: 'bo.shield', touch: 'bo.dribble-touch', hsnap: 'bo.head-snap'};   /* still poses (bo-5a/b) */
 function actRun(key){
   if(ACT_RUN[key] !== undefined) return ACT_RUN[key]; let r = null;
   try{ if(window.Acting && Acting.act && Acting.act('blasoff.' + key)) r = Acting.play({name: ''}, 'blasoff.' + key, {t0: 0}); }catch(e){ r = null; }
   return (ACT_RUN[key] = r);
 }
-function actFrame(p){   // → {key, f} or null (no Acting / unknown act)
-  const R = p.act && actRun(p.act); if(!R) return null;
-  const i = Math.min(p.bi || 0, R.beats.length - 1), q = Math.round(Math.max(0, Math.min(1, p.bq || 0)) * 4) / 4, key = 'A:' + p.act + ':' + i + ':' + q;
+function actFrame(p, o){   // → {key, f} or null (no Acting / unknown act) · o = {act, bi, bq} to draw a beat the engine isn't playing (⚽ the back-lift while J / K is held)
+  const act = o ? o.act : p.act, R = act && actRun(act); if(!R) return null;
+  const i = Math.min(o ? o.bi : (p.bi || 0), R.beats.length - 1), q = Math.round(Math.max(0, Math.min(1, o ? o.bq : (p.bq || 0))) * 4) / 4, key = 'A:' + act + ':' + i + ':' + q;
   if(G.spr[p.i][key]) return {key};
   return {key, f: R.at((R.start[i] + R.D[i].ms * q) / 1000)};
 }
@@ -2341,8 +2386,20 @@ function sprite(i, key, fr){
   if(p.gk){ g.fillStyle = '#FFFFFF'; g.strokeStyle = '#222'; g.lineWidth = 1.5; }
   box[key] = c; return c;
 }
+function holdBeat(p){   // ⚽ bo-5b: holding J / K with the ball = the anticipation, the back-lift grows with the power
+  const M = G.M; if(p.act || p.ctrl < 0 || M.ball.owner !== p.i || M.phase !== 'play') return null; const c = M.ctrls.find(x => x.pi === p.i); if(!c) return null;
+  const at = c.kAt >= 0 ? c.kAt : c.jAt >= 0 ? c.jAt : -1; if(at < 0) return null;
+  return {act: c.kAt >= 0 ? (c.star >= 1 ? 'blast' : 'shot') : 'pass', bi: 1, bq: Math.min(1, (M.t - at) / 0.75)};
+}
 function playerKey(p){
   if(p.st === 'slide' || (p.st === 'down' && !p.act) || p.st === 'dive') return 'lie';
+  const M = G.M, b = M.ball, sp = Math.hypot(p.vx, p.vy);
+  if(p.z > 0.05 && M.t - (p.hitT || -9) < 0.16) return 'hsnap';   /* 🗣️ the head snaps forward at the touch */
+  if(!p.gk && p.st === 'ok' && p.z <= 0.05){
+    if(b.owner < 0 && b.passTo === p.i){ const d = Math.hypot(b.x - p.x, b.y - p.y), bv = Math.hypot(b.vx, b.vy); if(bv > 1 && d / bv < 0.45) return 'prep'; }   /* 🫳 open up for the first touch */
+    if(b.owner === p.i){ if(sp < 3.5 && M.players.some(o => o.side !== p.side && !o.gk && Math.hypot(o.x - p.x, o.y - p.y) < 1.6)) return 'shield';   /* 🛡️ side-on, arm out */
+      if(sp > 1.5){ const f = Math.floor(p.run * 1.7); if(f % 8 === 0) return 'touch'; } }   /* ⚽ a little touch every few steps */
+  }
   if(p.gk && p.st === 'ok' && p.z <= 0.05 && !p.celebrate && G.M.ball.x * BO.dirOf(p.side, G.M) < 0) return Math.hypot(p.vx, p.vy) > 0.6 ? 'gkr' + (Math.floor(p.run * 1.7) % 2) : 'gkr0';   /* 🧤 ready stance while the ball is in his half */
   if(p.z > 0.05 || p.celebrate > 0) return 'air';
   if(p.kickT > 0.12) return 'kick';
@@ -2358,12 +2415,14 @@ function drawPlayer(g, p, t){
   const q = V.P(p.x + p.fx, p.y + p.fy, 0), dir = q && q[0] < f[0] - 0.5 ? -1 : 1;
   const ring = gEll(V, p.x, py, 0.55), c = p.ctrl >= 0 ? G.M.ctrls[p.ctrl] : null;
   if(ring){ g.lineWidth = Math.max(1.5, s * (c ? 0.09 : 0.05)); g.strokeStyle = c ? SEAT_COL[c.seat % 2] : TEAM_COL[p.side]; g.globalAlpha = c ? 0.95 : 0.7; g.beginPath(); g.ellipse(ring[0], ring[1], ring[2], ring[3], 0, 0, 7); g.stroke(); g.globalAlpha = 1; }
-  const far = s * 1.75 < FAR_PX, A = p.act && !far ? actFrame(p) : null;
+  const far = s * 1.75 < FAR_PX, HB = !far && !p.act ? holdBeat(p) : null, A = HB ? actFrame(p, HB) : p.act && !far ? actFrame(p) : null;
   const key = A ? A.key : p.act && far ? farKey(p) : playerKey(p), img = sprite(p.i, key, A && A.f), lift = (p.z + (p.celebrate > 0 ? Math.abs(Math.sin(t * 9)) * 0.35 : 0)) * s;
   const tilt = p.act === 'gkdive' ? (p.bi === 2 ? p.bq : p.bi === 3 ? 1 : p.bi === 4 ? 1 - p.bq : 0) : p.st === 'dive' ? 1 : 0;
+  const dh = p.act === 'dheader' ? (p.bi === 2 ? p.bq : p.bi === 3 ? 1 : p.bi === 4 ? 1 - p.bq : 0) : 0;   /* 🗣️ diving header: the body goes flat, head first */
   g.save(); g.translate(f[0], f[1] - lift);
   if(tilt) g.rotate((p.dive || 1) * dir * 0.9 * tilt);
-  if(p.flip > 0){ const hc = s * 0.95; g.translate(0, -hc); g.rotate(-dir * Math.PI * 2 * (1 - p.flip / 0.62)); g.translate(0, hc); }   // 🌀 flip volley: one full spin in the air
+  if(dh){ const hc = s * 0.5; g.translate(0, -hc); g.rotate(dir * 1.25 * dh); g.translate(0, hc); }
+  if(p.flip > 0){ const hc = s * 0.95; g.translate(0, -hc); g.rotate(-dir * Math.PI * 2 * (p.flipDir || 1) * (1 - p.flip / (p.flipD || 0.62))); g.translate(0, hc); }   // 🌀 flip volley: one full spin in the air · 🚲 bicycle: half a spin backwards (bo-5b)
   g.scale(dir * k / G.sq, k / G.sq); g.drawImage(img, -SPR_FX * G.sq, -SPR_FY * G.sq); g.restore();
   if(p.cards && G.M.L.cards){ g.fillStyle = '#FFD23F'; g.fillRect(f[0] + s * 0.35, f[1] - s * 1.9 - lift, s * 0.18, s * 0.26); }
   if(c){   // name + a triangle over the person you steer
@@ -2951,4 +3010,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a) END OF BlasOff.html -->
+<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a+bo-5b) END OF BlasOff.html -->
