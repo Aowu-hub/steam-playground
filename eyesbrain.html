@@ -141,6 +141,7 @@
     border-radius:20px;padding:14px 26px;min-height:58px;box-shadow:0 6px 0 #B36B00,0 0 0 6px rgba(255,255,255,0.25);animation:rev-bob 1.4s ease-in-out infinite;}
   .reveal:active{transform:translateY(4px);box-shadow:0 2px 0 #B36B00;} @keyframes rev-bob{50%{transform:translateY(-4px) scale(1.03);}}
   .reveal[disabled]{animation:none;opacity:.75;cursor:default;}
+  #board.tight #nextbtn{min-height:42px;padding:6px 18px;font-size:1.05rem;box-shadow:0 4px 0 #0E7A5C,0 0 0 4px rgba(255,255,255,0.25);} #board.tight .explain,#board.tight .tipline{font-size:0.72rem;padding:3px 8px;margin-top:2px;line-height:1.25;} #board.notip .tipline{display:none;}   /* 📐 ebr-8 */
   .reveal.next{background:linear-gradient(135deg,#7CF0B8,#22C3A1);color:#063A2B;box-shadow:0 6px 0 #0E7A5C,0 0 0 6px rgba(255,255,255,0.25);animation:none;}
   #nextbtn{position:relative;z-index:5;flex:0 0 auto;}
   .lookbar{position:absolute;left:14px;right:14px;bottom:8px;height:8px;border-radius:5px;background:rgba(255,255,255,0.2);overflow:hidden;z-index:3;}
@@ -870,8 +871,34 @@ function placeBoard(){
   G.board = {x: bx, y: by, w: bw, h: bh}; b.style.setProperty('--ts', Math.floor(Math.max(18, ts)) + 'px');
   const n = it ? Math.max(1, it.toks.length) : 6, aw2 = $('answer').clientWidth - 16; $('answer').style.setProperty('--as', Math.max(18, Math.min(44, Math.floor(aw2 / Math.max(6, n + 1) / 1.1))) + 'px');
 }
-function fitTiles(){ if(G && G.sw) placeBoard(); }
+function fitTiles(){ if(G && G.sw){ const st = $('stage'); if(Math.abs(st.clientHeight - G.sh) > 1 || Math.abs(st.clientWidth - G.sw) > 1) sizeStage(); else placeBoard(); fitBoard(); } }   // 📐 ebr-8: the stage can change height without a resize (answer row)
 /* 🖼️ END ebr-7 */
+/* 📐 ebr-8 the board always holds everything in it (tiles + ✓/✗ marks + explanation + 💡 tip + ▶ Next) */
+function boardNeed(b){ let h = 20 + 24, n = 0; for(const c of b.children){ if(c.classList.contains('hidden')) continue; const cs = getComputedStyle(c); if(cs.position === 'absolute' || cs.display === 'none') continue; h += c.offsetHeight; n++; } return h + 8 * Math.max(0, n - 1); }   // padding + room for the ✓ / ✗ marks
+function fitBoard(){
+  if(!G || !G.board) return; const b = $('board'), w = G.sw, h = G.sh, tall = h > w * 0.75, B = G.board; let need = boardNeed(b);
+  if(need > B.h){   // 1) grow into free stage space
+    if(!tall){ B.h = Math.min(h - 20, need); B.y = Math.max(10, Math.round((h - B.h) / 2)); }
+    else { const avMin = Math.max(70, h * 0.2); B.h = Math.min(h - 10 - avMin, need); }
+    b.style.top = Math.round(B.y) + 'px'; b.style.height = Math.round(B.h) + 'px';
+  }
+  B.h = Math.min(B.h, h - B.y - 4); b.style.height = Math.round(B.h) + 'px';
+  b.classList.remove('tight', 'notip'); let ts = parseFloat(b.style.getPropertyValue('--ts')) || 56;
+  const shrink = floor => { for(let i = 0; i < 20 && boardNeed(b) > B.h && ts > floor; i++){ ts = Math.max(floor, Math.floor(ts * 0.92)); b.style.setProperty('--ts', ts + 'px'); } };
+  if(boardNeed(b) > B.h) b.classList.add('tight');   // 2) smaller ▶ Next + notes
+  shrink(Math.min(ts, 38));                          // 3) smaller tiles, but still easy to read
+  if(boardNeed(b) > B.h) b.classList.add('notip');   // 4) still too tall → drop the 💡 tip (the ✗ explanation stays)
+  shrink(22);
+  if(tall && G.avHome){ const room = h - (B.y + B.h) - 4; if(room > 40) G.avHome.h = Math.min(G.avHome.h, room); }
+  const bn = $('banner');   // 3) the banner never sits on the tiles
+  if(!tall && G.avW >= 110){ Object.assign(bn.style, {left: Math.round(G.avW / 2) + 'px', top: '12px', maxWidth: Math.round(G.avW - 8) + 'px', whiteSpace: 'normal', textAlign: 'center'}); }
+  else if(tall && h - (B.y + B.h) > 44){ Object.assign(bn.style, {left: '50%', top: Math.round(B.y + B.h + 6) + 'px', maxWidth: '94%', whiteSpace: '', textAlign: ''}); }
+  else Object.assign(bn.style, {left: '', top: '', maxWidth: '', whiteSpace: '', textAlign: ''});
+}
+let EBR8_RAF = 0; const EBR8_MO = new MutationObserver(() => { if(EBR8_RAF) return; EBR8_RAF = requestAnimationFrame(() => { EBR8_RAF = 0; fitTiles(); }); });
+const ebr8Watch = () => { ['parts', 'board-note'].forEach(id => $(id) && EBR8_MO.observe($(id), {childList: true, subtree: true, characterData: true})); ['nextbtn', 'hidebtn'].forEach(id => $(id) && EBR8_MO.observe($(id), {attributes: true, attributeFilter: ['class']})); };
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ebr8Watch); else ebr8Watch();
+/* 📐 END ebr-8 */
 function lineSplit(chunks, lines){ const per = Math.ceil(chunks.length / lines), out = []; for(let i = 0; i < chunks.length; i += per) out.push(chunks.slice(i, i + per)); return out; }
 
 // 🧑 avatars: custom little moves for this game (AvatarKit draws them)
@@ -1542,4 +1569,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (ebr-4+back-1+modes-3+mg-1+ebr-6+ebr-7+p1d+p3a+cs-4c) END OF EyesBrainRiot.html -->
+<!-- (ebr-4+back-1+modes-3+mg-1+ebr-6+ebr-7+p1d+p3a+cs-4c+ebr-8) END OF EyesBrainRiot.html -->
