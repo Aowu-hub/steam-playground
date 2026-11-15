@@ -266,6 +266,7 @@
 <script src="inc/AvatarActing.js"></script>
 <script src="inc/RoomPlus.js"></script>
 <script src="inc/WorkshopKit.js"></script>
+<script src="inc/IsoKit.js"></script>
 </head>
 <body ontouchstart="">
 
@@ -475,9 +476,9 @@ function camTarget(){ const m = me(); const x = m ? m.x : N / 2, y = m ? m.y : N
 function placeView(){
   if(!CAM.w || !CAM.h || !(VIEW.fit > 0)) return;
   const w = CAM.w, h = CAM.h, sc = VIEW.fit * CAM.zoom; VIEW.scale = sc;
-  const L = -(N * TWD / 2 + 10), Rr = N * TWD / 2 + 10, T = -(WALL + 34), B = N * THT + 26;
+  const L = -(N * TWD / 2 + 18), Rr = N * TWD / 2 + 18, T = -(WALL + 34), B = N * THT + 44;   // ir-2a: + the thick walls + the diorama slab
   if((Rr - L) * sc <= w) VIEW.ox = w / 2; else VIEW.ox = clamp(w / 2 - CAM.cx * sc, w - Rr * sc, -L * sc);
-  if((B - T) * sc <= h) VIEW.oy = (h - (N * THT + WALL) * sc) / 2 + WALL * sc + 6; else VIEW.oy = clamp(h / 2 - CAM.cy * sc, h - B * sc, -T * sc);
+  if((B - T) * sc <= h) VIEW.oy = (h - (N * THT + 36 + WALL + 8) * sc) / 2 + (WALL + 8) * sc; else VIEW.oy = clamp(h / 2 - CAM.cy * sc, h - B * sc, -T * sc);
 }
 function updateCamera(dt){
   const [tx, ty] = camTarget();
@@ -496,7 +497,7 @@ function layout(){
   const st = $('stage'), cv = $('cv'), w = st.clientWidth, h = st.clientHeight;
   VIEW.dpr = Math.min(window.devicePixelRatio || 1, 2);
   cv.width = Math.round(w * VIEW.dpr); cv.height = Math.round(h * VIEW.dpr);
-  const worldW = N * TWD + 12, worldH = N * THT + WALL + 70;
+  const worldW = N * TWD + 36, worldH = N * THT + WALL + 92;   // ir-2a: room for the thick walls + the diorama slab
   VIEW.fit = Math.min(w / worldW, h / worldH); CAM.w = w; CAM.h = h;
   placeView(); syncZoomBtns();
 }
@@ -748,7 +749,7 @@ function drawStatic(force){
   if(staticKey === key && staticLayer) return;
   if(staticLayer && !force && performance.now() - CAM.lastZoomAt < 160 && staticKey.split('|').slice(2).join('|') === key.split('|').slice(2).join('|')) return;   // pinching: stretch the old one for a moment
   staticKey = key;
-  const L = -(N * TWD / 2 + 14), T = -(WALL + 44), W = (N * TWD + 28) * sc, H = (N * THT + WALL + 90) * sc;
+  const L = -(N * TWD / 2 + 14), T = -(WALL + 44), W = (N * TWD + 28) * sc, H = (N * THT + WALL + 90 + N * 10) * sc;   // + N × 10: the diorama slab + its soft shadow (ir-2a)
   if(!(W >= 1 && H >= 1)) return;
   const r = Math.min(VIEW.dpr, 4096 / W, 4096 / H);
   staticLayer = document.createElement('canvas'); staticLayer.width = Math.ceil(W * r); staticLayer.height = Math.ceil(H * r);
@@ -756,7 +757,48 @@ function drawStatic(force){
   const keep = [VIEW.ox, VIEW.oy]; VIEW.ox = -L * sc; VIEW.oy = -T * sc; SL = {ox: VIEW.ox, oy: VIEW.oy, r, scale: sc};
   try { paintStatic(g); } finally { VIEW.ox = keep[0]; VIEW.oy = keep[1]; }
 }
+// 🧱 ir-2a (2026-11-15): the room is painted by the shared 2.5D engine IsoKit — the polished look Aowu OK'd (ir-0, 17:52 + 17:57):
+//   diorama slab, thick walls with caps + a pattern per room, chunky floors, deep windows + sunlight, wall items lying in the wall plane, one light top-left.
+//   Same rooms, same furniture, same places, same camera + saves. No IsoKit (offline copy without it, a load error) → the old painter below.
+const ISO_LOOK = {jungle: ['lawn', 'leaves', '#6B4A2C', '#8A5E36'], house: ['plank', 'stripes', '#8A6440', '#B58B5A'], space: ['panel', 'panels', '#151A33', '#2A3256'],
+  fantasy: ['flag', 'bricks', '#4A3F63', '#6E6290'], concert: ['gloss', 'foam', '#0E0A1C', '#281D44']};
+function hexOf(c){ c = String(c || '#888888'); if(c[0] === '#') return c.length === 4 ? '#' + c.slice(1).split('').map(x => x + x).join('') : c.slice(0, 7); const m = (c.match(/[\d.]+/g) || [136, 136, 136]).slice(0, 3).map(v => Math.max(0, Math.min(255, Math.round(+v)))); return '#' + m.map(v => v.toString(16).padStart(2, '0')).join(''); }
+function isoLook(D){
+  if(ISO_LOOK[R.key] && D === ROOMS[R.key]) return ISO_LOOK[R.key];
+  const F = hexOf(D.floor[0]), floor = D.planks ? 'plank' : D.glow ? 'panel' : F.toUpperCase() === '#7CC36A' ? 'lawn' : 'tile',
+    wall = D.vines ? 'leaves' : D.stones ? 'bricks' : D.starsWall ? 'plain' : 'stripes';
+  return [floor, wall, D.glow || D.starsWall ? '#151A33' : '#8A6440', D.glow || D.starsWall ? '#2A3256' : '#B58B5A'];
+}
+function isoRoomMap(){
+  const D = R.def, L = isoLook(D), th = 'room-' + (isMyKey(R.key) ? 'my' : R.key), F0 = hexOf(D.floor[0]), F1 = hexOf(D.floor[1]);
+  Iso.addTheme(th, {base: L[2], baseDark: L[2], tile: {[L[0]]: {top: F0, top2: F1, side: L[3]}}});
+  const M = Iso.map({w: N, h: N, theme: th, seed: 3, base: 1.9, cell: () => ({t: L[0], h: 0})}), night = !!(D.glow || D.dance || D.starsWall || D === ROOMS.fantasy || D === ROOMS.space || D === ROOMS.concert);
+  Iso.room(M, {wall: {h: WALL, left: hexOf(D.wallL), right: hexOf(D.wallR), trim: hexOf(D.trim), pattern: L[1]}, night,
+    windows: (D.windows || []).map(([side, u, kind, ch]) => ({side, u, kind, ch, glow: kind === 'space' ? 'rgba(24,231,255,0.75)' : null})),
+    decor: (D.decor || []).filter(d => d[5] !== 'torch').map(([side, u, z, ch, size]) => ({side, u, z, ch, size})),
+    wallPaint(g, RW){ if(!D.starsWall) return; g.fillStyle = 'rgba(255,240,180,0.85)'; for(let i = 0; i < 70; i++){ const side = i % 2, u = (i * 0.618 * 7) % N, z = 20 + (i * 37) % (WALL - 30), p = side ? RW(0, u, z) : RW(u, 0, z); g.fillRect(p[0], p[1], 2, 2); } },
+    floor(g, P){ const poly = (pts, f, st, lw) => { g.beginPath(); pts.forEach((p, k) => k ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); if(f){ g.fillStyle = f; g.fill(); } if(st){ g.strokeStyle = st; g.lineWidth = lw || 1; g.stroke(); } };
+      D.items.forEach(it => {
+        if(it.k === 'rug' && !it.lifted){ const a = 0.12, q = (u, v) => P(it.x + u, it.y + v, 2), sh = (u, v) => P(it.x + u + 0.04, it.y + v + 0.06, 0);   // 🧶 rug: soft shadow, border, fringe
+          poly([sh(a, a), sh(it.w - a, a), sh(it.w - a, it.d - a), sh(a, it.d - a)], 'rgba(0,0,0,0.16)'); poly([q(a, a), q(it.w - a, a), q(it.w - a, it.d - a), q(a, it.d - a)], it.c);
+          poly([q(0.38, 0.38), q(it.w - 0.38, 0.38), q(it.w - 0.38, it.d - 0.38), q(0.38, it.d - 0.38)], null, 'rgba(255,255,255,0.55)', 2.5);
+          g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 1.2; for(let u = 0.25; u < it.w - 0.1; u += 0.18){ const p = q(u, it.d - a); g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(p[0] - 2, p[1] + 4); g.stroke(); } }
+        if(it.k === 'decal'){ const p = P(it.x, it.y, 0); emo(g, it.ch, p[0], p[1], 22, 0.9); }
+        if(it.k === 'pond'){ const c = P(it.x + it.w / 2, it.y + it.d / 2, 0), ax = it.w * TWD / 2 * 0.92, ay = it.d * THT / 2 * 0.92;   // 🪷 pond with a stone rim
+          g.fillStyle = '#8E8A80'; g.beginPath(); g.ellipse(c[0], c[1] + 2, ax + 6, ay + 4, 0, 0, 7); g.fill();
+          for(let k = 0; k < 14; k++){ const an = k / 14 * Math.PI * 2; g.fillStyle = k % 2 ? '#B8B3A6' : '#A39E92'; g.beginPath(); g.ellipse(c[0] + Math.cos(an) * (ax + 3), c[1] + Math.sin(an) * (ay + 2), 6, 4, 0, 0, 7); g.fill(); }
+          const wg = g.createLinearGradient(0, c[1] - ay, 0, c[1] + ay); wg.addColorStop(0, '#2F86D6'); wg.addColorStop(1, '#6CC4F5'); g.fillStyle = wg; g.beginPath(); g.ellipse(c[0], c[1], ax, ay, 0, 0, 7); g.fill();
+          g.strokeStyle = 'rgba(255,255,255,0.6)'; g.lineWidth = 2; g.beginPath(); g.ellipse(c[0] - ax * 0.25, c[1] - ay * 0.3, ax * 0.35, ay * 0.22, 0, Math.PI * 1.1, Math.PI * 1.9); g.stroke(); emo(g, '🪷', c[0] - 18, c[1] + 4, 26); }
+      }); }});
+  return M;
+}
 function paintStatic(g){
+  if(!(window.Iso && Iso.paintRoom)) return paintStaticOld(g);
+  const M = isoRoomMap(); g.save(); g.translate(VIEW.ox, VIEW.oy); g.scale(VIEW.scale, VIEW.scale);
+  Iso.paintRoom(g, M, 'back'); Iso.paintRoom(g, M, 'ground'); Iso.paintRoom(g, M, 'floor'); g.restore();
+  drawShelf(g, R.def, VIEW.scale); drawAO(g, true);   // the Room's own: My Room shelf + soft contact shadows under furniture
+}
+function paintStaticOld(g){
   const D = R.def, k = VIEW.scale;
   // walls
   poly(g, [iso(0, 0, 0), iso(0, N, 0), iso(0, N, WALL), iso(0, 0, WALL)], D.wallL);
@@ -801,9 +843,10 @@ function paintStatic(g){
 }
 // Ambient occlusion: soft dark where walls meet the floor (darkest in the back corner),
 // a fade at the bottom of each wall, and soft contact shadows under every piece of furniture.
-function drawAO(g){
+function drawAO(g, contactsOnly){
   const D = R.def, dark = D.glow || D.stones ? 0.34 : 0.22;
   const band = (pts, a) => poly(g, pts, 'rgba(0,0,0,' + a.toFixed(3) + ')');
+  if(!contactsOnly){
   for(let i = 0; i < 6; i++){
     const u0 = i * 0.14, u1 = u0 + 0.14, a = dark * Math.pow(1 - i / 6, 1.6) * 0.55;
     band([iso(u0, 0), iso(u1, 0), iso(u1, N), iso(u0, N)], a);   // along the left wall (x small)
@@ -813,6 +856,7 @@ function drawAO(g){
     const z0 = i * 9, z1 = z0 + 9, a = dark * (1 - i / 5) * 0.5;
     band([iso(0, 0, z0), iso(0, N, z0), iso(0, N, z1), iso(0, 0, z1)], a);
     band([iso(0, 0, z0), iso(N, 0, z0), iso(N, 0, z1), iso(0, 0, z1)], a);
+  }
   }
   D.items.forEach(it => {                                                                                                 // contact shadows
     if(['decal', 'rug', 'pond', 'emoji', 'hammock'].includes(it.k)) return;
@@ -997,15 +1041,19 @@ function draw(){
   if(D.dance){ for(let x = 0; x < N; x++) for(let y = D.danceFrom || 3; y < N; y++){ if((x * 7 + y * 3 + Math.floor(t * 4)) % 5 !== 0) continue; poly(g, [iso(x + 0.06, y + 0.06), iso(x + 0.94, y + 0.06), iso(x + 0.94, y + 0.94), iso(x + 0.06, y + 0.94)], 'hsla(' + ((x * 40 + y * 25 + t * 90) % 360) + ',90%,60%,0.45)'); } }
   // depth-sorted things
   const things = [];
-  D.items.forEach(it => { if(it.k === 'decal' || it.k === 'pond' || (it.k === 'rug' && !it.lifted)) return; things.push({d: it.k === 'stage' ? -3 : it.x + (it.w || 1) - 0.5 + it.y + (it.d || 1) - 0.5 + (it.noblock ? 5 : 0) + (it.lifted ? 20 : 0), f: () => {
+  D.items.forEach(it => { if(it.k === 'decal' || it.k === 'pond' || (it.k === 'rug' && !it.lifted)) return; const dd = it.k === 'stage' ? -3 : it.x + (it.w || 1) - 0.5 + it.y + (it.d || 1) - 0.5 + (it.noblock ? 5 : 0) + (it.lifted ? 20 : 0);
+    things.push({k: dd, x: it.x, y: it.y, w: it.w || 1, d: it.d || 1, depth: it.k === 'stage' || it.noblock || it.lifted ? dd : null, f: () => {
     if(!it.lifted) return drawFurniture(g, it);
     const c = iso(it.x + it.w / 2, it.y + it.d / 2); g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(c[0], c[1], it.w * 18 * k, it.d * 9 * k, 0, 0, 7); g.fill();
     g.save(); g.translate(0, -(16 + Math.sin(R.t * 8) * 2) * k); g.globalAlpha = 0.92; if(it.k === 'rug') poly(g, [iso(it.x + 0.15, it.y + 0.15), iso(it.x + it.w - 0.15, it.y + 0.15), iso(it.x + it.w - 0.15, it.y + it.d - 0.15), iso(it.x + 0.15, it.y + it.d - 0.15)], it.c); else drawFurniture(g, it); g.restore(); }}); });
-  R.pets.forEach(p => things.push({d: p.type === 'dj' ? -2.9 : p.type === 'window' ? -5 : p.x + p.y + (p.z > 30 ? 0.3 : 0), f: () => drawPet(g, p, k)}));
-  R.avatars.forEach(a => things.push({d: a.x + a.y, f: () => { const [sx, sy] = iso(a.x, a.y); drawRoomAv(g, a, sx, sy, k * AVS); }}));
-  R.avatars.forEach(a => { if(!a.pet) return; const pe = eqOf(fixAv(a.av), 'pet'); if(!pe){ a.pet = null; return; } things.push({d: a.pet.x + a.pet.y, f: () => { const [px, py] = iso(a.pet.x, a.pet.y); drawPetItem(g, pe, px, py, k * AVS, R.t, a.name, a.pet.dir, a.pet.trick); }}); });
+  R.pets.forEach(p => { const dd = p.type === 'dj' ? -2.9 : p.type === 'window' ? -5 : p.x + p.y + (p.z > 30 ? 0.3 : 0); things.push({k: dd, x: p.x, y: p.y, depth: p.type === 'dj' || p.type === 'window' || p.z > 30 ? dd : null, f: () => drawPet(g, p, k)}); });
+  R.avatars.forEach(a => things.push({k: a.x + a.y, x: a.x, y: a.y, f: () => { const [sx, sy] = iso(a.x, a.y); drawRoomAv(g, a, sx, sy, k * AVS); }}));
+  R.avatars.forEach(a => { if(!a.pet) return; const pe = eqOf(fixAv(a.av), 'pet'); if(!pe){ a.pet = null; return; } things.push({k: a.pet.x + a.pet.y, x: a.pet.x, y: a.pet.y, f: () => { const [px, py] = iso(a.pet.x, a.pet.y); drawPetItem(g, pe, px, py, k * AVS, R.t, a.name, a.pet.dir, a.pet.trick); }}); });
   if(isMyKey(R.key)) drawMyRoomExtras(things, g, k);
-  things.sort((a, b) => a.d - b.d).forEach(th => th.f());
+  // 🛋️ ir-2a: sort by FOOTPRINT (IsoKit drawOrder) — a thing wholly behind another along x or y is drawn first, so an avatar next to a long sofa / bed is never hidden by it.
+  //   Plain {d, f} things (My Room extras) keep their own depth. Iso.sortDraw = a true order (plain Array.sort can chain a mover back behind the sofa). No IsoKit → the old one-number sort.
+  things.forEach(th => { if(th.x == null){ th.depth = th.d; th.k = th.d; } });
+  (window.Iso && Iso.sortDraw ? Iso.sortDraw(things) : things.sort((a, b) => a.k - b.k)).forEach(th => th.f());
   drawDecoMarks(g, k);
   // light beams over everything (concert)
   if(D.dance){ for(let b = 0; b < 4; b++){ const top = iso(2 + b * (N - 4) / 3, 0, WALL), ang = Math.sin(t * 0.9 + b) * 0.5; g.save(); g.translate(top[0], top[1]); g.rotate(ang); const gr = g.createLinearGradient(0, 0, 0, 260 * k); const col = (R.genre ? genreOf(R.genre)[3] : ['255,79,216', '24,231,255', '255,200,69', '80,255,160'])[b]; gr.addColorStop(0, 'rgba(' + col + ',0.45)'); gr.addColorStop(1, 'rgba(' + col + ',0)'); g.fillStyle = gr; g.beginPath(); g.moveTo(-4 * k, 0); g.lineTo(4 * k, 0); g.lineTo(46 * k, 260 * k); g.lineTo(-46 * k, 260 * k); g.closePath(); g.fill(); g.restore(); } }
