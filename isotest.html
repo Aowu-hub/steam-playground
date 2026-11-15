@@ -124,7 +124,8 @@ function step(dt){
   }
 }
 function render(alpha, t){
-  for(let q = 0; q < S.units.length; q++){ const u = S.units[q], it = S.items[q];
+  if(S.followU && S.V.followObj !== S.followU.it) stopFollow();   // a drag / minimap tap stops following
+  for(let q = 0; q < S.units.length; q++){ const u = S.units[q], it = u.it;
     it.x = u.px + (u.x - u.px) * alpha; it.y = u.py + (u.y - u.py) * alpha; it.z = u.pz + (u.z - u.pz) * alpha;
     it.pic = u.frames[u.path ? Math.floor(u.dist * 3.2) % Iso.WALK_N : 0]; it.flip = u.flip; }
   const st = Iso.frame(S.V, {items: S.items, t, groundFx: ringFx});
@@ -134,7 +135,8 @@ function render(alpha, t){
 function ringFx(g, V, t){
   const ring = (x, y, z, c, a) => { const p = V.toScreen(x, y, z), k = V.zoom, pul = 1 + Math.sin(t * 6) * 0.08; g.save(); g.translate(p.x, p.y); g.scale(pul, pul);
     g.strokeStyle = c; g.globalAlpha = a; g.lineWidth = 3; g.beginPath(); g.moveTo(0, -14 * k); g.lineTo(28 * k, 0); g.lineTo(0, 14 * k); g.lineTo(-28 * k, 0); g.closePath(); g.stroke(); g.restore(); };
-  if(S.follow && S.units[0]) ring(S.items[0].x, S.items[0].y, S.items[0].z, '#FFC845', 0.95);
+  if(S.followU){ const it = S.followU.it; ring(it.x, it.y, it.z, '#FFC845', 0.95); const p = V.toScreen(it.x, it.y, it.z); g.font = "700 13px 'Fredoka', sans-serif"; g.textAlign = 'center'; const nm = '🎯 ' + S.followU.who.name, w = g.measureText(nm).width + 14;
+    g.fillStyle = 'rgba(255,200,69,.95)'; g.beginPath(); g.roundRect ? g.roundRect(p.x - w / 2, p.y + 10, w, 20, 10) : g.rect(p.x - w / 2, p.y + 10, w, 20); g.fill(); g.fillStyle = '#2A2440'; g.fillText(nm, p.x, p.y + 25); }
   if(S.call && t - S.call.t < 1.4) ring(S.call.x, S.call.y, S.call.z, '#FF5C9A', 1 - (t - S.call.t) / 1.4);
 }
 
@@ -148,17 +150,19 @@ function meter(st){
 }
 
 /* ---------- 🔧 setup ---------- */
+// the free area: below the top chips, above the tool buttons (the map is fitted + kept there)
+function pads(){ const t = $('hud').getBoundingClientRect(), b = $('tools').getBoundingClientRect(); return {t: Math.round(t.bottom) + 4, b: Math.round(innerHeight - b.top) + 6}; }
 async function build(){
   const n = S.big ? 96 : 32; S.M = makeWorld(n); S.free = walkable(S.M); S.units.length = 0; S.items.length = 0;   // a new map → everyone gets a new spot
-  if(!S.V){ S.V = Iso.view($('iso'), S.M, {min: 0.3, max: 3}); S.V.onTap = tap; S.mm = Iso.minimap($('mini'), S.M, S.V, {dots: () => S.items}); }
+  if(!S.V){ S.V = Iso.view($('iso'), S.M, {min: 0.3, max: 3, pad: pads()}); S.V.onTap = tap; S.mm = Iso.minimap($('mini'), S.M, S.V, {dots: () => S.items}); addEventListener('resize', () => S.V.setPad(pads())); }
   else { S.V.map = S.M; S.V.chunks.clear(); S.V.chunkAny.clear(); S.V._px = 0; S.V._liquid = null; S.V._sky = null; S.mm = Iso.minimap($('mini'), S.M, S.V, {dots: () => S.items}); S.V.fit(); }
   if(!S.big){ S.V.fit(); const tall = S.V.H > S.V.W * 1.3; if(S.V.W > 700 || tall) S.V.zoomAt(S.V.zoom * (tall ? 2 : 1.25), S.V.W / 2, S.V.H / 2); }   // phone held upright: start closer (pan to explore, 🔍 Fit shows all)
   await setCount(S.count);
 }
 async function setCount(n){
-  n = Math.min(n, Iso.budget.units); S.count = n; $('t-count').textContent = '👥 ' + n;
-  while(S.units.length > n){ S.units.pop(); S.items.pop(); }
-  const add = []; while(S.units.length < n){ const u = makeUnit(S.units.length); S.units.push(u); S.items.push({x: u.x, y: u.y, z: u.z, pic: null}); add.push(u); }
+  const want = n; n = Math.min(n, Iso.budget.units); S.count = n; $('t-count').textContent = '👥 ' + n + (want > n ? ' (phone max)' : '');
+  while(S.units.length > n){ const u = S.units.pop(), k = S.items.indexOf(u.it); if(k >= 0) S.items.splice(k, 1); if(S.followU === u) stopFollow(); }
+  const add = []; while(S.units.length < n){ const u = makeUnit(S.units.length); u.it = {x: u.x, y: u.y, z: u.z, pic: null, u}; S.units.push(u); S.items.push(u.it); add.push(u); }
   // the same 20 family looks repeat → their pictures are shared; bake what's new with a loading bar
   const pics = []; add.forEach(u => { u.frames = framesOf(u); pics.push(...u.frames); });
   const fresh = pics.filter(p => !p.by.size); if(fresh.length > 12){ $('loading').classList.remove('hidden'); $('loading').style.opacity = 1; $('load-text').textContent = 'Baking ' + fresh.length + ' little pictures…'; }
@@ -175,13 +179,18 @@ function tap(cell){
   S.units.map(u => [u, Math.hypot(u.x - cell.i, u.y - cell.j)]).sort((a, b) => a[1] - b[1]).slice(0, 6).forEach(([u]) => { u.asking = false; goTo(u, cell.i + 0.5, cell.j + 0.5); });
   if(window.UI && UI.sound) try{ UI.sound('tap'); }catch(e){}
 }
-$('t-count').onclick = () => setCount(COUNTS[(COUNTS.indexOf(S.count) + 1) % COUNTS.length] || 40);
+$('t-count').onclick = () => { const i = COUNTS.indexOf(S.count); setCount(S.count >= Iso.budget.units && i < COUNTS.length - 1 && COUNTS[i + 1] > Iso.budget.units ? COUNTS[0] : COUNTS[(i + 1) % COUNTS.length] || 40); };
 $('t-theme').onclick = () => { S.theme = (S.theme + 1) % THEMES.length; S.M.setTheme(THEMES[S.theme][0]); S.V._sky = null; S.mm = Iso.minimap($('mini'), S.M, S.V, {dots: () => S.items}); $('t-theme').textContent = '🎨 ' + THEMES[S.theme][1]; };
 $('t-edit').onclick = () => { S.edit = !S.edit; $('t-edit').classList.toggle('on', S.edit); $('tip').textContent = S.edit ? '⛰️ tap a tile to raise it (4th tap = flat again)' : '👆 drag to move · 🤏 pinch or wheel to zoom · tap the ground to call friends'; $('tip').style.opacity = 1; };
 $('t-big').onclick = () => { S.big = !S.big; $('t-big').classList.toggle('on', S.big); $('t-big').textContent = S.big ? '🗺️ 96 × 96' : '🗺️ Big map'; build(); };
-$('t-follow').onclick = () => { S.follow = !S.follow; $('t-follow').classList.toggle('on', S.follow); S.V.follow(S.follow ? S.items[0] : null); };
-$('t-fit').onclick = () => { S.follow = false; $('t-follow').classList.remove('on'); S.V.follow(null); S.V.fit(); };
+// 🎯 Follow = the friend nearest the middle of the screen (tap again = stop); dragging the map also stops it
+function stopFollow(){ S.followU = null; S.V.follow(null); $('t-follow').classList.remove('on'); $('t-follow').textContent = '🎯 Follow'; }
+$('t-follow').onclick = () => { if(S.followU){ stopFollow(); return; }
+  let best = null, bd = 1e9; S.units.forEach(u => { const p = S.V.toScreen(u.it.x, u.it.y, u.it.z), d = Math.hypot(p.x - S.V.cx, p.y - S.V.cy); if(d < bd){ bd = d; best = u; } });
+  if(!best) return; S.followU = best; S.V.follow(best.it); $('t-follow').classList.add('on'); $('t-follow').textContent = '🎯 ' + best.who.name; };
+$('t-fit').onclick = () => { if(S.followU) stopFollow(); S.V.fit(); };
 setTimeout(() => { $('tip').style.opacity = 0; }, 6000);
+$('iso').addEventListener('pointerdown', () => { if(!S.edit) setTimeout(() => { $('tip').style.opacity = 0; }, 1200); });
 S.setCount = setCount; window.ISOTEST = S;
 build().then(() => { S.loop = Iso.loop({update: step, render}); });
 })();
