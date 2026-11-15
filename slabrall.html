@@ -43,6 +43,17 @@
   .title{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;margin-bottom:14px;}
   .title h1{font-size:2.1rem;letter-spacing:.01em;} .title p{margin:0;color:var(--ink-soft);font-weight:700;}
   .title .logo{font-size:2.8rem;line-height:1;animation:sb-rally 1.6s ease-in-out infinite;}
+  /* 🏷️ lg-1 logo badges (drawn in code) */
+  .title .logo.sla-on{animation:sla-bob 2.4s ease-in-out infinite;font-size:0;} .title .logo canvas{display:block;}
+  @keyframes sla-bob{0%,100%{transform:translateY(0);}50%{transform:translateY(-4px);}}
+  .title.has-mark h1{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+  .sla-mark{width:min(380px,82vw);height:auto;display:block;filter:drop-shadow(0 6px 10px rgba(0,0,0,.25));}
+  @media (max-height:520px){ .sla-mark{width:min(250px,46vw);} }
+  .ui-mbtn .mi.sla-mi{width:2.7rem;font-size:0;} .ui-mbtn .mi.sla-mi canvas{width:2.7rem;height:2.7rem;display:block;}
+  @media (max-width:759px){ .ui-mbtn .mi.sla-mi{width:2.3rem;} .ui-mbtn .mi.sla-mi canvas{width:2.3rem;height:2.3rem;} }
+  @media (max-height:500px) and (orientation:landscape){ .ui-mbtn .mi.sla-mi{width:1.9rem;} .ui-mbtn .mi.sla-mi canvas{width:1.9rem;height:1.9rem;}
+    #scr-menu .title.has-mark h1{position:static;width:auto;height:auto;overflow:visible;clip:auto;} }   /* sideways phone: UiKit's slim text title instead of the mark */
+  .result-card .res-badge{width:58px;height:58px;margin-bottom:-6px;} @media (max-height:560px){ .result-card .res-badge{display:none;} }
   @keyframes sb-rally{0%,100%{transform:translateX(-14px) rotate(-14deg);}50%{transform:translateX(14px) rotate(14deg);}}
   .who{display:inline-flex;align-items:center;gap:8px;margin-top:6px;background:var(--card);border-radius:14px;padding:6px 12px;font-weight:800;font-size:0.85rem;}
   .who button{border:none;background:none;color:var(--orange);font-weight:800;cursor:pointer;font-size:inherit;text-decoration:underline;padding:0;min-height:30px;}
@@ -1662,7 +1673,8 @@ function showScreen(name){
 }
 function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
 function canPlay(i){ const p = progressOf(S.player); if(i === 5) return p.unlocked >= 5; if(i === 4) return p.unlocked >= 4; return i <= Math.max(p.unlocked, AGE_START[S.age] || 0); }
-function renderPlayers(){
+function renderPlayers(){ slaPaintLogos();   // 🏷️ lg-1
+
   const box = $('player-list'); box.innerHTML = '';
   if(!S.players.length){ box.innerHTML = '<div class="empty">No players yet — add one on the Dashboard first.</div>'; return; }
   S.players.forEach(p => { const b = document.createElement('button'); b.className = 'pick'; b.setAttribute('data-sound', 'pop');
@@ -1685,7 +1697,7 @@ function renderMenu(){
     UI.modeGroups(sl, MODE_GROUPS, mgList(), {next: k => k === 'cup' || k === 'ljoin' || k === 'lhost' ? null : $('level-list'),
       onPick: k => { if(k === 'cup'){ openCup(); return 'stop'; } if(k === 'ljoin'){ lkOpenJoin(); return 'stop'; } if(k === 'lhost'){ lkHostPick(); return 'stop'; } SET.sport = k; savePrefs(); markSports(); return false; }});
   }
-  markSports(); renderLevels(); cupBtnLabel(); mgCupLabel();
+  markSports(); renderLevels(); cupBtnLabel(); mgCupLabel(); slaPaintLogos();   // 🏷️ lg-1
   if(window.UI && UI.leaders) UI.leaders($('leaders'), GAME_ID, S.player);
   $('pow-list').innerHTML = SB.POWER_KEYS.map(k => { const P = SB.POWERS[k]; return '<div>' + P.icon + ' <b>' + P.name + '</b> <small>(' + TIER_NAME[P.tier] + ')</small><br>' + UI.esc(P.about) + '</div>'; }).join('');
 }
@@ -1721,7 +1733,7 @@ function renderLevels(){
 function openSetup(lvl){
   SET.level = lvl; const sp = SB.SPORTS[SET.sport], L = SB.LEVELS[lvl];
   if(LEVEL_UI[lvl].hardcore) SET.mode = 'robot';
-  $('setup-logo').textContent = sp.icon; $('setup-title').textContent = sp.name + ' · ' + L.name;
+  if(!slaLogoInto($('setup-logo'), sp.id, 76)) $('setup-logo').textContent = sp.icon; $('setup-title').textContent = sp.name + ' · ' + L.name;   // 🏷️ lg-1
   $('setup-sub').textContent = sp.about + ' ' + targetText(sp, lvl);
   buildModes(); buildSeats(); buildThemes(); buildBalls(); buildTrails(); buildFeathers();
   $('pw-chip').textContent = '⚡ Power-ups: ' + (SET.powers ? 'on' : 'off'); $('pw-chip').classList.toggle('on', SET.powers);
@@ -1885,7 +1897,7 @@ function hasPeople(ti){ return ti >= 0 && CUP.teams[ti].members.some(Boolean); }
 function memberText(t){ return t.members.map((m, k) => m ? UI.esc(m) : '🤖 ' + UI.esc(t.bots[k])).join(' + '); }
 function renderBracket(){
   if(!CUP) return; const sp = SB.SPORTS[CUP.sport];
-  $('br-title').textContent = sp.icon + ' ' + sp.name + ' Cup';
+  $('br-title').textContent = sp.icon + ' ' + sp.name + ' Cup'; slaLogoInto(document.querySelector('#scr-bracket .title .logo'), sp.id, 76);   // 🏷️ lg-1
   $('br-sub').textContent = (CUP.fmt === 'double' ? '👥 Doubles' : '👤 Singles') + ' · ' + CUP.size + ' teams · 🤖 ' + SB.LEVELS[CUP.level].name + ' robots · ' + cupTargetText(CUP);
   const nx = nextMatch(), T = CUP.teams;
   const row = (ti, x, side) => { if(ti < 0) return '<div class="bt tbd"><span class="dot" style="background:#ccc"></span><span class="n">waiting…</span></div>';
@@ -2555,6 +2567,187 @@ function decoAround(g, V, M, T, t){
     const c = V.P(x, y, 0), k = V.sc(x, y, 0); drawEmo(g, d.e, c[0], c[1] - k * 0.4 + Math.sin(t * 1.4 + d.ph) * 2, k * 0.75 * d.s);
   });
 }
+/* 🏷️ lg-1 LOGO BADGES — Aowu's logo sheet ("SlaBrall logos — style reference.png") redrawn in code: neon shield + sport icon + two-tone "Sla"+name.
+   Recoloured per court theme, drawn once per sport × theme into a 240 px picture (cache), then copied wherever it is needed:
+   menu main mark · sport cards · setup title · court / table / rink / room floor · cup + result cards. No image files. */
+const SLA_PAL = {
+  classic: {neon: '#36D6FF', neon2: '#FF8A1F', f1: '#17396D', f2: '#071426', sla: ['#FFFFFF', '#5FE0FF'], rest: ['#FFE45C', '#FF7A1A'], ink: '#06101F'},
+  dino:    {neon: '#9BE15D', neon2: '#FFB23F', f1: '#255A2B', f2: '#0C1F0E', sla: ['#F6FFE0', '#A6EE62'], rest: ['#FFE07A', '#FF8A2A'], ink: '#0A1608'},
+  sea:     {neon: '#3FF3E0', neon2: '#FF7F6B', f1: '#0C4A70', f2: '#041C2E', sla: ['#E6FFFF', '#3FF3E0'], rest: ['#FFD9B0', '#FF6B5B'], ink: '#03121E'},
+  dance:   {neon: '#FF4FE3', neon2: '#FFE14A', f1: '#3D1468', f2: '#12051F', sla: ['#FFFFFF', '#FF8CF0'], rest: ['#FFF27A', '#FFB800'], ink: '#0D0318'},
+  space:   {neon: '#8E7CFF', neon2: '#5CF2FF', f1: '#2A2470', f2: '#07051A', sla: ['#FFFFFF', '#B8F3FF'], rest: ['#EDE4FF', '#A585FF'], ink: '#05031A'},
+  sky:     {neon: '#FFD34D', neon2: '#3DB2F0', f1: '#2D7FC4', f2: '#0F3F6E', sla: ['#FFFFFF', '#BFE8FF'], rest: ['#FFF0A0', '#F2A81D'], ink: '#0A2440'}
+};
+function slaPal(theme){ return SLA_PAL[theme] || SLA_PAL[Object.keys(SLA_PAL)[Math.max(0, THEME_KEYS.indexOf(theme)) % 6]] || SLA_PAL.classic; }
+const SLA_FONT = (px, it) => (it === false ? '' : 'italic ') + '700 ' + px + 'px Fredoka, Nunito, "Arial Rounded MT Bold", sans-serif';
+function slaWord(g, word, cx, cy, maxW, px, P, opt){   // two-tone lettering: "Sla" cool, the rest warm · thick dark edge · thin white line · neon glow
+  opt = opt || {}; g.save(); g.textBaseline = 'alphabetic'; g.lineJoin = 'round'; g.font = SLA_FONT(px);
+  const a = word.slice(0, 3), b = word.slice(3); let w = g.measureText(word).width;
+  if(w > maxW){ px = px * maxW / w; g.font = SLA_FONT(px); w = g.measureText(word).width; }
+  const x0 = cx - w / 2, wa = g.measureText(a).width, top = cy - px * 0.72, bot = cy + px * 0.08;
+  g.shadowColor = P.neon; g.shadowBlur = opt.glow == null ? px * 0.35 : opt.glow; g.strokeStyle = P.ink; g.lineWidth = px * 0.2;
+  g.strokeText(word, x0, cy); g.shadowBlur = 0; g.lineWidth = px * 0.2; g.strokeText(word, x0, cy);
+  const ga = g.createLinearGradient(0, top, 0, bot); ga.addColorStop(0, P.sla[0]); ga.addColorStop(1, P.sla[1]);
+  const gb = g.createLinearGradient(0, top, 0, bot); gb.addColorStop(0, P.rest[0]); gb.addColorStop(1, P.rest[1]);
+  g.fillStyle = ga; g.fillText(a, x0, cy); g.fillStyle = gb; g.fillText(b, x0 + wa, cy);
+  g.lineWidth = Math.max(1, px * 0.03); g.strokeStyle = 'rgba(255,255,255,0.85)'; g.strokeText(word, x0, cy);
+  g.restore(); return px;
+}
+function slaShield(g, inset){   // 240-box shield: flat top with round corners, curved sides to a point
+  const k = inset || 0; g.beginPath(); g.moveTo(52 + k, 14 + k); g.lineTo(188 - k, 14 + k); g.quadraticCurveTo(212 - k, 14 + k, 212 - k, 38 + k); g.lineTo(212 - k, 116);
+  g.quadraticCurveTo(210 - k, 184 - k * 0.6, 120, 228 - k * 1.3); g.quadraticCurveTo(30 + k, 184 - k * 0.6, 28 + k, 116); g.lineTo(28 + k, 38 + k); g.quadraticCurveTo(28 + k, 14 + k, 52 + k, 14 + k); g.closePath();
+}
+function slaLines(g, pts, col, w){ g.strokeStyle = col; g.lineWidth = w; g.lineCap = 'round'; pts.forEach(([x0, y0, x1, y1]) => { g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); }); }
+function slaBallT(g, x, y, r, c1, c2, seam){   // a round ball with a soft light + optional tennis seam
+  const gr = g.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r); gr.addColorStop(0, c1); gr.addColorStop(1, c2);
+  g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = Math.max(1.5, r * 0.08); g.stroke();
+  if(seam){ g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = Math.max(1.5, r * 0.12); g.beginPath(); g.arc(x - r * 1.05, y, r * 0.75, -0.95, 0.95); g.stroke(); g.beginPath(); g.arc(x + r * 1.05, y, r * 0.75, Math.PI - 0.95, Math.PI + 0.95); g.stroke(); }
+}
+function slaNet(g, x0, x1, yTop, yBot, P){   // posts + mesh + white tape
+  g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x0, yTop, x1 - x0, yBot - yTop);
+  g.strokeStyle = 'rgba(255,255,255,0.45)'; g.lineWidth = 1.2; for(let x = x0; x <= x1; x += 7){ g.beginPath(); g.moveTo(x, yTop); g.lineTo(x, yBot); g.stroke(); } for(let y = yTop; y <= yBot; y += 6){ g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke(); }
+  g.fillStyle = '#FFFFFF'; g.fillRect(x0 - 2, yTop - 3, x1 - x0 + 4, 5); g.fillStyle = P.neon; g.fillRect(x0 - 5, yTop - 6, 6, yBot - yTop + 10); g.fillRect(x1 - 1, yTop - 6, 6, yBot - yTop + 10);
+}
+function slaRacket(g, x, y, ang, rx, ry, frame, handleLen, opt){   // oval racket head at (x,y) turned by ang, strings, throat + handle
+  opt = opt || {}; g.save(); g.translate(x, y); g.rotate(ang);
+  g.strokeStyle = opt.grip || '#2B2B33'; g.lineCap = 'round'; g.lineWidth = opt.shaft || 7; g.beginPath(); g.moveTo(0, ry * 0.9); g.lineTo(0, ry + handleLen * 0.55); g.stroke();
+  g.lineWidth = (opt.shaft || 7) * 1.6; g.beginPath(); g.moveTo(0, ry + handleLen * 0.55); g.lineTo(0, ry + handleLen); g.stroke();
+  g.save(); g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, 7); g.clip(); g.fillStyle = 'rgba(255,255,255,0.08)'; g.fill();
+  g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 1.3; const st = opt.strings || 7;
+  for(let i = -rx; i <= rx; i += st){ g.beginPath(); g.moveTo(i, -ry); g.lineTo(i, ry); g.stroke(); } for(let j = -ry; j <= ry; j += st){ g.beginPath(); g.moveTo(-rx, j); g.lineTo(rx, j); g.stroke(); } g.restore();
+  g.strokeStyle = frame; g.lineWidth = opt.rim || 6; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, 7); g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 1.5; g.beginPath(); g.ellipse(0, 0, rx - 1, ry - 1, 0, 3.6, 5.2); g.stroke();
+  g.restore();
+}
+const SLA_ICON = {
+  slaball(g, P){   // 🎾 tennis: racket + ball over the net
+    slaNet(g, 50, 190, 112, 136, P);
+    slaRacket(g, 142, 66, 0.62, 30, 40, P.neon2, 58, {});
+    slaLines(g, [[34, 46, 58, 52], [30, 60, 56, 62], [36, 74, 58, 72]], 'rgba(255,255,255,0.7)', 3);
+    slaBallT(g, 82, 60, 19, '#F4FF8A', '#9BD11A', true);
+  },
+  slapong(g, P){   // 🏓 ping-pong: round red paddle + small ball + low net
+    g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(44, 128, 152, 8); slaNet(g, 60, 180, 116, 128, P);
+    g.save(); g.translate(104, 80); g.rotate(-0.55);
+    g.fillStyle = '#C98A4B'; g.strokeStyle = '#7A4E25'; g.lineWidth = 2; g.beginPath(); g.roundRect ? g.roundRect(-8, 26, 16, 48, 6) : g.rect(-8, 26, 16, 48); g.fill(); g.stroke();
+    g.fillStyle = '#1B1B1F'; g.beginPath(); g.arc(0, 0, 41, 0, 7); g.fill();
+    const rg = g.createRadialGradient(-12, -14, 4, 0, 0, 38); rg.addColorStop(0, '#FF8A6E'); rg.addColorStop(1, '#D8261C'); g.fillStyle = rg; g.beginPath(); g.arc(0, -1, 37, 0, 7); g.fill();
+    g.restore();
+    g.setLineDash([5, 6]); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(150, 46); g.quadraticCurveTo(178, 66, 176, 106); g.stroke(); g.setLineDash([]);
+    slaBallT(g, 150, 46, 11, '#FFE2B8', '#FF8A1F', false);
+  },
+  slapoof(g, P){   // 🥒 pickleball: long solid paddle + holey ball
+    g.save(); g.translate(98, 78); g.rotate(-0.45);
+    g.fillStyle = '#2B2B33'; g.beginPath(); g.roundRect ? g.roundRect(-9, 40, 18, 46, 6) : g.rect(-9, 40, 18, 46); g.fill();
+    const lg = g.createLinearGradient(-30, -50, 30, 50); lg.addColorStop(0, '#7FD3FF'); lg.addColorStop(1, '#1F6FE0'); g.fillStyle = lg;
+    g.strokeStyle = '#0B2E66'; g.lineWidth = 4; g.beginPath(); g.roundRect ? g.roundRect(-30, -52, 60, 96, 22) : g.rect(-30, -52, 60, 96); g.fill(); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,0.6)'; g.lineWidth = 2; g.beginPath(); g.moveTo(-20, -38); g.lineTo(-20, 22); g.stroke();
+    g.restore();
+    slaLines(g, [[176, 92, 196, 104], [184, 80, 204, 88]], 'rgba(255,255,255,0.7)', 3);
+    slaBallT(g, 160, 60, 20, '#FFF7A0', '#F2C511', false);
+    g.fillStyle = 'rgba(120,90,0,0.55)'; [[0, 0], [-9, -7], [9, -7], [-8, 8], [8, 8], [0, -14], [0, 14]].forEach(([dx, dy]) => { g.beginPath(); g.arc(160 + dx, 60 + dy, 3, 0, 7); g.fill(); });
+  },
+  slashot(g, P){   // 🏒 table hockey: the table from the end — slot goal, mallet + puck
+    g.fillStyle = '#E9F6FF'; g.strokeStyle = P.neon2; g.lineWidth = 6; g.beginPath(); g.moveTo(66, 44); g.lineTo(174, 44); g.lineTo(202, 136); g.lineTo(38, 136); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = 'rgba(31,111,224,0.18)'; for(let i = 0; i < 5; i++) for(let j = 0; j < 9; j++){ const yy = 54 + i * 18, ww = 0.5 + i * 0.12; g.beginPath(); g.arc(120 + (j - 4) * 15 * (0.8 + i * 0.1), yy, 1.6, 0, 7); g.fill(); }
+    g.strokeStyle = '#E8402F'; g.lineWidth = 3; g.beginPath(); g.moveTo(52, 90); g.lineTo(188, 90); g.stroke();
+    g.strokeStyle = 'rgba(232,64,47,0.8)'; g.beginPath(); g.ellipse(120, 90, 22, 9, 0, 0, 7); g.stroke();
+    g.fillStyle = '#10141C'; g.fillRect(100, 39, 40, 9); g.fillStyle = P.neon; g.fillRect(96, 36, 6, 12); g.fillRect(138, 36, 6, 12);
+    slaLines(g, [[106, 82, 112, 64], [120, 84, 120, 62], [134, 82, 128, 64]], 'rgba(31,60,120,0.55)', 3);
+    g.fillStyle = '#10141C'; g.beginPath(); g.ellipse(120, 96, 13, 6, 0, 0, 7); g.fill(); g.fillStyle = '#3A4252'; g.beginPath(); g.ellipse(120, 94, 13, 6, 0, 0, 7); g.fill();
+    const mx = 150, my = 120; g.fillStyle = '#A11A12'; g.beginPath(); g.ellipse(mx, my + 5, 25, 12, 0, 0, 7); g.fill();
+    const mg = g.createRadialGradient(mx - 8, my - 6, 2, mx, my, 26); mg.addColorStop(0, '#FF8A6E'); mg.addColorStop(1, '#E8402F'); g.fillStyle = mg; g.beginPath(); g.ellipse(mx, my, 25, 12, 0, 0, 7); g.fill();
+    g.fillStyle = '#A11A12'; g.fillRect(mx - 8, my - 22, 16, 20); g.beginPath(); g.ellipse(mx, my - 2, 8, 4, 0, 0, 7); g.fill();
+    g.fillStyle = '#FF6A55'; g.beginPath(); g.ellipse(mx, my - 22, 8, 4, 0, 0, 7); g.fill();
+  },
+  slabam(g, P){   // 🏸 badminton: high net + thin racket + shuttle
+    slaNet(g, 50, 190, 100, 122, P); g.fillStyle = P.neon; g.fillRect(45, 94, 6, 46); g.fillRect(189, 94, 6, 46);
+    slaRacket(g, 148, 58, 0.5, 22, 29, P.neon2, 70, {shaft: 4, strings: 6, rim: 5});
+    g.save(); g.translate(84, 60); g.rotate(-0.75);
+    g.fillStyle = 'rgba(255,255,255,0.95)'; g.strokeStyle = 'rgba(80,90,110,0.8)'; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(-8, 4); g.lineTo(-20, 40); g.lineTo(20, 40); g.lineTo(8, 4); g.closePath(); g.fill(); g.stroke();
+    for(let i = -2; i <= 2; i++){ g.beginPath(); g.moveTo(i * 3.5, 4); g.lineTo(i * 9, 40); g.stroke(); }
+    g.strokeStyle = P.neon2; g.lineWidth = 2.5; g.beginPath(); g.moveTo(-15, 26); g.lineTo(15, 26); g.stroke();
+    g.fillStyle = '#F5F0E6'; g.beginPath(); g.arc(0, 2, 10, Math.PI, 0); g.lineTo(10, 6); g.lineTo(-10, 6); g.closePath(); g.fill(); g.strokeStyle = 'rgba(0,0,0,0.35)'; g.stroke();
+    g.restore();
+    slaLines(g, [[50, 34, 66, 42], [44, 48, 62, 52]], 'rgba(255,255,255,0.7)', 3);
+  },
+  slawall(g, P){   // 🧱 squash: the front wall with the red out-line + tin, squash racket, small dark ball
+    const wg = g.createLinearGradient(0, 30, 0, 136); wg.addColorStop(0, '#F4F7FB'); wg.addColorStop(1, '#C9D3E0'); g.fillStyle = wg; g.strokeStyle = P.neon; g.lineWidth = 4;
+    g.beginPath(); g.moveTo(52, 30); g.lineTo(188, 30); g.lineTo(188, 136); g.lineTo(52, 136); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#E8402F'; g.fillRect(52, 44, 136, 5); g.fillRect(52, 118, 136, 10);
+    g.strokeStyle = 'rgba(232,64,47,0.55)'; g.lineWidth = 2; g.beginPath(); g.moveTo(52, 92); g.lineTo(188, 92); g.stroke();
+    slaRacket(g, 146, 82, 0.42, 25, 33, P.neon2, 50, {shaft: 6});
+    slaLines(g, [[56, 60, 74, 66], [58, 76, 76, 76]], 'rgba(80,90,110,0.6)', 3);
+    slaBallT(g, 92, 70, 11, '#4A4F5C', '#111318', false); g.fillStyle = '#FFE14A'; g.beginPath(); g.arc(88, 66, 2.6, 0, 7); g.arc(96, 66, 2.6, 0, 7); g.fill();
+  }
+};
+const SLA_BADGE_CACHE = {};
+function slaBadge(sportId, theme){   // one 240 px badge picture per sport × theme (cached)
+  const key = sportId + ':' + (theme || 'classic'); if(SLA_BADGE_CACHE[key]) return SLA_BADGE_CACHE[key];
+  const sp = SB.SPORTS[sportId] || SB.SPORTS.slapong, P = slaPal(theme), c = document.createElement('canvas'); c.width = 240; c.height = 240;
+  const g = c.getContext('2d'); if(!g) return null;
+  g.save(); slaShield(g); const fg = g.createLinearGradient(0, 14, 0, 228); fg.addColorStop(0, P.f1); fg.addColorStop(1, P.f2); g.fillStyle = fg; g.fill();
+  g.clip(); const rg = g.createRadialGradient(120, 80, 6, 120, 80, 120); rg.addColorStop(0, 'rgba(255,255,255,0.22)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = rg; g.fillRect(0, 0, 240, 240);
+  try{ (SLA_ICON[sp.id] || SLA_ICON.slapong)(g, P); }catch(e){} g.restore();
+  g.save(); g.lineJoin = 'round'; g.shadowColor = P.neon; g.shadowBlur = 16; g.strokeStyle = P.neon; g.lineWidth = 7; slaShield(g); g.stroke();
+  g.shadowBlur = 0; g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 1.5; slaShield(g); g.stroke();
+  g.strokeStyle = P.neon2; g.lineWidth = 3; slaShield(g, 9); g.stroke(); g.restore();
+  // the name banner across the lower part (wider than the shield, like the sheet)
+  g.save(); g.fillStyle = 'rgba(0,0,0,0.45)'; g.beginPath(); g.moveTo(22, 150); g.lineTo(218, 150); g.lineTo(212, 196); g.lineTo(28, 196); g.closePath(); g.fill(); g.restore();
+  slaWord(g, sp.name, 120, 188, 226, 50, P);
+  return (SLA_BADGE_CACHE[key] = c);
+}
+const SLA_MARK_CACHE = {};
+function slaMark(theme){   // 🏓 the main mark: swoosh + burst + ball, "SlaBrall", tagline (720 × 330 picture, cached per theme)
+  const key = theme || 'classic'; if(SLA_MARK_CACHE[key]) return SLA_MARK_CACHE[key];
+  const P = slaPal(theme), c = document.createElement('canvas'); c.width = 720; c.height = 330; const g = c.getContext('2d'); if(!g) return null;
+  const bx = 452, by = 108, br = 62;
+  // swoosh arc
+  g.save(); g.lineCap = 'round'; const sw = g.createLinearGradient(140, 0, 600, 0); sw.addColorStop(0, 'rgba(255,255,255,0)'); sw.addColorStop(0.5, P.sla[1]); sw.addColorStop(1, '#FFFFFF');
+  g.strokeStyle = sw; g.lineWidth = 16; g.shadowColor = P.neon; g.shadowBlur = 18; g.beginPath(); g.ellipse(380, 210, 250, 168, 0, Math.PI * 1.08, Math.PI * 1.86); g.stroke();
+  g.lineWidth = 6; g.strokeStyle = P.neon2; g.beginPath(); g.ellipse(380, 210, 228, 150, 0, Math.PI * 1.12, Math.PI * 1.8); g.stroke(); g.restore();
+  // burst
+  g.save(); g.translate(bx + 16, by - 6); const bg = g.createRadialGradient(0, 0, 10, 0, 0, 120); bg.addColorStop(0, '#FFF2A8'); bg.addColorStop(0.5, P.rest[1]); bg.addColorStop(1, 'rgba(255,90,20,0)');
+  g.fillStyle = bg; g.beginPath(); for(let i = 0; i < 22; i++){ const a = i * Math.PI / 11, d = i % 2 ? 58 : 112 + (i % 4) * 8; g.lineTo(Math.cos(a) * d, Math.sin(a) * d); } g.closePath(); g.fill(); g.restore();
+  // speed streaks
+  slaLines(g, [[230, 92, 372, 100], [250, 124, 378, 122], [276, 150, 384, 140], [300, 70, 380, 82]], P.sla[1], 7);
+  slaLines(g, [[262, 108, 380, 112], [300, 138, 388, 132]], P.rest[1], 5);
+  // the ball
+  g.save(); g.shadowColor = P.neon; g.shadowBlur = 24; slaBallT(g, bx, by, br, '#F7FF9C', '#5DBB1A', true); g.restore();
+  g.fillStyle = 'rgba(255,255,255,0.35)'; g.beginPath(); g.ellipse(bx - 22, by - 28, 20, 11, -0.6, 0, 7); g.fill();
+  slaWord(g, 'SlaBrall', 360, 258, 660, 132, P, {glow: 26});
+  // tagline
+  g.save(); g.font = '700 30px Fredoka, Nunito, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+  g.strokeStyle = P.ink; g.lineWidth = 8; g.strokeText('THE ULTIMATE SLAP & RALLY GAME', 360, 300); g.fillStyle = '#FFFFFF'; g.fillText('THE ULTIMATE SLAP & RALLY GAME', 360, 300); g.restore();
+  return (SLA_MARK_CACHE[key] = c);
+}
+function slaCanvas(pic, w, h, cls){   // a sharp DOM copy of a cached picture (device pixel ratio aware)
+  const el = document.createElement('canvas'), d = Math.min(3, window.devicePixelRatio || 1); el.width = Math.round(w * d); el.height = Math.round(h * d);
+  el.style.width = w + 'px'; el.style.height = h + 'px'; if(cls) el.className = cls; const g = el.getContext('2d'); if(g && pic) g.drawImage(pic, 0, 0, el.width, el.height); return el;
+}
+function slaTheme(){ return (typeof SET !== 'undefined' && SET.theme) || 'classic'; }
+function slaPaintLogos(){   // put the badges + main mark into the menus (safe to call again: replaces what is there)
+  try{
+    const th = slaTheme();
+    ['scr-menu', 'scr-player'].forEach(id => { const t = document.querySelector('#' + id + ' .title'), lg = t && t.querySelector('.logo'), pic = slaMark(th); if(!lg || !pic) return;
+      lg.textContent = ''; const el = slaCanvas(pic, 380, 174, 'sla-mark'); el.style.width = ''; el.style.height = ''; el.setAttribute('role', 'img'); el.setAttribute('aria-label', 'SlaBrall — the ultimate slap & rally game');
+      lg.appendChild(el); lg.classList.add('sla-on'); t.classList.add('has-mark'); });
+    document.querySelectorAll('#sport-list .ui-mbtn').forEach(b => { const k = b.dataset.k, mi = b.querySelector('.mi'); if(!mi || !SB.SPORTS[k]) return; const pic = slaBadge(k, th); if(!pic) return;
+      mi.textContent = ''; mi.classList.add('sla-mi'); const el = slaCanvas(pic, 44, 44); el.style.width = ''; el.style.height = ''; el.setAttribute('aria-label', SB.SPORTS[k].name); mi.appendChild(el); });
+  }catch(e){}
+}
+function slaLogoInto(box, sportId, px){   // the sport's badge inside a .logo box (setup title, cup bracket)
+  try{ const pic = slaBadge(sportId, slaTheme()); if(!box || !pic) return false; box.textContent = ''; box.appendChild(slaCanvas(pic, px, px)); box.classList.add('sla-on'); return true; }catch(e){ return false; }
+}
+function slaResultBadge(){   // a small badge on top of the result card (match + cup)
+  try{ const card = $('result-card'), sp = (G && G.M && G.M.sp) || SB.SPORTS[SET.sport]; if(!card || !sp || card.querySelector('.res-badge')) return; const pic = slaBadge(sp.id, (G && G.theme) || slaTheme()); if(!pic) return;
+    const el = slaCanvas(pic, 58, 58, 'res-badge'); el.style.width = ''; el.style.height = ''; card.insertBefore(el, card.firstChild); }catch(e){}
+}
+if(document.fonts && document.fonts.load) document.fonts.load(SLA_FONT(40)).then(() => {   // the real font arrived → draw the lettering again
+  if(!document.fonts.check(SLA_FONT(40))) return; Object.keys(SLA_BADGE_CACHE).forEach(k => delete SLA_BADGE_CACHE[k]); Object.keys(SLA_MARK_CACHE).forEach(k => delete SLA_MARK_CACHE[k]); slaPaintLogos();
+}).catch(() => {});
+/* 🏷️ END LOGO BADGES */
 /* 🏷️ tb-1 the sport's "Sla…" logo painted on the court / table / rink / room floor — every court theme has its own style (font, colours, badge).
    Drawn once into a small picture per sport × theme, then laid flat on the surface (one per half, each readable from its own end). */
 const LOGO_STYLE = {   // theme → look (unknown themes get one from the list by their position)
@@ -2581,18 +2774,24 @@ function logoPic(sp, theme, T){
   emo(g, T.icon || sp.icon, x0 - 44, 80, 64);   // the court theme's badge
   return (LOGO_CACHE[key] = c);
 }
-function layLogo(g, V, pic, x, y, len){   // the picture flat on the floor at (x, y), text along the width — always readable from where YOU look (never mirrored / upside down)
+function layText(g, V, pic, x, y, len){   // the picture flat on the floor at (x, y), text along the width — always readable from where YOU look (never mirrored / upside down)
   const a = V.P(x, y, 0), e1 = V.P(x, y + 1, 0), e2 = V.P(x + 1, y, 0), s = len / pic.width;
   let ux = [(e1[0] - a[0]) * s, (e1[1] - a[1]) * s], vy = [(e2[0] - a[0]) * s, (e2[1] - a[1]) * s];
   if(ux[0] * vy[1] - ux[1] * vy[0] < 0) vy = [-vy[0], -vy[1]];   // no mirror writing
   if(ux[0] < -1e-6 || (Math.abs(ux[0]) < 1e-6 && ux[1] > 0)){ ux = [-ux[0], -ux[1]]; vy = [-vy[0], -vy[1]]; }   // left → right on screen
   g.save(); g.translate(a[0], a[1]); g.transform(ux[0], ux[1], vy[0], vy[1], 0, 0); g.drawImage(pic, -pic.width / 2, -pic.height / 2); g.restore();
 }
+function layBadge(g, V, pic, x, y, len){   // 🏷️ lg-1 a square badge flat on the floor, turned so it stands upright on YOUR screen (never mirrored)
+  const a = V.P(x, y, 0), b = V.P(x + 1, y, 0), c = V.P(x, y + 1, 0), ex = [b[0] - a[0], b[1] - a[1]], ey = [c[0] - a[0], c[1] - a[1]], s = len / pic.width;
+  let best = null; [ex, [-ex[0], -ex[1]], ey, [-ey[0], -ey[1]]].forEach((d, i) => { const o = i < 2 ? ey : ex; let r = [o[0], o[1]]; if(r[0] * d[1] - r[1] * d[0] < 0) r = [-r[0], -r[1]];
+    const sc = d[1] / (Math.hypot(d[0], d[1]) || 1); if(!best || sc > best.sc) best = {sc, r, d}; });
+  g.save(); g.translate(a[0], a[1]); g.transform(best.r[0] * s, best.r[1] * s, best.d[0] * s, best.d[1] * s, 0, 0); g.drawImage(pic, -pic.width / 2, -pic.height / 2); g.restore();
+}
 function surfaceLogos(g, V, M, theme, T){
-  const sp = M.sp, pic = logoPic(sp, theme, T); g.save(); g.globalAlpha = sp.table ? 0.5 : 0.32;
-  if(sp.squash) layLogo(g, V, pic, -sp.Lh * 0.55, 0, sp.Wh * 1.3);   // 🧱 on the back of the room floor
-  else if(sp.kind === 'puck') layLogo(g, V, pic, 0, 0, sp.Wh * 1.1);   // 🏒 centre ice
-  else [-1, 1].forEach(sd => layLogo(g, V, pic, sd * sp.Lh * (sp.table ? 0.5 : 0.42), 0, Math.min(sp.Wh * (sp.table ? 1.25 : 1.05), sp.Lh * 0.8)));   // one on each half
+  const sp = M.sp, bd = slaBadge(sp.id, theme), pic = bd || logoPic(sp, theme, T), layLogo = bd ? layBadge : layText; g.save(); g.globalAlpha = sp.table ? 0.55 : 0.42;   // 🏷️ lg-1 badge (tb-1 text picture = fallback)
+  if(sp.squash) layLogo(g, V, pic, -sp.Lh * 0.55, 0, Math.min(sp.Wh * 1.1, sp.Lh * 0.8));   // 🧱 on the back of the room floor
+  else if(sp.kind === 'puck') layLogo(g, V, pic, 0, 0, sp.Wh * 0.9);   // 🏒 centre ice
+  else [-1, 1].forEach(sd => layLogo(g, V, pic, sd * sp.Lh * (sp.table ? 0.5 : 0.48), 0, Math.min(sp.Wh * (sp.table ? 1.1 : 0.95), sp.Lh * 0.62)));   // one on each half (🏷️ lg-1 square badge)
   g.restore();
 }
 function courtPts(V, x0, y0, x1, y1, z){ return [V.P(x0, y0, z), V.P(x1, y0, z), V.P(x1, y1, z), V.P(x0, y1, z)]; }
@@ -2810,7 +3009,7 @@ function saveText(res, cleared){
   const h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New high score!' : cleared ? (res.best && res.best.score ? 'Best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Saved') : '✅ Feats saved — win to unlock the next level';
   return featText(res.feats, h);
 }
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+function showResult(html){ $('result-card').innerHTML = html; slaResultBadge(); $('result').classList.remove('hidden'); }   // 🏷️ lg-1 badge on top
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pickOne(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
