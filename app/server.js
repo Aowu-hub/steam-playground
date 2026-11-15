@@ -433,13 +433,15 @@ function saveSetting(key, value) {
   // While a CHOICE (avatar, look, room…) from an offline device is replayed, a value set LATER on another device is kept (newest wins).
   const stamp = new Date(), newest = typeof OFFLINE_NEWEST_ !== 'undefined' && OFFLINE_NEWEST_;
   if (values.length && values[0][0] === 'Key' && !values[0][2]) sh.getRange(1, 3).setValue('Updated');
-  for (let i = 1; i < values.length; i++) {
-    if (values[i][0] === key) {
-      const prev = values[i][2] && typeof values[i][2].getTime === 'function' ? values[i][2].getTime() : 0;
-      if (newest && prev > stamp.getTime()) return { ok: true, kept: 'newer' };
-      sh.getRange(i + 1, 2, 1, 2).setValues([[value, stamp]]);
-      return { ok: true };
-    }
+  // 🎴 gr-2: EVERY row with this key gets the value. Two rows for one key (two first saves at the same moment) used to make
+  // reads (getSettings = last row) and writes (= first row) use different rows → the setting "never saved again".
+  const rows = [];
+  for (let i = 1; i < values.length; i++) if (values[i][0] === key) rows.push(i);
+  if (rows.length) {
+    const prev = Math.max.apply(null, rows.map(i => values[i][2] && typeof values[i][2].getTime === 'function' ? values[i][2].getTime() : 0));
+    if (newest && prev > stamp.getTime()) return { ok: true, kept: 'newer' };
+    rows.forEach(i => sh.getRange(i + 1, 2, 1, 2).setValues([[value, stamp]]));
+    return { ok: true };
   }
   sh.appendRow([key, value, stamp]);
   return { ok: true };
@@ -4772,7 +4774,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23) END OF Code.gs
 ;
 /* ===== PosePartyCode.gs ===== */
 // PosePartyCode.gs — 📷 Pose Party server (plan 11j S2). Separate file so it doesn't clash with other chats in Code.gs.
