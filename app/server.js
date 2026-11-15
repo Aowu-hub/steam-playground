@@ -740,7 +740,7 @@ const MODES_ = [
   { game: 'number-board', id: 'together', icon: '👨‍👩‍👧', name: 'Algebros Play together', pitch: 'Number battle with your family!', route: 'numberboard', tried: { feat: [['number-board', 'togetherGames']] } },
   { game: 'math-quest', id: 'minute', icon: '⏱️', name: 'Minute Challenge', pitch: '60 seconds — how many sums?', route: 'mathquest', tried: { feat: [['math-quest', 'sprintRounds'], ['math-quest', 'sprintBest']] } },
   { game: 'double-up', id: 'challenge', icon: '🏔️', name: 'Double Up Challenge', pitch: 'Tiny 3×3 board — reach 1024!', route: 'doubleup', tried: { feat: [['double-up', 'chTile']] } },
-  { game: 'memory', id: 'friends', icon: '👥', name: 'Memory with friends', pitch: 'Take turns — most pairs wins!', route: 'memory', tried: { feat: [['memory', 'wins']] } },
+  { game: 'memory', id: 'friends', icon: '👥', name: 'Memories with friends', pitch: 'Take turns — most pairs wins!', route: 'memory', tried: { feat: [['memory', 'wins']] } },
   { game: 'chess', id: 'duo', icon: '👫', name: 'Chess for 2', pitch: 'Play chess with a friend!', route: 'chess', tried: null },
   { game: 'checkers', id: 'duo', icon: '👫', name: 'Checkers for 2', pitch: 'Play checkers with a friend!', route: 'checkers', tried: null },
   { game: 'pose-party', id: 'classic', icon: '🎯', name: 'Classic', pitch: 'Copy each pose — 3, 2, 1, snap!', route: 'poseparty', tried: { board: 'pose-party' } },
@@ -1062,8 +1062,8 @@ const BUILT_IN_GAMES = [
     Status: 'Live', PageRoute: 'hopper', Icon: '🐸', Description: 'Hop your avatar across roads, rivers and rails in 6 wild worlds' },
   { GameID: 'turbo', GameName: 'Turbo Trail', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Timing / Reflexes',
     Status: 'Live', PageRoute: 'turbo', Icon: '🏎️', Description: 'Race to the finish before the clock runs out — jumps, drifts, rivals and wild worlds' },
-  { GameID: 'memory', GameName: 'Memory Match', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Memory / Focus',
-    Status: 'Live', PageRoute: 'memory', Icon: '🃏', Description: 'Flip the cards and find the pairs — 4×4 to 8×8, on your own or with up to 4 players' },
+  { GameID: 'memory', GameName: 'Memories Match', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Memory / Focus',
+    Status: 'Live', PageRoute: 'memory', Icon: '🃏', Description: 'Flip the cards and find the pairs — pick a map (4×4 to 10×10) and a level (peeks, look-alikes, swaps, 💀 scramble), on your own or with up to 4 players' },
   { GameID: 'math-quest', GameName: 'Math Quest', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Math / Numbers',
     Status: 'Live', PageRoute: 'mathquest', Icon: '🧮', Description: 'Add, take away, times and share in 5 worlds — pictures for little ones, big numbers for big kids' },
   { GameID: 'double-up', GameName: 'Double Up', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Math / Strategy',
@@ -1106,7 +1106,7 @@ const BUILT_IN_GAMES = [
     Status: 'Live', PageRoute: 'workshop', Icon: '🔨', Description: 'Build your own beds, chairs, lamps and more — use them in My Room, give them, and win the Design Show' },
 ];
 // Built-in games that got a new name: an old sheet row still showing the OLD name is renamed once (a name Aowu typed himself is left alone).
-const RENAMED_GAMES_ = { 'number-board': ['Number Puzzle Board', 'Algebros'], 'word-board': ['Word Puzzle Board', 'Lettercraft'], 'number-grid': ['Number Grid', 'Digitinct'] };
+const RENAMED_GAMES_ = { 'memory': ['Memory Match', 'Memories Match'], 'number-board': ['Number Puzzle Board', 'Algebros'], 'word-board': ['Word Puzzle Board', 'Lettercraft'], 'number-grid': ['Number Grid', 'Digitinct'] };
 function ensureBuiltInGames_() {
   const sh = ss_().getSheetByName('Games');
   if (!sh || sh.getLastRow() === 0) return;
@@ -2864,9 +2864,9 @@ const TITLE_DEFS = [
   { id: 'tt_drift', name: 'Drift King', icon: '🌀', hint: 'Drift for 60 seconds in Turbo Trail', rule: f => featVal_(f, 'turbo', 'drift') >= 60 },
   { id: 'tt_rocket', name: 'Ramp Rocket', icon: '🦘', hint: 'Jump 30 times in Turbo Trail', rule: f => featVal_(f, 'turbo', 'jumps') >= 30 },
   { id: 'tt_champ', name: 'Turbo Champion', icon: '🏆', hint: 'Win the Extreme Turbo Trail race', rule: (f, x) => x.cleared.turbo >= 5 },
-  { id: 'mm_elephant', name: 'Elephant Memory', icon: '🐘', hint: 'Finish 5 Memory Match boards with no misses', rule: f => featVal_(f, 'memory', 'perfect') >= 5 },
-  { id: 'mm_streak', name: 'Streak Star', icon: '🔥', hint: 'Match 8 pairs in a row in Memory Match', rule: f => featVal_(f, 'memory', 'bestStreak') >= 8 },
-  { id: 'mm_master', name: 'Memory Master', icon: '🧠', hint: 'Finish Memory Match Extreme', rule: (f, x) => x.cleared.memory >= 5 },
+  { id: 'mm_elephant', name: 'Elephant Memory', icon: '🐘', hint: 'Finish 5 Memories Match boards with no misses', rule: f => featVal_(f, 'memory', 'perfect') >= 5 },
+  { id: 'mm_streak', name: 'Streak Star', icon: '🔥', hint: 'Match 8 pairs in a row in Memories Match', rule: f => featVal_(f, 'memory', 'bestStreak') >= 8 },
+  { id: 'mm_master', name: 'Memory Master', icon: '🧠', hint: 'Finish Memories Match Extreme', rule: (f, x) => x.cleared.memory >= 5 },
   { id: 'ws_master', name: 'Master Builder', icon: '🔨', hint: 'Build 10 things in the Furniture Workshop', rule: f => featVal_(f, 'workshop', 'made') >= 10 },
   { id: 'ws_fav', name: 'Crowd Favourite', icon: '🌟', hint: 'Get 8 stars on one thing in the Design Show', rule: f => featVal_(f, 'workshop', 'topStars') >= 8 },
   { id: 'ws_judge', name: 'Fair Judge', icon: '🗳️', hint: 'Vote for 15 things in the Design Show', rule: f => featVal_(f, 'workshop', 'votes') >= 15 },
@@ -3218,7 +3218,7 @@ const ITEM_LINES = [
   { id: 'hero', name: 'Super hero', icon: '🦸', slot: 'costume', game: 'pinball', steps: ['Hero mask', 'Hero cape', 'Power gloves & boots', 'Super suit', 'Hover hero', 'Legend aura'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('pinball', n, 'Pinball')).concat([W_.score('pinball', 100000, 'Pinball')]) },
   { id: 'frog', name: 'Frog', icon: '🐸', slot: 'costume', game: 'hopper', steps: ['Frog cap', 'Frog hood', 'Frog suit', 'Tree frog', 'Frog prince'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('hopper', n, 'Dodgy Hopper')) },
   { id: 'racer', name: 'Racer', icon: '🏁', slot: 'costume', game: 'turbo', steps: ['Racing cap', 'Racing gloves', 'Racing helmet', 'Racing suit', 'Turbo champion'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('turbo', n, 'Turbo Trail')) },
-  { id: 'cards', name: 'Magic cards', icon: '🃏', slot: 'hand', game: 'memory', steps: ['One card', 'Card pair', 'Card fan', 'Magic deck', 'Golden deck'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('memory', n, 'Memory Match')) },
+  { id: 'cards', name: 'Magic cards', icon: '🃏', slot: 'hand', game: 'memory', steps: ['One card', 'Card pair', 'Card fan', 'Magic deck', 'Golden deck'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('memory', n, 'Memories Match')) },
   // ⚛️ Sciencetory atom looks (looks only — the element colour always stays; AtomSkins.html draws them; picked per player sp_atomskin:<Name>; Classic is free) · sc-2b
   { id: 'atomskin', name: 'Atom looks', icon: '⚛️', slot: 'atomskin', game: 'sciencetory', soon: 'Used on every atom in 🔬 Sciencetory ⚗️ Chemistry + ⚛️ Quantum — pick it on their lab screens', steps: ['Bubble', 'Jelly', 'Cartoon', 'Glow', 'Crystal', 'Planet', 'Electron cloud', 'Pixel', 'Galaxy'],
     ways: [W_.feat('sciencetory', 'elements', 2, 'Collect your first 2 element cards'), W_.feat('sciencetory', 'chemRounds', 1, 'Play a ⚗️ Chemistry round'), W_.feat('sciencetory', 'atoms', 3, 'Build 3 atoms in ⚛️ Quantum'),
@@ -3354,7 +3354,7 @@ const RIDE_ONS = [
     about: 'Half eagle, half lion! An eagle\'s head and wings with a strong lion\'s body. In old stories griffins guard gold and treasure.' },
   { id: 'sphinx', name: 'Sphinx', icon: '🗿', miles: 460, beast: true, quest: { how: 'pass Digitinct Hard', r: x => (x.cleared['number-grid'] || 0) >= 4 },
     about: 'A wise lion from old Egypt wearing a striped royal headdress. It loves riddles — answer right and it lets you pass!' },
-  { id: 'ninetails', name: 'Nine-tailed Fox', icon: '🦊', miles: 520, beast: true, quest: { how: 'pass Memory Match Extreme', r: x => (x.cleared['memory'] || 0) >= 5 },
+  { id: 'ninetails', name: 'Nine-tailed Fox', icon: '🦊', miles: 520, beast: true, quest: { how: 'pass Memories Match Extreme', r: x => (x.cleared['memory'] || 0) >= 5 },
     about: 'A magic fox from Chinese, Japanese and Korean stories. It grows a new tail every hundred years, so nine tails means very old and very wise.' },
   { id: 'qilin', name: 'Qilin', icon: '🦌', miles: 590, beast: true, quest: { how: 'find 7 daily treasures', r: x => (x.dailies || 0) >= 7 },
     about: 'A gentle Chinese lucky beast with a deer\'s body, dragon scales and one golden horn. It walks so softly the grass doesn\'t bend, and it brings good luck.' },
@@ -3910,7 +3910,7 @@ const DAILY_GOALS = [
   { id: 'hopper', icon: '🐸', how: 'Score 800 in one Dodgy Hopper game today', r: d => d.rows.some(r => r.game === 'hopper' && r.score >= 800) },
   { id: 'turbo', icon: '🏎️', how: 'Finish a Turbo Trail race today', r: d => d.rows.some(r => r.game === 'turbo' && r.stars > 0) },
   { id: 'math', icon: '🧮', how: 'Pass a Math Quest level today', r: d => d.rows.some(r => r.game === 'math-quest' && r.stars > 0) },
-  { id: 'memory', icon: '🃏', how: 'Finish a Memory Match board today', r: d => d.rows.some(r => r.game === 'memory' && r.stars > 0) },
+  { id: 'memory', icon: '🃏', how: 'Finish a Memories Match board today', r: d => d.rows.some(r => r.game === 'memory' && r.stars > 0) },
   { id: 'build', icon: '🔨', how: 'Build something in the Furniture Workshop today', r: d => (d.room.built || 0) >= 1 },
   { id: 'board', icon: '♟️', how: 'Beat the bot in Checkers or Chess today', r: d => d.rows.some(r => r.game === 'checkers' || r.game === 'chess') },
   { id: 'brawl', icon: '🥊', how: 'Win 2 brawls in Brawl Buddies today', r: d => d.rows.filter(r => r.game === 'brawl-buddies' && r.stars > 0).length >= 2 },
@@ -4775,7 +4775,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1) END OF Code.gs
 ;
 /* ===== PosePartyCode.gs ===== */
 // PosePartyCode.gs — 📷 Pose Party server (plan 11j S2). Separate file so it doesn't clash with other chats in Code.gs.
