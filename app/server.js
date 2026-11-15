@@ -742,6 +742,8 @@ const MODES_ = [
   { game: 'word-board', id: 'together', icon: '👨‍👩‍👧', name: 'Lettercraft Play together', pitch: 'Word battle with your family!', route: 'wordboard', tried: { feat: [['word-board', 'togetherGames']] } },
   { game: 'number-board', id: 'together', icon: '👨‍👩‍👧', name: 'Algebros Play together', pitch: 'Number battle with your family!', route: 'numberboard', tried: { feat: [['number-board', 'togetherGames']] } },
   { game: 'math-quest', id: 'minute', icon: '⏱️', name: 'Minute Challenge', pitch: '60 seconds — how many sums?', route: 'mathquest', tried: { feat: [['math-quest', 'sprintRounds'], ['math-quest', 'sprintBest']] } },
+  { game: 'math-quest', id: 'worden', icon: '🔤', name: 'Math Quest Word Sums', pitch: 'The sum is written in words!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':worden', feat: [['math-quest', 'wordRight']] } },   // ➗ mq-w1
+  { game: 'math-quest', id: 'wordth', icon: '🐘', name: 'Math Quest เลขคำไทย', pitch: 'Sums in Thai words — อ่านเป็นคำ!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':wordth', feat: [['math-quest', 'thaiRight']] } },   // ➗ mq-w1
   { game: 'double-up', id: 'challenge', icon: '🏔️', name: 'Double Up Challenge', pitch: 'Tiny 3×3 board — reach 1024!', route: 'doubleup', tried: { feat: [['double-up', 'chTile']] } },
   { game: 'memory', id: 'friends', icon: '👥', name: 'Memories with friends', pitch: 'Take turns — most pairs wins!', route: 'memory', tried: { feat: [['memory', 'wins']] } },
   { game: 'chess', id: 'duo', icon: '👫', name: 'Chess for 2', pitch: 'Play chess with a friend!', route: 'chess', tried: null },
@@ -760,6 +762,7 @@ const MODES_ = [
 const MODES_NEW_DAYS_ = 7;
 // 🗂️ mg-1 Mode groups — the same boxes (and order) as each game's start page. A mode not listed here has no group (2-mode games stay flat).
 const MODE_GROUPS_ = {
+  'math-quest': [{k: 'numbers', icon: '🔢', en: 'Numbers', th: 'ตัวเลข', modes: ['classic', 'minute', 'sign', 'fix', 'clock']}, {k: 'english', icon: '🔤', en: 'English', th: 'ภาษาอังกฤษ', modes: ['worden', 'storyen', 'tricken', 'listenen']}, {k: 'thai', icon: '🐘', en: 'Thai', th: 'ภาษาไทย', modes: ['wordth', 'storyth', 'trickth', 'listenth']}],   // ➗ mq-w1
   'sciencetory': [{k: 'matter', icon: '⚗️', en: 'Matter', th: 'สสาร', modes: ['chem', 'quantum', 'particle']}, {k: 'forces', icon: '⚙️', en: 'Forces & Energy', th: 'แรงและพลังงาน', modes: ['mechanic', 'thermo', 'electro']}, {k: 'waves', icon: '🌈', en: 'Waves & Space', th: 'คลื่นและอวกาศ', modes: ['optics', 'acoustics', 'cosmic']}, {k: 'earth', icon: '🌍', en: 'Earth & Life', th: 'โลกและชีวิต', modes: ['geo', 'bio']}],   // 🔬 sc-2b (same boxes as the page)
   'pokadif': [{k: 'spot', icon: '🖼️', en: 'Spot', th: 'จับผิดภาพ', modes: ['spot', 'blink']}, {k: 'odd', icon: '🎯', en: 'Odd One Out', th: 'หาตัวที่ต่าง', modes: ['odd']}, {k: 'endless', icon: '⏱️', en: 'Arcade', th: 'อาร์เคด', modes: ['arcade']}, {k: 'stories', icon: '📖', en: 'Stories', th: 'นักสืบผจญภัย', modes: ['detective']}],   // 🔍 pk-2a + pk-2b + pk-3a
   'geoscout': [{k: 'numbers', icon: '🧮', en: 'Number play', th: 'เล่นกับตัวเลข', modes: ['scale', 'count', 'tens', 'next']}, {k: 'shapes', icon: '🔷', en: 'Shapes + parts', th: 'รูปทรง · เศษส่วน', modes: ['shape', 'frac', 'wobble']}, {k: 'friends', icon: '⚔️', en: 'With friends', th: 'เล่นกับเพื่อน', modes: ['battle']}, {k: 'story', icon: '📖', en: 'Story', th: 'เนื้อเรื่อง', modes: ['journey']}],   // 🗂️ p3a (F5)
@@ -2715,6 +2718,9 @@ const FEAT_DEFS = {
     rounds: { name: 'Rounds', icon: '🧮', kind: 'sum', hidden: true },
     sprintBest: { name: 'Minute Mixer', icon: '⏱️', kind: 'max', tiers: [10, 20, 30] },
     sprintRounds: { name: 'Minute Challenges', icon: '⏱️', kind: 'sum', hidden: true },
+    wordRight: { name: 'Word Wizard', icon: '🔤', kind: 'sum', tiers: [25, 100, 400] },   // ➗ mq-w1: right answers in 🔤 Word Sums
+    thaiRight: { name: 'Thai Number Reader', icon: '🐘', kind: 'sum', tiers: [25, 100, 400] },   // ➗ mq-w1: right answers in 🐘 เลขคำไทย
+    typedRight: { name: 'Pad Pro', icon: '⌨️', kind: 'sum', tiers: [25, 100, 400] },   // ➗ mq-w1: answers typed on the number pad
   },
   memory: {
     pairs: { name: 'Pair Finder', icon: '🃏', kind: 'sum', tiers: [50, 250, 1000] },
@@ -2894,6 +2900,9 @@ const TITLE_DEFS = [
   { id: 'mq_whiz', name: 'Number Whiz', icon: '🧮', hint: 'Get 250 Math Quest answers right', rule: f => featVal_(f, 'math-quest', 'correct') >= 250 },
   { id: 'mq_streak', name: 'Streak Master', icon: '🔥', hint: 'Answer 15 Math Quest questions in a row', rule: f => featVal_(f, 'math-quest', 'bestStreak') >= 15 },
   { id: 'mq_champ', name: 'Math Champion', icon: '🏅', hint: 'Pass Math Quest Extreme', rule: (f, x) => (x.cleared['math-quest'] || 0) >= 5 },
+  { id: 'mq_words', name: 'Word Wizard', icon: '🔤', hint: 'Get 100 Math Quest Word Sums right', rule: f => featVal_(f, 'math-quest', 'wordRight') >= 100 },   // ➗ mq-w1
+  { id: 'mq_thai', name: 'Thai Number Reader', icon: '🐘', hint: 'Get 100 Math Quest เลขคำไทย sums right', rule: f => featVal_(f, 'math-quest', 'thaiRight') >= 100 },   // ➗ mq-w1
+  { id: 'mq_typer', name: 'Pad Pro', icon: '⌨️', hint: 'Type 100 right answers on the Math Quest number pad', rule: f => featVal_(f, 'math-quest', 'typedRight') >= 100 },   // ➗ mq-w1
 ];
 function featVal_(f, g, s) { return Number(((f || {})[g] || {})[s]) || 0; }
 function featsSheet_() {
@@ -4733,6 +4742,23 @@ function savePyraLooks(name, looks) {
   return { ok: true, looks: clean };
 }
 
+// ➗ mq-w1: Math Quest picks follow the PLAYER (Aowu 2026-11-14) — ONE Settings row "MathQuest_<Name>" = {mode, ans, series, world,
+// recent: {'<mode>:<level>': [[question keys of a round] × ≤ 3]}} (🎲 the page skips those questions). The whole object each time = a choice: the newest wins.
+function saveMathPrefs(name, prefs) {
+  if (!activePlayers_(listProfilesFull()).some(p => p.Name === name)) throw new Error('Unknown player.');
+  if (!prefs || typeof prefs !== 'object' || Array.isArray(prefs)) throw new Error('Bad data.');
+  const pickOf = (v, re, d) => re.test(String(v == null ? '' : v)) ? String(v) : d;
+  const out = { mode: pickOf(prefs.mode, /^[a-z]{2,12}$/, 'classic'), ans: pickOf(prefs.ans, /^(auto|choose|type)$/, 'auto'), series: pickOf(prefs.series, /^(add|sub|mul|div|mix)$/, 'add'), world: pickOf(prefs.world, /^[a-z]{2,12}$/, 'school'), recent: {} };
+  const rec = prefs.recent && typeof prefs.recent === 'object' && !Array.isArray(prefs.recent) ? prefs.recent : {};
+  Object.keys(rec).slice(-40).forEach(k => {
+    if (!/^[a-z]{2,12}:[0-5]$/.test(k) || !Array.isArray(rec[k])) return;
+    out.recent[k] = rec[k].slice(-3).map(r => Array.isArray(r) ? r.slice(0, 30).map(x => String(x)).filter(x => /^[a-z0-9_-]{1,40}$/i.test(x)) : []);
+  });
+  let s = JSON.stringify(out);
+  while (s.length > 20000 && Object.keys(out.recent).length) { delete out.recent[Object.keys(out.recent)[0]]; s = JSON.stringify(out); }
+  saveSetting('MathQuest_' + name, s);
+  return { ok: true, prefs: out };
+}
 // 🧬 SkillKit saves (td-1, plan "TD-Stories — full plan.md" §6): ONE Settings row per player per game — "SkillTree_<game>_<Name>" =
 // {ch: chapters done (only grows), last: {<hero>: SkillKit tree.save()}, lastForms} — picks + evolve forms, never a log.
 const SKILL_TREE_GAMES_ = ['td-draprincess'];
@@ -4778,7 +4804,8 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1) END OF Code.gs
+
 ;
 /* ===== PosePartyCode.gs ===== */
 // PosePartyCode.gs — 📷 Pose Party server (plan 11j S2). Separate file so it doesn't clash with other chats in Code.gs.
@@ -6349,6 +6376,7 @@ return {"include": typeof include === 'function' ? include : undefined,
 "saveBestiaryPins": typeof saveBestiaryPins === 'function' ? saveBestiaryPins : undefined,
 "getBestiaryAll": typeof getBestiaryAll === 'function' ? getBestiaryAll : undefined,
 "savePyraLooks": typeof savePyraLooks === 'function' ? savePyraLooks : undefined,
+"saveMathPrefs": typeof saveMathPrefs === 'function' ? saveMathPrefs : undefined,
 "saveGameFile": typeof saveGameFile === 'function' ? saveGameFile : undefined,
 "getGameFiles": typeof getGameFiles === 'function' ? getGameFiles : undefined,
 "loadGameFile": typeof loadGameFile === 'function' ? loadGameFile : undefined,
