@@ -457,12 +457,25 @@ function saveSettings(obj) {
 }
 
 // ⭐ Favourite games per player (Gameroom): Settings `Fav_<Name>` = JSON list of GameIDs, in the order they were starred.
-function saveFavorites(name, ids) {
+function saveFavorites(name, ids, stamp) {
   if (!name) throw new Error('Pick a player first.');
   const live = getGames().map(g => g.GameID);
   const clean = (Array.isArray(ids) ? ids : []).map(String).filter((id, i, a) => live.indexOf(id) !== -1 && a.indexOf(id) === i).slice(0, 30);
-  saveSetting('Fav_' + name, JSON.stringify(clean));
-  return { favorites: clean };
+  // 🎴 gr-2b: a save carries {dev, at} (device id + tap time). From the SAME device an older save never overwrites a newer one
+  // (a late answer / a ✨ wd-1 resend); other devices go by arrival (their clocks can't be compared). Old callers: no stamp → saved.
+  const dev = stamp && stamp.dev ? String(stamp.dev).slice(0, 40) : '', at = stamp ? Number(stamp.at) || 0 : 0;
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(10000); } catch (e) { /* save anyway */ }
+  try {
+    if (dev && at) {
+      const s = getSettings(); let last = null;
+      try { last = JSON.parse(s['FavAt_' + name] || 'null'); } catch (e) { last = null; }
+      if (last && last.dev === dev && Number(last.at) > at) return { favorites: favoritesFor_(name, s), kept: 'newer' };
+    }
+    saveSetting('Fav_' + name, JSON.stringify(clean));
+    if (dev && at) saveSetting('FavAt_' + name, JSON.stringify({ dev: dev, at: at }));
+    return { favorites: clean };
+  } finally { try { lock.releaseLock(); } catch (e) {} }
 }
 function favoritesFor_(name, settings) { try { const v = JSON.parse((settings || getSettings())['Fav_' + name] || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
 
@@ -4804,7 +4817,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */

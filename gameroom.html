@@ -157,6 +157,12 @@
     font-size:1.2rem;line-height:1;cursor:pointer;box-shadow:0 3px 0 rgba(0,0,0,0.12);transition:transform .15s;}
   .fav:active{transform:scale(.85);} .fav.on{background:#FFE1EA;} .fav.pop{animation:favpop .45s cubic-bezier(.2,1.8,.4,1);}
   @keyframes favpop{0%{transform:scale(.5);}60%{transform:scale(1.35);}100%{transform:scale(1);}}
+  /* ❤️ gr-2b: ⏳ until the server has this heart / ⬆️ (wd-1 resends it when the line is back) */
+  .fav.wait, .card-acts .fav.wait{position:relative;}
+  .fav.wait::after{content:'⏳';position:absolute;left:-9px;top:-7px;z-index:4;width:21px;height:21px;border-radius:50%;background:#FFFDF7;border:2px solid #2A1E3A;
+    display:flex;align-items:center;justify-content:center;font-size:.62rem;line-height:1;animation:favwait 1.4s ease-in-out infinite;pointer-events:none;}
+  @keyframes favwait{0%,100%{transform:rotate(0);}40%{transform:rotate(180deg);}60%{transform:rotate(180deg);}}
+  @media (prefers-reduced-motion: reduce){ .fav.wait::after{animation:none;} }
   .game-card .title{padding-right:46px;}
   .game-card.faved{box-shadow:0 0 0 3px #FF6B8B, var(--shadow, 0 6px 0 rgba(0,0,0,0.08));}
   /* 🎴 gr-3 group header rows (span the whole grid row) */
@@ -785,6 +791,13 @@ let progress = {};
 let NEW_ORDER = [];         /* 🆕 gro-1: GameIDs newest first (server NEW_GAMES_ dates); games older than that list follow in reverse sheet order */
 let favs = [];               /* ❤️ this player's favourite GameIDs, first starred first */
 let FAV_LOCAL_AT = 0;        /* ❤️ gr-2: when this page last changed favs (a later server answer sent BEFORE that must not overwrite them) */
+let favOk = null;            /* ❤️ gr-2b: the list the SERVER has (null = no answer yet) — a failed save goes back to it */
+let favWait = 0;             /* ❤️ gr-2b: saves sent and not answered yet → ⏳ on the hearts that differ from favOk */
+let favSent = 0;             /* ❤️ gr-2b: tap time of the newest save sent */
+const FAV_DEV = (() => { try { let d = localStorage.getItem('sp_favdev'); if(!d){ d = Date.now().toString(36) + Math.random().toString(36).slice(2, 7); localStorage.setItem('sp_favdev', d); } return d; } catch(e){ return 'nodev'; } })();
+function favListOf(d){ try { const f = JSON.parse(((d && d.settings) || {})['Fav_' + CURRENT_PLAYER] || '[]'); return Array.isArray(f) ? f : []; } catch(e){ return []; } }
+function favPending(id){ return favWait > 0 && !!favOk && favs.indexOf(id) !== favOk.indexOf(id); }
+function favMarks(){ document.querySelectorAll('.fav[data-fav]').forEach(el => el.classList.toggle('wait', favPending(el.dataset.fav))); }
 let filter = 'all';          // 'all' | 'foryou' | a STEAMFocus value
 let currentPlayerAge = null;
 
@@ -839,6 +852,7 @@ function loadGameroom(){
   google.script.run
     .withSuccessHandler(d=>{
       loadChip(false);
+      if(favOk === null || !favWait) favOk = favListOf(d);   // ❤️ gr-2b: what the server has
       if(FAV_LOCAL_AT > sentAt){ d.settings = d.settings || {}; d.settings['Fav_' + CURRENT_PLAYER] = JSON.stringify(favs); }
       writeRoom(d);
       applyRoom(d);
@@ -1130,7 +1144,7 @@ function openGameroomGuide(){ UI.guide(gameroomGuide()); }
 
 // ❤️ Favourites: tap the heart — the game moves to the top for this player (saved on this device at once, then on the server).
 function favHtml(g){ if(!CURRENT_PLAYER) return ''; const on = favs.indexOf(g.GameID) >= 0;
-  return '<span class="fav' + (on ? ' on' : '') + '" role="button" tabindex="0" data-fav="' + UI.esc(g.GameID) + '" aria-pressed="' + on + '" title="' + (on ? 'Remove from my favourites' : 'Add to my favourites') + '">' + (on ? '❤️' : '🤍') + '</span>' +
+  return '<span class="fav' + (on ? ' on' : '') + (favPending(g.GameID) ? ' wait' : '') + '" role="button" tabindex="0" data-fav="' + UI.esc(g.GameID) + '" aria-pressed="' + on + '" title="' + (on ? 'Remove from my favourites' : 'Add to my favourites') + '">' + (on ? '❤️' : '🤍') + '</span>' +
     (on && favAbove(g) ? '<span class="fav-up" role="button" tabindex="0" data-up="' + UI.esc(g.GameID) + '" title="Move up" aria-label="Move ' + UI.esc(nameOf(g)) + ' up one step">⬆️</span>' : ''); }
 // ⬆️ gro-1: the favourite just above this one in the SAME section (big cards / mini games), or null
 function favAbove(g){
@@ -1149,14 +1163,28 @@ function moveFavUp(g){
   UI.toast('⬆️ ' + nameOf(g) + ' moved up');
   saveFavs();
 }
-// ❤️ gr-2: one save at a time, always the newest list (two quick taps can't land in the wrong order)
-let favSaving = false, favAgain = false;
+// ❤️ gr-2 / gr-2b: every save goes at once with this device's id + its tap time; the server keeps only the newest from this
+// device, so a late answer or a ✨ wd-1 resend of an OLD list can't win. ⏳ on the changed hearts until the server has them.
 function saveFavs(){
-  FAV_LOCAL_AT = Date.now();
-  if(favSaving){ favAgain = true; return; }
-  favSaving = true; favAgain = false;
-  const done = ok => { favSaving = false; if(favAgain) saveFavs(); else if(!ok) UI.toast('Could not save favourites — they are kept on this device', 'err'); };
-  google.script.run.withSuccessHandler(() => done(true)).withFailureHandler(() => done(false)).saveFavorites(CURRENT_PLAYER, favs.slice());
+  const at = Math.max(Date.now(), favSent + 1), list = favs.slice();
+  FAV_LOCAL_AT = favSent = at; favWait++; favMarks();
+  const after = () => { favWait = Math.max(0, favWait - 1); favMarks(); };
+  google.script.run
+    .withSuccessHandler(r => {
+      if(at === favSent || (r && r.kept)) favOk = (r && Array.isArray(r.favorites)) ? r.favorites.slice() : list;
+      after();
+    })
+    .withFailureHandler(() => {
+      if(at === favSent && favOk){   // the server said no → back to what it has
+        favs = favOk.slice();
+        const c = readRoom(); if(c){ c.settings = c.settings || {}; c.settings['Fav_' + CURRENT_PLAYER] = JSON.stringify(favs); writeRoom(c); }
+        if(filter === 'fav' && !favs.length) filter = 'all';
+        renderFilters(); render();
+      }
+      after();
+      if(at === favSent) UI.toast('❤️ Not saved — please tap again', 'err');
+    })
+    .saveFavorites(CURRENT_PLAYER, list, {dev: FAV_DEV, at: at});
 }
 function toggleFav(g){
   const id = g.GameID, at = favs.indexOf(id), add = at < 0;
@@ -1323,4 +1351,4 @@ loadGameroom();
 </script>
 </body>
 </html>
-<!-- (11m+11j+11i+11x-1+11y-1+sb-4+pp-4+ebr-3+r34+wd-1+bc-3+r35b+modes-2+gr-1+gs-2+af-1+mg-1+gro-1+sb2-2+p5+p5-2+p5-3+p5-4+p5-5+p5-6+p5-7+p5-8+lk-1b-g+lk-2c+lk-1b-g2+lk-2e+td-1+pd-1+bo-1+pk-1+gr-td1+sc-1+pk-2a+gr-lk3+sc-2a+pk-2b+pk-3a+lk-5a+sc-2b+lk-5f+sc-2d+gr-23) END OF Gameroom.html -->
+<!-- (11m+11j+11i+11x-1+11y-1+sb-4+pp-4+ebr-3+r34+wd-1+bc-3+r35b+modes-2+gr-1+gs-2+af-1+mg-1+gro-1+sb2-2+p5+p5-2+p5-3+p5-4+p5-5+p5-6+p5-7+p5-8+lk-1b-g+lk-2c+lk-1b-g2+lk-2e+td-1+pd-1+bo-1+pk-1+gr-td1+sc-1+pk-2a+gr-lk3+sc-2a+pk-2b+pk-3a+lk-5a+sc-2b+lk-5f+sc-2d+gr-23+gr-2b) END OF Gameroom.html -->
