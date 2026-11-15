@@ -414,17 +414,24 @@ var PK = (function () {
     count:  { icon: '🔢', name: 'Count', tip: 'more or fewer spots, petals or dots' },
     equation: { icon: '🧮', name: 'Odd equation', tip: 'a sum on a sign that changed' },
     word:   { icon: '🔤', name: 'Odd word', tip: 'a word on a sign that changed' },
-    pattern: { icon: '🌀', name: 'Pattern break', tip: 'a bead that breaks its pattern' }
+    pattern: { icon: '🌀', name: 'Pattern break', tip: 'a bead that breaks its pattern' },
+    // pk-5a 🔍 SUBTLE changes (Aowu 2026-11-15: "a line, a similar but different tone colour") — from ⚡ Hard
+    tone:   { icon: '🌗', name: 'Shade', tip: 'the same colour, a bit lighter or darker' },
+    line:   { icon: '✏️', name: 'Line', tip: 'a thin line added or gone' },
+    dot:    { icon: '🔘', name: 'Little dot', tip: 'a little dot added or gone' },
+    tilt:   { icon: '↪️', name: 'Tilt', tip: 'something tilted a little' },
+    stretch: { icon: '↔️', name: 'Stretch', tip: 'something a little wider or thinner' }
   };
+  var SUBTLE = ['tone', 'line', 'dot', 'tilt', 'stretch'];
   // levels (plan §8): n = differences in a picture · items · r = item size · mag = how big a change is (1 = huge, smaller = subtler)
   // hints = 🔍 magnifier per picture · glow = soft glow on a missed difference after s seconds (0 = never) · lives = oops allowed (0 = no limit)
   var LEVELS = [
     { name: 'Basic',        n: 3, items: 8,  r: 31, mag: 1.0,  types: ['colour', 'gone'], hints: 3, glow: 10, pics: 3, lives: 0, guide: true },
     { name: 'Junior',       n: 4, items: 10, r: 28, mag: 0.85, types: ['colour', 'gone', 'size', 'shape'], hints: 2, glow: 20, pics: 3, lives: 0 },
     { name: 'Intermediate', n: 5, items: 12, r: 26, mag: 0.7,  types: TYPES6, hints: 2, glow: 0, pics: 3, lives: 0 },
-    { name: 'Hard',         n: 6, items: 14, r: 24, mag: 0.6,  types: TYPES6.concat(['equation', 'word']), hints: 1, glow: 0, pics: 3, lives: 0 },
-    { name: 'Extreme',      n: 7, items: 16, r: 22, mag: 0.5,  types: TYPES, hints: 1, glow: 0, pics: 3, lives: 0 },
-    { name: 'Hardcore',     n: 7, items: 18, r: 21, mag: 0.4,  types: TYPES, hints: 0, glow: 0, pics: 3, lives: 3, hardcore: true, decoys: true }
+    { name: 'Hard',         n: 6, items: 14, r: 24, mag: 0.6,  types: TYPES6.concat(['equation', 'word']), sub: ['tone', 'line', 'dot', 'tilt'], subtle: 0.5, detail: 0.35, tonal: 0, hints: 1, glow: 0, pics: 3, lives: 0 },
+    { name: 'Extreme',      n: 7, items: 16, r: 22, mag: 0.5,  types: TYPES, sub: SUBTLE.concat(['pattern']), subtle: 0.75, detail: 0.5, tonal: 0.5, hints: 1, glow: 0, pics: 3, lives: 0 },
+    { name: 'Hardcore',     n: 7, items: 18, r: 21, mag: 0.4,  types: TYPES, sub: SUBTLE.concat(['equation', 'word', 'pattern']), subtle: 1, detail: 0.6, tonal: 1, hints: 0, glow: 0, pics: 3, lives: 3, hardcore: true, decoys: true }
   ];
 
   // ---------- signs: sums + words (pk-2a) ----------
@@ -449,6 +456,14 @@ var PK = (function () {
   function shuffle(R, a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(R() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   function hexRgb(h) { var n = parseInt(h.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; }
   function colDist(a, b) { var x = hexRgb(a), y = hexRgb(b); return Math.sqrt(Math.pow(x[0] - y[0], 2) * 0.3 + Math.pow(x[1] - y[1], 2) * 0.59 + Math.pow(x[2] - y[2], 2) * 0.11) * 1.7; }
+  // 🌗 pk-5a: the same colour a bit lighter / darker — at least `need` (sum of R+G+B steps) apart so it still shows
+  function rgbHex(c) { return '#' + c.map(function (v) { v = Math.max(0, Math.min(255, Math.round(v))); return (v < 16 ? '0' : '') + v.toString(16); }).join(''); }
+  function rgbSum(a, b) { var x = hexRgb(a), y = hexRgb(b); return Math.abs(x[0] - y[0]) + Math.abs(x[1] - y[1]) + Math.abs(x[2] - y[2]); }
+  function toneShift(c, need, dir) {
+    var x = hexRgb(c), lum = (x[0] * 0.3 + x[1] * 0.59 + x[2] * 0.11) / 255, to = dir ? (dir > 0 ? 255 : 0) : (lum > 0.55 ? 0 : 255);
+    for (var t = 0.06; t <= 0.7; t += 0.02) { var y = rgbHex(x.map(function (v) { return v + (to - v) * t; })); if (rgbSum(c, y) >= need) return y; }
+    return null;
+  }
   function dist(a, b) { return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y)); }
   function clone(it) { var o = {}; for (var k in it) o[k] = it[k]; return o; }
   function hash(str) { var h = 2166136261 >>> 0; for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h; }
@@ -485,6 +500,7 @@ var PK = (function () {
     var b = clone(a), d = { t: type, idA: a.id, idB: a.id, x: a.x, y: a.y, r: radiusOf(a) };
     var mag = L.mag, K = KINDS[a.k];
     if (type === 'colour') {
+      if (a.k === 'beads') return null;
       var need = 110 + 110 * mag, opts = shuffle(R, PAL).filter(function (c) { return c !== a.c && colDist(c, a.c) >= need; });
       if (!opts.length) opts = shuffle(R, PAL).filter(function (c) { return colDist(c, a.c) >= 100; });
       if (!opts.length) return null;
@@ -527,8 +543,29 @@ var PK = (function () {
       if (a.k !== 'beads') return null;
       var bi = 2 + Math.floor(R() * 4), cur = a.pat[bi], alt = PAL.filter(function (c) { return c !== cur && colDist(c, cur) >= 110 && a.pat.indexOf(c) < 0; });
       if (!alt.length) return null; b.pat = a.pat.slice(); b.pat[bi] = pick(R, alt); d.sub = 'pattern';
+    } else if (type === 'tone') {   // 🌗 same colour, a bit lighter or darker (sum of R+G+B steps 108 → 92 by level)
+      if (!toneOk(a.k)) return null;
+      var tn = toneShift(a.c, Math.round(60 + 80 * mag), R() < 0.5 ? 1 : -1) || toneShift(a.c, Math.round(60 + 80 * mag));
+      if (!tn || tn === a.c) return null; b.c = tn; d.sub = 'tone';
+    } else if (type === 'line') {   // ✏️ a thin line across the piece, added or gone
+      if (!lineOk(a.k) || radiusOf(a) < 22 || a.dt) return null;   // stripes OR dots on a piece, never both (a dot would hide the line)
+      if (a.ln && R() < 0.5) b.ln = a.ln - 1; else if ((a.ln || 0) < 3) b.ln = (a.ln || 0) + 1; else b.ln = a.ln - 1;
+      if (b.la == null) b.la = 0;   // (never touch picture A)
+      d.sub = b.ln > (a.ln || 0) ? 'line+' : 'line-';
+    } else if (type === 'dot') {   // 🔘 a little dot on the piece, added or gone
+      if (!detailOk(a.k) || a.k === 'dice' || a.k === 'ladybug' || a.ln) return null;
+      if (a.dt && R() < 0.5) b.dt = a.dt - 1; else if ((a.dt || 0) < 3) b.dt = (a.dt || 0) + 1; else b.dt = a.dt - 1;
+      d.sub = b.dt > (a.dt || 0) ? 'dot+' : 'dot-';
+    } else if (type === 'tilt') {   // ↪️ turned a little (not a flip): 24° → 20° by level
+      if (!tiltOk(a.k)) return null;
+      var deg = Math.round(14 + 16 * mag); b.rot = ((a.rot || 0) + (R() < 0.5 ? deg : -deg) + 360) % 360; d.sub = 'tilt'; d.r = radiusOf(a) * reach(a.k) * Math.max(1, a.sx || 1);
+    } else if (type === 'stretch') {   // ↔️ a little wider or thinner
+      if (!detailOk(a.k) || a.k === 'circle') return null;
+      var f = 1 + 0.12 + 0.16 * mag, wide = R() < 0.5, sx0 = a.sx || 1;
+      if (wide && radiusOf(a) * f > freeRoom(a, sc.A.concat(B), deco)) wide = false;
+      b.sx = Math.round(sx0 * (wide ? f : 1 / f) * 100) / 100; d.sub = wide ? 'wider' : 'thinner'; d.r = radiusOf(a) * Math.max(1, b.sx, sx0) * (reach(a.k) > 1.1 ? 1.12 : 1);
     } else if (type === 'count') {
-      if (!K.n || radiusOf(a) < 24) return null;
+      if (!K.n || radiusOf(a) < 24 || a.ln || a.dt) return null;   // pk-5a: no stripes / dots over the spots you count
       var step = mag >= 0.7 ? 2 : 1, n2 = a.n + (R() < 0.5 ? step : -step);
       if (n2 < K.n[0] || n2 > K.n[1]) n2 = a.n + (n2 < K.n[0] ? step : -step);
       if (n2 < K.n[0] || n2 > K.n[1] || n2 === a.n) return null;
@@ -551,8 +588,17 @@ var PK = (function () {
     for (var i = 0; i < t1.length; i++) if (t1[i] !== t2[i]) { var pr = [t1[i], t2[i]].sort().join(''); if (LOOK_ALIKE.indexOf(pr) < 0) return false; any = true; }
     return any;
   }
+  function detailOk(k) { return k !== 'sign' && k !== 'beads'; }
+  function lineOk(k) { return detailOk(k) && k !== 'leaf' && k !== 'rocket' && k !== 'boat' && k !== 'crystal'; }   // thin pieces: a stripe would hardly show
+  function toneOk(k) { return k !== 'beads' && k !== 'cloud'; }   // a cloud is always white (its colour is only a tint)
+  // how far a piece reaches when it turns (square corners stick out ≈ 1.42 × its radius)
+  function reach(k) { return ['square', 'house', 'dice', 'sign', 'diamond', 'gift', 'box'].indexOf(k) >= 0 ? 1.45 : ['star', 'hexagon', 'triangle', 'crystal', 'gear', 'heart'].indexOf(k) >= 0 ? 1.2 : 1.15; }
+  function tiltOk(k) { return detailOk(k) && k !== 'circle' && k !== 'planet'; }
   function fits(type, k) { var K = KINDS[k]; if (type === 'equation' || type === 'word') return k === 'sign'; if (type === 'pattern') return k === 'beads';
-    if (k === 'sign' || k === 'beads') return type === 'colour' || type === 'gone';
+    if (type === 'tone') return toneOk(k); if (type === 'line') return lineOk(k); if (type === 'stretch') return detailOk(k) && k !== 'circle';
+    if (type === 'dot') return detailOk(k) && k !== 'dice' && k !== 'ladybug'; if (type === 'tilt') return tiltOk(k);
+    if (k === 'beads') return type === 'gone';   // pk-5a: beads take their colours from the pattern, not from c
+    if (k === 'sign') return type === 'colour' || type === 'gone';
     if (type === 'turn') return !!(K.h || K.r); if (type === 'count') return !!K.n; return true; }
 
   // ---------- a whole scene ----------
@@ -571,11 +617,18 @@ var PK = (function () {
       }
       // 🧸 decoys (💀 Hardcore): fewer kinds + fewer colours, so look-alike things sit side by side
       var kinds = L.decoys ? shuffle(R, sc.kinds).slice(0, 4) : sc.kinds, cols = L.decoys ? shuffle(R, PAL).slice(0, 4) : null, used = {};
+      // 🌗 pk-5a: 🌋 / 💀 use families of close shades, so a shade change hides among look-alike colours
+      if (L.tonal && R() < L.tonal) { var base = shuffle(R, PAL).slice(0, L.decoys ? 2 : 3); cols = [];
+        base.forEach(function (c) { cols.push(c); [1, -1].forEach(function (dd) { var t = toneShift(c, 100, dd); if (t) cols.push(t); }); }); }
       // the difference types this picture will show (each type once before any repeats)
       var types = [], pool = opt.force ? [opt.force] : L.types;
       var n = opt.n || L.n;
-      while (types.length < n) types = types.concat(shuffle(R, pool));
-      types = types.slice(0, n);
+      // pk-5a: ⚡ half · 🌋 three quarters · 💀 all of the changes are SUBTLE ones (shade, line, dot, tilt, stretch …)
+      var nSub = opt.force ? 0 : Math.round(n * (L.subtle || 0)), subs = [];
+      while (subs.length < nSub) subs = subs.concat(shuffle(R, L.sub));
+      while (types.length < n - nSub) types = types.concat(shuffle(R, pool));
+      types = shuffle(R, types.slice(0, n - nSub).concat(subs.slice(0, nSub)));
+      if (!opt.force && nSub) pool = L.sub.concat(nSub < n ? L.types : []);
       // the items: the first n are the ones that will change → each gets a kind that can show its type
       var count = Math.max(L.items, n + 3);
       for (var j = 0; j < count; j++) {
@@ -592,6 +645,8 @@ var PK = (function () {
         used[c] = (used[c] || 0) + 1;
         var it = { id: 'i' + j, k: k, x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, r: Math.round(r * 10) / 10, c: c, rot: 0, fl: R() < 0.5 ? 1 : -1, n: countOf(R, k) };
         if (KINDS[k].r && R() < 0.3) it.rot = 90;
+        // ✏️🔘 pk-5a: from ⚡ Hard many pieces already wear stripes + dots (so adding / removing one is a real search)
+        if (L.detail && detailOk(k) && ty !== 'count' && !KINDS[k].n) { if (R() < L.detail) { it.ln = 1 + Math.floor(R() * 2); it.la = pick(R, [0, 0, 45, 90, -45]); } if (!it.ln && k !== 'dice' && k !== 'ladybug' && R() < L.detail * 0.7) it.dt = 1 + Math.floor(R() * 2); if (tiltOk(k) && R() < L.detail * 0.5) it.rot = pick(R, [-15, 15, -30, 30]); }
         if (k === 'sign') { it.fl = 1; if (ty === 'word') { var ws = pick(R, WORD_SETS); it.txt = pick(R, ws); it.tt = 'word'; } else { it.eq = makeSum(R, level); it.txt = sumText(it.eq); it.tt = 'eq'; } }
         if (k === 'beads') { it.fl = 1; it.pat = makePattern(R, level, 6).seq; }
         sc.A.push(it);
@@ -1102,7 +1157,7 @@ var PK = (function () {
   function rankOf(cleared) { var r = RANKS[0]; RANKS.forEach(function (x) { if (cleared >= x.at) r = x; }); return r; }
   function nextRank(cleared) { for (var i = 0; i < RANKS.length; i++) if (RANKS[i].at > cleared) return RANKS[i]; return null; }
 
-  return { W: W, H: H, GROUND: GROUND, MIN_HIT: MIN_HIT, KINDS: KINDS, SHAPES: SHAPES, THEMES: THEMES, THEME_KEYS: THEME_KEYS, PAL: PAL, TYPES: TYPES, TYPE_INFO: TYPE_INFO,
+  return { W: W, H: H, GROUND: GROUND, MIN_HIT: MIN_HIT, KINDS: KINDS, SHAPES: SHAPES, THEMES: THEMES, THEME_KEYS: THEME_KEYS, PAL: PAL, TYPES: TYPES, TYPE_INFO: TYPE_INFO, SUBTLE: SUBTLE, toneShift: toneShift, rgbSum: rgbSum,
     LEVELS: LEVELS, RANKS: RANKS, TYPES6: TYPES6, WORD_SETS: WORD_SETS, RHYMES: RHYMES, ODD: ODD, ODD_ROUNDS: ODD_ROUNDS, makeOdd: makeOdd, oddPoints: oddPoints, makePattern: makePattern, sumText: sumText, ARCADE: ARCADE, CHECK_EVERY: CHECK_EVERY, arcadeScore: arcadeScore, arcadeStars: arcadeStars, mmss: mmss, TRIP_KEYS: TRIP_KEYS, PHOTO_ACTS: PHOTO_ACTS, PHOTO_FACES: PHOTO_FACES, SELFIE: SELFIE, photoAct: photoAct, makePhoto: makePhoto, STORY: STORY, BOOTS: BOOTS, VERBS: VERBS, CASES: CASES, caseById: caseById, makeCase: makeCase, makeWalk: makeWalk, makeDigit: makeDigit, bfs: bfs, clueMatch: clueMatch, storyPoints: storyPoints, caseBonus: caseBonus, rng: rng, newSeed: newSeed, makeScene: makeScene, signature: signature, poke: poke, pokeFound: pokeFound, radiusOf: radiusOf, hitOf: hitOf,
     colDist: colDist, picturePoints: picturePoints, starsFor: starsFor, rankOf: rankOf, nextRank: nextRank, fits: fits };
 })();
@@ -1275,10 +1330,30 @@ function pkBackground(g, sc){
   if(typeof emo === 'function') sc.deco.forEach(d => emo(g, d.ch, d.x, d.y, d.sz, 0.55));
 }
 function pkItem(g, it){
-  const K = PK.KINDS[it.k] || {s: 1}, r = it.r * K.s, P = PK_PAINT[it.k] || PK_PAINT.circle;
+  const K = PK.KINDS[it.k] || {s: 1}, r = it.r * K.s, P = PK_PAINT[it.k] || PK_PAINT.circle, sx = it.sx || 1;
   g.save(); g.translate(it.x, it.y);
-  g.fillStyle = 'rgba(0,0,0,0.16)'; g.beginPath(); g.ellipse(0, r * 0.92, r * 0.66, r * 0.14, 0, 0, 7); g.fill();
-  g.rotate((it.rot || 0) * Math.PI / 180); g.scale(it.fl || 1, 1); P(g, r, it.c, it.n, it); g.restore();
+  g.fillStyle = 'rgba(0,0,0,0.16)'; g.beginPath(); g.ellipse(0, r * 0.92, r * 0.66 * sx, r * 0.14, 0, 0, 7); g.fill();
+  g.rotate((it.rot || 0) * Math.PI / 180); g.scale((it.fl || 1) * sx, 1);
+  if(it.ln || it.dt) pkDetailed(g, it, r, P); else P(g, r, it.c, it.n, it);
+  g.restore();
+}
+// ✏️🔘 pk-5a: stripes + little dots painted ON the piece only (clipped to its own shape on a small canvas)
+let PK_OFF = null;
+function pkInk(c){ const x = PK.KINDS ? parseInt(c.slice(1), 16) : 0, lum = (((x >> 16) & 255) * 0.3 + ((x >> 8) & 255) * 0.59 + (x & 255) * 0.11) / 255; return lum > 0.5 ? '#26203F' : '#FFFFFF'; }
+function pkDetailed(g, it, r, P){
+  const m = g.getTransform(), s = Math.max(1, Math.hypot(m.a, m.b)), S = Math.ceil(r * 2.8 * s) + 4;
+  if(!PK_OFF) PK_OFF = document.createElement('canvas');
+  const oc = PK_OFF; if(oc.width < S || oc.height < S){ oc.width = Math.max(oc.width, S); oc.height = Math.max(oc.height, S); }
+  const o = oc.getContext('2d'); o.setTransform(1, 0, 0, 1, 0, 0); o.clearRect(0, 0, oc.width, oc.height); o.setTransform(s, 0, 0, s, S / 2, S / 2);   // wipe ALL of it: smoothing reads a pixel past the copied square
+  P(o, r, it.c, it.n, it);
+  o.globalCompositeOperation = 'source-atop'; const ink = pkInk(it.c);
+  if(it.ln){ o.save(); o.rotate((it.la || 0) * Math.PI / 180); o.strokeStyle = ink; o.lineWidth = Math.max(2.7, r * 0.12); o.lineCap = 'round';
+    for(let i = 0; i < it.ln; i++){ const y = (i - (it.ln - 1) / 2) * r * 0.34; o.beginPath(); o.moveTo(-r * 0.95, y); o.lineTo(r * 0.95, y); o.stroke(); } o.restore(); }
+  o.globalCompositeOperation = 'source-over';
+  // 🔘 dots: whole little stickers near the middle (not clipped — a thin piece would cut them away)
+  if(it.dt){ o.fillStyle = ink; o.strokeStyle = ink === '#FFFFFF' ? 'rgba(38,32,63,0.55)' : 'rgba(255,255,255,0.7)'; o.lineWidth = 1; const at = [[0.2, -0.16], [-0.2, 0.1], [0.06, 0.24]], dr = Math.max(4.6, r * 0.17);
+    for(let i = 0; i < it.dt; i++){ o.beginPath(); o.arc(at[i][0] * r, at[i][1] * r, dr, 0, 7); o.fill(); o.stroke(); } }
+  g.save(); g.scale(1 / s, 1 / s); g.drawImage(oc, 0, 0, S, S, -S / 2, -S / 2, S, S); g.restore();
 }
 // paint picture 'A' or 'B' of a scene; k = CSS pixels per world unit, dpr = device pixels per CSS pixel
 function pkPaint(cv, sc, side, k, dpr){
@@ -1360,7 +1435,7 @@ function makePicture(theme, opt){   // a Spot / Blink / Arcade picture: a normal
   window.PK_FAMILY = familyList(); const place = pkPick(PK.TRIP_KEYS.filter(k => k !== G.lastPlace)); G.lastPlace = place;
   return PK.makePhoto(PK.newSeed(), G.level, place, Object.assign({people: window.PK_FAMILY.length, acts: photoActs()}, opt || {}));
 }
-const FOUND_SAY = {pose: '🕺 A new pose!', face: '😉 A new face!', foot: '👣 A thief footprint!', colour: '🎨 A new colour!', missing: '➖ Something is missing!', extra: '➕ Something extra!', bigger: '📏 It got bigger!', smaller: '📏 It got smaller!',
+const FOUND_SAY = {tone: '🌗 A different shade!', 'line+': '✏️ A new line!', 'line-': '✏️ A line is gone!', 'dot+': '🔘 A new little dot!', 'dot-': '🔘 A little dot is gone!', tilt: '↪️ It tilted!', wider: '↔️ It got wider!', thinner: '↔️ It got thinner!', pose: '🕺 A new pose!', face: '😉 A new face!', foot: '👣 A thief footprint!', colour: '🎨 A new colour!', missing: '➖ Something is missing!', extra: '➕ Something extra!', bigger: '📏 It got bigger!', smaller: '📏 It got smaller!',
   shape: '🔺 A different shape!', flip: '🔄 It flipped!', turn: '🔄 It turned!', more: '🔢 There are more!', fewer: '🔢 There are fewer!'};
 const PRAISE = ['Great eyes!', 'Super sleuth!', 'You got it!', 'Sharp!', 'Nice poke!', 'Detective skills!'];
 
@@ -1498,7 +1573,7 @@ function nextPicture(){
   ['pic-a', 'pic-b'].forEach(id => { const e = $(id); e.classList.remove('in'); void e.offsetWidth; e.classList.add('in'); });
   if(G.mode === 'arcade') goal(G.pic === 0 ? (G.A.bonus ? '🏁 ' + G.rounds + ' pictures! Find ⏳+' + G.A.bonus + ' s · oops ⏱+' + G.A.oops + ' s' : '🏁 ' + G.rounds + ' pictures — go, go, go!' + (G.A.oops ? ' Oops = +' + G.A.oops + ' s' : '')) : '📸 ' + (G.pic + 1) + '/' + G.rounds + ' — find ' + nN + '!');
   else if(G.mode === 'blink') goal(G.pic === 0 && G.level === 0 ? '👁️ The picture flips A ↔ B. Poke what changes! (' + L.n + ' to find)' : '👁️ Watch it blink — find ' + L.n + ' changes!' + (G.level < 2 ? ' ' + typeTips() : ''));
-  else goal(G.pic === 0 && G.level === 0 ? '👀 Look at A and B. Poke what\'s different! (' + L.n + ' to find)' : '🔍 Find ' + L.n + ' differences!' + (G.level < 2 ? ' ' + typeTips() : ''));
+  else goal(G.pic === 0 && G.level === 0 ? '👀 Look at A and B. Poke what\'s different! (' + L.n + ' to find)' : '🔍 Find ' + L.n + ' differences!' + (G.level < 2 ? ' ' + typeTips() : G.pic === 0 && L.sub && !G.scene.photo ? ' Some are tiny: ' + L.sub.slice(0, 4).map(t => PK.TYPE_INFO[t].icon).join(' ') : ''));   // pk-5a: warn about the subtle ones
   G.busy = false;
   if(G.mode === 'blink') startBlink();
   if(L.guide && G.pic === 0) guideHand();
@@ -2340,4 +2415,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d+pk-4a+pk-4b+pk-4c+pk-4d) END OF Pokadif.html -->
+<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d+pk-4a+pk-4b+pk-4c+pk-4d+pk-5a) END OF Pokadif.html -->
