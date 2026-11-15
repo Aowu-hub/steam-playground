@@ -480,14 +480,31 @@ function placeView(){
   if((Rr - L) * sc <= w) VIEW.ox = w / 2; else VIEW.ox = clamp(w / 2 - CAM.cx * sc, w - Rr * sc, -L * sc);
   if((B - T) * sc <= h) VIEW.oy = (h - (N * THT + 36 + WALL + 8) * sc) / 2 + (WALL + 8) * sc; else VIEW.oy = clamp(h / 2 - CAM.cy * sc, h - B * sc, -T * sc);
 }
+// 🎥 ir-2b (2026-11-16): the camera is IsoKit's view (camera only — the Room still draws everything itself):
+//   drag to look around + glide · pinch / wheel zoom TOWARD the fingers / cursor · follows your avatar (again as soon as you tap to walk) ·
+//   a tap walks on LIFT, so a drag never walks by accident · ➕ ➖ 🗺️ + the saved zoom per player keep their numbers (1 = whole room … 2.8).
+//   The static picture stretches while the view moves and is re-baked when it settles. No IsoKit → the old camera below.
+let IV = null, IV_SAVED = 0;
+const FOLLOW = {get x(){ const m = me(); return m ? m.x : N / 2; }, get y(){ const m = me(); return m ? m.y : N / 2; }, get z(){ return 50 / ((window.Iso && Iso.HZ) || 16); }};
+function camIV(){
+  if(IV) return IV; if(!(window.Iso && Iso.view && Iso.paintRoom)) return null;
+  try{ IV = Iso.view(cv, isoRoomMap(), {snap: false, margin: 0, dprCap: 2, centerSmall: true}); }catch(e){ IV = null; return null; }
+  IV.onTap = (cell, px, py, e) => roomTap(px, py, e); IV.follow(FOLLOW); return IV;
+}
+function syncIV(){ VIEW.scale = IV.zoom; VIEW.ox = IV.cx - IV.cam.x * IV.zoom + IV._sx(); VIEW.oy = IV.cy - IV.cam.y * IV.zoom + IV._sy(); if(VIEW.fit > 0) CAM.zoom = IV.zoom / VIEW.fit; }
 function updateCamera(dt){
+  if(IV){ IV.tick(dt); syncIV();
+    if(IV.moving || IV._ptr.size || IV._snapTo) CAM.lastZoomAt = performance.now();   // moving → stretch the static picture, re-bake when settled
+    else if(Math.abs(CAM.zoom - IV_SAVED) > 0.004){ IV_SAVED = CAM.zoom; saveZoom(); syncZoomBtns(); }
+    return; }
   const [tx, ty] = camTarget();
   if(!CAM.ready){ CAM.cx = tx; CAM.cy = ty; CAM.ready = true; }
   const f = 1 - Math.exp(-dt * 5); CAM.cx += (tx - CAM.cx) * f; CAM.cy += (ty - CAM.cy) * f;
   placeView();
 }
 function setZoom(z, quiet){
-  const nz = clamp(z, 1, ZOOM_MAX); if(Math.abs(nz - CAM.zoom) < 0.001) return; CAM.zoom = nz; CAM.lastZoomAt = performance.now(); placeView(); saveZoom();
+  const nz = clamp(z, 1, ZOOM_MAX); if(Math.abs(nz - CAM.zoom) < 0.001) return; CAM.zoom = nz; CAM.lastZoomAt = performance.now();
+  if(IV){ IV.zoomAt(VIEW.fit * nz, IV.cx, IV.cy); IV.follow(FOLLOW); syncIV(); IV_SAVED = CAM.zoom; } else placeView(); saveZoom();
   if(!quiet) showBanner(nz <= 1.001 ? '🗺️ The whole room' : '🔍 Zoom ' + Math.round(nz * 100) + '%'); syncZoomBtns();
 }
 function zoomBy(f){ setZoom(CAM.zoom * f); UISound.play('tap'); }
@@ -495,10 +512,14 @@ function wholeRoom(){ setZoom(CAM.zoom > 1.01 ? 1 : defaultZoom() > 1 ? defaultZ
 function syncZoomBtns(){ const b = $('zoombox'); if(!b) return; b.querySelector('[data-z="in"]').disabled = CAM.zoom >= ZOOM_MAX - 0.01; b.querySelector('[data-z="out"]').disabled = CAM.zoom <= 1.001; b.querySelector('[data-z="all"]').classList.toggle('on', CAM.zoom <= 1.001); }
 function layout(){
   const st = $('stage'), cv = $('cv'), w = st.clientWidth, h = st.clientHeight;
-  VIEW.dpr = Math.min(window.devicePixelRatio || 1, 2);
-  cv.width = Math.round(w * VIEW.dpr); cv.height = Math.round(h * VIEW.dpr);
   const worldW = N * TWD + 36, worldH = N * THT + WALL + 92;   // ir-2a: room for the thick walls + the diorama slab
   VIEW.fit = Math.min(w / worldW, h / worldH); CAM.w = w; CAM.h = h;
+  if(R && camIV()){ IV.map = isoRoomMap(); IV.resize(); VIEW.dpr = IV.dpr; IV.min = VIEW.fit; IV.max = VIEW.fit * ZOOM_MAX;   // 🎥 ir-2b
+    IV.zoom = clamp(VIEW.fit * CAM.zoom, IV.min, IV.max); IV_SAVED = CAM.zoom;
+    if(!CAM.ready){ const m = me(); IV.follow(FOLLOW); IV.centerOn(m ? m.x : N / 2, m ? m.y : N / 2, FOLLOW.z); CAM.ready = true; } else IV.clampCam();
+    syncIV(); syncZoomBtns(); return; }
+  VIEW.dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = Math.round(w * VIEW.dpr); cv.height = Math.round(h * VIEW.dpr);
   placeView(); syncZoomBtns();
 }
 window.addEventListener('resize', () => { if(R) layout(); });
@@ -1117,21 +1138,27 @@ document.addEventListener('keyup', e => { keysDown.delete(e.code); if(actionFor(
 window.addEventListener('blur', () => { keysDown.clear(); cancelCharge(); });
 $('controls').addEventListener('pointerdown', e => e.stopPropagation());
 ['musicbox', 'visitbox', 'giftbox', 'mailbox', 'deco', 'zoombox'].forEach(id => $(id).addEventListener('pointerdown', e => e.stopPropagation()));
-$('stage').addEventListener('pointermove', e => { if(!DECO || !DECO.drag || PINCH.d0) return; const r = cv.getBoundingClientRect(); decoMove(e.clientX - r.left, e.clientY - r.top); });
+$('stage').addEventListener('pointermove', e => { if(!DECO || !DECO.drag || PINCH.d0 || (IV && IV._ptr.size > 1)) return; const r = cv.getBoundingClientRect(); decoMove(e.clientX - r.left, e.clientY - r.top); });
 ['pointerup', 'pointercancel'].forEach(ev => $('stage').addEventListener(ev, () => { if(DECO && DECO.drag) decoUp(); }));
 // Two fingers = pinch zoom (never a walk); mouse wheel / trackpad = zoom.
 const PINCH = {pts: new Map(), d0: 0, z0: 1};
 function pinchDist(){ const a = [...PINCH.pts.values()]; return a.length < 2 ? 0 : Math.hypot(a[0][0] - a[1][0], a[0][1] - a[1][1]); }
-$('stage').addEventListener('pointermove', e => { if(!PINCH.pts.has(e.pointerId)) return; PINCH.pts.set(e.pointerId, [e.clientX, e.clientY]); if(PINCH.pts.size >= 2 && PINCH.d0 > 0){ setZoom(PINCH.z0 * pinchDist() / PINCH.d0, true); syncZoomBtns(); } });
+$('stage').addEventListener('pointermove', e => { if(IV || !PINCH.pts.has(e.pointerId)) return; PINCH.pts.set(e.pointerId, [e.clientX, e.clientY]); if(PINCH.pts.size >= 2 && PINCH.d0 > 0){ setZoom(PINCH.z0 * pinchDist() / PINCH.d0, true); syncZoomBtns(); } });
 ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => $('stage').addEventListener(ev, e => { PINCH.pts.delete(e.pointerId); if(PINCH.pts.size < 2) PINCH.d0 = 0; }));
-$('stage').addEventListener('wheel', e => { if(!R || e.target.closest('.musicbox,.deco,.controls,.zoombox')) return; e.preventDefault(); setZoom(CAM.zoom * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0018)), true); syncZoomBtns(); }, {passive: false});
+$('stage').addEventListener('wheel', e => { if(IV || !R || e.target.closest('.musicbox,.deco,.controls,.zoombox')) return; e.preventDefault(); setZoom(CAM.zoom * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0018)), true); syncZoomBtns(); }, {passive: false});
 $('stage').addEventListener('pointerdown', e => {
   if(!R) return;
+  if(IV){ IV.pan = !DECO; if(IV._ptr.size > 1){ if(DECO && DECO.drag) decoUp(); const m0 = me(); if(m0) m0.path = []; return; }   // 🎥 ir-2b: taps arrive on lift (roomTap)
+    e.preventDefault(); Music.unlock(); hideTip(); if(DECO){ const r = cv.getBoundingClientRect(); decoDown(e.clientX - r.left, e.clientY - r.top, e); } return; }
   if(e.pointerType !== 'mouse'){ PINCH.pts.set(e.pointerId, [e.clientX, e.clientY]); if(PINCH.pts.size >= 2){ PINCH.d0 = pinchDist(); PINCH.z0 = CAM.zoom; const m0 = me(); if(m0) m0.path = []; if(DECO && DECO.drag) decoUp(); e.preventDefault(); return; } }
   e.preventDefault(); Music.unlock(); hideTip();
-  const r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, k = VIEW.scale;
-  // tapped someone? (avatars first, nearest to the front)
+  const r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
   if(DECO){ decoDown(px, py, e); return; }
+  roomTap(px, py, e);
+});
+function roomTap(px, py, e){   // a tap on the room (old camera: on finger-down · IsoKit camera: on lift)
+  if(!R || DECO) return; const k = VIEW.scale;
+  // tapped someone? (avatars first, nearest to the front)
   if(myRoomTap(px, py)) return;
   const hitPet = R.avatars.find(a => { if(!a.pet || !eqOf(fixAv(a.av), 'pet')) return false; const [sx, sy] = iso(a.pet.x, a.pet.y); return Math.hypot(px - sx, py - (sy - 10 * k * AVS)) < 15 * k * AVS; });
   if(hitPet){ tapAvatarPet(hitPet); return; }
@@ -1142,9 +1169,9 @@ $('stage').addEventListener('pointerdown', e => {
   const [gx, gy] = screenToGrid(px, py), m = me();
   if(!m || gx < 0 || gy < 0 || gx >= N || gy >= N) return;
   const path = findPath([m.x, m.y], [gx, gy]);
-  if(path){ m.path = path; m.gest = null; UISound.play('tap'); }
+  if(path){ m.path = path; m.gest = null; UISound.play('tap'); if(IV) IV.follow(FOLLOW); }   // walking → the camera follows you again
   else { UISound.play('error'); }
-});
+}
 const PET_SAYS = {'🐕': ['Woof! 🐶', '❤️'], '🐈': ['Meow 😺', '💤'], '🐒': ['Ooh ooh! 🍌', '🍌'], '🦜': ['Hello! 🦜', '🎵'], '🦥': ['…hi…', '💤'], '🐸': ['Ribbit!', '💚'], '🦋': ['✨', '🌸'], '🤖': ['Beep boop!', '⚡'], '👾': ['Blip!', '💜'], '🦄': ['Neigh! 🌈', '🌈'], '🐲': ['Rawr! 🔥', '🔥'], '🧚': ['Sparkle!', '✨'], '🦉': ['Hoot!', '🌙'], 'vacuum': ['Vroom vroom', '✨'], 'cleaner': ['Cleaning!', '🧽']};
 function petReact(p){
   const says = PET_SAYS[p.ch] || ['❤️', '❤️'];
