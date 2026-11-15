@@ -26,7 +26,7 @@
     --bg:#2A2F6B; --card:#FFFFFF; --panel:#EEF0FF; --ink:#1E2346; --ink-soft:#5E6390;
     --pink:#FF4D8D; --violet:#5B4BE0; --gold:#FFC845; --mint:#2EC4B6; --green:#4CB963; --danger:#E5484D;
     --terracotta:#5B4BE0; --mustard:#FFC845; --dusty-blue:#5E6390; /* used by UiKit */
-    --t1:#E9E6FF; --t2:#B9B2FF; --tink:#1E2346; --tbox:#F5F3FF; --tbox2:#E6E1FF; --tline:#3B3375; --tsel:#FFE48A; --tpeer:#FFF6D2;
+    --t1:#E9E6FF; --t2:#B9B2FF; --tink:#1E2346; --tbox:#F5F3FF; --tbox2:#E6E1FF; --tline:#3B3375; --tsel:#FFE48A; --tpeer:#FFF6D2; --tlock:#9D96E1;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html{height:100%;background:#F3F2FF;}
@@ -119,6 +119,16 @@
   .cell.br{border-right:3px solid var(--tline);} .cell.bb{border-bottom:3px solid var(--tline);}
   .cell.lastc{border-right:none;} .cell.lastr{border-bottom:none;}
   .cell.given{color:var(--tink);} .cell.given .v{opacity:1;}
+  /* 🔒 dg-1 LOCKED CLUES: a darker tile in the set's own colour + a raised plate + a frame + a corner notch (not colour alone) */
+  .cell.given{background:var(--tlock);color:var(--tink);box-shadow:inset 0 0 0 2px rgba(255,255,255,0.55),inset 0 -3px 0 rgba(0,0,0,0.2);}
+  .cell.given::after{content:'';position:absolute;left:0;top:0;width:calc(var(--cs) * 0.22);height:calc(var(--cs) * 0.22);background:linear-gradient(135deg,var(--tline) 50%,transparent 50%);opacity:0.75;pointer-events:none;}
+  .cell.given .v{filter:drop-shadow(0 2px 0 rgba(0,0,0,0.22));}
+  .cell.given.alt{background:var(--tlock);} .cell.given.peer{background:var(--tlock);box-shadow:inset 0 0 0 3px var(--tpeer),inset 0 -3px 0 rgba(0,0,0,0.2);}
+  .cell.given.same{background:var(--tlock);box-shadow:inset 0 0 0 4px #2EC48A;} .cell.given.sel{background:var(--tlock);box-shadow:inset 0 0 0 4px #FF9F1C;}
+  .cell.lockbump{animation:lockbump .42s ease;} @keyframes lockbump{0%,100%{transform:none;}25%{transform:rotate(-4deg) scale(0.96);}60%{transform:rotate(3deg) scale(0.98);}}
+  .lockpop{position:absolute;left:50%;top:6%;transform:translateX(-50%);font-size:calc(var(--cs) * 0.34);line-height:1;pointer-events:none;animation:lockpop .7s ease-out forwards;z-index:3;}
+  @keyframes lockpop{0%{opacity:0;transform:translate(-50%,30%) scale(0.5);}30%{opacity:1;transform:translate(-50%,-20%) scale(1.15);}100%{opacity:0;transform:translate(-50%,-90%) scale(1);}}
+  /* 🔒 /dg-1 */
   .cell.mine .v{color:#3D49D8;} .theme-pic .cell.mine .v{color:inherit;}
   .cell.peer{background:var(--tpeer);} .cell.same{background:#D7F5E6;} .cell.sel{background:var(--tsel);box-shadow:inset 0 0 0 3px #FF9F1C;z-index:2;}
   .cell.wrong{background:#FFD6D8 !important;} .cell.wrong .v{color:#E5484D !important;}
@@ -241,6 +251,7 @@
   <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the play">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-4b -->
   <details class="rules"><summary>📖 How to play</summary><ul>
     <li><b>The rule:</b> every row ↔, every column ↕ and every thick-lined box has each picture exactly <b>once</b>.</li>
+    <li><b>🔒 Clues:</b> the darker squares with a frame and a corner mark are clues — they are locked. You fill the light squares.</li>
     <li><b>Play:</b> tap an empty square, then tap a picture at the bottom. Or tap a picture first, then tap squares to paint it in. Keys: arrows + 1–9, Backspace to erase.</li>
     <li><b>🗺️ Map, then 🎚️ difficulty:</b> pick the size (4 × 4 · 5 × 5 · 6 × 6 · 9 × 9 — a bigger map gives ×1.25 · ×1.5 · ×2 points), then how hard: more or fewer clues, how mistakes show, notes and hints.</li>
     <li><b>Wrong?</b> Basic to Intermediate: it bounces back — try again. Hard and Extreme: it turns red until you fix it. Every miss costs a star.</li>
@@ -462,6 +473,7 @@ function bankPuzzle(){
 
 /* ================= MENUS ================= */
 function showScreen(name){
+  dragAbort(); /* 🐞 dg-2 */
   ['player', 'menu', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
   $('back-btn').classList.toggle('hidden', name === 'play'); window.scrollTo(0, 0);
 }
@@ -526,7 +538,7 @@ function startGame(lvl, puzzle){ setTimeout(cheerMount, 0); /* 📣 cs-4b */
     over: false, t0: performance.now(), paused: false, pausedAt: 0, pausedTotal: 0, cells: 0};
   const sp = $('scr-play');
   sp.style.setProperty('--t1', T.c[0]); sp.style.setProperty('--t2', T.c[1]); sp.style.setProperty('--tbox', T.box[0]); sp.style.setProperty('--tbox2', T.box[1]); sp.style.setProperty('--tline', T.line);
-  sp.classList.toggle('theme-pic', !!T.pic); sp.style.setProperty('--tink', '#1E2346');
+  sp.classList.toggle('theme-pic', !!T.pic); sp.style.setProperty('--tink', '#1E2346'); sp.style.setProperty('--tlock', lockColour(T));   /* 🔒 dg-1 */
   BAR.level(L.emoji + ' ' + L.name + ' · ' + T.icon, L.hardcore ? 'hc' : ''); BAR.miss(0); BAR.time(0);
   BAR.hide('miss', L.check === 'submit');
   paintVoice();
@@ -605,10 +617,16 @@ function paintPalette(){
     b.title = THEMES[G.theme].names[v - 1] + ' (' + v + ')' + (left > 0 ? ' · ' + left + ' left' : left === 0 ? ' · all placed' : '');
     b.classList.toggle('done', left <= 0 && G.L.check !== 'submit'); b.classList.toggle('brush', G.brush === v); });
 }
+/* 🔒 dg-1: clue squares = the set's strong colour mixed 22 % toward its line colour (vehicles orange would sit too close to the yellow "selected" square otherwise) */
+function mixHex(a, b, t){ const p = h => [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16)); const A = p(a), B = p(b); return '#' + A.map((v, k) => Math.round(v + (B[k] - v) * t).toString(16).padStart(2, '0')).join(''); }
+function lockColour(T){ return T.lock || mixHex(T.c[1], T.line, 0.22); }
+function lockBump(i){ const d = $('board').children[i]; if(!d) return; d.classList.remove('lockbump'); void d.offsetWidth; d.classList.add('lockbump');
+  const b = document.createElement('b'); b.className = 'lockpop'; b.textContent = '🔒'; d.appendChild(b); setTimeout(() => b.remove(), 720);
+  ngTone(330, 0.09, 'triangle', 0.12); $('tip-line').textContent = '🔒 That square is a clue — it is locked. Pick a light square.'; }
 function tapCell(i){
   if(!G || G.over) return;
   G.sel = i; UISound.play('tap');
-  if(G.brush && !G.given[i]) place(i, G.brush); else paintSel();
+  if(G.brush && !G.given[i]) place(i, G.brush); else { if(G.brush && G.given[i]) lockBump(i); paintSel(); }   /* 🔒 dg-1 */
 }
 function tapSym(v){
   if(!G || G.over) return;
@@ -691,14 +709,14 @@ function hud(){
   if(lockHandle){ const l = lockHandle.remainingMs(); BAR.left(l, l < 120000); }
 }
 function toggleVoice(){ voiceOn = !voiceOn; savePrefs(); paintVoice(); if(!voiceOn) try{ speechSynthesis.cancel(); }catch(e){} }
-function pauseGame(){ if(G && !G.paused && !G.over){ G.paused = true; G.pausedAt = performance.now(); } }
+function pauseGame(){ dragAbort(); /* 🐞 dg-2 */ if(G && !G.paused && !G.over){ G.paused = true; G.pausedAt = performance.now(); } }
 function resume(){ if(G && G.paused && !G.over){ G.pausedTotal += performance.now() - G.pausedAt; G.paused = false; } }
 function leavePlay(){
   if(!G || G.over){ backToMenu(); return; }
   pauseGame();
   UI.confirm({icon: '◀', title: 'Leave this puzzle?', body: 'This puzzle will not be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(ok) backToMenu(); else resume(); });
 }
-function backToMenu(){ if(window.Cheer) Cheer.unmount(); clearInterval(timerId); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); renderMenu(); showScreen('menu'); }
+function backToMenu(){ dragAbort(); /* 🐞 dg-2 */ if(window.Cheer) Cheer.unmount(); clearInterval(timerId); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); renderMenu(); showScreen('menu'); }
 document.addEventListener('keydown', e => {
   if(!G || G.over || $('scr-play').classList.contains('hidden') || !$('result').classList.contains('hidden')) return;
   const n = G.n, k = e.key;
@@ -828,10 +846,10 @@ function buddyFrame(now){
 
 /* ---------- ✋ drag a picture from the bar onto a square, or move / take back one you placed ---------- */
 let DR = null, dragQuiet = 0;
-function dragFrom(e, src){ if(!G || G.over || e.button > 0) return; DR = Object.assign({x0: e.clientX, y0: e.clientY, moved: false, ghost: null}, src); }
+function dragFrom(e, src){ if(!G || G.over || e.button > 0) return; if(DR){ if(DR.pid !== e.pointerId) return; dragAbort(); } DR = Object.assign({x0: e.clientX, y0: e.clientY, moved: false, ghost: null, pid: e.pointerId, t: performance.now()}, src); }   /* 🐞 dg-2 */
 document.addEventListener('pointermove', e => {
-  if(!DR) return;
-  if(!DR.moved){ if(Math.hypot(e.clientX - DR.x0, e.clientY - DR.y0) < 9) return; DR.moved = true;
+  if(!DR || (DR.pid != null && e.pointerId !== DR.pid)) return; if(e.buttons === 0 && e.pointerType === 'mouse'){ dragUp(e); return; } DR.t = performance.now();   /* 🐞 dg-2 */
+  if(!DR.moved){ if(Math.hypot(e.clientX - DR.x0, e.clientY - DR.y0) < 9) return; DR.moved = true; dragCapture(e);
     const gh = document.createElement('div'); gh.className = 'dragghost'; gh.textContent = THEMES[G.theme].syms[DR.v - 1]; document.body.appendChild(gh); DR.ghost = gh;
     if(DR.from === 'cell') ngCell(DR.i).classList.add('lifted'); UISound.play('tap'); }
   e.preventDefault();
@@ -839,13 +857,26 @@ document.addEventListener('pointermove', e => {
   document.querySelectorAll('#board .cell.dropok').forEach(c => c.classList.remove('dropok'));
   const i = dropCellAt(e.clientX, e.clientY); if(i >= 0) ngCell(i).classList.add('dropok');
 }, {passive: false});
-document.addEventListener('pointerup', e => { if(!DR) return; const d = DR; DR = null; if(d.moved) dragDrop(d, e.clientX, e.clientY); });
-document.addEventListener('pointercancel', () => { if(DR && DR.moved) dragEnd(DR); DR = null; });
-function dropCellAt(x, y){ const el = document.elementFromPoint(x, y), c = el && el.closest('#board .cell'); if(!c) return -1; const i = Number(c.dataset.i); return G.given[i] ? -1 : i; }
-function dragEnd(d){ if(d.ghost) d.ghost.remove(); document.querySelectorAll('#board .cell.dropok, #board .cell.lifted').forEach(c => c.classList.remove('dropok', 'lifted')); dragQuiet = performance.now(); }
+document.addEventListener('pointerup', e => { if(DR && DR.pid != null && e.pointerId !== DR.pid) return; dragUp(e); });   /* 🐞 dg-2 */
+document.addEventListener('pointercancel', e => { if(DR && DR.pid != null && e.pointerId !== DR.pid) return; dragAbort(); });   /* 🐞 dg-2 */
+function dropCellAt(x, y){ const el = document.elementFromPoint(x, y), c = el && el.closest('#board .cell'); if(!c) return -1; const i = Number(c.dataset.i); return G.given[i] ? -2 - i : i; }   /* 🔒 dg-1: -2 - i = a clue square */
+function dragEnd(d){ if(d.ghost) d.ghost.remove(); dragSweep(); document.querySelectorAll('#board .cell.dropok, #board .cell.lifted').forEach(c => c.classList.remove('dropok', 'lifted')); dragQuiet = performance.now(); }
+/* 🐞 DRAG GUARD (dg-2): one drag per finger; a lost finger-up, a 2nd finger, an app switch or a screen change never leaves a block on screen */
+function dragSweep(){ document.querySelectorAll('.dragghost').forEach(g => g.remove()); }
+function dragCapture(e){ try{ document.body.setPointerCapture(e.pointerId); DR.cap = true; }catch(err){} }
+function dragRelease(d){ if(d && d.cap){ try{ if(document.body.hasPointerCapture(d.pid)) document.body.releasePointerCapture(d.pid); }catch(err){} } }
+function dragUp(e){ if(!DR) return; const d = DR; DR = null; dragRelease(d); if(d.moved) dragDrop(d, e.clientX, e.clientY); }
+function dragAbort(){ const d = DR; DR = null; if(d){ dragRelease(d); if(d.moved){ dragEnd(d); } } dragSweep(); }
+document.addEventListener('pointerdown', e => { if(DR && (e.pointerId === DR.pid || performance.now() - (DR.t || 0) > 250)) dragAbort(); else if(!DR) dragSweep(); }, true);
+document.addEventListener('lostpointercapture', e => { if(DR && DR.cap && e.pointerId === DR.pid) dragAbort(); });
+document.addEventListener('visibilitychange', () => { if(document.hidden) dragAbort(); });
+window.addEventListener('pagehide', dragAbort); window.addEventListener('blur', dragAbort); window.addEventListener('orientationchange', dragAbort);
+setInterval(() => { if(!DR && document.querySelector('.dragghost')) dragSweep(); }, 700);
+/* 🐞 /DRAG GUARD (dg-2) */
 function dragDrop(d, x, y){
   const i = dropCellAt(x, y); dragEnd(d);
   if(!G || G.over) return;
+  if(i <= -2){ lockBump(-2 - i); return; }   /* 🔒 dg-1 */
   const wasNotes = G.notesMode;
   if(d.from === 'cell'){
     if(i === d.i) return;
@@ -864,6 +895,7 @@ function ngTone(freq, dur, type, gain, slideTo, delay){
 
 /* ================= FINISH ================= */
 function finishGame(why, wrongCount){
+  dragAbort(); /* 🐞 dg-2 */
   if(!G || G.over) return;
   if(!(wrongCount > 0)) wrongCount = (G.wrongAt && G.wrongAt.size) || 1;   /* never show 'undefined squares' */
   G.over = true; clearInterval(timerId);
@@ -974,4 +1006,4 @@ boot();
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.chips', {rows: 3}); }</script>
 </body>
 </html>
-<!-- (r16+emoji+r32+back-1+p1a+p2+p3b+cs-4b) END OF NumberGrid.html -->
+<!-- (r16+emoji+r32+back-1+p1a+p2+p3b+cs-4b+dg-2+dg-1) END OF NumberGrid.html -->

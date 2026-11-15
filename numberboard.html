@@ -607,6 +607,7 @@ function chooseMove(moves, strength){
 
 /* ================= MENUS ================= */
 function showScreen(name){
+  dragAbort(); /* 🐞 dg-2 */
   ['player', 'menu', 'play', 'link'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));   // 📡 lk-3d: + link
   $('back-btn').classList.toggle('hidden', name === 'play' || name === 'link'); window.scrollTo(0, 0);
 }
@@ -1161,17 +1162,18 @@ function buddyFrame(now){
 let DR = null, dragQuiet = 0;
 function dragFrom(e, src){
   if(!canAct() || e.button > 0) return;
-  DR = Object.assign({x0: e.clientX, y0: e.clientY, moved: false, ghost: null, over: null}, src);
+  if(DR){ if(DR.pid !== e.pointerId) return; dragAbort(); }   /* 🐞 dg-2 */
+  DR = Object.assign({x0: e.clientX, y0: e.clientY, moved: false, ghost: null, over: null, pid: e.pointerId, t: performance.now()}, src);
 }
 document.addEventListener('pointermove', e => {
-  if(!DR) return;
-  if(!DR.moved){ if(Math.hypot(e.clientX - DR.x0, e.clientY - DR.y0) < 9) return; dragBegin(); }
+  if(!DR || (DR.pid != null && e.pointerId !== DR.pid)) return; if(e.buttons === 0 && e.pointerType === 'mouse'){ dragUp(e); return; } DR.t = performance.now();   /* 🐞 dg-2 */
+  if(!DR.moved){ if(Math.hypot(e.clientX - DR.x0, e.clientY - DR.y0) < 9) return; dragBegin(); if(!DR) return; dragCapture(e); }
   e.preventDefault();
   DR.ghost.style.left = e.clientX + 'px'; DR.ghost.style.top = e.clientY + 'px';
   dragOver(e.clientX, e.clientY);
 }, {passive: false});
-document.addEventListener('pointerup', e => { if(!DR) return; const d = DR; DR = null; if(d.moved) dragDrop(d, e.clientX, e.clientY); });
-document.addEventListener('pointercancel', () => { if(DR && DR.moved) dragEnd(DR); DR = null; });
+document.addEventListener('pointerup', e => { if(DR && DR.pid != null && e.pointerId !== DR.pid) return; dragUp(e); });   /* 🐞 dg-2 */
+document.addEventListener('pointercancel', e => { if(DR && DR.pid != null && e.pointerId !== DR.pid) return; dragAbort(); });   /* 🐞 dg-2 */
 function dragTile(d){ const P = cur(); if(d.from === 'rack') return P.rack.find(r => r.id === d.id); const p = G.pend.find(q => q.i === d.i); return p ? {id: p.id, t: p.blank ? '?' : p.t} : null; }
 function dragBegin(){
   const x = dragTile(DR); if(!x){ DR = null; return; }
@@ -1199,7 +1201,19 @@ function dragOver(x, y){
   if(t && t.kind === 'cell') cellEl(t.i).classList.add('dropok');
   if(t && t.kind === 'rack'){ const P = cur(), from = P.rack.findIndex(r => r.id === DR.id), to = rackIndexAt(x); if(from >= 0 && to !== from){ const [m] = P.rack.splice(from, 1); P.rack.splice(to, 0, m); renderRack(false); } }
 }
-function dragEnd(d){ if(d.ghost) d.ghost.remove(); G.dragId = null; document.querySelectorAll('.cell.dropok').forEach(c => c.classList.remove('dropok')); $('swapbox').classList.remove('hot'); dragQuiet = performance.now(); }
+function dragEnd(d){ if(d.ghost) d.ghost.remove(); dragSweep(); G.dragId = null; document.querySelectorAll('.cell.dropok').forEach(c => c.classList.remove('dropok')); $('swapbox').classList.remove('hot'); dragQuiet = performance.now(); }
+/* 🐞 DRAG GUARD (dg-2): one drag per finger; a lost finger-up, a 2nd finger, an app switch or a screen change never leaves a block on screen */
+function dragSweep(){ document.querySelectorAll('.dragghost').forEach(g => g.remove()); }
+function dragCapture(e){ try{ document.body.setPointerCapture(e.pointerId); DR.cap = true; }catch(err){} }
+function dragRelease(d){ if(d && d.cap){ try{ if(document.body.hasPointerCapture(d.pid)) document.body.releasePointerCapture(d.pid); }catch(err){} } }
+function dragUp(e){ if(!DR) return; const d = DR; DR = null; dragRelease(d); if(d.moved) dragDrop(d, e.clientX, e.clientY); }
+function dragAbort(){ const d = DR; DR = null; if(d){ dragRelease(d); if(d.moved){ dragEnd(d); if(G){ renderRack(false); renderSwapBox(); } } } dragSweep(); }
+document.addEventListener('pointerdown', e => { if(DR && (e.pointerId === DR.pid || performance.now() - (DR.t || 0) > 250)) dragAbort(); else if(!DR) dragSweep(); }, true);
+document.addEventListener('lostpointercapture', e => { if(DR && DR.cap && e.pointerId === DR.pid) dragAbort(); });
+document.addEventListener('visibilitychange', () => { if(document.hidden) dragAbort(); });
+window.addEventListener('pagehide', dragAbort); window.addEventListener('blur', dragAbort); window.addEventListener('orientationchange', dragAbort);
+setInterval(() => { if(!DR && document.querySelector('.dragghost')) dragSweep(); }, 700);
+/* 🐞 /DRAG GUARD (dg-2) */
 function dragDrop(d, x, y){
   const t = dragTarget(x, y); dragEnd(d);
   if(!G || !canAct()){ if(G) renderRack(false); return; }
@@ -1270,7 +1284,7 @@ document.addEventListener('keydown', e => {
 
 function toggleVoice(){ voiceOn = !voiceOn; savePrefs(); paintVoice(); if(!voiceOn) try{ speechSynthesis.cancel(); }catch(e){} }
 function elapsed(){ return G ? performance.now() - G.t0 - G.pausedTotal - (G.paused ? performance.now() - G.pausedAt : 0) : 0; }
-function pauseGame(){ if(G && !G.paused && !G.over){ G.paused = true; G.pausedAt = performance.now(); } }
+function pauseGame(){ dragAbort(); /* 🐞 dg-2 */ if(G && !G.paused && !G.over){ G.paused = true; G.pausedAt = performance.now(); } }
 function resume(){ if(G && G.paused && !G.over){ G.pausedTotal += performance.now() - G.pausedAt; G.paused = false; } }
 function leavePlay(){
   if(G && G.lx){ lxLeavePlay(); return; }   // 📡 lk-3d
@@ -1278,10 +1292,11 @@ function leavePlay(){
   pauseGame();
   UI.confirm({icon: '◀', title: 'Leave this game?', body: 'This game will not be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(ok) backToMenu(); else resume(); });
 }
-function backToMenu(){ if(window.Cheer) Cheer.unmount(); clearInterval(timerId); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); closeSheet(); renderMenu(); showScreen('menu'); }
+function backToMenu(){ dragAbort(); /* 🐞 dg-2 */ if(window.Cheer) Cheer.unmount(); clearInterval(timerId); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); closeSheet(); renderMenu(); showScreen('menu'); }
 
 /* ================= FINISH ================= */
 function finishGame(why, bad){
+  dragAbort(); /* 🐞 dg-2 */
   if(!G || G.over) return;
   G.over = true; G.busy = false; clearInterval(timerId); closeSheet();
   cheerEnd(why); /* 📣 cs-3b */
@@ -1636,4 +1651,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.chips', {rows: 3}); }</script>
 </body>
 </html>
-<!-- (11v+emoji+r32+back-1+modes-3+gs-4+p1a+p1a-3+p2+p4c+cs-3b+lk-3d+lk-5a+lk-5d+lk-5f) END OF NumberBoard.html -->
+<!-- (11v+emoji+r32+back-1+modes-3+gs-4+p1a+p1a-3+p2+p4c+cs-3b+lk-3d+lk-5a+lk-5d+lk-5f+dg-2) END OF NumberBoard.html -->
