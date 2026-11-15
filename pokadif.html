@@ -379,8 +379,11 @@ var PK = (function () {
     pencil: { s: 1, r: [90, 180] }, trophy: { s: 1 }, gift: { s: 0.95 }, cactus: { s: 1, n: [1, 3] }, sun: { s: 1, n: [5, 9] }, snowman: { s: 1, n: [1, 4] }, ufo: { s: 1.05, n: [2, 5] },
     anchor: { s: 1 }, suitcase: { s: 1 }, camera: { s: 1 }, icecream: { s: 1 }
   };
+  // 🎲 pk-5c Mix layer 5 "others" + layer 4 particles: 🖼️ a little framed picture (count its stars) · 🐜 an ant · ✨ a particle (it.pt says which)
+  KINDS.frame = { s: 1, n: [1, 4] }; KINDS.ant = { s: 0.9, h: true }; KINDS.pt = { s: 1 };
+  var NOT_PIECE = ['sign', 'beads', 'frame', 'ant', 'pt', 'person'];
   var NEW_KINDS = ['apple', 'cherry', 'banana', 'carrot', 'cupcake', 'donut', 'lollipop', 'cat', 'frog', 'turtle', 'butterfly', 'bee', 'crab', 'whale', 'duck', 'penguin', 'owl', 'car', 'bus', 'kite', 'umbrella', 'crown', 'key', 'mug', 'teapot', 'pencil', 'trophy', 'gift', 'cactus', 'sun', 'snowman', 'ufo', 'anchor'];
-  var PIECES = Object.keys(KINDS).filter(function (k) { return k !== 'sign' && k !== 'beads'; });
+  var PIECES = Object.keys(KINDS).filter(function (k) { return NOT_PIECE.indexOf(k) < 0; });
   // 🎨 pk-5b looks (the same in A and B): 1 two-tone · 2 checks · 3 a cute face — on simple bodies only
   var LOOKS = ['circle', 'square', 'triangle', 'star', 'heart', 'diamond', 'hexagon', 'balloon', 'planet', 'gift', 'mug', 'crystal', 'apple', 'kite', 'umbrella', 'trophy', 'rocket', 'whale', 'owl', 'penguin'];
   var FACES = ['circle', 'square', 'triangle', 'star', 'heart', 'hexagon', 'balloon', 'apple', 'mug', 'gift', 'crystal', 'planet'];
@@ -451,9 +454,9 @@ var PK = (function () {
     { name: 'Basic',        n: 3, items: 8,  r: 31, mag: 1.0,  types: ['colour', 'gone'], hints: 3, glow: 10, pics: 3, lives: 0, guide: true },
     { name: 'Junior',       n: 4, items: 10, r: 28, mag: 0.85, types: ['colour', 'gone', 'size', 'shape'], hints: 2, glow: 20, pics: 3, lives: 0 },
     { name: 'Intermediate', n: 5, items: 12, r: 26, mag: 0.7,  types: TYPES6, hints: 2, glow: 0, pics: 3, lives: 0 },
-    { name: 'Hard',         n: 6, items: 14, r: 24, mag: 0.6,  types: TYPES6.concat(['equation', 'word']), sub: ['tone', 'line', 'dot', 'tilt'], subtle: 0.5, detail: 0.35, tonal: 0, hints: 1, glow: 0, pics: 3, lives: 0 },
-    { name: 'Extreme',      n: 7, items: 16, r: 22, mag: 0.5,  types: TYPES, sub: SUBTLE.concat(['pattern']), subtle: 0.75, detail: 0.5, tonal: 0.5, hints: 1, glow: 0, pics: 3, lives: 0 },
-    { name: 'Hardcore',     n: 7, items: 18, r: 21, mag: 0.4,  types: TYPES, sub: SUBTLE.concat(['equation', 'word', 'pattern']), subtle: 1, detail: 0.6, tonal: 1, hints: 0, glow: 0, pics: 3, lives: 3, hardcore: true, decoys: true }
+    { name: 'Hard',         n: 6, items: 14, r: 24, mag: 0.6,  types: TYPES6.concat(['equation', 'word']), sub: ['tone', 'line', 'dot', 'tilt'], subtle: 0.5, detail: 0.35, tonal: 0, ov: [0.25, 0.62, 0.8], hints: 1, glow: 0, pics: 3, lives: 0 },
+    { name: 'Extreme',      n: 7, items: 16, r: 22, mag: 0.5,  types: TYPES, sub: SUBTLE.concat(['pattern']), subtle: 0.75, detail: 0.5, tonal: 0.5, ov: [0.4, 0.52, 0.74], hints: 1, glow: 0, pics: 3, lives: 0 },
+    { name: 'Hardcore',     n: 7, items: 18, r: 21, mag: 0.4,  types: TYPES, sub: SUBTLE.concat(['equation', 'word', 'pattern']), subtle: 1, detail: 0.6, tonal: 1, ov: [0.5, 0.46, 0.66], hints: 0, glow: 0, pics: 3, lives: 3, hardcore: true, decoys: true }
   ];
 
   // ---------- signs: sums + words (pk-2a) ----------
@@ -520,6 +523,36 @@ var PK = (function () {
   }
   function countOf(R, k) { var n = KINDS[k].n; return n ? n[0] + Math.floor(R() * (n[1] - n[0] + 1)) : 0; }
 
+  // ---------- 🥞 pk-5c overlap: a piece leans on another (in front or behind) ----------
+  // a piece that sits BEHIND its partner may only take a change that still shows (≥ 55 % of it visible, no lines / dots / counts under the other piece)
+  var FRAGILE = ['count', 'dot', 'line', 'equation', 'word', 'pattern'];
+  function overlapOk(k) { return PIECES.indexOf(k) >= 0; }
+  function overlapSpot(R, L, items, deco, r, skip) {
+    var ov = L.ov; if (!ov) return null;
+    var qs = shuffle(R, items.filter(function (q) { return !q.pair && (!q.lay || q.lay === 'props') && overlapOk(q.k) && !(q.z || 0) && !(skip && skip[q.id]); }));
+    for (var t = 0; t < qs.length && t < 6; t++) {
+      var q = qs[t];
+      for (var u = 0; u < 8; u++) {
+        var ang = R() * Math.PI * 2, f = ov[1] + R() * (ov[2] - ov[1]), dd = (radiusOf(q) + r) * f, p = { x: q.x + Math.cos(ang) * dd, y: q.y + Math.sin(ang) * dd };
+        if (p.x < r + 6 || p.x > W - r - 6 || p.y < r + 8 || p.y > H - r - 6) continue;
+        var okp = items.every(function (o) { return o === q || dist(p, o) >= (radiusOf(o) + r) * 1.08 + 6; }) && deco.every(function (o) { return dist(p, o) >= o.r + r + 2; });
+        if (okp) return { x: p.x, y: p.y, q: q };
+      }
+    }
+    return null;
+  }
+  function isUnder(a, items) { if (!a.pair) return false; for (var i = 0; i < items.length; i++) if (items[i].id === a.pair) return (items[i].z || 0) > (a.z || 0); return false; }
+  // how much of a piece shows (0 … 1): points on the piece not covered by a piece in front of it
+  function visFrac(a, items) {
+    var r = radiusOf(a) * 0.8, n = 0, v = 0;
+    for (var gx = -3; gx <= 3; gx++) for (var gy = -3; gy <= 3; gy++) {
+      if (gx * gx + gy * gy > 9) continue; n++;
+      var px = a.x + gx * r / 3, py = a.y + gy * r / 3;
+      if (!items.some(function (q) { return q.id !== a.id && (q.z || 0) > (a.z || 0) && Math.sqrt((q.x - px) * (q.x - px) + (q.y - py) * (q.y - py)) < radiusOf(q) * 0.85; })) v++;
+    }
+    return v / n;
+  }
+
   // ---------- one difference ----------
   // turns item A (in list B) into its changed copy; returns the diff or null when this item can't show that type
   function applyDiff(R, sc, L, type, a, B, deco) {
@@ -527,6 +560,7 @@ var PK = (function () {
     if (ib < 0) return null;
     var b = clone(a), d = { t: type, idA: a.id, idB: a.id, x: a.x, y: a.y, r: radiusOf(a) };
     var mag = L.mag, K = KINDS[a.k];
+    if (isUnder(a, sc.A) && (FRAGILE.indexOf(type) >= 0 || visFrac(a, sc.A) < 0.55)) return null;   // 🥞 pk-5c: half-hidden pieces keep their change visible
     if (type === 'colour') {
       if (a.k === 'beads') return null;
       var need = 110 + 110 * mag, opts = shuffle(R, PAL).filter(function (c) { return c !== a.c && colDist(c, a.c) >= need; });
@@ -616,9 +650,9 @@ var PK = (function () {
     for (var i = 0; i < t1.length; i++) if (t1[i] !== t2[i]) { var pr = [t1[i], t2[i]].sort().join(''); if (LOOK_ALIKE.indexOf(pr) < 0) return false; any = true; }
     return any;
   }
-  function detailOk(k) { return k !== 'sign' && k !== 'beads'; }
+  function detailOk(k) { return k !== 'sign' && k !== 'beads' && k !== 'frame' && k !== 'ant' && k !== 'pt' && k !== 'person'; }
   function lineOk(k) { return detailOk(k) && ['leaf', 'rocket', 'boat', 'crystal', 'pencil', 'key', 'carrot', 'banana', 'anchor', 'lollipop', 'cherry', 'cactus', 'butterfly', 'umbrella', 'trophy'].indexOf(k) < 0; }   // thin pieces: a stripe would hardly show
-  function toneOk(k) { return k !== 'beads' && k !== 'cloud' && k !== 'banana' && k !== 'pencil'; }   // a cloud is always white (its colour is only a tint)
+  function toneOk(k) { return k !== 'beads' && k !== 'cloud' && k !== 'banana' && k !== 'pencil' && k !== 'ant' && k !== 'pt' && k !== 'person'; }   // a cloud is always white (its colour is only a tint)
   // how far a piece reaches when it turns (square corners stick out ≈ 1.42 × its radius)
   function reach(k) { return ['square', 'house', 'dice', 'sign', 'diamond', 'gift', 'box'].indexOf(k) >= 0 ? 1.45 : ['bus', 'car', 'mug', 'suitcase', 'camera', 'trophy', 'crown', 'teapot', 'whale'].indexOf(k) >= 0 ? 1.25 : ['star', 'hexagon', 'triangle', 'crystal', 'gear', 'heart'].indexOf(k) >= 0 ? 1.2 : 1.15; }
   function tiltOk(k) { return detailOk(k) && k !== 'circle' && k !== 'planet'; }
@@ -627,6 +661,8 @@ var PK = (function () {
     if (type === 'dot') return detailOk(k) && k !== 'dice' && k !== 'ladybug' && !KINDS[k].n; if (type === 'tilt') return tiltOk(k);
     if (k === 'beads') return type === 'gone';   // pk-5a: beads take their colours from the pattern, not from c
     if (k === 'sign') return type === 'colour' || type === 'gone';
+    if (k === 'ant') return type === 'turn' || type === 'gone' || type === 'colour';   // pk-5c: a small thing — bold changes only
+    if (k === 'frame' && (type === 'turn' || type === 'shape')) return false;
     if (type === 'turn') return !!(K.h || K.r); if (type === 'count') return !!K.n; return true; }
 
   // ---------- a whole scene ----------
@@ -666,7 +702,7 @@ var PK = (function () {
       types = shuffle(R, types.slice(0, n - nSub).concat(subs.slice(0, nSub)));
       if (!opt.force && nSub) pool = L.sub.concat(nSub < n ? L.types : []);
       // the items: the first n are the ones that will change → each gets a kind that can show its type
-      var count = Math.max(L.items, n + 3);
+      var count = Math.max(L.items, n + 3), noOv = {};
       for (var j = 0; j < count; j++) {
         var ty = types[j];
         var kk = kinds.filter(function (k) { return !ty || fits(ty, k); });
@@ -675,12 +711,17 @@ var PK = (function () {
         var k = pick(R, kk), r = L.r * (0.88 + R() * 0.24);
         if (KINDS[k].n) r = Math.max(r, 27);
         if (k === 'sign' || k === 'beads') r = Math.max(r, 31);   // words, sums and beads big enough to read on a phone   // things you can count (spots, petals, pips, windows) are big enough to count on a phone
-        var p = freeSpot(R, sc.A, sc.deco, r * KINDS[k].s, 300, lay);
+        var p = null, ovq = null;
+        // 🥞 pk-5c: from ⚡ Hard some pieces lean on another one (in front or behind) — never signs / beads, never things you count or read
+        if (L.ov && overlapOk(k) && FRAGILE.indexOf(ty) < 0 && R() < L.ov[0]) { var os = overlapSpot(R, L, sc.A, sc.deco, r * KINDS[k].s, noOv); if (os) { p = os; ovq = os.q; } }
+        if (!p) p = freeSpot(R, sc.A, sc.deco, r * KINDS[k].s, 300, lay);
         if (!p) continue;
         var c = cols ? pick(R, cols) : colourFor(R, used);
         used[c] = (used[c] || 0) + 1;
         var it = { id: 'i' + j, k: k, x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, r: Math.round(r * 10) / 10, c: c, rot: 0, fl: R() < 0.5 ? 1 : -1, n: countOf(R, k) };
         if (KINDS[k].r && R() < 0.3) it.rot = 90;
+        if (ovq) { it.z = R() < 0.5 ? 1 : -1; it.pair = ovq.id; ovq.pair = it.id; }
+        if (FRAGILE.indexOf(ty) >= 0) noOv[it.id] = 1;   // a piece meant for a line / dot / count / sign is never leaned on
         // ✏️🔘 pk-5a: from ⚡ Hard many pieces already wear stripes + dots (so adding / removing one is a real search)
         // 🎨 pk-5b: about 1 piece in 3 wears a look (two-tone · checks · face), the same in A and B
         if (ty !== 'count' && ty !== 'dot' && ty !== 'line' && LOOKS.indexOf(k) >= 0 && R() < 0.34) it.lk = FACES.indexOf(k) >= 0 ? 1 + Math.floor(R() * 3) : 1 + Math.floor(R() * 2);
@@ -1112,6 +1153,158 @@ var PK = (function () {
   function storyPoints(level, r) { var p = 260 - r.oops * 30 - r.hints * 50 + Math.max(0, 40 - r.secs) * 3; return Math.max(40, Math.round(p * (1 + level * 0.25) * ((STORY[level] || {}).hardcore ? 3 : 1))); }
   function caseBonus(level) { return Math.round(1000 * (1 + level * 0.25) * ((STORY[level] || {}).hardcore ? 3 : 1)); }
 
+  // ================= 🎲 MIX = 5 random layers (pk-5c, Aowu 2026-11-15 01:52 "1 scenery · 2 people · 3 props · 4 particles · 5 others") =================
+  // Every Mix picture = a new combo: 🏞️ any scene (6 houses · 🌱 · ⏰ · 7 trip places) + 1–2 big scenery pieces behind · 🧑 1–3 of the family (real avatars)
+  // · 🎒 pieces from the whole box (61 kinds) · ✨ a swarm of one particle kind · 🎲 others (signs, beads, a framed picture, ants). A change can land in ANY layer.
+  var MIX_SCENES = THEME_KEYS.concat(['garden', 'clock']).concat(TRIP_KEYS);
+  var SCENERY = ['tree', 'cloud', 'house', 'sun', 'planet', 'whale', 'boat', 'snowman', 'bus', 'rocket', 'kite', 'umbrella'];
+  var PARTICLES = { confetti: 1, bubble: 0, sparkle: 0, snow: 1, drop: 0, leaflet: 1, star: 1 };   // 1 = can take a 🌗 shade change (thin ✨ sparkles / 💧 drops: too few pixels)
+  var PT_KEYS = Object.keys(PARTICLES);
+  var MIX_LAYERS = ['scene', 'people', 'props', 'particles', 'others'];
+  var MIX_LAYER_INFO = { scene: ['🏞️', 'Scenery'], people: ['🧑', 'People'], props: ['🎒', 'Props'], particles: ['✨', 'Particles'], others: ['🎲', 'Others'] };
+  var MIX_PEOPLE_R = [40, 38, 36, 34, 33, 32], MIX_PT_R = [10, 9.5, 9.2, 9, 8.8, 8.6];
+  function ptCols(R, TH) {   // particle colours that stand out on the sky of this scene
+    var c = shuffle(R, PAL.concat(['#FFFFFF'])).filter(function (x) { return colDist(x, TH.top) >= 120 && colDist(x, TH.bot) >= 120; });
+    return c.length >= 2 ? c.slice(0, 2) : ['#FFFFFF', '#FFD23F'];
+  }
+  // a particle spot: in the sky, never touching a piece (small gap), apart from the other particles
+  function ptSpot(R, items, deco, r) {
+    var p = { x: r + 6 + R() * (W - 2 * r - 12), y: r + 6 + R() * (GROUND - 24 - r - 6) };
+    for (var i = 0; i < items.length; i++) { var q = items[i], need = q.k === 'pt' ? r * 2.8 : q.k === 'person' ? q.r * 1.15 + r + 3 : radiusOf(q) * reach(q.k) + r * 1.2 + 3; if (dist(p, q) < need) return null; }
+    for (var j = 0; j < deco.length; j++) if (dist(p, deco[j]) < deco[j].r + r + 2) return null;
+    return p;
+  }
+  function mixPersonDiff(R, sc, L, a, acts, isSub) {
+    var bi = -1; for (var i = 0; i < sc.B.length; i++) if (sc.B[i].id === a.id) bi = i; if (bi < 0) return null;
+    var b = clone(sc.B[bi]); sc.B[bi] = b;   // a copy: a change that is thrown away (clash) never leaks into picture B
+    var canFlip = lopsided(a) && (L.types.indexOf('turn') >= 0 || (L.sub || []).length), ty = canFlip && R() < 0.4 ? 'flip' : 'pose';
+    if (ty === 'flip') b.fl = -a.fl;
+    else { var others = acts.filter(function (x) { return x !== a.base && PHOTO_ACTS[x] && PHOTO_ACTS[x][0] !== (PHOTO_ACTS[a.base] || [])[0]; }); if (!others.length) return null; b.base = pick(R, others); }
+    return { t: ty, sub: ty, idA: a.id, idB: a.id, x: a.x, y: a.y, r: a.r * 1.1 };
+  }
+  function mixParticleDiff(R, sc, L, a, isSub, TH) {
+    var bi = -1; for (var i = 0; i < sc.B.length; i++) if (sc.B[i].id === a.id) bi = i; if (bi < 0) return null;
+    var opts = isSub ? ['gone', 'tone'] : ['gone', 'colour'], ty = pick(R, opts);
+    if (ty === 'tone' && !PARTICLES[a.pt]) ty = 'gone';
+    var b = clone(a), d = { t: ty, idA: a.id, idB: a.id, x: a.x, y: a.y, r: a.r };
+    if (ty === 'gone') {
+      if (R() < 0.5) { sc.B.splice(bi, 1); d.sub = 'missing'; d.idB = null; return d; }
+      var p = null; for (var pt = 0; pt < 80 && !p; pt++) p = ptSpot(R, sc.B.concat(sc.A), sc.deco, a.r); if (!p) return null;
+      var e = { id: 'x' + a.id, k: 'pt', pt: a.pt, x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, r: a.r, c: a.c, rot: Math.round(R() * 180), fl: 1, n: 0, z: 2, lay: 'particles' };
+      sc.B.push(e); d.sub = 'extra'; d.idA = null; d.idB = e.id; d.x = e.x; d.y = e.y; return d;
+    }
+    if (ty === 'colour') { var cs = ptCols(R, TH).concat(shuffle(R, PAL)).filter(function (c) { return colDist(c, a.c) >= 180; }); if (!cs.length) return null; b.c = cs[0]; d.sub = 'colour'; }
+    else { var tn = toneShift(a.c, 130, R() < 0.5 ? 1 : -1) || toneShift(a.c, 130); if (!tn) return null; b.c = tn; d.sub = 'tone'; }
+    sc.B[bi] = b; return d;
+  }
+  // makeMix(seed, level, {n, people (family size), acts, avoid, avoidLay, avoidTheme, theme, layer (tests: all changes in one layer)}) → a scene with mix: true
+  function makeMix(seed, level, opt) {
+    opt = opt || {};
+    var L = LEVELS[level] || LEVELS[0], n = opt.n || L.n, fam = Math.max(1, opt.people || 2);
+    var acts = (opt.acts || Object.keys(PHOTO_ACTS)).filter(function (a) { return PHOTO_ACTS[a]; });
+    for (var attempt = 0; attempt < 40; attempt++) {
+      var R = rng(seed + attempt * 7919);
+      var T = opt.theme && THEMES[opt.theme] ? opt.theme : pick(R, MIX_SCENES.filter(function (k) { return k !== opt.avoidTheme; })), TH = THEMES[T];
+      var sc = { seed: seed, level: level, theme: T, mix: true, W: W, H: H, ground: GROUND, kinds: [], deco: [], A: [], B: [], diffs: [], layers: {} };
+      // 🎒 the piece box: this scene's pieces + 12 from anywhere (minus the last pictures' kinds)
+      var box = TH.kinds.filter(function (k) { return PIECES.indexOf(k) >= 0; });
+      box = box.concat(shuffle(R, PIECES.filter(function (k) { return box.indexOf(k) < 0; })).slice(0, 12));
+      if (opt.avoid && opt.avoid.length) { var fresh = box.filter(function (k) { return opt.avoid.indexOf(k) < 0; }); if (fresh.length >= 10) box = fresh; }
+      sc.kinds = box;
+      sc.layout = opt.lay || pick(R, LAYOUTS.filter(function (l) { return l !== opt.avoidLay; }));
+      var lay = null;
+      if (sc.layout === 'rows') lay = { rows: [70, 150] };
+      else if (sc.layout === 'cluster') { lay = { cl: [] }; for (var ci = 0; ci < 3; ci++) lay.cl.push({ x: 70 + ci * 130 + (R() - 0.5) * 40, y: 70 + R() * 100 }); }
+      var nd = 2 + Math.floor(R() * 2);
+      for (var i = 0; i < nd; i++) { var side = i % 2 === 0; sc.deco.push({ ch: pick(R, TH.deco), x: side ? 16 + R() * 30 : W - 16 - R() * 30, y: 26 + R() * 90, r: 14, sz: 20 + R() * 6 }); }
+      var id = 0, L1 = [], used = {};
+      // 1 🏞️ scenery: 1–2 big pieces behind everything, high up
+      var nScene = 1 + (R() < 0.5 ? 1 : 0), scK = shuffle(R, SCENERY.filter(function (k) { return TH.kinds.indexOf(k) >= 0; }).concat(shuffle(R, SCENERY).slice(0, 3)));
+      for (var si = 0; si < nScene && si < scK.length; si++) {
+        var sk = scK[si], sr = 40 + R() * 8, sp = null;
+        for (var st = 0; st < 60 && !sp; st++) { var q0 = freeSpot(R, sc.A, sc.deco, sr * KINDS[sk].s, 1); if (q0 && q0.y < 150) sp = q0; }
+        if (!sp) continue;
+        var sit = { id: 's' + (id++), k: sk, x: Math.round(sp.x * 10) / 10, y: Math.round(sp.y * 10) / 10, r: Math.round(sr * 10) / 10, c: colourFor(R, used), rot: 0, fl: R() < 0.5 ? 1 : -1, n: countOf(R, sk), z: -2, lay: 'scene' };
+        sc.A.push(sit);
+      }
+      // 2 🧑 people: 1–3 of the family standing on the ground
+      var np = Math.min(fam, 1 + Math.floor(R() * (level ? 3 : 2))), pr = MIX_PEOPLE_R[level] || 32, who = shuffle(R, Array.apply(null, Array(fam)).map(function (_, x) { return x; }));
+      for (var q = 0; q < np; q++) {
+        var py = H - 8 - pr * 1.1, px = null;
+        for (var pt = 0; pt < 60 && px == null; pt++) { var tx = pr + 6 + R() * (W - 2 * pr - 12); if (sc.A.every(function (o) { return o.k !== 'person' || Math.abs(o.x - tx) >= pr * 2.1; }) && sc.deco.every(function (o) { return dist({ x: tx, y: py }, o) >= o.r + pr; })) px = tx; }
+        if (px == null) continue;
+        var pa = pick(R, acts.filter(function (x) { return !used['a:' + x]; }).length ? acts.filter(function (x) { return !used['a:' + x]; }) : acts); used['a:' + pa] = 1;
+        sc.A.push({ id: 'p' + q, k: 'person', who: who[q], base: pa, face: null, x: Math.round(px * 10) / 10, y: Math.round(py * 10) / 10, r: pr, c: '#ffffff', rot: 0, fl: R() < 0.5 ? -1 : 1, n: 0, lay: 'people' });
+      }
+      // 5 🎲 others: 1–2 of a sign · beads · a framed picture · an ant
+      var oth = shuffle(R, ['sign', 'beads', 'frame', 'ant', 'frame', 'sign']).slice(0, 1 + (R() < 0.6 ? 1 : 0));
+      oth.forEach(function (k) {
+        var r = k === 'ant' ? 19 : Math.max(L.r, 30), p = freeSpot(R, sc.A, sc.deco, r * KINDS[k].s, 300, lay); if (!p) return;
+        var it = { id: 'o' + (id++), k: k, x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, r: r, c: colourFor(R, used), rot: 0, fl: k === 'ant' && R() < 0.5 ? -1 : 1, n: countOf(R, k), lay: 'others' };
+        if (k === 'sign') { if (level >= 3 && R() < 0.5) { it.txt = pick(R, pick(R, WORD_SETS)); it.tt = 'word'; } else { it.eq = makeSum(R, level); it.txt = sumText(it.eq); it.tt = 'eq'; } }
+        if (k === 'beads') it.pat = makePattern(R, level, 6).seq;
+        sc.A.push(it);
+      });
+      // 3 🎒 props (🥞 overlap from ⚡ Hard)
+      var nProps = Math.max(n + 2, L.items - np - sc.A.length + 2), kinds = L.decoys ? shuffle(R, box).slice(0, 5) : box, cols = null;
+      if (L.tonal && R() < L.tonal) { cols = []; shuffle(R, PAL).slice(0, 3).forEach(function (c) { cols.push(c); [1, -1].forEach(function (dd) { var t = toneShift(c, 100, dd); if (t) cols.push(t); }); }); }
+      for (var j = 0; j < nProps; j++) {
+        var kfree = kinds.filter(function (x) { return sc.A.filter(function (o) { return o.k === x; }).length < (L.decoys ? 4 : 2); });   // a kind at most twice (💀 look-alikes: 4)
+        var k = pick(R, kfree.length ? kfree : kinds), r = L.r * (0.88 + R() * 0.24); if (KINDS[k].n) r = Math.max(r, 27);
+        var p = null, ovq = null;
+        if (L.ov && R() < L.ov[0]) { var os = overlapSpot(R, L, sc.A, sc.deco, r * KINDS[k].s); if (os) { p = os; ovq = os.q; } }
+        if (!p) p = freeSpot(R, sc.A, sc.deco, r * KINDS[k].s, 300, lay);
+        if (!p) continue;
+        var c = cols ? pick(R, cols) : colourFor(R, used); used[c] = (used[c] || 0) + 1;
+        var it = { id: 'i' + (id++), k: k, x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, r: Math.round(r * 10) / 10, c: c, rot: 0, fl: R() < 0.5 ? 1 : -1, n: countOf(R, k), lay: 'props' };
+        if (KINDS[k].r && R() < 0.3) it.rot = 90;
+        if (ovq) { it.z = R() < 0.5 ? 1 : -1; it.pair = ovq.id; ovq.pair = it.id; }
+        if (LOOKS.indexOf(k) >= 0 && R() < 0.3) it.lk = FACES.indexOf(k) >= 0 ? 1 + Math.floor(R() * 3) : 1 + Math.floor(R() * 2);
+        if (L.detail && detailOk(k) && !KINDS[k].n && !it.lk && R() < L.detail) { it.ln = 1 + Math.floor(R() * 2); it.la = pick(R, [0, 0, 45, 90, -45]); }
+        sc.A.push(it);
+      }
+      // 4 ✨ particles: a swarm of one kind in the sky (two colours that stand out)
+      var ptk = pick(R, PT_KEYS), pc = ptCols(R, TH), ptr = MIX_PT_R[level] || 8, npt = 7 + Math.floor(R() * 6);
+      for (var u = 0, got = 0; u < npt * 30 && got < npt; u++) {
+        var pp = ptSpot(R, sc.A, sc.deco, ptr); if (!pp) continue;
+        sc.A.push({ id: 'f' + (id++), k: 'pt', pt: ptk, x: Math.round(pp.x * 10) / 10, y: Math.round(pp.y * 10) / 10, r: ptr, c: pc[got % 2], rot: Math.round(R() * 180), fl: 1, n: 0, z: 2, lay: 'particles' }); got++;
+      }
+      if (got < 5) continue;   // a swarm needs ≥ 5 — too crowded? build the picture again
+      MIX_LAYERS.forEach(function (ly) { sc.layers[ly] = sc.A.filter(function (x) { return x.lay === ly; }).length; });
+      sc.B = sc.A.map(clone);
+      // the changes: spread over the layers (each layer once first, then props weigh most)
+      var have = MIX_LAYERS.filter(function (ly) { return sc.layers[ly] > 0; });
+      if (opt.layer) have = [opt.layer];
+      var plan = shuffle(R, have.filter(function (ly) { return ly !== 'props'; })); if (have.indexOf('props') >= 0) plan.unshift('props');
+      var WT = { props: 4, people: 2, particles: 2, others: 2, scene: 1 }, bag = []; have.forEach(function (ly) { for (var w = 0; w < WT[ly]; w++) bag.push(ly); });
+      while (plan.length < n + 6) plan.push(pick(R, bag));
+      var nSub = Math.round(n * (L.subtle || 0)), subs = shuffle(R, Array.apply(null, Array(n)).map(function (_, x) { return x < nSub; })), taken = {};
+      for (var pi = 0; pi < plan.length && sc.diffs.length < n; pi++) {
+        var ly = plan[pi], isSub = subs[sc.diffs.length], cands = shuffle(R, sc.A.filter(function (x) { return x.lay === ly && !taken[x.id]; })), done = false;
+        for (var cq = 0; cq < cands.length && !done && cq < 8; cq++) {
+          var a = cands[cq], Bsave = sc.B.slice(), d = null;
+          if (ly === 'people') d = mixPersonDiff(R, sc, L, a, acts, isSub);
+          else if (ly === 'particles') d = mixParticleDiff(R, sc, L, a, isSub, TH);
+          else {
+            var tl = (isSub && L.sub ? L.sub.concat(ly === 'others' ? ['count', 'turn', 'gone'] : []) : L.types).filter(function (t) { return fits(t, a.k) && !(ly === 'scene' && (t === 'shape' || t === 'count')); });
+            tl = shuffle(R, tl);
+            for (var z = 0; z < tl.length && !d; z++) { sc.B = Bsave.slice(); d = applyDiff(R, sc, L, tl[z], a, sc.B, sc.deco); }
+          }
+          if (!d) { sc.B = Bsave; continue; }
+          d.hit = hitOf(d);
+          if (sc.diffs.some(function (o) { return dist(o, d) < o.hit + d.hit + 4; })) { sc.B = Bsave; continue; }
+          d.layer = ly; d.i = sc.diffs.length; taken[a.id] = 1; if (d.idB && d.idB !== a.id) taken[d.idB] = 1; sc.diffs.push(d); done = true;
+        }
+      }
+      if (sc.diffs.length < n) continue;
+      sc.diffs.forEach(function (d) { d.x = Math.round(d.x * 10) / 10; d.y = Math.round(d.y * 10) / 10; d.r = Math.round(d.r * 10) / 10; d.hit = Math.round(hitOf(d) * 10) / 10; });
+      sc.A.concat(sc.B).forEach(function (x) { if (x.k === 'person') x.act = actOf(x); });
+      sc.sig = signature(sc);
+      return sc;
+    }
+    return null;
+  }
+
   // ================= 📸 FAMILY PHOTO HUNT (pk-4a, Aowu 16:32) =================
   // The family's own avatars pose at a trip place; every person = {k: 'person', who (family index), act}. Acts = our own 🎭 BLOCK pokadif photo acts
   // (pose + face mixes) + the shared 🤳 selfie. Changes: 🕺 pose (another photo act) · 😉 face (same pose, another face, ⚡+) · 🔄 turned round (🔦+, lopsided poses only)
@@ -1196,7 +1389,7 @@ var PK = (function () {
   function nextRank(cleared) { for (var i = 0; i < RANKS.length; i++) if (RANKS[i].at > cleared) return RANKS[i]; return null; }
 
   return { W: W, H: H, GROUND: GROUND, MIN_HIT: MIN_HIT, KINDS: KINDS, SHAPES: SHAPES, THEMES: THEMES, THEME_KEYS: THEME_KEYS, PAL: PAL, TYPES: TYPES, TYPE_INFO: TYPE_INFO, SUBTLE: SUBTLE, NEW_KINDS: NEW_KINDS, PIECES: PIECES, LAYOUTS: LAYOUTS, toneShift: toneShift, rgbSum: rgbSum,
-    LEVELS: LEVELS, RANKS: RANKS, TYPES6: TYPES6, WORD_SETS: WORD_SETS, RHYMES: RHYMES, ODD: ODD, ODD_ROUNDS: ODD_ROUNDS, makeOdd: makeOdd, oddPoints: oddPoints, makePattern: makePattern, sumText: sumText, ARCADE: ARCADE, CHECK_EVERY: CHECK_EVERY, arcadeScore: arcadeScore, arcadeStars: arcadeStars, mmss: mmss, TRIP_KEYS: TRIP_KEYS, PHOTO_ACTS: PHOTO_ACTS, PHOTO_FACES: PHOTO_FACES, SELFIE: SELFIE, photoAct: photoAct, makePhoto: makePhoto, STORY: STORY, BOOTS: BOOTS, VERBS: VERBS, CASES: CASES, caseById: caseById, makeCase: makeCase, makeWalk: makeWalk, makeDigit: makeDigit, bfs: bfs, clueMatch: clueMatch, storyPoints: storyPoints, caseBonus: caseBonus, rng: rng, newSeed: newSeed, makeScene: makeScene, signature: signature, poke: poke, pokeFound: pokeFound, radiusOf: radiusOf, hitOf: hitOf,
+    LEVELS: LEVELS, RANKS: RANKS, TYPES6: TYPES6, WORD_SETS: WORD_SETS, RHYMES: RHYMES, ODD: ODD, ODD_ROUNDS: ODD_ROUNDS, makeOdd: makeOdd, oddPoints: oddPoints, makePattern: makePattern, sumText: sumText, ARCADE: ARCADE, CHECK_EVERY: CHECK_EVERY, arcadeScore: arcadeScore, arcadeStars: arcadeStars, mmss: mmss, TRIP_KEYS: TRIP_KEYS, PHOTO_ACTS: PHOTO_ACTS, PHOTO_FACES: PHOTO_FACES, SELFIE: SELFIE, photoAct: photoAct, makePhoto: makePhoto, makeMix: makeMix, MIX_SCENES: MIX_SCENES, MIX_LAYERS: MIX_LAYERS, MIX_LAYER_INFO: MIX_LAYER_INFO, PARTICLES: PARTICLES, SCENERY: SCENERY, visFrac: visFrac, isUnder: isUnder, STORY: STORY, BOOTS: BOOTS, VERBS: VERBS, CASES: CASES, caseById: caseById, makeCase: makeCase, makeWalk: makeWalk, makeDigit: makeDigit, bfs: bfs, clueMatch: clueMatch, storyPoints: storyPoints, caseBonus: caseBonus, rng: rng, newSeed: newSeed, makeScene: makeScene, signature: signature, poke: poke, pokeFound: pokeFound, radiusOf: radiusOf, hitOf: hitOf,
     colDist: colDist, picturePoints: picturePoints, starsFor: starsFor, rankOf: rankOf, nextRank: nextRank, fits: fits };
 })();
 if (typeof module !== 'undefined') module.exports = PK;
@@ -1347,6 +1540,26 @@ const PK_PAINT = {
     const f = Acting.fit(who, PK_FIT_ACTS(), w, h, {t: 0, variant: 0});
     Acting.draw(g, who, -w / 2 + f.x, -h / 2 + f.y, f.k, it.act, {t: 0, variant: 0, noPet: true});
   },
+  // 🎲 pk-5c Mix layer 5 "others": 🖼️ a little framed picture (n = stars in it, count them) · 🐜 an ant
+  frame(g, r, c, n){ n = Math.max(1, Math.min(4, n || 2)); g.beginPath(); g.moveTo(-r * 0.3, -r * 0.82); g.lineTo(0, -r * 1.0); g.lineTo(r * 0.3, -r * 0.82); g.lineWidth = r * 0.05; g.strokeStyle = PK_INK; g.stroke();
+    pkRR(g, -r * 0.9, -r * 0.78, r * 1.8, r * 1.5, r * 0.1); pkFill(g, c, r); pkRR(g, -r * 0.68, -r * 0.56, r * 1.36, r * 1.06, r * 0.05); g.fillStyle = '#BFE4FF'; g.fill();
+    g.fillStyle = '#7BC96F'; g.beginPath(); g.moveTo(-r * 0.68, r * 0.5); g.quadraticCurveTo(-r * 0.2, r * 0.05, r * 0.2, r * 0.3); g.quadraticCurveTo(r * 0.5, r * 0.15, r * 0.68, r * 0.3); g.lineTo(r * 0.68, r * 0.5); g.closePath(); g.fill();
+    const at = [[-0.36, -0.28], [0.34, -0.3], [0, -0.22], [-0.04, 0.1]].slice(0, n);
+    at.forEach(([x, y], i) => { const p = []; for(let k = 0; k < 10; k++){ const a = -Math.PI / 2 + k * Math.PI / 5, q = k % 2 ? r * 0.08 : r * 0.19; p.push([x * r + Math.cos(a) * q, y * r + Math.sin(a) * q]); } pkPoly(g, p); pkFill(g, '#FFD23F', r * 0.45); }); },
+  ant(g, r, c){ g.strokeStyle = PK_INK; g.lineWidth = Math.max(1.4, r * 0.08); g.lineCap = 'round';
+    [-0.3, 0, 0.3].forEach(x => { g.beginPath(); g.moveTo(x * r, r * 0.05); g.lineTo(x * r - r * 0.18, r * 0.55); g.moveTo(x * r, r * 0.05); g.lineTo(x * r + r * 0.12, r * 0.55); g.stroke(); });
+    g.beginPath(); g.moveTo(r * 0.62, -r * 0.18); g.quadraticCurveTo(r * 0.8, -r * 0.7, r * 1.0, -r * 0.62); g.stroke();
+    [[-0.58, 0.02, 0.4, 0.3], [0, 0, 0.26, 0.22], [0.55, -0.08, 0.26, 0.24]].forEach(([x, y, a, b]) => { g.beginPath(); g.ellipse(x * r, y * r, a * r, b * r, 0, 0, 7); pkFill(g, c, r * 0.8); });
+    pkDot(g, r * 0.66, -r * 0.14, r * 0.07, '#FFFFFF'); pkShine(g, -r * 0.66, -r * 0.1, r * 0.1); },
+  // ✨ pk-5c Mix layer 4: a particle (it.pt = confetti · bubble · sparkle · snow · drop · leaflet · star), always outlined so it shows on any sky
+  pt(g, r, c, n, it){ const k = (it && it.pt) || 'star';
+    if(k === 'confetti'){ pkRR(g, -r * 0.85, -r * 0.48, r * 1.7, r * 0.96, r * 0.12); pkFill(g, c, r * 0.9); return; }
+    if(k === 'bubble'){ g.beginPath(); g.arc(0, 0, r * 0.9, 0, 7); g.fillStyle = c; g.globalAlpha = 0.5; g.fill(); g.globalAlpha = 1; pkOut(g, r * 0.9); g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(-r * 0.3, -r * 0.32, r * 0.22, 0, 7); g.fill(); return; }
+    if(k === 'drop'){ g.beginPath(); g.moveTo(0, -r); g.quadraticCurveTo(r * 0.85, r * 0.15, 0, r * 0.85); g.quadraticCurveTo(-r * 0.85, r * 0.15, 0, -r); g.closePath(); pkFill(g, c, r * 0.9); pkShine(g, -r * 0.22, r * 0.12, r * 0.14); return; }
+    if(k === 'leaflet'){ g.beginPath(); g.ellipse(0, 0, r * 0.95, r * 0.5, 0, 0, 7); pkFill(g, c, r * 0.9); g.beginPath(); g.moveTo(-r * 0.8, 0); g.lineTo(r * 0.8, 0); g.lineWidth = r * 0.1; g.strokeStyle = pkTone(c, 0.6); g.stroke(); return; }
+    const pts = k === 'sparkle' ? 4 : k === 'snow' ? 6 : 5, inner = k === 'sparkle' ? 0.42 : k === 'snow' ? 0.55 : 0.46, p = [];
+    for(let i = 0; i < pts * 2; i++){ const a = -Math.PI / 2 + i * Math.PI / pts, q = i % 2 ? r * inner : r; p.push([Math.cos(a) * q, Math.sin(a) * q]); }
+    pkPoly(g, p); pkFill(g, c, r * 0.9); if(k === 'snow') pkDot(g, 0, 0, r * 0.18, pkTone(c, 0.8)); },
   // 📖 pk-3b story pieces: 🦴 a bone (dino clutter) · 🪙 a coin (sea clutter)
   bone(g, r){ g.fillStyle = '#F4EBD6'; g.beginPath(); g.rect(-r * 0.55, -r * 0.14, r * 1.1, r * 0.28); g.fill(); pkOut(g, r * 0.4);
     [[-0.6, -0.16], [-0.6, 0.16], [0.6, -0.16], [0.6, 0.16]].forEach(p => { g.beginPath(); g.arc(r * p[0], r * p[1], r * 0.2, 0, 7); pkFill(g, '#F4EBD6', r * 0.4); }); },
@@ -1482,7 +1695,7 @@ function pkBackground(g, sc){
 function pkItem(g, it){
   const K = PK.KINDS[it.k] || {s: 1}, r = it.r * K.s, P = PK_PAINT[it.k] || PK_PAINT.circle, sx = it.sx || 1;
   g.save(); g.translate(it.x, it.y);
-  g.fillStyle = 'rgba(0,0,0,0.16)'; g.beginPath(); g.ellipse(0, r * 0.92, r * 0.66 * sx, r * 0.14, 0, 0, 7); g.fill();
+  if(it.k !== 'pt'){ g.fillStyle = 'rgba(0,0,0,0.16)'; g.beginPath(); g.ellipse(0, r * 0.92, r * 0.66 * sx, r * 0.14, 0, 0, 7); g.fill(); }   // ✨ particles float: no shadow
   g.rotate((it.rot || 0) * Math.PI / 180); g.scale((it.fl || 1) * sx, 1);
   if(it.ln || it.dt || it.lk) pkDetailed(g, it, r, P); else P(g, r, it.c, it.n, it);
   g.restore();
@@ -1516,7 +1729,7 @@ function pkPaint(cv, sc, side, k, dpr){
   const g = cv.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height);
   g.setTransform(k * dpr, 0, 0, k * dpr, 0, 0);
   pkBackground(g, sc);
-  (side === 'B' ? sc.B : sc.A).slice().sort((a, b) => a.y - b.y || (a.id < b.id ? -1 : 1)).forEach(it => pkItem(g, it));
+  (side === 'B' ? sc.B : sc.A).slice().sort((a, b) => (a.z || 0) - (b.z || 0) || a.y - b.y || (a.id < b.id ? -1 : 1)).forEach(it => pkItem(g, it));   // 🥞 pk-5c layers: scenery (−2) · behind (−1) · pieces · in front (1) · particles (2)
   g.setTransform(1, 0, 0, 1, 0, 0);
 }
 // 🎯 one Odd One Out card: a picture card (one piece in a 100 × 100 card) or a text card (sum / word)
@@ -1587,6 +1800,11 @@ function familyList(){ const names = [S.player].concat((S.players || []).map(p =
   return names.map(n => ({name: n, av: myAvatar(n)})); }
 function photoActs(){ return Object.keys(PK.PHOTO_ACTS).filter(a => !window.Acting || Acting.has('acts', a)); }
 function makePicture(theme, opt){   // a Spot / Blink / Arcade picture: a normal scene, or a 📸 family photo when the 📸 Family trip scene is picked
+  if(theme === 'mix'){   // 🎲 pk-5c Mix = 5 random layers (scenery · people · props · particles · others) — a new combo every picture
+    window.PK_FAMILY = familyList();
+    const sc = PK.makeMix(PK.newSeed(), G.level, Object.assign({people: window.PK_FAMILY.length, acts: photoActs(), avoid: G.recentKinds || [], avoidLay: G.lastLay, avoidTheme: G.lastTheme}, opt || {}));
+    if(sc){ const ks = Array.from(new Set(sc.A.filter(a => PK.PIECES.indexOf(a.k) >= 0).map(a => a.k))); G.recentKinds = ks.concat((G.lastKinds || [])); G.lastKinds = ks; G.lastLay = sc.layout; }
+    return sc; }
   if(theme !== 'trip'){   // 🧩 pk-5b no-repeat: skip the kinds of the last 2 pictures + use another layout than the last one
     const sc = PK.makeScene(PK.newSeed(), G.level, theme, Object.assign({avoid: G.recentKinds || [], avoidLay: G.lastLay}, opt || {}));
     if(sc){ const ks = Array.from(new Set(sc.A.map(a => a.k))); G.recentKinds = ks.concat((G.lastKinds || [])); G.lastKinds = ks; G.lastLay = sc.layout; }
@@ -1721,9 +1939,9 @@ function startCase(lvl){
 function nextPicture(){
   if(!G) return;
   G.pic++; const L = G.L;
-  let theme = SET.house === 'mix' ? pkPick(PK.THEME_KEYS.filter(k => k !== G.lastTheme)) : SET.house;
+  let theme = SET.house;   // 🎲 pk-5c: Mix builds its own 5-layer picture (its scene = sc.theme)
   let sc = null; for(let i = 0; i < 12 && !sc; i++){ sc = makePicture(theme, G.A ? {n: G.A.n} : null); if(sc && G.used[sc.sig]) sc = null; }
-  G.lastTheme = theme; G.used[sc.sig] = 1; G.scene = sc; G.found = sc.diffs.map(() => false); G.pOops = 0; G.pHints = 0; G.pSecs = 0; G.lastFind = performance.now(); G.glowAt = -1;
+  G.lastTheme = sc.mix ? sc.theme : theme; G.used[sc.sig] = 1; G.scene = sc; G.found = sc.diffs.map(() => false); G.pOops = 0; G.pHints = 0; G.pSecs = 0; G.lastFind = performance.now(); G.glowAt = -1;
   if(G.mode !== 'arcade') G.hints = L.hints;
   const nN = sc.diffs.length;
   clearMarks(); if(G.mode === 'arcade') BAR.count('pic', '📸', G.pics + '/' + G.rounds, 'Pictures to the 🏁'); else BAR.count('pic', MODE_ICON[G.mode], (G.pic + 1) + '/' + G.rounds, 'Picture'); BAR.count('found', '🔎', '0/' + nN, 'Found');
@@ -1732,6 +1950,7 @@ function nextPicture(){
   ['pic-a', 'pic-b'].forEach(id => { const e = $(id); e.classList.remove('in'); void e.offsetWidth; e.classList.add('in'); });
   if(G.mode === 'arcade') goal(G.pic === 0 ? (G.A.bonus ? '🏁 ' + G.rounds + ' pictures! Find ⏳+' + G.A.bonus + ' s · oops ⏱+' + G.A.oops + ' s' : '🏁 ' + G.rounds + ' pictures — go, go, go!' + (G.A.oops ? ' Oops = +' + G.A.oops + ' s' : '')) : '📸 ' + (G.pic + 1) + '/' + G.rounds + ' — find ' + nN + '!');
   else if(G.mode === 'blink') goal(G.pic === 0 && G.level === 0 ? '👁️ The picture flips A ↔ B. Poke what changes! (' + L.n + ' to find)' : '👁️ Watch it blink — find ' + L.n + ' changes!' + (G.level < 2 ? ' ' + typeTips() : ''));
+  else if(sc.mix && G.pic === 0 && G.level > 0) goal('🔍 Find ' + L.n + ' — anywhere! 🏞️ 🧑 🎒 ✨ 🎲');   // 🎲 pk-5c: changes can be in any layer
   else goal(G.pic === 0 && G.level === 0 ? '👀 Look at A and B. Poke what\'s different! (' + L.n + ' to find)' : '🔍 Find ' + L.n + ' differences!' + (G.level < 2 ? ' ' + typeTips() : G.pic === 0 && L.sub && !G.scene.photo ? ' Some are tiny: ' + L.sub.slice(0, 4).map(t => PK.TYPE_INFO[t].icon).join(' ') : ''));   // pk-5a: warn about the subtle ones
   G.busy = false;
   if(G.mode === 'blink') startBlink();
@@ -2403,9 +2622,9 @@ function raceGo(lvl, opp){
 function raceNext(){
   if(!RC) return;
   G.pic++; if(G.pic >= RC.rounds) return raceEnd();
-  const theme = SET.house === 'mix' ? pkPick(PK.THEME_KEYS.filter(k => k !== G.lastTheme)) : SET.house;
+  const theme = SET.house;   // 🎲 pk-5c: Mix = its own 5-layer picture
   let sc = null; for(let i = 0; i < 12 && !sc; i++){ sc = makePicture(theme); if(sc && G.used[sc.sig]) sc = null; }
-  G.lastTheme = theme; G.used[sc.sig] = 1; G.scene = sc; RC.owner = sc.diffs.map(() => -1); RC.pf = [0, 0];
+  G.lastTheme = sc.mix ? sc.theme : theme; G.used[sc.sig] = 1; G.scene = sc; RC.owner = sc.diffs.map(() => -1); RC.pf = [0, 0];
   RC.marks.forEach(m => m.el.remove()); RC.marks = [];
   $('rc-pic').textContent = '📸 ' + (G.pic + 1) + '/' + RC.rounds;
   raceDots(); raceLayout(true);
@@ -2574,4 +2793,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d+pk-4a+pk-4b+pk-4c+pk-4d+pk-5a+pk-5b) END OF Pokadif.html -->
+<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d+pk-4a+pk-4b+pk-4c+pk-4d+pk-5a+pk-5b+pk-5c) END OF Pokadif.html -->
