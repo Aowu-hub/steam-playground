@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<script>window.SP_BUILD={"page":"memory","routes":{"home":"index.html","gameroom":"gameroom.html","minigames":"minigames.html","stacking":"stacking.html","setup":"setup.html","achievements":"achievements.html","maze":"maze.html","robot":"robot.html","checkers":"checkers.html","chess":"chess.html","pinball":"pinball.html","hopper":"hopper.html","turbo":"turbo.html","memory":"memory.html","mathquest":"mathquest.html","doubleup":"doubleup.html","blockdrop":"blockdrop.html","popblocks":"popblocks.html","numbergrid":"numbergrid.html","numberboard":"numberboard.html","wordboard":"wordboard.html","sweetswap":"sweetswap.html","beatcorner":"beatcorner.html","slabrall":"slabrall.html","blasoff":"blasoff.html","brawlbuddies":"brawlbuddies.html","alignext":"alignext.html","soulbopper":"soulbopper.html","snakize":"snakize.html","polyplot":"polyplot.html","wisdeck":"wisdeck.html","eyesbrain":"eyesbrain.html","georead":"georead.html","geoscout":"geoscout.html","pokadif":"pokadif.html","pyradive":"pyradive.html","artifactory":"artifactory.html","tdstories":"tdstories.html","sciencetory":"sciencetory.html","isotest":"isotest.html","workshop":"workshop.html","room":"room.html","collection":"collection.html","poseparty":"poseparty.html"}};</script>
+<script>window.SP_BUILD={"page":"memory","routes":{"home":"index.html","gameroom":"gameroom.html","minigames":"minigames.html","stacking":"stacking.html","setup":"setup.html","achievements":"achievements.html","maze":"maze.html","robot":"robot.html","checkers":"checkers.html","chess":"chess.html","pinball":"pinball.html","hopper":"hopper.html","turbo":"turbo.html","memory":"memory.html","mathquest":"mathquest.html","doubleup":"doubleup.html","blockdrop":"blockdrop.html","popblocks":"popblocks.html","numbergrid":"numbergrid.html","numberboard":"numberboard.html","wordboard":"wordboard.html","sweetswap":"sweetswap.html","beatcorner":"beatcorner.html","slabrall":"slabrall.html","blasoff":"blasoff.html","brawlbuddies":"brawlbuddies.html","alignext":"alignext.html","soulbopper":"soulbopper.html","snakize":"snakize.html","polyplot":"polyplot.html","wisdeck":"wisdeck.html","eyesbrain":"eyesbrain.html","georead":"georead.html","geoscout":"geoscout.html","pokadif":"pokadif.html","pyradive":"pyradive.html","artifactory":"artifactory.html","tdstories":"tdstories.html","sciencetory":"sciencetory.html","isotest":"isotest.html","station":"station.html","workshop":"workshop.html","room":"room.html","collection":"collection.html","poseparty":"poseparty.html"}};</script>
 <script src="app/boot.js"></script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -1040,9 +1040,10 @@ function lxHostGo(){
   const list = Link.players().filter(p => p.name && p.on && !p.screen).sort((a, b) => a.seat - b.seat).slice(0, 4);
   if(list.length < (tv ? 1 : 2)){ UISound.play('error'); UI.toast(tv ? '📺 Wait for a player to join' : '📡 Wait for a friend to join'); return; }
   const r = LX.games++ % list.length, order = list.slice(r).concat(list.slice(0, r));   // a different player starts every round
-  let map = mapOk(mapOf(PICK.map)) ? PICK.map : '8';
+  const stn = !!(window.Station && Station.on);   // 📺 st-1: from the Game Station = the voted level + board, Classic cards
+  let map = stn && Station.map && mapOk(mapOf(Station.map)) ? Station.map : mapOk(mapOf(PICK.map)) ? PICK.map : '8';
   if(map === '10' && order.some(p => LX.phone[p.seat])){ map = '8'; UI.toast('📱 A phone is in the room — 8×8 this time'); }
-  LX.cfg = {id: Date.now().toString(36), host: S.player, tv, names: order.map(p => p.name), seats: order.map(p => p.seat === Link.seat() ? 'host' : p.seat), map, lvl: canPlay(PICK.lvl) ? PICK.lvl : 0, deck: PICK.deck, mode: PICK.mode === 'steam' ? 'steam' : 'classic', sdeck: PICK.sdeck};
+  LX.cfg = {id: Date.now().toString(36), host: S.player, tv, names: order.map(p => p.name), seats: order.map(p => p.seat === Link.seat() ? 'host' : p.seat), map, lvl: stn && Station.lvl != null ? Station.lvl : canPlay(PICK.lvl) ? PICK.lvl : 0, deck: PICK.deck, mode: !stn && PICK.mode === 'steam' ? 'steam' : 'classic', sdeck: PICK.sdeck};
   lxCloseLobby(); hideResult(); const o = document.querySelector('.lx-over'); if(o) o.remove();
   LX.pending = {role: 'host', me: tv ? -1 : order.findIndex(p => p.seat === Link.seat()), cfg: LX.cfg};
   lxStart(LX.cfg); lxSendGo(null, true);
@@ -1186,11 +1187,14 @@ function lxUrlCode(cb){
   try{ cb(new URLSearchParams(location.search).get('link') || ''); }catch(e){ cb(''); }
 }
 msAfter('choosePlayer', () => {
+  if(MODE_LINK === 'ltv'){ if(MemCover) MemCover.hide(); lxOpenHost(true); return; }   // 📺 st-1: the Gameroom's / Game Station's 📺 Room hostess
   if(MODE_LINK === 'link' || MODE_LINK === 'lhost' || MODE_LINK === 'ljoin'){ if(MemCover) MemCover.hide(); if(MODE_LINK === 'ljoin') lxJoin(); else if(MODE_LINK === 'lhost') lxOpenHost(false); else lxChoose(); return; }
   lxUrlCode(c => { c = String(c || '').replace(/[^0-9]/g, '').slice(0, 4); if(c.length === 4){ if(MemCover) MemCover.hide(); lxJoin(c); } });
 });
+/* 📺 STATION (st-1): opened from the 📺 Game Station — the TV starts by itself when the voted players are in (voted level + board), the players vote 🔁 again / 🎮 another game after the match (LinkKit `Station`) */
+if(window.Station) Station.game({url: WEBAPP_URL, page: 'memory', player: () => S.player || CURRENT_PLAYER, start: () => lxHostGo(), again: () => lxHostGo()});
 /* 📡 END LINK (mm-4) */
 </script>
 </body>
 </html>
-<!-- (11n+r32+back-1+modes-3+p1b+p1d+cs-3b+mm-1+mm-2+mm-3+mm-4+mm-5) END OF Memory.html -->
+<!-- (11n+r32+back-1+modes-3+p1b+p1d+cs-3b+mm-1+mm-2+mm-3+mm-4+mm-5+st-1) END OF Memory.html -->
