@@ -55,6 +55,8 @@
   @keyframes isoBob{0%,100%{transform:translateY(0) rotate(-4deg);}50%{transform:translateY(-8px) rotate(4deg);}}
   /* phones: icons only (the active button + the 🎨 look keep their words), the tip sits above the minimap, details fold into the card */
   @media (max-width:560px){ #tools .sp-btn{padding:6px 9px;min-height:38px;} #tools .sp-btn:not(.on) .bl{display:none;} #tools .grp{gap:4px;} #tools .grp + .grp{padding-left:5px;} #tools{gap:5px;padding:6px;}
+  /* act-1: 8 buttons — the narrowest phones (≤ 400 px) get a tighter dock so it stays one row */
+  @media (max-width:400px){ #tools{gap:3px;padding:5px;} #tools .grp{gap:2px;} #tools .grp + .grp{padding-left:3px;} #tools .sp-btn{padding:5px 6px;min-height:36px;} #tools .sp-btn .bi{font-size:1rem;} }
     #mini{width:112px;height:72px;} #tip{bottom:calc(var(--dock-h, 56px) + 100px + env(safe-area-inset-bottom));} #hud:not(.open) #m-more{display:none;} }
   @media (max-height:430px){ #mini{width:120px;height:76px;} #tip{display:none;} #tools{padding:5px 6px;} #tools .sp-btn{min-height:34px;padding:4px 9px;} #hud:not(.open) #m-more{display:none;} }
   .hidden{display:none !important;}
@@ -62,6 +64,7 @@
 <script src="inc/UiKit.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/ActionFX.js"></script>
 <script src="inc/IsoKit.js"></script>
 </head>
 <body ontouchstart="">
@@ -77,7 +80,7 @@
 <div id="tools" class="glass">
   <div class="grp"><button id="t-count" class="sp-btn sp-secondary sp-sm" data-sound="none">👥 40</button></div>
   <div class="grp"><button id="t-room" class="sp-btn sp-secondary sp-sm" data-sound="none">🏡 Room</button><button id="t-big" class="sp-btn sp-secondary sp-sm" data-sound="none">🗺️ Big map</button><button id="t-theme" class="sp-btn sp-secondary sp-sm" data-sound="none">🎨 Meadow</button></div>
-  <div class="grp"><button id="t-edit" class="sp-btn sp-secondary sp-sm" data-sound="none">⛰️ Build</button></div>
+  <div class="grp"><button id="t-edit" class="sp-btn sp-secondary sp-sm" data-sound="none">⛰️ Build</button><button id="t-act" class="sp-btn sp-secondary sp-sm" data-sound="none">🎬 Act</button></div>
   <div class="grp"><button id="t-follow" class="sp-btn sp-secondary sp-sm" data-sound="none">🎯 Follow</button><button id="t-fit" class="sp-btn sp-secondary sp-sm" data-sound="none">🔍 Fit</button></div>
 </div>
 <div id="loading"><div class="ic">🧱</div><p id="load-text">Building the little world…</p><div class="bar"><i id="load-bar"></i></div></div>
@@ -133,6 +136,7 @@ function goTo(u, tx, ty){ if(u.asking) return; u.asking = true;
 function wander(u){ const s = S.free[Math.floor(rnd() * S.free.length)]; goTo(u, s[0] + 0.5, s[1] + 0.5); }
 function step(dt){
   for(const u of S.units){ u.px = u.x; u.py = u.y; u.pz = u.z;
+    if(u.hold){ continue; }   // 🎬 in the action show: stands still
     if(!u.path){ u.wait -= dt; if(u.wait <= 0 && !u.asking) wander(u); continue; }
     const tgt = u.path[u.pi], dx = tgt.x - u.x, dy = tgt.y - u.y, d = Math.hypot(dx, dy), mv = u.spd * dt;
     if(d <= mv){ u.x = tgt.x; u.y = tgt.y; if(++u.pi >= u.path.length){ u.path = null; u.wait = 0.4 + rnd() * 2.5; } }
@@ -145,8 +149,9 @@ function render(alpha, t){
   if(S.followU && S.V.followObj !== S.followU.it) stopFollow();   // a drag / minimap tap stops following
   for(let q = 0; q < S.units.length; q++){ const u = S.units[q], it = u.it;
     it.x = u.px + (u.x - u.px) * alpha; it.y = u.py + (u.y - u.py) * alpha; it.z = u.pz + (u.z - u.pz) * alpha;
-    it.pic = u.frames[u.path ? Math.floor(u.dist * 3.2) % Iso.WALK_N : 0]; it.flip = u.flip; }
-  const st = Iso.frame(S.V, {items: S.items, t, groundFx: ringFx, overlay: (g, V) => { if(S.room && S.edit && ghost) Iso.footprint(g, V, ghost, t); }});
+    it.pic = u.frames[u.path && !u.hold ? Math.floor(u.dist * 3.2) % Iso.WALK_N : 0]; if(!it.act) it.flip = u.flip; }
+  showTick(t);
+  const st = Iso.frame(S.V, {items: S.items, t, groundFx: ringFx, overlay: (g, V) => { if(S.room && S.edit && ghost) Iso.footprint(g, V, ghost, t); showFx(g, V, t); }});
   S.mm.draw(); meter(st);
 }
 // ◇ pulsing ring under the followed friend + where friends were called to
@@ -213,14 +218,14 @@ $('iso').addEventListener('pointermove', placeMove);
 /* ---------- 🔧 setup ---------- */
 // the free area: below the top chips, above the tool buttons (the map is fitted + kept there)
 function pads(){ const t = $('hud').getBoundingClientRect(), b = $('tools').getBoundingClientRect(); return {t: Math.round(t.bottom) + 4, b: Math.round(innerHeight - b.top) + 6}; }
-async function build(){
+async function build(){ if(S.show && typeof showOn === 'function') showOn(false);
   const n = S.big ? 96 : 32; let things = []; if(S.room){ const r = makeRoom(); S.M = r.M; things = r.things; } else S.M = makeWorld(n); S.free = walkable(S.M); S.units.length = 0; S.items.length = 0; S.things = things; things.forEach(t => S.items.push(t));   // a new map → everyone gets a new spot
   if(!S.V){ S.V = Iso.view($('iso'), S.M, {min: 0.3, max: 3, pad: pads()}); S.V.onTap = tap; S.mm = Iso.minimap($('mini'), S.M, S.V, {dots: () => S.items}); addEventListener('resize', () => S.V.setPad(pads())); }
   else { S.V.map = S.M; S.V.chunks.clear(); S.V.chunkAny.clear(); S.V._px = 0; S.V._liquid = null; S.V._sky = null; S.mm = Iso.minimap($('mini'), S.M, S.V, {dots: () => S.items}); S.V.fit(); }
   if(S.room){ S.V.fit(); } else if(!S.big){ S.V.fit(); const tall = S.V.H > S.V.W * 1.3; if(S.V.W > 700 || tall) S.V.zoomAt(S.V.zoom * (tall ? 2 : 1.25), S.V.W / 2, S.V.H / 2); }   // phone held upright: start closer (pan to explore, 🔍 Fit shows all)
   await setCount(S.count);
 }
-async function setCount(n){
+async function setCount(n){ if(S.show) showOn(false);
   const want = n; n = Math.min(n, Iso.budget.units); S.count = n; setLbl($('t-count'), '👥 ' + n + (want > n ? ' (phone max)' : ''));
   while(S.units.length > n){ const u = S.units.pop(), k = S.items.indexOf(u.it); if(k >= 0) S.items.splice(k, 1); if(S.followU === u) stopFollow(); }
   const add = []; while(S.units.length < n){ const u = makeUnit(S.units.length); u.it = {x: u.x, y: u.y, z: u.z, pic: null, u}; S.units.push(u); S.items.push(u.it); add.push(u); }
@@ -256,6 +261,37 @@ $('t-follow').onclick = () => { if(S.followU){ stopFollow(); return; }
 $('t-fit').onclick = () => { if(S.followU) stopFollow(); S.V.fit(); };
 setTimeout(() => { $('tip').style.opacity = 0; }, 6000);
 $('iso').addEventListener('pointerdown', () => { if(!S.edit) setTimeout(() => { $('tip').style.opacity = 0; }, 1200); });
+// 🎬 act-1 action show: the friend nearest the middle is the target, up to 8 friends around take turns with every move (Iso.act on 🧱 B1's beats);
+//   on CONTACT the effect starts at the hand / foot (Iso.act's anchor) and flies to the target, which reacts (knocked back · love-struck · falls · dizzy)
+const SHOW_ACTS = ['act.shoot', 'move.punch.straight', 'beat.throw', 'act.cast', 'move.kick.roundhouse', 'act.summon', 'act.shield', 'move.punch.uppercut', 'act.heal', 'act.whip', 'act.slash', 'move.kick.front', 'act.spray', 'move.punch.haymaker', 'beat.force'];
+// the target's answer: punches / kicks → the 🎬 ActionFX reaction that fits (uppercut → knock-up …); the rest → a reaction that fits the skill
+const REACT = {'act.shoot': 'act.love', 'beat.throw': 'move.react.flinch', 'act.cast': 'move.react.dizzy', 'act.whip': 'move.react.spinout', 'act.slash': 'act.fall', 'act.spray': 'move.react.frozen', 'beat.force': 'move.react.pushslide'};
+const reactTo = k => REACT[k] || (/^move\./.test(k) && window.ActionFX ? ActionFX.reactFor(k) : 'move.react.bighit');
+// things that FLY to the target (melee moves have their own contact effect — nothing flies)
+const FX_CH = {'act.shoot': '💘', 'beat.throw': '⚾', 'act.cast': '✨', 'act.summon': '🌟', 'act.shield': '🫧', 'act.heal': '💗', 'act.whip': '🎀', 'act.slash': '⚡', 'act.spray': '💦', 'beat.force': '💨'};
+S.show = null; S.fx = [];
+function showOn(on){ const sh = S.show; if(sh){ sh.cast.forEach(u => { u.hold = false; u.wait = 0.3; }); } S.show = null; S.fx.length = 0; $('t-act').classList.toggle('on', !!on); if(!on) return;
+  let tgt = null, bd = 1e9; S.units.forEach(u => { const p = S.V.toScreen(u.it.x, u.it.y, u.it.z), d = Math.hypot(p.x - S.V.cx, p.y - S.V.cy); if(d < bd){ bd = d; tgt = u; } }); if(!tgt) return;
+  const near = S.units.filter(u => u !== tgt).map(u => [u, Math.hypot(u.x - tgt.x, u.y - tgt.y)]).filter(a => a[1] > 0.8 && a[1] < 7).sort((a, b) => a[1] - b[1]).slice(0, 8).map(a => a[0]);
+  const cast = [tgt].concat(near); cast.forEach(u => { u.hold = true; u.path = null; });
+  // 👊 the two nearest step up next to the target for the punches / kicks (melee needs contact); the rest act from where they stand
+  const melee = near.slice(0, 2); melee.forEach((u, n) => { u.x = tgt.x + (n ? 0 : -1.05); u.y = tgt.y + (n ? -1.05 : 0); u.it.x = u.x; u.it.y = u.y; u.it.z = tgt.it.z; });
+  S.show = {tgt, actors: near, melee, ranged: near.length > 2 ? near.slice(2) : near, cast, i: 0, next: 0}; }
+function showTick(t){ const sh = S.show; if(!sh || !sh.actors.length || t < sh.next) return; const key = SHOW_ACTS[sh.i % SHOW_ACTS.length], mel = /^move\./.test(key),
+    pool = mel ? sh.melee : sh.ranged, u = pool[(sh.i >> 1) % pool.length]; sh.i++; sh.next = t + 1.15;
+  const self = key === 'act.shield' || key === 'act.heal' || key === 'act.summon';
+  Iso.act(u.it, u.who, key, {t, target: sh.tgt.it, onContact: hit => {
+    const to = self ? null : {x: sh.tgt.it.x, y: sh.tgt.it.y, z: (sh.tgt.it.z || 0) + 2.4}; if(FX_CH[key]) S.fx.push({ch: FX_CH[key], from: hit, to, t0: t, kind: self ? 'self' : 'fly'});
+    const re = self ? null : reactTo(key); if(re && !sh.tgt.it.act) setTimeout(() => { if(S.show === sh) Iso.act(sh.tgt.it, sh.tgt.who, re, {t: performance.now() / 1000, target: u.it}); }, mel ? 30 : 220); }}); }
+function showFx(g, V, t){ for(let i = S.fx.length - 1; i >= 0; i--){ const f = S.fx[i], a = (t - f.t0) / (f.kind === 'self' ? 0.9 : 0.35); if(a >= 1.4){ S.fx.splice(i, 1); continue; }
+    const k = V.zoom, P = V.toScreen(f.from.x, f.from.y, f.from.z);
+    g.save(); g.globalAlpha = Math.max(0, 1 - a * 0.7); g.strokeStyle = '#FFD84D'; g.lineWidth = 3 * k; g.beginPath(); g.arc(P.x, P.y, (6 + a * 22) * k, 0, Math.PI * 2); g.stroke(); g.restore();   // ⭕ the pop AT THE HAND
+    if(f.kind === 'self'){ for(let n = 0; n < 5; n++){ const an = n / 5 * Math.PI * 2 + a * 2; emojiAt(g, f.ch, P.x + Math.cos(an) * 18 * k * a, P.y + Math.sin(an) * 9 * k * a - 20 * k * a, 14 * k, 1 - a / 1.4); } }
+    else { const Q = V.toScreen(f.to.x, f.to.y, f.to.z), q = Math.min(1, a); emojiAt(g, f.ch, P.x + (Q.x - P.x) * q, P.y + (Q.y - P.y) * q - Math.sin(q * Math.PI) * 18 * k, 16 * k, a < 1 ? 1 : 1.4 - a);
+      if(a >= 1){ g.save(); g.globalAlpha = 1.4 - a; g.fillStyle = 'rgba(255,92,154,.35)'; g.beginPath(); g.arc(Q.x, Q.y, (a - 0.9) * 40 * k, 0, Math.PI * 2); g.fill(); g.restore(); } } } }
+function emojiAt(g, ch, x, y, sz, al){ g.save(); g.globalAlpha = Math.max(0, Math.min(1, al)); g.font = Math.max(6, Math.round(sz)) + 'px serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ch, x, y); g.restore(); }
+$('t-act').onclick = () => showOn(!S.show);
+S.showOn = showOn; S.render = render;
 S.setCount = setCount; S.build = build; window.ISOTEST = S;
 build().then(() => { S.loop = Iso.loop({update: step, render}); });
 })();
