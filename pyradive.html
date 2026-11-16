@@ -413,6 +413,10 @@ var PD = (function () {
   // Team-local: u = distance from the net into your own court (always ≥ 0 on your side), v = across.
   var DT = 1 / 120;
   var PGRAV = 15.5, JUMPV = 4.4;         // players: a ~0.6 m jump, ~0.55 s in the air
+  // 🦘 pd-6b2: jump height by power — p.jf scales the height (and the gravity, so the air time stays the same); every RULE reads rz(p) = the
+  //   height of the plain 0.62 m jump, so reach / dunk / block / net / robot timing are exactly as before (seeded matches replay the same)
+  var JF = { hop: 1, attack: 1.6, power: 2.0, pyra: 2.4 };   // 0.62 · 1.0 · 1.25 · 1.5 m
+  function rz(p) { return p.z / (p.jf || 1); }
   var BALL_R = 0.12;
 
   // ---------- 🏐 PyraSpike modes (R1). R2 adds 🦶 PyraStrike, R3 ⚡ PyraSpark (same engine, own rules) ----------
@@ -642,7 +646,7 @@ var PD = (function () {
   function startServe(M, team) {
     M.phase = 'serve'; M.phaseT = 0; M.serveTeam = team; M.side = team; M.n = 0; M.lastP = null; M.lastAct = null; M.lastTeam = null; M.lastBlock = false;
     M.recv = [null, null]; M.cp = [null, null]; M.spiker = [null, null]; M.setter = [null, null]; M.rally = 0; M.serveFresh = false;
-    M.players.forEach(function (p) { var b = baseOf(M, p); p.x = b.x; p.y = b.y; p.z = 0; p.vz = 0; p.dive = null; p.block = 0; p.want = null; p.state = 'ready'; p.act = null; p.charge = -1; p.recover = 0; });
+    M.players.forEach(function (p) { var b = baseOf(M, p); p.x = b.x; p.y = b.y; p.z = 0; p.vz = 0; p.jf = 1; p.approach = null; p.dive = null; p.block = 0; p.want = null; p.state = 'ready'; p.act = null; p.charge = -1; p.recover = 0; });
     M.players.forEach(function (q) { q.jumpServe = null; q.feed = null; });
     var s = serverOf(M, team), sp = serveSpot(M, team); s.x = sp.x; s.y = sp.y;
     var b = M.ball; b.held = s.id; b.pyra = null; b.spirit = null; b.spiritSlot = null; b.spiritTier = null; b.vx = b.vy = b.vz = 0; b.trail = []; placeHeld(M);
@@ -742,7 +746,7 @@ var PD = (function () {
     var b = M.ball; if (M.phase !== 'rally' || b.held != null) return false;
     if (M.lastP === p.id && M.t - b.hitT < 0.25) return false;
     if (uOf(p.team, b.x) < -0.05) return false;
-    var hz = b.z - p.z, dh = hyp(b.x - p.x, b.y - p.y);
+    var hz = b.z - rz(p), dh = hyp(b.x - p.x, b.y - p.y);
     var hi = 2.45 + (key === 'drive' || key === 'dink' ? 0.25 : 0), lo = -0.05;
     return dh <= reachOf(M, p, key) && hz >= lo && hz <= hi;
   }
@@ -770,7 +774,7 @@ var PD = (function () {
   // doTouch: a player touches the ball. key: 'touch' (J) · 'drive' (K) · 'dink' (L) — the body part is picked by the ball's height.
   function doTouch(M, p, key, opt) {
     opt = opt || {};
-    var b = M.ball, T = p.team, opp = 1 - T, nn = nextNOf(M, T), hz = b.z - p.z, lv = M.lv, person = isPerson(p);
+    var b = M.ball, T = p.team, opp = 1 - T, nn = nextNOf(M, T), hz = b.z - rz(p), lv = M.lv, person = isPerson(p);
     // faults: same player twice in a row · a 4th touch
     if (M.side === T && M.lastP === p.id && !M.lastBlock && M.lastTeam === T) {
       if (lv.dbl && !isStrike(M)) return fault(M, T, 'double', p.id);   // 🦶 takraw: one player may touch it again
@@ -779,10 +783,10 @@ var PD = (function () {
     if (nn > 3) { if (lv.four) return fault(M, T, 'four', p.id); forceOver = true; }
     var act;
     if (key === 'dink') act = 'dink';
-    else if (key === 'drive') act = hz >= (isStrike(M) ? 1.2 : 1.5) && (p.z > 0.15 || hz >= (isStrike(M) ? 1.45 : 1.75)) ? 'dunk' : 'drive';
+    else if (key === 'drive') act = hz >= (isStrike(M) ? 1.2 : 1.5) && (rz(p) > 0.15 || hz >= (isStrike(M) ? 1.45 : 1.75)) ? 'dunk' : 'drive';
     else act = p.dive ? 'dive' : hz < 0.75 ? 'dig' : hz < 1.75 ? 'bump' : 'set';
     if (key === 'touch' && (nn >= 3 || forceOver)) forceOver = true;
-    M.lastStyle = act === 'dunk' && isStrike(M) && ((p.z > 0.5 && hz >= 2.1) || (p.pyraArm && p.meter >= PYRA_COST)) ? 'bicycle' : act === 'dunk' && isStrike(M) ? 'roll' : null;   // 🚲 high ball / flame = bicycle kick
+    M.lastStyle = act === 'dunk' && isStrike(M) && ((rz(p) > 0.5 && hz >= 2.1) || (p.pyraArm && p.meter >= PYRA_COST)) ? 'bicycle' : act === 'dunk' && isStrike(M) ? 'roll' : null;   // 🚲 high ball / flame = bicycle kick
     var atk = act === 'dunk' || act === 'drive' || act === 'dink'; comboStep(M, p, atk);
     var pyra = false, spirit = spiritGo(M, p, act);
     if (atk && !(spirit && spirit.slot === 'combo')) comboEnd(M, T);
@@ -971,7 +975,10 @@ var PD = (function () {
     if (M.lastP === p.id && M.t - M.ball.hitT < 0.35) return false;   // a second tap right after your own touch = a button mash, not a double touch
     p.want = { key: key, t: 0.42 };
     // K on a high ball near the net = jump + dunk in one press (people) — the jump starts now
-    if (key === 'drive' && p.z === 0 && !p.dive && M.ball.z > 2.0 && uOf(p.team, p.x) < 3.2 && hyp(M.ball.x - p.x, M.ball.y - p.y) < 2.4) jump(M, p, true);
+    // 💥 pd-6b2 run-up: your team's ball still going up (or high and far) → run to the spot under its way down, jump at the right moment
+    var bb = M.ball, ttd = bb.vz < 0 ? (bb.z - 2.9) / Math.max(0.5, -bb.vz) : 9;
+    if ((key === 'drive' || key === 'dink') && !isStrike(M) && p.z === 0 && !p.dive && M.side === p.team && M.n >= 1 && bb.held == null && uOf(p.team, bb.x) > 0 && uOf(p.team, bb.x) < 3.6 && bb.z > 1.4 && ttd > 0.32) { p.approach = { key: key, t: 1.6 }; p.want = { key: key, t: 0.6 }; ev(M, 'approach', { p: p.id }); }
+    else if (key === 'drive' && p.z === 0 && !p.dive && M.ball.z > 2.0 && uOf(p.team, p.x) < 3.2 && hyp(M.ball.x - p.x, M.ball.y - p.y) < 2.4) jump(M, p, true);
     return true;
   }
   function release(M, pid, key) {
@@ -980,10 +987,13 @@ var PD = (function () {
   }
   function jump(M, p, forSpike) {
     if (p.z > 0 || p.dive || p.recover > 0) return false;
-    p.vz = JUMPV; p.state = 'jump';
+    p.state = 'jump'; p.approach = null;
     var oppHasIt = M.lastTeam != null && M.lastTeam !== p.team || (M.side !== p.team && M.phase === 'rally');
     if (!forSpike && uOf(p.team, p.x) < 1.7 && oppHasIt) { p.block = 0.75; if (p.pyraArm && p.meter >= PYRA_COST) { p.pyraBlock = true; } }
-    ev(M, p.block > 0 ? 'blockJump' : 'jump', { p: p.id });
+    var big = forSpike || p.block > 0;   // 🦘 pd-6b2: spike / block jumps go higher with power (same air time, same rules)
+    p.jf = !big ? JF.hop : (p.pyraArm && p.meter >= PYRA_COST) || p.spiritArm ? JF.pyra : p.meter >= PYRA_COST ? JF.power : JF.attack;
+    p.vz = JUMPV * p.jf;
+    ev(M, p.block > 0 ? 'blockJump' : 'jump', { p: p.id, h: Math.round(JUMPV * JUMPV * p.jf / (2 * PGRAV) * 100) / 100 });
     return true;
   }
 
@@ -1037,8 +1047,8 @@ var PD = (function () {
         var plan = M.rally + '/' + nn;
         if (p.planFor !== plan) { p.planFor = plan; p.planDink = M.rnd() < lv.bot.dink; p.planHard = M.rnd() < 0.15 + lv.bot.spike; p.planLow = M.rnd() < 0.5 ? 'touch' : 'drive'; }
         var key = 'touch';
-        if (nn >= 3) key = (b.z - p.z) >= 1.5 && p.planHard ? (p.planDink ? 'dink' : 'drive') : p.planLow;
-        if (nn >= 3 && p.z > 0.1) key = p.planDink ? 'dink' : 'drive';
+        if (nn >= 3) key = (b.z - rz(p)) >= 1.5 && p.planHard ? (p.planDink ? 'dink' : 'drive') : p.planLow;
+        if (nn >= 3 && rz(p) > 0.1) key = p.planDink ? 'dink' : 'drive';
         if (canReach(M, p, key)) {
           if (p.meter >= PYRA_COST && !isPerson(p) && (key === 'drive' || key === 'dink') && M.rnd() < 0.35) { p.pyraArm = true; p.spiritArm = p.meter >= SPIRIT_COST && M.level >= 1; if (p.spiritArm && M.level >= 2) armTeam(M, p); }
           p.aimF = (M.rnd() * 2 - 1) * 0.6; p.aimS = (M.rnd() * 2 - 1) * 0.8;
@@ -1054,7 +1064,7 @@ var PD = (function () {
       // the other side is about to attack → front row comes to the net to block
       var front = isBlocker(M, p);
       if (front) { var ak = byId(M, M.spiker[1 - T]); tgt = { x: 0.7 * sgn(T), y: ak ? ak.y : 0 };
-        if (ak && ak.z > 0.2 && p.z === 0 && Math.abs(p.y - ak.y) < 1.2 && uOf(T, p.x) < 1.2 && (p.blockTry !== M.rally)) { p.blockTry = M.rally; if (M.rnd() < lv.bot.block) jump(M, p); } }
+        if (ak && rz(ak) > 0.2 && p.z === 0 && Math.abs(p.y - ak.y) < 1.2 && uOf(T, p.x) < 1.2 && (p.blockTry !== M.rally)) { p.blockTry = M.rally; if (M.rnd() < lv.bot.block) jump(M, p); } }
     }
     if (!tgt) { var bs = baseOf(M, p); tgt = bs; if (M.phase === 'rally' && M.landTeam === T && !mine) tgt = { x: bs.x * 0.8 + (M.landing ? M.landing.x * 0.2 : 0), y: bs.y * 0.8 + (M.landing ? M.landing.y * 0.2 : 0) }; }
     return { x: tgt.x, y: tgt.y, run: run };
@@ -1091,6 +1101,17 @@ var PD = (function () {
           if (d > 0.12) { var k = (hyp(p.input.x, p.input.y) > 0.2 ? 0.35 : 1) * lv.assist.autoMove; vx += dx / d * run * k; vy += dy / d * run * k; }
         }
       }
+      if (p.approach && isPerson(p)) {   // 💥 pd-6b2 run-up
+        var ap = p.approach; ap.t -= dt;
+        if (ap.t <= 0 || M.phase !== 'rally' || M.side !== p.team || b.held != null || p.dive || p.z > 0 || uOf(p.team, b.x) < 0) p.approach = null;
+        else {
+          var gB = ballG(M), at = b.vz < 0 ? Math.max(0, (b.z - 2.9) / Math.max(0.5, -b.vz)) : (b.vz / gB + Math.sqrt(Math.max(0, 2 * (b.z + b.vz * b.vz / (2 * gB) - 2.9) / gB)));
+          var ax = b.x + b.vx * at + sgn(p.team) * 0.45, ay = b.y + b.vy * at, adx = ax - p.x, ady = ay - p.y, ad = hyp(adx, ady);
+          if (ad > 0.1) { var asp = Math.min(run * 1.05, ad / Math.max(dt, at * 0.6 + dt)); vx = adx / ad * asp; vy = ady / ad * asp; } else { vx = 0; vy = 0; }
+          if (p.want) p.want.t = Math.max(p.want.t, 0.6); else p.want = { key: ap.key, t: 0.6 };
+          if (b.vz < 0) { var tta = (b.z - 2.9) / Math.max(0.5, -b.vz); if (tta < 0.32 && hyp(b.x - p.x, b.y - p.y) < 1.8) { jump(M, p, true); p.want = { key: ap.key, t: 0.6 }; } }
+        }
+      }
       if (tgt) { var tdx = tgt.x - p.x, tdy = tgt.y - p.y, td = hyp(tdx, tdy), r2 = tgt.run || run; if (td > 0.08) { var sp = Math.min(r2, td / dt); vx = tdx / td * sp; vy = tdy / td * sp; } }
       if (M.phase === 'serve' && M.ball.held === p.id) { vx = 0; vy = 0; }
       if (p.dive) { p.dive.t -= dt; vx = p.dive.dx * 6.2 * Math.max(0.85, lv.spd); vy = p.dive.dy * 6.2 * Math.max(0.85, lv.spd); if (p.dive.t <= 0) { p.dive = null; p.recover = 0.4; } }
@@ -1102,11 +1123,11 @@ var PD = (function () {
       var u = uOf(p.team, p.x), umin = isPerson(p) ? 0.15 : 0.42;
       if (!(M.phase === 'serve' && M.ball.held === p.id)) u = clamp(u, umin, M.L + 3);
       p.x = u * sgn(p.team); p.y = clamp(p.y, -M.W / 2 - 2, M.W / 2 + 2);
-      if (p.z > 0 || p.vz > 0) { p.vz -= PGRAV * dt; p.z += p.vz * dt; if (p.z <= 0) { p.z = 0; p.vz = 0; p.state = 'ready'; p.land = 0.12; if (!p.block) p.pyraBlock = false; } }
+      if (p.z > 0 || p.vz > 0) { p.vz -= PGRAV * (p.jf || 1) * dt; p.z += p.vz * dt; if (p.z <= 0) { p.z = 0; p.vz = 0; p.jf = 1; p.state = 'ready'; p.land = 0.12; if (!p.block) p.pyraBlock = false; } }
       if (p.land > 0) p.land -= dt;
       var mv = hyp(vx, vy); p.walkT = mv > 0.4 && p.z === 0 ? p.walkT + dt * Math.min(1.6, mv / 3) : 0;
       // net touch (Intermediate+): a person jumping right into the net
-      if (M.phase === 'rally' && lv.net && p.z > 0.15 && uOf(p.team, p.x) < 0.24 && isPerson(p) && M.lastTeam != null) { fault(M, p.team, 'net', p.id); }
+      if (M.phase === 'rally' && lv.net && rz(p) > 0.15 && uOf(p.team, p.x) < 0.24 && isPerson(p) && M.lastTeam != null) { fault(M, p.team, 'net', p.id); }
     });
     if (M.phase === 'serve') {
       placeHeld(M);
@@ -1126,7 +1147,7 @@ var PD = (function () {
     M.players.forEach(function (p) {
       if (M.phase !== 'rally') return;
       if (p.want && canReach(M, p, p.want.key)) doTouch(M, p, p.want.key);
-      else if (isPerson(p) && !p.want && M.recv[p.team] === p.id && b.z - p.z < 0.6 && b.vz < 0) {   // 🌱 auto dig: a low ball right at your feet
+      else if (isPerson(p) && !p.want && M.recv[p.team] === p.id && b.z - rz(p) < 0.6 && b.vz < 0) {   // 🌱 auto dig: a low ball right at your feet
         if (hyp(b.x - p.x, b.y - p.y) <= lv.assist.autoDig && uOf(p.team, b.x) > 0 && M.lastTeam != null) doTouch(M, p, 'touch', { auto: true });
       }
     });
@@ -1143,7 +1164,7 @@ var PD = (function () {
       var from = px < 0 ? 0 : 1, to = 1 - from;
       if (Math.abs(b.y) > M.W / 2 + 0.45) { ev(M, 'out', { team: M.lastTeam, why: 'antenna' }); point(M, 1 - (M.lastTeam == null ? from : M.lastTeam), 'out'); return; }
       // 🧱 block?
-      var blk = b.spirit && b.spiritSlot !== 'block' ? null : teamOf(M, to).filter(function (q) { return q.block > 0 && q.z > 0.12 && uOf(to, q.x) < 1.1 && Math.abs(b.y - q.y) <= 0.62 * (q.spiritArm && q.meter >= SPIRIT_COST ? 2.6 : q.pyraBlock ? 1.8 : 1) && b.z >= M.netH - 0.15 && b.z <= q.z + 2.65 + (q.spiritArm ? 0.6 : 0); })[0];   // a Spirit attack can't be blocked
+      var blk = b.spirit && b.spiritSlot !== 'block' ? null : teamOf(M, to).filter(function (q) { return q.block > 0 && rz(q) > 0.12 && uOf(to, q.x) < 1.1 && Math.abs(b.y - q.y) <= 0.62 * (q.spiritArm && q.meter >= SPIRIT_COST ? 2.6 : q.pyraBlock ? 1.8 : 1) && b.z >= M.netH - 0.15 && b.z <= rz(q) + 2.65 + (q.spiritArm ? 0.6 : 0); })[0];   // a Spirit attack can't be blocked
       if (blk && M.lastTeam === from) {
         var spB = spiritGo(M, blk, 'block');
         var pyraB = !spB && blk.pyraBlock && blk.meter >= PYRA_COST && !blk.spiritArm;
@@ -3524,4 +3545,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pd-4c+cs-pd+ck-2d+pd-4e+pd-5a+pd-7+pd-5b+pd-6a+pd-5c+pd-6b+pd-5d) END OF PyraDive.html -->
+<!-- (pd-4c+cs-pd+ck-2d+pd-4e+pd-5a+pd-7+pd-5b+pd-6a+pd-5c+pd-6b+pd-5d+pd-6b2) END OF PyraDive.html -->
