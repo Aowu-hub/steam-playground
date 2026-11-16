@@ -263,12 +263,15 @@ setTimeout(() => { $('tip').style.opacity = 0; }, 6000);
 $('iso').addEventListener('pointerdown', () => { if(!S.edit) setTimeout(() => { $('tip').style.opacity = 0; }, 1200); });
 // 🎬 act-1 action show: the friend nearest the middle is the target, up to 8 friends around take turns with every move (Iso.act on 🧱 B1's beats);
 //   on CONTACT the effect starts at the hand / foot (Iso.act's anchor) and flies to the target, which reacts (knocked back · love-struck · falls · dizzy)
-const SHOW_ACTS = ['act.shoot', 'move.punch.straight', 'beat.throw', 'act.cast', 'move.kick.roundhouse', 'act.summon', 'act.shield', 'move.punch.uppercut', 'act.heal', 'act.whip', 'act.slash', 'move.kick.front', 'act.spray', 'move.punch.haymaker', 'beat.force'];
-// the target's answer: punches / kicks → the 🎬 ActionFX reaction that fits (uppercut → knock-up …); the rest → a reaction that fits the skill
-const REACT = {'act.shoot': 'act.love', 'beat.throw': 'move.react.flinch', 'act.cast': 'move.react.dizzy', 'act.whip': 'move.react.spinout', 'act.slash': 'act.fall', 'act.spray': 'move.react.frozen', 'beat.force': 'move.react.pushslide'};
-const reactTo = k => REACT[k] || (/^move\./.test(k) && window.ActionFX ? ActionFX.reactFor(k) : 'move.react.bighit');
-// things that FLY to the target (melee moves have their own contact effect — nothing flies)
-const FX_CH = {'act.shoot': '💘', 'beat.throw': '⚾', 'act.cast': '✨', 'act.summon': '🌟', 'act.shield': '🫧', 'act.heal': '💗', 'act.whip': '🎀', 'act.slash': '⚡', 'act.spray': '💦', 'beat.force': '💨'};
+const SHOW_ACTS = ['move.throw.bow', 'move.punch.straight', 'move.cast.beam', 'move.kick.roundhouse', 'move.defend.bubble', 'move.slash.spin', 'move.cast.bolt', 'move.punch.uppercut', 'move.power.heal', 'act.whip',
+  'move.slash.cross', 'move.throw.overhand', 'move.kick.front', 'move.cast.skycall', 'move.punch.haymaker', 'act.shoot', 'move.slash.cleave', 'move.cast.blast'];
+// the target's answer: 🎬 ActionFX picks the reaction that fits (uppercut → knock-up, haymaker → knockback …); self moves (shield, heal, sky call) → none
+const REACT = {'act.shoot': 'act.love', 'act.whip': 'move.react.spinout', 'move.cast.bolt': 'move.react.dizzy', 'move.cast.beam': 'move.react.knockback', 'move.throw.bow': 'move.react.flinch', 'move.throw.overhand': 'move.react.bighit'};
+const SELF = /^move\.(defend|power)\.|^move\.cast\.skycall$/;
+const MELEE = /^move\.(punch|kick|slash)\./;
+const reactTo = k => SELF.test(k) ? null : REACT[k] || (/^move\./.test(k) && window.ActionFX ? ActionFX.reactFor(k) : 'move.react.bighit');
+// things that FLY to the target (melee + self moves bring their own effect — nothing flies)
+const FX_CH = {'act.shoot': '💘', 'move.throw.bow': '🏹', 'move.throw.overhand': '⚾', 'move.cast.beam': '✨', 'move.cast.bolt': '⚡', 'move.cast.blast': '💨', 'act.whip': '🎀'};
 S.show = null; S.fx = [];
 function showOn(on){ const sh = S.show; if(sh){ sh.cast.forEach(u => { u.hold = false; u.wait = 0.3; }); } S.show = null; S.fx.length = 0; $('t-act').classList.toggle('on', !!on); if(!on) return;
   let tgt = null, bd = 1e9; S.units.forEach(u => { const p = S.V.toScreen(u.it.x, u.it.y, u.it.z), d = Math.hypot(p.x - S.V.cx, p.y - S.V.cy); if(d < bd){ bd = d; tgt = u; } }); if(!tgt) return;
@@ -277,9 +280,9 @@ function showOn(on){ const sh = S.show; if(sh){ sh.cast.forEach(u => { u.hold = 
   // 👊 the two nearest step up next to the target for the punches / kicks (melee needs contact); the rest act from where they stand
   const melee = near.slice(0, 2); melee.forEach((u, n) => { u.x = tgt.x + (n ? 0 : -1.05); u.y = tgt.y + (n ? -1.05 : 0); u.it.x = u.x; u.it.y = u.y; u.it.z = tgt.it.z; });
   S.show = {tgt, actors: near, melee, ranged: near.length > 2 ? near.slice(2) : near, cast, i: 0, next: 0}; }
-function showTick(t){ const sh = S.show; if(!sh || !sh.actors.length || t < sh.next) return; const key = SHOW_ACTS[sh.i % SHOW_ACTS.length], mel = /^move\./.test(key),
+function showTick(t){ const sh = S.show; if(!sh || !sh.actors.length || t < sh.next) return; const key = SHOW_ACTS[sh.i % SHOW_ACTS.length], mel = MELEE.test(key),
     pool = mel ? sh.melee : sh.ranged, u = pool[(sh.i >> 1) % pool.length]; sh.i++; sh.next = t + 1.15;
-  const self = key === 'act.shield' || key === 'act.heal' || key === 'act.summon';
+  const self = SELF.test(key) || key === 'act.summon';
   Iso.act(u.it, u.who, key, {t, target: sh.tgt.it, onContact: hit => {
     const to = self ? null : {x: sh.tgt.it.x, y: sh.tgt.it.y, z: (sh.tgt.it.z || 0) + 2.4}; if(FX_CH[key]) S.fx.push({ch: FX_CH[key], from: hit, to, t0: t, kind: self ? 'self' : 'fly'});
     const re = self ? null : reactTo(key); if(re && !sh.tgt.it.act) setTimeout(() => { if(S.show === sh) Iso.act(sh.tgt.it, sh.tgt.who, re, {t: performance.now() / 1000, target: u.it}); }, mel ? 30 : 220); }}); }
