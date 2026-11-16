@@ -775,6 +775,8 @@ const MODES_ = [
   { game: 'math-quest', id: 'sign', icon: '❓', name: 'Math Quest Missing sign', pitch: 'Which sign makes the sum true?', route: 'mathquest', added: '2026-11-16', tried: { board: 'math-quest', theme: ':sign' } },   // ➗ mq-w4
   { game: 'math-quest', id: 'fix', icon: '🔍', name: 'Math Quest Find the mistake', pitch: 'Be a maths detective — spot it, fix it!', route: 'mathquest', added: '2026-11-16', tried: { board: 'math-quest', theme: ':fix' } },   // ➗ mq-w4
   { game: 'math-quest', id: 'clock', icon: '🕐', name: 'Math Quest Clock maths', pitch: 'Read the clock, add the minutes!', route: 'mathquest', added: '2026-11-16', tried: { board: 'math-quest', theme: ':clock' } },   // ➗ mq-w4
+  { game: 'math-quest', id: 'listenen', icon: '🎧', name: 'Math Quest Listen', pitch: 'Hear the sum — no numbers on screen!', route: 'mathquest', added: '2026-11-16', tried: { board: 'math-quest', theme: ':listenen' } },   // ➗ mq-w5
+  { game: 'math-quest', id: 'listenth', icon: '👂', name: 'Math Quest ฟังโจทย์', pitch: 'Thai sums you hear — ฟังแล้วตอบ!', route: 'mathquest', added: '2026-11-16', tried: { board: 'math-quest', theme: ':listenth' } },   // ➗ mq-w5
   { game: 'double-up', id: 'challenge', icon: '🏔️', name: 'Double Up Challenge', pitch: 'Tiny 3×3 board — reach 1024!', route: 'doubleup', tried: { feat: [['double-up', 'chTile']] } },
   { game: 'memory', id: 'friends', icon: '👥', name: 'Memories with friends', pitch: 'Take turns — most pairs wins!', route: 'memory', tried: { feat: [['memory', 'wins']] } },
   { game: 'memory', id: 'time', icon: '⏱️', name: 'Memories Time attack', pitch: 'Beat the clock — find every pair fast!', route: 'memory', added: '2026-11-15', tried: { board: 'memory', theme: 'Time attack' } },
@@ -2772,6 +2774,7 @@ const FEAT_DEFS = {
     signRight: { name: 'Sign Finder', icon: '❓', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-w4: ❓ Missing sign
     fixRight: { name: 'Maths Detective', icon: '🔍', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-w4: 🔍 Find the mistake (find + fix)
     clockRight: { name: 'Time Teller', icon: '🕐', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-w4: 🕐 Clock maths
+    listenRight: { name: 'Sharp Ears', icon: '🎧', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-w5: 🎧 Listen / 👂 ฟังโจทย์
   },
   memory: {
     pairs: { name: 'Pair Finder', icon: '🃏', kind: 'sum', tiers: [50, 250, 1000] },
@@ -2964,6 +2967,7 @@ const TITLE_DEFS = [
   { id: 'mq_trick', name: 'Trick Spotter', icon: '🕵️', hint: 'Spot 25 Math Quest trick questions (🤔 English or 🙃 ไทย)', rule: f => featVal_(f, 'math-quest', 'trickRight') >= 25 },   // ➗ mq-w3
   { id: 'mq_test', name: 'Test Ace', icon: '📝', hint: 'Get 50 Math Quest test questions right (📝 Test Practice or 📝 ข้อสอบ)', rule: f => featVal_(f, 'math-quest', 'testRight') >= 50 },   // ➗ mq-t1
   { id: 'mq_detective', name: 'Maths Detective', icon: '🔍', hint: 'Find 25 mistakes in Math Quest 🔍 Find the mistake', rule: f => featVal_(f, 'math-quest', 'fixRight') >= 25 },   // ➗ mq-w4
+  { id: 'mq_ears', name: 'Sharp Ears', icon: '🎧', hint: 'Get 50 Math Quest sums right just by listening (🎧 Listen or 👂 ฟังโจทย์)', rule: f => featVal_(f, 'math-quest', 'listenRight') >= 50 },   // ➗ mq-w5
 ];
 function featVal_(f, g, s) { return Number(((f || {})[g] || {})[s]) || 0; }
 function featsSheet_() {
@@ -4867,7 +4871,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
