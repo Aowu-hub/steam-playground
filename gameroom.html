@@ -63,6 +63,13 @@
   .hi{font-family:var(--font-display,'Fredoka',sans-serif);font-weight:700;font-size:1.7rem;line-height:1.1;text-shadow:0 2px 0 rgba(0,0,0,0.10);}
   .q{font-weight:800;opacity:.92;font-size:0.95rem;}
   .q button{border:none;background:rgba(255,255,255,0.25);color:#fff;border-radius:10px;padding:3px 10px;font-weight:800;cursor:pointer;}
+  /* 🎮 ap-1 APP LOGO (Aowu 2026-11-16): wide screens = in the free middle of the 👋 card on a soft light patch; phones = top row, right of 🏠 Dashboard */
+  .lobby-logo{display:none;position:relative;z-index:1;flex:0 0 auto;margin:-6px 0;}
+  .lobby-logo.on{display:block;}
+  .lobby-logo::before{content:"";position:absolute;inset:-16% -7%;border-radius:50%;background:radial-gradient(ellipse at center,rgba(255,255,255,0.6),rgba(255,255,255,0) 70%);z-index:-1;pointer-events:none;}
+  .lobby.has-mid .who{flex-shrink:0;}
+  .app-logo-top{display:none;position:absolute;z-index:150;pointer-events:none;}
+  .app-logo-top.on{display:block;}
   .stats{display:flex;gap:8px;flex-wrap:wrap;position:relative;z-index:1;}
   .stat{
     display:flex;align-items:center;gap:6px;background:var(--card);color:var(--ink);
@@ -576,6 +583,7 @@
 <script src="inc/UiKit.js"></script>
 <script src="inc/Themes.js"></script>
 <script src="inc/LinkKit.js"></script>
+<script src="inc/GameLogos.js"></script>   <!-- 🎮 ap-1: the code-drawn app logo (🏷️ logo chat's kit) -->
 </head>
 <!-- ontouchstart="" is a deliberate no-op: iOS Safari/WKWebView only honors
      :active styles on descendants when SOME ancestor has a touch listener
@@ -589,6 +597,7 @@
 <!-- Mobile has no top nav bar (that's desktop-only), so without this a
      phone/tablet visitor here has no way back to the Dashboard at all. -->
 <button class="mobile-back" data-sound="none" onclick="goNav('home')">🏠 Dashboard</button>
+<div class="app-logo-top" id="app-logo-top" aria-hidden="true"></div>   <!-- 🎮 ap-1: app logo right of 🏠 Dashboard (phones) -->
 
 <nav class="desktop-nav">
   <div class="brand">STEAM Playground</div>
@@ -610,6 +619,7 @@
         <div class="q" id="q">What shall we play today?</div>
       </div>
     </div>
+    <div class="lobby-logo" id="lobby-logo" aria-hidden="true"></div>   <!-- 🎮 ap-1: app logo in the free middle (wide screens) -->
     <div class="stats">
       <span class="stat t-chip" id="stat-trophies">🏅 <b id="trophies">–</b> badges</span>
       <button class="stat t-chip station-chip" id="station-chip" data-sound="pop" onclick="goNav('station')" title="Play together on the TV — everyone on their own phone">📺 Game Station</button>   <!-- 📺 st-1 (📡 puzzle chat) -->
@@ -683,6 +693,30 @@ const NAV_KIND = {home:'home', gameroom:'rooms', achievements:'trophy', setup:'a
 function goNav(page){
   UI.go(WEBAPP_URL + '?page=' + page + (CURRENT_PLAYER ? '&player=' + encodeURIComponent(CURRENT_PLAYER) : ''), NAV_KIND[page] || 'nav');
 }
+/* ---------- 🎮 ap-1 APP LOGO (UiKit UI.appLogo + GameLogos 'app'; placement: Claude outputs/logos/app/app-logo-placement.png) ---------- */
+function placeAppLogo(){
+  if(!UI.appLogo || !UI.appLogo.has()) return;
+  const top = document.getElementById('app-logo-top'), mid = document.getElementById('lobby-logo'), lobby = document.querySelector('.lobby');
+  const back = document.querySelector('.mobile-back'), who = lobby && lobby.querySelector('.who'), stats = lobby && lobby.querySelector('.stats');
+  if(!top || !mid || !who || !stats) return;
+  const cs = getComputedStyle(lobby), inner = lobby.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const free = Math.floor(inner - who.offsetWidth - stats.offsetWidth - 2 * 16 - 20), midPx = Math.min(250, free);
+  if(midPx >= 170){   // 🖥️ iPad sideways / computer: the free middle of the 👋 card
+    top.classList.remove('on'); lobby.classList.add('has-mid'); mid.classList.add('on');
+    if(mid.dataset.apPx != midPx) UI.appLogo.mount(mid, 'wide', midPx); return;
+  }
+  mid.classList.remove('on'); lobby.classList.remove('has-mid');
+  const br = back && getComputedStyle(back).display !== 'none' ? back.getBoundingClientRect() : null;
+  if(!br || innerWidth > 900){ top.classList.remove('on'); return; }
+  const left = Math.round(br.right + 10), room = innerWidth - left - 14, wide = innerWidth >= 360 && room >= 120;
+  const kind = wide ? 'wide' : 'badge', px = wide ? Math.floor(Math.min(165, room)) : 44, h = Math.round(px * UI.appLogo.ratio(kind));
+  top.style.left = left + 'px'; top.style.top = Math.round(br.top + window.scrollY + (br.height - h) / 2) + 'px'; top.classList.add('on');
+  if(top.dataset.apKind !== kind || top.dataset.apPx != px) UI.appLogo.mount(top, kind, px);
+}
+(function(){ let rq = 0; const later = () => { cancelAnimationFrame(rq); rq = requestAnimationFrame(placeAppLogo); };
+  addEventListener('resize', later); addEventListener('load', later);
+  try { const ro = new ResizeObserver(later); ['.lobby .who', '.lobby .stats', '.mobile-back'].forEach(q => { const e = document.querySelector(q); if(e) ro.observe(e); }); } catch(e){}
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', later); else later(); })();
 function sessionQueryString(){
   let qs = '';
   if(CURRENT_PLAYER) qs += '&player=' + encodeURIComponent(CURRENT_PLAYER);
@@ -1354,4 +1388,4 @@ loadGameroom();
 </script>
 </body>
 </html>
-<!-- (11m+11j+11i+11x-1+11y-1+sb-4+pp-4+ebr-3+r34+wd-1+bc-3+r35b+modes-2+gr-1+gs-2+af-1+mg-1+gro-1+sb2-2+p5+p5-2+p5-3+p5-4+p5-5+p5-6+p5-7+p5-8+lk-1b-g+lk-2c+lk-1b-g2+lk-2e+td-1+pd-1+bo-1+pk-1+gr-td1+sc-1+pk-2a+gr-lk3+sc-2a+pk-2b+pk-3a+lk-5a+sc-2b+lk-5f+sc-2d+gr-23+gr-2b+sc-3a+sc-3b+sc-3c+st-1+gr-5) END OF Gameroom.html -->
+<!-- (11m+11j+11i+11x-1+11y-1+sb-4+pp-4+ebr-3+r34+wd-1+bc-3+r35b+modes-2+gr-1+gs-2+af-1+mg-1+gro-1+sb2-2+p5+p5-2+p5-3+p5-4+p5-5+p5-6+p5-7+p5-8+lk-1b-g+lk-2c+lk-1b-g2+lk-2e+td-1+pd-1+bo-1+pk-1+gr-td1+sc-1+pk-2a+gr-lk3+sc-2a+pk-2b+pk-3a+lk-5a+sc-2b+lk-5f+sc-2d+gr-23+gr-2b+sc-3a+sc-3b+sc-3c+st-1+gr-5+ap-1) END OF Gameroom.html -->
