@@ -2246,6 +2246,7 @@ function cupAfterMatch(M, mySide){
   if(M.pens && T.kind !== 'league'){ const pm = M.pens.g[mySide], po = M.pens.g[1 - mySide]; f.pens = C.meIsA ? [pm, po] : [po, pm]; }
   if(T.kind !== 'league' && f.ga === f.gb && !f.pens){ const w = M.winner === mySide; f.pens = C.meIsA ? (w ? [1, 0] : [0, 1]) : (w ? [0, 1] : [1, 0]); }   // a golden goal decided it
   cupAdvance(T); cupSave(T); G.cupDone = T;
+  if(T.done && T.teams[T.champ]) GameComic._feed([{k: 'cupend', kind: T.kind, champ: T.teams[T.champ].name, me: !!T.teams[T.champ].me, captain: T.teams[T.champ].captain || null}]);   // 💥 📣 R4d: a trophy page / crowd
   if(T.done && T.teams[T.champ] && T.teams[T.champ].me){ const w = cupWins(); w[T.kind] = (w[T.kind] || 0) + 1; ls(store('cupwins'), JSON.stringify(w)); }   // 👕 R4c: a won cup unlocks its kit
   const rb = document.querySelector('#result-card .res-btns'); if(rb) rb.innerHTML = '<button class="btn soft sp-btn sp-secondary" id="btn-levels" data-sound="none" onclick="backToMenu()">🎚️ Levels</button><button class="btn sp-btn sp-primary" id="btn-cup" data-sound="pop" onclick="cupBack()">' + (T.done ? '🏆 See the winner' : '🏆 Back to the ' + (T.kind === 'league' ? 'table' : 'cup')) + '</button>';
 }
@@ -2321,6 +2322,7 @@ function taleAfter(ok, stars){
   if(ok){ d.done[id] = true; if(chDone(d, T.ci) && d.kits.indexOf(T.ch.id) < 0){ d.kits.push(T.ch.id); chNow = true; } taleSave(d);
     if(first && S.player !== 'Guest') saveFeatsOnly(S.player, {taleSteps: Object.keys(d.done).length, taleChapters: TALE.filter((_, ci) => chDone(d, ci)).length}, 3); }   // 📜 R4c: badges + the 📜 Kick Tale Hero title
   G.taleBack = {ch: T.ci, reward: chNow};
+  if(ok) GameComic._feed([{k: 'talestep', chapter: T.ch.id, n: T.ci + 1, step: T.st.title, chapterDone: chNow, all: chNow && T.ci === 5}]);   // 💥 📣 R4d
   const rb = document.querySelector('#result-card .res-btns');
   if(rb) rb.innerHTML = '<button class="btn soft sp-btn sp-secondary" data-sound="tap" onclick="taleRetry()">🔁 Try again</button><button class="btn sp-btn sp-primary" id="btn-tale" data-sound="pop" onclick="taleBack()">📜 Back to the story</button>';
   const rc = $('result-card'); if(rc){ const n = document.createElement('div'); n.className = 'tale-note' + (ok ? ' ok' : ''); n.innerHTML = ok ? (chNow ? '🎉 Chapter ' + (T.ci + 1) + ' done! ' + T.ch.reward[0] + ' <b>' + T.ch.reward[1] + '</b> unlocked (👕 pick it on the setup page)' + (T.ci < 5 ? ' · 📜 chapter ' + (T.ci + 2) + ' is open!' : ' · 🏆 you finished Kick Tale!') : first ? '✅ Story step done!' : '✅ Done again!') : T.ch.coach[0] + ' ' + (T.st.kind === 'skills' ? 'You need ' + '⭐'.repeat(T.st.need || 1) + ' — try again!' : 'So close — try again, you can do it!'); rc.insertBefore(n, rc.querySelector('.res-btns')); }
@@ -3441,8 +3443,9 @@ const GameComic = {
   listen(fn){ this._fns.push(fn); return () => { this._fns = this._fns.filter(f => f !== fn); }; },
   log(){ return this._log.slice(); },
   area(){ return $('stage'); },
+  context(){ return G ? {cup: G.cup ? {kind: G.cup.T.kind, round: cupRoundName(G.cup.T), opp: G.cup.opp.name, captain: G.captain} : null, tale: G.tale ? {chapter: G.tale.ch.id, n: G.tale.ci + 1, step: G.tale.st.title, coach: G.tale.ch.coach} : null, kit: SET.kit || 'classic'} : null; },   // 🏆 📜 R4d: which cup round / story step this match is
   view(){ return V ? {P: V.P, sc: V.sc, mode: G && G.view.mode} : null; },
-  free(){ const st = $('stage').getBoundingClientRect(), taken = [...document.querySelectorAll('#pads .stick, #pads .btnpad, #pads .swbtn')].map(e => e.getBoundingClientRect()).filter(r => r.width);
+  free(){ const st = $('stage').getBoundingClientRect(), taken = [...document.querySelectorAll('#pads .stick, #pads .btnpad, #pads .swbtn, #pads .bodypad')].map(e => e.getBoundingClientRect()).filter(r => r.width);
     const rows = [{left: st.left, top: st.top, right: st.right, bottom: st.top + st.height * 0.3}]; return rows.map(r => { taken.forEach(t => { if(t.top < r.bottom && t.bottom > r.top && t.left < r.right && t.right > r.left){ if(t.left - r.left > r.right - t.right) r.right = t.left - 4; else r.left = t.right + 4; } }); return {left: Math.round(r.left), top: Math.round(r.top), width: Math.round(r.right - r.left), height: Math.round(r.bottom - r.top)}; }).filter(r => r.width >= 60 && r.height >= 40); },
   _reset(){ this._log = []; },
   _feed(list){ if(!list || !list.length || !G) return; const M = G.M, md = SZ_ID[G.size]; list.forEach(e => { this._log.push(e); this._fns.forEach(f => { try{ f(md, e, M); }catch(err){} }); }); if(this._log.length > 600) this._log.splice(0, this._log.length - 600); }
@@ -3480,4 +3483,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a+bo-5b+bo-pz+bo-5c+bo-5d+r4a+r4b+r4c) END OF BlasOff.html -->
+<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a+bo-5b+bo-pz+bo-5c+bo-5d+r4a+r4b+r4c+r4d) END OF BlasOff.html -->
