@@ -406,6 +406,10 @@ var PK = (function () {
   THEMES.bakery = { name: 'Bakery', icon: '🍰', top: '#E9A97E', bot: '#FFEAD2', ground: '#9C6A42', hill: '#B98258', deco: ['🥐', '🧁', '🥖', '🍪', '🎂'], kinds: ['cupcake', 'donut', 'cherry', 'apple', 'mug', 'teapot', 'circle', 'heart', 'star', 'lollipop', 'icecream', 'banana', 'gift', 'cat', 'crown', 'carrot'], caseOnly: true };
   THEMES.volcano = { name: 'Volcano Village', icon: '🌋', top: '#3A1D2E', bot: '#E08A4A', ground: '#4A3A34', hill: '#5E4A40', deco: ['🌋', '🔥', '🪨', '♨️', '🌴'], kinds: ['crystal', 'house', 'tree', 'mushroom', 'star', 'diamond', 'hexagon', 'circle', 'cactus', 'sun', 'turtle', 'gear', 'crab', 'anchor', 'key', 'owl'], caseOnly: true };
   THEMES.farm = { name: 'Sunny Farm', icon: '🌼', top: '#7FCBF0', bot: '#E6F7C9', ground: '#6FB14E', hill: '#8FCB6A', deco: ['🌼', '🚜', '🐄', '🌾', '🏡'], kinds: ['flower', 'bee', 'butterfly', 'apple', 'tree', 'carrot', 'house', 'heart', 'duck', 'owl', 'sun', 'cherry', 'frog', 'mushroom', 'cat', 'bus'], caseOnly: true };
+  // 📖 pk-6c: 🎻 Concert Hall · 🏮 Night Market · ❄️ Ice Palace (case-only)
+  THEMES.concert = { name: 'Concert Hall', icon: '🎻', top: '#2A0E1E', bot: '#7A2340', ground: '#5A3420', hill: '#6E4028', deco: ['🎻', '🎺', '🎵', '🥁', '🎹'], kinds: ['star', 'heart', 'circle', 'diamond', 'crown', 'trophy', 'bird', 'balloon', 'mug', 'teapot', 'camera', 'owl', 'cat', 'gift', 'duck', 'sun'], caseOnly: true };
+  THEMES.market = { name: 'Night Market', icon: '🏮', top: '#120A2E', bot: '#5A2A6E', ground: '#3A2F2A', hill: '#4C3E36', deco: ['🏮', '🥭', '🍢', '🛺', '🌶️'], kinds: ['donut', 'lollipop', 'balloon', 'apple', 'cherry', 'banana', 'mug', 'gift', 'cupcake', 'icecream', 'carrot', 'teapot', 'fish', 'crab', 'suitcase', 'car'], caseOnly: true };
+  THEMES.ice = { name: 'Ice Palace', icon: '❄️', top: '#5DA9E9', bot: '#E6F6FF', ground: '#E8F6FF', hill: '#CFE8F7', deco: ['❄️', '🧊', '⛄', '🐧', '🏔️'], kinds: ['snowman', 'penguin', 'crystal', 'diamond', 'star', 'cloud', 'hexagon', 'circle', 'whale', 'owl', 'icecream', 'gift', 'kite', 'key', 'house', 'planet'], caseOnly: true };
   // 🧩 pk-5b: every scene gets ~10 of the new pieces (+ 3 random guests from any scene per picture)
   THEMES.dino.kinds = THEMES.dino.kinds.concat(['cactus', 'turtle', 'frog', 'butterfly', 'bee', 'apple', 'banana', 'carrot', 'owl', 'crab']);
   THEMES.sea.kinds = THEMES.sea.kinds.concat(['whale', 'crab', 'turtle', 'duck', 'anchor', 'umbrella', 'penguin', 'icecream', 'lollipop', 'kite']);
@@ -610,7 +614,7 @@ var PK = (function () {
       B.push(e); d.sub = 'extra'; d.idA = null; d.idB = e.id; d.x = e.x; d.y = e.y; d.r = radiusOf(e); return d;
     } else if (type === 'size') {
       var grow = 1 + 0.55 * mag + 0.2, shrink = 1 / (1 + 0.45 * mag + 0.25);
-      if (L.quiet) { grow = quietMag(L, 1.10, 1.12); shrink = 1 / grow; }   // 🤫 pk-5d: ±10–12 %
+      if (L.quiet) { if (THIN.indexOf(a.k) >= 0) return null; grow = quietMag(L, 1.10, 1.12); shrink = 1 / grow; }   // 🤫 pk-5d: ±10–12 % (pk-6c: not on thin pieces — too few pixels)
       var up = R() < 0.5;
       if (up) { b.r = a.r * grow; var room = freeRoom(a, sc.A.concat(B), deco); if (radiusOf(b) > room) up = false; }
       if (!up) { b.r = a.r * shrink; if (radiusOf(b) < 11) return null; }
@@ -738,6 +742,14 @@ var PK = (function () {
         var side = i % 2 === 0, dx = side ? 16 + R() * 40 : W - 16 - R() * 40, dy = 30 + R() * (H - 60);
         sc.deco.push({ ch: pick(R, TH.deco), x: dx, y: dy, r: 15, sz: 22 + R() * 8 });
       }
+      // 🧑 pk-6d: reserve ground spots for the family BEFORE the pieces (kept free; addPeople stands them there at the end)
+      var resv = [];
+      if (opt.people && !opt.force && !opt.kinds && R() < (opt.peopleShare == null ? 0.6 : opt.peopleShare)) {
+        var npR = Math.min(Math.max(1, opt.people), R() < 0.5 ? 1 : 2), prR = (MIX_PEOPLE_R[level] || 32) - 4;
+        for (var rq = 0; rq < npR; rq++) for (var rt = 0; rt < 40; rt++) { var rx = prR + 8 + R() * (W - 2 * prR - 16), ry = H - 8 - prR * 1.1;
+          if (resv.every(function (o) { return Math.abs(o.x - rx) >= prR * 2.2; }) && sc.deco.every(function (o) { return dist({ x: rx, y: ry }, o) >= o.r + prR * 1.2; })) { resv.push({ x: rx, y: ry, r: prR * 1.2, pr: prR, person: 1 }); break; } }
+      }
+      var obst = sc.deco.concat(resv);
       // 🧸 decoys (💀 Hardcore): fewer kinds + fewer colours, so look-alike things sit side by side
       var kinds = L.decoys ? shuffle(R, sc.kinds).slice(0, 4) : sc.kinds, cols = L.decoys ? shuffle(R, PAL).slice(0, 4) : null, used = {};
       // 🌗 pk-5a: 🌋 / 💀 use families of close shades, so a shade change hides among look-alike colours
@@ -765,8 +777,8 @@ var PK = (function () {
         if (k === 'sign' || k === 'beads') r = Math.max(r, 31);   // words, sums and beads big enough to read on a phone   // things you can count (spots, petals, pips, windows) are big enough to count on a phone
         var p = null, ovq = null;
         // 🥞 pk-5c: from ⚡ Hard some pieces lean on another one (in front or behind) — never signs / beads, never things you count or read
-        if (L.ov && overlapOk(k) && FRAGILE.indexOf(ty) < 0 && R() < L.ov[0]) { var os = overlapSpot(R, L, sc.A, sc.deco, r * KINDS[k].s, noOv); if (os) { p = os; ovq = os.q; } }
-        if (!p) p = freeSpot(R, sc.A, sc.deco, r * KINDS[k].s, 300, lay);
+        if (L.ov && overlapOk(k) && FRAGILE.indexOf(ty) < 0 && R() < L.ov[0]) { var os = overlapSpot(R, L, sc.A, obst, r * KINDS[k].s, noOv); if (os) { p = os; ovq = os.q; } }
+        if (!p) p = freeSpot(R, sc.A, obst, r * KINDS[k].s, 300, lay);
         if (!p) continue;
         var c = cols ? pick(R, cols) : colourFor(R, used);
         used[c] = (used[c] || 0) + 1;
@@ -791,7 +803,7 @@ var PK = (function () {
         var a = cand[q], type = types[di] || pick(R, pool);
         var tryTypes = [type].concat(shuffle(R, pool));
         for (var z = 0; z < tryTypes.length; z++) {
-          var Bsave = sc.B.slice(), d = applyDiff(R, sc, L, tryTypes[z], a, sc.B, sc.deco);
+          var Bsave = sc.B.slice(), d = applyDiff(R, sc, L, tryTypes[z], a, sc.B, obst);
           if (!d) { sc.B = Bsave; continue; }
           var clash = sc.diffs.some(function (o) { return dist(o, d) < hitOf(o) + hitOf(d) + 4; });
           if (clash) { sc.B = Bsave; break; }
@@ -800,12 +812,45 @@ var PK = (function () {
       }
       if (sc.diffs.length === n && (!opt.force || sc.diffs.every(function (d) { return d.t === opt.force || (opt.force === 'turn' && L.noflip && d.t === 'tilt'); }))) {
         sc.diffs.forEach(function (d) { d.x = Math.round(d.x * 10) / 10; d.y = Math.round(d.y * 10) / 10; d.r = Math.round(d.r * 10) / 10; d.hit = Math.round(hitOf(d) * 10) / 10; });
+        if (resv.length) addPeople(R, sc, L, level, opt, resv);   // 🧑 pk-6d
         sc.sig = signature(sc);
         return sc;
       }
     }
     return null;
   }
+  // 🧑 pk-6d: the family small INSIDE a house scene (~6 pictures in 10): 1–2 people on the ground, away from every change;
+  // half the time one of them carries a change (a similar pose on ⚡+ / a flip up to ⚡) instead of one piece change, so the count stays the same
+  function addPeople(R, sc, L, level, opt, resv) {
+    var acts = (opt.acts || Object.keys(PHOTO_ACTS)).filter(function (a) { return PHOTO_ACTS[a]; }), fam = Math.max(1, opt.people);
+    var np = resv.length, pr = resv[0].pr, who = shuffle(R, Array.apply(null, Array(fam)).map(function (_, x) { return x; })), placed = [];
+    var all = sc.A.concat(sc.B);
+    for (var q = 0; q < np; q++) {
+      var py = resv[q].y, px = null;
+      for (var t = 0; t < 1 && px == null; t++) {
+        var x = resv[q].x, c = { x: x, y: py };
+        if (!all.every(function (o) { return dist(c, o) >= (o.k === 'person' ? pr * 2.1 : radiusOf(o) + pr * 1.12); })) continue;   // (the reserved spot kept the pieces away)
+        px = x;
+      }
+      if (px == null) continue;
+      var pa = pick(R, acts), P = { id: 'p' + q, k: 'person', who: who[q], base: pa, face: null, x: Math.round(px * 10) / 10, y: Math.round(py * 10) / 10, r: pr, c: '#ffffff', rot: 0, fl: R() < 0.5 ? -1 : 1, n: 0, lay: 'people' };
+      sc.A.push(P); sc.B.push(clone(P)); all.push(P); placed.push(P);
+    }
+    sc.people = placed.length;
+    if (placed.length && sc.diffs.length && R() < 0.5) {   // one person carries a change instead of a piece
+      var P0 = placed[0], hp = Math.max(MIN_HIT, P0.r * 1.1 * 1.2), clash = sc.diffs.slice(0, -1).some(function (d) { return dist(d, P0) < d.hit + hp + 4; });
+      var dp = clash ? null : mixPersonDiff(R, sc, L, P0, acts, false);   // (changes only that person in picture B)
+      if (dp) {
+        var k = sc.diffs.length - 1, d0 = sc.diffs[k], a0 = sc.A.filter(function (x) { return x.id === d0.idA; })[0];
+        if (d0.idA && d0.idB) { for (var i = 0; i < sc.B.length; i++) if (sc.B[i].id === d0.idB) sc.B[i] = clone(a0); }   // undo that piece change
+        else if (d0.idA) sc.B.push(clone(a0));
+        else sc.B = sc.B.filter(function (x) { return x.id !== d0.idB; });
+        sc.diffs.splice(k, 1); dp.hit = Math.round(hitOf(dp) * 10) / 10; dp.i = sc.diffs.length; sc.diffs.push(dp);
+      }
+    }
+    sc.A.concat(sc.B).forEach(function (x) { if (x.k === 'person') x.act = actOf(x); });
+  }
+
   // ---------- 🌀 patterns (beads in a scene + 🎯 Odd One Out rows) ----------
   var UNITS = [[0, 1], [0, 0, 1], [0, 1, 2], [0, 1, 1], [0, 0, 1, 1], [0, 1, 2, 1]];
   function makePattern(R, level, len) {
@@ -1179,7 +1224,73 @@ var PK = (function () {
         yes: [['🐝', 'bee'], ['🦋', 'butterfly'], ['🐦', 'hummingbird'], ['🪲', 'beetle'], ['🦇', 'fruit bat']],
         no: [['🐟', 'fish'], ['🚗', 'car'], ['🧸', 'teddy bear'], ['🪨', 'rock'], ['📺', 'TV'], ['🍕', 'pizza'], ['🎈', 'balloon'], ['🧦', 'sock']],
         trick: [['🕷️', 'spider'], ['🐛', 'caterpillar']], why: { yes: 'visits flowers and carries pollen from one to the next!', no: 'does not carry pollen — bees, butterflies and hummingbirds do!' } },
-      solved: 'The golden honey pot is home — the bees come buzzing back and the orchard is full of blossom! 🐝🌸' }
+      solved: 'The golden honey pot is home — the bees come buzzing back and the orchard is full of blossom! 🐝🌸' },
+    // 🎵 pk-6c
+    { id: 'orchestra', n: 12, icon: '🎵', name: 'The Silent Orchestra', theme: 'concert', topic: 'Sound + vibration', place: 'the Concert Hall', owner: 'Maestro Melody', thing: 'golden tuning fork', walkTo: 'backstage', dropAt: 'by the big drum',
+      open: '🎵 The orchestra can\'t play a note — Maestro Melody\'s golden tuning fork is gone and every instrument is out of tune! Dusty footprints lead across the stage…',
+      suspects: [['🦜', 'Polly the Parrot'], ['🐺', 'Howl the Wolf'], ['🦗', 'Chirpy the Cricket'], ['🐘', 'Trumpet the Elephant'], ['🐧', 'Waddles the Penguin']],
+      drops: [['🎼', 'a page of music'], ['🪶', 'a feather'], ['🥁', 'a drumstick'], ['🎀', 'a ribbon'], ['🍬', 'a cough sweet'], ['🔔', 'a tiny bell']],
+      clutter: ['star', 'heart', 'circle', 'diamond', 'crown', 'trophy', 'bird', 'balloon'],
+      count: '🎵',
+      chapters: [
+        { title: 'The empty case', icon: '🎻', say: 'The tuning fork\'s velvet case is empty — and the stage is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
+        { title: 'Behind the curtain', icon: '🎭', say: 'The prints slip behind the curtain. Find the way backstage — then check the stage camera!', steps: ['walk', 'spot'] },
+        { title: 'The locked dressing room', icon: '🔐', say: 'The dressing room is locked… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
+      ],
+      lessons: [
+        { icon: '🔊', title: 'Sound is a wiggle', text: 'When something shakes back and forth very fast — vibrates — it pushes the air, and that wiggle is the sound we hear.' },
+        { icon: '🎸', title: 'High and low', text: 'Short or tight strings vibrate fast and sound HIGH. Long or loose strings vibrate slowly and sound LOW.' },
+        { icon: '👂', title: 'How we hear', text: 'The wiggling air reaches your ear and makes your eardrum wiggle too. Your brain turns that into music!' }
+      ],
+      quiz: { ask: 'Maestro Melody asks: which one makes a sound when it VIBRATES?', nope: 'Which one does NOT make a sound by vibrating?',
+        yes: [['🥁', 'drum'], ['🎸', 'guitar string'], ['🔔', 'bell'], ['🎺', 'trumpet'], ['🗣️', 'voice']],
+        no: [['🧽', 'sponge'], ['🧸', 'teddy bear'], ['🍞', 'bread'], ['🧦', 'sock'], ['🧶', 'wool'], ['☁️', 'cloud'], ['🍮', 'pudding'], ['🛏️', 'pillow']],
+        trick: [['📷', 'a photo of a drum'], ['🔇', 'a muted speaker']], why: { yes: 'makes a sound when it vibrates!', no: 'stays quiet — drums, strings, bells and voices vibrate to make sound!' } },
+      solved: 'The golden tuning fork is back — ting! Every instrument is in tune and the orchestra plays its best concert ever! 🎻🎶' },
+    // 🏮 pk-6c
+    { id: 'market', n: 13, icon: '🏮', name: 'Mystery at the Night Market', theme: 'market', topic: 'Money + counting change', place: 'the Night Market', owner: 'Auntie Malee', thing: 'golden coin box', walkTo: 'lantern stall', dropAt: 'by the mango sticky rice stall',
+      open: '🏮 Auntie Malee\'s golden coin box is gone from her stall at the Night Market! Sticky footprints weave between the lanterns…',
+      suspects: [['🐒', 'Mali the Monkey'], ['🐘', 'Chang the Elephant'], ['🐈', 'Maew the Cat'], ['🦎', 'Tukkae the Gecko'], ['🐓', 'Kai the Rooster']],
+      drops: [['🥭', 'a mango slice'], ['🍢', 'a grilled skewer'], ['🌶️', 'a chili'], ['🥥', 'a coconut chip'], ['🪙', 'a coin'], ['🍡', 'a sweet dumpling']],
+      clutter: ['donut', 'lollipop', 'balloon', 'apple', 'cherry', 'banana', 'mug', 'gift'],
+      count: '🏮',
+      chapters: [
+        { title: 'The empty stall', icon: '🧺', say: 'The coin box is gone and the stall is a mess — the ground is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
+        { title: 'Through the lanterns', icon: '🏮', say: 'The prints weave between the stalls. Find the way to the lantern stall — then check the market camera!', steps: ['walk', 'spot'] },
+        { title: 'The locked cart', icon: '🔐', say: 'The coin cart is locked… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
+      ],
+      lessons: [
+        { icon: '🪙', title: 'Coins and notes', text: 'Thai money is the baht: coins of 1, 2, 5 and 10 baht and notes of 20, 50, 100 and more. A bigger number means more money — not a bigger coin!' },
+        { icon: '➕', title: 'Adding it up', text: 'To find what to pay, add the prices: a mango for 20 baht and a skewer for 15 baht cost 20 + 15 = 35 baht.' },
+        { icon: '🔙', title: 'Counting change', text: 'Pay 50 baht for something that costs 35? Count up: 35 → 40 → 50. That is 5 + 10 = 15 baht change.' }
+      ],
+      quiz: { ask: 'Auntie Malee asks: which one can you PAY with?', nope: 'Which one can you NOT pay with?',
+        yes: [['🪙', 'coin'], ['💵', 'banknote'], ['💳', 'bank card'], ['📱', 'phone payment'], ['🎟️', 'gift voucher']],
+        no: [['🍃', 'leaf'], ['🪨', 'pebble'], ['🧸', 'teddy bear'], ['🍬', 'sweet'], ['🧦', 'sock'], ['🔑', 'key'], ['📚', 'book'], ['🎈', 'balloon']],
+        trick: [['🃏', 'a playing card'], ['🖼️', 'a picture of money']], why: { yes: 'can pay at the market!', no: 'can\'t pay — coins, notes, cards and phone payments can!' } },
+      solved: 'The golden coin box is back — Auntie Malee gives everyone mango sticky rice to say thank you! 🥭🏮' },
+    // 🧊 pk-6c
+    { id: 'ice', n: 14, icon: '🧊', name: 'The Melting Ice Palace', theme: 'ice', topic: 'States of matter', place: 'the Ice Palace', owner: 'Queen Frost', thing: 'Frost Crystal', walkTo: 'frozen tower', dropAt: 'by the ice fountain',
+      open: '🧊 The Ice Palace is MELTING! Queen Frost\'s Frost Crystal keeps it cold — and someone took it. Wet footprints lead down the icy hall…',
+      suspects: [['🐧', 'Pip the Penguin'], ['🦭', 'Sammy the Seal'], ['🐻‍❄️', 'Polo the Polar Bear'], ['🦊', 'Flurry the Fox'], ['🦉', 'Tundra the Owl']],
+      drops: [['🧤', 'a mitten'], ['🐟', 'a fish'], ['❄️', 'a snowflake'], ['🧣', 'a scarf thread'], ['🍫', 'a cocoa crumb'], ['🥕', 'a snowman\'s carrot']],
+      clutter: ['snowman', 'penguin', 'crystal', 'diamond', 'star', 'cloud', 'hexagon', 'circle'],
+      count: '❄️',
+      chapters: [
+        { title: 'The empty pedestal', icon: '💎', say: 'The Frost Crystal\'s pedestal is empty — and the wet floor is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
+        { title: 'Down the icy hall', icon: '🛷', say: 'The prints slide down the icy hall. Find the way to the frozen tower — then check the palace camera!', steps: ['walk', 'spot'] },
+        { title: 'The locked tower', icon: '🔐', say: 'The frozen tower is locked… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
+      ],
+      lessons: [
+        { icon: '🧊', title: 'Solid, liquid, gas', text: 'Ice is solid water, water is liquid water, and steam is water as a gas. The same stuff — three different forms!' },
+        { icon: '🌡️', title: 'Heat melts, cold freezes', text: 'Add heat and ice melts into water. Take heat away and water freezes into ice again.' },
+        { icon: '☁️', title: 'Water goes round', text: 'Puddles slowly turn into water vapour in the air, make clouds, and come back down as rain or snow.' }
+      ],
+      quiz: { ask: 'Queen Frost asks: which one is a LIQUID?', nope: 'Which one is NOT a liquid?',
+        yes: [['💧', 'water'], ['🥛', 'milk'], ['🧃', 'juice'], ['🍯', 'honey'], ['🍵', 'tea']],
+        no: [['🪨', 'rock'], ['🧸', 'teddy bear'], ['🍪', 'cookie'], ['🔑', 'key'], ['📚', 'book'], ['🧱', 'brick'], ['🥄', 'spoon'], ['👟', 'shoe']],
+        trick: [['🧊', 'ice cube'], ['💨', 'steam']], why: { yes: 'is a liquid — it flows and takes the shape of its cup!', no: 'is not a liquid — a solid keeps its shape, a gas floats away!' } },
+      solved: 'The Frost Crystal is back — the Ice Palace sparkles and freezes solid again! ❄️👑' }
   ];
   function caseById(id) { for (var i = 0; i < CASES.length; i++) if (CASES[i].id === id) return CASES[i]; return CASES[0]; }
   // 🔐 one code digit + where it hides
@@ -1276,7 +1387,7 @@ var PK = (function () {
   // ================= 🎲 MIX = 5 random layers (pk-5c, Aowu 2026-11-15 01:52 "1 scenery · 2 people · 3 props · 4 particles · 5 others") =================
   // Every Mix picture = a new combo: 🏞️ any scene (6 houses · 🌱 · ⏰ · 7 trip places) + 1–2 big scenery pieces behind · 🧑 1–3 of the family (real avatars)
   // · 🎒 pieces from the whole box (61 kinds) · ✨ a swarm of one particle kind · 🎲 others (signs, beads, a framed picture, ants). A change can land in ANY layer.
-  var CASE_SCENES = ['garden', 'clock', 'bakery', 'volcano', 'farm'];   // 📖 case-only scenes (pk-4c, pk-6b) — 🎲 Mix uses them too
+  var CASE_SCENES = ['garden', 'clock', 'bakery', 'volcano', 'farm', 'concert', 'market', 'ice'];   // 📖 case-only scenes (pk-4c, pk-6b) — 🎲 Mix uses them too
   var MIX_SCENES = THEME_KEYS.concat(CASE_SCENES).concat(TRIP_KEYS);
   var SCENERY = ['tree', 'cloud', 'house', 'sun', 'planet', 'whale', 'boat', 'snowman', 'bus', 'rocket', 'kite', 'umbrella'];
   var PARTICLES = { confetti: 1, bubble: 0, sparkle: 0, snow: 1, drop: 0, leaflet: 1, star: 1 };   // 1 = can take a 🌗 shade change (thin ✨ sparkles / 💧 drops: too few pixels)
@@ -1454,11 +1565,18 @@ var PK = (function () {
       var sc = { seed: seed, level: level, theme: T, photo: true, W: W, H: H, ground: GROUND, kinds: TH.kinds.slice(), deco: [], A: [], B: [], diffs: [], people: np };
       for (var i = 0; i < 3; i++) { var side = i % 2 === 0; sc.deco.push({ ch: pick(R, TH.deco), x: side ? 16 + R() * 26 : W - 16 - R() * 26, y: 24 + R() * 70, r: 14, sz: 20 + R() * 6 }); }
       // 👨‍👩‍👧 the family in a row on the ground (one may take a 🤳 selfie)
-      var pr = np <= 2 ? 60 : np === 3 ? 54 : 46, gap = (W - 40) / np, used = {}, sel = R() < 0.6 ? Math.floor(R() * np) : -1;
-      for (var q = 0; q < np; q++) {
+      // 📸 pk-6d (Aowu 03:27 "zoom in / avatar in depth"): a shot is a 👥 row, a 🏞️ depth shot (back row smaller + higher, front row bigger) or a 🔍 close-up (1–2 people big, you always in it, the landmark zoomed in)
+      var shot = opt.shot || pick(R, ['row', 'depth', 'depth', 'close', 'row']), shown = [];
+      for (var w0 = 0; w0 < np; w0++) shown.push(w0);
+      if (shot === 'close') { var mate = 1 + Math.floor(R() * (np - 1)); shown = R() < 0.45 ? [0] : [0, mate]; sc.zoom = 1.35; }
+      sc.shot = shot;
+      var nq = shown.length, pr = shot === 'close' ? (nq === 1 ? 84 : 72) : np <= 2 ? 60 : np === 3 ? 54 : 46, gap = (W - 40) / nq, used = {}, sel = R() < 0.6 ? Math.floor(R() * nq) : -1, front0 = R() < 0.5 ? 0 : 1;
+      for (var q = 0; q < nq; q++) {
         var a = sel === q ? SELFIE : pick(R, acts.filter(function (x) { return !used[x]; }).length ? acts.filter(function (x) { return !used[x]; }) : acts); used[a] = 1;
-        sc.A.push({ id: 'p' + q, k: 'person', who: q, base: a, face: null, x: 20 + gap * (q + 0.5) + (R() - 0.5) * gap * 0.14, y: H - 16 - pr * 1.08, r: pr, c: '#ffffff', rot: 0, fl: R() < 0.5 ? -1 : 1, n: 0 });
+        var depth = shot === 'depth' ? ((q + front0) % 2 === 0 ? 1.1 : 0.74) : 1, rq = Math.round(pr * depth * 10) / 10, lift = depth < 1 ? 30 : 0;
+        sc.A.push({ id: 'p' + q, k: 'person', who: shown[q], base: a, face: null, x: 20 + gap * (q + 0.5) + (R() - 0.5) * gap * 0.14, y: H - 16 - rq * 1.08 - lift, r: rq, c: '#ffffff', rot: 0, fl: R() < 0.5 ? -1 : 1, n: 0, depth: depth });
       }
+      sc.people = nq;
       // 🎒 trip props in the free space (sky, sides, between legs never — freeSpot keeps clear of people)
       var nprops = Math.max(4, n + 3 - np + 1);
       for (var j = 0; j < nprops * 3 && sc.A.filter(function (x) { return x.k !== 'person'; }).length < nprops; j++) {
@@ -1475,7 +1593,7 @@ var PK = (function () {
         var people = sc.A.filter(function (x) { return x.k === 'person' && !taken[x.id]; }), props = sc.A.filter(function (x) { return x.k !== 'person' && !taken[x.id]; });
         if (ty === 'flip' && L.noflip) ty = 'pose';   // 🤫 pk-5d: 🌋 💀 no flips
         if (ty === 'flip') people = people.filter(lopsided);
-        if (ty === 'face') people = pr >= 54 ? people.filter(function (x) { return x.base !== SELFIE; }) : [];   // faces only on big people (≤ 3 in the photo)
+        if (ty === 'face') people = people.filter(function (x) { return x.r >= 54 && x.base !== SELFIE; });   // faces only on big people (pk-6d: per person — front row + close-ups)
         if ((ty === 'pose' || ty === 'flip' || ty === 'face') && !people.length) ty = props.length ? pick(R, ['colour', 'gone']) : 'extra';
         if (ty === 'colour' && L.quiet && props.some(function (x) { return toneOk(x.k); })) props = props.filter(function (x) { return toneOk(x.k); });   // 🤫 pk-5d
         if ((ty === 'colour' || ty === 'gone') && !props.length) ty = 'extra';
@@ -1818,7 +1936,14 @@ function pkBackground(g, sc){
     g.fillStyle = 'rgba(255,140,40,0.35)'; g.beginPath(); g.ellipse(200, 70, 26, 7, 0, 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,0.12)'; [[205, 46, 14], [214, 26, 18], [226, 8, 22]].forEach(([x, y, r]) => { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }); }   // 🌋 pk-6b mountain + glow + smoke
   if(sc.theme === 'farm'){ g.fillStyle = 'rgba(180,60,50,0.28)'; g.beginPath(); g.moveTo(318, PK.GROUND); g.lineTo(318, 160); g.lineTo(349, 132); g.lineTo(380, 160); g.lineTo(380, PK.GROUND); g.closePath(); g.fill();
     g.strokeStyle = 'rgba(255,255,255,0.45)'; g.lineWidth = 3; for(let x = 6; x < 300; x += 26){ g.beginPath(); g.moveTo(x, PK.GROUND); g.lineTo(x, PK.GROUND - 22); g.stroke(); } g.beginPath(); g.moveTo(0, PK.GROUND - 15); g.lineTo(300, PK.GROUND - 15); g.stroke(); }   // 🌼 pk-6b barn + fence
-  if(T.mark){ if(sc.theme === 'trip_aurora' || sc.theme === 'trip_moon'){ for(let i = 0; i < 22; i++){ g.fillStyle = 'rgba(255,255,255,' + (0.3 + R() * 0.5) + ')'; g.beginPath(); g.arc(R() * PK.W, R() * PK.GROUND * 0.6, 0.6 + R() * 1.3, 0, 7); g.fill(); } } pkTrip(g, sc, R); }
+  if(sc.theme === 'concert'){ g.fillStyle = 'rgba(170,20,50,0.40)'; [[0, 1], [PK.W, -1]].forEach(([x0, d]) => { g.beginPath(); g.moveTo(x0, 0); g.lineTo(x0 + d * 52, 0); g.quadraticCurveTo(x0 + d * 30, 110, x0 + d * 44, PK.GROUND); g.lineTo(x0, PK.GROUND); g.closePath(); g.fill(); });
+    g.fillStyle = 'rgba(255,240,200,0.10)'; [[120, 230], [280, 170]].forEach(([x, x2]) => { g.beginPath(); g.moveTo(x, 0); g.lineTo(x2 - 45, PK.GROUND); g.lineTo(x2 + 45, PK.GROUND); g.closePath(); g.fill(); }); g.fillStyle = 'rgba(255,220,150,0.25)'; g.fillRect(0, PK.GROUND, PK.W, 4); }   // 🎻 pk-6c curtains + spotlights + stage edge
+  if(sc.theme === 'market'){ g.strokeStyle = 'rgba(255,220,180,0.35)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, 18); g.quadraticCurveTo(PK.W / 2, 58, PK.W, 18); g.stroke();
+    for(let i = 1; i < 10; i++){ const x = i * PK.W / 10, t = x / PK.W, y = 18 + 4 * 40 * t * (1 - t) * 0.5 + 8; g.fillStyle = 'rgba(255,110,60,0.55)'; g.beginPath(); g.ellipse(x, y, 6, 8, 0, 0, 7); g.fill(); }
+    [[0, 150, 110], [PK.W - 110, 150, 110]].forEach(([x, y, w]) => { for(let k = 0; k < w; k += 18){ g.fillStyle = (k / 18) % 2 ? 'rgba(255,255,255,0.14)' : 'rgba(230,60,70,0.22)'; g.fillRect(x + k, y, 18, 12); } }); }   // 🏮 pk-6c lantern string + stall awnings
+  if(sc.theme === 'ice'){ g.fillStyle = 'rgba(255,255,255,0.45)'; [[60, 120, 34], [130, 80, 40], [270, 90, 38], [340, 130, 30]].forEach(([x, top, w]) => { g.beginPath(); g.moveTo(x - w / 2, PK.GROUND); g.lineTo(x - w / 2, top); g.lineTo(x, top - 30); g.lineTo(x + w / 2, top); g.lineTo(x + w / 2, PK.GROUND); g.closePath(); g.fill(); });
+    g.fillStyle = 'rgba(120,180,230,0.25)'; g.fillRect(0, PK.GROUND, PK.W, 3); }   // ❄️ pk-6c ice towers
+  if(T.mark){ if(sc.theme === 'trip_aurora' || sc.theme === 'trip_moon'){ for(let i = 0; i < 22; i++){ g.fillStyle = 'rgba(255,255,255,' + (0.3 + R() * 0.5) + ')'; g.beginPath(); g.arc(R() * PK.W, R() * PK.GROUND * 0.6, 0.6 + R() * 1.3, 0, 7); g.fill(); } } if(sc.zoom){ g.save(); g.translate(PK.W / 2, PK.GROUND); g.scale(sc.zoom, sc.zoom); g.translate(-PK.W / 2, -PK.GROUND); pkTrip(g, sc, R); g.restore(); } else pkTrip(g, sc, R); }   // 🔍 pk-6d close-up: the landmark zoomed in
   else { g.fillStyle = T.hill; g.beginPath(); g.ellipse(PK.W * 0.25, PK.GROUND + 8, PK.W * 0.42, 26, 0, 0, 7); g.ellipse(PK.W * 0.8, PK.GROUND + 12, PK.W * 0.36, 22, 0, 0, 7); g.fill(); }
   g.fillStyle = T.ground; g.fillRect(0, PK.GROUND + 4, PK.W, PK.H - PK.GROUND);
   if(typeof emo === 'function') sc.deco.forEach(d => emo(g, d.ch, d.x, d.y, d.sz, 0.55));
@@ -1937,7 +2062,8 @@ function makePicture(theme, opt){   // a Spot / Blink / Arcade picture: a normal
     if(sc){ const ks = Array.from(new Set(sc.A.filter(a => PK.PIECES.indexOf(a.k) >= 0).map(a => a.k))); G.recentKinds = ks.concat((G.lastKinds || [])); G.lastKinds = ks; G.lastLay = sc.layout; }
     return sc; }
   if(theme !== 'trip'){   // 🧩 pk-5b no-repeat: skip the kinds of the last 2 pictures + use another layout than the last one
-    const sc = PK.makeScene(PK.newSeed(), G.level, theme, Object.assign({avoid: G.recentKinds || [], avoidLay: G.lastLay}, opt || {}));
+    window.PK_FAMILY = familyList();   // 🧑 pk-6d: the family stands small in ~6 of 10 house pictures (and may carry a change)
+    const sc = PK.makeScene(PK.newSeed(), G.level, theme, Object.assign({avoid: G.recentKinds || [], avoidLay: G.lastLay, people: window.PK_FAMILY.length, acts: photoActs()}, opt || {}));
     if(sc){ const ks = Array.from(new Set(sc.A.map(a => a.k))); G.recentKinds = ks.concat((G.lastKinds || [])); G.lastKinds = ks; G.lastLay = sc.layout; }
     return sc; }
   window.PK_FAMILY = familyList(); const place = pkPick(PK.TRIP_KEYS.filter(k => k !== G.lastPlace)); G.lastPlace = place;
@@ -2450,7 +2576,7 @@ function caseOf(){ return PK.caseById(SET.caseId || 'magnet'); }
 function caseSeen(){ try{ return JSON.parse(localStorage.getItem(CASE_KEY + ':' + (S.player || '')) || '{}'); }catch(e){ return {}; } }
 function caseSeenSave(o){ try{ localStorage.setItem(CASE_KEY + ':' + (S.player || ''), JSON.stringify(o)); }catch(e){} }
 function lessonCount(){ return Object.keys(caseSeen()).filter(k => /^L:/.test(k)).length; }
-const CASE_SHELF = [{id: 'magnet'}, {id: 'dino'}, {id: 'ship'}, {id: 'disco'}, {id: 'moon'}, {id: 'cloud'}, {id: 'garden'}, {id: 'clock'}, {id: 'cake'}, {id: 'volcano'}, {id: 'bees'}];   // pk-6b: + 🍰 🌋 🐝   // pk-3b: 3 case books · pk-4b: + 🪩 🪐 · pk-4c: + ☁️ 🌱 ⏰
+const CASE_SHELF = [{id: 'magnet'}, {id: 'dino'}, {id: 'ship'}, {id: 'disco'}, {id: 'moon'}, {id: 'cloud'}, {id: 'garden'}, {id: 'clock'}, {id: 'cake'}, {id: 'volcano'}, {id: 'bees'}, {id: 'orchestra'}, {id: 'market'}, {id: 'ice'}];   // pk-6b: + 🍰 🌋 🐝 · pk-6c: + 🎵 🏮 🧊   // pk-3b: 3 case books · pk-4b: + 🪩 🪐 · pk-4c: + ☁️ 🌱 ⏰
 function renderCases(){
   const box = $('house-list'), seen = caseSeen();
   box.innerHTML = CASE_SHELF.map(c => { const C = c.soon ? c : PK.caseById(c.id), on = (SET.caseId || 'magnet') === c.id;
@@ -2927,4 +3053,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d+pk-4a+pk-4b+pk-4c+pk-4d+pk-5a+pk-5b+pk-5c+pk-5d+pk-6a+pk-6b) END OF Pokadif.html -->
+<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d+pk-4a+pk-4b+pk-4c+pk-4d+pk-5a+pk-5b+pk-5c+pk-5d+pk-6a+pk-6b+pk-6c+pk-6d) END OF Pokadif.html -->
