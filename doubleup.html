@@ -168,6 +168,9 @@
   .new-badge,.title-new,.feat-new{display:inline-block;background:linear-gradient(135deg,#FFC845,#FF9F1C);color:#3A2500;border-radius:10px;padding:4px 10px;font-weight:800;margin:2px;}
   .res-btns > #b-menu, .res-btns > #tg-x, .res-btns > #btn-levels, .res-btns > #btn-hc-levels{order:-1;} .res-btns > #b-next, .res-btns > #btn-next{order:2;}   /* 🔘 p1b: exit left, main action right */
   .res-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+  /* 🧱 b3w2: one-page setup — ▶ Start sits at the bottom, always in reach (the picked level = GameFrame's GF.pick) */
+  .b3-start{position:sticky;bottom:0;z-index:5;display:flex;justify-content:center;padding:10px 0 calc(env(safe-area-inset-bottom, 0px) + 14px);margin-top:12px;pointer-events:none;}
+  .b3-start .sp-btn{min-width:min(420px,92%);min-height:56px;font-size:1.15rem;pointer-events:auto;box-shadow:0 8px 22px rgba(0,0,0,.28);}
   .confetti{position:fixed;top:-40px;z-index:390;font-size:1.6rem;pointer-events:none;animation:fall linear forwards;}
   @keyframes fall{to{transform:translateY(110vh) rotate(540deg);}}
   @media (prefers-reduced-motion: reduce){ .title .logo{animation:none;} }
@@ -180,6 +183,9 @@
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
 <script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-4a: the cheering crowd (CheerSquad.html) -->
+<script src="inc/GameFrame.js"></script>
+<script src="inc/GameCovers.js"></script>
+<script src="inc/CardArt.js"></script>   <!-- 🧱 b3w2: 🎬 cover + 🏁 result card (GameFrame + GameCovers + CardArt) -->
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
 
 <section class="screen hidden" id="scr-player">
@@ -190,21 +196,13 @@
 <section class="screen hidden" id="scr-menu">
   <div class="title"><div class="logo">🔀</div><h1>Double Up</h1><p>Slide the tiles — two the same join and grow up!</p>
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
-  <div class="section-head">1. Pick what grows</div>
+  <div class="section-head">🎨 1. Pick what grows</div>   <!-- 🧱 b3w2: ONE setup page -->
   <div class="chips" id="theme-list"></div>
-  <div class="section-head">2. Pick a level</div>
+  <div class="section-head" id="level-head">🎚️ 2. Pick a level</div>
   <div class="levels" id="level-list"></div>
+  <div class="section-head" id="opt-head">⚙️ 3. Options</div>
   <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the board">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-4a -->
-  <details class="rules"><summary>📖 How to play</summary><ul>
-    <li><b>Slide:</b> swipe ↑ ↓ ← → (or use the arrow buttons / arrow keys). Every tile slides as far as it can.</li>
-    <li><b>Double up:</b> two tiles that are the same join into one bigger tile (2 + 2 = 4, 4 + 4 = 8 …). In picture themes they grow up: 🥚 → 🐣 → 🐥 → 🐔 …</li>
-    <li><b>Win:</b> make the goal tile shown on the level. After every slide a new small tile appears — when the board is full and nothing can join, the game is over.</li>
-    <li><b>↶ Undo:</b> as many as you like on Basic and Junior, 3 on Intermediate, 1 on Hard. Stars: ⭐⭐⭐ = no undo used.</li>
-    <li><b>🪨 Rock (Extreme):</b> a rock that never moves — slide around it!</li>
-    <li><b>💀 Hardcore:</b> make 4096, no undo — points ×3. <b>🏔️ Challenge:</b> a tiny 3 × 3 board — can you reach 1024? (2048 can't fit on 3 × 3!)</li>
-    <li><b>Tip:</b> keep your biggest tile in a corner and build towards it.</li>
-  </ul></details>
-  <div class="ui-leaders" id="leaders"></div>
+  <div class="b3-start"><button class="btn sp-btn sp-primary" id="btn-start" data-sound="pop" onclick="startSetup()">▶ Start</button></div>   <!-- 🧱 b3w2: 📖 how-to + 🏆 leaders live on the cover -->
 </section>
 
 <section class="hidden" id="scr-play">
@@ -235,7 +233,7 @@ const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '�
   extras: [{id: 'undo-btn', icon: '↶', label: 'Undo (U)', onClick: () => undo(), keep: true},
     {id: 'voice-btn', icon: '🔈', label: 'Voice', onClick: () => toggleVoice()}]});
 function paintVoice(){ BAR.extra('voice-btn', {icon: voiceOn ? '🔊' : '🔈', label: voiceOn ? 'Voice: on' : 'Voice: off'}); }
-var NAV_INNER = {};   // 🧭 inner screens: their top button goes to the main screen
+var NAV_INNER = {menu: ['◀ Double Up', () => openCover()]};   // 🧱 b3w2: the setup's top button goes back to the 🎬 cover
 UI.navBar(document.getElementById('back-btn'), {onclick: false});
 const $ = id => document.getElementById(id);
 const pick = a => a[rnd(a.length)];
@@ -379,7 +377,7 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
-  loadPrefs(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4a */ renderMenu(); showScreen('menu');
+  loadPrefs(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4a */ renderMenu(); showScreen('menu'); openCover();   /* 🧱 b3w2: the 🎬 cover first */
   chMigrate();
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
@@ -395,7 +393,7 @@ function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return 
 
 function picOf(v, T){ T = T || THEMES[theme]; return T.pics ? T.pics[Math.min(T.pics.length - 1, lg(v) - 1)] : String(v); }
 function renderLevels(){
-  const box = $('level-list'); box.innerHTML = ''; if(window.UI && UI.leaders) UI.leaders($('leaders'), GAME_ID, S.player);
+  const box = $('level-list'); box.innerHTML = '';   /* 🧱 b3w2: 🏆 leaders live on the cover */
   const p = progressOf(S.player), rec = AGE_START[S.age], T = THEMES[theme];
   const card = (L, i, open, done, best) => {
     const b = document.createElement('button');
@@ -410,22 +408,49 @@ function renderLevels(){
   };
   LEVELS.forEach((L, i) => {
     const open = canPlay(i), b = card(L, i, open, p.unlocked > i, bestHtml(p, i));
-    b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore' : i === 4 ? 'Pass Hard to unlock Extreme!' : 'Pass the level before to unlock it'); return; } startGame(i); };
-    box.appendChild(b);
+    b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore' : i === 4 ? 'Pass Hard to unlock Extreme!' : 'Pass the level before to unlock it'); return; } chooseLevel(i); };   /* 🧱 b3w2: a tap picks */
+    b.dataset.i = i; box.appendChild(b);
   });
   const cb = chBest(), chOpen = p.unlocked >= 5, fam = chFamily();
   const famHtml = fam && fam.name !== S.player ? '<div class="best fam"><span>👑 family best: ' + UI.esc(fam.name) + ' ' + picOf(fam.tile, T) + ' ' + fam.tile + '</span></div>' : '';
   const b = card(CHALLENGE, -1, chOpen, cb && cb.tile >= CHALLENGE.goal, (cb ? '<div class="best"><span>🏆 ' + Number(cb.score).toLocaleString() + '</span><span>best ' + picOf(cb.tile, T) + ' ' + cb.tile + '</span></div>' : '<div class="best none">No score yet</div>') + famHtml);
   b.id = 'challenge-card';
-  b.onclick = () => { if(!chOpen){ UISound.play('error'); UI.toast('Beat Extreme to open the 🏔️ Challenge'); return; } startGame('challenge'); };
+  b.onclick = () => { if(!chOpen){ UISound.play('error'); UI.toast('Beat Extreme to open the 🏔️ Challenge'); return; } chooseLevel('challenge'); };   /* 🧱 b3w2: a tap picks */
+  b.dataset.i = 'challenge';
   box.appendChild(b);
+  { let i = -1; try{ const v = localStorage.getItem(setupKey('lv')); i = v === 'challenge' ? v : Number(v); }catch(e){} const rec0 = AGE_START[S.age];
+    chosenLevel = (i === 'challenge' && progressOf(S.player).unlocked >= 5) || (i >= 0 && canPlay(i)) ? i : (canPlay(rec0) ? rec0 : Math.max(0, [0, 1, 2, 3, 4, 5].filter(canPlay).pop() || 0)); } markPicks();   /* 🧱 b3w2 */
+}
+/* 🧱 b3w2 (Game Baseline): ONE setup page — 🎨 pictures → 🎚️ level → ⚙️ options → ▶ Start; the level is remembered per player */
+let chosenLevel = 0;
+const setupKey = k => 'sp_' + GAME_ID.replace(/-/g, '') + '_' + k + ':' + (S.player || '');
+function chooseLevel(i, quiet){
+  chosenLevel = i; try{ localStorage.setItem(setupKey('lv'), String(i)); }catch(e){}
+  markPicks(); if(!quiet){ const w = $('opt-head'); if(w && w.scrollIntoView) w.scrollIntoView({behavior: 'smooth', block: 'center'}); }
+}
+function markPicks(){
+  document.querySelectorAll('#level-list .lvl').forEach(b => { const on = String(b.dataset.i) === String(chosenLevel); b.classList.toggle('sel', on); if(window.GF && GF.pick) GF.pick(b, on); });
+  const L = chosenLevel === 'challenge' ? CHALLENGE : LEVELS[chosenLevel], T = THEMES[theme], st = $('btn-start');
+  if(st && L) st.textContent = '▶ Start · ' + L.emoji + ' ' + L.name + (T ? ' · ' + (T.icon ? T.icon + ' ' : '') + T.name : '');
+}
+function startSetup(){ if(!(chosenLevel === 'challenge' ? progressOf(S.player).unlocked >= 5 : canPlay(chosenLevel))){ UISound.play('error'); UI.toast('Pick a level that is open 🔓'); return; } startGame(chosenLevel); }
+// 🎬 the cover (GameFrame): who's here + champions + how to play; ▶ Play opens the setup page
+let DoubleCover = null;
+const DOUBLE_VERSION = '2.0';   /* 🧱 b3w2: shown on the cover footer — bump with each round */
+function openCover(){
+  if(!window.GF){ showScreen('menu'); return; }
+  if(DoubleCover && DoubleCover.who !== S.player){ DoubleCover.destroy(); DoubleCover = null; }
+  if(!DoubleCover){ DoubleCover = GF.cover(document.body, {game: GAME_ID, title: 'Double Up', icon: '🔀', version: DOUBLE_VERSION, me: S.player, players: S.players, avatarOf: myAvatar, seats: {min: 1, max: 1},
+      acts: ['beat.jump', 'beat.bow'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms',
+      onPlay: () => { DoubleCover.hide(); showScreen('menu'); } }); DoubleCover.who = S.player; }
+  DoubleCover.show();
 }
 
 /* ================= GAME ================= */
 if(window.matchMedia('(pointer:coarse)').matches || navigator.maxTouchPoints > 0 || 'ontouchstart' in window) document.body.classList.add('touch');
 let CELL = 80, GAP = 10;
 function startGame(lvl){ setTimeout(cheerMount, 0); /* 📣 cs-4a */
-  hideResult(); clearInterval(timerId);
+  hideResult(); if(DoubleCover) DoubleCover.hide();   /* 🧱 b3w2 */ clearInterval(timerId);
   const L = lvl === 'challenge' ? CHALLENGE : LEVELS[lvl], T = THEMES[theme];
   G = {lvl, L, theme, B: newBoard(L), score: 0, moves: 0, merges: 0, undos: L.undo, undosUsed: 0, hist: [], best: 0, won: false, over: false, busy: false,
     t0: performance.now(), paused: false, pausedAt: 0, pausedTotal: 0, els: {}};
@@ -450,6 +475,7 @@ function layout(){
   render(true);
 }
 window.addEventListener('resize', () => { if(G) layout(); });
+if(window.ResizeObserver){ let lastWH = ''; new ResizeObserver(() => { const r = $('scr-play').getBoundingClientRect(), wh = Math.round(r.width) + 'x' + Math.round(r.height); if(wh === lastWH) return; lastWH = wh; if(G && !$('scr-play').classList.contains('hidden')) layout(); }).observe($('scr-play')); }   /* 📱 ls-1: iPhone sideways first open — follow the play screen, only when its size really changed */
 function xy(i){ const n = G.B.n; return [GAP + (i % n) * (CELL + GAP), GAP + ((i / n) | 0) * (CELL + GAP)]; }
 function place(el, i){ const [x, y] = xy(i); el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.width = el.style.height = CELL + 'px'; }
 function tileHtml(t){
@@ -557,17 +583,16 @@ function finishGame(why){
   setTimeout(() => {
     if(G !== g) return;
     const next = cleared && !L.challenge && g.lvl < 5, cb = L.challenge ? chBest() : null;
-    showResult('<div class="big">' + (cleared ? picOf(g.best, T) : '🔀') + '</div><h2 class="' + (cleared ? 'cheer' : '') + '">' + (cleared ? (L.challenge ? 'Challenge beaten!' : stars === 3 ? 'Perfect double up!' : 'Level passed!') : 'No more moves!') + '</h2>' +
-      (cleared && !L.challenge ? '<div class="rating">' + [0, 1, 2].map(k => '<span class="st' + (k < stars ? '' : ' off') + '" style="animation-delay:' + (0.25 + k * 0.25) + 's">⭐</span>').join('') + '</div>' : '') +
-      '<div class="score-big">🏆 <span id="score-count">0</span></div>' +
-      '<div class="stats"><span>' + (T.pics ? picOf(g.best, T) + ' ' : '') + 'best ' + g.best + (nm ? ' (' + nm + ')' : '') + '</span><span>👆 ' + g.moves + ' slides</span><span>⏱ ' + fmt(secs * 1000) + '</span>' + (L.undo ? '<span>↶ ' + g.undosUsed + ' undo</span>' : '') + (L.hardcore ? '<span>💀 ×3</span>' : '') + '</div>' +
-      (!cleared ? '<div class="tip">🎯 Make ' + L.goal + ' to pass. ' + pick(TIPS) + '</div>' : stars < 3 && !L.challenge ? '<div class="tip">⭐⭐⭐ = no undo. ' + pick(TIPS) + '</div>' : '') +
-      '<div class="save-note" id="save-note">' + (L.challenge ? '🏔️ Your best challenge: ' + (cb ? picOf(cb.tile, T) + ' ' + cb.tile + ' · 🏆 ' + Number(cb.score).toLocaleString() : '—') + ' (saved for your family)' : g.score > 0 ? '<span class="ui-spin a-bounce">🔀</span> Saving your score…' : 'Not saved — join some tiles to get a score.') + '</div>' +
-      '<div class="res-btns">' + (next ? '<button class="btn sp-btn sp-primary" id="b-next">' + (g.lvl === 4 ? '💀 Try Hardcore ▶' : 'Next level ▶') + '</button>' : '') + '<button class="btn sp-btn ' + (next ? 'soft sp-secondary' : 'sp-primary') + '\" id="b-again">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🎚️ Levels</button></div>');
-    countUp($('score-count'), g.score, 1000);
-    $('b-again').onclick = () => startGame(g.lvl);
-    $('b-menu').onclick = () => backToMenu();
-    if($('b-next')) $('b-next').onclick = () => { const p = progressOf(S.player); p.unlocked = Math.max(p.unlocked, g.lvl + 1); S.progress[S.player] = p; startGame(g.lvl + 1); };
+    GF.result({wrap: $('result'), card: $('result-card'), win: cleared, icon: cleared ? picOf(g.best, T) : '🔀', title: cleared ? (L.challenge ? 'Challenge beaten!' : stars === 3 ? 'Perfect double up!' : 'Level passed!') : 'No more moves!',   /* 🧱 b3w2: the shared 🏁 card */
+      sub: (!cleared ? '🎯 Make ' + L.goal + ' to pass. ' + pick(TIPS) : stars < 3 && !L.challenge ? '⭐⭐⭐ = no undo. ' + pick(TIPS) : '') + (L.challenge || g.score > 0 ? '' : ' Not saved — join some tiles to get a score.'),
+      stars: cleared && !L.challenge ? stars : null, score: g.score,
+      best: L.challenge ? 'Your best challenge: ' + (cb ? picOf(cb.tile, T) + ' ' + cb.tile + ' · 🏆 ' + Number(cb.score).toLocaleString() : '—') + ' (saved for your family)' : null,
+      stats: [[T.pics ? picOf(g.best, T) : '⭐', 'best ' + g.best + (nm ? ' (' + nm + ')' : '')], ['👆', g.moves + ' slides'], ['⏱', fmt(secs * 1000)]].concat(L.undo ? [['↶', g.undosUsed + ' undo']] : [], L.hardcore ? [['💀', '×3']] : []),
+      save: !L.challenge && g.score > 0 ? 'Saving your score…' : null, buddy: {name: S.player, av: myAvatar(S.player)}, confetti: false,
+      levels: () => backToMenu(), levelsText: '🎚️ Levels', again: () => startGame(g.lvl), againText: '🔁 Play again',
+      next: next ? () => { const p = progressOf(S.player); p.unlocked = Math.max(p.unlocked, g.lvl + 1); S.progress[S.player] = p; startGame(g.lvl + 1); } : null, nextText: g.lvl === 4 ? '💀 Try Hardcore ▶' : 'Next level ▶'});
+    [['btn-levels', 'b-menu'], ['btn-again', 'b-again'], ['btn-next', 'b-next']].forEach(([x, y]) => { const e = $(x); if(e) e.id = y; });   // the old ids (tests, cheer)
+    cheerFaces();   /* 📣 cs-4a: the crowd's faces on the card */
   }, cleared ? 1700 : 1000);
 }
 function party(text){ const p = document.createElement('div'); p.className = 'praise'; p.textContent = text; document.body.appendChild(p); setTimeout(() => p.remove(), 1600); }
@@ -679,4 +704,4 @@ showResult = function(){ const args = arguments;  const r = bdBase.showResult.ap
 </script>
 </body>
 </html>
-<!-- (11n+back-1+modes-3+p1b+p2+p6e+cs-4a) END OF DoubleUp.html -->
+<!-- (11n+back-1+modes-3+p1b+p2+p6e+cs-4a+b3w2) END OF DoubleUp.html -->
