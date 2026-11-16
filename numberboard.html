@@ -302,7 +302,7 @@
   <details class="rules"><summary>📖 How to play</summary><ul>
     <li><b>Make a number sentence:</b> put tiles in one line (across or down) so they read like <b>3 + 4 = 7</b>. Every sentence needs an <b>=</b> and both sides must make the same number.</li>
     <li><b>Drag:</b> slide a tile along your rack to put your hand in order (like 3 + 4 = 7), drag it onto a square to place it, drag a yellow tile back to the rack (or to another square), or drop tiles in the 🔁 swap box to change them.</li>
-    <li><b>Your player:</b> waits on the bench doing silly moves — when you play, they run along your number sentence counting the points! Big plays (25+ or all 8 tiles) start the board's big show (🌳 oak tree, 🐒 jungle swing, 🌊 ocean wave, 🤖 robot build…). Tap ⏩ to skip.</li>
+    <li><b>Your player:</b> sits at the table with the other players (🪑) and reaches in on their turn — when you play, they run along your number sentence counting the points! Big plays (25+ or all 8 tiles) start the board's big show (🌳 oak tree, 🐒 jungle swing, 🌊 ocean wave, 🤖 robot build…). Tap ⏩ to skip.</li>
     <li><b>Place tiles:</b> tap a tile in your rack, then tap a square. Or tap a square first (tap again to switch → / ↓) and then tap tiles — they go in one after another. Tap a yellow tile to take it back. Keyboard: type numbers and signs, Enter plays.</li>
     <li><b>First move</b> goes over the ⭐ in the middle. After that every new sentence must use a tile already on the board, like a crossword.</li>
     <li><b>Big numbers:</b> number tiles next to each other join up: 1 then 2 = 12. Number tiles 10–20 stand on their own.</li>
@@ -1153,26 +1153,32 @@ function buddyFrame(now){
   const dpr = Math.min(2, window.devicePixelRatio || 1), w = cv.offsetWidth, h = cv.offsetHeight;
   if(cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)){ cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
-  const ps = G.players, n = ps.length, seatY = h - 16, k = (h - 8) / 100;
-  // bench
-  g.fillStyle = 'rgba(120,72,30,0.9)'; g.fillRect(8, seatY - 4, w - 16, 7); g.fillStyle = 'rgba(90,52,20,0.9)'; g.fillRect(16, seatY + 3, 5, 13); g.fillRect(w - 21, seatY + 3, 5, 13); g.fillRect(8, seatY - 22, w - 16, 4);
-  ps.forEach((P, idx) => {
-    const st = BUD.st[P.name] || (BUD.st[P.name] = {gest: null, next: performance.now() / 1000 + 1 + Math.random() * 2});
-    const x = w * (n === 1 ? 0.3 : 0.14 + idx * (0.72 / Math.max(1, n - 1))), me = idx === G.cur, tnow = now / 1000;
-    if(BUD.away === P.name){ emo(g, '🏃', x - 9, seatY - 13, 18); emo(g, '💨', x + 9, seatY - 13, 18); return; }
-    const base = me ? seatY + 10 : seatY + 2, kk = me ? k : k * 0.82;
-    if(P.bot){ const s = Math.round(h * (me ? 0.62 : 0.5)); emo(g, THEMES[G.theme].bot, x, base - 4 - s * 0.38 - (me ? Math.abs(Math.sin(tnow * 4)) * 6 : 0), s); }
-    else {
-      if(me){ if(!st.gest && tnow > st.next){ const pool = IDLE.map(gestureByKey).filter(Boolean); st.gest = {g: pick(pool), t: 0}; } if(st.gest){ st.gest.t += dt; if(st.gest.t > st.gest.g.d){ st.gest = null; st.next = tnow + 2 + Math.random() * 3; } } }
-      else st.gest = null;
-      try{   // r32: placed so the whole avatar and its moves stay inside the bench box (no cut-off heads / swords / jumps)
-        const av = myAvatar(P.name), Q = avatarPlace(av, P.name, w, h, x, base, kk, me ? IDLE : []);
-        drawAvatar(g, {name: P.name, av, dir: 1, walkT: 0, gest: me ? st.gest : null}, Q.x, Q.y, Q.k, {t: tnow, still: !me});
-      }catch(e){}
-    }
-    if(!me){ g.fillStyle = 'rgba(120,72,30,0.95)'; g.fillRect(x - 22, seatY - 4, 44, 7); }
-    else { g.fillStyle = '#FF4D8D'; g.beginPath(); g.moveTo(x - 6, 4); g.lineTo(x + 6, 4); g.lineTo(x, 11); g.fill(); if(G.lx && idx !== G.lx.seat && !P.bot) lxBubble(g, x, w, h, tnow, P); }
-  });
+  const ps = G.players;
+  if(window.UI && UI.tableScene && window.UI_TABLE !== false){   // 🪑 24h: everyone sits at a 2.5D table (UiKit TABLE SCENE) — the bench below is the fallback
+    const seats = UI.tableScene.draw(g, w, h, G.players.map(P => ({name: P.name, bot: P.bot, icon: P.bot ? THEMES[G.theme].bot : '', away: BUD.away === P.name})), G.cur, now / 1000, {emo, av: myAvatar});
+    if(G.lx) seats.forEach(S => { const P = G.players[S.i]; if(S.i === G.cur && S.i !== G.lx.seat && !P.bot) lxBubble(g, S.x, w, h, now / 1000, P); });
+  } else {
+    const n = ps.length, seatY = h - 16, k = (h - 8) / 100;
+    // bench
+    g.fillStyle = 'rgba(120,72,30,0.9)'; g.fillRect(8, seatY - 4, w - 16, 7); g.fillStyle = 'rgba(90,52,20,0.9)'; g.fillRect(16, seatY + 3, 5, 13); g.fillRect(w - 21, seatY + 3, 5, 13); g.fillRect(8, seatY - 22, w - 16, 4);
+    ps.forEach((P, idx) => {
+      const st = BUD.st[P.name] || (BUD.st[P.name] = {gest: null, next: performance.now() / 1000 + 1 + Math.random() * 2});
+      const x = w * (n === 1 ? 0.3 : 0.14 + idx * (0.72 / Math.max(1, n - 1))), me = idx === G.cur, tnow = now / 1000;
+      if(BUD.away === P.name){ emo(g, '🏃', x - 9, seatY - 13, 18); emo(g, '💨', x + 9, seatY - 13, 18); return; }
+      const base = me ? seatY + 10 : seatY + 2, kk = me ? k : k * 0.82;
+      if(P.bot){ const s = Math.round(h * (me ? 0.62 : 0.5)); emo(g, THEMES[G.theme].bot, x, base - 4 - s * 0.38 - (me ? Math.abs(Math.sin(tnow * 4)) * 6 : 0), s); }
+      else {
+        if(me){ if(!st.gest && tnow > st.next){ const pool = IDLE.map(gestureByKey).filter(Boolean); st.gest = {g: pick(pool), t: 0}; } if(st.gest){ st.gest.t += dt; if(st.gest.t > st.gest.g.d){ st.gest = null; st.next = tnow + 2 + Math.random() * 3; } } }
+        else st.gest = null;
+        try{   // r32: placed so the whole avatar and its moves stay inside the bench box (no cut-off heads / swords / jumps)
+          const av = myAvatar(P.name), Q = avatarPlace(av, P.name, w, h, x, base, kk, me ? IDLE : []);
+          drawAvatar(g, {name: P.name, av, dir: 1, walkT: 0, gest: me ? st.gest : null}, Q.x, Q.y, Q.k, {t: tnow, still: !me});
+        }catch(e){}
+      }
+      if(!me){ g.fillStyle = 'rgba(120,72,30,0.95)'; g.fillRect(x - 22, seatY - 4, 44, 7); }
+      else { g.fillStyle = '#FF4D8D'; g.beginPath(); g.moveTo(x - 6, 4); g.lineTo(x + 6, 4); g.lineTo(x, 11); g.fill(); if(G.lx && idx !== G.lx.seat && !P.bot) lxBubble(g, x, w, h, tnow, P); }
+    });
+  }
   const who = $('buddy-who'); if(who){ const P = cur(); who.textContent = P.bot ? '🤖 Robot is thinking…' : G.lx ? (G.cur === G.lx.seat ? 'Your turn, ' + P.name : '✏️ ' + P.name + ' is thinking…') : (G.L.together || ps.length > 2 ? P.name + "'s turn" : 'Your turn, ' + P.name); }
 }
 
@@ -1670,4 +1676,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.chips', {rows: 3}); }</script>
 </body>
 </html>
-<!-- (11v+emoji+r32+back-1+modes-3+gs-4+p1a+p1a-3+p2+p4c+cs-3b+lk-3d+lk-5a+lk-5d+lk-5f+dg-2+dg-2b+gb-1) END OF NumberBoard.html -->
+<!-- (11v+emoji+r32+back-1+modes-3+gs-4+p1a+p1a-3+p2+p4c+cs-3b+lk-3d+lk-5a+lk-5d+lk-5f+dg-2+dg-2b+gb-1+24h) END OF NumberBoard.html -->
