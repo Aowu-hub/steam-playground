@@ -2233,7 +2233,7 @@ function buildSeats(){
   if(SET.mode === 'robot'){
     box.innerHTML = '<div class="seats">' + seatHtml(S.player, 'You · left', 0) + '<div class="vs">VS</div>' + seatHtml(null, HELMETS[SET.level].i + ' ' + HELMETS[SET.level].n, 1, true) + '</div>' +
       '<div class="note helm-note" style="margin-top:8px">🤖 A random family member puts on the ' + HELMETS[SET.level].i + ' <b>' + HELMETS[SET.level].n + '</b> (Mk ' + (SET.level + 1) + '). Each robot gets a random style: ' + BB.STYLE_KEYS.map(k => BB.STYLES[k].icon + ' ' + BB.STYLES[k].name).join(' · ') + '.</div>' +
-      (BB.LEVELS[SET.level].team > 1 ? '<div class="note team-note" style="margin-top:8px">🔁 Tag team ' + BB.LEVELS[SET.level].team + ' v ' + BB.LEVELS[SET.level].team + ': family buddies join your team. Tag them in with your dodge + bonk keys together (T + G) or the 🔁 button.</div>' : '') +
+      (BB.LEVELS[SET.level].team > 1 ? '<div class="note team-note" style="margin-top:8px">🔁 Tag team ' + BB.LEVELS[SET.level].team + ' v ' + BB.LEVELS[SET.level].team + ': family buddies join your team. Swap them in with your dodge + bonk keys together (T + G) or the 🔁 Swap button.</div>' : '') +
       (LEVEL_UI[SET.level].hardcore ? '<div class="hc-note" style="margin-top:10px">💀 Hardcore: one round, you start with half your hearts, the robot blocks and juggles. ×3 score.</div>' : '');
   } else {
     if(SET.opp && list.indexOf(SET.opp) < 0 && SET.opp !== 'Guest') SET.opp = '';
@@ -2337,7 +2337,7 @@ function layoutPlay(){
   pzArcAll($('scr-play'));
   requestAnimationFrame(resize); resize();
 }
-function pzRingOrder(){ return G && G.M.sq[0].length > 1 ? ['bonk', 'grab', 'power', 'tag'] : ['bonk', 'grab', 'power', 'dodge']; }   // 🕹️ pz-1: 🤼 Grab = its own one-tap button · 3v3 → 🔁 Tag takes 💨 Dodge's spot (dodge = → → / ← ← on the stick) · 🛡️ = hold 👊 or walk back
+function pzRingOrder(){ return ['bonk', 'grab', 'power', 'dodge', 'block', G && G.M.sq[0].length > 1 ? 'tag' : null]; }   // 🌸 pz-2 (Aowu 09:33 + 15:01): 7 slots — 💨 Dodge stays in 3v3, 🛡️ Block = slot 5 (holding 👊 still blocks), 🔁 Swap (tag a buddy in) = slot 6, empty in 1v1   // 🕹️ pz-1: 🤼 Grab = its own one-tap button · 3v3 → 🔁 Tag takes 💨 Dodge's spot (dodge = → → / ← ← on the stick) · 🛡️ = hold 👊 or walk back
 function legendHtml(){
   const duo = G.M.duo, A = KEYS[0], B = KEYS[1];
   const set = (K, who) => '<span><b>' + who + '</b> ' + kk(K.left) + kk(K.right) + ' move · ' + kk(K.jump) + ' jump · ' + kk(K.duck) + ' duck · ' + kk(K.boop) + '👊 ' + kk(K.bonk) + '💥 ' + kk(K.power) + '🌀 ' + kk(K.dodge) + '💨</span>';
@@ -2345,7 +2345,7 @@ function legendHtml(){
 }
 /* 🕹️ pz-1 PADS (✨ polish chat): the UiKit pad rule — sizes from --pad-*, 👉 one thumb arc, shared button look. */
 const PZ_LOOK = {boop: ['👊', 'Boop', '#FF4D6D'], bonk: ['💥', 'Bonk', '#FF9F1C'], block: ['🛡️', 'Block', '#6EE7F9'], power: ['🌀', 'Power', '#FFC845'],
-  dodge: ['💨', 'Dodge', '#7CC8FF'], tag: ['🔁', 'Tag', '#6EE7F9'], jump: ['⤴️', 'Jump', '#7CF29C'], grab: ['🤼', 'Grab', '#7CF29C']};
+  dodge: ['💨', 'Dodge', '#7CC8FF'], tag: ['🔁', 'Swap', '#C08BFF'], jump: ['⤴️', 'Jump', '#7CF29C'], grab: ['🤼', 'Grab', '#7CF29C']};
 function pzSize(d, two){   // stick + buttons from the shared vars (2 players on one screen: a bit smaller, never under 56 px)
   if(!(window.UI && UI.pad)) return;
   d.querySelectorAll('.tpad').forEach(p => p.style.setProperty('--d', two ? 'calc(var(--pad-stick) * 0.78)' : 'var(--pad-stick)'));
@@ -2363,10 +2363,10 @@ function pzFan(box, order, blk){   // box = .tbtns → 👊 main + the ring (mos
   if(blk){ let t = 0; const off = () => { clearTimeout(t); t = 0; blk(false); main.classList.remove('pz-shield'); };
     main.addEventListener('pointerdown', e => { try{ main.setPointerCapture(e.pointerId); }catch(err){} clearTimeout(t); t = setTimeout(() => { blk(true); main.classList.add('pz-shield'); }, 260); });
     main.addEventListener('pointerup', off); main.addEventListener('pointercancel', off); }
-  const others = order.map(B).filter(Boolean); box.querySelectorAll('.tb').forEach(b => { if(b !== main && others.indexOf(b) < 0) b.remove(); });
-  box.__pzArc = () => UI.pad.arc(box, main, others, {fit: true}); return box;
+  const slots = order.map(a => a ? B(a) : null), others = slots.filter(Boolean); box.querySelectorAll('.tb').forEach(b => { if(b !== main && others.indexOf(b) < 0) b.remove(); });
+  box.__pzArc = () => (UI.pad.petals && window.UI_PETALS !== false) ? UI.pad.petals(box, main, slots, {fit: true}) : UI.pad.arc(box, main, others.slice(0, 4), {fit: true}); return box;   // 🌸 pz-2: slot places fixed (null = empty slot)
 }
-function pzFitStick(el, n){ if(!el || !(window.UI && UI.pad)) return; const k = UI.pad.stickFor(innerWidth, UI.pad.geo(innerWidth, innerHeight, n).w); el.querySelectorAll('.tpad').forEach(p => p.style.setProperty('--d', k + 'px')); }   // the stick never touches the 👉 ring (upright phones)
+function pzFitStick(el, n){ n = Math.min(4, n); if(!el || !(window.UI && UI.pad)) return; const k = UI.pad.stickFor(innerWidth, UI.pad.geo(innerWidth, innerHeight, n).w); el.querySelectorAll('.tpad').forEach(p => p.style.setProperty('--d', k + 'px')); }   // the stick never touches the 👉 ring (upright phones)
 function pzArcAll(root){ (root || document).querySelectorAll('.tbtns.pz-fan').forEach(b => { if(b.__pzArc) b.__pzArc(); }); }
 // one round thumb pad (◀ ▶ move, ▲ jump, ▼ duck — diagonals work: down-back = sitting block) + 4 buttons
 function ctlEl(pi, parts){
@@ -2374,7 +2374,7 @@ function ctlEl(pi, parts){
   const pad = '<div class="tpad" data-p="' + pi + '"><span class="ar u">▲</span><span class="ar d">▼</span><span class="ar l">◀</span><span class="ar r">▶</span><div class="knob"></div></div>';
   const btn = '<div class="tbtns">' + [['boop', '👊', 'Boop'], ['bonk', '💥', 'Bonk'], ['power', '🌀', 'Power'], ['dodge', '💨', 'Dodge']].map(([a, i, n]) => '<button class="tb' + (a === 'power' ? ' pwr' : '') + '" data-a="' + a + '" data-p="' + pi + '" aria-label="' + n + '">' + i + '<small>' + n + '</small></button>').join('')
     + '<button class="tb grab half blk" data-a="block" data-p="' + pi + '" aria-label="Block (hold)">🛡️ Block</button><button class="tb grab half" data-a="grab" data-p="' + pi + '" aria-label="Grapple">🤼 Grab</button>'
-    + (G && G.M.sq[pi].length > 1 ? '<button class="tb grab tag" data-a="tag" data-p="' + pi + '" aria-label="Tag a buddy in">🔁 Tag</button>' : '') + '</div>';
+    + (G && G.M.sq[pi].length > 1 ? '<button class="tb grab tag" data-a="tag" data-p="' + pi + '" aria-label="Swap in a buddy">🔁 Swap</button>' : '') + '</div>';
   d.innerHTML = parts.split('+').map(x => x === 'pad' ? pad : btn).join('');
   d.querySelectorAll('.tpad').forEach(el => bindPad(el, pi));
   const pzTwo = !!(G && G.M.f.filter(p => p.human).length > 1); pzSize(d, pzTwo);   // 🕹️ pz-1
@@ -2509,7 +2509,7 @@ function handleEvents(list){
     else if(e.k === 'jump'){ boing(500, 0.08, 'sine', 0.04); }
     else if(e.k === 'land'){ G.fx.push({k: 'dust', x: e.x, y: 0, t: 0, life: 0.4}); boing(120, 0.15, 'triangle', 0.1); }
     else if(e.k === 'getup'){ visOf(G, e.p).getup = 0; }
-    else if(e.k === 'tag'){ bigWord('🔁 Tag! ' + e.to + '!'); UISound.play('whoosh'); boing(520, 0.12, 'sine', 0.1); G.hpShow[e.p] = 1; G.flash = 0.12; crowdReact('cheer', 1.4); setNames(); }
+    else if(e.k === 'tag'){ bigWord('🔁 Swap! ' + e.to + '!'); UISound.play('whoosh'); boing(520, 0.12, 'sine', 0.1); G.hpShow[e.p] = 1; G.flash = 0.12; crowdReact('cheer', 1.4); setNames(); }
     else if(e.k === 'tagin'){ G.fx.push({k: 'txt', x: e.x, y: 2.4, txt: '🔁 ' + e.to + ' jumps in!', t: 0, life: 1.1, gold: true}); G.hpShow[e.p] = 1; setNames(); }
     else if(e.k === 'out'){ G.fx.push({k: 'txt', x: e.x, y: 2.2, txt: '💫 ' + e.name + ' is out!', t: 0, life: 1.2}); boing(140, 0.3, 'triangle', 0.14); crowdReact('gasp', 1.2); if(FX) G.hitstop = 0.18; }
     else if(e.k === 'notag'){ const p = M.f[e.p]; if(p.human){ UISound.play('error'); G.fx.push({k: 'txt', x: p.x, y: p.y + 2.1, txt: '🔁 in ' + Math.ceil(e.cd || 0) + ' s', t: 0, life: 0.8, small: true}); } }
@@ -3948,4 +3948,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.themes', {rows: 2}); }</script>
 </body>
 </html>
-<!-- (11i-I+back-1+r35+modes-3+mg-1+ck-room+p1c+p2+p3a+ck-2b+cs-2c+ls-1b+pz-1) END OF BrawlBuddies.html -->
+<!-- (11i-I+back-1+r35+modes-3+mg-1+ck-room+p1c+p2+p3a+ck-2b+cs-2c+ls-1b+pz-1+pz-2) END OF BrawlBuddies.html -->
