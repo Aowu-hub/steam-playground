@@ -79,6 +79,7 @@
   .lvl .num{position:absolute;top:8px;left:10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.75rem;color:var(--ink-soft);}
   .lvl .badge{position:absolute;top:6px;right:8px;font-size:1rem;}
   .lvl.recommended{border-color:var(--mint);}
+  .mq-th .lvl.recommended::after{content:'เหมาะกับเธอ!';}   /* ➗ mq-t4b */
   .lvl.recommended::after{content:'Great for you!';position:absolute;bottom:-9px;left:50%;transform:translateX(-50%);white-space:nowrap;background:var(--mint);color:#fff;font-size:0.62rem;font-weight:800;padding:2px 8px;border-radius:8px;}
   .lvl.locked{opacity:.55;cursor:not-allowed;filter:grayscale(.6);}
   .lvl .learn{font-size:0.7rem;font-weight:800;color:var(--pink);}
@@ -262,7 +263,7 @@
   <div id="mode-list"></div>   <!-- ➗ mq-w1: 🗂️ MODE GROUPS (mg-1) — 🔢 Numbers · 🔤 English · 🐘 ไทย -->
   <div class="section-head" id="series-head"><span class="sn">2.</span> Pick your maths</div>
   <div class="chips" id="series-list"></div>
-  <div class="section-head"><span class="sn">3.</span> Pick a world</div>
+  <div class="section-head" id="world-head"><span class="sn">3.</span> Pick a world</div>
   <div class="chips worlds" id="world-list"></div>
   <div class="section-head hidden" id="grade-head"><span class="sn">4.</span> <span id="grade-t">🌋 Extreme: which grade?</span></div>   <!-- ➗ mq-t3 -->
   <div class="chips hidden" id="grade-list"></div>
@@ -417,6 +418,8 @@ function isThaiMode(k){ return modeOf(k).lang === 'th'; }
 const WORLD_TH = {school: 'โรงเรียน', space: 'อวกาศ', lab: 'ห้องแล็บวิทยาศาสตร์', animals: 'โลกสัตว์', market: 'ตลาด'};
 const LEVEL_TH = {Basic: 'พื้นฐาน', Junior: 'เริ่มต้น', Intermediate: 'ปานกลาง', Hard: 'ยาก', Extreme: 'ยากมาก', Hardcore: 'สุดโหด'};
 function tx(en, th){ return G && isThaiMode(G.mode) ? th : en; }
+function mtx(en, th){ return isThaiMode(G ? G.mode : mode) ? th : en; }   // ➗ mq-t4b: the menu / levels screen follows the picked mode
+const BLURB_TH = {Basic: 'เริ่มง่าย ๆ มีรูปช่วย ไม่ต้องรีบ', Junior: 'เลขเล็ก ๆ ค่อย ๆ คิด มีรูปช่วย', Intermediate: 'โจทย์ยาวขึ้น อ่านให้ดีแล้วคิดให้รอบคอบ', Hard: 'หลายขั้นตอน ต้องคิดเร็วขึ้น', Extreme: 'เลขใหญ่ คิดไว ๆ', Hardcore: 'ผิดข้อเดียวจบเกม! ไม่มีตัวช่วย ได้คะแนน ×3'};
 function lvLabel(md, L){ const i = LEVELS.indexOf(L), th = isThaiMode(md);
   if(isTestMode(md) && i === 4 && testGrade !== 'mix') return gradeLabel(Number(testGrade), th ? 'th' : 'en');   // ➗ mq-t3
   if(isTestMode(md) && i === 5) return th ? 'สถานการณ์จริง' : 'Real life';   // ➗ mq-t4: short chip
@@ -1957,7 +1960,7 @@ function renderMenu(){
   $('world-list').innerHTML = WORLD_KEYS.map(k => '<button class="chip' + (k === world ? ' on' : '') + '" data-sound="pop" data-world="' + k + '"><span class="ic">' + WORLDS[k].icon + '</span>' + WORLDS[k].name + '<small>' + WORLDS[k].sub + '</small></button>').join('');
   $('series-list').querySelectorAll('[data-series]').forEach(b => b.onclick = () => { series = b.dataset.series; savePrefs(); $('series-list').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); renderLevels(); });
   $('world-list').querySelectorAll('[data-world]').forEach(b => b.onclick = () => { world = b.dataset.world; savePrefs(); $('world-list').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); });
-  renderLevels();
+  menuLang(); renderLevels();   // ➗ mq-t4b
 }
 // ➗ mq-w1: 🗂️ the ways to play (UiKit mode cards); 🔜 cards say "coming soon" and change nothing
 function renderModes(){
@@ -1968,12 +1971,25 @@ function renderModes(){
     next: () => $('lvl-head'), moreText: '👇 Pick a level below'});
   menuParts();
 }
+const MENU_TH = {   // ➗ mq-t4b: the start page in Thai when a Thai mode is picked
+  head: {'mode-head': ['Pick a way to play', 'เลือกวิธีเล่น'], 'series-head': ['Pick your maths', 'เลือกโจทย์เลข'], 'world-head': ['Pick a world', 'เลือกโลก'], 'ans-head': ['How do you answer?', 'ตอบแบบไหน?']},
+  series: {add: 'บวก', sub: 'ลบ', mul: 'คูณ', div: 'หาร', mix: 'คละ'},
+  world: {school: ['โรงเรียน', 'ดินสอ หนังสือ และแอปเปิล'], space: ['อวกาศ', 'ฐานจรวดและดวงดาว'], lab: ['ห้องแล็บ', 'หลอดทดลองและฟองอากาศ'], animals: ['โลกสัตว์', 'ลูกหมา ลูกแมว ลูกเจี๊ยบ'], market: ['ตลาด', 'ผลไม้ ผัก และเหรียญ']},
+  ans: {auto: ['อัตโนมัติ', 'แตะก่อน · พิมพ์ตั้งแต่ ⚡ ยาก'], choose: ['เลือก', 'แตะคำตอบ'], type: ['พิมพ์', 'แป้นตัวเลข · คะแนน ×1.25']}};
+function menuLang(){ const th = isThaiMode(mode); document.body.classList.toggle('mq-th', th);
+  const label = (b, name, sub) => { [...b.childNodes].filter(n => n.nodeType === 3).forEach(n => n.remove()); const ic = b.querySelector('.ic'); b.insertBefore(document.createTextNode(name), ic ? ic.nextSibling : b.firstChild); const sm = b.querySelector('small:not(.mult)'); if(sm && sub !== undefined) sm.textContent = sub; };
+  Object.entries(MENU_TH.head).forEach(([id, t]) => { const h = $(id); if(!h) return; const tgt = h.querySelector('.lt'); if(tgt) return; [...h.childNodes].filter(n => n.nodeType === 3).forEach(n => n.remove()); h.appendChild(document.createTextNode(' ' + (th ? t[1] : t[0]))); });
+  document.querySelectorAll('#series-list [data-series]').forEach(b => label(b, th ? MENU_TH.series[b.dataset.series] : SERIES[b.dataset.series].name));
+  document.querySelectorAll('#world-list [data-world]').forEach(b => { const k = b.dataset.world; label(b, th ? MENU_TH.world[k][0] : WORLDS[k].name, th ? MENU_TH.world[k][1] : WORLDS[k].sub); });
+  document.querySelectorAll('#ans-list [data-ans]').forEach(b => { const a = ANS_WAYS.find(x => x.k === b.dataset.ans), t = MENU_TH.ans[b.dataset.ans]; label(b, th ? t[0] : a.name, th ? t[1] : a.sub); }); }
 function menuParts(){
   const minute = mode === 'minute';
   ['series-head', 'series-list', 'ans-head', 'ans-list'].forEach(id => $(id).classList.toggle('hidden', minute || isTrickMode(mode) || isTestMode(mode)));   // ➗ mq-w3: tricks have their own maths + are always tapped
   ['grade-head', 'grade-list'].forEach(id => $(id).classList.toggle('hidden', !isTestMode(mode))); if(isTestMode(mode)) renderGrade();   // ➗ mq-t3
   let n = 0; document.querySelectorAll('#scr-menu .section-head').forEach(h => { if(h.classList.contains('hidden')) return; const sn = h.querySelector('.sn'); if(sn) sn.textContent = (++n) + '.'; });
-  $('lvl-head').querySelector('.lt').textContent = minute ? 'Start the race' : 'Pick a level';
+  $('lvl-head').querySelector('.lt').textContent = minute ? 'Start the race' : mtx('Pick a level', 'เลือกระดับ');   // ➗ mq-t4b
+  if(window.UI && UI.modeMore) UI.modeMore(() => $('lvl-head'), mtx('👇 Pick a level below', '👇 เลือกระดับด้านล่าง'));   // ➗ mq-t4b: the 👇 pill in the mode's language
+  menuLang();
 }
 function renderGrade(){   // ➗ mq-t3: 🌋 Extreme in 📝 modes plays one grade or all four
   const th = mode === 'testth', G4 = [['mix', '🎲', th ? 'คละ' : 'Mixed'], ['9', '', th ? 'ม.3' : 'Grade 9'], ['10', '', th ? 'ม.4' : 'Grade 10'], ['11', '', th ? 'ม.5' : 'Grade 11'], ['12', '', th ? 'ม.6' : 'Grade 12']];
@@ -1998,17 +2014,17 @@ function storyRange(L){ const i = Math.max(0, LEVELS.indexOf(L)), th = mode === 
   return (th ? '📜 ' + n + ' ขั้น · ถึง ' + cap + (i >= 3 ? ' · 🪙 บาท ⏰ นาที' : '') + (i >= 4 ? ' · 🙈 เลขหลอก' : '') : '📖 ' + n + (n === '1' ? ' step' : ' steps') + ' · up to ' + cap + (i >= 3 ? ' · 🪙 baht ⏰ minutes' : '') + (i >= 4 ? ' · 🙈 extra number' : '')); }
 function wordRange(L){ const th = mode === 'wordth', top = series === 'mul' || series === 'div' ? (L.tables ? 'tables' : (L.mul[0] * L.mul[1])) : L.add, n = typeof top === 'number' ? (th ? wordsTH(top) : wordsEN(top)) : (th ? 'สูตรคูณ' : 'times tables');
   return (th ? '🐘 คำไทย · ถึง ' : '🔤 in words · up to ') + n; }
-function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">No score yet</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span>' + (b.timeSec ? '<span>⏱ ' + fmt(b.timeSec * 1000) + '</span>' : '') + '<span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
+function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">' + mtx('No score yet', 'ยังไม่มีคะแนน') + '</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span>' + (b.timeSec ? '<span>⏱ ' + fmt(b.timeSec * 1000) + '</span>' : '') + '<span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
 function renderLevels(){
   const box = $('level-list'); box.innerHTML = ''; if(window.UI && UI.leaders) UI.leaders($('leaders'), 'math-quest', S.player); const p = progressOf(S.player), rec = AGE_START[S.age];
   if(mode !== 'minute') LEVELS.forEach((L, i) => {   // ➗ mq-w1: ⏱️ Minute = its own mode
     const open = canPlay(i), done = p.unlocked > i, b = document.createElement('button');
     b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (L.hardcore ? ' hardcore' : ''); b.setAttribute('data-sound', open ? 'pop' : 'none');
     b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">🏅</span>' : open ? '' : '<span class="badge">🔒</span>') +
-      '<div class="big">' + L.emoji + '</div><div class="nm">' + L.name + '</div><div class="learn">' + rangeText(L) + '</div>' +
-      '<div class="lives">' + L.qs + ' questions · ⏱ ' + fmt(L.time * 1000 * modeTime(mode) * caseTime(mode, L)) + (L.hardcore ? ' · 💀 1 mistake' : '') + '</div>' +
-      '<div class="sub">' + (L.hardcore && !open ? '🔒 Beat Extreme to open 💀 Hardcore' : L.blurb) + '</div>' + bestHtml(p, i);
-    b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore' : i === 4 ? 'Pass Hard to unlock Extreme!' : 'Pass the level before to unlock it'); return; } startGame(i); };
+      '<div class="big">' + L.emoji + '</div><div class="nm">' + mtx(L.name, LEVEL_TH[L.name] || L.name) + '</div><div class="learn">' + rangeText(L) + '</div>' +
+      '<div class="lives">' + L.qs + mtx(' questions', ' ข้อ') + ' · ⏱ ' + fmt(L.time * 1000 * modeTime(mode) * caseTime(mode, L)) + (L.hardcore ? mtx(' · 💀 1 mistake', ' · 💀 ผิดได้ 1 ครั้ง') : '') + '</div>' +
+      '<div class="sub">' + (L.hardcore && !open ? mtx('🔒 Beat Extreme to open 💀 Hardcore', '🔒 ผ่านระดับยากมากก่อน จึงจะเล่นสุดโหดได้') : mtx(L.blurb, BLURB_TH[L.name] || L.blurb)) + '</div>' + bestHtml(p, i);   /* ➗ mq-t4b: Thai cards in Thai modes */
+    b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? mtx('Beat Extreme to open 💀 Hardcore', 'ผ่านระดับยากมากก่อน จึงจะเล่นสุดโหดได้') : i === 4 ? mtx('Pass Hard to unlock Extreme!', 'ผ่านระดับยากก่อน จึงจะเล่นยากมากได้!') : mtx('Pass the level before to unlock it', 'ผ่านระดับก่อนหน้าก่อนนะ')); return; } startGame(i); };
     box.appendChild(b);
   });
   // ⏱️ Minute Challenge card (➗ mq-w1: only in the ⏱️ mode)
@@ -2395,4 +2411,4 @@ showResult = function(){ const args = arguments;  const r = bdBase.showResult.ap
 </script>
 </body>
 </html>
-<!-- (r9+back-1+modes-3+p1b+p2+p6e+cs-4b+mq-w1+mq-w2+mq-w3+mq-t1+mq-t2+mq-t2b+mq-t3+mq-t4) END OF MathQuest.html -->
+<!-- (r9+back-1+modes-3+p1b+p2+p6e+cs-4b+mq-w1+mq-w2+mq-w3+mq-t1+mq-t2+mq-t2b+mq-t3+mq-t4+mq-t4b) END OF MathQuest.html -->
