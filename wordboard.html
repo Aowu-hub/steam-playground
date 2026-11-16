@@ -269,6 +269,19 @@
   #scr-play.dark .swapbox{color:#fff;}
   .swapbox.hidden{display:none;}
   .side{position:relative;}
+  /* 🔘 gb-1 (Aowu 2026-11-16 10:34 drawing): upright phone → layout() sets .bd-ph: rack · [buttons | bench | buttons] + 🚀 Play under the bench · hint line */
+  #scr-play.bd-ph .side{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr) minmax(0,1fr);grid-template-areas:"rack rack rack" "swap swap swap" "l1 bench r1" "l2 bench r2" "l3 play r3" "msg msg msg" "bag bag bag";column-gap:6px;row-gap:6px;}
+  #scr-play.bd-ph .side > *{grid-column:1 / -1;}
+  #scr-play.bd-ph .acts{display:contents;}
+  #scr-play.bd-ph #rack{grid-area:rack;} #scr-play.bd-ph .msg{grid-area:msg;}
+  #scr-play.bd-ph .buddy{grid-area:bench;height:auto;min-height:84px;}
+  #scr-play.bd-ph #b-play{grid-area:play;font-size:1rem;} #scr-play.bd-ph #b-check{grid-area:l1;} #scr-play.bd-ph #b-hint{grid-area:l2;} #scr-play.bd-ph #b-recall{grid-area:l3;}
+  #scr-play.bd-ph #b-mix{grid-area:r1;} #scr-play.bd-ph #b-swap{grid-area:r2;} #scr-play.bd-ph #b-pass{grid-area:r3;}
+  #scr-play.bd-ph .act:not(.play){min-height:40px;flex-direction:row;gap:5px;font-size:0.8rem;} #scr-play.bd-ph .act:not(.play) .i{font-size:1rem;}
+  #scr-play.bd-ph .bagline{grid-area:bag;font-size:0.76rem;}
+  #scr-play.bd-ph .swapbox{grid-area:swap;}
+  #scr-play.bd-ph .msg{min-height:0;padding:6px 10px;font-size:0.84rem;}
+  #arena > .turnbar{position:absolute;left:50%;transform:translateX(-50%);z-index:4;width:max-content;max-width:80%;font-size:0.8rem;line-height:1.5;padding:0 10px;border-radius:10px;background:rgba(255,250,240,.95);box-shadow:0 1px 4px rgba(0,0,0,.18);pointer-events:none;}
   .swapbox.floating{position:absolute;left:0;right:0;z-index:20;background:rgba(233,227,255,0.96);box-shadow:0 8px 18px rgba(0,0,0,0.25);color:#3B2A20;}
   .swapbox.hot{background:rgba(122,92,250,0.38);border-style:solid;}
   .sb-lbl{font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.85rem;white-space:nowrap;}
@@ -377,7 +390,7 @@ const SESSION_START = Number(''+__SP("sessionStart")+'') || null;
 const DURATION_MIN = Number(''+__SP("durationMin")+'') || null;
 const GAME_ID = 'word-board';
 // 🎛️ p1a: the shared top bar — ◀ Back (where you came from) · 🎚️ Levels · 🏠 | 🔤 Lettercraft · level | player cards | 🔁 round | ❓ 🔍 🔈 ⚙️
-const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '🔤', name: 'Lettercraft', levelId: 'hud-level',
+const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '🔤', name: 'Lettercraft', levelId: 'hud-level', fold: true,
   levels: () => leavePlay(), playing: () => !!(G && !G.over), onLeave: () => { clearInterval(timerId); try{ speechSynthesis.cancel(); }catch(e){} },
   pause: {pause: () => pauseGame(), resume: () => resume()}, onFit: () => { if(G) layout(); },
   extras: [{id: 'zoom-btn', icon: '🔍', label: 'Zoom the board (Z)', onClick: () => toggleZoom()}, {id: 'voice-btn', icon: '🔈', label: 'Voice: off', onClick: () => toggleVoice()}]});
@@ -743,12 +756,17 @@ function layout(){
   let s;
   if(portrait){ s = Math.floor((Math.min(W - 24, 760) - 10 - (N - 1) * 2) / N);
     // lc-fit: held upright the hand + buttons must still fit under the board — cap the board by the height that is left
-    const gap = parseFloat(cs.rowGap) || 8, sh = Math.floor((H - pad - side.offsetHeight - gap - 16 - (N - 1) * 2) / N); if(sh >= 18) s = Math.min(s, sh); }   // only when it then fits (a very short phone keeps the old size + scrolls — its hand panel alone is ~360 px)
+    const gap = parseFloat(cs.rowGap) || 8, sh = Math.floor((H - pad - side.offsetHeight - gap - 16 - (N - 1) * 2) / N); if(sh >= 18 && W >= 560) s = Math.min(s, sh); }   // gb-1: tablets only — a phone keeps the board full width (Aowu 09:53)   // only when it then fits (a very short phone keeps the old size + scrolls — its hand panel alone is ~360 px)
   else s = Math.floor((Math.min(H - pad - 12, W - side.offsetWidth - 46) - 10 - (N - 1) * 2) / N);
+  // 🔘 gb-1 (Aowu 2026-11-16 10:34 drawing): an upright phone keeps the board FULL width; the hand panel wraps the buttons round the bench (.bd-ph) and "Your turn" sits on the board's top edge
+  const ph = portrait && W < 560, tb = $('turnbar'), scr = $('scr-play'); scr.classList.toggle('bd-ph', ph);
+  if(ph && tb.parentElement !== ar) ar.appendChild(tb); else if(!ph && tb.parentElement !== side) side.insertBefore(tb, side.firstChild);
   s = Math.max(18, Math.min(s, 60));
   G.baseCs = s; $('scr-play').style.setProperty('--cs', Math.round(s * G.zoom) + 'px');
   const wrap = $('board-wrap'); if(portrait){ wrap.style.maxWidth = (W - 12) + 'px'; wrap.style.maxHeight = ''; } else { wrap.style.maxWidth = ''; wrap.style.maxHeight = (H - pad) + 'px'; }
   BAR.extra('zoom-btn', {hidden: s >= 34});
+  if(ph) requestAnimationFrame(() => { const b = $('board-wrap').getBoundingClientRect(), a = ar.getBoundingClientRect(); tb.style.top = Math.max(0, b.top - a.top + ar.scrollTop - 9) + 'px'; });   // gb-1: on the board's top edge
+  else tb.style.top = '';
   setWordMode();   // r31: dock or shelf for the 📖 word cards
 }
 window.addEventListener('resize', () => { if(G) layout(); });
@@ -1536,6 +1554,7 @@ function countUp(el, to, ms){ if(!el) return; const t0 = performance.now(); (fun
 function cheerTaken(){ return Array.from(document.querySelectorAll('#gbar, #board-wrap, #side > *, .top-btn')); }
 function cheerMount(){
   if(!window.Cheer || !G) return; Cheer.unmount(); const box = $('scr-play');
+  if(Math.min(innerWidth, innerHeight) < 500) return;   // 🔘 gb-1 (Aowu 09:53): no crowd on phones — the board + hand need the room (✨ polish chat, 📣 Cheer chat told)
   Cheer.mount(box, {game: 'lettercraft', players: G.players.map((p, i) => ({name: p.name, side: i, human: !p.bot})), me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'overlay',
     zones: () => Cheer.freeZones(box, cheerTaken), avoid: cheerTaken,
     clear: b => { const B = box.getBoundingClientRect(), F = $('board-wrap').getBoundingClientRect(), l = F.left - B.left, t = F.top - B.top; return !(b.r > l - 3 && b.l < l + F.width + 3 && b.b > t - 3 && b.t < t + F.height + 3); }});
@@ -1806,4 +1825,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.chips', {rows: 3}); }</script>
 </body>
 </html>
-<!-- (r31+emoji+r32+lc-2+back-1+modes-3+gr-6+p1a+p1a-3+p2+p4c+size-1+lk-3a+cs-3d+lc-fit+lk-5a+lk-5c+lk-5f+dg-2+dg-2b) END OF WordBoard.html -->
+<!-- (r31+emoji+r32+lc-2+back-1+modes-3+gr-6+p1a+p1a-3+p2+p4c+size-1+lk-3a+cs-3d+lc-fit+lk-5a+lk-5c+lk-5f+dg-2+dg-2b+gb-1) END OF WordBoard.html -->
