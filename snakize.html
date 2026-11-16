@@ -83,6 +83,7 @@
   html .mapc.on, html [data-theme] .mapc.on{border-color:#FFC845 !important;box-shadow:0 0 0 3px #7C5CFF !important;}
   .mapc.on::after{content:'✓';position:absolute;top:5px;right:7px;width:20px;height:20px;border-radius:50%;background:#FFC845;color:#3A2500;font-size:.75rem;font-weight:900;display:flex;align-items:center;justify-content:center;}
   .mapnote{font-size:.75rem;font-weight:800;color:var(--ink-soft);}
+  .maps.shapes{grid-template-columns:repeat(9,minmax(0,1fr));} @media (max-width:900px){ .maps.shapes{grid-template-columns:repeat(5,minmax(0,1fr));} }   /* 🧩 24n */
   @media (max-width:640px){ .maps{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;} .mapc{padding:6px 3px 5px;border-radius:14px;} .mapc .ic{font-size:1.1rem;} .mapc .nm{font-size:.86rem;} }
   .lvl .best{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 8px;font-size:0.74rem;font-weight:800;}
   .lvl .best span{background:var(--panel);border-radius:10px;padding:2px 8px;} .lvl .best.none{color:var(--ink-soft);}
@@ -261,6 +262,8 @@
   <div class="modes" id="mode-list"></div>
   <div id="map-wrap"><div class="section-head" id="map-head">🗺️ 1. Pick a map size <span class="mapnote">(bigger map = ×more points)</span></div>
   <div class="maps" id="map-list"></div></div>
+  <div id="shape-wrap" class="hidden"><div class="section-head" id="shape-head">🧩 Map shape <span class="mapnote">(smaller / twistier map = ×more points)</span></div>   <!-- 🧩 24n -->
+  <div class="maps shapes" id="shape-list"></div></div>
   <div class="section-head" id="level-head">Pick a level</div>
   <div class="levels" id="level-list"></div>
   <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the board">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-2b -->
@@ -429,12 +432,39 @@ var SN = (function () {
 
   // ======================================================================
   // 🍎 SNAKEAST — grid snake
+  // 🧩 24n MAP SHAPES (✨ polish chat, Aowu 2026-11-16 18:30): 🍎 Snakeast maps can be a shape — cells outside = void (M.wall 3) = a wall to
+  // bump into; on wrap levels (🌱 🐣) the snake tunnels across the void to the other side of the shape. Start spots move inside the shape.
+  function shapeMask(name, n){ var c = (n - 1) / 2, M = new Array(n * n);
+    for(var y = 0; y < n; y++) for(var x = 0; x < n; x++){ var dx = x - c, dy = y - c, ax = Math.abs(dx), ay = Math.abs(dy), r = Math.sqrt(dx * dx + dy * dy), on = true, a, X, Y, wall;
+      switch(name){
+        case 'island': a = Math.atan2(dy, dx); on = r < c * (0.86 + 0.14 * Math.sin(a * 3 + 1) + 0.06 * Math.sin(a * 7)) + 0.35; break;
+        case 'plus': on = ax <= c * 0.45 + 0.1 || ay <= c * 0.45 + 0.1; break;
+        case 'diamond': on = ax + ay <= c * 1.25 + 0.1; break;
+        case 'donut': on = r <= c + 0.5 && r >= c * 0.36; break;
+        case 'heart': X = dx / (c + 0.6) * 1.25; Y = -dy / (c + 0.6) * 1.25 + 0.3; on = Math.pow(X * X + Y * Y - 1, 3) - X * X * Y * Y * Y <= 0; break;
+        case 'hourglass': on = ax <= ay + 1 || ay >= c * 0.8; break;
+        case 'rooms': wall = Math.round(c); on = !((x === wall && ay > c * 0.3) || (y === wall && ax > c * 0.3)); break;
+        case 'arrow': on = dy <= c * 0.05 ? ax <= dy + c + 0.01 : ax <= c * 0.45 + 0.1; break;
+        default: on = true; }
+      M[y * n + x] = on; }
+    return M; }
+  function applyVoid(M){ if(!M.voidM) return; for(var i = 0; i < M.voidM.length; i++) if(M.voidM[i]) M.wall[i] = 3; }
+  function isVoid(M, x, y){ return !!(M.voidM && x >= 0 && y >= 0 && x < M.n && y < M.n && M.voidM[y * M.n + x]); }
+  // a start spot inside the shape: 3 body cells behind + 4 free cells ahead, nearest to the usual spot, never on another snake's spot
+  function fitSpot(M, sp, taken){
+    var n = M.n, best = null, bd = 1e9, ds = [sp.d].concat(['r', 'l', 'd', 'u'].filter(function(d){ return d !== sp.d; }));
+    for(var y = 1; y < n - 1; y++) for(var x = 1; x < n - 1; x++) ds.forEach(function(d, di){ var dx = DIRS[d][0], dy = DIRS[d][1], ok = true;
+      for(var k = -2; k <= 4 && ok; k++){ var xx = x + dx * k, yy = y + dy * k; if(!inb(M, xx, yy) || M.wall[yy * n + xx]) ok = false; }
+      if(!ok || taken.some(function(t){ return Math.abs(t.x - x) + Math.abs(t.y - y) < 4; })) return;
+      var dd = Math.abs(x - sp.x) + Math.abs(y - sp.y) + di * 3; if(dd < bd){ bd = dd; best = {x: x, y: y, d: d}; } });
+    return best || sp; }
   function newFeast(o){
     var L = o.mods ? Object.assign({}, FEAST[o.level], o.mods) : FEAST[o.level], n = o.n || ((o.players || []).length > 2 ? Math.max(18, L.n) : L.n);
     var M = { mode: 'feast', L: L, lv: o.level, n: n, rnd: rng(o.seed || 1), t: 0, ev: [], over: false, winner: -1, endless: !!o.endless,
       target: o.endless ? Infinity : (o.target || L.target), tick: L.tick, wall: new Uint8Array(n * n), foods: [], movers: [], portals: [], falling: [], walls2: [],
       snakes: [], skills: !!o.skills, skillCd: 14, giftEvery: L.gift, giftT: L.gift, slowT: 0, slowBy: -1, freezeT: 0, duel: (o.players || []).length > 1 && !o.coop, coop: !!o.coop, eatenAll: 0, story: o.story || null, leadI: 0 };
     var P = o.players && o.players.length ? o.players : [{ name: 'You', human: true }];
+    if(o.shape && o.shape !== 'square'){ M.shape = o.shape; M.voidM = shapeMask(o.shape, n).map(function(on){ return !on; }); applyVoid(M); }   // 🧩 24n
     // walls first (maze), then snakes, then rocks/movers/portals/food
     if(L.maze) buildMaze(M);
     var starts = startSpots(M, P.length);
@@ -457,26 +487,26 @@ var SN = (function () {
     var n = M.n, mid = Math.floor(n / 2), out = [];
     var spots = [{ x: 3, y: mid, d: 'r' }, { x: n - 4, y: mid - 1 + (n % 2), d: 'l' }, { x: mid, y: 3, d: 'd' }, { x: mid - 1 + (n % 2), y: n - 4, d: 'u' }];
     if(count === 1) spots[0] = { x: Math.max(3, mid - 2), y: mid, d: 'r' };
-    for(var i = 0; i < count; i++) out.push(spots[i]);
+    for(var i = 0; i < count; i++) out.push(M.voidM ? fitSpot(M, spots[i], out) : spots[i]);   // 🧩 24n: inside the shape
     return out;
   }
   function inb(M, x, y){ return x >= 0 && y >= 0 && x < M.n && y < M.n; }
-  function clearAround(M, x, y, r){ for(var yy = y - r; yy <= y + r; yy++) for(var xx = x - r - 2; xx <= x + r + 2; xx++) if(inb(M, xx, yy)) M.wall[yy * M.n + xx] = 0; }
+  function clearAround(M, x, y, r){ for(var yy = y - r; yy <= y + r; yy++) for(var xx = x - r - 2; xx <= x + r + 2; xx++) if(inb(M, xx, yy) && M.wall[yy * M.n + xx] !== 3) M.wall[yy * M.n + xx] = 0; }
   function buildMaze(M){
     // short wall bars on a coarse lattice (never a dead end: every free cell stays reachable)
     var n = M.n;
     for(var tries = 0; tries < 30; tries++){
-      M.wall.fill(0);
+      M.wall.fill(0); applyVoid(M);
       for(var y = 3; y < n - 2; y += 4) for(var x = 3; x < n - 2; x += 4){
         if(M.rnd() < 0.25) continue;
         var horiz = M.rnd() < 0.5, len = 2 + Math.floor(M.rnd() * 2);
-        for(var k = 0; k < len; k++){ var xx = horiz ? x + k - 1 : x, yy = horiz ? y : y + k - 1; if(inb(M, xx, yy)) M.wall[yy * n + xx] = 1; }
+        for(var k = 0; k < len; k++){ var xx = horiz ? x + k - 1 : x, yy = horiz ? y : y + k - 1; if(inb(M, xx, yy) && M.wall[yy * n + xx] !== 3) M.wall[yy * n + xx] = 1; }
       }
       // keep the start lanes open
-      var mid = Math.floor(n / 2); for(var xx2 = 0; xx2 < n; xx2++){ M.wall[mid * n + xx2] = 0; }
+      var mid = Math.floor(n / 2); for(var xx2 = 0; xx2 < n; xx2++){ if(M.wall[mid * n + xx2] !== 3) M.wall[mid * n + xx2] = 0; }
       if(connected(M)) return;
     }
-    M.wall.fill(0);
+    M.wall.fill(0); applyVoid(M);
   }
   function connected(M){
     var n = M.n, seen = new Uint8Array(n * n), stack = [], free = 0, start = -1;
@@ -490,7 +520,7 @@ var SN = (function () {
   function occupied(M, x, y, opts){
     opts = opts || {};
     var n = M.n; if(!inb(M, x, y)) return 'out';
-    if(M.wall[y * n + x]) return M.wall[y * n + x] === 1 ? 'wall' : 'rock';
+    if(M.wall[y * n + x]) return M.wall[y * n + x] === 2 ? 'rock' : 'wall';   // 🧩 24n: 3 = void = wall
     for(var i = 0; i < M.movers.length; i++){ var mv = M.movers[i]; if(mv.x === x && mv.y === y) return 'mover'; }
     for(var j = 0; j < M.falling.length; j++){ var fr = M.falling[j]; if(fr.landed && fr.x === x && fr.y === y) return 'rock2'; }
     for(var w = 0; w < M.walls2.length; w++){ var wc = M.walls2[w]; if(wc.x === x && wc.y === y && (!opts.owner || wc.by !== opts.owner)) return 'tailwall'; }
@@ -559,7 +589,8 @@ var SN = (function () {
   function wrapXY(M, x, y){ return [(x + M.n) % M.n, (y + M.n) % M.n]; }
   function nextCell(M, x, y, d){
     var nx = x + DIRS[d][0], ny = y + DIRS[d][1];
-    if(M.L.wrap) { var w = wrapXY(M, nx, ny); nx = w[0]; ny = w[1]; }
+    if(M.L.wrap) { var w = wrapXY(M, nx, ny); nx = w[0]; ny = w[1];
+      for(var tg = 0; tg < M.n && isVoid(M, nx, ny); tg++){ w = wrapXY(M, nx + DIRS[d][0], ny + DIRS[d][1]); nx = w[0]; ny = w[1]; } }   // 🧩 24n: tunnel across the void
     for(var p = 0; p < M.portals.length; p++){ var P = M.portals[p];
       if(P.a[0] === nx && P.a[1] === ny) return { x: P.b[0] + DIRS[d][0], y: P.b[1] + DIRS[d][1], portal: p };
       if(P.b[0] === nx && P.b[1] === ny) return { x: P.a[0] + DIRS[d][0], y: P.a[1] + DIRS[d][1], portal: p }; }
@@ -634,7 +665,7 @@ var SN = (function () {
     var c = nextCell(M, s.body[0][0], s.body[0][1], s.dir);
     if(M.L.wrap) { var w = wrapXY(M, c.x, c.y); c.x = w[0]; c.y = w[1]; }
     var h = hitAt(M, s, c.x, c.y);
-    if(h && s.chili && (h.why === 'rock' || h.why === 'mover' || h.why === 'rock2' || h.why === 'tailwall' || (h.why === 'wall' && inb(M, c.x, c.y)))){
+    if(h && s.chili && (h.why === 'rock' || h.why === 'mover' || h.why === 'rock2' || h.why === 'tailwall' || (h.why === 'wall' && inb(M, c.x, c.y) && M.wall[c.y * M.n + c.x] !== 3))){
       burnAt(M, c.x, c.y); s.chili = 0; push(M, { k: 'burn', s: s.i, x: c.x, y: c.y }); h = null;
     }
     if(h){ bump(M, s, h); return; }
@@ -649,7 +680,7 @@ var SN = (function () {
     if(L >= M.target && !M.over){ finish(M, s.i, 'target'); }
   }
   function burnAt(M, x, y){
-    if(inb(M, x, y)) M.wall[y * M.n + x] = 0;
+    if(inb(M, x, y) && M.wall[y * M.n + x] !== 3) M.wall[y * M.n + x] = 0;
     M.movers = M.movers.filter(function(m){ return !(m.x === x && m.y === y); });
     M.falling = M.falling.filter(function(f){ return !(f.x === x && f.y === y); });
     M.walls2 = M.walls2.filter(function(w){ return !(w.x === x && w.y === y); });
@@ -1338,7 +1369,10 @@ function sizeKey(mode){ const k = (SET.sizes || {})[mode || SET.mode]; return (M
 function levelValue(mode, i){ return mode === 'gate' ? SN.GATE[i].R : mode === 'castle' ? SN.CASTLE[i].n : SN.FEAST[i].n; }
 function sizeLabel(mode, v){ return mode === 'gate' ? 'arena ' + v : v + '×' + v; }
 // the picked size for this mode + level: {v, mult, std, n | mods}
-function sizeFor(mode, i){
+function sizeFor(mode, i){ const o = sizeFor0(mode, i), SH = mode === 'feast' && typeof curShape === 'function' ? curShape() : null;   // 🧩 24n: + the map shape
+  if(SH && SH.hard){ o.mult = +(o.mult * SHAPE_MULT[SH.hard]).toFixed(2); o.engine = Object.assign({}, o.engine || {}, {shape: SH.k}); o.label = (o.label || sizeLabel(mode, o.v)) + ' · ' + SH.icon + ' ' + SH.name; o.shape = SH; }
+  return o; }
+function sizeFor0(mode, i){
   const list = MAP_SIZES[mode]; if(!list) return {std: true, mult: 1, v: 0};
   const lv = levelValue(mode, i), z = list.find(x => x.k === sizeKey(mode));
   const idx = z ? list.indexOf(z) : Math.max(0, list.findIndex(x => x.v >= lv)), v = z ? z.v : lv, out = {v, mult: SIZE_LOOK[idx < 0 ? 3 : idx].x, std: !z || z.v === lv, label: sizeLabel(mode, v)};
@@ -1356,13 +1390,42 @@ function renderSizes(){
   box.innerHTML = [{k: 'auto', icon: '🎚️', name: 'Level size', sub: 'grows with the level', x: '×1 → ×2'}].concat(list.map((z, i) => ({k: z.k, icon: SIZE_LOOK[i].icon, name: SIZE_LOOK[i].name, sub: SET.mode === 'gate' ? 'arena ' + z.v : z.v + ' × ' + z.v, x: '×' + SIZE_LOOK[i].x})))
     .map(z => '<button class="mapc' + (z.k === cur ? ' on' : '') + '" data-k="' + z.k + '" data-sound="tap"><div class="ic">' + z.icon + '</div><div class="nm">' + z.name + '</div><div class="sub">' + z.sub + '</div><div class="x">' + z.x + '</div></button>').join('');
   box.querySelectorAll('.mapc').forEach(b => b.onclick = () => { SET.sizes = Object.assign({}, SET.sizes, {[SET.mode]: b.dataset.k}); savePrefs(); renderLevels(); });
+  if(typeof renderShapes === 'function') renderShapes();   // 🧩 24n
 }
 /* 🗺️ END MAP SIZE */
+/* 🧩 24n MAP SHAPES (page): 🍎 Snakeast map shape + its own ⭐ hardness, measured on the 12 / 16 / 21 maps: room left (1 − cells) + 2 × detour
+   (shortest path ÷ straight line) → ★ < 0.37 · ★★ 0.37–0.45 · ★★★ ≥ 0.45 → points ×1.25 / ×1.5 / ×2, on top of the map-size ×. Off: window.SN_SHAPES = false. */
+const SHAPES = [
+  {k: 'square', icon: '⬛', name: 'Classic', hard: 0},
+  {k: 'plus', icon: '➕', name: 'Cross', hard: 1}, {k: 'diamond', icon: '💎', name: 'Diamond', hard: 1},
+  {k: 'donut', icon: '🍩', name: 'Donut', hard: 2}, {k: 'rooms', icon: '🚪', name: 'Four rooms', hard: 2}, {k: 'heart', icon: '💗', name: 'Heart', hard: 2}, {k: 'hourglass', icon: '⏳', name: 'Hourglass', hard: 2}, {k: 'island', icon: '🏝️', name: 'Island', hard: 2},
+  {k: 'arrow', icon: '⬆️', name: 'Arrow', hard: 3}];
+const SHAPE_MULT = [1, 1.25, 1.5, 2];
+function shapeOf(k){ return SHAPES.find(x => x.k === k) || SHAPES[0]; }
+function curShape(){ return window.SN_SHAPES === false ? SHAPES[0] : shapeOf(SET.shape); }
+function renderShapes(){
+  const wrap = $('shape-wrap'), box = $('shape-list'); if(!box) return; const on = SET.mode === 'feast' && window.SN_SHAPES !== false; if(wrap) wrap.classList.toggle('hidden', !on); if(!on) return;
+  const cur = curShape().k;
+  box.innerHTML = SHAPES.map(z => '<button class="mapc shp' + (z.k === cur ? ' on' : '') + '" data-k="' + z.k + '" data-sound="tap"><div class="ic">' + z.icon + '</div><div class="nm">' + z.name + '</div><div class="sub">' + (z.hard ? '⭐'.repeat(z.hard) : 'full map') + '</div><div class="x">' + (z.hard ? '×' + SHAPE_MULT[z.hard] : '×1') + '</div></button>').join('');
+  box.querySelectorAll('.mapc').forEach(b => b.onclick = () => { SET.shape = b.dataset.k; savePrefs(); renderLevels(); });
+}
+// pixel fall-off round the shape (on the cached field picture)
+function paintVoid(g, M, T, n, cell){
+  if(!M.voidM) return; const inside = (x, y) => x >= 0 && y >= 0 && x < n && y < n && !M.voidM[y * n + x];
+  g.fillStyle = T.out; for(let i = 0; i < n * n; i++) if(M.voidM[i]) g.fillRect((i % n) * cell, ((i / n) | 0) * cell, cell + 0.5, cell + 0.5);
+  const R = SN.rng(n * 31 + 7), k = Math.max(2, cell / 4);
+  for(let y = 0; y < n; y++) for(let x = 0; x < n; x++){ if(inside(x, y)) continue; let near = 0; for(let j = -1; j <= 1; j++) for(let i = -1; i <= 1; i++) if(inside(x + i, y + j)) near++;
+    if(!near) continue; for(let q = 0; q < 16; q++){ if(R() < 0.45 * near / 4){ g.fillStyle = q % 3 ? T.bg[0] : T.bg[1]; g.globalAlpha = 0.35 + R() * 0.5; g.fillRect(x * cell + (q % 4) * k, y * cell + (q >> 2) * k, k, k); } } }
+  g.globalAlpha = 1;
+  for(let y = 0; y < n; y++) for(let x = 0; x < n; x++){ if(!inside(x, y)) continue; g.fillStyle = T.out;   // chipped pixel corners on the edge cells
+    [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([i, j]) => { if(inside(x + i, y + j) || R() > 0.55) return; const px = i < 0 ? 0 : i > 0 ? 3 : Math.floor(R() * 4), py = j < 0 ? 0 : j > 0 ? 3 : Math.floor(R() * 4); g.fillRect(x * cell + px * k, y * cell + py * k, k, k); }); }
+}
+
 let G = null, lockHandle = null, KEYS = null, raf = 0;
 function ls(k, v){ try{ if(v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }catch(e){ return null; } }
 function store(k){ return 'sp_snake_' + k + ':' + (S.player || ''); }
-function loadPrefs(){ try{ const p = JSON.parse(ls(store('prefs')) || '{}'); if(THEMES[p.theme]) SET.theme = p.theme; if(MODES[p.mode] && BUILT_MODES.indexOf(p.mode) >= 0) SET.mode = p.mode; if(['solo', 'duo', 'party'].indexOf(p.play) >= 0) SET.play = p.play; if(p.opp) SET.opp = p.opp; if(Array.isArray(p.opps)) SET.opps = p.opps; if(SN.SKILLS[p.skill]) SET.skill = p.skill; SET.endless = !!p.endless; if(p.sizes && typeof p.sizes === 'object') SET.sizes = p.sizes; }catch(e){} }
-function savePrefs(){ ls(store('prefs'), JSON.stringify({theme: SET.theme, mode: SET.mode, play: SET.play, opp: SET.opp, opps: SET.opps, skill: SET.skill, endless: SET.endless, sizes: SET.sizes})); }
+function loadPrefs(){ try{ const p = JSON.parse(ls(store('prefs')) || '{}'); if(typeof p.shape === 'string') SET.shape = p.shape;   /* 🧩 24n */ if(THEMES[p.theme]) SET.theme = p.theme; if(MODES[p.mode] && BUILT_MODES.indexOf(p.mode) >= 0) SET.mode = p.mode; if(['solo', 'duo', 'party'].indexOf(p.play) >= 0) SET.play = p.play; if(p.opp) SET.opp = p.opp; if(Array.isArray(p.opps)) SET.opps = p.opps; if(SN.SKILLS[p.skill]) SET.skill = p.skill; SET.endless = !!p.endless; if(p.sizes && typeof p.sizes === 'object') SET.sizes = p.sizes; }catch(e){} }
+function savePrefs(){ ls(store('prefs'), JSON.stringify({theme: SET.theme, mode: SET.mode, play: SET.play, opp: SET.opp, opps: SET.opps, skill: SET.skill, endless: SET.endless, sizes: SET.sizes, shape: SET.shape})); }
 function myAvatar(name){ const a = S.avatars[name]; return a ? fixAv(a) : defaultAvatar(name || 'player'); }
 // riders keep their look, hats and costumes — but not their own ride-on or pet (the snake is the ride today)
 function riderAv(av){ const a = JSON.parse(JSON.stringify(av)); a.eq = Object.assign({}, a.eq || {}); delete a.eq.ride; delete a.eq.pet; return fixAv(a); }
@@ -1855,9 +1918,11 @@ function fieldCache(st, T, n, cell){
   const R2 = SN.rng(n * 13 + 1); for(let i = 0; i < Math.round(n * n / 18); i++){ const x = Math.floor(R2() * n), y = Math.floor(R2() * n); if(st.M.wall[y * n + x]) continue; emo(g, T.decor[i % T.decor.length], (x + 0.5) * cell, (y + 0.5) * cell, cell * 0.55, 0.28); }
   const M = st.M;
   for(let y = 0; y < n; y++) for(let x = 0; x < n; x++){ const w = M.wall[y * n + x]; if(!w) continue;
+    if(w === 3) continue;   // 🧩 24n: void (painted by paintVoid)
     if(w === 1){ g.fillStyle = T.wall; rrect(g, x * cell + 1, y * cell + 1, cell - 2, cell - 2, cell * 0.18); g.fill(); g.fillStyle = T.wallHi; rrect(g, x * cell + 2, y * cell + 2, cell - 4, cell * 0.38, cell * 0.14); g.fill(); }
     else emo(g, T.rock, (x + 0.5) * cell, (y + 0.5) * cell, cell * 0.85); }
-  if(!M.L.wrap){ g.strokeStyle = T.out; g.lineWidth = Math.max(2, cell * 0.12); g.strokeRect(1, 1, n * cell - 2, n * cell - 2); }
+  paintVoid(g, M, T, n, cell);   // 🧩 24n
+  if(!M.L.wrap && !M.voidM){ g.strokeStyle = T.out; g.lineWidth = Math.max(2, cell * 0.12); g.strokeRect(1, 1, n * cell - 2, n * cell - 2); }
   st.fieldCache = {key, c};
   return c;
 }
@@ -1868,7 +1933,7 @@ function drawFeast(g, W, H, st, preview){
   const fc = fieldCache(st, T, n, cell);
   g.drawImage(fc, bx, by, n * cell, n * cell);
   g.save(); g.translate(bx, by);
-  if(M.L.wrap && !st.preview){ g.strokeStyle = 'rgba(255,255,255,0.35)'; g.setLineDash([cell * 0.3, cell * 0.3]); g.lineWidth = 2; g.strokeRect(1, 1, n * cell - 2, n * cell - 2); g.setLineDash([]); }
+  if(M.L.wrap && !st.preview && !M.voidM){ g.strokeStyle = 'rgba(255,255,255,0.35)'; g.setLineDash([cell * 0.3, cell * 0.3]); g.lineWidth = 2; g.strokeRect(1, 1, n * cell - 2, n * cell - 2); g.setLineDash([]); }
   if(T.tiles && !st.preview){ for(let i = 0; i < 6; i++){ const R = SN.rng(Math.floor(t * 2) * 7 + i), x = Math.floor(R() * n), y = Math.floor(R() * n); g.fillStyle = ['rgba(255,79,163,0.25)', 'rgba(255,224,102,0.25)', 'rgba(110,231,249,0.25)'][i % 3]; g.fillRect(x * cell, y * cell, cell, cell); } }
   const C = (x, y) => [(x + 0.5) * cell, (y + 0.5) * cell];
   // portals
@@ -2460,4 +2525,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.themes', {rows: 2}); UI.pageRows('.skins', {rows: 2}); }</script>
 </body>
 </html>
-<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a+p3e+cs-2b+ck-2c+pz-1) END OF Snakize.html -->
+<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a+p3e+cs-2b+ck-2c+pz-1+24n) END OF Snakize.html -->

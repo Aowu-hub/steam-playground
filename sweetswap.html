@@ -109,6 +109,8 @@
   .arena{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:4px 10px var(--safe-b, 18px);position:relative;}
   .board{position:relative;background:var(--board);border-radius:18px;box-shadow:0 8px 0 rgba(0,0,0,0.2);touch-action:none;flex:none;}
   .slot{position:absolute;border-radius:22%;background:var(--slot);}
+  .slot.hole{display:none;} .board.shaped{background:transparent;box-shadow:none;} #shape-cv{position:absolute;left:0;top:0;pointer-events:none;filter:drop-shadow(0 6px 0 rgba(0,0,0,0.18));}   /* 🧩 24n */
+  .shape-chip{display:inline-flex;flex-direction:column;align-items:center;gap:1px;min-width:82px;} .shape-chip .hd{font-size:.7rem;font-weight:800;opacity:.85;line-height:1.1;}
   /* blockers (ice box, package, cage…): a cover drawn OVER the picture (the picture still shows through); double = thicker + cracks; the corner badge shows the theme blocker */
   .icecap{position:absolute;z-index:3;pointer-events:none;border-radius:24%;transition:opacity .25s,transform .25s;}
   .icecap.i1,.icecap.i2{background:linear-gradient(145deg,rgba(235,250,255,0.55),rgba(160,220,245,0.35));box-shadow:inset 0 0 0 3px rgba(255,255,255,0.95),0 0 0 2px rgba(110,190,230,0.7);}
@@ -256,9 +258,11 @@
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
   <div class="section-head">🎨 1. Pick your pictures</div>   <!-- 🧱 b3w2: ONE setup page -->
   <div class="chips" id="theme-list"></div>
-  <div class="section-head" id="level-head">🎚️ 2. Pick a level</div>
+  <div class="shape-wrap"><div class="section-head" id="shape-head">🧩 2. Pick a board shape</div>   <!-- 🧩 24n -->
+  <div class="chips" id="shape-list"></div></div>
+  <div class="section-head" id="level-head">🎚️ 3. Pick a level</div>
   <div class="levels" id="level-list"></div>
-  <div class="section-head" id="opt-head">⚙️ 3. Options</div>
+  <div class="section-head" id="opt-head">⚙️ 4. Options</div>
   <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the board">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-4a -->
   <div class="b3-start"><button class="btn sp-btn sp-primary" id="btn-start" data-sound="pop" onclick="startSetup()">▶ Start</button></div>   <!-- 🧱 b3w2: 📖 how-to + 🏆 leaders live on the cover -->
 </section>
@@ -322,6 +326,62 @@ const THEMES = {
   space: {name: 'Spacecraft', pics: ['🚀', '🛸', '🛰️', '🪐', '☄️', '🌙'], t: ['#1B1440', '#3A2A7A'], board: '#120C2E', slot: 'rgba(255,255,255,0.14)', dark: true, cage: {ic: '☄️', name: 'meteor cage', cls: 'ck-meteor'}, power: {ic: '🛡️', name: 'EMP shield', fx: 'emp'}}
 };
 const THEME_KEYS = Object.keys(THEMES);
+/* 🧩 24n BOARD SHAPES (✨ polish chat, Aowu 2026-11-16 18:30 "i like the shown yes … without a sweet to swap it should shuffle … each map has
+   its own hardness too"): the board can be a shape — holes = no picture, pictures fall past the holes inside their column, no swap left →
+   🔀 the board mixes (reshuffle, as before). Each shape has its own ⭐ hardness, measured (valid swaps vs the full square, 300 random boards ×
+   n 7 / 8 / 9): ★ ≥ 50 % · ★★ 33–50 % · ★★★ < 33 % → points ×1.25 / ×1.5 / ×2 (Classic ×1); collect goals follow the shape's cells.
+   The edge breaks into pixels (pixel fall-off, drawn on #shape-cv under the slots). Off: window.SS_SHAPES = false (Classic only). */
+const SHAPES = [
+  {k: 'square', icon: '⬛', name: 'Classic', hard: 0},
+  {k: 'house', icon: '🏠', name: 'House', hard: 1}, {k: 'heart', icon: '💗', name: 'Heart', hard: 1}, {k: 'plus', icon: '➕', name: 'Cross', hard: 1},
+  {k: 'diamond', icon: '💎', name: 'Diamond', hard: 2}, {k: 'donut', icon: '🍩', name: 'Donut', hard: 2}, {k: 'cloud', icon: '☁️', name: 'Cloud', hard: 2},
+  {k: 'arrow', icon: '⬆️', name: 'Arrow', hard: 3}, {k: 'x', icon: '✖️', name: 'X', hard: 3}];
+const SHAPE_MULT = [1, 1.25, 1.5, 2];
+function shapeOf(k){ return SHAPES.find(s => s.k === k) || SHAPES[0]; }
+function shapeStars(h){ return h ? '⭐'.repeat(h) : ''; }
+function shapeMask(name, n){ const c = (n - 1) / 2, M = new Array(n * n);
+  for(let y = 0; y < n; y++) for(let x = 0; x < n; x++){ const dx = x - c, dy = y - c, ax = Math.abs(dx), ay = Math.abs(dy), r = Math.hypot(dx, dy); let on = true;
+    switch(name){
+      case 'cloud': case 'island': { const a = Math.atan2(dy, dx); on = r < c * (0.86 + 0.14 * Math.sin(a * 3 + 1) + 0.06 * Math.sin(a * 7)) + 0.35; break; }
+      case 'plus': on = ax <= c * 0.45 + 0.1 || ay <= c * 0.45 + 0.1; break;
+      case 'diamond': on = ax + ay <= c * 1.25 + 0.1; break;
+      case 'donut': on = r <= c + 0.5 && r >= c * 0.36; break;
+      case 'heart': { const X = dx / (c + 0.6) * 1.25, Y = -dy / (c + 0.6) * 1.25 + 0.3; on = Math.pow(X * X + Y * Y - 1, 3) - X * X * Y * Y * Y <= 0; break; }
+      case 'hourglass': on = ax <= ay + 1 || ay >= c * 0.8; break;
+      case 'arrow': on = dy <= c * 0.05 ? ax <= dy + c + 0.01 : ax <= c * 0.45 + 0.1; break;
+      case 'x': on = Math.abs(ax - ay) <= 1.01 || r < 1.6; break;
+      case 'house': on = dy >= -c * 0.1 || ax <= dy + c + 0.01; break;
+      default: on = true; }
+    M[y * n + x] = on; }
+  return M; }
+let HOLE = null;   // per game: HOLE[i] = true → no picture there (null = Classic)
+function isHole(i){ return !!(HOLE && HOLE[i]); }
+let shapeKey = 'square';
+function setShape(k){ shapeKey = shapeOf(k).k; try{ localStorage.setItem(setupKey('shape'), shapeKey); }catch(e){} renderShapes(); markPicks(); }
+function renderShapes(){ const box = $('shape-list'); if(!box) return; const on = window.SS_SHAPES !== false;
+  box.closest('.shape-wrap') && (box.closest('.shape-wrap').style.display = on ? '' : 'none');
+  box.innerHTML = SHAPES.map(s => '<button class="chip shape-chip' + (s.k === shapeKey ? ' on' : '') + '" data-sound="pop" data-shape="' + s.k + '" title="' + s.name + (s.hard ? ' · ×' + SHAPE_MULT[s.hard] + ' points' : '') + '"><span class="ic">' + s.icon + '</span>' + s.name + '<small class="hd">' + (s.hard ? shapeStars(s.hard) + ' ×' + SHAPE_MULT[s.hard] : 'full board') + '</small></button>').join('');
+  box.querySelectorAll('[data-shape]').forEach(b => b.onclick = () => setShape(b.dataset.shape)); }
+// pixel fall-off: the shape's cells in the board colour + little blocks crumbling off its edge (seeded → the same picture each time)
+function paintShape(){
+  const bd = $('board'), cv = $('shape-cv'); if(!G || !bd) return; bd.classList.toggle('shaped', !!HOLE); if(!cv) return;
+  if(!HOLE){ cv.style.display = 'none'; return; }
+  const n = G.n, size = bd.offsetWidth, dpr = Math.min(2, window.devicePixelRatio || 1); cv.style.display = ''; cv.width = Math.round(size * dpr); cv.height = Math.round(size * dpr);
+  cv.style.width = cv.style.height = size + 'px'; const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, size, size);
+  const col = THEMES[G.theme].board, st = CS + GAP, inside = (x, y) => x >= 0 && y >= 0 && x < n && y < n && !HOLE[y * n + x];
+  let s = 1234567; const rnd2 = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  g.fillStyle = col;
+  for(let y = 0; y < n; y++) for(let x = 0; x < n; x++){ if(!inside(x, y)) continue; g.fillRect(x * st, y * st, st + GAP, st + GAP); }
+  const k = Math.max(3, Math.round(st / 6));
+  for(let y = -1; y <= n; y++) for(let x = -1; x <= n; x++){ if(inside(x, y)) continue; let near = 0; for(let j = -1; j <= 1; j++) for(let i = -1; i <= 1; i++) if(inside(x + i, y + j)) near++;
+    if(!near) continue; const x0 = x * st + GAP / 2, y0 = y * st + GAP / 2;
+    for(let q = 0; q < 36; q++){ const px = x0 + (q % 6) * st / 6, py = y0 + Math.floor(q / 6) * st / 6;
+      // closer to a play cell = more blocks
+      const cx = Math.min(Math.max(px, 0), size), cy = Math.min(Math.max(py, 0), size); let d = 9; for(let j = -1; j <= 1; j++) for(let i = -1; i <= 1; i++) if(inside(x + i, y + j)){ const ex = Math.max((x + i) * st + GAP / 2 - px, 0, px - ((x + i + 1) * st + GAP / 2)), ey = Math.max((y + j) * st + GAP / 2 - py, 0, py - ((y + j + 1) * st + GAP / 2)); d = Math.min(d, Math.hypot(ex, ey) / st); }
+      if(rnd2() < Math.max(0, 0.75 - d * 1.6)){ g.globalAlpha = 0.3 + rnd2() * 0.55; g.fillRect(Math.round(px), Math.round(py), k, k); } }
+  }
+  g.globalAlpha = 1;
+}
 const COLORS = ['#FFB3C1', '#FFE08A', '#C9B8FF', '#A8E6CF', '#9AD3F2', '#FFC79A'];
 const SHAPE_COLORS = ['#FF5470', '#FFB020', '#8B5CF6', '#22C55E', '#3B9CF5', '#FF7A3D'];
 const AGE_START = {'4-5': 0, '6-7': 1, '8-9': 2, '10+': 3};
@@ -390,12 +450,12 @@ function validSwap(g, n, a, b){
 }
 function allMoves(g, n){ const out = []; for(let i = 0; i < n * n; i++){ const c = i % n; if(c < n - 1 && validSwap(g, n, i, i + 1)) out.push([i, i + 1]); if(i + n < n * n && validSwap(g, n, i, i + n)) out.push([i, i + n]); } return out; }
 function fillFresh(n, K){
-  for(let guard = 0; guard < 200; guard++){
+  for(let guard = 0; guard < (HOLE ? 400 : 200); guard++){   // 🧩 24n: small shapes need more tries
     const g = new Array(n * n);
     for(let i = 0; i < n * n; i++){ const r = (i / n) | 0, c = i % n; let k, tries = 0;
       do { k = rnd(K); tries++; } while(tries < 30 && ((c >= 2 && kindAt(g, i - 1) === k && kindAt(g, i - 2) === k) || (r >= 2 && kindAt(g, i - n) === k && kindAt(g, i - 2 * n) === k) || (r >= 1 && c >= 1 && kindAt(g, i - 1) === k && kindAt(g, i - n) === k && kindAt(g, i - n - 1) === k)));
-      g[i] = newTile(k); }
-    if(!anyMatch(g, n) && allMoves(g, n).length >= 3) return g;
+      g[i] = isHole(i) ? null : newTile(k); }   // 🧩 24n: holes stay empty
+    if(!anyMatch(g, n) && allMoves(g, n).length >= (HOLE ? (guard < 150 ? 2 : 1) : 3)) return g;
   }
   return null;
 }
@@ -406,7 +466,7 @@ function inB(n, r, c){ return r >= 0 && c >= 0 && r < n && c < n; }
 function plus(n, i){ const r = (i / n) | 0, c = i % n, out = [i]; [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dr, dc]) => { if(inB(n, r + dr, c + dc)) out.push((r + dr) * n + c + dc); }); return out; }
 // where a bouncer lands: blockers first, then pictures a goal still needs, then anywhere (never twice on the same spot)
 function bounceTargets(g, n, from, hops){
-  const all = []; for(let j = 0; j < n * n; j++) if(j !== from) all.push(j);
+  const all = []; for(let j = 0; j < n * n; j++) if(j !== from && !isHole(j)) all.push(j);
   const ice = (typeof G !== 'undefined' && G && G.ice) || [], need = new Set(((typeof G !== 'undefined' && G && G.goals) || []).filter(x => x.t === 'collect' && x.got < x.need).map(x => x.k));
   const score = j => (ice[j] ? 10 + ice[j] * 2 : 0) + (g[j] && need.has(g[j].k) ? 4 : 0) + Math.random() * 3;
   const out = [], used = new Set([from]);
@@ -423,7 +483,7 @@ function powerCells(g, n, i, fx, count){
   else if(fx === 'virus'){ const front = [i]; while(front.length && order.length < count){ const j = front[rnd(front.length)], free = nb(j).filter(x => !seen.has(x)); if(!free.length){ front.splice(front.indexOf(j), 1); continue; } const x = pick(free); add(x); front.push(x); } }
   else if(fx === 'chain'){ let at = i; for(let guard = 0; guard < 200 && order.length < count; guard++){ const r = (at / n) | 0, c = at % n, opts = []; for(let dr = -3; dr <= 3; dr++) for(let dc = -3; dc <= 3; dc++){ const j = (r + dr) * n + c + dc; if(inB(n, r + dr, c + dc) && !seen.has(j) && Math.abs(dr) + Math.abs(dc) >= 2) opts.push(j); } if(!opts.length) break; at = pick(opts); add(at); } }
   else if(fx === 'emp'){ for(let d = 1; d < n && order.length < count; d++){ const ring = []; for(let r = r0 - d; r <= r0 + d; r++) for(let c = c0 - d; c <= c0 + d; c++) if(inB(n, r, c) && Math.max(Math.abs(r - r0), Math.abs(c - c0)) === d) ring.push(r * n + c); shuffle(ring).forEach(add); } }
-  else { const all = []; for(let j = 0; j < n * n; j++) if(j !== i) all.push(j); shuffle(all).forEach(add); }
+  else { const all = []; for(let j = 0; j < n * n; j++) if(j !== i && !isHole(j)) all.push(j); shuffle(all).forEach(add); }
   return order;
 }
 function effectCells(g, n, i, t, force){
@@ -469,6 +529,7 @@ function picHtml(k, T){ T = T || THEMES[theme]; if(k < 0) return '🌈'; return 
 function renderMenu(){
   $('theme-list').innerHTML = THEME_KEYS.map(k => '<button class="chip' + (k === theme ? ' on' : '') + '" data-sound="pop" data-theme-key="' + k + '"><span class="ic">' + [0, 1, 2].map(i => picHtml(i, THEMES[k])).join('') + '</span>' + THEMES[k].name + '</button>').join('');
   $('theme-list').querySelectorAll('[data-theme-key]').forEach(b => b.onclick = () => { theme = b.dataset.themeKey; savePrefs(); $('theme-list').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); renderLevels(); markPicks(); });   /* 🧱 b3w2 */
+  { let k = ''; try{ k = localStorage.getItem(setupKey('shape')) || ''; }catch(e){} shapeKey = shapeOf(k).k; } renderShapes();   // 🧩 24n
   renderLevels();
 }
 function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">No score yet</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span><span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
@@ -501,7 +562,7 @@ function chooseLevel(i, quiet){
 function markPicks(){
   document.querySelectorAll('#level-list .lvl').forEach(b => { const on = Number(b.dataset.i) === chosenLevel; b.classList.toggle('sel', on); if(window.GF && GF.pick) GF.pick(b, on); });
   const L = LEVELS[chosenLevel], T = THEMES[theme], st = $('btn-start');
-  if(st && L) st.textContent = '▶ Start · ' + L.emoji + ' ' + L.name + (T ? ' · ' + T.name : '');
+  const SH = shapeOf(shapeKey); if(st && L) st.textContent = '▶ Start · ' + L.emoji + ' ' + L.name + (T ? ' · ' + T.name : '') + (SH.hard && window.SS_SHAPES !== false ? ' · ' + SH.icon + ' ' + SH.name : '');
 }
 function startSetup(){ if(!canPlay(chosenLevel)){ UISound.play('error'); UI.toast('Pick a level that is open 🔓'); return; } startGame(chosenLevel); }
 // 🎬 the cover (GameFrame): who's here + champions + how to play; ▶ Play opens the setup page
@@ -520,13 +581,14 @@ function openCover(){
 let CS = 50, GAP = 4;
 function startGame(lvl){ setTimeout(cheerMount, 0); /* 📣 cs-4a */
   hideResult(); if(SweetCover) SweetCover.hide();   /* 🧱 b3w2 */ clearInterval(timerId); clearTimeout(hintTimer);
-  const L = LEVELS[lvl], T = THEMES[theme], n = L.n;
-  const ice = L.ice ? iceLayout(n, L.ice) : new Array(n * n).fill(0);
+  const L = LEVELS[lvl], T = THEMES[theme], n = L.n, SH = window.SS_SHAPES === false ? SHAPES[0] : shapeOf(shapeKey);   // 🧩 24n
+  HOLE = SH.k === 'square' ? null : shapeMask(SH.k, n).map(on => !on); const frac = HOLE ? HOLE.filter(h => !h).length / (n * n) : 1;
+  const ice = (L.ice ? iceLayout(n, L.ice) : new Array(n * n).fill(0)).map((v, i) => isHole(i) ? 0 : v);
   G = {lvl, L, theme, n, K: L.K, g: fillFresh(n, L.K), ice, moves: L.moves, movesGiven: L.moves, score: 0, matches: 0, specials: 0, powers: 0, bestCombo: 0, hintsLeft: typeof L.hint === 'number' ? L.hint : 0,
-    stage: 1, stages: L.stage2 ? 2 : 1, goals: makeGoals(L.goals, ice),
+    stage: 1, stages: L.stage2 ? 2 : 1, shape: SH, frac, goals: makeGoals(L.goals, ice, frac),
     sel: -1, cursor: -1, busy: false, over: false, els: {}, t0: performance.now(), paused: false, pausedAt: 0, pausedTotal: 0};
   const sp = $('scr-play'); sp.className = T.cage.cls || ''; sp.style.setProperty('--ck', '"' + T.cage.ic + '"'); sp.style.setProperty('--pw', '"' + T.power.ic + '"'); sp.style.setProperty('--t1', T.t[0]); sp.style.setProperty('--t2', T.t[1]); sp.style.setProperty('--board', T.board); sp.style.setProperty('--slot', T.slot); sp.classList.toggle('dark', !!T.dark);
-  BAR.level(L.emoji + ' ' + L.name, L.hardcore ? 'hc' : '');
+  BAR.level(L.emoji + ' ' + L.name + (HOLE ? ' · ' + SH.icon : ''), L.hardcore ? 'hc' : '');
   $('hint-btn').classList.toggle('hidden', !L.hint); $('hint-btn').textContent = '💡'; paintVoice();
   showScreen('play'); buildBoard(); layout(); hud(); renderGoals(); requestAnimationFrame(() => { if(G) layout(); });
   timerId = setInterval(hud, 1000);
@@ -535,15 +597,15 @@ function startGame(lvl){ setTimeout(cheerMount, 0); /* 📣 cs-4a */
   armHint();
 }
 function goalPlain(gl){ return gl.t === 'collect' ? 'collect ' + gl.need : gl.t === 'ice' ? 'break the ' + THEMES[G.theme].cage.name : 'make ' + gl.need + ' super pictures'; }
-function makeGoals(list, ice){ return list.map(gl => Object.assign({got: 0}, gl, gl.t === 'ice' ? {need: ice.reduce((a, b) => a + b, 0)} : {})); }
+function makeGoals(list, ice, frac){ return list.map(gl => Object.assign({got: 0}, gl, gl.t === 'ice' ? {need: ice.reduce((a, b) => a + b, 0)} : gl.t === 'collect' && frac < 1 ? {need: Math.max(6, Math.round(gl.need * Math.max(0.6, frac)))} : {})); }   // 🧩 24n: collect goals follow the shape's cells
 // Extreme + Hardcore: stage 1 goals done → a short break, new blockers drop on the board, new goals (+ bonus moves on Extreme)
 async function nextStage(){
   const g = G, S2 = g.L.stage2, add = iceLayout(g.n, S2.ice);
   g.stage = 2; addScore(500 * (g.lvl + 1), null);
   party('🎉 Stage 1 done!'); say('Stage 2!'); UISound.play('unlock'); confetti([THEMES[g.theme].power.ic, '⭐', '🎉'], 18); splashAll();
   await sleep(1100); if(G !== g) return;
-  for(let i = 0; i < g.n * g.n; i++) g.ice[i] = Math.max(g.ice[i], add[i]);
-  g.goals = makeGoals(S2.goals, g.ice);
+  for(let i = 0; i < g.n * g.n; i++) g.ice[i] = isHole(i) ? 0 : Math.max(g.ice[i], add[i]);
+  g.goals = makeGoals(S2.goals, g.ice, g.frac);
   for(let i = 0; i < g.n * g.n; i++) paintIce(i, true);
   if(S2.bonus){ g.moves += S2.bonus; g.movesGiven += S2.bonus; }
   hud(); renderGoals(); UISound.play('drop');
@@ -551,8 +613,8 @@ async function nextStage(){
   await sleep(400);
 }
 function buildBoard(){
-  const bd = $('board'); bd.innerHTML = ''; G.els = {};
-  for(let i = 0; i < G.n * G.n; i++){ const s = document.createElement('div'); s.className = 'slot'; s.id = 'slot-' + i; bd.appendChild(s); const c = document.createElement('div'); c.className = 'icecap'; c.id = 'ice-' + i; bd.appendChild(c); }
+  const bd = $('board'); bd.innerHTML = '<canvas id="shape-cv"></canvas>'; G.els = {};   // 🧩 24n
+  for(let i = 0; i < G.n * G.n; i++){ const s = document.createElement('div'); s.className = 'slot' + (isHole(i) ? ' hole' : ''); s.id = 'slot-' + i; bd.appendChild(s); const c = document.createElement('div'); c.className = 'icecap'; c.id = 'ice-' + i; bd.appendChild(c); }
   G.g.forEach((t, i) => { if(t) bd.appendChild(tileEl(t)); });
 }
 function tileEl(t){
@@ -572,6 +634,7 @@ function layout(){
   $('scr-play').style.setProperty('--cs', CS + 'px');
   for(let i = 0; i < n * n; i++){ const s = $('slot-' + i), c = $('ice-' + i), [x, y] = xy(i), pos = 'left:' + x + 'px;top:' + y + 'px;width:' + CS + 'px;height:' + CS + 'px'; s.style.cssText = pos; c.style.cssText = pos; paintIce(i, true); }
   G.g.forEach((t, i) => { if(t && G.els[t.id]) { G.els[t.id].classList.remove('fall'); place(G.els[t.id], i); } });
+  paintShape();   // 🧩 24n
 }
 window.addEventListener('resize', () => { if(G) layout(); });
 if(window.ResizeObserver){ let lastWH = ''; new ResizeObserver(() => { const r = $('scr-play').getBoundingClientRect(), wh = Math.round(r.width) + 'x' + Math.round(r.height); if(wh === lastWH) return; lastWH = wh; if(G && !$('scr-play').classList.contains('hidden')) layout(); }).observe($('scr-play')); }   /* 📱 ls-1: iPhone sideways first open — follow the play screen, only when its size really changed */
@@ -612,9 +675,9 @@ document.addEventListener('keydown', e => {
   if(!G || $('scr-play').classList.contains('hidden') || !$('result').classList.contains('hidden') || G.busy || G.over) return;
   const n = G.n, k = e.key, dir = {ArrowLeft: -1, ArrowRight: 1, ArrowUp: -n, ArrowDown: n}[k];
   if(k === 'h' || k === 'H'){ useHint(); return; }
-  if(G.cursor < 0) G.cursor = G.sel >= 0 ? G.sel : Math.floor(n * n / 2);
+  if(G.cursor < 0){ G.cursor = G.sel >= 0 ? G.sel : Math.floor(n * n / 2); if(isHole(G.cursor)) G.cursor = G.g.findIndex(Boolean); }
   if(dir !== undefined){ e.preventDefault(); const c = G.cursor, j = c + dir;
-    if(j < 0 || j >= n * n || (Math.abs(dir) === 1 && ((j / n) | 0) !== ((c / n) | 0))) return;
+    if(j < 0 || j >= n * n || (Math.abs(dir) === 1 && ((j / n) | 0) !== ((c / n) | 0)) || isHole(j)) return;
     if(G.sel === c){ setSel(-1); trySwap(c, j); G.cursor = j; } else G.cursor = j; showCursor(); return; }
   if(k === ' ' || k === 'Enter'){ e.preventDefault(); setSel(G.sel === G.cursor ? -1 : G.cursor); showCursor(); }
 });
@@ -708,7 +771,7 @@ async function matchRound(focus){
   await gravity();
   return true;
 }
-function addScore(pts, at){ const mult = 1 + 0.5 * Math.max(0, (G.chain || 1) - 1), v = Math.round(pts * mult * (G.L.hardcore ? 3 : 1)); G.score += v; hud(); if(at != null) floatAt(at, '+' + v); }
+function addScore(pts, at){ const mult = 1 + 0.5 * Math.max(0, (G.chain || 1) - 1), v = Math.round(pts * mult * (G.L.hardcore ? 3 : 1) * SHAPE_MULT[(G.shape && G.shape.hard) || 0]); G.score += v; hud(); if(at != null) floatAt(at, '+' + v); }
 // pop a set of cells: super pictures inside fire too; ice cracks; goals count; new super pictures appear
 async function popCells(cells, creates, opt){
   const g = G.g, n = G.n, fired = opt.fired || new Set(), queue = [...cells], skip = new Set(creates.map(c => c.i));
@@ -754,10 +817,11 @@ function calmKind(g, n, i, K){
 async function gravity(){
   const g = G.g, n = G.n, K = G.K, bd = $('board');
   for(let c = 0; c < n; c++){
-    let write = n - 1;
-    for(let r = n - 1; r >= 0; r--){ const t = g[r * n + c]; if(t){ if(write !== r){ g[write * n + c] = t; g[r * n + c] = null; } write--; } }
-    const missing = write + 1;
-    for(let r = write; r >= 0; r--){ const t = newTile(calmKind(g, n, r * n + c, K)); g[r * n + c] = t; const el = tileEl(t); bd.appendChild(el); el.classList.remove('fall'); place(el, r * n + c, missing + 1); }
+    const rows = []; for(let r = n - 1; r >= 0; r--) if(!isHole(r * n + c)) rows.push(r);   // 🧩 24n: only the play cells of this column, bottom first
+    const keep = rows.map(r => g[r * n + c]).filter(Boolean); rows.forEach(r => { g[r * n + c] = null; });
+    keep.forEach((t, k) => { g[rows[k] * n + c] = t; });
+    const top = rows.slice(keep.length), missing = top.length ? n - top[top.length - 1] : 0;
+    top.forEach(r => { const t = newTile(calmKind(g, n, r * n + c, K)); g[r * n + c] = t; const el = tileEl(t); bd.appendChild(el); el.classList.remove('fall'); place(el, r * n + c, missing + 1); });
   }
   void bd.offsetHeight;
   g.forEach((t, i) => { const el = t && G.els[t.id]; if(el){ el.classList.add('fall'); place(el, i); } });
@@ -774,8 +838,9 @@ async function cascade(a, b){
 async function reshuffle(){
   showBanner('🔀 No swaps left — mixing!', 'gold'); await sleep(500);
   const g = G.g, n = G.n;
-  for(let guard = 0; guard < 100; guard++){ const ts = shuffle(g.slice()); for(let i = 0; i < n * n; i++) g[i] = ts[i]; if(!anyMatch(g, n) && allMoves(g, n).length) break; }
-  g.forEach((t, i) => moveEl(t, i)); await sleep(300);
+  const cells = []; for(let i = 0; i < n * n; i++) if(!isHole(i)) cells.push(i);   // 🧩 24n: holes stay holes
+  for(let guard = 0; guard < 100; guard++){ const ts = shuffle(cells.map(i => g[i])); cells.forEach((i, k) => { g[i] = ts[k]; }); if(!anyMatch(g, n) && allMoves(g, n).length) break; }
+  g.forEach((t, i) => { if(t) moveEl(t, i); }); await sleep(300);
 }
 // draws a super picture going off; returns how long (ms) to wait before the pictures pop
 function cellC(i){ const [x, y] = xy(i); return [x + CS / 2, y + CS / 2]; }
@@ -921,7 +986,7 @@ function finishGame(why, left){
   G.over = true; clearInterval(timerId); clearHint();
   const g = G, L = g.L, secs = Math.max(1, Math.round(elapsed() / 1000)), cleared = why === 'goal', T = THEMES[g.theme];
   const frac = (left || 0) / (g.movesGiven || L.moves), stars = !cleared ? 0 : frac >= 0.3 ? 3 : frac >= 0.12 ? 2 : 1;
-  const stats = {matches: g.matches, specials: g.specials, bestCombo: g.bestCombo, rounds: 1};
+  const stats = {matches: g.matches, specials: g.specials, bestCombo: g.bestCombo, rounds: 1, shape: g.shape ? g.shape.k : 'square'};
   if(g.stages > 1) stats.stages = g.stage - (cleared ? 0 : 1);
   if(g.score > 0) saveWin(S.player, g.lvl, {timeSec: secs, stars, score: g.score, theme: g.theme, cleared, stats});
   cheerEnd(cleared); /* 📣 cs-4a */
@@ -934,7 +999,7 @@ function finishGame(why, left){
     const tip = !cleared ? 'Still to do: ' + todo.map(plain).join(' · ') + '. ' + pick(TIPS) : stars < 3 ? '⭐⭐⭐ = finish with lots of moves left. ' + pick(TIPS) : '';
     GF.result({wrap: $('result'), card: $('result-card'), win: cleared, icon: cleared ? (stars === 3 ? '🏆' : '🍬') : '😮', title: cleared ? (stars === 3 ? 'Super sweet!' : 'Level passed!') : 'Out of moves!',
       sub: tip + (g.score > 0 ? '' : (tip ? ' ' : '') + 'Not saved — make a match to get a score.'), stars: cleared ? stars : null, score: g.score,
-      stats: [['💫', g.matches + ' matches'], ['✨', g.specials + ' super']].concat(g.powers ? [[T.power.ic, g.powers + ' power']] : [], g.stages > 1 ? [['🏁', 'stage ' + g.stage + '/2']] : [], [['🔗', 'best chain ' + g.bestCombo], ['⏱', fmt(secs * 1000)]], cleared && left ? [['🍬', left + ' moves left']] : [], L.hardcore ? [['💀', '×3']] : []),
+      stats: [['💫', g.matches + ' matches'], ['✨', g.specials + ' super']].concat(g.shape && g.shape.hard ? [[g.shape.icon, g.shape.name + ' ' + shapeStars(g.shape.hard) + ' ×' + SHAPE_MULT[g.shape.hard]]] : []).concat(g.powers ? [[T.power.ic, g.powers + ' power']] : [], g.stages > 1 ? [['🏁', 'stage ' + g.stage + '/2']] : [], [['🔗', 'best chain ' + g.bestCombo], ['⏱', fmt(secs * 1000)]], cleared && left ? [['🍬', left + ' moves left']] : [], L.hardcore ? [['💀', '×3']] : []),
       save: g.score > 0 ? 'Saving your score…' : null, buddy: {name: S.player, av: myAvatar(S.player)}, confetti: false,
       levels: () => backToMenu(), levelsText: '🎚️ Levels', again: () => startGame(g.lvl), againText: '🔁 Play again',
       next: next ? () => { const p = progressOf(S.player); p.unlocked = Math.max(p.unlocked, g.lvl + 1); S.progress[S.player] = p; startGame(g.lvl + 1); } : null, nextText: g.lvl === 4 ? '💀 Try Hardcore ▶' : 'Next level ▶'});
@@ -1015,4 +1080,4 @@ boot();
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.chips', {rows: 3}); }</script>
 </body>
 </html>
-<!-- (r22+back-1+p1b+p2+cs-4a+b3w2) END OF SweetSwap.html -->
+<!-- (r22+back-1+p1b+p2+cs-4a+b3w2+24n) END OF SweetSwap.html -->
