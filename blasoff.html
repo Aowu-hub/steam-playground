@@ -211,6 +211,8 @@
   .cup-table tr.me td{background:#FFF6DC;} .cup-table tr:nth-child(2) td{border-top:2px solid rgba(255,210,63,0.6);}
   .cup-champ{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;background:linear-gradient(180deg,#FFF6DC,#FFE7A3);border-radius:18px;padding:8px;margin:8px 0;animation:cupin .5s ease-out both;}
   .cup-champ canvas{width:150px;height:157px;} .cup-champ .big{font-size:40px;}
+  /* 👕 R4c kits: a colour dot per kit, locked ones greyed */
+  .chip.kit i{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--kc);margin-right:5px;vertical-align:-1px;box-shadow:0 0 0 2px rgba(255,255,255,0.8),0 0 0 3px rgba(19,37,74,0.2);} .chip.kit.locked{opacity:.5;}
   /* 📜 R4b Kick Tale: 6 chapter cards (wrap, never sideways), steps in order, the coach's story card */
   #tale-box{max-width:1000px;margin:0 auto;padding:0 12px 24px;position:relative;}
   .tale-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin:12px 0;}
@@ -2041,8 +2043,8 @@ let SET = {twist: true, kind: 'match', drill: 'target', size: 4, level: 0, who: 
 let G = null, lockHandle = null, KEYS = null, V = null;
 function ls(k, v){ try{ if(v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }catch(e){ return null; } }
 function store(k){ return 'sp_blasoff_' + k + ':' + (S.player || ''); }
-function loadPrefs(){ try{ const p = JSON.parse(ls(store('prefs')) || 'null'); if(p) Object.assign(SET, {kind: ['match', 'skills', 'shootout', 'battle', 'party'].includes(p.kind) ? p.kind : 'match', twist: p.twist !== false, drill: BO.DRILLS[p.drill] ? p.drill : 'target', size: BO.SIZES[p.size] ? +p.size : 4, theme: LOOKS[p.theme] ? p.theme : 'classic', night: !!p.night, view: p.view || 'auto', form: p.form || '121', who: p.who || 'robot'}); }catch(e){} SET.ball = sharedBall(); fixForm(); }
-function savePrefs(){ ls(store('prefs'), JSON.stringify({twist: SET.twist, kind: SET.kind, drill: SET.drill, size: SET.size, theme: SET.theme, night: SET.night, view: SET.view, form: SET.form, who: SET.who})); }
+function loadPrefs(){ try{ const p = JSON.parse(ls(store('prefs')) || 'null'); if(p) Object.assign(SET, {kit: p.kit || 'classic', kind: ['match', 'skills', 'shootout', 'battle', 'party', 'cup', 'league', 'family', 'tale'].includes(p.kind) ? p.kind : 'match', twist: p.twist !== false, drill: BO.DRILLS[p.drill] ? p.drill : 'target', size: BO.SIZES[p.size] ? +p.size : 4, theme: LOOKS[p.theme] ? p.theme : 'classic', night: !!p.night, view: p.view || 'auto', form: p.form || '121', who: p.who || 'robot'}); }catch(e){} SET.ball = sharedBall(); fixForm(); }
+function savePrefs(){ ls(store('prefs'), JSON.stringify({kit: SET.kit, twist: SET.twist, kind: SET.kind, drill: SET.drill, size: SET.size, theme: SET.theme, night: SET.night, view: SET.view, form: SET.form, who: SET.who})); }
 function fixForm(){ const Sz = BO.SIZES[SET.size]; if(!Sz.forms[SET.form]) SET.form = Sz.formOrder[0]; }
 function ownedBalls(name){ return Math.min(BallSkins.count, Number((S.ballSkins || {})[name || S.player]) || 0); }
 function sharedBall(){ const raw = ls('sp_ball:' + S.player); if(raw == null || raw === '') return -1; const v = Number(raw); return Number.isFinite(v) && v >= 0 && v < ownedBalls() ? v : -1; }
@@ -2244,6 +2246,7 @@ function cupAfterMatch(M, mySide){
   if(M.pens && T.kind !== 'league'){ const pm = M.pens.g[mySide], po = M.pens.g[1 - mySide]; f.pens = C.meIsA ? [pm, po] : [po, pm]; }
   if(T.kind !== 'league' && f.ga === f.gb && !f.pens){ const w = M.winner === mySide; f.pens = C.meIsA ? (w ? [1, 0] : [0, 1]) : (w ? [0, 1] : [1, 0]); }   // a golden goal decided it
   cupAdvance(T); cupSave(T); G.cupDone = T;
+  if(T.done && T.teams[T.champ] && T.teams[T.champ].me){ const w = cupWins(); w[T.kind] = (w[T.kind] || 0) + 1; ls(store('cupwins'), JSON.stringify(w)); }   // 👕 R4c: a won cup unlocks its kit
   const rb = document.querySelector('#result-card .res-btns'); if(rb) rb.innerHTML = '<button class="btn soft sp-btn sp-secondary" id="btn-levels" data-sound="none" onclick="backToMenu()">🎚️ Levels</button><button class="btn sp-btn sp-primary" id="btn-cup" data-sound="pop" onclick="cupBack()">' + (T.done ? '🏆 See the winner' : '🏆 Back to the ' + (T.kind === 'league' ? 'table' : 'cup')) + '</button>';
 }
 function cupBack(){ const T = G && G.cupDone; if(G) cancelAnimationFrame(G.raf); G = null; V = null; if(T) showCup(T); else backToMenu(); }
@@ -2315,11 +2318,12 @@ function taleStart(ci, si){
 }
 function taleAfter(ok, stars){
   const T = G.tale, d = taleLoad(), id = stepId(T.ci, T.si), first = ok && !d.done[id]; let chNow = false;
-  if(ok){ d.done[id] = true; if(chDone(d, T.ci) && d.kits.indexOf(T.ch.id) < 0){ d.kits.push(T.ch.id); chNow = true; } taleSave(d); }
+  if(ok){ d.done[id] = true; if(chDone(d, T.ci) && d.kits.indexOf(T.ch.id) < 0){ d.kits.push(T.ch.id); chNow = true; } taleSave(d);
+    if(first && S.player !== 'Guest') saveFeatsOnly(S.player, {taleSteps: Object.keys(d.done).length, taleChapters: TALE.filter((_, ci) => chDone(d, ci)).length}, 3); }   // 📜 R4c: badges + the 📜 Kick Tale Hero title
   G.taleBack = {ch: T.ci, reward: chNow};
   const rb = document.querySelector('#result-card .res-btns');
   if(rb) rb.innerHTML = '<button class="btn soft sp-btn sp-secondary" data-sound="tap" onclick="taleRetry()">🔁 Try again</button><button class="btn sp-btn sp-primary" id="btn-tale" data-sound="pop" onclick="taleBack()">📜 Back to the story</button>';
-  const rc = $('result-card'); if(rc){ const n = document.createElement('div'); n.className = 'tale-note' + (ok ? ' ok' : ''); n.innerHTML = ok ? (chNow ? '🎉 Chapter ' + (T.ci + 1) + ' done! ' + T.ch.reward[0] + ' <b>' + T.ch.reward[1] + '</b> unlocked' + (T.ci < 5 ? ' · 📜 chapter ' + (T.ci + 2) + ' is open!' : ' · 🏆 you finished Kick Tale!') : first ? '✅ Story step done!' : '✅ Done again!') : T.ch.coach[0] + ' ' + (T.st.kind === 'skills' ? 'You need ' + '⭐'.repeat(T.st.need || 1) + ' — try again!' : 'So close — try again, you can do it!'); rc.insertBefore(n, rc.querySelector('.res-btns')); }
+  const rc = $('result-card'); if(rc){ const n = document.createElement('div'); n.className = 'tale-note' + (ok ? ' ok' : ''); n.innerHTML = ok ? (chNow ? '🎉 Chapter ' + (T.ci + 1) + ' done! ' + T.ch.reward[0] + ' <b>' + T.ch.reward[1] + '</b> unlocked (👕 pick it on the setup page)' + (T.ci < 5 ? ' · 📜 chapter ' + (T.ci + 2) + ' is open!' : ' · 🏆 you finished Kick Tale!') : first ? '✅ Story step done!' : '✅ Done again!') : T.ch.coach[0] + ' ' + (T.st.kind === 'skills' ? 'You need ' + '⭐'.repeat(T.st.need || 1) + ' — try again!' : 'So close — try again, you can do it!'); rc.insertBefore(n, rc.querySelector('.res-btns')); }
 }
 function taleBack(){ const f = G && G.taleBack; if(G) cancelAnimationFrame(G.raf); G = null; V = null; SET.kind = 'tale'; showTale(f); }
 function taleRetry(){ const T = G && G.tale; if(!T) return; if(G) cancelAnimationFrame(G.raf); G = null; V = null; hideResult(); taleStart(T.ci, T.si); }
@@ -2328,6 +2332,30 @@ function drawCoconut(g, x, y, r, roll){   // 🥥 brown, hairy, three eyes
   g.fillStyle = gr; g.beginPath(); g.ellipse(0, 0, r * 1.05, r * 0.95, 0, 0, 7); g.fill(); g.strokeStyle = 'rgba(40,20,5,0.55)'; g.lineWidth = Math.max(1, r * 0.08);
   for(let i = 0; i < 7; i++){ const a = i * 0.9; g.beginPath(); g.moveTo(Math.cos(a) * r * 0.2, Math.sin(a) * r * 0.2); g.lineTo(Math.cos(a + 0.3) * r * 0.95, Math.sin(a + 0.3) * r * 0.9); g.stroke(); }
   g.fillStyle = '#2B1608'; [[-0.28, -0.22], [0.12, -0.3], [-0.06, 0.05]].forEach(([a, b]) => { g.beginPath(); g.arc(a * r, b * r, r * 0.11, 0, 7); g.fill(); }); g.restore();
+}
+
+/* ================= 👕 KITS (R4c): your team's shirt — Classic + one per Kick Tale chapter + one per cup kind won =================
+   Kept on this device (unlocked from the story / cups you won here); the badges + titles for them are on the server. */
+const KITS = [
+  {id: 'classic', icon: '🔵', name: 'Classic blue', c: 5},
+  {id: 'vine', icon: '🌿', name: 'Vine kit', c: 15, tale: 'jungle', how: 'Finish 🦖 Jungle Street in 📜 Kick Tale'},
+  {id: 'octo', icon: '🐙', name: 'Octo kit', c: 4, tale: 'school', how: 'Finish 🐙 School Team in 📜 Kick Tale'},
+  {id: 'disco', icon: '🪩', name: 'Disco kit', c: 6, tale: 'city', how: 'Finish 🪩 City Tricks in 📜 Kick Tale'},
+  {id: 'robo', icon: '⚙️', name: 'Robo kit', c: 8, tale: 'robot', how: 'Finish 🤖 Robot Training in 📜 Kick Tale'},
+  {id: 'astro', icon: '🚀', name: 'Astro kit', c: 9, tale: 'moon', how: 'Finish 🪐 Moon Away Game in 📜 Kick Tale'},
+  {id: 'champion', icon: '🏆', name: 'Champion kit', c: 16, tale: 'cloud', how: 'Win the ☁️ Cloud Final in 📜 Kick Tale'},
+  {id: 'cupgold', icon: '🥇', name: 'Cup gold', c: 2, win: 'cup', how: 'Win a 🏆 Knockout Cup'},
+  {id: 'league', icon: '📊', name: 'League purple', c: 11, win: 'league', how: 'Win a 📊 League'},
+  {id: 'royal', icon: '👑', name: 'Captain orange', c: 1, win: 'family', how: 'Win a 👑 Family cup'}
+];
+function cupWins(){ try{ return JSON.parse(ls(store('cupwins')) || '{}') || {}; }catch(e){ return {}; } }
+function kitOpen(K){ if(!K.tale && !K.win) return true; if(K.tale) return taleLoad().kits.indexOf(K.tale) >= 0; return (cupWins()[K.win] || 0) > 0; }
+function myKit(){ const K = KITS.find(k => k.id === SET.kit) || KITS[0]; return K.id !== 'classic' && kitOpen(K) ? K : null; }
+function buildKits(){
+  let box = $('kit-box'); if(!box){ box = document.createElement('div'); box.className = 'box'; box.id = 'kit-box'; box.innerHTML = '<h3>👕 Your kit</h3><div class="chips" id="kit-row"></div>'; $('form-box').after(box); }
+  if(!kitOpen(KITS.find(k => k.id === SET.kit) || KITS[0])) SET.kit = 'classic';
+  $('kit-row').innerHTML = KITS.map(K => { const open = kitOpen(K); return '<button class="chip kit' + (SET.kit === K.id ? ' on' : '') + (open ? '' : ' locked') + '" data-k="' + K.id + '" data-sound="' + (open ? 'tap' : 'none') + '" style="--kc:' + OUTFIT_COLS[K.c] + '"><i></i>' + (open ? K.icon + ' ' + K.name : '🔒 ' + K.name) + '</button>'; }).join('');
+  $('kit-row').querySelectorAll('.chip').forEach(b => b.onclick = () => { const K = KITS.find(k => k.id === b.dataset.k); if(!kitOpen(K)){ UISound.play('error'); UI.toast('🔒 ' + K.how); return; } SET.kit = K.id; savePrefs(); buildKits(); });
 }
 
 /* ================= SETUP ================= */
@@ -2343,7 +2371,7 @@ function openSetup(lvl){
   if(KD === 'battle'){ $('setup-logo').textContent = '🎤'; $('setup-title').textContent = '🎤 Tricks Battle · ' + L.name; $('setup-sub').textContent = 'Your turn: 20 s of tricks ON the beat (the ring closes on you = now!) — J 🦶 stepover · K 🌈 rainbow · L 🌀 around the world · Space 🦵 knee · J + K 🧢 neck stall. 🎮 Left thumb (arrows / WASD): ⬆️ hop · ⬇️ drop · 🔄 spin · 😎 show-off — press one WITH a trick on the same beat = a COMBO (16 of them, big points). A different trick each time builds the combo. 3 judges score 🎵 timing · 🌈 variety · ✨ style — best of 3 rounds. ' + BO.BPM[lvl] + ' beats a minute.'; $('go-btn').textContent = '🎤 Start the battle'; }
   if(KD === 'party'){ $('setup-logo').textContent = '🎉'; $('setup-title').textContent = '🎉 Party ball · ' + SZ_NAME[SET.size] + ' · ' + L.name; $('setup-sub').textContent = '🎉 A wild bomb ball: it bounces like crazy (anything can happen!) and a goal pops it into confetti. ' + $('setup-sub').textContent; }
   if(KD === 'shootout'){ $('setup-logo').textContent = '🥅'; $('setup-title').textContent = '🥅 Penalty shootout · ' + L.name; $('setup-sub').textContent = '5 kicks each, then sudden death. Your kick: shoot (K / 💥) when the sliding 🎯 is where you want. Their kick: dive with Q / E (or ⬅️ ➡️) — or stay in the middle!'; }
-  buildWho(); buildForms(); buildLooks(); buildBalls();
+  buildWho(); buildForms(); buildLooks(); buildBalls(); buildKits();
   const VIEW_TXT = {auto: '📷 View: Auto', behind: '📷 View: Behind your team', side: '📷 View: From the side', top: '📷 View: From above'};
   const vc = () => { $('view-chip').textContent = VIEW_TXT[SET.view] || VIEW_TXT.auto; $('view-chip').classList.toggle('on', SET.view !== 'auto'); };
   vc(); $('view-chip').onclick = () => { const o = ['auto', 'behind', 'side', 'top']; SET.view = o[(o.indexOf(SET.view) + 1) % 4]; savePrefs(); vc(); UI.toast(SET.view === 'auto' ? '📷 Behind your team when one team has people · from the side for 2 teams' : VIEW_TXT[SET.view].replace('📷 View: ', '📷 ')); };
@@ -2447,7 +2475,7 @@ function sfx(kind, vol){
 }
 
 /* ================= MATCH ================= */
-function kitAv(av, side, gk){ const a = JSON.parse(JSON.stringify(fixAv(av))); a.outfit = 0; a.outfitColor = gk ? KEEPER_KIT[side] : TEAM_KIT[side]; a.oc2 = 0; a.eq = {}; return a; }   // 👕 team kit: same shirt for the whole team (the kit line comes in R4); no ride-ons / held things on the pitch
+function kitAv(av, side, gk){ const a = JSON.parse(JSON.stringify(fixAv(av))), K = !gk && side === 0 ? myKit() : null; a.outfit = 0; a.outfitColor = K ? K.c : gk ? KEEPER_KIT[side] : TEAM_KIT[side]; a.oc2 = 0; a.eq = {}; return a; }   // 👕 team kit: same shirt for the whole team (the kit line comes in R4); no ride-ons / held things on the pitch
 function startMatch(){
   hideResult(); savePrefs();
   const kind0 = SET.kind || 'match', kind = CUP_KINDS.includes(kind0) ? 'match' : kind0; if(kind === 'skills' || (kind === 'battle' && SET.who === 'coop') || kind0 !== kind) SET.who = 'robot';
@@ -3337,6 +3365,7 @@ function finishMatch(){
     if(h.name === 'Guest') return;
     const p = M.players.find(q => q.name === h.name && q.side === h.side) || {g: {}}, won = win === h.side, conceded = M.score[1 - h.side];
     const stats = {matches: 1, wins: won ? 1 : 0, goals: p.g.goals || 0, assists: p.g.assists || 0, tricks: p.g.tricks || 0, volleys: p.g.volleys || 0, tackles: p.g.tackles || 0, shoutSaves: p.g.shoutSaves || 0, headers: p.g.headers || 0, nutmegs: p.g.nutmegs || 0, perfects: p.ctrl >= 0 && M.ctrls[p.ctrl] ? M.ctrls[p.ctrl].perfects : 0, blasts: p.ctrl >= 0 && M.ctrls[p.ctrl] ? M.ctrls[p.ctrl].blasts : 0, cleanSheets: conceded === 0 && (won || win < 0) ? 1 : 0, bestGoals: p.g.goals || 0};
+    if(G.cup && seat === 0){ const T = G.cup.T; stats[T.kind + 'Plays'] = 1; if(T.done && T.teams[T.champ] && T.teams[T.champ].me) stats[{cup: 'cups', league: 'leagues', family: 'familyCups'}[T.kind]] = 1; }   // 🏆 R4c
     if(G.kind === 'party') stats.win_party = won ? 1 : 0; else if(G.kind === 'shootout') stats.win_pens = won ? 1 : 0; else if(G.kind === 'battle') stats.win_battle = won ? 1 : 0; else stats['win_' + G.size + 'v' + G.size] = won ? 1 : 0;
     if(vsRobot) saveWin(h.name, G.level, {score: scoreFor(h), stars: won ? (h.side === mySide ? stars : 1) : 0, cleared: won, timeSec: secs, theme: (G.kind === 'party' ? 'Party ball' : G.kind === 'shootout' ? 'Penalty shootout' : G.kind === 'battle' ? 'Tricks Battle' : SZ_NAME[G.size]) + ' · ' + LOOKS[G.theme].name, stats}, seat);
     else saveFeatsOnly(h.name, stats, seat);
@@ -3441,7 +3470,7 @@ function msOpen(id){ if(!ID_SZ[id] && !KINDS.includes(id)) return; setKind(id); 
 function msNow(){ return modeId(); }
 function msWrap(fn, idOf){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ try{ const id = idOf.apply(this, arguments); if(id && UI.modeTried) UI.modeTried(S.player || CURRENT_PLAYER, MS_GAME, id); }catch(e){} return f.apply(this, arguments); }; }
 function msAfter(fn, after){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ const r = f.apply(this, arguments); try{ after.apply(this, arguments); }catch(e){} return r; }; }
-msWrap('startMatch', () => modeId());
+msWrap('startMatch', () => TALERUN && TALERUN.armed ? 'tale' : modeId());   // 📜 a story step counts as Kick Tale
 msAfter('choosePlayer', name => {
   if(!window.UI || !UI.modeLink) return;
   const id = UI.modeLink(MODE_LINK); if(id) msOpen(id);
@@ -3451,4 +3480,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a+bo-5b+bo-pz+bo-5c+bo-5d+r4a+r4b) END OF BlasOff.html -->
+<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a+bo-5b+bo-pz+bo-5c+bo-5d+r4a+r4b+r4c) END OF BlasOff.html -->

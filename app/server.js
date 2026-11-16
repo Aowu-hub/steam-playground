@@ -751,6 +751,10 @@ const MODES_ = [
   { game: 'blasoff', id: 'skills', icon: '🎯', name: 'Skill challenges', pitch: '7 drills, three stars each!', route: 'blasoff', tried: { feat: [['blasoff', 'skills']] }, added: '2026-11-14' },   // 🎯 bo-3a
   { game: 'blasoff', id: 'shootout', icon: '🥅', name: 'Penalty shootout', pitch: 'Kick on the target, dive in goal!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Penalty shootout ·', feat: [['blasoff', 'win_pens']] }, added: '2026-11-14' },
   { game: 'blasoff', id: 'battle', icon: '🎤', name: 'Tricks Battle', pitch: 'Tricks on the beat, 3 judges!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Tricks Battle ·', feat: [['blasoff', 'win_battle']] }, added: '2026-11-14' },   // 🎤 bo-3b
+  { game: 'blasoff', id: 'cup', icon: '🏆', name: 'Knockout Cup', pitch: '8 teams, win or go home!', route: 'blasoff', tried: { feat: [['blasoff', 'cupPlays']] }, added: '2026-11-16' },   // 🏆 r4a / r4c
+  { game: 'blasoff', id: 'league', icon: '📊', name: 'League', pitch: 'Play everyone, top the table!', route: 'blasoff', tried: { feat: [['blasoff', 'leaguePlays']] }, added: '2026-11-16' },
+  { game: 'blasoff', id: 'family', icon: '👑', name: 'Family cup', pitch: 'Captain your own family team!', route: 'blasoff', tried: { feat: [['blasoff', 'familyPlays']] }, added: '2026-11-16' },
+  { game: 'blasoff', id: 'tale', icon: '📜', name: 'Kick Tale', pitch: 'From the jungle to the cloud final!', route: 'blasoff', tried: { feat: [['blasoff', 'taleSteps']] }, added: '2026-11-16' },   // 📜 r4b / r4c
   { game: 'turbo', id: 'ghost', icon: '👻', name: 'Ghost race', pitch: 'Race the family\'s best rides!', route: 'turbo', tried: null },
   { game: 'turbo', id: 'duo', icon: '👥', name: '2-player race', pitch: 'Race a friend, split screen!', route: 'turbo', tried: null },
   { game: 'word-board', id: 'together', icon: '👨‍👩‍👧', name: 'Lettercraft Play together', pitch: 'Word battle with your family!', route: 'wordboard', tried: { feat: [['word-board', 'togetherGames']] } },
@@ -799,7 +803,7 @@ const MODE_GROUPS_ = {
   'eyes-brain': [{k: 'remember', icon: '🔢', en: 'Ways to remember', th: 'วิธีจำ', modes: ['classic', 'backwards', 'colour', 'letters', 'listen', 'word', 'shapes']}, {k: 'challenge', icon: '🏔️', en: 'Challenge', th: 'ท้าทาย', modes: ['challenge', 'daily']}, {k: 'party', icon: '👥', en: 'Party', th: 'เล่นกันหลายคน', modes: ['chain']}],
   'pyraspike': [{k: 'spike', icon: '🏐', en: 'PyraSpike', th: 'วอลเลย์บอล', modes: ['beach', 'small', 'full']}, {k: 'strike', icon: '🦶', en: 'PyraStrike', th: 'ตะกร้อ', modes: ['strikesolo', 'strikeduo', 'strikeregu', 'hoop']}, {k: 'spark', icon: '⚡', en: 'PyraSpark', th: 'บอลข้ามโต๊ะ', modes: ['sparksolo', 'sparkduo', 'party']}, {k: 'train', icon: '🎯', en: 'Training + Cups', th: 'ฝึกซ้อม + ถ้วย', modes: ['zonehits', 'combo', 'rallyrun', 'juggle', 'cups']}],   // 🔥 pd-3a
   'sla-brall': [{k: 'sports', icon: '🏓', en: 'Sports', th: 'กีฬา', modes: ['slashot', 'slapoof', 'slaball', 'slapong', 'slabam', 'slawall']}, {k: 'cup', icon: '🏆', en: 'Cup', th: 'ทัวร์นาเมนต์', modes: ['cup']}, {k: 'link', icon: '📡', en: 'Own devices', th: 'เล่นหลายเครื่อง', modes: ['lhost', 'ljoin']}],   // 📡 p3a: lk-1b's 🔗 Join friends
-  'blasoff': [{k: 'match', icon: '⚽', en: 'Matches', th: 'แข่งฟุตบอล', modes: ['fours', 'sevens', 'elevens', 'party']}, {k: 'small', icon: '🏙️', en: 'Futsal + Street', th: 'ฟุตซอล · สตรีท', modes: ['futsal', 'street']}, {k: 'skill', icon: '🕺', en: 'Tricks + skills', th: 'ลีลา · ทักษะ', modes: ['battle', 'skills', 'shootout']}],   // ⚽ bo-1 · 🌍 bo-2a · 🏙️ bo-2b
+  'blasoff': [{k: 'match', icon: '⚽', en: 'Matches', th: 'แข่งฟุตบอล', modes: ['fours', 'sevens', 'elevens', 'party']}, {k: 'small', icon: '🏙️', en: 'Futsal + Street', th: 'ฟุตซอล · สตรีท', modes: ['futsal', 'street']}, {k: 'skill', icon: '🕺', en: 'Tricks + skills', th: 'ลีลา · ทักษะ', modes: ['battle', 'skills', 'shootout']}, {k: 'cup', icon: '🏆', en: 'Cups + story', th: 'ถ้วย · เนื้อเรื่อง', modes: ['cup', 'league', 'family', 'tale']}],   // ⚽ bo-1 · 🌍 bo-2a · 🏙️ bo-2b · 🏆 r4c
   'brawl-buddies': [{k: 'battle', icon: '🥊', en: 'Battle', th: 'ต่อสู้', modes: ['battle']}, {k: 'adv', icon: '🗺️', en: 'Brawenture', th: 'ผจญภัย', modes: ['brawenture']}],
   'georead': [{k: 'sounds', icon: '🔊', en: 'Sounds', th: 'เสียง', modes: ['phonics', 'rhyme', 'say']}, {k: 'words', icon: '🧱', en: 'Words', th: 'คำ', modes: ['build', 'sight', 'case', 'trace']}, {k: 'reading', icon: '📖', en: 'Reading', th: 'อ่าน', modes: ['story', 'types']}, {k: 'journey', icon: '🗺️', en: 'Journey', th: 'ผจญภัย', modes: ['journey']}],
   'pose-party': [{k: 'pose', icon: '🎯', en: 'Pose', th: 'ท่าโพส', modes: ['classic', 'speed', 'copy']}, {k: 'move', icon: '💃', en: 'Move', th: 'ขยับตัว', modes: ['dance', 'statue', 'freeze']}, {k: 'together', icon: '🧑‍🤝‍🧑', en: 'Together', th: 'เล่นด้วยกัน', modes: ['group', 'mirror', 'letters']}, {k: 'calm', icon: '🧘', en: 'Calm', th: 'ยืดเหยียด', modes: ['yoga']}]
@@ -2602,6 +2606,14 @@ const FEAT_DEFS = {
     win_pens: { name: 'Shootout wins', icon: '🥅', kind: 'sum', hidden: true },
     win_battle: { name: 'Tricks Battle wins', icon: '🎤', kind: 'sum', tiers: [1, 10, 50] },   // 🎤 bo-3b
     win_party: { name: 'Party ball wins', icon: '🎉', kind: 'sum', tiers: [1, 10, 50] },   // 🎉 bo-3c
+    cups: { name: 'Cup Winner', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },   // 🏆 r4c (r4a cups)
+    leagues: { name: 'League Champion', icon: '📊', kind: 'sum', tiers: [1, 5, 20] },
+    familyCups: { name: 'Family Captain', icon: '👑', kind: 'sum', tiers: [1, 5, 20] },
+    taleChapters: { name: 'Kick Tale', icon: '📜', kind: 'max', tiers: [1, 3, 6] },   // 📜 r4c (r4b story)
+    taleSteps: { name: 'Kick Tale steps', icon: '📜', kind: 'max', hidden: true },
+    cupPlays: { name: 'Cup matches', icon: '🏆', kind: 'sum', hidden: true },
+    leaguePlays: { name: 'League matches', icon: '📊', kind: 'sum', hidden: true },
+    familyPlays: { name: 'Family cup matches', icon: '👑', kind: 'sum', hidden: true },
   },
   // 🔍 Pokadif feats (pk-1)
   'pokadif': {
@@ -2864,6 +2876,9 @@ const TITLE_DEFS = [
   { id: 'bo_volley', name: 'Volley Hero', icon: '🎯', hint: 'Hit 10 volleys in BlasOff (Space, Space, then K or J)', rule: f => featVal_(f, 'blasoff', 'volleys') >= 10 },
   { id: 'bo_voice', name: "Keeper's Voice", icon: '📣', hint: 'Shout your keeper to 10 saves in BlasOff', rule: f => featVal_(f, 'blasoff', 'shoutSaves') >= 10 },
   { id: 'bo_nutmeg', name: 'Nutmeg King', icon: '🥜', hint: 'Nutmeg 10 players in BlasOff (L when one stands right in front of you)', rule: f => featVal_(f, 'blasoff', 'nutmegs') >= 10 },   // 🏙️ bo-2b
+  { id: 'bo_captain', name: 'Captain', icon: '👑', hint: 'Win a 👑 Family cup in BlasOff', rule: f => featVal_(f, 'blasoff', 'familyCups') >= 1 },   // 🏆 r4c
+  { id: 'bo_cupking', name: 'Cup King', icon: '🏆', hint: 'Win 3 knockout cups in BlasOff', rule: f => featVal_(f, 'blasoff', 'cups') >= 3 },
+  { id: 'bo_tale', name: 'Kick Tale Hero', icon: '📜', hint: 'Finish all 6 chapters of 📜 Kick Tale in BlasOff', rule: f => featVal_(f, 'blasoff', 'taleChapters') >= 6 },
   { id: 'pd_ace', name: 'Ace Driver', icon: '🚀', hint: 'Serve 10 aces in PyraDive', rule: f => featVal_(f, 'pyraspike', 'aces') >= 10 },
   { id: 'pd_dink', name: 'Ghost Dinker', icon: '🪶', hint: 'Set up 20 kills (assists) in PyraDive', rule: f => featVal_(f, 'pyraspike', 'assists') >= 20 },
   { id: 'pd_dunk', name: 'Spirit Dunker', icon: '💥', hint: 'Score 25 kills in PyraDive', rule: f => featVal_(f, 'pyraspike', 'kills') >= 25 },
