@@ -79,9 +79,15 @@ function moveName(key){ const st = ActionFX.style(key.replace('move.', '')); ret
 function play(key){ const G = geo(), t = performance.now() / 1000; ActionFX.opts.calm = !!(window.FXCALM);
   document.querySelectorAll('.mv').forEach(b => b.classList.toggle('on', b.dataset.k === key));
   const fam0 = key.split('.')[1]; me.av = fam0 === 'slash' || fam0 === 'jump' ? SWORD : PLAIN;   // ⚔️ slashes + jump attacks: a sword in the hand (games keep their own item)
-  const isReact = key.indexOf('move.react.') === 0, atk = isReact ? 'move.punch.straight' : key, rk = isReact ? key : ActionFX.reactFor(key);
-  runA = ActionFX.play(me, atk, {t0: t, x: G.ax, y: G.gy, k: G.k, dir: 1, element, onContact: r => { runB = ActionFX.play(bud, rk, {t0: r.contactT, x: G.bx, y: G.gy, k: G.k, dir: -1, element}); }});
-  runB = null; $('now').innerHTML = moveName(isReact ? rk : key) + '<small>' + (isReact ? 'the buddy reacts to a 👊 straight' : 'the buddy: ' + moveName(rk)) + '</small>'; }
+  const isReact = fam0 === 'react', rk = isReact ? key : ActionFX.reactFor(key);
+  runA = runB = null;
+  if(fam0 === 'defend'){   // 🛡️ the buddy attacks; my defend lands its contact on the buddy's contact
+    const a = Acting.play(bud, 'move.punch.straight', {t0: 0}), d = Acting.play(me, key, {t0: 0}), lag = Math.max(0, (a.contactMs - d.contactMs) / 1000), lead = Math.max(0, (d.contactMs - a.contactMs) / 1000);
+    runB = Acting.play(bud, 'move.punch.straight', {t0: t + lead}); runA = ActionFX.play(me, key, {t0: t + lag, x: G.ax, y: G.gy, k: G.k, dir: 1, element});
+    $('now').innerHTML = moveName(key) + '<small>the buddy throws a 👊 straight — you defend</small>'; return; }
+  const atk = isReact ? 'move.punch.straight' : key;
+  runA = ActionFX.play(me, atk, {t0: t, x: G.ax, y: G.gy, k: G.k, dir: 1, element, onContact: r => { if(rk) runB = ActionFX.play(bud, rk, {t0: r.contactT, x: G.bx, y: G.gy, k: G.k, dir: -1, element}); }});
+  $('now').innerHTML = moveName(isReact ? rk : key) + '<small>' + (isReact ? 'the buddy reacts to a 👊 straight' : rk ? 'the buddy: ' + moveName(rk) : 'a self move — nobody is hit') + '</small>'; }
 function frame(){ const t = performance.now() / 1000; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); const G = geo();
   g.fillStyle = 'rgba(255,255,255,.06)'; g.fillRect(0, G.gy, W, H - G.gy); g.save(); const sh = ActionFX.shake(t); g.translate(sh.x, sh.y);
   const fa = runA && !runA.done ? runA.at(t) : null, fb = runB && !runB.done ? runB.at(t) : null;
@@ -106,4 +112,4 @@ fit(); renderTabs(); renderMoves(); renderEls(); renderOpts(); requestAnimationF
 </script>
 </body>
 </html>
-<!-- (fx-1a+fx-1b) END OF FxGallery.html -->
+<!-- (fx-1a+fx-1b+fx-1c) END OF FxGallery.html -->
