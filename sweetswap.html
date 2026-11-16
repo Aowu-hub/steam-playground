@@ -234,7 +234,13 @@
   @keyframes fall{to{transform:translateY(110vh) rotate(540deg);}}
   @media (max-width:520px){ .hud{justify-content:flex-start;gap:4px;padding-left:6px;padding-right:6px;} .pill{padding:5px 7px;font-size:0.8rem;} .sc{font-size:0.82rem;padding-right:7px;} .sc canvas{width:22px;height:26px;} }
   @media (orientation:landscape) and (max-height:560px){ .hud{padding-top:calc(4px + env(safe-area-inset-top));} .acts{grid-template-columns:repeat(4,1fr);} .act{min-height:38px;font-size:0.72rem;} .act .i{font-size:1rem;} .msg{min-height:34px;padding:5px 10px;font-size:0.82rem;} .rt{min-height:34px;font-size:1.1rem;} .side{gap:6px;width:min(46vw,360px);} }
-  @media (prefers-reduced-motion: reduce){ .title .logo{animation:none;} .board.shake,.board.shake2{animation:none;} }
+  /* 🧑‍🤝‍🧑 24r family pieces */ .tile .in.fam{background:none;box-shadow:0 3px 0 rgba(0,0,0,0.18);} .tile .in.fam span{display:block;width:100%;height:100%;}
+  img.famp{width:1.5em;height:1.5em;border-radius:24%;vertical-align:-0.38em;object-fit:contain;} .tile .in img.famp{width:100%;height:100%;display:block;border-radius:0;}
+  .famfx{position:absolute;z-index:6;pointer-events:none;animation:famin var(--fd,800ms) ease-out both;} .famfx.pop{z-index:8;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.25));}
+  @keyframes famin{0%{opacity:0;transform:scale(.6);}12%{opacity:1;transform:scale(1.06);}20%{transform:scale(1);}82%{opacity:1;}100%{opacity:0;transform:scale(.92);}}
+  #fam-who{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 0 8px;} #fam-who .fw-lab{font-size:13px;font-weight:700;opacity:.75;width:100%;} #fam-who .chip.off{opacity:.55;}
+  .chip .hd{display:block;font-size:.7rem;font-weight:800;opacity:.85;line-height:1.1;}
+  @media (prefers-reduced-motion: reduce){ .famfx{animation:none;} .title .logo{animation:none;} .board.shake,.board.shake2{animation:none;} }
 </style>
 </head>
 <body ontouchstart="">
@@ -258,6 +264,7 @@
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
   <div class="section-head">🎨 1. Pick your pictures</div>   <!-- 🧱 b3w2: ONE setup page -->
   <div class="chips" id="theme-list"></div>
+  <div class="chips hidden" id="fam-who"></div>   <!-- 🧑‍🤝‍🧑 24r -->
   <div class="shape-wrap"><div class="section-head" id="shape-head">🧩 2. Pick a board shape</div>   <!-- 🧩 24n -->
   <div class="chips" id="shape-list"></div></div>
   <div class="section-head" id="level-head">🎚️ 3. Pick a level</div>
@@ -325,6 +332,139 @@ const THEMES = {
   vehicles: {name: 'Vehicles', pics: ['🚗', '🚌', '🚒', '🚜', '🚲', '✈️'], t: ['#E3F4FF', '#A8D8F5'], board: '#2F6FA0', slot: 'rgba(255,255,255,0.25)', cage: {ic: '⛽', name: 'gas out', cls: 'ck-gas'}, power: {ic: '⚡', name: 'Power node', fx: 'chain'}},
   space: {name: 'Spacecraft', pics: ['🚀', '🛸', '🛰️', '🪐', '☄️', '🌙'], t: ['#1B1440', '#3A2A7A'], board: '#120C2E', slot: 'rgba(255,255,255,0.14)', dark: true, cage: {ic: '☄️', name: 'meteor cage', cls: 'ck-meteor'}, power: {ic: '🛡️', name: 'EMP shield', fx: 'emp'}}
 };
+/* 🧑‍🤝‍🧑 24r FAMILY PIECES (✨ polish chat, Aowu 2026-11-16 20:42 + 20:44 + 21:21 + 21:31 "ok go"): the family's own avatars are the pictures.
+   👨‍👩‍👧 Family = colour rim + initial (★ ×1.25) · 🙂 Faces only = no colour help (★★ ×1.5, stacks with the 🧩 board shape).
+   Who: the player + other family members from the Players list (their saved avatar = S.avatars, fresh every page open; a new mix each game),
+   pets-free 🤖 buddies fill when the family is small; 👁️ a person can hide their face (device setting sp_ss_famhide).
+   Moves are DRAWN ONCE per person when a game starts (AvatarActing `Acting.draw`, frames kept in memory only → a changed avatar shows next game),
+   then replayed on a small overlay canvas: 💤 idle now and then · ✨ match 3 small · 🎉 4 / ✖️ / ✨ power = pops out · 💥 L/T = high-five
+   · 🌈 5 = the person's own 🎭 Signature act · 😅 swap back · 🔗 combos ×2 amazed · ×3 gasp · ×4 wave · ×5+ party · 🏆 win.
+   Calm (🌱 Basic, reduced motion): no idle, combos = one small ripple. Off: window.SS_FAMFX = false (pictures stay, no moves). */
+const FAM_RIM = ['#FF5A5F', '#F5A300', '#9B5CF6', '#22A86A', '#3B82F6', '#F2711C'];
+const FAM_BUDDY = ['Bo', 'Pip', 'Zuzu', 'Kiki', 'Momo', 'Tiko'];
+const THEME_MULT = [1, 1.25, 1.5];
+Object.assign(THEMES, {
+  family: {name: 'Family', fam: 1, hard: 1, pics: ['😀', '😄', '😎', '🤩', '😊', '🥳'], t: ['#FFF0F7', '#FFCFE4'], board: '#B04E86', slot: 'rgba(255,255,255,0.28)', cage: {ic: '🧺', name: 'picnic basket', cls: ''}, power: {ic: '📸', name: 'Family photo', fx: 'rain'}},
+  faces: {name: 'Faces only', fam: 2, hard: 2, pics: ['😀', '😄', '😎', '🤩', '😊', '🥳'], t: ['#F1EEF6', '#CFC6DE'], board: '#5B4B6B', slot: 'rgba(255,255,255,0.2)', cage: {ic: '🎁', name: 'gift box', cls: 'ck-box'}, power: {ic: '📸', name: 'Group photo', fx: 'rain'}}
+});
+const FAM = {who: [], img: [], key: '', strips: {}, live: [], raf: 0, idleT: 0, R: 144};
+const FAM_POOLS = {
+  idle: ['cool', 'gest.peekaboo', 'gest.yawn', 'curious', 'giggle', 'shy'],
+  small: ['gest.clap', 'laugh', 'wave', 'excited', 'cheer.hop'],
+  big: ['cheer', 'cheer.fist', 'gest.dab', 'flex', 'victory'],
+  bomb: ['gest.highfive', 'hug-pair', 'cheer.starjump', 'gest.spin'],
+  oops: ['oops', 'shrug', 'confused', 'facepalm'],
+  amazed: ['amazed', 'gasp'], wave: ['cheer.starjump', 'cheer.hop'], party: ['gest.dance', 'cheer.disco', 'cheer.floss'], win: ['victory', 'cheer']};
+function famOn(){ return !!(window.Acting && window.SS_FAMFX !== false); }
+function famCalm(){ return !!(G && G.lvl === 0) || !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }
+function famHidden(){ try{ return JSON.parse(localStorage.getItem('sp_ss_famhide') || '[]'); }catch(e){ return []; } }
+function famSetHidden(list){ try{ localStorage.setItem('sp_ss_famhide', JSON.stringify(list)); }catch(e){} }
+function famHash(t){ let h = 2166136261; for(let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
+function famActOk(a){ return window.Acting && Acting.has('acts', a); }
+// the people for this game: me first, then a shuffled mix of the rest (hidden ones skipped), 🤖 buddies fill
+function famPick(K, mix){
+  const hide = famHidden(), me = S.player, names = (S.players || []).map(p => p.Name).filter(n => n && n !== me && hide.indexOf(n) < 0);
+  const list = (me && hide.indexOf(me) < 0 ? [me] : []).concat(mix ? shuffle(names) : names);
+  const who = list.slice(0, K).map(n => ({name: n, av: myAvatar(n)}));
+  for(let i = 0; who.length < K; i++) who.push({name: FAM_BUDDY[i % FAM_BUDDY.length], av: defaultAvatar('🤖' + FAM_BUDDY[i % FAM_BUDDY.length]), buddy: true});
+  return who;
+}
+// one avatar drawn into a tile (S px): rim tile (Family) or plain card (Faces only); pop = bigger frame, the body pops out of the tile
+function famDraw(q, w, act, t, S, k, faceOnly, popK){
+  const Z = Math.round(S * (popK || 1)), ox = (Z - S) / 2, oy = (Z - S) * 0.38, rim = faceOnly ? 'rgba(60,40,80,.22)' : FAM_RIM[k % 6];
+  const f = Acting.fit(w, ['idle'], S, S * 1.9, {pad: 2});
+  if(popK){ q.fillStyle = (faceOnly ? '#7B6B8B' : FAM_RIM[k % 6]) + '38'; q.beginPath(); for(let i = 0; i < 24; i++){ const a = i / 24 * 6.283 + t * 1.2, r = Z * (i % 2 ? 0.36 : 0.5); q.lineTo(Z / 2 + Math.cos(a) * r, Z * 0.48 + Math.sin(a) * r); } q.fill(); }
+  q.save(); q.beginPath(); q.roundRect(ox + 1, oy + 1, S - 2, S - 2, S * 0.24);
+  const gr = q.createLinearGradient(0, oy, 0, oy + S); gr.addColorStop(0, faceOnly ? '#FFFFFF' : rim + '30'); gr.addColorStop(1, faceOnly ? '#ECE8F2' : rim + '70'); q.fillStyle = gr; q.fill();
+  if(!popK) q.clip();
+  try{ Acting.draw(q, w, ox + f.x, oy + f.y + S * 0.18, f.k * 1.05, act, {t, noPet: true, ride: 'drop'}); }catch(e){}
+  q.restore();
+  q.lineWidth = Math.max(2, S * 0.07); q.strokeStyle = rim; q.beginPath(); q.roundRect(ox + 1 + q.lineWidth / 2, oy + 1 + q.lineWidth / 2, S - 2 - q.lineWidth, S - 2 - q.lineWidth, S * 0.22); q.stroke();
+  if(!faceOnly && !popK){ q.fillStyle = rim; q.beginPath(); q.arc(ox + S * 0.84, oy + S * 0.84, S * 0.15, 0, 7); q.fill(); q.fillStyle = '#fff'; q.font = '800 ' + Math.round(S * 0.19) + 'px Fredoka, Nunito, sans-serif'; q.textAlign = 'center'; q.textBaseline = 'middle'; q.fillText((w.name || '?').replace(/^\W+/, '')[0] || '?', ox + S * 0.84, oy + S * 0.855); }
+}
+// the still pictures for the tiles (+ the 🎨 chip): drawn once per game, kept only in memory
+function famPrep(K, mix, force){
+  const T = THEMES[theme] && THEMES[theme].fam ? THEMES[theme] : THEMES.family, fo = T.fam === 2;
+  const who = famPick(K, mix), key = fo + '|' + who.map(w => w.name + ':' + famHash(JSON.stringify(w.av || {})) + ':' + (Acting.sig ? Acting.sig(w.av) : '')).join(',');
+  if(!force && key === FAM.key && FAM.img.length >= K) return;
+  FAM.key = key; FAM.who = who; FAM.fo = fo; FAM.strips = {}; FAM.img = who.map((w, k) => { const c = document.createElement('canvas'); c.width = c.height = FAM.R; famDraw(c.getContext('2d'), w, 'idle', 0, FAM.R, k, fo); return c.toDataURL('image/png'); });
+}
+function famPic(k, T){
+  if(!window.Acting) return T.pics[k];
+  if(G && THEMES[G.theme] === T && FAM.img[k]) return '<img class="famp" alt="' + UI.esc(famName(k)) + '" src="' + FAM.img[k] + '">';
+  const fo = T.fam === 2, ck = (fo ? 'f' : 'r') + (S.player || '') + famHidden().join(','); FAM.chip = FAM.chip || {};   // 🎨 setup chip: the first 3 faces, its own small cache
+  if(!FAM.chip[ck]){ try{ FAM.chip[ck] = famPick(3, false).map((w, j) => { const c = document.createElement('canvas'); c.width = c.height = 64; famDraw(c.getContext('2d'), w, 'idle', 0, 64, j, fo); return c.toDataURL('image/png'); }); }catch(e){ FAM.chip[ck] = []; } }
+  return FAM.chip[ck][k] ? '<img class="famp" alt="" src="' + FAM.chip[ck][k] + '">' : T.pics[k];
+}
+function famName(k){ const w = FAM.who[k]; return w ? w.name : ''; }
+// a move = N frames drawn once (cached per person × act × size kind), replayed by one shared animation loop
+function famStrip(k, act, pop){
+  const id = k + '|' + act + '|' + (pop ? 'p' : 's'); if(FAM.strips[id]) return FAM.strips[id];
+  const w = FAM.who[k]; if(!w || !famActOk(act)) return null;
+  const N = 6, S = FAM.R, P = pop ? 1.55 : 1, Z = Math.round(S * P), c = document.createElement('canvas'); c.width = Z * N; c.height = Z; const q = c.getContext('2d');
+  for(let i = 0; i < N; i++){ q.save(); q.translate(i * Z, 0); famDraw(q, w, act, i / N, S, k, FAM.fo, pop ? P : 0); q.restore(); }
+  return (FAM.strips[id] = {c, N, Z, P});
+}
+function famBake(){   // draw the common moves while the player looks at the board (idle time), so the first match never waits
+  if(!G || !THEMES[G.theme].fam || !famOn()) return; const g = G, jobs = [];
+  FAM.who.forEach((w, k) => { ['small', 'big', 'oops', 'amazed'].forEach(p => FAM_POOLS[p].slice(0, 2).forEach(a => jobs.push([k, a, p === 'big']))); jobs.push([k, Acting.sig(w.av), true]); });
+  const step = d => { if(G !== g) return; const t0 = performance.now(); while(jobs.length && performance.now() - t0 < 12){ const j = jobs.shift(); famStrip(j[0], j[1], j[2]); } if(jobs.length) (window.requestIdleCallback || (f => setTimeout(f, 40)))(step); };
+  (window.requestIdleCallback || (f => setTimeout(f, 300)))(step);
+}
+// play a move over cell i (the tile's kind k): pop = bigger frame on top of the neighbours; plays `loops` times then fades
+function famPlay(i, k, pool, o){
+  o = o || {}; if(!G || !famOn() || !THEMES[G.theme].fam || k == null || k < 0 || !FAM.who[k]) return false;
+  if(FAM.live.length >= (o.max || 24)) return false;
+  const acts = typeof pool === 'string' && FAM_POOLS[pool] ? FAM_POOLS[pool].filter(famActOk) : [].concat(pool).filter(famActOk); if(!acts.length) return false;
+  const st = famStrip(k, acts[Math.floor(Math.random() * acts.length)], !!o.pop); if(!st) return false;
+  const [x, y] = xy(i), D = CS * st.P, el = document.createElement('canvas'), dpr = Math.min(2, window.devicePixelRatio || 1);
+  el.className = 'famfx' + (o.pop ? ' pop' : ''); el.width = Math.round(D * dpr); el.height = Math.round(D * dpr);
+  el.style.cssText = 'left:' + (x + CS / 2 - D / 2) + 'px;top:' + (y + CS / 2 - D * (o.pop ? 0.62 : 0.5)) + 'px;width:' + D + 'px;height:' + D + 'px;animation-delay:' + (o.delay || 0) + 'ms;--fd:' + ((o.ms || 700) + (o.delay || 0)) + 'ms';
+  $('board').appendChild(el);
+  const live = {el, st, t0: performance.now() + (o.delay || 0), ms: o.ms || 700, loops: o.loops || 2, cell: i}; FAM.live.push(live); famLoop();
+  return true;
+}
+function famLoop(){
+  if(FAM.raf) return;
+  const tick = now => { FAM.raf = 0;
+    FAM.live = FAM.live.filter(L => { const age = now - L.t0; if(age > L.ms || !L.el.isConnected){ L.el.remove(); return false; } if(age < 0) return true;
+      const f = Math.min(L.st.N - 1, Math.floor((age / L.ms * L.loops % 1) * L.st.N)); if(f !== L.f){ L.f = f; const q = L.el.getContext('2d'); q.clearRect(0, 0, L.el.width, L.el.height); q.drawImage(L.st.c, f * L.st.Z, 0, L.st.Z, L.st.Z, 0, 0, L.el.width, L.el.height); } return true; });
+    if(FAM.live.length) FAM.raf = requestAnimationFrame(tick); };
+  FAM.raf = requestAnimationFrame(tick);
+}
+function famClear(){ FAM.live.forEach(L => L.el.remove()); FAM.live = []; clearInterval(FAM.idleT); FAM.idleT = 0; }
+// 🎉 a match group popped: the bigger the group, the bigger the move (sp = what the match makes)
+function famMatch(gr, sp, k){
+  if(!G || !THEMES[G.theme].fam) return; const cells = [...gr.cells], mid = cells[(cells.length / 2) | 0];
+  if(sp === 'rainbow') famPlay(mid, k, [Acting.sig(FAM.who[k] && FAM.who[k].av)], {pop: true, ms: 1100, loops: 2});
+  else if(sp === 'bomb') famPlay(mid, k, 'bomb', {pop: true, ms: 900});
+  else if(sp === 'x' || sp === 'power' || cells.length >= 4) famPlay(mid, k, 'big', {pop: true, ms: 850});
+  else famPlay(mid, k, 'small', {ms: 600});
+}
+function famOops(a, b){ if(!G || !THEMES[G.theme].fam) return; [a, b].forEach(i => { const t = G.g[i]; if(t) famPlay(i, t.k, 'oops', {ms: 650}); }); }
+// 🔗 combo chains: the crowd of faces reacts (×2 a few · ×3 more · ×4 a wave by column · ×5+ the whole board)
+function famCombo(n){
+  if(!G || !THEMES[G.theme].fam || !famOn()) return; const g = G.g, N = G.n, cells = []; g.forEach((t, i) => { if(t && t.k >= 0) cells.push(i); });
+  const calm = famCalm(), pick = m => shuffle(cells.slice()).slice(0, m);
+  if(calm || n === 2) pick(calm ? 3 : 5).forEach((i, j) => famPlay(i, g[i].k, 'amazed', {ms: 600, delay: j * 40}));
+  else if(n === 3) pick(10).forEach((i, j) => famPlay(i, g[i].k, 'amazed', {ms: 650, delay: j * 30}));
+  else if(n === 4) pick(18).sort((a, b) => a % N - b % N).forEach(i => famPlay(i, g[i].k, 'wave', {ms: 600, delay: (i % N) * 70}));
+  else pick(24).forEach((i, j) => famPlay(i, g[i].k, 'party', {ms: 1000, delay: (j % 6) * 50, loops: 3}));
+}
+function famWin(){ if(!G || !THEMES[G.theme].fam || !famOn()) return; const g = G.g, cells = []; g.forEach((t, i) => { if(t && t.k >= 0) cells.push(i); }); shuffle(cells).slice(0, famCalm() ? 4 : 14).forEach((i, j) => famPlay(i, g[i].k, 'win', {ms: 1000, delay: j * 60, pop: j < 2})); }
+// 💤 now and then one face does a little thing (only while nobody is moving)
+function famIdle(){ clearInterval(FAM.idleT); if(!G || !THEMES[G.theme].fam || !famOn() || famCalm()) return;
+  FAM.idleT = setInterval(() => { if(!G || G.over || G.busy || G.paused || $('scr-play').classList.contains('hidden') || FAM.live.length) return; const cells = []; G.g.forEach((t, i) => { if(t && t.k >= 0 && !t.sp) cells.push(i); }); if(!cells.length) return; const i = cells[Math.floor(Math.random() * cells.length)]; famPlay(i, G.g[i].k, 'idle', {ms: 900}); }, 4200); }
+function famStart(){ if(!G || !THEMES[G.theme].fam) return; famClear(); try{ famPrep(G.K, true, true); }catch(e){} famIdle(); famBake(); }
+// 👁️ who is in the game (setup page, Family pictures only): tap a face to hide it on this device
+function renderFamWho(){
+  const box = $('fam-who'); if(!box) return; const T = THEMES[theme];
+  if(!T || !T.fam){ box.innerHTML = ''; box.classList.add('hidden'); return; }
+  const hide = famHidden(), names = (S.players || []).map(p => p.Name).filter(Boolean);
+  box.classList.remove('hidden');
+  box.innerHTML = '<span class="fw-lab">👁️ Faces in the game · tap to hide</span>' + names.map(n => '<button class="chip fw' + (hide.indexOf(n) < 0 ? ' on' : ' off') + '" data-sound="pop" data-fam-name="' + UI.esc(n) + '">' + (hide.indexOf(n) < 0 ? '🙂 ' : '🙈 ') + UI.esc(n) + '</button>').join('');
+  box.querySelectorAll('[data-fam-name]').forEach(b => b.onclick = () => { const n = b.dataset.famName, h = famHidden(), at = h.indexOf(n); if(at < 0) h.push(n); else h.splice(at, 1); famSetHidden(h); FAM.key = ''; FAM.chip = {}; renderMenu(); });
+}
 const THEME_KEYS = Object.keys(THEMES);
 /* 🧩 24n BOARD SHAPES (✨ polish chat, Aowu 2026-11-16 18:30 "i like the shown yes … without a sweet to swap it should shuffle … each map has
    its own hardness too"): the board can be a shape — holes = no picture, pictures fall past the holes inside their column, no swap left →
@@ -525,10 +665,10 @@ function choosePlayer(name){
   loadPrefs(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4a */ renderMenu(); showScreen('menu'); openCover();   /* 🧱 b3w2: the 🎬 cover first */
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
-function picHtml(k, T){ T = T || THEMES[theme]; if(k < 0) return '🌈'; return T.shapes ? '<b style="color:' + SHAPE_COLORS[k] + '">' + T.pics[k] + '</b>' : T.pics[k]; }
+function picHtml(k, T){ T = T || THEMES[theme]; if(k < 0) return '🌈'; if(T.fam) return famPic(k, T); return T.shapes ? '<b style="color:' + SHAPE_COLORS[k] + '">' + T.pics[k] + '</b>' : T.pics[k]; }
 function renderMenu(){
-  $('theme-list').innerHTML = THEME_KEYS.map(k => '<button class="chip' + (k === theme ? ' on' : '') + '" data-sound="pop" data-theme-key="' + k + '"><span class="ic">' + [0, 1, 2].map(i => picHtml(i, THEMES[k])).join('') + '</span>' + THEMES[k].name + '</button>').join('');
-  $('theme-list').querySelectorAll('[data-theme-key]').forEach(b => b.onclick = () => { theme = b.dataset.themeKey; savePrefs(); $('theme-list').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); renderLevels(); markPicks(); });   /* 🧱 b3w2 */
+  $('theme-list').innerHTML = THEME_KEYS.map(k => '<button class="chip' + (k === theme ? ' on' : '') + '" data-sound="pop" data-theme-key="' + k + '"><span class="ic">' + [0, 1, 2].map(i => picHtml(i, THEMES[k])).join('') + '</span>' + THEMES[k].name + (THEMES[k].hard ? '<small class="hd">' + '★'.repeat(THEMES[k].hard) + ' ×' + THEME_MULT[THEMES[k].hard] + '</small>' : '') + '</button>').join(''); renderFamWho();   /* 🧑‍🤝‍🧑 24r */
+  $('theme-list').querySelectorAll('[data-theme-key]').forEach(b => b.onclick = () => { theme = b.dataset.themeKey; savePrefs(); $('theme-list').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); renderLevels(); markPicks(); renderFamWho(); });   /* 🧱 b3w2 · 🧑‍🤝‍🧑 24r */
   { let k = ''; try{ k = localStorage.getItem(setupKey('shape')) || ''; }catch(e){} shapeKey = shapeOf(k).k; } renderShapes();   // 🧩 24n
   renderLevels();
 }
@@ -562,7 +702,7 @@ function chooseLevel(i, quiet){
 function markPicks(){
   document.querySelectorAll('#level-list .lvl').forEach(b => { const on = Number(b.dataset.i) === chosenLevel; b.classList.toggle('sel', on); if(window.GF && GF.pick) GF.pick(b, on); });
   const L = LEVELS[chosenLevel], T = THEMES[theme], st = $('btn-start');
-  const SH = shapeOf(shapeKey); if(st && L) st.textContent = '▶ Start · ' + L.emoji + ' ' + L.name + (T ? ' · ' + T.name : '') + (SH.hard && window.SS_SHAPES !== false ? ' · ' + SH.icon + ' ' + SH.name : '');
+  const SH = shapeOf(shapeKey); if(st && L) st.textContent = '▶ Start · ' + L.emoji + ' ' + L.name + (T ? ' · ' + T.name + (T.hard ? ' ' + '★'.repeat(T.hard) : '') : '') + (SH.hard && window.SS_SHAPES !== false ? ' · ' + SH.icon + ' ' + SH.name : '');
 }
 function startSetup(){ if(!canPlay(chosenLevel)){ UISound.play('error'); UI.toast('Pick a level that is open 🔓'); return; } startGame(chosenLevel); }
 // 🎬 the cover (GameFrame): who's here + champions + how to play; ▶ Play opens the setup page
@@ -587,6 +727,7 @@ function startGame(lvl){ setTimeout(cheerMount, 0); /* 📣 cs-4a */
   G = {lvl, L, theme, n, K: L.K, g: fillFresh(n, L.K), ice, moves: L.moves, movesGiven: L.moves, score: 0, matches: 0, specials: 0, powers: 0, bestCombo: 0, hintsLeft: typeof L.hint === 'number' ? L.hint : 0,
     stage: 1, stages: L.stage2 ? 2 : 1, shape: SH, frac, goals: makeGoals(L.goals, ice, frac),
     sel: -1, cursor: -1, busy: false, over: false, els: {}, t0: performance.now(), paused: false, pausedAt: 0, pausedTotal: 0};
+  famClear(); if(T.fam) famStart();   // 🧑‍🤝‍🧑 24r: the family's faces for this game (a new mix, fresh avatars)
   const sp = $('scr-play'); sp.className = T.cage.cls || ''; sp.style.setProperty('--ck', '"' + T.cage.ic + '"'); sp.style.setProperty('--pw', '"' + T.power.ic + '"'); sp.style.setProperty('--t1', T.t[0]); sp.style.setProperty('--t2', T.t[1]); sp.style.setProperty('--board', T.board); sp.style.setProperty('--slot', T.slot); sp.classList.toggle('dark', !!T.dark);
   BAR.level(L.emoji + ' ' + L.name + (HOLE ? ' · ' + SH.icon : ''), L.hardcore ? 'hc' : '');
   $('hint-btn').classList.toggle('hidden', !L.hint); $('hint-btn').textContent = '💡'; paintVoice();
@@ -620,7 +761,7 @@ function buildBoard(){
 function tileEl(t){
   const T = THEMES[G.theme], el = document.createElement('div');
   el.className = 'tile' + (t.sp ? ' ' + t.sp : ''); el.dataset.id = t.id;
-  el.innerHTML = '<div class="in" style="--tc:' + (t.k >= 0 ? (T.shapes ? '#FFFFFF' : COLORS[t.k]) : '#fff') + '"><span>' + picHtml(t.k, T) + '</span></div>';
+  el.innerHTML = '<div class="in' + (T.fam ? ' fam' : '') + '" style="--tc:' + (t.k >= 0 ? (T.shapes ? '#FFFFFF' : COLORS[t.k]) : '#fff') + '"><span>' + picHtml(t.k, T) + '</span></div>';
   G.els[t.id] = el; return el;
 }
 function xy(i){ const n = G.n; return [GAP + (i % n) * (CS + GAP), GAP + ((i / n) | 0) * (CS + GAP)]; }
@@ -700,7 +841,7 @@ async function trySwap(a, b){
   if(!G) return;
   const combo = A.sp === 'rainbow' || B.sp === 'rainbow' || (isSpecial(A) && isSpecial(B));
   if(!combo && !matchAt(g, G.n, a) && !matchAt(g, G.n, b)){
-    g[a] = A; g[b] = B; moveEl(A, a); moveEl(B, b); UISound.play('error'); await sleep(200); G.busy = false; armHint(); return;
+    g[a] = A; g[b] = B; moveEl(A, a); moveEl(B, b); UISound.play('error'); famOops(a, b); await sleep(200); G.busy = false; armHint(); return;
   }
   G.moves--; hud();
   if(combo) await superSwap(a, b, A, B);
@@ -762,6 +903,7 @@ async function matchRound(focus){
         if(sp !== 'rainbow' && shared !== undefined) pivot = Number(shared); else { const long = gr.runs.reduce((a, b) => b.cells.length > a.cells.length ? b : a); pivot = long.cells[(long.cells.length / 2) | 0]; } } }
     gr.cells.forEach(c => cells.add(c));
     if(sp) creates.push({i: pivot, k: sp === 'rainbow' ? -1 : k, sp});
+    famMatch(gr, sp, k);   // 🧑‍🤝‍🧑 24r
     if(sp === 'power'){ G.powers++; const T = THEMES[G.theme]; combo(T.power.ic + ' ' + T.power.name + '!'); say(T.power.name); }
     G.matches++;
     const base = maxLen >= 5 ? 200 : sp === 'power' ? 250 : maxLen === 4 ? 120 : gr.cells.size > 4 ? 150 : hasSq ? 80 : 60;
@@ -771,7 +913,7 @@ async function matchRound(focus){
   await gravity();
   return true;
 }
-function addScore(pts, at){ const mult = 1 + 0.5 * Math.max(0, (G.chain || 1) - 1), v = Math.round(pts * mult * (G.L.hardcore ? 3 : 1) * SHAPE_MULT[(G.shape && G.shape.hard) || 0]); G.score += v; hud(); if(at != null) floatAt(at, '+' + v); }
+function addScore(pts, at){ const mult = 1 + 0.5 * Math.max(0, (G.chain || 1) - 1), v = Math.round(pts * mult * (G.L.hardcore ? 3 : 1) * SHAPE_MULT[(G.shape && G.shape.hard) || 0] * THEME_MULT[THEMES[G.theme].hard || 0]); G.score += v; hud(); if(at != null) floatAt(at, '+' + v); }
 // pop a set of cells: super pictures inside fire too; ice cracks; goals count; new super pictures appear
 async function popCells(cells, creates, opt){
   const g = G.g, n = G.n, fired = opt.fired || new Set(), queue = [...cells], skip = new Set(creates.map(c => c.i));
@@ -830,7 +972,7 @@ async function gravity(){
 async function cascade(a, b){
   G.chain = 0;
   let focus = [b, a];
-  while(G && !G.over){ G.chain++; const did = await matchRound(focus); if(!did) break; focus = null; if(G && G.chain >= 2) chainBadge(G.chain); }
+  while(G && !G.over){ G.chain++; const did = await matchRound(focus); if(!did) break; focus = null; if(G && G.chain >= 2){ chainBadge(G.chain); famCombo(G.chain); } }
   if(!G) return;
   const chain = G.chain - 1; G.bestCombo = Math.max(G.bestCombo, chain);
   if(chain >= 2){ combo(COMBOS[Math.min(chain, COMBOS.length - 1)]); if(chain >= 3) say(COMBOS[Math.min(chain, COMBOS.length - 1)].replace('!', '')); }
@@ -970,13 +1112,13 @@ function leavePlay(){
   pauseGame();
   UI.confirm({icon: '◀', title: 'Leave this game?', body: 'This game will not be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(ok) backToMenu(); else resume(); });
 }
-function backToMenu(){ if(window.Cheer) Cheer.unmount(); clearInterval(timerId); clearHint(); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); renderMenu(); showScreen('menu'); }
+function backToMenu(){ famClear(); if(window.Cheer) Cheer.unmount(); clearInterval(timerId); clearHint(); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); renderMenu(); showScreen('menu'); }
 
 /* ================= FINISH ================= */
 // Sweet finish: every move left turns into bonus points.
 async function winGame(){
   if(!G || G.over) return;
-  G.over = true; clearHint();
+  G.over = true; clearHint(); famWin();   // 🧑‍🤝‍🧑 24r
   const g = G, left = g.moves; g.leftAtWin = left;
   if(left > 0){ showBanner('🍬 Sweet finish! ' + left + ' moves left', 'gold'); for(let k = 0; k < left && G === g; k++){ g.moves--; addScore(100 * (g.lvl + 1), null); hud(); UISound.play('tap'); await sleep(70); } }
   finishGame('goal', left);
@@ -999,7 +1141,7 @@ function finishGame(why, left){
     const tip = !cleared ? 'Still to do: ' + todo.map(plain).join(' · ') + '. ' + pick(TIPS) : stars < 3 ? '⭐⭐⭐ = finish with lots of moves left. ' + pick(TIPS) : '';
     GF.result({wrap: $('result'), card: $('result-card'), win: cleared, icon: cleared ? (stars === 3 ? '🏆' : '🍬') : '😮', title: cleared ? (stars === 3 ? 'Super sweet!' : 'Level passed!') : 'Out of moves!',
       sub: tip + (g.score > 0 ? '' : (tip ? ' ' : '') + 'Not saved — make a match to get a score.'), stars: cleared ? stars : null, score: g.score,
-      stats: [['💫', g.matches + ' matches'], ['✨', g.specials + ' super']].concat(g.shape && g.shape.hard ? [[g.shape.icon, g.shape.name + ' ' + shapeStars(g.shape.hard) + ' ×' + SHAPE_MULT[g.shape.hard]]] : []).concat(g.powers ? [[T.power.ic, g.powers + ' power']] : [], g.stages > 1 ? [['🏁', 'stage ' + g.stage + '/2']] : [], [['🔗', 'best chain ' + g.bestCombo], ['⏱', fmt(secs * 1000)]], cleared && left ? [['🍬', left + ' moves left']] : [], L.hardcore ? [['💀', '×3']] : []),
+      stats: [['💫', g.matches + ' matches'], ['✨', g.specials + ' super']].concat(g.shape && g.shape.hard ? [[g.shape.icon, g.shape.name + ' ' + shapeStars(g.shape.hard) + ' ×' + SHAPE_MULT[g.shape.hard]]] : []).concat(T.hard ? [['🧑‍🤝‍🧑', T.name + ' ' + '★'.repeat(T.hard) + ' ×' + THEME_MULT[T.hard]]] : [], g.powers ? [[T.power.ic, g.powers + ' power']] : [], g.stages > 1 ? [['🏁', 'stage ' + g.stage + '/2']] : [], [['🔗', 'best chain ' + g.bestCombo], ['⏱', fmt(secs * 1000)]], cleared && left ? [['🍬', left + ' moves left']] : [], L.hardcore ? [['💀', '×3']] : []),
       save: g.score > 0 ? 'Saving your score…' : null, buddy: {name: S.player, av: myAvatar(S.player)}, confetti: false,
       levels: () => backToMenu(), levelsText: '🎚️ Levels', again: () => startGame(g.lvl), againText: '🔁 Play again',
       next: next ? () => { const p = progressOf(S.player); p.unlocked = Math.max(p.unlocked, g.lvl + 1); S.progress[S.player] = p; startGame(g.lvl + 1); } : null, nextText: g.lvl === 4 ? '💀 Try Hardcore ▶' : 'Next level ▶'});
@@ -1080,4 +1222,4 @@ boot();
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.chips', {rows: 3}); }</script>
 </body>
 </html>
-<!-- (r22+back-1+p1b+p2+cs-4a+b3w2+24n) END OF SweetSwap.html -->
+<!-- (r22+back-1+p1b+p2+cs-4a+b3w2+24n+24r) END OF SweetSwap.html -->
