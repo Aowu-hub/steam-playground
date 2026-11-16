@@ -376,6 +376,12 @@ var BO = (function () {
   /* 🕺 bo-5c tricks + keepy-ups: the game part happens on the trick press (people: the 0.14 s chord wait = the wind-up, robots: a short wind-up) → contact → follow-through */
   (function () { var T = {stepover: [80, 260, 120], elastico: [70, 240, 110], roulette: [80, 300, 120], rainbow: [70, 280, 140], nutmeg: [60, 220, 110], heel: [60, 200, 110], nolook: [60, 200, 110], rabona: [80, 280, 160], jfoot: [60, 160, 80], jknee: [60, 160, 80], jhead: [60, 180, 90]};
     Object.keys(T).forEach(function (k) { var v = T[k]; ACT_BEATS[k] = [{n: 'ready', ms: 0}, {n: 'anticipation', ms: 100}, {n: 'contact', ms: v[0], go: 1, kick: 1}, {n: 'follow', ms: v[1]}, {n: 'settle', ms: v[2]}]; }); })();
+  /* 🧤 bo-5d keeper · 🙌 throw-in · 🎯 run-up · 🦶 tackles · 🤕 falls · 🎉 celebrations — [ready, anticipation, contact, follow, settle] ms */
+  (function () { var T = {gkcatch: [0, 120, 80, 200, 150], gkscoop: [0, 120, 80, 200, 150], gkpunch: [0, 100, 70, 220, 150], gkthrow: [0, 250, 80, 250, 150], gkroll: [0, 200, 80, 250, 150], gkpunt: [0, 250, 90, 300, 160],
+      throwin: [0, 160, 80, 250, 150], runup: [0, 380, 60, 60, 40], tackle: [0, 0, 90, 220, 150], slidetk: [0, 60, 80, 360, 450], fall: [0, 120, 100, 280, 350], stumble: [0, 0, 80, 200, 120],
+      celknee: [0, 200, 120, 1300, 400], celplane: [0, 150, 100, 1600, 300], celfist: [0, 200, 100, 900, 300], celjump: [0, 160, 80, 1000, 300]};
+    Object.keys(T).forEach(function (k) { var v = T[k]; ACT_BEATS[k] = [{n: 'ready', ms: v[0]}, {n: 'anticipation', ms: v[1]}, {n: 'contact', ms: v[2], go: 1}, {n: 'follow', ms: v[3]}, {n: 'settle', ms: v[4]}]; }); })();
+  var CELEBS = ['celknee', 'celplane', 'celfist', 'celjump'];
   var KICK_MIN = {pass: 0.09, shot: 0.15};   // a tap shorter than this still shows its back-lift (contact ≤ 0.15 s after the release)
   var WIND = [0.2, 0.18, 0.16, 0.14, 0.11, 0.08];   // 🤖 robots: committed wind-up (s) per level before the contact
   // 🦘 jump height (m) per action (Aowu 00:48: "a header needs a higher jump, a spinning kick a higher jump + spin, a jump dodge over a slide…")
@@ -604,7 +610,7 @@ var BO = (function () {
         if (Math.abs(ux) > 0.01) room = Math.min(room, ((ux > 0 ? M.S.Lh : -M.S.Lh) - p.x) / ux); if (Math.abs(uy) > 0.01) room = Math.min(room, ((uy > 0 ? M.S.Wh : -M.S.Wh) - p.y) / uy);
         room = Math.max(4, room - 2); speed = Math.min(speed, Math.sqrt(2 * (M.S.fric || 3.6) * room)); } }   /* 🧤 a goal kick never flies out */
     var dx = tx - p.x, dy = ty - p.y, dm = hyp(dx, dy) || 1;
-    p.kickAs = o.trick ? (heel ? 'heel' : 'nolook') : loft ? 'loft' : 'pass';
+    p.kickAs = o.as || (o.trick ? (heel ? 'heel' : 'nolook') : loft ? 'loft' : 'pass');
     if (loft) { var dd = dm, tt = clamp(dd / 16, 0.6, 1.4); kickBall(M, p, dx / tt * 0.82, dy / tt * 0.82, GRAV * tt * 0.5, o.spin || 0); }
     else kickBall(M, p, dx / dm * speed, dy / dm * speed, 0, o.spin || 0);
     kickShow(M, p);
@@ -970,6 +976,10 @@ var BO = (function () {
     var air = p.z > 0.05 && p.act && ACT_BEATS[p.act] && ACT_BEATS[p.act][3].air;
     startAct(M, p, k, {antic: 0}); if (p.bi < 2) { p.bi = 2; p.bt = 0; } p.beat = 'contact'; if (air && !ACT_BEATS[k][3].air) p.actAir = 0;
   }
+  // 🧤 bo-5d: an action seen only from its contact moment (a catch, a tackle, a fall …) — contact → follow → settle
+  function showAct(M, p, key) {
+    if (!ACT_BEATS[key]) return; startAct(M, p, key, {antic: 0}); if (p.act === key && p.bi < 2) { p.bi = 2; p.bt = 0; p.beat = 'contact'; }
+  }
   // ⚽ wind-up → contact: the kick happens when the anticipation ends AND the player still has the ball (else a whiff)
   function kickAct(M, p, key, fire, sec) {
     startAct(M, p, key, {antic: Math.round((sec || 0) * 1000), fire: fire, kicking: true});
@@ -1007,6 +1017,7 @@ var BO = (function () {
   function standTackle(M, p) {
     if (p.cd > 0 || p.st !== 'ok') return;
     p.cd = 0.55; var b = M.ball, o = b.owner >= 0 ? M.players[b.owner] : null;
+    showAct(M, p, 'tackle');   /* 🦶 bo-5d: the lunge — the tackling foot blocks the ball */
     if (!o || o.side === p.side) { ev(M, 'tackle', {by: p.i, ok: false, miss: true}); return; }
     var d = hyp(o.x - p.x, o.y - p.y);
     if (d > 1.45) { ev(M, 'tackle', {by: p.i, from: o.i, ok: false, miss: true}); return; }
@@ -1015,20 +1026,21 @@ var BO = (function () {
     var chance = ctrlOf(M, p) ? M.L.steal : M.L.tackle;
     if (M.rnd() < chance) {
       if (behind && M.L.fouls && M.rnd() < 0.3) { foul(M, p, o, false); return; }
-      b.owner = p.i; b.last = p.i; b.lastSide = p.side; b.shot = null; b.offside = null; o.st = 'stumble'; o.stT = 0.3; M.stats[p.side].tackles++; p.g.tackles++;
+      b.owner = p.i; b.last = p.i; b.lastSide = p.side; b.shot = null; b.offside = null; o.st = 'stumble'; o.stT = 0.3; showAct(M, o, 'stumble'); M.stats[p.side].tackles++; p.g.tackles++;
       ev(M, 'tackle', {by: p.i, from: o.i, ok: true, side: p.side}); starAdd(M, ctrlOf(M, p), 0.08);
     } else { p.st = 'stumble'; p.stT = 0.4; ev(M, 'tackle', {by: p.i, from: o.i, ok: false}); }
   }
   function slide(M, p) {
     if (p.cd > 0 || p.st !== 'ok' || p.z > 0) return;
     p.st = 'slide'; p.stT = 0.5; p.cd = 1.4; var m = hyp(p.vx, p.vy); if (m > 0.5) { p.fx = p.vx / m; p.fy = p.vy / m; }
+    startAct(M, p, 'slidetk', {antic: 60});   /* 🛝 bo-5d: drop on one hip → slide → get up (the game state is the same as before) */
     p.vx = p.fx * 8.2; p.vy = p.fy * 8.2; ev(M, 'slide', {by: p.i, side: p.side});
   }
   function foul(M, by, on, hard) {
     M.stats[by.side].fouls++;
     ev(M, 'foul', {by: by.i, on: on.i, side: by.side});
     if (M.L.cards && (hard || M.rnd() < 0.35)) { by.cards++; M.stats[by.side].cards++; M.cards.push({i: by.i, t: M.t}); ev(M, 'card', {by: by.i, side: by.side, n: by.cards}); }
-    on.st = 'down'; on.stT = 0.7;
+    on.st = 'down'; on.stT = 0.7; startAct(M, on, 'fall', {antic: 100});   /* 🤕 stumble → hands → roll → get up (no injuries shown) */
     restart(M, 'free', on.side, on.x, on.y);
   }
 
@@ -1061,7 +1073,7 @@ var BO = (function () {
     M.ball.owner = p.i; M.phase = 'play'; M.rs = null; p.st = 'ok';
     var spin = c && rs.kind !== 'throw' && rs.kind !== 'kickoff' ? c.curve * 6.5 : 0, ax = to ? to.x - p.x : c ? c.ax : dirOf(p.side, M), ay = to ? to.y - p.y : c ? c.ay : 0;
     if (c) c.curve = 0;
-    if (rs.kind === 'kickoff' || what === 'pass' || rs.kind === 'throw') pass(M, p, {power: rs.kind === 'throw' ? Math.min(Math.max(power, high ? 0.5 : 0), high ? 0.7 : 0.55) : power, ax: ax, ay: ay, aimHelp: 3, human: !!c, spin: spin, loft: !!high, to: to, safe: rs.kind === 'goalkick'});
+    if (rs.kind === 'kickoff' || what === 'pass' || rs.kind === 'throw') pass(M, p, {power: rs.kind === 'throw' ? Math.min(Math.max(power, high ? 0.5 : 0), high ? 0.7 : 0.55) : power, ax: ax, ay: ay, aimHelp: 3, human: !!c, spin: spin, loft: !!high, to: to, safe: rs.kind === 'goalkick', as: rs.kind === 'throw' ? 'throwin' : null});
     if (high) flipPass(M, p, rs.kind);
     else if (what !== 'pass' && rs.kind !== 'kickoff' && rs.kind !== 'throw') shoot(M, p, {power: power, ax: ax, ay: ay, aimHelp: M.L.aim, human: !!c, spin: spin, fk: rs.kind === 'free'});
     if (rs.wall) { M.ball.fk = {wall: rs.wall.map(function (w) { return w.i; }), t: M.t}; if (M.level >= 2) rs.wall.forEach(function (w) { var q = M.players[w.i]; if (q && q.z <= 0) { q.vz = 3.4; q.immune = 0.5; } }); }
@@ -1089,7 +1101,19 @@ var BO = (function () {
     takeRestart(M, k, null, 'pass', clamp(hyp(p.x - k.x, p.y - k.y) / 30, 0.3, 0.7), p);
     return true;
   }
+  // 🎯 bo-5d run-up: the taker steps back at an angle, then runs in over `sec` (the kick still happens at the same moment as before)
+  function runUp(M, p, bx, by, sec) {
+    var d = dirOf(p.side, M), sy = by > 0.5 ? 1 : by < -0.5 ? -1 : (p.i % 2 ? 1 : -1), back = 1.7;
+    p.ru = {x0: bx - d * back, y0: by + sy * back * 0.6, x1: bx - d * 0.3, y1: by, t0: M.t, sec: sec};
+    p.x = p.ru.x0; p.y = p.ru.y0; p.vx = p.vy = 0; startAct(M, p, 'runup', {antic: Math.round(sec * 1000 - 60)});
+  }
+  function stepRun(M, p) {
+    var R = p.ru, u = clamp((M.t - R.t0) / R.sec, 0, 1), x = R.x0 + (R.x1 - R.x0) * u, y = R.y0 + (R.y1 - R.y0) * u, m = hyp(R.x1 - R.x0, R.y1 - R.y0) || 1;
+    p.x = x; p.y = y; p.fx = (R.x1 - R.x0) / m; p.fy = (R.y1 - R.y0) / m; p.vx = p.fx * m / R.sec * 0.5; p.vy = p.fy * m / R.sec * 0.5; p.run = (p.run || 0) + 0.25;
+    if (u >= 1) p.ru = null;
+  }
   function robotRestart(M, p) {
+    p.ru = null;
     var d = dirOf(p.side, M), rs = M.rs;
     if (rs.kind === 'free' && hyp(d * M.S.Lh - p.x, p.y) < 22 && M.rnd() < 0.55) { var wl = rs.wall; takeRestart(M, p, null, 'shot', 0.6 + M.rnd() * 0.3); if (wl && M.ball.shot) { M.ball.fk = {wall: wl.map(function (w) { return w.i; }), t: M.t}; M.ball.shot.fk = true; } return; }
     if (rs.kind === 'corner') { M.ball.owner = p.i; M.phase = 'play'; M.rs = null; var tg = bestPass(M, p, d, -Math.sign(p.y) || 1, 1.6); pass(M, p, {power: 0.85, ax: tg ? tg.x - p.x : d, ay: tg ? tg.y - p.y : -p.y, aimHelp: 3, acc: M.L.passAcc}); return; }
@@ -1098,7 +1122,7 @@ var BO = (function () {
     if (M.S.n === 1) { p.aiT = 0.3; return; }   // 🏙️ 1v1: no one to pass to — just dribble off
     var dirx = rs.kind === 'kickoff' ? -d * 0.4 : d, tgt = bestPass(M, p, dirx, rs.kind === 'kickoff' ? (M.rnd() < 0.5 ? 1 : -1) : 0, 1.6);
     if (rs.kind === 'goalkick') { var gt = tgt || bestPass(M, p, d, 0, 2.6); pass(M, p, {power: 0.6, ax: gt ? gt.x - p.x : d, ay: gt ? gt.y - p.y : 0, aimHelp: 3, acc: Math.max(0.85, M.L.passAcc || 0), to: gt, safe: true}); return; }   /* a rolling ball that stops inside the lines */
-    pass(M, p, {power: 0.3, ax: tgt ? tgt.x - p.x : dirx, ay: tgt ? tgt.y - p.y : 0, aimHelp: 3, acc: M.L.passAcc});
+    pass(M, p, {power: 0.3, ax: tgt ? tgt.x - p.x : dirx, ay: tgt ? tgt.y - p.y : 0, aimHelp: 3, acc: M.L.passAcc, as: rs.kind === 'throw' ? 'throwin' : null});
   }
 
   // ---------- 🧤 keeper: dives for shots; a shout from your team tells the robot which way ----------
@@ -1127,6 +1151,7 @@ var BO = (function () {
     var lead = tc * 1000 - 40 - (guess ? 160 : 120), ant = clamp(lead, 0, 150);
     if (guess) startAct(M, k, 'gkdive', {antic: ant});
     else if (zc > 1.45 && k.z <= 0.02) startAct(M, k, 'gkhigh', {antic: ant});
+    else if (k.z <= 0.02) startAct(M, k, zc < 0.45 ? 'gkscoop' : 'gkcatch', {antic: clamp(tc * 1000 - 40 - 120, 0, 150)});   /* 🧤 bo-5d: a straight shot — scoop it up (low) or hands to the chest */
     ev(M, 'dive', {by: k.i, side: ds, dir: guess, shout: sh.shout, right: right});
   }
   function shotAtLine(M) {
@@ -1140,7 +1165,8 @@ var BO = (function () {
     M.stats[ds].saves++; k.g.saves++;
     var sv = ev(M, 'save', {by: k.i, side: ds, shot: sh.by, shout: sh.shout, right: sh.right, kind: sp < 17 && Math.abs(b.z - 1) < 0.9 ? 'catch' : 'parry'});
     if (sh.shout && sh.right) { M.ctrls.forEach(function (c) { if (c.side === ds) { var me = M.players[c.pi]; if (me) me.g.shoutSaves++; } }); sv.shoutSave = true; }
-    if (sv.kind === 'catch') { b.owner = k.i; b.vx = b.vy = b.vz = 0; b.z = 0.6; b.last = k.i; b.lastSide = ds; b.shot = null; k.holdT = 0.9 + M.rnd() * 0.4; b.held = 1; }
+    if (sv.kind === 'catch') { b.owner = k.i; b.vx = b.vy = b.vz = 0; b.z = 0.6; b.last = k.i; b.lastSide = ds; b.shot = null; k.holdT = 0.9 + M.rnd() * 0.4; b.held = 1; if (!k.act) showAct(M, k, 'gkcatch'); }
+    else if (!sh.guess && b.z > 1.2 && k.act !== 'gkhigh') showAct(M, k, 'gkpunch');   /* 🧤 a hard high one straight at him: punched away */
     else { b.vx = -b.vx * 0.32; b.vy = (b.vy * 0.3) + (sh.guess || (M.rnd() < 0.5 ? -1 : 1)) * (4 + M.rnd() * 3); b.vz = 2.2 + M.rnd() * 2; b.last = k.i; b.lastSide = ds; b.shot = null; b.lock = k.i; b.lockT = 0.3; }
     return true;
   }
@@ -1242,7 +1268,7 @@ var BO = (function () {
     var assist = !own && b.passer >= 0 && b.passer !== b.last && M.players[b.passer].side === side && M.t - b.passT < 7 ? b.passer : -1;
     if (M.drill) { drillGoal(M, side); return; }
     M.score[side]++;
-    if (by && !own) { by.g.goals++; by.celebrate = 2.4; starAdd(M, ctrlOf(M, by), 0.2); }
+    if (by && !own) { by.g.goals++; by.celebrate = 2.4; starAdd(M, ctrlOf(M, by), 0.2); startAct(M, by, CELEBS[Math.floor(M.rnd() * CELEBS.length)]); }   /* 🎉 bo-5d: knee slide · airplane · fist pump · jump — with its run-in first */
     if (assist >= 0) M.players[assist].g.assists++;
     var kind = b.shot ? b.shot.kind : 'shot';
     b.vx *= 0.15; b.vy *= 0.15; b.vz = 0; b.shot = null;
@@ -1293,7 +1319,7 @@ var BO = (function () {
         if (o && o.side !== p.side) {
           var bd = hyp(b.x - p.x - p.fx * 0.5, b.y - p.y - p.fy * 0.5), od = hyp(o.x - p.x, o.y - p.y);
           if (o.immune > 0 && od < 1.9) { /* jumped over it (the ball hops with you) */ }
-          else if (bd < 0.75) { b.owner = -1; b.vx = p.fx * 7 + p.vx * 0.3; b.vy = p.fy * 7 + p.vy * 0.3; b.last = p.i; b.lastSide = p.side; b.lock = o.i; b.lockT = 0.5; o.st = 'stumble'; o.stT = 0.35; M.stats[p.side].tackles++; p.g.tackles++; ev(M, 'tackle', {by: p.i, from: o.i, ok: true, slide: true, side: p.side}); }
+          else if (bd < 0.75) { b.owner = -1; b.vx = p.fx * 7 + p.vx * 0.3; b.vy = p.fy * 7 + p.vy * 0.3; b.last = p.i; b.lastSide = p.side; b.lock = o.i; b.lockT = 0.5; o.st = 'stumble'; o.stT = 0.35; if (!o.act) showAct(M, o, 'stumble'); M.stats[p.side].tackles++; p.g.tackles++; ev(M, 'tackle', {by: p.i, from: o.i, ok: true, slide: true, side: p.side}); }
           else if (od < 0.85 && M.L.fouls) { p.st = 'down'; p.stT = 0.9; foul(M, p, o, ((p.x - o.x) * o.fx + (p.y - o.y) * o.fy) < -0.3); return; }
         } else if (b.owner < 0 && hyp(b.x - p.x, b.y - p.y) < 0.85 && b.z < 0.5) { b.vx = p.fx * 6; b.vy = p.fy * 6; b.last = p.i; b.lastSide = p.side; b.shot = null; }
         if (p.stT <= 0) { p.st = 'down'; p.stT = 0.55; }
@@ -1386,10 +1412,10 @@ var BO = (function () {
     p.sprint = false;
   }
   function standTackleBot(M, p, o) {
-    var b = M.ball;
+    var b = M.ball; if (!p.act) showAct(M, p, 'tackle');   /* 🦶 bo-5d lunge */
     if (o.immune > 0) { p.st = 'stumble'; p.stT = 0.4; ev(M, 'tackle', {by: p.i, from: o.i, ok: false, dodged: true}); return; }
     var oc = ctrlOf(M, o), chance = oc ? M.L.tackle : 0.45;
-    if (M.rnd() < chance) { b.owner = p.i; b.last = p.i; b.lastSide = p.side; b.offside = null; o.st = 'stumble'; o.stT = 0.3; M.stats[p.side].tackles++; p.g.tackles++; ev(M, 'tackle', {by: p.i, from: o.i, ok: true, side: p.side}); }
+    if (M.rnd() < chance) { b.owner = p.i; b.last = p.i; b.lastSide = p.side; b.offside = null; o.st = 'stumble'; o.stT = 0.3; if (!o.act) showAct(M, o, 'stumble'); M.stats[p.side].tackles++; p.g.tackles++; ev(M, 'tackle', {by: p.i, from: o.i, ok: true, side: p.side}); }
     else { p.st = 'stumble'; p.stT = 0.35; ev(M, 'tackle', {by: p.i, from: o.i, ok: false}); }
   }
   function offsideLine(M, side) { var d = dirOf(side, M), xs = M.players.filter(function (o) { return o.side !== side; }).map(function (o) { return o.x * d; }).sort(function (a, b) { return b - a; }); return Math.max(0, xs[1] == null ? M.S.Lh : xs[1]); }
@@ -1439,17 +1465,20 @@ var BO = (function () {
     if (b.owner === p.i) {
       p.holdT -= dt;
       var hx = gx + d * 2.2; moveTo(M, p, hx, clamp(p.y, -S.goalW, S.goalW), dt, 0.5);
-      if (p.holdT <= 0 && M.phase === 'play') {
-        b.held = 0; var tg = bestPass(M, p, d, 0, 1.4);
+      var gkw = b.held && !M.fast && !M.drill ? 0.25 : 0;   /* 🧤 bo-5d: the wind-up starts early, so the ball still leaves when it did before (balance unchanged) */
+      if (p.holdT <= gkw && M.phase === 'play' && !winding(p)) {
+        var tg = bestPass(M, p, d, 0, 1.4);
         var rush = M.players.some(function (o) { return o.side !== p.side && hyp(o.x - p.x, o.y - p.y) < 5; });
-        pass(M, p, {power: rush ? 0.95 : 0.5, ax: tg ? tg.x - p.x : d, ay: tg ? tg.y - p.y : 0, aimHelp: 3, acc: 0.85});
+        var how = !b.held ? null : rush ? 'gkpunt' : tg && hyp(tg.x - p.x, tg.y - p.y) > 14 ? 'gkthrow' : 'gkroll';   /* 🧤 bo-5d: punt it away when rushed · overarm throw far · bowl it short */
+        var go = function () { b.held = 0; var t2 = bestPass(M, p, d, 0, 1.4) || tg; pass(M, p, {power: rush ? 0.95 : 0.5, ax: t2 ? t2.x - p.x : d, ay: t2 ? t2.y - p.y : 0, aimHelp: 3, acc: 0.85, as: how}); };
+        if (how && gkw) kickAct(M, p, how, go, Math.max(0.12, p.holdT + (how === 'gkroll' ? -0.05 : 0))); else go();
       }
       return;
     }
     if (p.st !== 'ok') return;
     var bx = b.x, by = b.y, inBox = (bx - gx) * d < S.boxL + 1 && Math.abs(by) < S.boxW + 1, loose = b.owner < 0 && !b.shot;
     var close = hyp(bx - p.x, by - p.y);
-    if (inBox && loose && b.lastSide !== p.side && hyp(b.vx, b.vy) < 12 && closestToBall(M, p.side, false) === p) { moveTo(M, p, bx, by, dt); if (close < 1.0 && b.z < 2.1) { b.owner = p.i; b.held = 1; b.vx = b.vy = b.vz = 0; b.last = p.i; b.lastSide = p.side; b.shot = null; b.offside = null; p.holdT = 0.9; ev(M, 'claim', {by: p.i, side: p.side}); } return; }
+    if (inBox && loose && b.lastSide !== p.side && hyp(b.vx, b.vy) < 12 && closestToBall(M, p.side, false) === p) { moveTo(M, p, bx, by, dt); if (close < 1.0 && b.z < 2.1) { var lowc = b.z < 0.45; b.owner = p.i; b.held = 1; b.vx = b.vy = b.vz = 0; b.last = p.i; b.lastSide = p.side; b.shot = null; b.offside = null; p.holdT = 0.9; ev(M, 'claim', {by: p.i, side: p.side}); showAct(M, p, lowc ? 'gkscoop' : 'gkcatch'); } return; }
     var far = hyp(bx - gx, by), out = clamp((26 - far) / 26, 0, 1) * 2.2 + 0.7;
     var ty = clamp(by * (0.25 + 0.25 * (1 - far / 40)), -S.goalW * 0.8, S.goalW * 0.8);
     moveTo(M, p, gx + d * out, ty, dt, 0.9);
@@ -1477,8 +1506,8 @@ var BO = (function () {
     if (!p.gk && b.z > 1.1) { header(M, p); return; }
     // offside: the player the pass was for touches it
     if (b.offside && b.offside.i === p.i && b.lastSide === p.side) { M.stats[p.side].offsides++; ev(M, 'offside', {by: p.i, side: p.side}); var o = b.offside; restart(M, 'free', 1 - o.side, o.x, o.y); return; }
-    if (b.shot && p.gk && b.shot.side !== p.side) { b.held = 1; p.holdT = 0.9; M.stats[p.side].saves++; ev(M, 'save', {by: p.i, side: p.side, kind: 'catch', shot: b.shot.by}); }
-    else if (p.gk && b.lastSide !== p.side && b.owner < 0) { b.held = 1; p.holdT = 0.9; ev(M, 'claim', {by: p.i, side: p.side}); }
+    if (b.shot && p.gk && b.shot.side !== p.side) { b.held = 1; p.holdT = 0.9; M.stats[p.side].saves++; ev(M, 'save', {by: p.i, side: p.side, kind: 'catch', shot: b.shot.by}); if (!p.act) showAct(M, p, b.z < 0.45 ? 'gkscoop' : 'gkcatch'); }
+    else if (p.gk && b.lastSide !== p.side && b.owner < 0) { b.held = 1; p.holdT = 0.9; ev(M, 'claim', {by: p.i, side: p.side}); if (!p.act) showAct(M, p, b.z < 0.45 ? 'gkscoop' : 'gkcatch'); }
     else if (p.gk && b.lastSide === p.side) { b.held = 0; }
     if (M.nut) {   // 🥜 the nutmeg: the same player gets the ball back past the defender
       var nu = M.nut; M.nut = null;
@@ -1527,12 +1556,14 @@ var BO = (function () {
     b.owner = -1; b.x = d * (S.Lh - S.spot); b.y = 0; b.z = 0; b.vx = b.vy = b.vz = 0; b.shot = null; b.spin = 0;
     kicker.x = b.x - d * 1.6; kicker.y = 0.3; kicker.fx = d; kicker.fy = 0;
     k.x = d * (S.Lh - 0.2); k.y = 0; k.fx = -d; k.fy = 0;
-    P.kicker = kicker.i; P.keeper = k.i; P.step = 'set'; P.t = 0; P.aim = null; P.dive = null; P.mk = 0; P.mkPh = M.rnd() * 6;
+    P.kicker = kicker.i; P.keeper = k.i; P.step = 'set'; P.t = 0; P.ran = 0; P.runAt = null; kicker.ru = null; P.aim = null; P.dive = null; P.mk = 0; P.mkPh = M.rnd() * 6;
   }
   function pensKey(M, c, k, down) {
     var P = M.pens; if (!P || !down) return;
-    if (c.side === P.turn && (k === 'K' || k === 'J') && P.step === 'set' && P.t > 0.5) { P.aim = P.mk; P.human = true; pensKick(M); }   // 🎯 the kick goes where the moving target is
+    if (c.side === P.turn && (k === 'K' || k === 'J') && P.step === 'set' && P.t > 0.5 && P.runAt == null) { P.aim = P.mk; P.human = true; if (M.fast) pensKick(M); else pensRun(M, 0.4); }   // 🎯 the kick goes where the moving target WAS when you pressed — then the run-up (bo-5d)
   }
+  function pensRun(M, sec) { var P = M.pens, kk = M.players[P.kicker], b = M.ball; P.runAt = P.t + sec; if (!kk) return; var d = dirOf(P.turn, M);
+    kk.ru = {x0: b.x - d * 1.6, y0: 0.3 + 0.5, x1: b.x - d * 0.4, y1: 0, t0: M.t, sec: sec}; kk.x = kk.ru.x0; kk.y = kk.ru.y0; startAct(M, kk, 'runup', {antic: Math.round(sec * 1000 - 60)}); }
   function pensDive(M, side, ys) { var P = M.pens; if (!P || side === P.turn || P.step !== 'set') return; P.dive = ys; }
   function pensKick(M) {
     var P = M.pens, S = M.S, side = P.turn, d = dirOf(side, M), b = M.ball, kicker = M.players[P.kicker], k = M.players[P.keeper];
@@ -1555,8 +1586,11 @@ var BO = (function () {
     if (P.step === 'set') {
       var kickHuman = sideHuman(M, P.turn);
       if (kickHuman) P.mk = Math.sin(P.t * PEN_SPD[M.level] + P.mkPh);   // 🎯 the target slides across the goal
+      var kk = M.players[P.kicker];
+      if (P.runAt != null) { if (kk && kk.ru) stepRun(M, kk); if (P.t >= P.runAt) { P.runAt = null; if (kk) kk.ru = null; pensKick(M); } return; }   /* 🎯 bo-5d: the run-up, then the kick */
+      if (!kickHuman && !M.fast && kk && P.t > 2.2 - 0.45 && !P.ran) { P.ran = 1; pensRun(M, 0.45); return; }
       if (!kickHuman && P.t > (M.fast ? 0.2 : 2.2)) pensKick(M);
-      else if (kickHuman && P.t > (M.fast ? 0.4 : 6)) { P.aim = P.mk; P.human = true; pensKick(M); }
+      else if (kickHuman && P.t > (M.fast ? 0.4 : 6)) { P.aim = P.mk; P.human = true; if (M.fast) pensKick(M); else pensRun(M, 0.4); }
       return;
     }
     if (P.step === 'flight') {
@@ -1621,7 +1655,10 @@ var BO = (function () {
     } else if (M.phase === 'restart') {
       var rs = M.rs, tp = rs ? M.players[rs.taker] : null;
       if (tp && hyp(tp.x - rs.x, tp.y - rs.y) < 1.2 && M.phaseT > 0.3) { M.ball.x = rs.x; M.ball.y = rs.y; M.ball.owner = -1; }
-      if (tp && !ctrlOf(M, tp) && M.phaseT > (M.fast ? 0.25 : rs.ask ? rs.wait : 1.6 + M.L.react)) { tp.x = rs.x - dirOf(tp.side, M) * 0.3; tp.y = rs.y; robotRestart(M, tp); }
+      var rthr = M.fast ? 0.25 : rs.ask ? rs.wait : 1.6 + M.L.react;
+      if (tp && !ctrlOf(M, tp) && !M.fast && !M.drill && (rs.kind === 'corner' || rs.kind === 'free') && M.phaseT > rthr - 0.44 && tp.act !== 'runup' && !rs.ran) { rs.ran = 1; runUp(M, tp, rs.x, rs.y, 0.44); }   /* 🎯 bo-5d: 3–5 steps in at an angle, then the kick */
+      if (tp && tp.act === 'runup' && tp.ru) stepRun(M, tp);
+      if (tp && !ctrlOf(M, tp) && M.phaseT > rthr) { tp.x = rs.x - dirOf(tp.side, M) * 0.3; tp.y = rs.y; robotRestart(M, tp); }
       else if (tp && ctrlOf(M, tp) && M.fast && M.phaseT > 0.3) {   /* a person's set piece waits for J / K (Aowu 2026-11-14) — only the test-speed mode takes it by itself */
         tp.x = rs.x - dirOf(tp.side, M) * 0.3; tp.y = rs.y; takeRestart(M, tp, ctrlOf(M, tp), 'pass', 0.4); }
     }
@@ -1669,8 +1706,8 @@ var BO = (function () {
   }
   return {DT: DT, SIZES: SIZES, LEVELS: LEVELS, TRICKS: TRICKS, newMatch: newMatch, step: step, input: input, key: key, shout: shout, takeEvents: takeEvents, simulate: simulate,
     hint: hint, bestPass: bestPass, keeperOf: keeperOf, dirOf: dirOf, restart: restart, kickoffSetup: kickoffSetup, startPens: startPens, homeOf: homeOf, addCtrl: addCtrl, setCtrl: setCtrl,
-    throwTo: throwTo, MO_WIN: MO_WIN, DRILLS: DRILLS, battleStart: battleStart, BTRICK: BTRICK, B_BODY: B_BODY, B_BALL: B_BALL, B_CHORD: B_CHORD, chordKey: chordKey, BPM: BPM, B_PERF: B_PERF, B_GOOD: B_GOOD, CONE_STARS: CONE_STARS, drill: drill, TWISTS: TWISTS, PARTY: PARTY, inMud: inMud, inZone: inZone, ACT_BEATS: ACT_BEATS, JUMPS: JUMPS, WIND: WIND, KICK_MIN: KICK_MIN,
-    _: {kickAct: kickAct, winding: winding, kickShow: kickShow, startAct: startAct, actTick: actTick, jumpNow: jumpNow, jumpV: jumpV, airTime: airTime, threatened: threatened, askBall: askBall, kickBall: kickBall, pass: pass, shoot: shoot, trick: trick, nutmeg: nutmeg, nutTarget: nutTarget, momentOf: momentOf, moments: moments, starAdd: starAdd, lift: lift, standTackle: standTackle, slide: slide, isOffside: isOffside, foul: foul, endMatch: endMatch}};
+    throwTo: throwTo, CELEBS: CELEBS, MO_WIN: MO_WIN, DRILLS: DRILLS, battleStart: battleStart, BTRICK: BTRICK, B_BODY: B_BODY, B_BALL: B_BALL, B_CHORD: B_CHORD, chordKey: chordKey, BPM: BPM, B_PERF: B_PERF, B_GOOD: B_GOOD, CONE_STARS: CONE_STARS, drill: drill, TWISTS: TWISTS, PARTY: PARTY, inMud: inMud, inZone: inZone, ACT_BEATS: ACT_BEATS, JUMPS: JUMPS, WIND: WIND, KICK_MIN: KICK_MIN,
+    _: {goal: goal, foul: foul, showAct: showAct, runUp: runUp, pensRun: pensRun, kickAct: kickAct, winding: winding, kickShow: kickShow, startAct: startAct, actTick: actTick, jumpNow: jumpNow, jumpV: jumpV, airTime: airTime, threatened: threatened, askBall: askBall, kickBall: kickBall, pass: pass, shoot: shoot, trick: trick, nutmeg: nutmeg, nutTarget: nutTarget, momentOf: momentOf, moments: moments, starAdd: starAdd, lift: lift, standTackle: standTackle, slide: slide, isOffside: isOffside, foul: foul, endMatch: endMatch}};
 })();
 // ENGINE END
 /* 🏷️ BlasLogo (bo-6, Aowu 2026-11-15 12:33 OK): the BlasOff logo + mode badges drawn in code — plan claude/blasoff-logo-plan.md */
@@ -2418,7 +2455,7 @@ function drawLookPreview(c, k){
 const SPR_W = 150, SPR_H = 160, SPR_FX = 75, SPR_FY = 140;
 /* 🎬 bo-5a real actions: the engine's beat (p.act · p.bi · p.bq) → the pose of 🎭 BLOCK blasoff (AvatarActing) at that moment.
    One timeline per act (the engine is the clock, the timeline only gives the pose); pictures cached per (player, act, beat, ¼ step), ≤ 600, oldest out. */
-const ACT_RUN = {}, SPR_LRU = [], SPR_CAP = 600, GK_POSE = {gkr0: 'bo.gk-ready', gkr1: 'bo.gk-shuffle', prep: 'bo.trap-open', shield: 'bo.shield', touch: 'bo.dribble-touch', hsnap: 'bo.head-snap', tload: 'bo.trick-load'};   /* still poses (bo-5a/b) */
+const ACT_RUN = {}, SPR_LRU = [], SPR_CAP = 600, GK_POSE = {gkr0: 'bo.gk-ready', gkr1: 'bo.gk-shuffle', prep: 'bo.trap-open', shield: 'bo.shield', touch: 'bo.dribble-touch', hsnap: 'bo.head-snap', tload: 'bo.trick-load', gkhold: 'bo.gk-hold', tihold: 'bo.ti-hold'};   /* still poses (bo-5a/b) */
 function actRun(key){
   if(ACT_RUN[key] !== undefined) return ACT_RUN[key]; let r = null;
   try{ if(window.Acting && Acting.act && Acting.act('blasoff.' + key)) r = Acting.play({name: ''}, 'blasoff.' + key, {t0: 0}); }catch(e){ r = null; }
@@ -2431,7 +2468,7 @@ function actFrame(p, o){   // → {key, f} or null (no Acting / unknown act) · 
   return {key, f: R.at((R.start[i] + R.D[i].ms * q) / 1000)};
 }
 const FAR_PX = 34;   // a player drawn shorter than this uses the short picture set (stand · run · kick · air · lie)
-function farKey(p){ const air = p.z > 0.05; if(p.act === 'gkdive') return p.bi >= 2 && p.bi <= 3 ? 'lie' : 'stand'; return air ? 'air' : p.gk && p.act ? 'gkr0' : 'stand'; }
+function farKey(p){ if(p.st === 'slide' || p.st === 'down') return 'lie'; const air = p.z > 0.05; if(p.act === 'gkdive') return p.bi >= 2 && p.bi <= 3 ? 'lie' : 'stand'; return air ? 'air' : p.gk && p.act ? 'gkr0' : 'stand'; }
 function sprite(i, key, fr){
   const box = G.spr[i]; if(box[key]) return box[key];
   const Q = G.sq, c = document.createElement('canvas'); c.width = Math.round(SPR_W * Q); c.height = Math.round(SPR_H * Q); const g = c.getContext('2d'); g.scale(Q, Q);
@@ -2455,6 +2492,8 @@ function holdBeat(p){   // ⚽ bo-5b: holding J / K with the ball = the anticipa
 function playerKey(p){
   if(p.st === 'slide' || (p.st === 'down' && !p.act) || p.st === 'dive') return 'lie';
   const M = G.M, b = M.ball, sp = Math.hypot(p.vx, p.vy);
+  if(p.gk && b.owner === p.i && b.held) return 'gkhold';   /* 🧤 bo-5d: the ball held at the chest */
+  if(M.phase === 'restart' && M.rs && M.rs.kind === 'throw' && M.rs.taker === p.i && Math.hypot(p.x - M.rs.x, p.y - M.rs.y) < 1.4) return 'tihold';   /* 🙌 the ball behind the head, both hands */
   if(p.z > 0.05 && M.t - (p.hitT || -9) < 0.16) return 'hsnap';   /* 🗣️ the head snaps forward at the touch */
   if(!p.gk && p.st === 'ok' && p.z <= 0.05){
     if(b.owner < 0 && b.passTo === p.i){ const d = Math.hypot(b.x - p.x, b.y - p.y), bv = Math.hypot(b.vx, b.vy); if(bv > 1 && d / bv < 0.45) return 'prep'; }   /* 🫳 open up for the first touch */
@@ -2478,7 +2517,7 @@ function drawPlayer(g, p, t){
   const ring = gEll(V, p.x, py, 0.55), c = p.ctrl >= 0 ? G.M.ctrls[p.ctrl] : null;
   if(ring){ g.lineWidth = Math.max(1.5, s * (c ? 0.09 : 0.05)); g.strokeStyle = c ? SEAT_COL[c.seat % 2] : TEAM_COL[p.side]; g.globalAlpha = c ? 0.95 : 0.7; g.beginPath(); g.ellipse(ring[0], ring[1], ring[2], ring[3], 0, 0, 7); g.stroke(); g.globalAlpha = 1; }
   const far = s * 1.75 < FAR_PX, HB = !far && !p.act ? holdBeat(p) : null, A = HB ? actFrame(p, HB) : p.act && !far ? actFrame(p) : null;
-  const key = A ? A.key : p.act && far ? farKey(p) : playerKey(p), img = sprite(p.i, key, A && A.f), lift = (p.z + (p.celebrate > 0 ? Math.abs(Math.sin(t * 9)) * 0.35 : 0)) * s;
+  const key = A ? A.key : p.act && far ? farKey(p) : playerKey(p), img = sprite(p.i, key, A && A.f), lift = (p.z + (p.celebrate > 0 && !(p.act && p.act.slice(0, 3) === 'cel') ? Math.abs(Math.sin(t * 9)) * 0.35 : 0)) * s;
   const tilt = p.act === 'gkdive' ? (p.bi === 2 ? p.bq : p.bi === 3 ? 1 : p.bi === 4 ? 1 - p.bq : 0) : p.st === 'dive' ? 1 : 0;
   const dh = p.act === 'dheader' ? (p.bi === 2 ? p.bq : p.bi === 3 ? 1 : p.bi === 4 ? 1 - p.bq : 0) : 0;   /* 🗣️ diving header: the body goes flat, head first */
   g.save(); g.translate(f[0], f[1] - lift);
@@ -2495,8 +2534,16 @@ function drawPlayer(g, p, t){
     if(G.M.L.stamina && p.stamina < 0.98){ g.fillStyle = 'rgba(0,0,0,0.5)'; g.fillRect(f[0] - s * 0.5, f[1] + s * 0.32, s, s * 0.1); g.fillStyle = p.stamina < 0.25 ? '#FF5A1F' : '#7CF7A0'; g.fillRect(f[0] - s * 0.5, f[1] + s * 0.32, s * p.stamina, s * 0.1); }
   }
 }
+function ballLook(){   // 🙌 / 🧤 bo-5d: where the ball LOOKS to be (the game's ball is unchanged): over the thrower's head, dropping for a punt
+  const M = G.M, b = M.ball, rs = M.rs;
+  if(M.phase === 'restart' && rs && rs.kind === 'throw' && b.owner < 0){ const p = M.players[rs.taker]; if(p && Math.hypot(p.x - rs.x, p.y - rs.y) < 1.4) return Object.assign({}, b, {x: p.x + p.fx * 0.05, y: p.y + p.fy * 0.05, z: 2.05}); }
+  const p = b.last >= 0 ? M.players[b.last] : null;
+  if(p && p.act === 'throwin' && p.bi >= 2 && M.t - (b.passT || -9) < 0.4){ const u = (M.t - b.passT) / 0.4; return Object.assign({}, b, {z: b.z + 1.8 * (1 - u)}); }
+  if(b.owner >= 0){ const o = M.players[b.owner]; if(o && o.act === 'gkpunt' && o.bi === 1) return Object.assign({}, b, {z: Math.max(0.15, b.z - 0.7 * o.bq)}); }
+  return b;
+}
 function drawBall(g, t){
-  const b = G.M.ball, sh = gEll(V, b.x, b.y, 0.26); if(sh){ g.fillStyle = 'rgba(0,0,0,' + Math.max(0.08, 0.32 - b.z * 0.05).toFixed(3) + ')'; g.beginPath(); g.ellipse(sh[0], sh[1], sh[2] * Math.max(0.5, 1 - b.z * 0.08), sh[3] * Math.max(0.5, 1 - b.z * 0.08), 0, 0, 7); g.fill(); }
+  const b = ballLook(), sh = gEll(V, b.x, b.y, 0.26); if(sh){ g.fillStyle = 'rgba(0,0,0,' + Math.max(0.08, 0.32 - b.z * 0.05).toFixed(3) + ')'; g.beginPath(); g.ellipse(sh[0], sh[1], sh[2] * Math.max(0.5, 1 - b.z * 0.08), sh[3] * Math.max(0.5, 1 - b.z * 0.08), 0, 0, 7); g.fill(); }
   const c = V.P(b.x, b.y, b.z + 0.24); if(!c) return; const r = Math.max(3, V.sc(b.x, b.y, b.z) * 0.27);
   if(b.shot && Math.hypot(b.vx, b.vy) > 12){ const c2 = V.P(b.x - b.vx * 0.05, b.y - b.vy * 0.05, b.z + 0.24 - b.vz * 0.05); if(c2){ g.strokeStyle = 'rgba(255,210,63,0.55)'; g.lineWidth = r * 1.4; g.lineCap = 'round'; g.beginPath(); g.moveTo(c2[0], c2[1]); g.lineTo(c[0], c[1]); g.stroke(); } }
   if(G.party && window.BombSkins){ if(G.M.phase === 'goal' && G.M.phaseT < 2.6) return; const gl = g.createRadialGradient(c[0], c[1], r * 0.3, c[0], c[1], r * 2.4); gl.addColorStop(0, 'rgba(255,79,163,' + (0.5 + 0.2 * Math.sin(t * 9)).toFixed(2) + ')'); gl.addColorStop(1, 'rgba(255,79,163,0)'); g.fillStyle = gl; g.beginPath(); g.arc(c[0], c[1], r * 2.4, 0, 7); g.fill();
@@ -3138,4 +3185,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a+bo-5b+bo-pz+bo-5c) END OF BlasOff.html -->
+<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a+bo-5b+bo-pz+bo-5c+bo-5d) END OF BlasOff.html -->
