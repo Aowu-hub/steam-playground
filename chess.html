@@ -805,14 +805,18 @@ function startSetup(){
 }
 // 🎬 the cover: who's here (you + a friend on this device, or 📱 own devices → the 📡 lobby) + champions + how to play
 let ChessCover = null;
+/* 📡 lk-6a: the room on the 🎬 cover — 🎮 Host and play · 📺 Room hostess · 🔗 Join a friend; ▶ on the cover starts the linked game */
+const CHESS_ROOM = {game: 'Chess', title: '♟️ Chess', page: 'chess', kind: 'chess', seats: 2, min: 2, url: WEBAPP_URL + '?page=chess', name: () => S.player, av: () => myAvatar(S.player), drawAvatar: (cv, p) => lxAv(cv, p),
+  label: tv => '♟️ Chess · 2 players' + (tv ? ' · 📺 on the TV' : ''), bot: () => lxBotL().bot, onLink: () => { LX.viaCover = true; }, onStart: () => { LX.viaCover = true; lxHostGo(); }};
 const CHESS_VERSION = '2.1';   /* b2fix2: shown on the cover footer — bump with each Chess round */
 function openCover(){
   if(!window.GF){ showScreen('menu'); return; }
   if(ChessCover && ChessCover.who !== S.player){ ChessCover.destroy(); ChessCover = null; }
   if(!ChessCover){ ChessCover = GF.cover(document.body, {game: 'chess', title: 'Chess', icon: '♟️', version: CHESS_VERSION, me: S.player, players: S.players.concat([{Name: 'Guest'}]), avatarOf: myAvatar, seats: {min: 1, max: 2},
       help: CHESS_HELP, acts: ['beat.bow', 'beat.punch'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms',
-      own: () => { ChessCover.hide(); lxChoose(); },   // 📡 own devices = the LinkKit lobby, unchanged (the lineup feed = 📡 LinkKit chat later)
+      own: C => { if(!(window.Link && Link.cover)){ ChessCover.hide(); lxChoose(); return; } lxWire(); Link.cover(C, CHESS_ROOM); },   /* 📡 lk-6a: the room lives on the cover (LinkKit Link.cover) */
       onPlay: line => { ChessCover.hide(); if(line.length > 1){ CH.mode = 'duo'; CH.friend = line[1].name; } else CH.mode = 'bot'; renderSetup(); showScreen('menu'); } }); ChessCover.who = S.player; }
+  if(window.Link && Link.cover && Link.cover.active(ChessCover)){ Link.cover.show(ChessCover); return; }   /* 📡 lk-6a: the room is still open → back to its cover */
   if(ChessCover.mode === 'own') ChessCover.setMode('solo');
   ChessCover.show();
 }
@@ -1609,6 +1613,7 @@ function lxExit(){
   if(G && G.lx){ if(window.Cheer) Cheer.unmount(); clearTimeout(botTimer); clearInterval(tickHandle); closePromo(); hideResult(); G = null; }
   $('scr-play').classList.remove('lx-flip'); ['me', 'op'].forEach(k => $('pl-' + k).classList.remove('lx-you'));
   renderLevels(); showScreen('menu');
+  if(LX.viaCover){ LX.viaCover = false; openCover(); }   /* 📡 lk-6a: a cover room ends on the cover */
 }
 function lxLeavePlay(){
   if(G.over){ lxExit(); return; }
@@ -1706,11 +1711,18 @@ function lxApply(st){
   if(st.end && !G.over) endGame(st.end.winner, st.end.why);
 }
 function lxResultBtns(){
-  if(G.lx.role === 'host') return '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again · colours swap</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 End the room</button></div>';
-  if(G.lx.tv && Link.captain && Link.captain() === Link.seat()) return '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again · colours swap</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 Leave</button></div>';   // 📺 the first player may start the next game
-  return '<div class="note lk-wait">⏳ ' + UI.esc(G.lx.tv ? 'The TV or the first player' : ((LX.cfg && LX.cfg.host) || 'The host')) + ' can start the next game<span class="lk-dots"></span></div><div class="res-btns"><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 Leave</button></div>';
+  const room = LX.viaCover ? '<button class="btn soft sp-btn sp-secondary" id="b-room">◀ Room</button>' : '';   /* 📡 lk-6a */
+  if(G.lx.role === 'host') return '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again · colours swap</button>' + room + '<button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 End the room</button></div>';
+  if(G.lx.tv && Link.captain && Link.captain() === Link.seat()) return '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again · colours swap</button>' + room + '<button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 Leave</button></div>';   // 📺 the first player may start the next game
+  return '<div class="note lk-wait">⏳ ' + UI.esc(G.lx.tv ? 'The TV or the first player' : ((LX.cfg && LX.cfg.host) || 'The host')) + ' can start the next game<span class="lk-dots"></span></div><div class="res-btns">' + room + '<button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 Leave</button></div>';
 }
-function lxResultWire(){ const a = $('b-again'); if(a) a.onclick = () => { if(G && G.lx && G.lx.role !== 'host'){ UI.busy(a, 'chess', 'Asking the TV…'); Link.ask('again'); } else lxHostGo(); }; $('b-menu').onclick = () => lxExit(); }
+function lxResultWire(){ const a = $('b-again'); if(a) a.onclick = () => { if(G && G.lx && G.lx.role !== 'host'){ UI.busy(a, 'chess', 'Asking the TV…'); Link.ask('again'); } else lxHostGo(); }; $('b-menu').onclick = () => lxExit(); const r = $('b-room'); if(r) r.onclick = () => lxToCover(); }   /* 📡 lk-6a: ◀ Room */
+function lxToCover(){   /* 📡 lk-6a: leave the finished game, keep the room — back to the cover, its line and ▶ Start */
+  clearTimeout(LX.autoT); lxThink(0); LX.cfg = null; const o = document.querySelector('.lx-over'); if(o) o.remove();
+  if(G && G.lx){ if(window.Cheer) Cheer.unmount(); clearTimeout(botTimer); clearInterval(tickHandle); closePromo(); hideResult(); G = null; }
+  $('scr-play').classList.remove('lx-flip'); ['me', 'op'].forEach(k => $('pl-' + k).classList.remove('lx-you'));
+  renderLevels(); showScreen('menu'); openCover();
+}
 function lxEnded(msg){
   if(G){ G.over = true; clearTimeout(LX.autoT); lxThink(0); }
   hideResult(); closePromo(); const o0 = document.querySelector('.lx-over'); if(o0) o0.remove();   // the message sits on top, alone
@@ -1825,4 +1837,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (11w-1+11x-3+r32+back-1+modes-3+p1b+cs-3a+lk-3b+lk-3c+lk-5a+lk-5f+b2+b2fix+b2fix2+lk-5g+st-1+24u-b) END OF Chess.html -->
+<!-- (11w-1+11x-3+r32+back-1+modes-3+p1b+cs-3a+lk-3b+lk-3c+lk-5a+lk-5f+b2+b2fix+b2fix2+lk-5g+st-1+24u-b+lk-6a) END OF Chess.html -->
