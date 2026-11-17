@@ -203,6 +203,7 @@
   .stick.on .knob{transition:none;background:radial-gradient(circle at 35% 30%,#FFF6D6,#FFC845 60%,#FF6B1A);}
   .stick .tip{position:absolute;left:50%;top:-20px;transform:translateX(-50%);font-weight:900;font-size:0.62rem;color:#fff;background:rgba(15,21,48,0.6);border-radius:8px;padding:1px 6px;white-space:nowrap;opacity:.85;}
   .stick.on .tip{opacity:0;}
+  .ctl-row.hidden,.ctl-note.hidden{display:none;} .ctl-row{margin-top:8px;} .ctl-note{margin-top:4px;}   /* 🎮 pd-8a */
   .actpad{position:absolute;display:grid;grid-template-columns:var(--shot) var(--shot) var(--main);gap:var(--pgap);align-items:end;justify-items:center;pointer-events:none;}   /* 🕹️ pd-5c: main button bottom-right */
   .actpad .sbtn.a-drive{width:var(--main);height:var(--main);grid-column:3;grid-row:2;}
   .actpad .sbtn.a-drive .ic{font-size:calc(var(--main) * 0.38);} .actpad .sbtn.a-drive .nm{font-size:calc(var(--main) * 0.15);}
@@ -248,6 +249,16 @@
   .actpad.ring .sbtn.pz-main{width:var(--main);height:var(--main);}
   .actpad.ring .sbtn.pz-main .ic{font-size:calc(var(--main) * 0.38);} .actpad.ring .sbtn.pz-main .nm{font-size:calc(var(--main) * 0.15);}
   .actpad.ring .pz-util{display:contents;}
+  /* 🌸 pd-8a petals: UiKit draws the wedge (.pz-pf) — our round look stays on the main + the crescent only */
+  .actpad.pz-petals-pd .sbtn.pz-pet{width:auto;height:auto;} .actpad.pz-petals-pd .sbtn.pz-pet .ic{font-size:calc(var(--sz) * 0.36);} .actpad.pz-petals-pd .sbtn.pz-pet .nm{font-size:max(10px,calc(var(--sz) * 0.14));}
+  .actpad.pz-petals-pd .sbtn.pz-pet.glow{animation:none;} .actpad.pz-petals-pd .sbtn.pz-pet.glow .pz-pf{animation:pz-pglow .8s ease-in-out infinite;}
+  .actpad.pz-petals-pd .sbtn.pz-pet.flash::after,.actpad.pz-petals-pd .sbtn.pz-pet.down{transform:none;} .actpad.pz-petals-pd .sbtn.pz-pet.flash::after{display:none;}
+  .actpad.pz-petals-pd .sbtn.pz-pet small{left:calc(50% + var(--lx,0px) + 10px);top:calc(50% + var(--ly,0px) + 8px);right:auto;bottom:auto;}
+  .actpad.pz-petals-pd .sbtn.pz-pet .ic{display:block;line-height:1.18;}   /* 🔤 tx-1: icon above the label with a gap */
+  .actpad.pz-petals-pd .sbtn.pz-main .ic{display:block;line-height:1.18;}
+  .actpad.pz-petals-pd .sbtn.pz-main.glow{animation:none;transform:none;} .actpad.pz-petals-pd .sbtn.pz-main.glow::after{content:'';position:absolute;inset:-7px;border-radius:50%;border:4px solid #FFF;box-shadow:0 0 18px 4px var(--rim);animation:pd-ringglow .7s ease-in-out infinite;pointer-events:none;} @keyframes pd-ringglow{50%{opacity:.35;}}   /* the main never grows into the 2 mm petal gap */
+  .pads:has(.pz-petals-pd) .stick.solo{left:calc(var(--pad-edge,var(--pz-edge)) + env(safe-area-inset-left));}   /* the petal ring keeps STICK_MIN + one gap from the edge margin (no +3 px) */
+
   .actpad.ring .sbtn.a-pyra{border-radius:50%;display:block;box-shadow:none;transition:opacity .25s ease, transform .35s cubic-bezier(.3,1.6,.5,1);transform-origin:var(--tx) var(--ty);
     background:radial-gradient(circle at var(--tx) var(--ty),#FFF6C8 0 12%,#FFC93C 30%,#FF7A1A 62%,#E5304B 100%);
     -webkit-mask:radial-gradient(circle var(--hr) at var(--hx) var(--hy),transparent 98%,#000 100%);mask:radial-gradient(circle var(--hr) at var(--hx) var(--hy),transparent 98%,#000 100%);}
@@ -363,6 +374,7 @@
   <div class="setup">
     <div class="box"><h3>👥 Who plays?</h3>
       <div class="chips" id="who-row"></div>
+      <div class="chips ctl-row" id="ctl-row"></div><div class="note ctl-note" id="ctl-note"></div>
       <div id="team-box"></div>
     </div>
     <div class="box"><h3>🏟️ Arena</h3><div class="arenas" id="arena-list"></div><div class="pdk-row" id="look-row"></div></div>
@@ -587,7 +599,7 @@ var PD = (function () {
   function sgn(team) { return team === 0 ? -1 : 1; }
   function uOf(team, x) { return x * sgn(team); }
   function hyp(a, b) { return Math.sqrt(a * a + b * b); }
-  function ev(M, k, o) { var e = o || {}; e.k = k; e.t = Math.round(M.t * 1000) / 1000; M.events.push(e); if (M.log.length > 600) M.log.shift(); M.log.push(e); return e; }
+  function ev(M, k, o) { var e = o || {}; e.k = k; if (e.p != null && M.ctl && (M.ctl[0] || M.ctl[1]) && M.players[e.p] && M.players[e.p].human) e.h = M.players[e.p].human; e.t = Math.round(M.t * 1000) / 1000; M.events.push(e); if (M.log.length > 600) M.log.shift(); M.log.push(e); return e; }
   // 🪐 pd-4c theme arenas: the moon court is floaty (less gravity — every shot is still solved with the same g, so aims stay right)
   var ARENA_GRAV = { moon: 0.7 };
   function ballG(M) { return 9.8 * M.lv.spd * M.lv.spd * 0.55 * (M.grav || 1); }
@@ -607,7 +619,8 @@ var PD = (function () {
       serveTeam: 0, side: 0, n: 0, lastP: null, lastAct: null, lastTeam: null, lastBlock: false, serveFresh: false,
       recv: [null, null], cp: [null, null], spiker: [null, null], setter: [null, null], assignT: 0,
       rally: 0, rallyMax: 0, tscale: 1, guide: null, waitReal: 0, guidedLeft: lv.assist.slowmo > 1 ? lv.assist.slowmo : 0,
-      target: cfg.target || lv.target, setsTo: lv.sets === 3 && !cfg.oneSet ? 2 : 1, setNo: 1, winner: null, deficit: [0, 0], over: false, teamSpirit: [null, null], trioPoint: null
+      target: cfg.target || lv.target, setsTo: lv.sets === 3 && !cfg.oneSet ? 2 : 1, setNo: 1, winner: null, deficit: [0, 0], over: false, teamSpirit: [null, null], trioPoint: null,
+      ctl: [false, false]   /* 🎮 pd-8a: team uses Ball control */
     };
     for (var t = 0; t < 2; t++) {
       var want = (cfg.teams && cfg.teams[t]) || [], seats = [], n = sp.n;
@@ -623,7 +636,7 @@ var PD = (function () {
       M.teams.push({ i: t, score: 0, sets: 0, slots: [] });
       for (s = 0; s < n; s++) {
         var w = seats[s], p = {
-          id: M.players.length, team: t, slot: s, name: w.name || '🤖', av: w.av || null, pins: w.pins || null, human: w.human || 0, auto: !!w.auto, bot: !w.human,
+          id: M.players.length, team: t, slot: s, name: w.name || '🤖', av: w.av || null, pins: w.pins || null, human: w.human || 0, own: w.human || 0, auto: !!w.auto, bot: !w.human,
           roles: sp.roles[s].slice(), x: 0, y: 0, z: 0, vz: 0, vx: 0, vy: 0, dir: t === 0 ? 1 : -1, walkT: 0, state: 'ready', stT: 0, act: null, actT: 9,
           input: { x: 0, y: 0 }, want: null, dive: null, block: 0, recover: 0, meter: 0, pyraArm: false, pyraBlock: false, charge: -1, aimF: 0, aimS: 0,
           willMiss: false, missFor: -1, gest: null, cheerT: 0,
@@ -632,6 +645,7 @@ var PD = (function () {
         M.players.push(p); M.teams[t].slots[s] = p.id;
       }
     }
+    ctlInit(M, cfg);   /* 🎮 pd-8a */
     if (sp.drill) drillInit(M);
     if (sp.party) { M.setsTo = 1; M.target = cfg.target || PARTY.target[M.level]; M.extras = []; for (var xb = 0; xb < PARTY.balls[M.level]; xb++) M.extras.push(partyBall(M, xb, 1.2 + xb * 1.4)); }
     if (sp.sport === 'hoop') hoopInit(M); else if (sp.sport === 'spark') sparkServe(M, sp.drill ? 1 : 0, true); else startServe(M, 0);
@@ -641,7 +655,7 @@ var PD = (function () {
 
   function baseOf(M, p) { var b = M.sp.base(M.L, M.W)[p.slot]; return { x: b[0] * sgn(p.team), y: b[1] * (p.team === 0 ? 1 : -1) }; }
   function serveSpot(M, team) { return { x: (M.L + 0.7) * sgn(team), y: -0.24 * M.W }; }   // the far corner: never behind the touch stick / buttons
-  function serverOf(M, team) { return byId(M, M.teams[team].slots[0]); }
+  function serverOf(M, team) { var tm = M.teams[team]; return byId(M, tm.slots[tm.srv || 0]); }   /* 🚀 pd-8a: serve turns (tm.srv) */
   /* 🧺 pd-5e (Aowu 12:20 "the toss person should have the ball and need to be in the court corner circle and toss the ball to the server"):
      🦶 PyraStrike like real takraw — the server (tekong) stands in the SERVICE CIRCLE, a teammate holds the ball in the QUARTER CIRCLE
      at the net and tosses it to the server's foot. 1v1 has no buddy: you toss it to yourself in the circle. */
@@ -664,6 +678,7 @@ var PD = (function () {
     var b = M.ball; b.held = s.id; b.pyra = null; b.spirit = null; b.spiritSlot = null; b.spiritTier = null; b.vx = b.vy = b.vz = 0; b.trail = []; placeHeld(M);
     M.serveWait = (M.level === 0 ? 1.6 : 0.9) + M.rnd() * 0.8;
     ev(M, 'serveReady', { team: team, p: s.id });
+    ctlServe(M, team, s);   /* 🎮 pd-8a: you drive your server */
   }
   function placeHeld(M) { var b = M.ball, p = byId(M, b.held); if (!p) return;
     if (p.feed) {   // 🦶 the feed: a teammate (or you, in 1v1) tosses the ball up to your kicking foot
@@ -715,7 +730,7 @@ var PD = (function () {
     var out = !inCourt(M, land.x, land.y, -0.25);
     var cands = teamOf(M, T).filter(function (p) { return !(M.lastTeam === T && M.lastP === p.id && !M.lastBlock && T === M.side) || (isStrike(M) && teamOf(M, T).length === 1); });
     if (!cands.length) return;
-    var who = null, person = cands.filter(isPerson)[0];
+    var who = null, person = M.ctl[T] ? null : cands.filter(isPerson)[0];   /* 🎮 pd-8a: every ball is yours */
     var dist = function (p) { return hyp(p.x - cp.x, p.y - cp.y); };
     if (nn === 3 && M.spiker[T] != null && cands.some(function (p) { return p.id === M.spiker[T]; })) who = byId(M, M.spiker[T]);
     else if (nn === 3 && person && M.lv.assist.setToYou) who = person;
@@ -726,6 +741,8 @@ var PD = (function () {
       var gen = M.lv.assist.setToYou ? 2 : 1.25, add = M.lv.assist.setToYou ? 1.5 : 0.4;   // 🌱 Basic / Junior: the kid gets more of the balls
       if (person && person !== who && dist(person) <= dist(who) * gen + add) who = person;
     }
+    if (M.ctl[T]) control(M, who.id, nn === 1 ? 'recv' : nn === 2 ? 'set' : 'hit');   /* 🎮 pd-8a: control follows the next toucher */
+    if (nn === 3 && M.ctl[1 - T]) ctlBlock(M, 1 - T, who);   /* 🧱 they are about to attack → your blocker */
     // a smart robot lets a ball that flies out drop
     var team = teamOf(M, T), anyBot = !isPerson(who);
     M.letGo = anyBot && out && M.rnd() < (M.lv.bot.smart * (who.team === humanTeam(M) ? 0.6 : 1));
@@ -733,6 +750,58 @@ var PD = (function () {
     who.willMiss = !isPerson(who) && M.rnd() < botMiss(M, who); who.missFor = M.rally;
     if (team.length && nn === 1) M.spiker[T] = null;
   }
+
+  /* 🎮 pd-8a BALL CONTROL (Aowu 2026-11-17 11:15 / 11:34): one person on a team (cfg.control 'ball' — the page's default; no control = the old fixed seat) drives whoever takes the team's NEXT touch — the server,
+     the receiver, the setter, the hitter (and the blocker while the other team attacks); robots move everyone else. p.own = whose look /
+     name this body wears (never changes) · p.human = which person drives it NOW (moves with control). The person's flame meter, arms, stats
+     and pins travel with control (CTL_KEEP), so "your meter" and "your stats" never split. Robot-only matches never touch any of it. */
+  var CTL_SPORT = { spike: true };   // pd-8b: 🦶 strike · ⭕ hoop · ⚡ spark duo
+  var CTL_KEEP = ['meter', 'pyraArm', 'spiritArm', 'pyraBlock', 'st', 'pins'];
+  function ctlInit(M, cfg) {
+    var sp = M.sp;
+    for (var t = 0; t < 2; t++) {
+      var ppl = teamOf(M, t).filter(function (q) { return q.human; }), T = M.teams[t];
+      M.ctl[t] = cfg.control === 'ball' && !!CTL_SPORT[sp.sport] && sp.n >= 2 && ppl.length === 1 && !sp.drill && !sp.party;
+      // 🚀 serve turns: a team with people and no Ball control (🧍 One player · 👥 two people) — everyone serves in turn, the person first
+      T.srv = 0; T.turns = !!cfg.control && !M.ctl[t] && ppl.length > 0 && sp.n >= 2 && (sp.sport === 'spike' || sp.sport === 'strike') && !M.lv.rot && !sp.drill && !sp.party;
+      if (T.turns) T.srv = ppl[0].slot;
+    }
+  }
+  function driverOf(M, T) { return teamOf(M, T).filter(function (q) { return q.human; })[0] || null; }
+  function bodyFor(M, p) {   // the page always speaks for the person's own seat → the body that person drives now
+    if (!p || !p.own || !M.ctl || !M.ctl[p.team]) return p;
+    return teamOf(M, p.team).filter(function (q) { return q.human === p.own; })[0] || p;
+  }
+  function control(M, toId, why) {
+    var to = byId(M, toId); if (!to || !M.ctl || !M.ctl[to.team]) return false;
+    var from = driverOf(M, to.team); if (!from || from.auto) return false;
+    if (from === to) { to.ctlWhy = why; return false; }
+    CTL_KEEP.forEach(function (k) { var v = from[k]; from[k] = to[k]; to[k] = v; });
+    to.human = from.human; from.human = 0;
+    [from, to].forEach(function (q) { q.input = { x: 0, y: 0 }; q.want = null; q.charge = -1; q.approach = null; q.aimF = 0; q.aimS = 0; });
+    from.ctlWhy = null; to.ctlWhy = why;
+    ev(M, 'control', { from: from.id, to: to.id, h: to.human, team: to.team, why: why });
+    return true;
+  }
+  function ctlServe(M, team, s) {
+    for (var t = 0; t < 2; t++) if (M.ctl[t]) {
+      if (t === team) control(M, s.id, 'serve');
+      else { var own = teamOf(M, t).filter(function (q) { return q.own; })[0]; if (own) control(M, own.id, 'home'); }
+    }
+  }
+  function ctlBlock(M, D, ak) {   // 🧱 the other team set it up → you drive your blocker nearest their hitter
+    var bl = teamOf(M, D).filter(function (q) { return isBlocker(M, q); }).sort(function (a, b) { return Math.abs(a.y - ak.y) - Math.abs(b.y - ak.y); })[0];
+    if (bl) control(M, bl.id, 'block');
+  }
+  function ctlHome(M) { for (var t = 0; t < 2; t++) if (M.ctl[t]) { var own = teamOf(M, t).filter(function (q) { return q.own; })[0]; if (own) control(M, own.id, 'home'); } }
+  // ↔️ the setter's stick points at a hitter (any person setting) — hitterFor is pure (the page draws the same pick)
+  function hitterFor(M, p) {
+    if (!p || !isPerson(p)) return null; var sa = p.setAim && M.t - p.setAim.t < 0.6 ? p.setAim : p.input, ix = sa.x, iy = sa.y, m = hyp(ix, iy); if (m < 0.35) return null;   // the stick at the press (the setter may let go / walk on)
+    var best = null, bs = -2;
+    teamOf(M, p.team).forEach(function (q) { if (q.id === p.id) return; var dx = q.x - p.x, dy = q.y - p.y, d = hyp(dx, dy) || 1, sc = (dx * ix + dy * iy) / (d * m); if (sc > bs) { bs = sc; best = q; } });
+    return best;
+  }
+  function pickHitter(M, p) { var h = hitterFor(M, p); if (h) ev(M, 'setPick', { p: p.id, to: h.id }); return h; }
   function humanTeam(M) { var h = M.players.filter(isPerson)[0]; return h ? h.team : -1; }
   function botMiss(M, p) { var m = M.lv.bot.miss * (p.team === humanTeam(M) ? 0.5 : 1); if (M.ball.pyra && M.lastTeam !== p.team) m += 0.25; if (M.ball.spirit && M.lastTeam !== p.team) m += 0.5; return m; }
   function planSpiker(M, T, setterId) {
@@ -826,7 +895,7 @@ var PD = (function () {
       lob(M, b, su * sgn(T) + e.x * 0.6, sv + e.y * 0.6, 2.0, (act === 'dig' || act === 'dive' ? 3.2 : 3.7) + (pyra ? 0.2 : 0));
       M.setter[T] = st ? st.id : null;
     } else {   // nn === 2: set it up for the spiker
-      var sk = planSpiker(M, T, p.id); M.spiker[T] = sk ? sk.id : null; M.setter[T] = p.id;
+      var sk = pickHitter(M, p) || planSpiker(M, T, p.id); M.spiker[T] = sk ? sk.id : null; M.setter[T] = p.id;   /* ↔️ pd-8a: the stick picks the hitter */
       var vv = sk ? clamp(sk.y, -M.W * 0.35, M.W * 0.35) : 0;
       lob(M, b, 0.95 * sgn(T) + e.x * 0.5, vv + e.y * 0.5, 2.75, 3.9 + (pyra ? 0.15 : 0));
     }
@@ -946,6 +1015,7 @@ var PD = (function () {
       M.nextSet = false; M.teams.forEach(function (t) { t.score = 0; }); M.setNo++; M.deficit = [0, 0];
       ev(M, 'newSet', { n: M.setNo }); w = M.setLoser;
     } else if (M.sideOut && M.lv.rot) rotate(M, w);
+    else if (M.sideOut && M.teams[w].turns) { var Tw = M.teams[w]; Tw.srv = (Tw.srv + 1) % Tw.slots.length; ev(M, 'serveTurn', { team: w, p: Tw.slots[Tw.srv] }); }   /* 🚀 pd-8a: everyone takes a turn to serve */
     startServe(M, w);
   }
   function rotate(M, team) {   // 🔄 Hard+: everyone moves one seat, the new seat 0 serves (🚀)
@@ -957,10 +1027,10 @@ var PD = (function () {
   }
 
   // ---------- input from the page ----------
-  function input(M, pid, x, y) { var p = byId(M, pid); if (!p) return; var m = hyp(x, y); if (m > 1) { x /= m; y /= m; } p.input.x = x; p.input.y = y; if (m > 0.2) { p.aimF = x * p.dir; p.aimS = y; } else { p.aimF = 0; p.aimS = 0; } }
+  function input(M, pid, x, y) { var p = bodyFor(M, byId(M, pid)); if (!p) return; var m = hyp(x, y); if (m > 1) { x /= m; y /= m; } p.input.x = x; p.input.y = y; if (m > 0.2) { p.aimF = x * p.dir; p.aimS = y; } else { p.aimF = 0; p.aimS = 0; } }
   // key: 'touch' (J) · 'drive' (K, hold on a serve = power) · 'dink' (L) · 'jump' (Space) · 'dive' (Shift) · 'pyra' (🔥 F)
   function press(M, pid, key) {
-    var p = byId(M, pid); if (!p || M.over || M.phase === 'over') return false;
+    var p = bodyFor(M, byId(M, pid)); if (!p || M.over || M.phase === 'over') return false;
     if (key === 'pyra') {
       if (p.meter >= PYRA_COST) { p.pyraArm = !p.pyraArm; p.spiritArm = p.pyraArm && p.meter >= SPIRIT_COST; armTeam(M, p); ev(M, 'pyraArm', { p: p.id, on: p.pyraArm, full: p.meter >= METER_MAX, spirit: p.spiritArm, team: teamSpiritOf(M, p) ? teamSpiritOf(M, p).tier : null }); if (p.spiritArm && typeof PD.SPIRIT === 'function') PD.SPIRIT(M, p); }
       else ev(M, 'pyraLow', { p: p.id, meter: Math.round(p.meter) });
@@ -991,6 +1061,7 @@ var PD = (function () {
     }
     if (M.lastP === p.id && M.t - M.ball.hitT < 0.35) return false;   // a second tap right after your own touch = a button mash, not a double touch
     p.want = { key: key, t: 0.42 };
+    if (key === 'touch' && isPerson(p)) p.setAim = { x: p.input.x, y: p.input.y, t: M.t };   /* ↔️ pd-8a: the stick when you pressed picks the hitter */
     // K on a high ball near the net = jump + dunk in one press (people) — the jump starts now
     // 💥 pd-6b2 run-up: your team's ball still going up (or high and far) → run to the spot under its way down, jump at the right moment
     var bb = M.ball, ttd = bb.vz < 0 ? (bb.z - 2.9) / Math.max(0.5, -bb.vz) : 9;
@@ -999,7 +1070,7 @@ var PD = (function () {
     return true;
   }
   function release(M, pid, key) {
-    var p = byId(M, pid); if (!p) return;
+    var p = bodyFor(M, byId(M, pid)); if (!p) return;
     if (key === 'drive' && M.phase === 'serve' && M.ball.held === p.id && p.charge >= 0) serve(M, p, clamp(p.charge / 0.9, 0.15, 1));
   }
   function jump(M, p, forSpike) {
@@ -1120,6 +1191,7 @@ var PD = (function () {
           var cp = M.cp[p.team], dx = cp.x + sgn(p.team) * 0.15 - p.x, dy = cp.y - p.y, d = hyp(dx, dy);
           if (d > 0.12) { var k = (hyp(p.input.x, p.input.y) > 0.2 ? 0.35 : 1) * lv.assist.autoMove; vx += dx / d * run * k; vy += dy / d * run * k; }
         }
+        if (lv.assist.autoMove && M.phase === 'rally' && p.ctlWhy === 'block' && M.side !== p.team) { var akb = byId(M, M.spiker[1 - p.team]); if (akb) { var bx = 0.7 * sgn(p.team) - p.x, by = akb.y - p.y, bd = hyp(bx, by); if (bd > 0.12) { var kb = (hyp(p.input.x, p.input.y) > 0.2 ? 0.35 : 1) * lv.assist.autoMove; vx += bx / bd * run * kb; vy += by / bd * run * kb; } } }   /* 🧱 pd-8a */
       }
       if (p.approach && isPerson(p)) {   // 💥 pd-6b2 run-up
         var ap = p.approach; ap.t -= dt;
@@ -1225,6 +1297,7 @@ var PD = (function () {
       var h = people[i], T = h.team;
       if (M.phase === 'serve' && M.ball.held === h.id) { g = { p: h.id, key: 'drive', why: 'serve', reach: true }; break; }
       if (M.phase === 'serve' && M.feeder === h.id) { var hs = byId(M, M.ball.held); if (hs && !isPerson(hs) && !hs.feed) { g = { p: h.id, key: 'touch', why: 'toss', reach: true }; break; } }   // 🧺 pd-5e
+      if (M.phase === 'rally' && h.ctlWhy === 'block' && M.side !== T && M.lastTeam !== T && M.n === 2) { var akg = byId(M, M.spiker[1 - T]); if (akg) { g = { p: h.id, key: 'jump', why: 'block', reach: rz(akg) > 0.25 && h.z === 0 && h.block <= 0 && Math.abs(h.y - akg.y) < 1.3 && uOf(T, h.x) < 1.7 }; break; } }   /* 🧱 pd-8a */
       if (M.phase === 'rally' && M.recv[T] === h.id && M.lastTeam != null) {
         var nn = nextNOf(M, T), key = nn >= 3 ? 'drive' : 'touch', b = M.ball, hz = b.z - h.z;
         var why = nn >= 3 ? 'dunk' : hz < 0.75 ? 'dig' : hz < 1.75 ? 'bump' : 'set';
@@ -1246,7 +1319,7 @@ var PD = (function () {
     var slow = g && g.reach && M.phase === 'rally' && lv.assist.slowmo && (lv.assist.slowmo === 1 || M.guidedLeft > 0) && !byId(M, g.p).want;
     if (slow) {
       M.tscale = 0.06; M.waitReal += realDt; M.waiting = true;
-      if (M.waitReal > 6) { var h = byId(M, g.p); ev(M, 'autoHelp', { p: h.id }); h.want = { key: g.key, t: 0.5 }; if (canReach(M, h, g.key)) doTouch(M, h, g.key, { auto: true }); M.waitReal = 0; }
+      if (M.waitReal > 6) { var h = byId(M, g.p); ev(M, 'autoHelp', { p: h.id }); if (g.key === 'jump') jump(M, h); else { h.want = { key: g.key, t: 0.5 }; if (canReach(M, h, g.key)) doTouch(M, h, g.key, { auto: true }); } M.waitReal = 0; }
     } else { if (M.waiting && g == null && M.guidedLeft > 0) M.guidedLeft--; M.tscale = M.tscale < 1 ? Math.min(1, M.tscale + realDt * 6) : 1; M.waitReal = 0; M.waiting = false; }
     M.acc += realDt * M.tscale;
     var n = 0;
@@ -1756,7 +1829,7 @@ var PD = (function () {
   }
 
   return { DT: DT, ARENA_GRAV: ARENA_GRAV, MODES: MODES, MODE_ORDER: MODE_ORDER, LEVELS: LEVELS, FILL: FILL, PYRA_COST: PYRA_COST, METER_MAX: METER_MAX, ROLE_ICON: ROLE_ICON, ROLE_NAME: ROLE_NAME, STRIKE_NAME: STRIKE_NAME, actName: actName, isStrike: isStrike, ACT_NAME: ACT_NAME,
-    pyraName: pyraName, SPIRITS: SPIRITS, SPIRITS_DUO: SPIRITS_DUO, SPIRITS_TRIO: SPIRITS_TRIO, armTeam: armTeam, SPIRIT_COST: SPIRIT_COST, spiritGo: spiritGo, slotOf: slotOf, newMatch: newMatch, step: step, tick: tick, input: input, press: press, release: release, takeEvents: takeEvents, simulate: simulate,
+    pyraName: pyraName, SPIRITS: SPIRITS, SPIRITS_DUO: SPIRITS_DUO, SPIRITS_TRIO: SPIRITS_TRIO, armTeam: armTeam, SPIRIT_COST: SPIRIT_COST, spiritGo: spiritGo, slotOf: slotOf, newMatch: newMatch, control: control, bodyOf: bodyFor, driverOf: driverOf, ctlHome: ctlHome, hitterFor: hitterFor, CTL_SPORT: CTL_SPORT, step: step, tick: tick, input: input, press: press, release: release, takeEvents: takeEvents, simulate: simulate,
     canReach: canReach, doTouch: doTouch, sparkTouch: sparkTouch, sparkTick: sparkTick, sparkReach: sparkReach, sparkPredict: sparkPredict, SPARK: SPARK, isSpark: isSpark, noHands: noHands, hoopTouch: hoopTouch, hoopTick: hoopTick, hoopReach: hoopReach, HOOP: { Z: HOOP_Z, R: HOOP_R, RING: RING, PTS: HOOP_PTS, NAME: HOOP_NAME, T: HOOP_T, UP: FEED_UP }, serve: serve, feedServe: feedServe, feederOf: feederOf, feedSpot: feedSpot, circleSpot: circleSpot, jumpServe: jumpServe, botServe: botServe, startServe: startServe, predict: predict, assign: assign, nextNOf: nextNOf, fill: fill, isPerson: isPerson, uOf: uOf, sgn: sgn, baseOf: baseOf, guideFor: guideFor,
     BALL_R: BALL_R, DRILL: DRILL, PARTY: PARTY, zoneRect: zoneRect, drillEnd: drillEnd, partyTick: partyTick, SPIRIT: null };   // 🔥🔥 SPIRIT = R2 hook: Spirit Dive supers (full meter) plug in here
 })();
@@ -2091,18 +2164,18 @@ const DRILL_WHY = ['zaim', 'ctrap', 'cpop', 'csmash', 'jkeep'];
 const GOAL_SPARK = {zaim: ['🎯 Send it into the glowing zone!', 'K'], ctrap: ['🔗 1 · Trap it — tap 🦵', 'J'], cpop: ['🔗 2 · Pop it up — tap 🦵 again', 'J'], csmash: ['🔗 3 · SMASH it — tap ⚡ while it is high!', 'K'], serve: ['⚡ Your serve! Tap ⚡ — land it on THEIR half', 'K'], sbounce: ['⏳ Let it bounce on your half of the table…', ''], strap: ['🦵 Trap it up!', 'J'], ssend: ['⚡ Send it back onto their half!', 'K']};
 function wordOf(M, e){ if(PD.isSpark(M)) return e.edgeTry ? WORDS_SPARK.edge : WORDS_SPARK[e.k]; return PD.isStrike(M) ? (e.style === 'bicycle' ? WORDS_STRIKE.bicycle : WORDS_STRIKE[e.k]) : WORDS[e.k]; }
 const WHY = {four: '4 touches! Only 3 a side', double: 'Double touch! The same player twice', net: 'Touched the net!', out: 'Out!', drop: 'It dropped!', in: 'In!', kill: 'Kill!', ace: 'Ace!', stuff: 'Stuff block!'};
-const GOAL_STRIKE = {toss: ['🧺 You toss! Tap 🦵 — throw it up to your server', 'J'], serve: ['🦶 Your serve! Tap 💥 — your buddy tosses, you kick', 'K'], bump: ['🦵 Trap it up with your thigh!', 'J'], set: ['🙆 Head it up high!', 'J'], dig: ['🦶 Toe save! Get a foot under it', 'J'], dunk: ['💥 Jump and STRIKE it over!', 'K']};
-const GOAL = {serve: ['🚀 Your serve! Tap 💥', 'K'], serveAll: ['🚀 Serve:'], bump: ['🤚 Bump it up to your setter!', 'J'], set: ['🙌 Set it up high!', 'J'], dig: ['🛡️ Dig! Save the low ball', 'J'], dunk: ['💥 Jump and DUNK it over the net!', 'K']};
+const GOAL_STRIKE = {block: ['🧱 They strike — Jump to BLOCK it!', 'Space'], toss: ['🧺 You toss! Tap 🦵 — throw it up to your server', 'J'], serve: ['🦶 Your serve! Tap 💥 — your buddy tosses, you kick', 'K'], bump: ['🦵 Trap it up with your thigh!', 'J'], set: ['🙆 Head it up high!', 'J'], dig: ['🦶 Toe save! Get a foot under it', 'J'], dunk: ['💥 Jump and STRIKE it over!', 'K']};
+const GOAL = {block: ['🧱 They spike — Jump to BLOCK it!', 'Space'], serve: ['🚀 Your serve! Tap 💥', 'K'], serveAll: ['🚀 Serve:'], bump: ['🤚 Bump it up to your setter!', 'J'], set: ['🙌 Set it up high!', 'J'], dig: ['🛡️ Dig! Save the low ball', 'J'], dunk: ['💥 Jump and DUNK it over the net!', 'K']};
 
 /* ================= STATE ================= */
 let S = {players: [], progress: {}, settings: {}, avatars: {}, player: '', age: ''};
-let SET = {mode: 'beach', level: 0, who: 'robot', p2: '', arena: 'classic', marker: true, cup: '', cupSport: 'beach', cupState: null};
+let SET = {control: 'ball', mode: 'beach', level: 0, who: 'robot', p2: '', arena: 'classic', marker: true, cup: '', cupSport: 'beach', cupState: null};
 let G = null, lockHandle = null, KEYS = null, RAF = 0;
 const GC_LISTEN = [], GC_LOG = [];
 function store(k){ return 'sp_pyradive_' + k + ':' + (S.player || ''); }
 function ls(k, v){ try{ if(v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }catch(e){ return null; } }
-function loadPrefs(){ try{ const p = JSON.parse(ls(store('prefs')) || '{}'); if(PD.MODES[p.mode]) SET.mode = p.mode; if(ARENAS.some(a => a.k === p.arena)) SET.arena = p.arena; SET.cup = CUPS[p.cup] ? p.cup : ''; SET.cupKind = CUPS[p.cupKind] ? p.cupKind : SET.cup || 'cupfour'; if(CUP_SPORTS.includes(p.cupSport)) SET.cupSport = p.cupSport; if(['robot', 'team', 'duo'].includes(p.who)) SET.who = p.who; if(p.marker === false) SET.marker = false; if(p.p2) SET.p2 = p.p2; }catch(e){} }
-function savePrefs(){ ls(store('prefs'), JSON.stringify({mode: SET.mode, arena: SET.arena, who: SET.who, marker: SET.marker, p2: SET.p2, cup: SET.cup || '', cupKind: SET.cupKind || '', cupSport: SET.cupSport || ''})); }
+function loadPrefs(){ try{ const p = JSON.parse(ls(store('prefs')) || '{}'); if(PD.MODES[p.mode]) SET.mode = p.mode; if(ARENAS.some(a => a.k === p.arena)) SET.arena = p.arena; SET.cup = CUPS[p.cup] ? p.cup : ''; SET.cupKind = CUPS[p.cupKind] ? p.cupKind : SET.cup || 'cupfour'; if(CUP_SPORTS.includes(p.cupSport)) SET.cupSport = p.cupSport; if(['robot', 'team', 'duo'].includes(p.who)) SET.who = p.who; if(p.marker === false) SET.marker = false; if(p.control === 'one') SET.control = 'one'; if(p.p2) SET.p2 = p.p2; }catch(e){} }
+function savePrefs(){ ls(store('prefs'), JSON.stringify({control: SET.control, mode: SET.mode, arena: SET.arena, who: SET.who, marker: SET.marker, p2: SET.p2, cup: SET.cup || '', cupKind: SET.cupKind || '', cupSport: SET.cupSport || ''})); }
 function myAvatar(name){ const a = S.avatars[name]; return a ? fixAv(a) : defaultAvatar(name || 'player'); }
 // 🏐 on court nobody rides a ride-on or holds an item (Aowu 2026-11-14 "remove ride on when play"); pets + trails stay home too
 function playAv(av){ const a = JSON.parse(JSON.stringify(av || {})); a.eq = Object.assign({}, a.eq || {}); delete a.eq.ride; delete a.eq.hand; delete a.eq.pet; delete a.eq.trail; return a; }
@@ -2229,7 +2302,7 @@ function openSetup(lvl){
   if(!SET.p2 || !others().includes(SET.p2)) SET.p2 = others()[0] || '';
   $('setup-logo').textContent = sp.icon; $('setup-title').textContent = sp.name + ' · ' + L.name; pdSetupBadge();   // 🏷️ pd-7
   $('setup-sub').textContent = sp.drill ? DRILL_GOAL[sp.drill] + ' · ' + levelGoal(SET.mode, lvl) : sp.party ? '🌀 ' + levelGoal(SET.mode, lvl) + ' · every ball that lands on their half counts · ' + LEVEL_UI[lvl].blurb : (L.sets === 3 ? 'Best of 3 sets to ' + L.target : 'First to ' + L.target) + ' points · 3 touches a side · ' + LEVEL_UI[lvl].blurb;
-  buildWho(); buildTeams(); buildArenas();
+  buildWho(); buildCtl(); buildTeams(); buildArenas();
   const mc = () => { $('aim-chip').textContent = '🎯 Landing marker: ' + (SET.marker ? 'on' : 'off'); $('aim-chip').classList.toggle('on', SET.marker); };
   mc(); $('aim-chip').onclick = () => { SET.marker = !SET.marker; savePrefs(); mc(); };
   $('go-btn').onclick = () => startMatch();
@@ -2244,7 +2317,19 @@ function buildWho(){
   row.querySelectorAll('.chip').forEach(b => b.onclick = () => { const k = b.dataset.k;
     if(k === 'team' && PD.MODES[SET.mode].n === 1){ UISound.play('error'); UI.toast('🦶 1v1 has one player a side — pick ⚔️ against each other'); return; }
     if(k !== 'robot' && (hc || none)){ UISound.play('error'); UI.toast(hc ? '💀 Hardcore is you against the robots' : 'Add a second player on the Dashboard first'); return; }
-    SET.who = k; savePrefs(); row.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); buildTeams(); });
+    SET.who = k; savePrefs(); row.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); buildCtl(); buildTeams(); });
+}
+// 🎮 pd-8a: how you play a team match — 🎮 Ball control (default: you move whoever plays the ball next) · 🧍 One player (one seat, serve turns go round)
+function ctlShown(){ const sp = PD.MODES[SET.mode]; return !!(sp && PD.CTL_SPORT[sp.sport] && sp.n >= 2 && !sp.drill && !sp.party && SET.who !== 'team'); }
+function buildCtl(){
+  const row = $('ctl-row'), note = $('ctl-note'); if(!row) return;
+  if(!ctlShown()){ row.innerHTML = ''; row.classList.add('hidden'); note.classList.add('hidden'); return; }
+  row.classList.remove('hidden'); note.classList.remove('hidden');
+  const list = [['ball', '🎮 Ball control'], ['one', '🧍 One player']];
+  row.innerHTML = list.map(([k, n]) => '<button class="chip' + (SET.control === k ? ' on' : '') + '" data-k="' + k + '" data-sound="tap">' + n + '</button>').join('');
+  const say = () => { note.textContent = SET.control === 'one' ? '🧍 You stay one player · everybody takes turns to serve' : '🎮 You move whoever plays the ball next — serve, bump, set, spike · robots move the rest'; };
+  say();
+  row.querySelectorAll('.chip').forEach(b => b.onclick = () => { SET.control = b.dataset.k; savePrefs(); row.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); say(); });
 }
 function pinsOf(name){ try{ return window.SpiritBestiary && SpiritBestiary.pins ? SpiritBestiary.pins(name) : null; }catch(e){ return null; } }   // ⭐ pd-4b favourite creatures
 function teamsCfg(){
@@ -2347,9 +2432,9 @@ function keyCatch(e){
 function startMatch(){
   hideResult();
   const cfg = SET.cfg || teamsCfg();
-  const cupOn = !!(SET.cupState && !SET.cupState.done), M = PD.newMatch({mode: SET.mode, level: SET.level, arena: SET.arena, seed: (Date.now() % 100000) + 7, teams: cfg, oneSet: cupOn || undefined, target: cupOn ? CUP_TARGET[SET.level] : undefined});
+  const cupOn = !!(SET.cupState && !SET.cupState.done), M = PD.newMatch({mode: SET.mode, level: SET.level, arena: SET.arena, control: SET.control, seed: (Date.now() % 100000) + 7, teams: cfg, oneSet: cupOn || undefined, target: cupOn ? CUP_TARGET[SET.level] : undefined});
   G = {M, cup: cupOn, level: SET.level, mode: SET.mode, who: SET.who, over: false, paused: false, held: false, t0: Date.now(), fx: [], words: [], cam: null, shake: 0, setScores: [], q: 1, ema: 16, last: 0, sticks: new Map(), keysDown: new Set(), seen: {}};
-  G.locals = M.players.filter(p => p.human);   // people on this device (P1 = human 1)
+  G.locals = M.players.filter(p => p.own);   // people on this device (P1 = own 1) — 🎮 pd-8a: their OWN seats (the body they drive = PD.bodyOf)
   loadLooks(); G.look = {ball: ballV(LOOKS.ball), table: LOOKS.table || 'classic', bomb: LOOKS.bomb || ''};   // 🎨 pd-4c
   BTN = M.drill && isHoop(M) ? BTN_JUGGLE : isHoop(M) ? BTN_HOOP : PD.isSpark(M) ? BTN_SPARK : PD.isStrike(M) ? BTN_STRIKE : BTN_SPIKE;
   GC_LOG.length = 0;
@@ -2386,7 +2471,8 @@ function frame(ts){
 
 /* ================= EVENTS → looks, sounds, words ================= */
 function snd(k){ try{ UISound.play(k); }catch(e){} }
-function nameOf(id){ const p = G.M.players[id]; return p ? p.name : ''; }
+function nameOf(id){ const p = ownerOf(G.M.players[id]); return p ? p.name : ''; }
+function ownerOf(q){ if(!q || !G || !q.human || q.own) return q; return G.M.players.find(o => o.team === q.team && o.own === q.human) || q; }   // 🎮 pd-8a: a driven robot body speaks for its person
 function isLocal(id){ const p = G && G.M.players[id]; return !!(p && p.human); }
 function handleEvents(list){
   const M = G.M;
@@ -2441,6 +2527,8 @@ function handleEvents(list){
       case 'setWon': G.setScores.push(e.score); bigWord('SET ' + teamName(e.team).toUpperCase() + '!', '', e.score.join(' – ')); barScore(); break;
       case 'newSet': banner('🏐 Set ' + e.n + '!', 'good', 1500); barScore(); break;
       case 'longRally': if(e.n % 5 === 0) floatWord('🔁 Rally ×' + e.n + '!', 0, -G.M.W / 2, G.M.netH + 1.2, '#FFE14A'); break;
+      case 'control': { const fr = G.M.players[e.from]; if(fr && G.locals.some(l => l.own === e.h)){ G.ctlFx = {x: fr.x, y: fr.y, to: e.to, t0: performance.now()}; if(e.why !== 'home') snd('tap'); } break; }   /* 🎮 pd-8a */
+      case 'serveTurn': if(isLocal(e.p) && G.locals.length === 1) banner('🚀 Your turn to serve!', 'good', 1600); break;   /* 🚀 pd-8a */
       case 'rotate': floatWord('🔄 Rotate!', PD.sgn(e.team) * G.M.L * 0.5, 0, 2.6, TEAM_COL[e.team]); break;
       case 'whiff': if(isLocal(e.p)) floatWord('💨', p.x, p.y, 2.2, '#FFFFFF'); break;
       case 'match': finishSoon(); break;
@@ -2475,7 +2563,7 @@ function handleEvents(list){
   });
 }
 function localSeat(id){ const p = G.M.players[id]; return p && p.human === 2 ? 1 : 0; }
-function teamName(t){ const M = G.M, ppl = M.players.filter(p => p.team === t && p.human); return ppl.length ? ppl.map(p => p.name).join(' + ') : 'Robots'; }
+function teamName(t){ const M = G.M, ppl = M.players.filter(p => p.team === t && p.own); return ppl.length ? ppl.map(p => p.name).join(' + ') : 'Robots'; }
 function barScore(){
   if(!G) return; const M = G.M;
   if(M.drill){ const D = M.drill, me = G.locals[0];   // 🎯 drills: your score + the clock / lives
@@ -2485,10 +2573,10 @@ function barScore(){
     BAR.count('streak', '🔁', D.streak, 'In a row'); BAR.hide('c:sets');
     if(me) BAR.meter('pyra', '🔥', me.meter / 100, 'Pyra meter', me.meter >= 50); return; }
   BAR.hide('lives'); BAR.hide('c:streak'); if(!isHoop(M)) BAR.hide('time');
-  BAR.players([0, 1].map(t => ({k: t, name: teamName(t), av: t === 0 ? '🔥' : M.players.some(p => p.team === 1 && p.human) ? '⚔️' : '🤖', score: M.teams[t].score, on: M.serveTeam === t, col: TEAM_COL[t], bot: !M.players.some(p => p.team === t && p.human)})));
+  BAR.players([0, 1].map(t => ({k: t, name: teamName(t), av: t === 0 ? '🔥' : M.players.some(p => p.team === 1 && p.own) ? '⚔️' : '🤖', score: M.teams[t].score, on: M.serveTeam === t, col: TEAM_COL[t], bot: !M.players.some(p => p.team === t && p.own)})));
   if(M.setsTo > 1 && !isHoop(M)) BAR.count('sets', '🏐', M.teams[0].sets + '–' + M.teams[1].sets, 'Sets won');
   if(isHoop(M)){ BAR.time(Math.ceil(M.timeLeft), M.timeLeft < 10); G.barT = Math.ceil(M.timeLeft); }
-  const me = G.locals[0]; if(me) BAR.meter('pyra', '🔥', me.meter / 100, 'Pyra meter', me.meter >= 50);
+  const me = G.locals[0] && PD.bodyOf(M, G.locals[0]); if(me) BAR.meter('pyra', '🔥', me.meter / 100, 'Pyra meter', me.meter >= 50);
 }
 function banner(text, cls, ms){ const b = $('banner'); b.textContent = text; b.className = 'banner on ' + (cls || ''); clearTimeout(banner.t); banner.t = setTimeout(() => b.classList.remove('on'), ms || 1500); }
 /* 🔥🔥 Spirit Dive show (pd-2a): a comic panel — "SPIRIT DIVE" small, the creature + move big — a short slow-motion, a burst in the
@@ -2496,7 +2584,7 @@ function banner(text, cls, ms){ const b = $('banner'); b.textContent = text; b.c
 // 📖 the creatures people call go into their Spirit Bestiary (robots' don't); NEW ones get a sticker on the panel
 function bestiaryAdd(e){
   if(!window.SpiritBestiary || !G) return false; let isNew = false;
-  (e.ids || [e.p]).forEach(id => { const q = G.M.players[id]; if(q && q.human) isNew = SpiritBestiary.add(q.name, e.creature, 'pyraspike') || isNew; });
+  (e.ids || [e.p]).forEach(id => { const q = ownerOf(G.M.players[id]); if(q && q.human) isNew = SpiritBestiary.add(q.name, e.creature, 'pyraspike') || isNew; });
   return isNew;
 }
 function openBestiary(){ if(!window.SpiritBestiary) return; UISound.play('tap'); SpiritBestiary.open(S.player, {back: 'PyraDive', title: 'Spirit Bestiary', onClose: bestiaryCount}); }
@@ -2673,6 +2761,30 @@ function pdRing(box, pad){
   const W = box.clientWidth, H = box.clientHeight; if(!W || !H) return null;
   const q = a => pad.querySelector('.sbtn[data-a="' + a + '"]'), main = q('drive') || q('touch'); if(!main) return null;
   main.classList.add('pz-main');
+  /* 🌸 pd-8a petal ring (pz-2, Game Baseline §11c): fixed slots M 💥 · 1 ← ✋ Touch · 2 ↖ ⬆️ Jump · 3 ↙ 🤸 Dive · 4 ↗ 🪶 Dink · 5 → / 6 ↓ empty (no ⇄ Switch — Aowu 11:34)
+     keepy-up: M Keep up · 1 Jump · 2 Lunge. UiKit places + shapes them (2 mm gaps, press reaction, 🏠 stick home); the 🌙 Pyra crescent hugs the main on the corner side. */
+  const slots = q('drive') ? [q('touch'), q('jump'), q('dive'), q('dink')] : [q('jump'), q('dive')], py = q('pyra');
+  if(UI.pad.petals && window.UI_PETALS !== false){
+    pad.classList.add('pz-petals-pd');
+    const Gm = UI.pad.petals(pad, main, slots, {fit: true}); if(!Gm) return null;
+    const fw = pad.offsetWidth, fh = pad.offsetHeight, sa = UI.pad.safe(), m = Gm.main;
+    const flame = (el, x, y, d) => { const f = pad.querySelector('.pd-fl[data-for="' + el.dataset.a + '"]'); if(!f) return; const z = d * 1.6; f.style.width = f.style.height = Math.round(z) + 'px'; f.style.left = Math.round(x - z / 2) + 'px'; f.style.top = Math.round(y - z * 0.8) + 'px'; };
+    flame(main, Gm.cx, Gm.cy, m);
+    slots.forEach(el => { if(!el) return; const P = Gm.petals[+el.dataset.slot]; if(P) flame(el, P.box.x + P.lx, P.box.y + P.ly, Math.max(56, Gm.depth)); });
+    if(py){
+      const room = Math.max(40, Math.min(fw - sa.r - Gm.edge - Gm.cx, fh - sa.b - Gm.edge - Gm.cy)), Ri = m / 2 + Math.max(10, Gm.gap * 0.8), Ro = Math.max(30, Math.round(room * 0.58)), k = (room - Ro) / Math.SQRT1_2 * 0.98;   // the pd-5d crescent, measured from the petal ring's main
+      const cx = Gm.cx + k * Math.SQRT1_2, cy = Gm.cy + k * Math.SQRT1_2, th = k + Ro - Ri, mid = (Ri + k + Ro) / 2 - k;
+      py.style.width = py.style.height = (2 * Ro) + 'px'; py.style.left = Math.round(cx - Ro) + 'px'; py.style.top = Math.round(cy - Ro) + 'px';
+      const v = (n, val) => py.style.setProperty(n, val);
+      v('--hr', Ri + 'px'); v('--hx', Math.round(Ro - k * Math.SQRT1_2) + 'px'); v('--hy', Math.round(Ro - k * Math.SQRT1_2) + 'px');
+      v('--tx', Math.round(Ro + mid * Math.SQRT1_2) + 'px'); v('--ty', Math.round(Ro + mid * Math.SQRT1_2) + 'px');
+      v('--ti', Math.round(Math.max(14, Math.min(26, th * 0.5))) + 'px'); v('--tn', Math.round(Math.max(9, Math.min(13, th * 0.26))) + 'px');
+      py._cres = {cx, cy, Ro, Ri, k, th, hx: Gm.cx, hy: Gm.cy};
+    }
+    if(box.classList.contains('port')){ const sk = UI.pad.stickFor(W, fw); box.style.setProperty('--stick', sk + 'px'); } else box.style.removeProperty('--stick');
+    pad._ring = {w: fw, h: fh}; return pad._ring;
+  }
+  { /* the round 🌼 ring (UI_PETALS = false) */
   const others = (q('drive') ? ['touch', 'jump', 'dive', 'dink'] : ['jump', 'dive']).map(q).filter(Boolean), py = q('pyra');
   const m = main.offsetWidth, b = others.length ? others[0].offsetWidth : m, Gm = UI.pad.geo(W, H, others.length, {main: m + 4, btn: b + 4}), sa = UI.pad.safe();   // + 4 px: the glow pulse grows a button, the round gap stays ≥ the rule
   const fw = Gm.w, fh = Gm.h; pad.style.width = fw + 'px'; pad.style.height = fh + 'px';
@@ -2693,31 +2805,32 @@ function pdRing(box, pad){
   }
   if(box.classList.contains('port')){ const sk = UI.pad.stickFor(W, fw); box.style.setProperty('--stick', sk + 'px'); } else box.style.removeProperty('--stick');
   pad._ring = {w: fw, h: fh}; return pad._ring;
+  }
 }
 function renderLegend(){ const K = KEYS[0]; $('keylegend').innerHTML = BTN.map(([a, ic, nm]) => '<span data-a="' + a + '"><b>' + UI.esc(keyName(K[a])) + '</b>' + ic + ' ' + nm + '</span>').join(''); }
 function flashBtn(pid, a){ const b = document.querySelector('.actpad[data-p="' + pid + '"] .sbtn[data-a="' + a + '"]'); if(b){ b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash'); } }
 function updatePads(){
   if(!G) return;
-  G.locals.forEach(p => {
-    const b = document.querySelector('.actpad[data-p="' + p.id + '"] .a-pyra'); if(!b) return;
+  G.locals.forEach(p0 => {
+    const b = document.querySelector('.actpad[data-p="' + p0.id + '"] .a-pyra'); if(!b) return; const p = PD.bodyOf(G.M, p0);   /* 🎮 pd-8a */
     const m = Math.round(p.meter); if(b._m !== m){ b._m = m; b.style.setProperty('--m', m + '%'); }
     const rp = b.closest('.actpad'); if(rp && rp.classList.contains('ring')){ rp.classList.toggle('pyra-on', p.meter >= PD.PYRA_COST || !!p.pyraArm); rp.classList.toggle('pyra-full', p.meter >= PD.SPIRIT_COST); }   // 🌼 pd-5d: 🔥 half = the whole group on fire · 💯 full = hotter fire
     b.classList.toggle('ready', p.meter >= PD.PYRA_COST && !p.pyraArm); b.classList.toggle('armed', !!p.pyraArm); b.classList.toggle('full', p.meter >= PD.SPIRIT_COST); b.classList.toggle('spirit', !!p.spiritArm);
   });
   if(isHoop(G.M) && Math.ceil(G.M.timeLeft) !== G.barT){ G.barT = Math.ceil(G.M.timeLeft); BAR.time(G.barT, G.barT < 10); }
   else if(G.M.drill && G.M.drill.time != null && !isHoop(G.M) && Math.ceil(G.M.drill.time) !== G.barT){ G.barT = Math.ceil(G.M.drill.time); BAR.time(G.barT, G.barT < 10); }
-  const me = G.locals[0]; if(me && Math.round(me.meter) !== G.barM){ G.barM = Math.round(me.meter); BAR.meter('pyra', '🔥', me.meter / 100, 'Pyra meter', me.meter >= 50); }
+  const me = G.locals[0] && PD.bodyOf(G.M, G.locals[0]); if(me && Math.round(me.meter) !== G.barM){ G.barM = Math.round(me.meter); BAR.meter('pyra', '🔥', me.meter / 100, 'Pyra meter', me.meter >= 50); }
 }
 // 🌱 the next move glows (+ 👆 on Basic and the first Junior touches), one goal line on screen
 function guided(){ const M = G.M; return M.lv.assist.slowmo === 1 || M.guidedLeft > 0; }
 function updateGuideUi(){
   if(!G) return; const M = G.M, g = M.guide, hand = $('hand'), line = $('goal-line');
-  const mine = g && G.locals.some(p => p.id === g.p) && !G.over && M.phase !== 'point';
+  const mine = g && G.locals.some(p => PD.bodyOf(M, p).id === g.p) && !G.over && M.phase !== 'point';
   const show = mine && (guided() || g.why === 'serve' || g.why === 'toss' || !!(M.drill && DRILL_WHY.includes(g.why)));
   document.querySelectorAll('.sbtn.glow, .keylegend .glow').forEach(el => { if(!show || el.dataset.a !== g.key) el.classList.remove('glow'); });
   const key = show ? (G.glowKey = g.p + ':' + g.key + ':' + g.why) : '';
   if(!show){ line.classList.add('off'); hand.classList.add('hidden'); G.goalTxt = ''; return; }
-  const b = document.querySelector('.actpad[data-p="' + g.p + '"] .sbtn[data-a="' + g.key + '"]') || document.querySelector('.keylegend [data-a="' + g.key + '"]');
+  const b = document.querySelector('.actpad[data-p="' + (ownerOf(M.players[g.p]) || {id: g.p}).id + '"] .sbtn[data-a="' + g.key + '"]') || document.querySelector('.keylegend [data-a="' + g.key + '"]');   /* 🎮 pd-8a: the pad belongs to your own seat */
   if(b) b.classList.add('glow');
   const GL = isHoop(M) ? GOAL_HOOP : PD.isSpark(M) ? GOAL_SPARK : PD.isStrike(M) ? GOAL_STRIKE : GOAL, gl = GL[g.why] || GL.bump, K = KEYS[localSeat(g.p)], kc = keyName(K[g.key]), kb = a => isTouch() ? '' : ' <kbd>' + UI.esc(keyName(K[a])) + '</kbd>';
   // serve on Junior+: the 3 serve kinds (💥 float · ⬆️ jump serve · 🪶 pinch) — Basic keeps the one-tap line
@@ -2803,6 +2916,7 @@ function draw(dt){
   if(sh) g.translate((Math.random() - 0.5) * sh, (Math.random() - 0.5) * sh);
   drawScene(g, M, {t: performance.now() / 1000, live: true});
   drawSpiritFx(g, M); drawOffBall(g, M);   // 🔥🔥 pd-5a
+  ctlFxDraw(g, M);   /* 🎮 pd-8a */
   padThru(M);   // 👀 pd-5c
   // particles + floating words
   G.fx = G.fx.filter(f => (f.t += dt) < f.life);
@@ -3209,13 +3323,50 @@ function auraSprite(big, r){
 }
 function walkPose(walkT){ const ph = Math.floor(((walkT * 11) % (Math.PI * 2)) / (Math.PI * 2) * 8), a = ph / 8 * Math.PI * 2, w = Math.sin(a); return {legL: w * 0.5, legR: -w * 0.5, armL: 0.15 - w * 0.4, armR: 0.15 + w * 0.4, dy: -Math.abs(Math.cos(a)) * 3}; }
 const IDLE_POSE = {armL: 0.15, armR: 0.15, legL: 0, legR: 0, dy: 0, mouth: 'smile'}, AIR_POSE = {armL: 2.4, armR: 2.4, legL: 0.35, legR: -0.35, dy: 0, mouth: 'open'};
+// 🎮 pd-8a BALL CONTROL look: a gold ring under the player you drive + 👇 + "🎮 name" · a gold arc when control jumps · 🌱 Basic / 🐣 Junior:
+//   cyan rings + 🕹️ arrows on the hitters while you are about to set (the one your stick points at glows brighter)
+function ctlDriven(M, p){ return !!(M.ctl && M.ctl[p.team] && p.human && G && G.locals.some(l => l.own === p.human)); }
+function ctlSetting(M, T){ const d = PD.driverOf(M, T); return d && M.ctl[T] && M.phase === 'rally' && M.side === T && M.n === 1 && M.recv[T] === d.id && M.lastTeam === T ? d : null; }
+function ctlArrow(dx, dy){ const a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)); return ['→', '↘', '↓', '↙', '←', '↖', '↑', '↗'][(a + 8) % 8]; }
+function ctlUnder(g, M, p, fx, fy, kAv, t){
+  if(!M.ctl || !M.ctl[p.team]) return;
+  const R = 22 * kAv * 1.45;
+  if(ctlDriven(M, p)){ const pu = 1 + 0.06 * Math.sin(t * 6);
+    g.save(); g.translate(fx, fy); g.scale(1, 0.4); g.shadowColor = '#FFD23F'; g.shadowBlur = 14; g.strokeStyle = '#FFD23F'; g.lineWidth = 5; g.beginPath(); g.arc(0, 0, R * pu, 0, 7); g.stroke();
+    g.shadowBlur = 0; g.strokeStyle = '#FFFFFF'; g.lineWidth = 2; g.beginPath(); g.arc(0, 0, R * pu * 0.78, 0, 7); g.stroke(); g.restore(); return; }
+  if(M.level > 1) return; const d = ctlSetting(M, p.team); if(!d || !G.locals.some(l => l.own === d.human)) return;
+  const pick = PD.hitterFor(M, d), on = pick && pick.id === p.id;
+  g.save(); g.translate(fx, fy); g.scale(1, 0.4); g.shadowColor = '#7CF7FF'; g.shadowBlur = on ? 18 : 8; g.strokeStyle = on ? '#FFFFFF' : '#7CF7FF'; g.lineWidth = on ? 5 : 3.5;
+  g.setLineDash(on ? [] : [7, 5]); g.beginPath(); g.arc(0, 0, R, 0, 7); g.stroke(); g.restore();
+}
+function ctlPill(g, x, y, ic, txt, bg, fg, h){
+  g.save(); g.font = '800 ' + Math.round(h * 0.62) + 'px Nunito, sans-serif'; const tw = g.measureText(txt).width, w = h * 1.05 + tw + h * 0.55;
+  g.fillStyle = bg; g.strokeStyle = 'rgba(20,10,40,0.85)'; g.lineWidth = 2; g.beginPath(); g.roundRect(x - w / 2, y - h / 2, w, h, h / 2); g.fill(); g.stroke();
+  emo(g, ic, x - w / 2 + h * 0.62, y, h * 0.72); g.fillStyle = fg; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(txt, x - w / 2 + h * 1.08, y + 1); g.restore();
+}
+function ctlOver(g, M, p, fx, ty, kAv){
+  if(!M.ctl || !M.ctl[p.team]) return;
+  const h = Math.max(16, Math.round(15 * kAv * 1.3));
+  if(ctlDriven(M, p)){ const own = ownerOf(p); ctlPill(g, fx, ty - h * 0.2, '🎮', G.locals.length === 1 ? 'You' : own ? own.name : 'You', '#FFD23F', '#1B1030', h); return; }
+  if(M.level > 1) return; const d = ctlSetting(M, p.team); if(!d || !G.locals.some(l => l.own === d.human)) return;
+  const a = P(d.x, d.y, 0), b = P(p.x, p.y, 0), pick = PD.hitterFor(M, d);
+  ctlPill(g, fx, ty - h * 1.25, '🕹️', ctlArrow(b[0] - a[0], b[1] - a[1]), pick && pick.id === p.id ? '#FFFFFF' : '#7CF7FF', '#1B1030', h);
+}
+function ctlFxDraw(g, M){   // the gold arc: from the old player to the new one (0.32 s)
+  const f = G.ctlFx; if(!f) return; const k = (performance.now() - f.t0) / 320; if(k >= 1){ G.ctlFx = null; return; }
+  const to = M.players[f.to]; if(!to) return; const a = P(f.x, f.y, 0), b = P(to.x, to.y, 0), mx = (a[0] + b[0]) / 2, my = Math.min(a[1], b[1]) - 40 - Math.abs(b[0] - a[0]) * 0.15;
+  const at = u => [(1 - u) * (1 - u) * a[0] + 2 * (1 - u) * u * mx + u * u * b[0], (1 - u) * (1 - u) * a[1] + 2 * (1 - u) * u * my + u * u * b[1]];
+  g.save(); g.globalAlpha = 1 - k * 0.6; g.strokeStyle = '#FFD23F'; g.lineWidth = 3; g.setLineDash([6, 6]); g.beginPath(); g.moveTo(a[0], a[1]); for(let u = 0.1; u <= k + 1e-6; u += 0.1){ const q = at(Math.min(u, k)); g.lineTo(q[0], q[1]); } g.stroke();
+  const q = at(k); g.setLineDash([]); g.fillStyle = '#FFF4C2'; g.shadowColor = '#FFD23F'; g.shadowBlur = 12; g.beginPath(); g.arc(q[0], q[1], 6, 0, 7); g.fill(); g.restore();
+}
 function drawPlayer(g, M, p, t, o){
   const [fx, fy, s] = P(p.x, p.y, 0), kAv = 1.55 * V.k * s / 70, live = o.live, lift = p.z * 45 * kAv;
   // 🔥 flame aura (half meter = soft glow, armed / full = big flames) — a cached picture, gently pulsing by size only
   if(p.meter >= 50 || p.pyraArm){ const big = p.spiritArm ? 'spirit' : p.pyraArm || p.meter >= 100, cy = fy - lift - 38 * kAv, r = (big === 'spirit' ? 64 : big ? 52 : 40) * kAv, a = auraSprite(big, r), pul = 1 + 0.06 * Math.sin(t * 9 + p.id), d = (a.width / 2) * pul;
     g.drawImage(a, fx - d, cy - d, d * 2, d * 2); }
   // the next touch: a ring under the feet (your own team)
-  if(live && M.phase === 'rally' && M.recv[p.team] === p.id){ g.save(); g.translate(fx, fy); g.scale(1, 0.38); g.strokeStyle = TEAM_COL[p.team]; g.lineWidth = 3; g.globalAlpha = 0.85; g.beginPath(); g.arc(0, 0, 22 * kAv * 1.4, 0, 7); g.stroke(); g.restore(); }
+  if(live) ctlUnder(g, M, p, fx, fy, kAv, t);   /* 🎮 pd-8a */
+  if(live && M.phase === 'rally' && M.recv[p.team] === p.id && !ctlDriven(M, p)){ g.save(); g.translate(fx, fy); g.scale(1, 0.38); g.strokeStyle = TEAM_COL[p.team]; g.lineWidth = 3; g.globalAlpha = 0.85; g.beginPath(); g.arc(0, 0, 22 * kAv * 1.4, 0, 7); g.stroke(); g.restore(); }
   const gest = M.phase !== 'rally' && p.gest && GEST[p.gest.k] ? {g: GESTURES.find(x => x.k === GEST[p.gest.k]) || GESTURES[0], t: Math.min(p.gest.t, 1.3)} : null;
   if(!p.av) p.av = playAv(defaultAvatar(p.name));
   if(!p.av._h) p.av._h = String(p.id) + Math.random().toString(36).slice(2, 6);
@@ -3241,8 +3392,9 @@ function drawPlayer(g, M, p, t, o){
   g.fillStyle = 'rgba(0,0,0,0.45)'; g.fillRect(fx - bw / 2, by, bw, bh);
   g.fillStyle = p.meter >= 50 ? '#FFB627' : '#FF6B1A'; g.fillRect(fx - bw / 2, by, bw * Math.min(1, p.meter / 100), bh);
   g.fillStyle = 'rgba(255,255,255,0.8)'; g.fillRect(fx - 0.5, by - 1, 1, bh + 2);
-  if(p.human || M.sp.n <= 3){ g.font = '800 ' + Math.max(10, Math.round(11 * kAv * 1.3)) + 'px Nunito, sans-serif'; g.textAlign = 'center'; g.lineWidth = arenaLook(M).light ? 5 : 3; g.strokeStyle = arenaLook(M).light ? 'rgba(20,20,40,0.85)' : 'rgba(0,0,0,0.6)';   // ☁️ light arenas: a darker outline
-    const nm = p.human ? p.name : p.name.slice(0, 9); g.strokeText(nm, fx, top - sz * 0.95); g.fillStyle = p.human ? '#FFE9A8' : '#E6ECFF'; g.fillText(nm, fx, top - sz * 0.95); }
+  if(p.own || M.sp.n <= 3){ g.font = '800 ' + Math.max(10, Math.round(11 * kAv * 1.3)) + 'px Nunito, sans-serif'; g.textAlign = 'center'; g.lineWidth = arenaLook(M).light ? 5 : 3; g.strokeStyle = arenaLook(M).light ? 'rgba(20,20,40,0.85)' : 'rgba(0,0,0,0.6)';   // ☁️ light arenas: a darker outline
+    const nm = p.own ? p.name : p.name.slice(0, 9); if(!(live && ctlDriven(M, p))){ g.strokeText(nm, fx, top - sz * 0.95); g.fillStyle = p.own ? '#FFE9A8' : '#E6ECFF'; g.fillText(nm, fx, top - sz * 0.95); } }
+  if(live) ctlOver(g, M, p, fx, top - sz * 0.95, kAv);   /* 🎮 pd-8a: the driven player's name = the 🎮 pill */
 }
 let BALL_SPR = {};
 function takrawSprite(px){   // 🦶 a woven rattan ball: golden ring weave with round holes
@@ -3342,6 +3494,7 @@ function paintArenaPreview(cv, k){
 /* ================= RESULT + SAVES ================= */
 function finishSoon(){ if(!G || G.over) return; G.over = true; setTimeout(() => { if(G && G.over) finishMatch(); }, FX ? 1500 : 30); }
 function finishMatch(){
+  if(G && G.M) PD.ctlHome(G.M);   /* 🎮 pd-8a: stats + meter back on your own seat */
   if(G.M.drill) return finishDrill();
   if(G.cup) return finishCupMatch();
   stopLoop(); const M = G.M, secs = Math.round((Date.now() - G.t0) / 1000), hc = !!LEVEL_UI[G.level].hardcore;
@@ -3479,6 +3632,7 @@ function showCupCard(last){
   if(champ && FX) confetti(['🏆', '🔥', '⭐', '🎉', '👑'], 34);
 }
 function finishCupMatch(){
+  if(G && G.M) PD.ctlHome(G.M);   /* 🎮 pd-8a */
   stopLoop(); const M = G.M, Cs = SET.cupState, me = G.locals[0], won = M.winner === me.team, opp = Cs.opp;
   $('hand').classList.add('hidden'); $('goal-line').classList.add('off'); NOTES.length = 0;
   // feats for every person of this match (kills, saves, spirits …); the cup itself is saved when it ends
@@ -3623,4 +3777,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pd-4c+cs-pd+ck-2d+pd-4e+pd-5a+pd-7+pd-5b+pd-6a+pd-5c+pd-6b+pd-5d+pd-6b2+pd-5e+pd-6c) END OF PyraDive.html -->
+<!-- (pd-4c+cs-pd+ck-2d+pd-4e+pd-5a+pd-7+pd-5b+pd-6a+pd-5c+pd-6b+pd-5d+pd-6b2+pd-5e+pd-6c+pd-8a) END OF PyraDive.html -->
