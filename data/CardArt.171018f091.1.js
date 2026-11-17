@@ -1,0 +1,1211 @@
+
+/* 🎴 CARD ART (p5) — storybook (crayon) pictures for every Gameroom card. Aowu 2026-11-13 picked style C "Storybook".
+   One painter per game: SCENES[id](K) → {b: still scene, m: the one moving part, a: animation}. Each part becomes an
+   <img> with an SVG data picture (filters are drawn ONCE, never per frame); the moving part only moves by CSS transform.
+   Box 320×200; the important part stays inside x 44..276 (phone cards are cut to ~1.22 wide). */
+(function(root){
+  'use strict';
+  const hx = h => { h = h.replace('#', ''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); };
+  const toHex = a => '#' + a.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+  const mix = (a, b, t) => { const A = hx(a), B = hx(b); return toHex(A.map((v, i) => v + (B[i] - v) * t)); };
+  const lite = (c, t) => mix(c, '#ffffff', t), dark = (c, t) => mix(c, '#000000', t);
+  const PAPER = '#F6ECD6', INK = '#3B2A20';
+  const FONT = 'Chalkboard SE, Comic Sans MS, Comic Neue, Fredoka, sans-serif';   // no quotes: the picture text is kept quote-free for the small data encoding
+  const SKIN = ['#F2C29B', '#C68B59', '#FAD7B5', '#8D5A3B'], HAIR = ['#4A2C1D', '#1F1A17', '#C9772E', '#6B3B1F'];
+
+  function kit(id, c1, c2){
+    const defs = [], seen = {};
+    const edge = c => mix(dark(c, .5), INK, .35);
+    function pat(c){   // coloured-pencil fill: the colour + soft diagonal hatching in a darker tone
+      const k = id + 'p' + c.slice(1);
+      if(!seen[k]){ seen[k] = 1; defs.push('<pattern id="' + k + '" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(38)"><rect width="5" height="5" fill="' + mix(c, PAPER, .08) + '"/><line x1="1" y1="0" x2="1" y2="5" stroke="' + dark(c, .16) + '" stroke-width="1.3" opacity=".55"/></pattern>'); }
+      return 'url(#' + k + ')';
+    }
+    const K = {id, c1, c2, INK, defs, mix, lite, dark, edge,
+      f: (c, x) => 'fill="' + pat(c) + '" stroke="' + edge(c) + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" ' + (x || ''),
+      fp: (c, x, w) => 'fill="' + mix(c, PAPER, .06) + '" stroke="' + edge(c) + '" stroke-width="' + (w || 1.8) + '" stroke-linejoin="round" ' + (x || ''),
+      l: (c, w, x) => 'fill="none" stroke="' + mix(c, INK, .22) + '" stroke-width="' + (w || 2) + '" stroke-linecap="round" stroke-linejoin="round" ' + (x || ''),
+      tube: (d, c, w) => '<path d="' + d + '" fill="none" stroke="' + edge(c) + '" stroke-width="' + (w + 3.6) + '" stroke-linecap="round" stroke-linejoin="round"/><path d="' + d + '" fill="none" stroke="' + pat(c) + '" stroke-width="' + w + '" stroke-linecap="round" stroke-linejoin="round"/><path d="' + d + '" fill="none" stroke="' + lite(c, .45) + '" stroke-width="' + (w * .22) + '" stroke-linecap="round" opacity=".7" transform="translate(-1.5 -2.5)"/>',
+      t: (x, y, s, size, c, x2) => '<text x="' + x + '" y="' + y + '" text-anchor="middle" dominant-baseline="central" font-family="' + FONT + '" font-weight="700" font-size="' + size + '" fill="' + (c || INK) + '" ' + (x2 || '') + '>' + s + '</text>',
+      spark: (x, y, r, c) => { c = c || '#FFD84A'; const q = r * .28; return '<path d="M' + x + ' ' + (y - r) + 'Q' + (x + q) + ' ' + (y - q) + ' ' + (x + r) + ' ' + y + 'Q' + (x + q) + ' ' + (y + q) + ' ' + x + ' ' + (y + r) + 'Q' + (x - q) + ' ' + (y + q) + ' ' + (x - r) + ' ' + y + 'Q' + (x - q) + ' ' + (y - q) + ' ' + x + ' ' + (y - r) + 'Z" ' + K.fp(c, '', 1.3) + '/>'; },
+      star: (x, y, r, c) => { let d = ''; for(let i = 0; i < 10; i++){ const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * .45 : r; d += (i ? 'L' : 'M') + (x + Math.cos(a) * rr).toFixed(1) + ' ' + (y + Math.sin(a) * rr).toFixed(1); } return '<path d="' + d + 'Z" ' + K.f(c || '#FFD84A') + '/>'; },
+      burst: (x, y, r, c, n) => { n = n || 12; let d = ''; for(let i = 0; i < n * 2; i++){ const a = i * Math.PI / n, rr = i % 2 ? r * .62 : r; d += (i ? 'L' : 'M') + (x + Math.cos(a) * rr).toFixed(1) + ' ' + (y + Math.sin(a) * rr).toFixed(1); } return '<path d="' + d + 'Z" ' + K.f(c || '#FFD84A') + '/>'; },
+      tile: (x, y, ch, col, T, tc) => { T = T || 26; return '<g transform="translate(' + x + ' ' + y + ')"><rect x="' + (-T / 2) + '" y="' + (-T / 2) + '" width="' + T + '" height="' + T + '" rx="' + (T * .22) + '" ' + K.f(col || '#FFF1D6') + '/>' + K.t(0, 1, ch, T * .66, tc) + '</g>'; },
+      // a child: x, y = feet; s = size; pose: arm angles in degrees (0 = down, 90 = sideways out, 170 = up)
+      kid: (x, y, s, o) => {
+        o = o || {};
+        const n = o.n || 0, skin = o.skin || SKIN[n % 4], hair = o.hair || HAIR[n % 4], shirt = o.shirt || c2, aL = o.aL == null ? 25 : o.aL, aR = o.aR == null ? 25 : o.aR;
+        const arm = (side, a) => { const r = a * Math.PI / 180, sx = side * 10, ex = sx + side * Math.sin(r) * 17, ey = -34 + Math.cos(r) * 17; return '<path d="M' + sx + ' -34 L' + ex.toFixed(1) + ' ' + ey.toFixed(1) + '" ' + K.l(shirt, 6.5) + '/><circle cx="' + ex.toFixed(1) + '" cy="' + ey.toFixed(1) + '" r="4" ' + K.fp(skin) + '/>'; };
+        let g = '<g transform="translate(' + x + ' ' + y + ') scale(' + s + ')">';
+        if(!o.headOnly){
+          if(!o.sit) g += '<path d="M-6 -14 L' + (o.legL || -8) + ' -1 M6 -14 L' + (o.legR || 8) + ' -1" ' + K.l(o.pants || '#3D5A8A', 6.5) + '/><ellipse cx="' + ((o.legL || -8) - 2) + '" cy="-1" rx="5" ry="3" ' + K.fp('#5B3A2A') + '/><ellipse cx="' + ((o.legR || 8) + 2) + '" cy="-1" rx="5" ry="3" ' + K.fp('#5B3A2A') + '/>';
+          g += arm(-1, aL) + arm(1, aR);
+          g += '<path d="M-11 -12 Q-13 -38 0 -38 Q13 -38 11 -12 Z" ' + K.f(shirt) + '/>';
+        }
+        const hy = o.headOnly ? 0 : -50;
+        g += '<circle cx="0" cy="' + hy + '" r="13" ' + K.fp(skin) + '/>';
+        g += '<path d="M-13 ' + (hy - 1) + ' Q-13 ' + (hy - 16) + ' 0 ' + (hy - 15) + ' Q14 ' + (hy - 15) + ' 13 ' + (hy - 2) + ' Q6 ' + (hy - 9) + ' -3 ' + (hy - 6) + ' Q-9 ' + (hy - 4) + ' -13 ' + (hy - 1) + 'Z" ' + K.f(hair) + '/>';
+        if(o.goggles) g += '<rect x="-12" y="' + (hy - 5) + '" width="24" height="9" rx="4.5" ' + K.fp(o.goggles) + '/><circle cx="-5.5" cy="' + (hy - .5) + '" r="2.6" fill="#E8FBFF"/><circle cx="5.5" cy="' + (hy - .5) + '" r="2.6" fill="#E8FBFF"/>';
+        else if(o.helmet) g += '<path d="M-14 ' + (hy + 1) + ' Q-14 ' + (hy - 17) + ' 0 ' + (hy - 17) + ' Q14 ' + (hy - 17) + ' 14 ' + (hy + 1) + 'Z" ' + K.f(o.helmet) + '/><circle cx="-4.5" cy="' + (hy + 2) + '" r="1.8" fill="' + INK + '"/><circle cx="4.5" cy="' + (hy + 2) + '" r="1.8" fill="' + INK + '"/>';
+        else g += '<circle cx="-4.5" cy="' + (hy + 1) + '" r="1.8" fill="' + INK + '"/><circle cx="4.5" cy="' + (hy + 1) + '" r="1.8" fill="' + INK + '"/>';
+        g += o.mouth === 'o' ? '<ellipse cx="0" cy="' + (hy + 7) + '" rx="2.6" ry="3.2" fill="#7F1D1D"/>' : '<path d="M-4.5 ' + (hy + 5.5) + ' Q0 ' + (hy + 10) + ' 4.5 ' + (hy + 5.5) + '" ' + K.l('#7F1D1D', 1.7) + '/>';
+        g += '<circle cx="-8" cy="' + (hy + 5) + '" r="2.4" fill="#F58E8E" opacity=".45"/><circle cx="8" cy="' + (hy + 5) + '" r="2.4" fill="#F58E8E" opacity=".45"/>';
+        return g + '</g>';
+      },
+      robot: (x, y, s, c, o) => { o = o || {}; return '<g transform="translate(' + x + ' ' + y + ') scale(' + s + ')"><line x1="0" y1="-48" x2="0" y2="-60" ' + K.l('#6B7280', 2.5) + '/><circle cx="0" cy="-62" r="4.5" ' + K.fp('#FFC93C') + '/><rect x="-22" y="-48" width="44" height="34" rx="9" ' + K.f(c) + '/><circle cx="-9" cy="-31" r="6" fill="#E8FBFF" stroke="' + K.edge(c) + '" stroke-width="1.5"/><circle cx="9" cy="-31" r="6" fill="#E8FBFF" stroke="' + K.edge(c) + '" stroke-width="1.5"/><circle cx="-8" cy="-30" r="2.6" fill="#1E1B4B"/><circle cx="10" cy="-30" r="2.6" fill="#1E1B4B"/><path d="M-7 -21 Q0 -16 7 -21" ' + K.l('#ffffff', 2) + '/><rect x="-17" y="-12" width="34" height="' + (o.short ? 18 : 30) + '" rx="7" ' + K.f(lite(c, .22)) + '/>' + (o.wheels ? '<circle cx="-10" cy="' + (o.short ? 8 : 20) + '" r="6" ' + K.fp('#374151') + '/><circle cx="10" cy="' + (o.short ? 8 : 20) + '" r="6" ' + K.fp('#374151') + '/>' : '') + (o.cheer ? '<path d="M-17 -6 L-32 -26" ' + K.l(c, 6) + '/><circle cx="-33" cy="-28" r="4.5" ' + K.fp(lite(c, .3)) + '/><path d="M17 -6 L30 8" ' + K.l(c, 6) + '/>' : '') + '</g>'; },
+      check: (x, y) => '<g transform="translate(' + x + ' ' + y + ')"><circle r="10" ' + K.f('#22C55E') + '/><path d="M-5 0 L-1.5 4 L5 -4" ' + K.l('#ffffff', 2.8) + '/></g>',
+      arrowHead: (x, y, ang, c, s) => { s = s || 7; const r = ang * Math.PI / 180, p = (a, l) => (x + Math.cos(r + a) * l).toFixed(1) + ' ' + (y + Math.sin(r + a) * l).toFixed(1); return '<path d="M' + p(2.6, s) + ' L' + x + ' ' + y + ' L' + p(-2.6, s) + '" ' + K.l(c, 3) + '/>'; }
+    };
+    return K;
+  }
+
+  // Paper + watercolour wash + the crayon finish (wobble, a second faint sketch line, crayon grain).
+  function svgOf(K, inner, withBg, bgExtra){
+    const id = K.id;
+    const filt = '<filter id="' + id + 'fx" x="-4%" y="-4%" width="108%" height="108%">' +
+      '<feTurbulence type="fractalNoise" baseFrequency=".045" numOctaves="2" seed="3" result="n1"/><feDisplacementMap in="SourceGraphic" in2="n1" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="a"/>' +
+      '<feTurbulence type="fractalNoise" baseFrequency=".07" numOctaves="2" seed="9" result="n2"/><feDisplacementMap in="SourceGraphic" in2="n2" scale="3.6" xChannelSelector="G" yChannelSelector="R" result="b"/>' +
+      '<feOffset in="b" dx=".9" dy=".7" result="b2"/><feComponentTransfer in="b2" result="b3"><feFuncA type="linear" slope=".34"/></feComponentTransfer>' +
+      '<feMerge result="m"><feMergeNode in="b3"/><feMergeNode in="a"/></feMerge>' +
+      '<feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="1" seed="5" result="g"/><feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  1.5 0 0 0 .22" result="ga"/>' +
+      '<feComposite in="m" in2="ga" operator="in"/></filter>';
+    let bg = '', over = '';
+    if(withBg){
+      const wash = '<filter id="' + id + 'w"><feTurbulence type="fractalNoise" baseFrequency=".02" numOctaves="3" seed="11"/><feDisplacementMap in="SourceGraphic" scale="24"/><feGaussianBlur stdDeviation="1.4"/></filter>' +
+        '<filter id="' + id + 'pp"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="3" seed="7"/><feColorMatrix values="0 0 0 0 .42  0 0 0 0 .33  0 0 0 0 .2  0 0 0 .55 0"/><feComposite in2="SourceGraphic" operator="in"/></filter>' +
+        '<pattern id="' + id + 'h" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><line x1="0" y1="0" x2="0" y2="7" stroke="' + dark(K.c1, .3) + '" stroke-width="1" opacity=".16"/></pattern>';
+      K.defs.push(wash);
+      bg = '<rect width="320" height="200" fill="' + PAPER + '"/><g filter="url(#' + id + 'w)"><ellipse cx="80" cy="60" rx="130" ry="75" fill="' + K.c1 + '" opacity=".34"/><ellipse cx="260" cy="160" rx="120" ry="64" fill="' + K.c2 + '" opacity=".26"/></g><rect width="320" height="200" fill="url(#' + id + 'h)"/>' + (bgExtra || '');
+      over = '<rect width="320" height="200" fill="#fff" filter="url(#' + id + 'pp)" opacity=".5"/>';
+    }
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" preserveAspectRatio="xMidYMid slice"><defs>' + filt + K.defs.join('') + '</defs>' + bg + '<g filter="url(#' + id + 'fx)">' + inner + '</g>' + over + '</svg>';
+  }
+
+  // ======================= the scenes (one per game) =======================
+  const S = {};
+  const OP = c => /[0-9A-Za-z]/.test(c) ? null : '#FFD58A';
+
+  // ➗ Algebros — one flying 7 makes two sums true
+  S['number-board'] = K => {
+    const T = 26, St = 29, x0 = 62, y0 = 50, sx = x0 + 4 * St; let b = '';
+    b += '<rect x="40" y="30" width="176" height="160" rx="14" ' + K.fp('#FFFFFF', 'opacity=".6"') + '/>';
+    ['3', '+', '4', '='].forEach((c, i) => b += K.tile(x0 + i * St, y0, c, OP(c), T, OP(c) ? '#B4410C' : null));
+    ['−', '5', '=', '2'].forEach((c, i) => b += K.tile(sx, y0 + (i + 1) * St, c, OP(c), T, OP(c) ? '#B4410C' : null));
+    ['6', '×', '1'].forEach((c, i) => b += K.tile(x0 + i * St, y0 + 3 * St, c, OP(c), T, OP(c) ? '#B4410C' : null));
+    b += '<rect x="' + (sx - 16) + '" y="' + (y0 - 16) + '" width="32" height="32" rx="8" fill="none" stroke="#22A355" stroke-width="2.6" stroke-dasharray="5 4"/>';
+    b += K.check(x0 - 4, y0 - 30) + K.check(sx + 28, y0 + 4 * St);
+    b += K.robot(250, 140, .9, K.c2, {cheer: 1});
+    b += '<rect x="214" y="168" width="70" height="9" rx="4" ' + K.f('#B7794A') + '/>' + ['8', '+', '9'].map((c, i) => '<g transform="translate(' + (228 + i * 21) + ' 158) scale(.7)">' + K.tile(0, 0, c, OP(c), 26) + '</g>').join('');
+    let m = '<path d="M270 16 Q232 0 ' + (sx + 18) + ' ' + (y0 - 22) + '" ' + K.l('#7A5CFA', 2.4, 'stroke-dasharray="2 7"') + '/>';
+    m += '<g transform="translate(' + (sx + 22) + ' ' + (y0 - 28) + ') rotate(-14) scale(1.25)">' + K.tile(0, 0, '7', '#BBF7D0') + '</g>' + K.spark(sx - 20, y0 - 26, 7) + K.spark(sx + 46, y0 - 4, 5);
+    return {b, m, a: 'hover'};
+  };
+
+  // 🔤 Lettercraft — WORD + a flying S makes WORDS
+  S['word-board'] = K => {
+    const T = 26, St = 29, x0 = 58, y0 = 64; let b = '';
+    b += '<rect x="36" y="38" width="190" height="148" rx="14" ' + K.fp('#FFFFFF', 'opacity=".6"') + '/>';
+    const sc = (x, y, n) => '<text x="' + (x + 8) + '" y="' + (y + 8) + '" text-anchor="middle" dominant-baseline="central" font-family="' + FONT + '" font-weight="700" font-size="7" fill="' + INK + '">' + n + '</text>';
+    [['W', 4], ['O', 1], ['R', 1], ['D', 2]].forEach(([c, n], i) => b += K.tile(x0 + i * St, y0, c, '#FFF1D6') + sc(x0 + i * St, y0, n));
+    [['E', 1], ['A', 1], ['D', 2]].forEach(([c, n], i) => b += K.tile(x0 + 2 * St, y0 + (i + 1) * St, c, '#FFF1D6') + sc(x0 + 2 * St, y0 + (i + 1) * St, n));
+    [['P', 3], ['L', 1], ['A', 1], ['Y', 4]].forEach(([c, n], i) => i !== 2 && (b += K.tile(x0 + i * St, y0 + 2 * St, c, '#FFF1D6') + sc(x0 + i * St, y0 + 2 * St, n)));
+    b += '<rect x="' + (x0 + 4 * St - 16) + '" y="' + (y0 - 16) + '" width="32" height="32" rx="8" fill="none" stroke="#22A355" stroke-width="2.6" stroke-dasharray="5 4"/>';
+    // open book + pencil
+    b += '<path d="M222 150 Q246 140 270 150 L270 182 Q246 172 222 182Z" ' + K.f('#FFFFFF') + '/><path d="M270 150 Q294 140 300 150 L300 182 Q290 172 270 182Z" ' + K.f('#FFFFFF') + '/><path d="M230 158 L262 154 M230 166 L262 162 M276 158 L294 154" ' + K.l('#9CA3AF', 1.4) + '/>';
+    b += '<path d="M250 110 L282 78" ' + K.l('#F4B400', 7) + '/><path d="M282 78 L288 72" ' + K.l('#F59EB0', 7) + '/><path d="M250 110 L246 116" ' + K.l('#3B2A20', 3) + '/>';
+    let m = '<path d="M290 30 Q252 12 ' + (x0 + 4 * St + 18) + ' ' + (y0 - 22) + '" ' + K.l(K.c1, 2.4, 'stroke-dasharray="2 7"') + '/><g transform="translate(' + (x0 + 4 * St + 20) + ' ' + (y0 - 30) + ') rotate(12) scale(1.25)">' + K.tile(0, 0, 'S', '#BBF7D0') + '</g>' + K.spark(x0 + 4 * St - 18, y0 - 30, 6) + K.spark(x0 + 4 * St + 44, y0 - 10, 5);
+    return {b, m, a: 'hover'};
+  };
+
+  // 🔢 Digitinct — drag the missing 3 into a 4×4 grid
+  S['number-grid'] = K => {
+    const C = 27, gx = 58, gy = 40; let b = '';   /* 🎴 gr-6: was 30 / 70 / 34 — room for the logo on the right */
+    const G = [['1', '2', '', '4'], ['3', '4', '1', '2'], ['2', '', '4', '1'], ['4', '1', '2', '3']];
+    b += '<rect x="' + (gx - 6) + '" y="' + (gy - 6) + '" width="' + (C * 4 + 12) + '" height="' + (C * 4 + 12) + '" rx="10" ' + K.f('#FFFFFF') + '/>';
+    G.forEach((r, y) => r.forEach((v, x) => { const glow = (x === 2 && y === 0); b += '<rect x="' + (gx + x * C) + '" y="' + (gy + y * C) + '" width="' + C + '" height="' + C + '" rx="4" ' + K.fp(glow ? '#BBF7D0' : ((x < 2) === (y < 2) ? '#EDE9FE' : '#FFF7E6')) + '/>' + (v ? K.t(gx + x * C + C / 2, gy + y * C + C / 2 + 1, v, 18) : ''); }));
+    b += '<path d="M' + (gx + 2 * C) + ' ' + (gy - 4) + ' V' + (gy + 4 * C + 4) + ' M' + (gx - 4) + ' ' + (gy + 2 * C) + ' H' + (gx + 4 * C + 4) + '" ' + K.l(K.c1, 3) + '/>';
+    // the number tray
+    b += '<rect x="190" y="152" width="88" height="32" rx="10" ' + K.f('#B7794A') + '/>' + ['1', '2', '4'].map((c, i) => K.tile(208 + i * 26, 168, c, '#FFF1D6', 22)).join('');   /* 🎴 gr-6: 24 left */
+    let m = '<path d="M194 60 Q170 26 ' + (gx + 2 * C + 30) + ' ' + (gy + 14) + '" ' + K.l(K.c2, 2.4, 'stroke-dasharray="2 7"') + '/>' + '<g transform="translate(204 66) rotate(8)">' + K.tile(0, 0, '3', '#FFE08A', 30) + '<path d="M6 14 q4 -6 10 -2 l8 10 q4 6 -2 10 l-10 4 q-6 2 -10 -4 Z" ' + K.fp('#F2C29B') + '/></g>' + K.spark(184, 44, 6);
+    return {b, m, a: 'hover'};
+  };
+
+  // ⬛ Polyplot — the last line closes a box and it becomes yours
+  S['polyplot'] = K => {
+    const D = 34, gx = 64, gy = 36; let b = '';
+    b += '<rect x="' + (gx + D) + '" y="' + (gy + D) + '" width="' + D + '" height="' + D + '" ' + K.f(K.c1) + '/><rect x="' + (gx + 3 * D) + '" y="' + (gy + 2 * D) + '" width="' + D + '" height="' + D + '" ' + K.f(K.c2) + '/><rect x="' + gx + '" y="' + (gy + 2 * D) + '" width="' + D + '" height="' + D + '" ' + K.f(K.c1) + '/>';
+    const L = [[0, 0, 1, 0], [1, 0, 2, 0], [1, 1, 2, 1], [1, 1, 1, 2], [2, 1, 2, 2], [1, 2, 2, 2], [0, 2, 1, 2], [0, 2, 0, 3], [0, 3, 1, 3], [1, 2, 1, 3], [3, 2, 4, 2], [3, 3, 4, 3], [3, 2, 3, 3], [4, 2, 4, 3], [2, 2, 2, 3], [2, 2, 3, 2], [2, 0, 3, 0], [3, 0, 3, 1], [4, 0, 4, 1], [3, 1, 4, 1]];
+    L.forEach(([a, c, d, e]) => b += '<path d="M' + (gx + a * D) + ' ' + (gy + c * D) + ' L' + (gx + d * D) + ' ' + (gy + e * D) + '" ' + K.l('#3B2A20', 3) + '/>');
+    for(let y = 0; y < 4; y++) for(let x = 0; x < 5; x++) b += '<circle cx="' + (gx + x * D) + '" cy="' + (gy + y * D) + '" r="4.2" ' + K.fp('#3B2A20') + '/>';
+    b += '<rect x="' + (gx + 3 * D) + '" y="' + gy + '" width="' + D + '" height="' + D + '" ' + K.fp('#FFE08A', 'opacity=".9"') + '/>';
+    b += K.kid(262, 182, .95, {n: 1, shirt: K.c1, aR: 150, aL: 20});
+    let m = '<path d="M' + (gx + 3 * D) + ' ' + (gy + D) + ' L' + (gx + 4 * D) + ' ' + (gy + D) + '" ' + K.l(K.c1, 4, 'stroke-dasharray="6 5"') + '/><g transform="translate(' + (gx + 4 * D - 4) + ' ' + (gy + D - 4) + ') rotate(-40)"><path d="M0 0 L8 -4 L46 -4 L46 4 L8 4 Z" ' + K.fp('#F4B400') + '/><path d="M0 0 L8 -4 L8 4Z" fill="' + INK + '"/></g>' + K.star(gx + 3.5 * D, gy + .5 * D, 9) + K.spark(gx + 4 * D + 16, gy - 4, 6);
+    return {b, m, a: 'wiggle'};
+  };
+
+  // 🔴 Alignext — the 4th disc drops in
+  S['alignext'] = K => {
+    const C = 28, gx = 76, gy = 52, R = ['', '', '', '', '', '', 'r', '', '', '', '', '', 'y', 'r', '', '', 'y', '', 'r', 'y', 'r', '', 'y', 'r', 'y', 'y', 'r', 'r'];
+    let b = '<rect x="' + (gx - 8) + '" y="' + (gy - 8) + '" width="' + (C * 6 + 16) + '" height="' + (C * 4 + 16) + '" rx="12" ' + K.f('#7C4DFF') + '/>';
+    b += '<path d="M' + (gx - 14) + ' ' + (gy + 4 * C + 8) + ' l-6 26 M' + (gx + 6 * C + 14) + ' ' + (gy + 4 * C + 8) + ' l6 26" ' + K.l('#5B3A9A', 6) + '/>';
+    for(let y = 0; y < 4; y++) for(let x = 0; x < 6; x++){ const v = R[y * 7 + x] || ''; b += '<circle cx="' + (gx + x * C + C / 2) + '" cy="' + (gy + y * C + C / 2) + '" r="11" ' + (v === 'r' ? K.f('#E63946') : v === 'y' ? K.f('#FFC21A') : K.fp('#F6ECD6')) + '/>'; }
+    b += '<path d="M' + (gx + C * 1.5) + ' ' + (gy + C * 3.5) + ' L' + (gx + C * 4.5) + ' ' + (gy + C * .5) + '" ' + K.l('#FFFFFF', 3, 'stroke-dasharray="4 5" opacity=".9"') + '/>';
+    b += K.kid(44, 186, .8, {n: 2, shirt: '#E63946', aL: 160, aR: 150, mouth: 'o'}) + K.kid(282, 186, .8, {n: 3, shirt: '#FFC21A', aL: 20, aR: 30});
+    let m = '<circle cx="' + (gx + 4 * C + C / 2) + '" cy="' + (gy - 22) + '" r="11" ' + K.f('#E63946') + '/><path d="M' + (gx + 4 * C + C / 2) + ' ' + (gy - 50) + ' v12 M' + (gx + 4 * C + C / 2 - 8) + ' ' + (gy - 46) + ' v8 M' + (gx + 4 * C + C / 2 + 8) + ' ' + (gy - 46) + ' v8" ' + K.l('#E63946', 2) + '/>' + K.spark(gx + 4 * C + 36, gy - 30, 6);
+    return {b, m, a: 'drop'};
+  };
+
+  // 🐍 Snakize — ride your snake to the fruit
+  S['snakeast'] = K => {
+    let grid = ''; for(let x = 0; x <= 320; x += 20) grid += '<line x1="' + x + '" y1="0" x2="' + x + '" y2="200" stroke="' + dark(K.c1, .2) + '" stroke-width="1" opacity=".25"/>'; for(let y = 0; y <= 200; y += 20) grid += '<line x1="0" y1="' + y + '" x2="320" y2="' + y + '" stroke="' + dark(K.c1, .2) + '" stroke-width="1" opacity=".25"/>';
+    let b = '<path d="M240 140 H320 V200 H220 V160 H240Z" ' + K.f(K.c2) + '/><line x1="290" y1="146" x2="290" y2="178" ' + K.l('#5B3A1A', 2.4) + '/><path d="M290 146 L308 152 L290 158Z" ' + K.f('#EF4444') + '/>';
+    b += '<g transform="translate(0 18)">' + K.tube('M40 182 C70 196 100 186 106 158 C112 128 72 120 84 96 C96 72 140 84 160 98 C176 110 196 100 204 84', '#22A04A', 24);
+    [[60, 188], [96, 172], [98, 134], [86, 104], [122, 86], [158, 98], [184, 100]].forEach(([x, y]) => b += '<circle cx="' + x + '" cy="' + y + '" r="3.6" ' + K.fp(K.c2) + '/>');
+    b += '<g transform="translate(212 74) rotate(-28)"><ellipse cx="0" cy="0" rx="22" ry="16" ' + K.f('#22A04A') + '/><path d="M6 1 Q16 -10 22 -8 Q19 1 22 10 Q16 11 6 1Z" fill="#7F1D1D"/><path d="M18 1 L30 1 L35 -3 M30 1 L35 5" ' + K.l('#EF4444', 2) + '/><circle cx="-2" cy="-11" r="6" fill="#fff" stroke="' + INK + '" stroke-width="1.5"/><circle cx="0" cy="-11" r="3" fill="#111"/></g>';
+    b += K.kid(176, 100, .9, {n: 0, shirt: '#3D7DD8', sit: 1, aR: 130, aL: 40}) + '</g>';   /* 🎴 gr-6: snake 18 lower, logo on top */
+    let m = '<g transform="translate(244 86)"><circle r="15" ' + K.f('#EF3B3B') + '/><path d="M0 -14 Q2 -22 6 -24" ' + K.l('#5B3A1A', 2.4) + '/><path d="M3 -18 Q14 -26 18 -16 Q8 -12 3 -18Z" ' + K.f('#3CB04A') + '/><ellipse cx="-5" cy="-5" rx="4" ry="6" fill="#fff" opacity=".55"/></g>' + K.spark(268, 76, 6) + K.spark(266, 112, 4);
+    return {b, m, a: 'bob', bg: grid};
+  };
+
+  // 🏎️ Turbo Trail — drift past the rival
+  function car(K, x, y, s, col, rot, helmet){
+    return '<g transform="translate(' + x + ' ' + y + ') rotate(' + rot + ') scale(' + s + ')"><rect x="-31" y="2" width="13" height="16" rx="4" ' + K.fp('#2B2B3A') + '/><rect x="18" y="2" width="13" height="16" rx="4" ' + K.fp('#2B2B3A') + '/><rect x="-30" y="-14" width="60" height="24" rx="9" ' + K.f(col) + '/><rect x="-19" y="-31" width="38" height="20" rx="8" ' + K.fp('#BDE6FF') + '/><circle cx="0" cy="-22" r="7.5" ' + K.fp(helmet) + '/><rect x="-5.5" y="-24" width="11" height="4" rx="2" fill="#1E293B"/><rect x="-34" y="-19" width="68" height="6" rx="3" ' + K.f(dark(col, .25)) + '/><rect x="-26" y="-6" width="9" height="5" rx="2" fill="#FF3B3B"/><rect x="17" y="-6" width="9" height="5" rx="2" fill="#FF3B3B"/></g>';
+  }
+  S['turbo'] = K => {
+    let b = '<path d="M0 74 Q160 62 320 74 L320 200 L0 200Z" ' + K.f('#5CC45A') + '/>';
+    b += '<path d="M30 200 C95 150 150 110 151 74 L171 74 C176 110 236 150 306 200 Z" ' + K.f('#6B6F82') + '/><path d="M168 200 C178 150 165 110 161 76" ' + K.l('#ffffff', 3.5, 'stroke-dasharray="12 10"') + '/>';
+    b += '<path d="M30 200 C95 150 150 110 151 74" ' + K.l('#EF4444', 4, 'stroke-dasharray="7 7"') + '/><path d="M306 200 C236 150 176 110 171 74" ' + K.l('#EF4444', 4, 'stroke-dasharray="7 7"') + '/>';
+    b += '<rect x="140" y="50" width="3" height="24" ' + K.fp('#9CA3AF') + '/><rect x="179" y="50" width="3" height="24" ' + K.fp('#9CA3AF') + '/><rect x="140" y="45" width="42" height="9" ' + K.fp('#ffffff') + '/>';
+    for(let i = 0; i < 10; i++) for(let j = 0; j < 2; j++) if((i + j) % 2) b += '<rect x="' + (141 + i * 4) + '" y="' + (46 + j * 4) + '" width="4" height="4" fill="#2B2B3A"/>';
+    const tree = (x, y, s) => '<g transform="translate(' + x + ' ' + y + ') scale(' + s + ')"><rect x="-3" y="0" width="6" height="14" ' + K.fp('#8B5A2B') + '/><circle cx="0" cy="-6" r="12" ' + K.f('#2E9E4F') + '/></g>';
+    b += tree(40, 92, .9) + tree(78, 78, .55) + tree(118, 70, .35) + tree(282, 96, 1) + tree(240, 80, .6) + tree(206, 72, .38);
+    b += car(K, 180, 112, .55, K.c2, 4, '#FDE68A');
+    let m = [0, 1, 2, 3].map(i => '<path d="M' + (44 + i * 6) + ' ' + (128 + i * 13) + ' L' + (78 + i * 4) + ' ' + (126 + i * 13) + '" ' + K.l('#ffffff', 2.6) + '/>').join('');
+    m += [[172, 186, 11], [190, 176, 8], [158, 194, 9], [205, 168, 6]].map(([x, y, r]) => '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" ' + K.fp('#E5E7EB') + '/>').join('');
+    m += car(K, 122, 158, 1.05, K.c1, -14, '#ffffff') + K.spark(142, 118, 6);
+    return {b, m, a: 'drift'};
+  };
+
+  // 🏭 Artifactory — a cup appears on the spinning lathe
+  S['artifactory'] = K => {
+    let b = '<rect x="0" y="170" width="320" height="30" ' + K.f('#9A6B43') + '/><rect x="40" y="40" width="96" height="7" rx="3" ' + K.f('#8B5A2B') + '/>';
+    b += '<path d="M52 40 Q48 22 56 14 L70 14 Q78 22 74 40Z" ' + K.f('#3BA0E8') + '/><path d="M86 40 L88 24 L106 24 L108 40Z" ' + K.f('#F2B84B') + '/><circle cx="124" cy="31" r="9" ' + K.f('#E85D75') + '/>';
+    b += '<rect x="36" y="146" width="250" height="14" rx="4" ' + K.f('#7C8597') + '/><rect x="52" y="160" width="14" height="14" ' + K.f('#5B6375') + '/><rect x="256" y="160" width="14" height="14" ' + K.f('#5B6375') + '/>';
+    b += '<rect x="40" y="88" width="56" height="58" rx="8" ' + K.f(K.c1) + '/><circle cx="58" cy="106" r="6" ' + K.fp('#FDE68A') + '/><rect x="96" y="104" width="12" height="30" rx="3" ' + K.fp('#A3ACBD') + '/>';
+    b += '<rect x="252" y="106" width="34" height="40" rx="7" ' + K.f(K.c1) + '/><path d="M252 119 L236 119" ' + K.l('#A3ACBD', 7) + '/>';
+    b += '<path d="M108 104 C130 100 138 92 158 94 C176 96 176 106 182 106 L182 132 C176 132 176 142 158 144 C138 146 130 138 108 134 Z" ' + K.f('#E2B07A') + '/><rect x="180" y="100" width="56" height="38" rx="3" ' + K.f('#C98E55') + '/>';
+    b += '<path d="M150 84 A28 10 0 0 1 196 86" ' + K.l('#7C3AED', 2.6) + '/>' + K.arrowHead(196, 86, 20, '#7C3AED');
+    b += '<path d="M184 138 L190 168" ' + K.l('#C0C7D4', 6) + '/><rect x="186" y="166" width="10" height="26" rx="4" transform="rotate(-11 191 179)" ' + K.f(K.c2) + '/>';
+    b += K.kid(292, 196, .9, {goggles: K.c2, shirt: '#3D7DD8', n: 2, aL: 120, aR: 20});
+    let m = '<path d="M186 136 q14 4 16 -8 q2 -10 -8 -8 q-6 2 -2 8" ' + K.l('#E9B77A', 3) + '/><path d="M188 140 q20 10 30 0 q6 -8 -2 -10" ' + K.l('#D79A5A', 2.6) + '/><path d="M182 142 q-6 14 6 20" ' + K.l('#E9B77A', 2.4) + '/>' + K.spark(214, 126, 6) + K.spark(232, 152, 4) + K.spark(166, 84, 4);
+    return {b, m, a: 'pulse'};
+  };
+
+  // 👻💣 Soul Bopper — bomb about to pop, a ghost soul floats free
+  S['soul-bopper'] = K => {
+    let b = '';
+    for(let y = 0; y < 5; y++) for(let x = 0; x < 9; x++){ const X = 16 + x * 32, Y = 22 + y * 34; if(x % 2 === 1 && y % 2 === 1) b += '<rect x="' + X + '" y="' + Y + '" width="30" height="30" rx="4" ' + K.f('#8B8FA3') + '/>'; else if((x * 7 + y * 3) % 5 === 0 && !(x === 4 && y === 2)) b += '<rect x="' + (X + 2) + '" y="' + (Y + 2) + '" width="26" height="26" rx="3" ' + K.f('#C98E55') + '/><path d="M' + (X + 4) + ' ' + (Y + 15) + ' H' + (X + 26) + ' M' + (X + 15) + ' ' + (Y + 4) + ' V' + (Y + 26) + '" ' + K.l('#8B5A2B', 1.6) + '/>'; }
+    b += '<g transform="translate(160 112)"><circle r="18" ' + K.f('#2B2B3A') + '/><ellipse cx="-6" cy="-7" rx="5" ry="3.5" fill="#fff" opacity=".5"/><rect x="-5" y="-24" width="10" height="7" rx="2" ' + K.fp('#6B7280') + '/><path d="M0 -24 Q6 -34 14 -32" ' + K.l('#8B5A2B', 2.4) + '/></g>' + K.burst(176, 80, 9, '#FF7A1A', 8);
+    b += K.kid(96, 186, .85, {n: 3, shirt: K.c1, aL: 150, aR: 30, mouth: 'o'});
+    let m = '<g transform="translate(232 70)"><path d="M-20 18 Q-22 -22 0 -24 Q22 -22 20 18 L13 12 L6 20 L0 12 L-6 20 L-13 12 Z" ' + K.fp('#E9E5FF') + '/><circle cx="-7" cy="-6" r="3.5" fill="' + INK + '"/><circle cx="7" cy="-6" r="3.5" fill="' + INK + '"/><ellipse cx="0" cy="5" rx="4" ry="5" fill="' + INK + '"/></g>' + K.spark(262, 44, 5, '#C4B5FD') + K.spark(206, 40, 4, '#C4B5FD');
+    return {b, m, a: 'float'};
+  };
+
+  // 🏓 SlaBrall — whack the ball over the net
+  // 🔥 PyraDive — jump, flame up, DUNK it over the net (pd-1)
+  S['pyraspike'] = K => {
+    let b = '<path d="M20 150 L300 150 L316 198 L4 198Z" ' + K.f('#E8813A') + '/><path d="M20 150 L300 150 L316 198 L4 198Z M160 150 V198" ' + K.l('#FFFFFF', 2.4) + '/>';
+    b += '<path d="M160 74 V198" ' + K.l('#3B2A20', 4) + '/><rect x="154" y="78" width="12" height="46" ' + K.fp('#FFFFFF', 'opacity=".55"') + '/>';
+    for(let i = 0; i < 5; i++) b += '<line x1="154" y1="' + (84 + i * 9) + '" x2="166" y2="' + (84 + i * 9) + '" stroke="' + INK + '" stroke-width="1" opacity=".5"/>';
+    b += '<path d="M150 78 H170" ' + K.l('#FFFFFF', 4) + '/>';
+    b += '<path d="M92 132 Q80 104 98 84 Q100 102 110 96 Q106 78 122 66 Q122 92 134 100 Q140 120 128 134Z" ' + K.f('#FFB627', 'opacity=".9"') + '/>';
+    b += K.kid(112, 140, 1, {n: 0, shirt: K.c1, aL: 150, aR: 172, mouth: 'o'});
+    b += K.kid(232, 196, .85, {n: 1, shirt: K.c2, aL: 40, aR: 30});
+    b += '<path d="M60 186 L64 172 L68 186" ' + K.l('#FFD84A', 2.6) + '/>';
+    /* 🎴 gr-5 sticker CARD_LOGO['pyraspike'] → its own layer since gr-6 (CardArt.parts().logo) */
+    let m = '<path d="M138 84 Q192 84 220 128" ' + K.l('#FF6B1A', 4, 'stroke-dasharray="3 6"') + '/><circle cx="222" cy="132" r="10" ' + K.f('#FFFFFF') + '/><path d="M214 128 Q222 124 230 130 M216 138 Q224 134 231 138" ' + K.l('#2F7BEA', 2) + '/>' + K.burst(222, 132, 20, '#FFB627', 10).replace('<path ', '<path opacity=".55" ');
+    return {b, m, a: 'zip'};
+  };
+
+  // 🔍 Pokadif — two pictures, one change, a detective with a magnifier (pk-1)
+  S['pokadif'] = K => {
+    const pic = (ox, c) => '<rect x="' + ox + '" y="64" width="122" height="72" rx="10" ' + K.f('#BFE6FF') + '/><path d="M' + (ox + 3) + ' 116 H' + (ox + 119) + ' V133 H' + (ox + 3) + 'Z" fill="#8BC34A" opacity=".85"/>'
+      + '<circle cx="' + (ox + 38) + '" cy="94" r="13" ' + K.fp(c) + '/><path d="M' + (ox + 74) + ' 110 l14 -26 l14 26z" ' + K.fp('#FFD23F') + '/>';
+    let b = pic(24, '#E63946') + pic(174, '#3A6FE8');
+    b += K.kid(160, 198, .9, {n: 0, shirt: K.c1, aL: 150, aR: 40, mouth: 'o'});
+    b += '<path d="M146 140 Q160 124 174 140 Z" ' + K.fp('#8B5A2B') + '/><path d="M140 141 H180" ' + K.l('#3B2410', 4) + '/>';
+    let m = '<circle cx="214" cy="98" r="23" fill="#FFFFFF" fill-opacity=".28" stroke="#3A2A12" stroke-width="6"/><path d="M230 114 L248 132" ' + K.l('#8B5A2B', 9) + '/>'
+      + K.spark(252, 74, 8) + K.burst(214, 98, 31, '#FFD66B', 10).replace('<path ', '<path opacity=".45" ');
+    return {b, m, a: 'zip'};
+  };
+
+  // 🔬 Sciencetory — a crafted cup in the press, the gauge climbing, the kid in a lab coat guessing 👍 (sc-1)
+  S['sciencetory'] = K => {
+    let b = '<rect x="0" y="170" width="320" height="30" ' + K.f('#5B6B8C') + '/><rect x="26" y="150" width="200" height="16" rx="5" ' + K.f('#8C9BB8') + '/>';
+    b += '<rect x="58" y="40" width="12" height="112" ' + K.f('#C9D3DE') + '/><rect x="182" y="40" width="12" height="112" ' + K.f('#C9D3DE') + '/><rect x="50" y="30" width="152" height="18" rx="5" ' + K.f(K.c1) + '/>';
+    b += '<rect x="96" y="48" width="60" height="12" rx="3" ' + K.f('#7C8597') + '/><path d="M126 60 V84" ' + K.l('#7C8597', 6) + '/><rect x="90" y="84" width="72" height="10" rx="3" ' + K.f('#A3ACBD') + '/>';
+    b += '<path d="M104 150 L108 102 Q126 96 144 102 L148 150Z" ' + K.f('#C98E55') + '/><path d="M110 112 Q126 108 142 112" ' + K.l('#8A5530', 2) + '/>';
+    b += '<circle cx="250" cy="70" r="30" ' + K.fp('#FFFFFF') + '/><path d="M228 82 A24 24 0 0 1 272 82" ' + K.l('#3BA0E8', 4) + '/>';
+    b += K.kid(276, 196, .85, {goggles: K.c2, shirt: '#F5F7FA', n: 1, aL: 150, aR: 20, mouth: 'o'});
+    let m = '<path d="M250 70 L266 54" ' + K.l('#E85D75', 3.4) + '/><circle cx="250" cy="70" r="4" ' + K.f('#E85D75') + '/>' + K.t(300, 26, '👍', 22) + K.spark(170, 100, 6) + K.spark(84, 108, 4);
+    return {b, m, a: 'pulse'};
+  };
+
+  // 🎴 gr-5 START — game logos as storybook stickers on the card picture (Gameroom lane, Aowu 2026-11-16)
+  // The real logos are drawn in each game (🏓 SlaBrall slaMark lg-1 · ⚽ BlasOff BlasLogo bo-6 · 🔥 PyraDive PyraLogo pd-7);
+  // here they are redrawn in the card style. Free spot: x 130..228, y 18..66 (right of ❓ How to play, left of the ❤️ on phones).
+  function cardWord(x, y, size, parts){   // two-tone word with a thick ink edge (no quotes inside: the picture stays small)
+    return '<text x="' + x + '" y="' + y + '" text-anchor="middle" dominant-baseline="central" font-family="' + FONT + '" font-weight="700" font-size="' + size
+      + '" stroke="' + INK + '" stroke-width="' + (size * .2).toFixed(1) + '" stroke-linejoin="round" paint-order="stroke" letter-spacing="-.3">'
+      + parts.map(p => '<tspan fill="' + p[1] + '">' + p[0] + '</tspan>').join('') + '</text>';
+  }
+  const CARD_LOGO = {
+    // 🏓 swoosh + burst + tennis ball over "SlaBrall" (Sla sky blue · Brall orange) — stacked like the real mark, centre x 180
+    'sla-brall': K => '<g class="card-logo">'
+      + '<path d="M144 50 Q168 24 198 30" ' + K.l('#38C8FF', 3.4) + '/><path d="M150 52 Q172 34 196 38" ' + K.l('#FF9A2A', 2.2) + '/>'
+      + '<path d="M150 40 H164 M146 46 H156" ' + K.l('#38C8FF', 2) + '/>'
+      + K.burst(208, 36, 13, '#FF9A2A', 9) + '<circle cx="208" cy="36" r="8" ' + K.f('#A8E063') + '/>'
+      + '<path d="M202.5 30.5 Q206.5 36 202.5 41.5 M213.5 30.5 Q209.5 36 213.5 41.5" ' + K.l('#FFFFFF', 1.6) + '/>'
+      + cardWord(180, 63, 20, [['Sla', '#7FD6FF'], ['Brall', '#FF9A2A']]) + '</g>',
+    // ⚽ 6-point star, a soccer ball blasting off on a flame, over "BlasOff" (Blas silver · Off orange)
+    'blasoff': K => {
+      const st = (cx, cy, r) => { let d = ''; for(let k = 0; k < 2; k++){ for(let i = 0; i < 3; i++){ const a = -Math.PI / 2 + k * Math.PI / 3 + i * 2 * Math.PI / 3; d += (i ? 'L' : 'M') + (cx + Math.cos(a) * r).toFixed(1) + ' ' + (cy + Math.sin(a) * r).toFixed(1); } d += 'Z'; } return d; };
+      return '<g class="card-logo"><path d="' + st(180, 40, 15) + '" fill="#3A2C55" stroke="#FF8A1E" stroke-width="2.6" stroke-linejoin="round"/>'
+        + '<path d="M172 50 Q169 44 174 39 Q176 44 179 43 Q178 38 183 35 L181 47Z" ' + K.f('#FF8A1E') + '/>'
+        + '<circle cx="183" cy="37" r="6.5" ' + K.fp('#FFFFFF') + '/><path d="M183 34 L186 36.2 L184.8 39.6 L181.2 39.6 L180 36.2Z" fill="' + INK + '"/>'
+        + K.spark(200, 28, 4, '#FFD84A') + cardWord(180, 64, 19, [['Blas', '#E9EEF5'], ['Off', '#FF8A1E']]) + '</g>';
+    },
+    // 🔥 pyramid with a fireball diving in, over "PyraDive" (Pyra cream · Dive orange)
+    'pyraspike': K => '<g class="card-logo"><path d="M180 25 L197 54 L163 54Z" ' + K.f('#5A2A12') + '/><path d="M180 25 L197 54 L163 54Z" fill="none" stroke="#FFC24A" stroke-width="2.4" stroke-linejoin="round"/>'
+      + '<path d="M171 33 Q174 40 179 43 Q172 45 169 39Z" ' + K.f('#FFD84A') + '/>'
+      + '<circle cx="181" cy="45" r="6.5" ' + K.f('#FF7A1A') + '/><path d="M178 42.5 Q181 40 184 41.5" ' + K.l('#FFF3A0', 1.6) + '/>'
+      + cardWord(180, 64, 18, [['Pyra', '#FFF3DC'], ['Dive', '#FF7A1A']]) + '</g>'
+  };
+  // 🎴 gr-5 END
+  // 🎴 gr-6 START — 5 approved GameLogos as storybook stickers (Gameroom lane, Aowu 2026-11-17; style guide = GameLogos 'main', 🏷️ logo chat)
+  // Same pencil look as gr-5. Since gr-6 every sticker is its OWN picture layer (CardArt.parts().logo → <img class="ca-l">), so the
+  // Gameroom can pop it in and hide it where the card picture is only a thin slice (phones held sideways).
+  // Free spot shared by every size (card units 320×200): PC ❓ chip x ≤ 122 (y 28..64) · phone ❤️ x ≥ 229 (y ≤ 53) · PC crop y 20..180
+  // → top middle x 124..228, y 18..64 (🐍 🃏 🃏 🔍 like gr-5) · 🔢 Digitinct right middle x 186..276, y 90..148 (the grid fills the top).
+  // Words are sized so even a wide fallback font fits (the test computer's DejaVu Sans Bold is wider than Comic Sans / Chalkboard).
+  function logoWord(x, y, size, parts, o){   // two-tone chunky word: optional neon halo (Aowu likes the glow) + own edge colour
+    o = o || {};
+    const at = '<text x="' + x + '" y="' + y + '" text-anchor="middle" dominant-baseline="central" font-family="' + FONT + '" font-weight="700" font-size="' + size + '" letter-spacing="' + (o.ls == null ? -.3 : o.ls) + '" ';
+    const txt = parts.map(p => p[0]).join('');
+    let s = '';
+    if(o.halo) s += at + 'fill="none" stroke="' + o.halo + '" stroke-width="' + (size * .62).toFixed(1) + '" stroke-linejoin="round" opacity=".42">' + txt + '</text>';
+    s += at + 'stroke="' + (o.edge || INK) + '" stroke-width="' + (size * .22).toFixed(1) + '" stroke-linejoin="round" paint-order="stroke">'
+      + parts.map(p => '<tspan fill="' + p[1] + '">' + p[0] + '</tspan>').join('') + '</text>';
+    return s;
+  }
+  Object.assign(CARD_LOGO, {
+    // 🐍 Snakize — neon-green SNAKIZE, the snake's head peeks over the S, its tail curls under the E (logo: snakize, classic)
+    'snakeast': K => '<g class="card-logo">'
+      + '<path d="M208 55 Q222 63 226 53" ' + K.l('#3FB83A', 3.6) + '/>'
+      + logoWord(178, 44, 18, [['SNAK', '#86E83C'], ['IZE', '#C8F34A']], {halo: '#B8FF4A', edge: '#163A12', ls: .2})
+      + '<g transform="translate(140 30) rotate(-12)"><ellipse cx="0" cy="0" rx="9" ry="7" ' + K.f('#4CC23A') + '/><circle cx="3" cy="-3.6" r="3.3" fill="#fff" stroke="' + INK + '" stroke-width="1.2"/><circle cx="3.8" cy="-3.6" r="1.6" fill="#111"/>'
+      + '<path d="M-8 2 L-12 3 L-14 0.5 M-12 3 L-14 5.5" ' + K.l('#EF4444', 1.5) + '/></g>'
+      + K.spark(222, 27, 4, '#D9FF7A') + '</g>',
+    // 🔢 Digitinct — the glowing number-tile icon over the white neon word (logo: numbergrid, classic)
+    'number-grid': K => {
+      const cols = ['#FF8A3D', '#FFC93C', '#4CC9F0', '#8B5CF6', '#22C55E', '#F472B6', '#38BDF8', '#FB7185', '#A3E635'];
+      let g = '<g class="card-logo"><rect x="213" y="90" width="36" height="36" rx="10" fill="#9FE7FF" opacity=".35"/>'
+        + '<rect x="216" y="93" width="30" height="30" rx="8" fill="#5B6BF5" stroke="#2A2A8A" stroke-width="2"/>';
+      for(let i = 0; i < 9; i++) g += '<rect x="' + (219.5 + (i % 3) * 8) + '" y="' + (96.5 + Math.floor(i / 3) * 8) + '" width="7" height="7" rx="1.8" fill="' + cols[i] + '"/>';
+      return g + logoWord(231, 138, 16, [['Digit', '#FFFFFF'], ['inct', '#E4DCFF']], {halo: '#7FE6FF', edge: '#3527A8'}) + K.spark(256, 94, 4, '#BDF4FF') + '</g>';
+    },
+    // 🃏 Memories Match — the matching pair of heart cards over gold "Memories" + pink "Match" (logo: memory, classic)
+    'memory': K => {
+      const card = (x, r) => '<g transform="translate(' + x + ' 34) rotate(' + r + ')"><rect x="-8" y="-10" width="16" height="20" rx="3" ' + K.fp('#FFF6E8') + '/><path d="M0 4 C-7 -1 -5 -7 0 -4 C5 -7 7 -1 0 4Z" fill="#F0476A"/></g>';
+      return '<g class="card-logo">' + card(167, -12) + card(185, 12) + K.spark(176, 25, 4)
+        + logoWord(176, 53, 15, [['Memories', '#FFC93C']], {edge: '#7A2A12'}) + logoWord(176, 68, 17, [['Match', '#FF6FAE']], {edge: '#6A1440'}) + '</g>';
+    },
+    // 🃏 WisDeck — a little fan of fact cards over gold "Wis" + green "Deck", the green vine sweeping into an arrow (logo: wisdeck)
+    'wisdeck': K => {
+      const c = (x, r, col) => '<g transform="translate(' + x + ' 32) rotate(' + r + ')"><rect x="-6" y="-9" width="12" height="17" rx="2.5" fill="' + col + '" stroke="' + INK + '" stroke-width="1.4"/></g>';
+      return '<g class="card-logo">' + c(165, -22, '#B08AF5') + c(171, -8, '#5AD0A8') + c(177, 6, '#FFD85A') + c(183, 20, '#FFFAF0')
+        + '<path d="M138 60 Q182 68 218 58 L222 48" ' + K.l('#2FA83A', 3) + '/><path d="M216 52 L222 45 L227 53" ' + K.l('#2FA83A', 3) + '/>'
+        + logoWord(176, 48, 18, [['Wis', '#FFC83A'], ['Deck', '#8AE03A']], {edge: '#1A2A1A'}) + '</g>';
+    },
+    // 🔍 Pokadif — the detective camera (deerstalker + blue lens) over the gold POKADIF (logo: pokadif, classic)
+    'pokadif': K => '<g class="card-logo"><g transform="translate(176 36) scale(.9)">'
+      + '<rect x="-12" y="-7" width="24" height="17" rx="4" ' + K.fp('#FFB020') + '/><rect x="-12" y="1" width="24" height="5" fill="#2EC4B6" opacity=".85"/>'
+      + '<circle cx="0" cy="2" r="6.4" fill="#1F4FD8" stroke="' + INK + '" stroke-width="1.6"/><circle cx="-1.8" cy=".2" r="1.8" fill="#BFE6FF"/>'
+      + '<path d="M-11 -7 Q-10 -17 0 -17 Q10 -17 11 -7Z" ' + K.fp('#9A6A3A') + '/><path d="M-14 -7 H14" ' + K.l('#5B3A1A', 2.2) + '/></g>'
+      + logoWord(176, 56, 18, [['POKADIF', '#FFC93C']], {edge: '#3A2410', ls: .2}) + K.spark(206, 28, 4) + '</g>'
+  });
+  // 🎴 gr-6 END
+
+  S['sla-brall'] = K => {
+    let b = '<path d="M60 70 L260 70 L310 200 L10 200Z" ' + K.f('#2FB0A0') + '/><path d="M60 70 L260 70 L310 200 L10 200Z M160 70 V200 M40 120 H280" ' + K.l('#FFFFFF', 2.4) + '/>';
+    b += '<path d="M44 112 H276" ' + K.l('#3B2A20', 3) + '/><path d="M44 112 L44 128 M276 112 L276 128" ' + K.l('#3B2A20', 3) + '/>';
+    for(let i = 0; i < 12; i++) b += '<line x1="' + (52 + i * 19) + '" y1="112" x2="' + (52 + i * 19) + '" y2="126" stroke="' + INK + '" stroke-width="1" opacity=".5"/>';
+    b += '<path d="M44 126 H276" ' + K.l('#3B2A20', 1.6) + '/>';
+    b += K.kid(242, 94, .6, {n: 1, shirt: K.c2, aL: 60, aR: 20});   // 🎴 gr-5: a step right, clear of the logo
+    b += K.kid(106, 198, 1.05, {n: 0, shirt: K.c1, aR: 150, aL: 40});
+    b += '<g transform="translate(126 120) rotate(30)"><ellipse cx="0" cy="-14" rx="12" ry="15" ' + K.f('#3D7DD8') + '/><path d="M0 0 V14" ' + K.l('#8B5A2B', 5) + '/></g>';
+    /* 🎴 gr-5 sticker CARD_LOGO['sla-brall'] → its own layer since gr-6 (CardArt.parts().logo) */
+    let m = '<path d="M140 104 Q186 78 226 88" ' + K.l('#FFD84A', 4, 'stroke-dasharray="3 6"') + '/><circle cx="230" cy="89" r="8" ' + K.f('#D9F99D') + '/>' + K.spark(248, 80, 6);
+    return {b, m, a: 'zip'};
+  };
+
+  // ⚽ BlasOff — a blasted kick flies past the diving keeper (bo-1)
+  S['blasoff'] = K => {
+    let b = '<path d="M30 78 L290 78 L320 200 L0 200Z" ' + K.f('#4CB963') + '/><path d="M30 78 L290 78 L320 200 L0 200Z M160 78 V200" ' + K.l('#FFFFFF', 2.4) + '/><ellipse cx="160" cy="140" rx="46" ry="20" ' + K.l('#FFFFFF', 2.2) + '/>';
+    b += '<path d="M226 50 H300 V92 H226Z" ' + K.l('#FFFFFF', 4) + '/>'; for(let i = 1; i < 6; i++) b += '<path d="M' + (226 + i * 12) + ' 52 V90 M228 ' + (52 + i * 7) + ' H298" stroke="#FFFFFF" stroke-width="1" opacity=".55"/>';
+    b += K.kid(262, 96, .62, {n: 2, shirt: '#FFD23F', aL: 165, aR: 120, mouth: 'o'});
+    b += K.kid(96, 196, 1.05, {n: 0, shirt: K.c1, aL: 60, aR: 120, legR: 16, legL: -10});
+    /* 🎴 gr-5 sticker CARD_LOGO['blasoff'] → its own layer since gr-6 (CardArt.parts().logo) */
+    let m = '<path d="M122 176 Q190 76 246 70" ' + K.l('#FFD84A', 4, 'stroke-dasharray="4 7"') + '/><g transform="translate(250 68)"><circle r="11" ' + K.fp('#FFFFFF') + '/><path d="M0 -5 L5 -1 L3 5 L-3 5 L-5 -1Z" fill="' + INK + '"/></g>' + K.spark(270, 48, 7) + K.spark(236, 86, 5, '#FF5A1F');
+    return {b, m, a: 'zip'};
+  };
+  // 🎴 gr-td1 START — TD-Stories scene
+  // 🏰 TD-Stories — the princess waves from her tower, her dragon breathes fire at a suitor with flowers
+  function tdDragon(K, x, y, s, c, o){   // x, y = feet (curled up, head to the right); o.fire = flame
+    o = o || {}; const belly = '#FFE7A8';
+    let g = '<g transform="translate(' + x + ' ' + y + ') scale(' + s + ')">';
+    g += '<path d="M-28 -8 Q-58 -4 -56 -26 Q-54 -38 -42 -34" ' + K.l(c, 8) + '/><path d="M-42 -34 L-36 -44 L-34 -30Z" ' + K.fp(belly) + '/>';
+    g += '<path d="M-6 -30 L-24 -64 L-4 -50 L6 -68 L16 -36Z" ' + K.f(K.lite(c, .3)) + '/>';
+    g += '<ellipse cx="0" cy="-18" rx="31" ry="18" ' + K.f(c) + '/><ellipse cx="5" cy="-11" rx="19" ry="8" ' + K.fp(belly) + '/>';
+    for(let i = 0; i < 4; i++) g += '<path d="M' + (-20 + i * 11) + ' -33 l4 -8 l4 8" ' + K.fp(belly, '', 1.3) + '/>';
+    g += '<ellipse cx="-14" cy="-2" rx="7" ry="4" ' + K.fp(K.dark(c, .15)) + '/><ellipse cx="14" cy="-2" rx="7" ry="4" ' + K.fp(K.dark(c, .15)) + '/>';
+    g += '<path d="M20 -26 Q30 -44 40 -48" ' + K.l(c, 13) + '/>';
+    g += '<path d="M36 -60 L31 -73 L43 -62Z M46 -61 L45 -75 L53 -61Z" ' + K.fp(belly) + '/>';
+    g += '<ellipse cx="46" cy="-52" rx="14" ry="11" ' + K.f(c) + '/><ellipse cx="59" cy="-47" rx="9" ry="7" ' + K.f(c) + '/>';
+    g += '<circle cx="44" cy="-56" r="4.4" fill="#FFFFFF" stroke="' + K.INK + '" stroke-width="1.2"/><circle cx="45.5" cy="-56" r="2.2" fill="' + K.INK + '"/><circle cx="63" cy="-49" r="1.3" fill="' + K.INK + '"/>';
+    g += o.mouth ? '<path d="M56 -42 Q62 -38 68 -43" ' + K.l('#7F1D1D', 1.8) + '/>' : '<path d="M54 -43 Q60 -40 64 -44" ' + K.l('#7F1D1D', 1.6) + '/>';
+    if(o.fire) g += '<path d="M68 -48 Q' + (68 + o.fire * .5) + ' -66 ' + (68 + o.fire) + ' -52 Q' + (68 + o.fire * .6) + ' -50 ' + (68 + o.fire * .9) + ' -40 Q' + (68 + o.fire * .45) + ' -30 68 -44Z" ' + K.f('#FFB627', 'opacity=".95"') + '/><path d="M70 -47 Q' + (70 + o.fire * .4) + ' -56 ' + (70 + o.fire * .7) + ' -48 Q' + (70 + o.fire * .4) + ' -40 70 -45Z" ' + K.fp('#FFF3A6') + '/>';
+    return g + '</g>';
+  }
+  function tdTower(K, x, y0, h){   // x = centre, y0 = top of the wall, h = wall height (to the ground)
+    const w = 50, L = x - w / 2; let g = '<rect x="' + L + '" y="' + y0 + '" width="' + w + '" height="' + h + '" ' + K.f('#D9D2E9') + '/>';
+    for(let r = 1; r * 16 < h; r++) for(let c = 0; c < 3; c++) g += '<path d="M' + (L + 4 + c * 16 + (r % 2) * 8) + ' ' + (y0 + r * 16) + ' h10" ' + K.l('#8B7FA8', 1.4, 'opacity=".55"') + '/>';
+    for(let i = 0; i < 4; i++) g += '<rect x="' + (L - 3 + i * 15) + '" y="' + (y0 - 10) + '" width="11" height="12" ' + K.fp('#D9D2E9') + '/>';
+    g += '<path d="M' + (x - 11) + ' ' + (y0 + h) + ' V' + (y0 + h - 22) + ' Q' + x + ' ' + (y0 + h - 34) + ' ' + (x + 11) + ' ' + (y0 + h - 22) + ' V' + (y0 + h) + 'Z" ' + K.f('#8B5A2B') + '/>';
+    g += '<rect x="' + (x - 6) + '" y="' + (y0 + 14) + '" width="12" height="16" rx="6" ' + K.fp('#3B2A50') + '/>';
+    return g;
+  }
+  const tdCrown = (K, x, y) => '<path d="M' + (x - 9) + ' ' + y + ' L' + (x - 9) + ' ' + (y - 9) + ' L' + (x - 4) + ' ' + (y - 4) + ' L' + x + ' ' + (y - 11) + ' L' + (x + 4) + ' ' + (y - 4) + ' L' + (x + 9) + ' ' + (y - 9) + ' L' + (x + 9) + ' ' + y + 'Z" ' + K.fp('#FFC93C') + '/>';
+  const tdFlowers = (K, x, y) => '<path d="M' + x + ' ' + y + ' l-5 -14 M' + x + ' ' + y + ' l0 -15 M' + x + ' ' + y + ' l5 -14" ' + K.l('#2E7D32', 2) + '/><circle cx="' + (x - 5) + '" cy="' + (y - 16) + '" r="4.5" ' + K.fp('#FF7AB6') + '/><circle cx="' + x + '" cy="' + (y - 18) + '" r="4.5" ' + K.fp('#FFD84A') + '/><circle cx="' + (x + 5) + '" cy="' + (y - 16) + '" r="4.5" ' + K.fp('#A78BFA') + '/>';
+  // a suitor: a knight in a helmet + plume (or a prince with a crown), carrying flowers
+  const tdSuitor = (K, x, y, s, o) => { o = o || {}; const hy = y - 65 * s;
+    return K.kid(x, y, s, {n: o.n || 3, shirt: o.shirt || '#6B7280', pants: '#4B5563', aL: o.aL == null ? 30 : o.aL, aR: o.aR == null ? 95 : o.aR, helmet: o.prince ? null : '#B8BEC9', mouth: o.mouth, legL: o.legL, legR: o.legR})
+      + (o.prince ? tdCrown(K, x, hy + 2 * s) : '<path d="M' + x + ' ' + (hy) + ' q6 -12 14 -10" ' + K.l('#E11D48', 4) + '/>')
+      + (o.flowers === false ? '' : tdFlowers(K, x + 27 * s, y - 34 * s)); };
+  function tdLand(K){   // sky-blue day, green hill, a sandy path from the right up to the tower door
+    return '<path d="M0 150 Q80 136 160 146 Q240 156 320 140 V200 H0Z" ' + K.f('#7CCB6B') + '/>'
+      + '<path d="M320 166 Q262 160 222 176 Q188 190 150 186 L150 198 Q196 200 230 188 Q266 176 320 182Z" ' + K.fp('#F2D9A6') + '/>'
+      + '<circle cx="34" cy="186" r="9" ' + K.fp('#FF9EC7') + '/><circle cx="292" cy="196" r="7" ' + K.fp('#FFD84A') + '/>';
+  }
+  S['tdstories'] = K => {
+    let b = tdLand(K) + tdTower(K, 120, 100, 86);
+    b += K.kid(120, 110, .6, {n: 1, shirt: K.c1, aL: 150, aR: 40, hair: '#F2B33D'}) + tdCrown(K, 120, 73);
+    b += tdDragon(K, 166, 186, .72, K.c2, {});
+    b += tdSuitor(K, 250, 182, .8, {aR: 95});
+    let m = '<g transform="translate(166 186) scale(.72)"><path d="M68 -48 Q98 -70 116 -54 Q100 -50 112 -36 Q92 -30 68 -44Z" ' + K.f('#FFB627', 'opacity=".95"') + '/><path d="M70 -47 Q92 -58 106 -50 Q92 -42 70 -45Z" ' + K.fp('#FFF3A6') + '/></g>'
+      + '<path d="M96 84 q-8 -6 -14 -2" ' + K.l('#FF5C9A', 2.4) + '/>' + K.spark(152, 70, 6) + K.spark(222, 112, 5, '#FF5C9A');
+    return {b, m, a: 'pulse'};
+  };
+  // 🎴 gr-td1 END — TD-Stories scene
+  // 🎵 BeatCorner — beats fly to the four corner pads
+  S['beat-corner'] = K => {
+    const pad = (x, y, c) => '<circle cx="' + x + '" cy="' + y + '" r="24" ' + K.f(c) + '/><circle cx="' + x + '" cy="' + y + '" r="14" ' + K.fp(lite(c, .45)) + '/>';
+    let b = pad(64, 46, '#FF4D8D') + pad(256, 46, '#3D7DD8') + pad(64, 158, '#22C55E') + pad(256, 158, '#FFC21A');
+    b += '<circle cx="160" cy="102" r="30" ' + K.f(K.c1) + '/>' + K.kid(160, 128, .7, {n: 2, shirt: K.c2, aL: 150, aR: 150, headOnly: 0});
+    b += '<path d="M120 82 L86 60 M200 82 L234 60 M120 122 L86 144 M200 122 L234 144" ' + K.l('#FFFFFF', 3, 'stroke-dasharray="3 6"') + '/>';
+    const note = (x, y, c, r) => '<g transform="translate(' + x + ' ' + y + ') rotate(' + (r || 0) + ')"><ellipse cx="0" cy="6" rx="6" ry="4.6" ' + K.fp(c) + '/><path d="M5 6 V-12 L13 -8" ' + K.l(c, 2.4) + '/></g>';
+    let m = note(104, 70, '#FF4D8D', -12) + note(216, 68, '#3D7DD8', 10) + note(108, 136, '#22C55E', -6) + note(212, 138, '#E0A800', 8) + K.spark(64, 46, 9) + K.burst(256, 158, 12, '#FFF3A6', 10);
+    return {b, m, a: 'pulse'};
+  };
+
+  // 🃏 WisDeck — a hand of fact cards, the owl card flips up
+  S['wisdeck'] = K => {
+    const card = (x, y, r, c, inner, n) => '<g transform="translate(' + x + ' ' + y + ') rotate(' + r + ')"><rect x="-34" y="-48" width="68" height="96" rx="8" ' + K.f('#FFFFFF') + '/><rect x="-28" y="-42" width="56" height="50" rx="5" ' + K.f(c) + '/>' + inner + '<rect x="-28" y="14" width="56" height="7" rx="3" ' + K.fp('#E5E7EB') + '/><rect x="-28" y="26" width="38" height="6" rx="3" ' + K.fp('#E5E7EB') + '/><circle cx="22" cy="34" r="9" ' + K.fp('#FFC21A') + '/>' + K.t(22, 35, n, 11) + '</g>';
+    const dino = '<path d="M-20 0 Q-18 -16 -4 -18 Q4 -28 14 -22 Q20 -20 16 -14 Q10 -14 8 -8 L10 4 M-14 0 V4 M-4 0 V4" ' + K.l('#2E7D32', 5) + '/>';
+    const globe = '<circle cx="0" cy="-17" r="17" ' + K.fp('#7DD3FC') + '/><path d="M-12 -24 q8 -2 10 6 q-2 6 -8 4 Z M4 -10 q6 -6 10 2 q-2 6 -8 4Z" ' + K.fp('#4ADE80') + '/>';
+    let b = card(100, 126, -16, '#BBF7D0', dino, '7') + card(220, 126, 16, '#BAE6FD', globe, '5');   /* 🎴 gr-6: 14 lower, logo on top */
+    const owl = '<ellipse cx="0" cy="-15" rx="16" ry="19" ' + K.fp('#A16207') + '/><circle cx="-7" cy="-20" r="6" fill="#fff"/><circle cx="7" cy="-20" r="6" fill="#fff"/><circle cx="-7" cy="-20" r="3" fill="' + INK + '"/><circle cx="7" cy="-20" r="3" fill="' + INK + '"/><path d="M-3 -12 L0 -8 L3 -12Z" fill="#F59E0B"/>';
+    let m = card(160, 112, 0, '#FDE68A', owl, '9') + K.spark(104, 72, 7) + K.spark(222, 76, 5);
+    return {b, m, a: 'bob'};
+  };
+
+  // 🔢 GeoScout — number towers on a balance scale
+  S['geoscout'] = K => {
+    const cube = (x, y, c) => '<rect x="' + x + '" y="' + y + '" width="20" height="20" rx="4" ' + K.f(c) + '/>';
+    let b = '<path d="M160 70 L160 176 M120 184 H200" ' + K.l('#6B7280', 6) + '/><path d="M150 176 L170 176 L176 186 L144 186Z" ' + K.fp('#6B7280') + '/>';
+    b += '<g transform="rotate(-8 160 70)"><path d="M70 70 H250" ' + K.l('#8B5A2B', 6) + '/><path d="M80 70 L66 110 M80 70 L94 110 M240 70 L226 110 M240 70 L254 110" ' + K.l('#6B7280', 1.6) + '/><path d="M56 110 Q80 122 104 110Z" ' + K.f('#C0C7D4') + '/><path d="M216 110 Q240 122 264 110Z" ' + K.f('#C0C7D4') + '/>';
+    b += cube(70, 90, '#3D7DD8') + cube(70, 70, '#3D7DD8') + cube(70, 50, '#3D7DD8') + K.t(80, 38, '3', 16);
+    b += cube(230, 90, '#FF8A3D') + cube(230, 70, '#FF8A3D') + K.t(240, 58, '2', 16) + '</g>';
+    b += '<circle cx="160" cy="70" r="7" ' + K.fp('#FFC21A') + '/>' + K.t(108, 160, '3 &gt; 2', 18, K.c1);
+    b += K.kid(262, 190, .8, {n: 1, shirt: K.c1, aL: 30, aR: 120});
+    let m = '<g transform="translate(220 30)">' + cube(-10, -10, '#FF8A3D') + '</g><path d="M220 48 v10 m-4 -4 l4 4 l4 -4" ' + K.l('#FF8A3D', 2.4) + '/>' + K.spark(200, 18, 5);
+    return {b, m, a: 'hover'};
+  };
+
+  // 🔤 GeoRead — letter boxes say their sounds: c-a-t
+  S['georead'] = K => {
+    const box = (x, y, ch, c) => '<g transform="translate(' + x + ' ' + y + ')"><path d="M-18 -16 L18 -16 L18 18 L-18 18Z" ' + K.f(c) + '/><path d="M-18 -16 L-10 -24 L26 -24 L18 -16 M18 -16 L26 -24 L26 10 L18 18" ' + K.f(dark(c, .12)) + '/>' + K.t(0, 2, ch, 22) + '</g>';
+    let b = '<rect x="30" y="140" width="200" height="10" rx="4" ' + K.f('#8B5A2B') + '/>' + box(70, 120, 'c', '#FDE68A') + box(118, 120, 'a', '#FCA5A5') + '<rect x="148" y="102" width="36" height="34" rx="4" fill="none" stroke="#22A355" stroke-width="2.4" stroke-dasharray="5 4"/>';
+    b += '<g transform="translate(70 58)"><path d="M-14 -8 h8 l10 -10 v36 l-10 -10 h-8z" ' + K.fp('#6B7280') + '/></g>';
+    b += K.kid(232, 190, 1, {n: 2, shirt: K.c1, aL: 140, aR: 140});
+    let m = box(232, 98, 't', '#93C5FD') + '<path d="M84 46 q8 12 0 24 M92 40 q12 18 0 36 M100 34 q16 24 0 48" ' + K.l(K.c2, 2.6) + '/>' + K.t(166, 40, 'k… a… t', 15, K.c2) + K.spark(270, 70, 5);
+    return {b, m, a: 'bob'};
+  };
+
+  // 👀🧠 Eyes Brain Riot — the curtain opens, remember the number!
+  S['eyes-brain'] = K => {
+    let b = '<rect x="40" y="26" width="240" height="120" rx="10" ' + K.f('#1E1B4B') + '/>';
+    b += '<path d="M40 26 Q70 80 54 146 L40 146Z" ' + K.f('#C81E5A') + '/><path d="M280 26 Q250 80 266 146 L280 146Z" ' + K.f('#C81E5A') + '/><path d="M34 22 H286" ' + K.l('#B45309', 6) + '/>';
+    ['8', '3', '5', '1'].forEach((n, i) => b += K.tile(112 + i * 32, 86, n, '#FFF1D6', 28));
+    b += '<g transform="translate(76 176)"><ellipse cx="0" cy="0" rx="22" ry="13" fill="#fff" stroke="' + INK + '" stroke-width="2"/><circle r="8" ' + K.fp('#3D7DD8') + '/><circle r="3.6" fill="' + INK + '"/></g>';
+    b += '<g transform="translate(246 172)"><path d="M-24 6 Q-30 -14 -12 -18 Q-6 -30 8 -24 Q26 -26 26 -8 Q32 10 12 14 Q0 22 -12 14 Q-24 16 -24 6Z" ' + K.f('#F9A8D4') + '/><path d="M-12 -14 q4 8 -2 14 M4 -20 q6 10 0 20 M16 -10 q-6 6 0 12" ' + K.l('#BE185D', 1.6) + '/></g>';
+    let m = '<path d="M106 176 L138 172 M106 182 L132 188" ' + K.l('#FFFFFF', 2.4, 'stroke-dasharray="3 5"') + '/>' + K.burst(270, 144, 9, '#FFD84A', 6) + K.spark(222, 142, 6) + K.spark(160, 56, 6) + K.spark(250, 66, 4);
+    return {b, m, a: 'pulse'};
+  };
+
+  // 📷 Pose Party — strike the star pose for the camera
+  S['pose-party'] = K => {
+    let b = '<path d="M0 170 H320 V200 H0Z" ' + K.f('#C084FC') + '/>';
+    b += '<g transform="translate(192 176)" opacity=".85"><circle cx="0" cy="-60" r="10" ' + K.l('#FF4FA3', 2.4, 'stroke-dasharray="4 4"') + '/><path d="M0 -50 V-18 M0 -44 L-20 -66 M0 -44 L20 -66 M0 -18 L-14 0 M0 -18 L14 0" ' + K.l('#FF4FA3', 2.4, 'stroke-dasharray="4 4"') + '/></g>';
+    b += K.kid(116, 176, 1.25, {n: 1, shirt: K.c1, aL: 135, aR: 145, legL: -16, legR: 16, mouth: 'o'});
+    b += '<g transform="translate(252 104)"><path d="M0 22 L-18 74 M0 22 L18 74 M0 22 V74" ' + K.l('#3B2A20', 3) + '/><rect x="-26" y="-8" width="52" height="34" rx="7" ' + K.f('#374151') + '/><circle cx="0" cy="9" r="11" ' + K.fp('#93C5FD') + '/><circle cx="0" cy="9" r="5" fill="' + INK + '"/><rect x="-18" y="-14" width="14" height="7" rx="2" ' + K.fp('#6B7280') + '/></g>';
+    b += '<path d="M222 130 L190 134 M222 140 L190 152" ' + K.l('#FFFFFF', 2, 'stroke-dasharray="3 5"') + '/>';
+    let m = K.burst(240, 86, 16, '#FFF3A6', 10) + K.star(56, 40, 9) + K.star(176, 32, 7, '#F9A8D4') + K.spark(60, 120, 5);
+    return {b, m, a: 'pulse'};
+  };
+
+  // 🥊 Brawl Buddies — BONK!
+  S['brawl-buddies'] = K => {
+    let b = '<path d="M0 156 H320 V200 H0Z" ' + K.f('#5B3A9A') + '/><path d="M0 96 H320 M0 118 H320 M0 140 H320" ' + K.l('#FF4D6D', 3) + '/><path d="M20 90 V156 M300 90 V156" ' + K.l('#F6ECD6', 6) + '/>';
+    b += K.kid(106, 170, 1.2, {n: 0, shirt: K.c1, aR: 100, aL: 60, legL: -14, legR: 14});
+    b += '<circle cx="135" cy="112" r="10" ' + K.f('#E11D48') + '/><circle cx="96" cy="140" r="9" ' + K.f('#E11D48') + '/>';
+    b += '<g transform="rotate(10 222 170)">' + K.kid(222, 170, 1.2, {n: 3, shirt: K.c2, aL: 150, aR: 30, mouth: 'o'}) + '</g><circle cx="196" cy="98" r="9" ' + K.f('#2563EB') + '/><circle cx="246" cy="146" r="9" ' + K.f('#2563EB') + '/>';
+    let m = K.burst(170, 96, 26, '#FFD84A', 12) + K.t(170, 97, 'BONK', 13, '#B91C1C') + K.star(226, 46, 6) + K.star(250, 58, 5, '#F9A8D4') + K.star(204, 50, 4, '#93C5FD');
+    return {b, m, a: 'pulse'};
+  };
+
+  // 🎯 Pinball — the ball shoots off a bumper
+  S['pinball'] = K => {
+    let b = '<path d="M56 10 L264 10 L290 196 L30 196Z" ' + K.f('#4B2BBF') + '/>';
+    b += '<circle cx="110" cy="62" r="18" ' + K.f('#FF4D8D') + '/><circle cx="110" cy="62" r="8" ' + K.fp('#FFE4EF') + '/><circle cx="208" cy="58" r="18" ' + K.f('#22C55E') + '/><circle cx="208" cy="58" r="8" ' + K.fp('#DCFCE7') + '/><circle cx="160" cy="100" r="18" ' + K.f('#FFC21A') + '/><circle cx="160" cy="100" r="8" ' + K.fp('#FEF9C3') + '/>';
+    b += '<path d="M64 128 L92 170 M256 128 L228 170" ' + K.l('#F6ECD6', 5) + '/>';
+    b += '<path d="M104 178 L148 190" ' + K.l('#FF4D8D', 9) + '/><path d="M216 178 L176 186" ' + K.l('#FF4D8D', 9) + '/><circle cx="104" cy="178" r="6" ' + K.fp('#F6ECD6') + '/><circle cx="216" cy="178" r="6" ' + K.fp('#F6ECD6') + '/>';
+    [70, 88, 232, 250].forEach((x, i) => b += '<circle cx="' + x + '" cy="' + (30 + (i % 2) * 6) + '" r="4.5" ' + K.fp(['#FFD84A', '#7DD3FC', '#FFD84A', '#7DD3FC'][i]) + '/>');
+    let m = '<path d="M160 160 Q166 136 182 122" ' + K.l('#FFFFFF', 3, 'stroke-dasharray="3 5"') + '/><circle cx="186" cy="118" r="9" ' + K.fp('#E5E7EB') + '/><ellipse cx="183" cy="115" rx="3" ry="2" fill="#fff"/>' + K.burst(160, 100, 26, '#FFF3A6', 10).replace('<path ', '<path opacity=".55" ') + K.spark(204, 104, 5);
+    return {b, m, a: 'zip'};
+  };
+
+  // 🐸 Dodgy Hopper — hop over the road and the river
+  S['hopper'] = K => {
+    let b = '<rect x="0" y="0" width="320" height="44" ' + K.f('#5CC45A') + '/><rect x="0" y="44" width="320" height="52" ' + K.f('#5AB4E8') + '/><rect x="0" y="96" width="320" height="18" ' + K.f('#5CC45A') + '/><rect x="0" y="114" width="320" height="58" ' + K.f('#6B6F82') + '/><rect x="0" y="172" width="320" height="28" ' + K.f('#5CC45A') + '/>';
+    b += '<path d="M0 143 H320" ' + K.l('#FFFFFF', 3, 'stroke-dasharray="14 12"') + '/>';
+    b += '<rect x="60" y="56" width="90" height="16" rx="8" ' + K.f('#9A6B43') + '/><rect x="200" y="74" width="80" height="16" rx="8" ' + K.f('#9A6B43') + '/>';
+    b += '<g transform="translate(70 130)"><rect x="-30" y="-10" width="60" height="22" rx="7" ' + K.f('#E63946') + '/><rect x="-14" y="-18" width="30" height="12" rx="4" ' + K.fp('#BDE6FF') + '/><circle cx="-18" cy="12" r="5" ' + K.fp('#2B2B3A') + '/><circle cx="18" cy="12" r="5" ' + K.fp('#2B2B3A') + '/></g>';
+    b += '<g transform="translate(256 156)"><rect x="-30" y="-10" width="60" height="22" rx="7" ' + K.f('#FFC21A') + '/><rect x="-16" y="-18" width="30" height="12" rx="4" ' + K.fp('#BDE6FF') + '/><circle cx="-18" cy="12" r="5" ' + K.fp('#2B2B3A') + '/><circle cx="18" cy="12" r="5" ' + K.fp('#2B2B3A') + '/></g>';
+    b += '<circle cx="290" cy="22" r="7" ' + K.fp('#FFD84A') + '/><circle cx="40" cy="20" r="7" ' + K.fp('#FFD84A') + '/>';
+    let m = '<path d="M164 172 Q156 140 162 112" ' + K.l('#FFFFFF', 2.4, 'stroke-dasharray="3 6"') + '/>' + K.kid(164, 116, .78, {n: 0, shirt: K.c1, aL: 140, aR: 140, legL: -12, legR: 12, mouth: 'o'});
+    return {b, m, a: 'hop'};
+  };
+
+  // 🃏 Memories Match — two cards flip and match
+  S['memory'] = K => {
+    const back = (x, y) => '<rect x="' + x + '" y="' + y + '" width="40" height="52" rx="7" ' + K.f(K.c1) + '/><path d="M' + (x + 8) + ' ' + (y + 26) + ' l12 -14 l12 14 l-12 14z" ' + K.fp(lite(K.c1, .45)) + '/>';
+    const face = (x, y) => '<rect x="' + x + '" y="' + y + '" width="40" height="52" rx="7" ' + K.f('#FFFFFF') + '/>' + K.star(x + 20, y + 26, 13, '#FFC21A');
+    let b = '';
+    const P = [[60, 26], [60, 86], [152, 86], [198, 86], [60, 146], [106, 146], [152, 146], [198, 146]];
+    P.forEach(([x, y]) => b += back(x, y));
+    b += face(106, 86) + '<path d="M150 112 Q164 112 168 104" ' + K.l('#22A355', 2.4, 'stroke-dasharray="3 4"') + '/>';
+    b += K.kid(276, 190, .95, {n: 2, shirt: K.c2, aL: 160, aR: 40, mouth: 'o'});
+    let m = '<g transform="translate(244 112) rotate(10)">' + face(-20, -26) + '</g>' + K.spark(232, 70, 6) + K.spark(272, 82, 4);
+    return {b, m, a: 'wiggle'};
+  };
+
+  // 🧮 Math Quest — the path through 5 worlds to the treasure
+  S['math-quest'] = K => {
+    let b = '<path d="M30 180 C80 150 60 110 120 110 C180 110 150 60 210 60 C240 60 246 74 260 78" ' + K.l('#E2B07A', 14) + '/><path d="M30 180 C80 150 60 110 120 110 C180 110 150 60 210 60 C240 60 246 74 260 78" ' + K.l('#FFF1D6', 3, 'stroke-dasharray="6 8"') + '/>';
+    [[52, 160, '+', '#22C55E'], [116, 112, '−', '#3D7DD8'], [172, 92, '×', '#FF8A3D'], [214, 58, '÷', '#A855F7']].forEach(([x, y, s, c]) => b += '<path d="M' + x + ' ' + (y + 16) + ' V' + (y - 12) + '" ' + K.l('#8B5A2B', 3) + '/><rect x="' + (x - 12) + '" y="' + (y - 26) + '" width="24" height="18" rx="4" ' + K.f(c) + '/>' + K.t(x, y - 17, s, 14, '#fff'));
+    b += '<path d="M14 196 Q40 172 70 196Z M240 196 Q270 160 300 196Z" ' + K.f('#5CC45A') + '/>';
+    b += K.kid(132, 150, .82, {n: 1, shirt: K.c1, aR: 120, aL: 30});
+    let m = '<g transform="translate(262 82)"><rect x="-18" y="-8" width="36" height="22" rx="4" ' + K.f('#B7794A') + '/><path d="M-18 -8 Q0 -26 18 -8Z" ' + K.f('#9A6B43') + '/><rect x="-4" y="-4" width="8" height="8" ' + K.fp('#FFD84A') + '/></g>' + K.spark(238, 64, 6) + K.spark(284, 62, 5) + K.spark(278, 104, 4);
+    return {b, m, a: 'pulse'};
+  };
+
+  // 🍬 Sweet Swap — swap two sweets, three in a row!
+  S['sweet-swap'] = K => {
+    const sweet = (x, y, k) => k === 0 ? '<circle cx="' + x + '" cy="' + y + '" r="12" ' + K.f('#FF4D8D') + '/><path d="M' + (x - 6) + ' ' + (y - 4) + ' q6 -6 12 0" ' + K.l('#FFE4EF', 2) + '/>'
+      : k === 1 ? '<path d="M' + (x - 18) + ' ' + (y - 7) + ' L' + (x - 10) + ' ' + y + ' L' + (x - 18) + ' ' + (y + 7) + 'Z M' + (x + 18) + ' ' + (y - 7) + ' L' + (x + 10) + ' ' + y + ' L' + (x + 18) + ' ' + (y + 7) + 'Z" ' + K.fp('#FFC21A') + '/><ellipse cx="' + x + '" cy="' + y + '" rx="11" ry="9" ' + K.f('#FFC21A') + '/>'
+      : k === 2 ? '<path d="M' + x + ' ' + (y + 11) + ' C' + (x - 18) + ' ' + (y - 2) + ' ' + (x - 8) + ' ' + (y - 16) + ' ' + x + ' ' + (y - 6) + ' C' + (x + 8) + ' ' + (y - 16) + ' ' + (x + 18) + ' ' + (y - 2) + ' ' + x + ' ' + (y + 11) + 'Z" ' + K.f('#A855F7') + '/>'
+      : '<rect x="' + (x - 11) + '" y="' + (y - 11) + '" width="22" height="22" rx="5" ' + K.f('#22C55E') + '/>';
+    const G = [[1, 3, 2, 0, 1], [2, 0, 1, 2, 3], [0, 0, 3, 0, 2], [3, 2, 1, 3, 1]];
+    let b = '<rect x="58" y="16" width="204" height="168" rx="16" ' + K.fp('#FFFFFF', 'opacity=".55"') + '/>';
+    G.forEach((r, y) => r.forEach((k, x) => { if(!(y === 2 && x === 2) && !(y === 1 && x === 2)) b += sweet(84 + x * 38, 42 + y * 38, k); }));
+    b += '<rect x="64" y="104" width="186" height="38" rx="18" fill="none" stroke="#22A355" stroke-width="2.6" stroke-dasharray="5 4"/>';
+    let m = sweet(160, 80, 0) + sweet(160, 118, 1) + '<path d="M182 82 Q196 99 182 116" ' + K.l(K.c2, 2.6) + '/>' + K.arrowHead(182, 116, 120, K.c2) + '<path d="M138 116 Q124 99 138 82" ' + K.l(K.c2, 2.6) + '/>' + K.arrowHead(138, 82, -60, K.c2) + K.spark(210, 92, 6) + K.spark(110, 150, 5);
+    return {b, m, a: 'wiggle'};
+  };
+
+  // 🔀 Double Up — 8 + 8 = 16!
+  S['double-up'] = K => {
+    const T = (x, y, n, c) => '<rect x="' + (x - 22) + '" y="' + (y - 22) + '" width="44" height="44" rx="9" ' + K.f(c) + '/>' + K.t(x, y + 1, n, n.length > 2 ? 15 : 20, '#fff');
+    let b = '<rect x="58" y="12" width="204" height="176" rx="16" ' + K.f('#E7D5C0') + '/>';
+    for(let y = 0; y < 4; y++) for(let x = 0; x < 4; x++) b += '<rect x="' + (68 + x * 48) + '" y="' + (22 + y * 40) + '" width="40" height="34" rx="7" ' + K.fp('#F6ECD6', 'opacity=".9"') + '/>';
+    b += T(88, 158, '2', '#9CA3AF') + T(184, 158, '4', '#F59E0B') + T(232, 118, '32', '#E11D48') + T(232, 158, '2', '#9CA3AF') + T(88, 38, '64', '#7C3AED');
+    let m = T(126, 78, '8', '#F28C28') + T(194, 78, '8', '#F28C28') + '<path d="M150 78 h8 M170 78 h-8" ' + K.l('#FFFFFF', 3) + '/>' + K.burst(160, 78, 18, '#FFD84A', 9) + K.t(160, 79, '16', 13, '#B91C1C') + K.spark(214, 46, 5);
+    return {b, m, a: 'pulse'};
+  };
+
+  // 🫧 Pop Blocks — a group pops into bubbles
+  S['pop-blocks'] = K => {
+    const C = ['#FF4D8D', '#FF9F1C', '#3D7DD8', '#22C55E'], G = [[0, 1, 2, 2, 1, 3], [1, 1, 0, 3, 3, 2], [2, 3, 0, 1, 2, 2], [3, 3, 1, 1, 0, 2]];
+    let b = '';
+    G.forEach((r, y) => r.forEach((k, x) => { if(!(k === 0 && (x === 2 && (y === 1 || y === 2)))) b += '<rect x="' + (66 + x * 32) + '" y="' + (62 + y * 32) + '" width="30" height="30" rx="7" ' + K.f(C[k]) + '/>'; }));
+    b += '<rect x="58" y="56" width="204" height="138" rx="12" fill="none" stroke="' + K.edge(K.c2) + '" stroke-width="3"/>';
+    let m = '';
+    [[130, 46, 14], [148, 20, 9], [116, 18, 7], [170, 38, 10], [100, 40, 6]].forEach(([x, y, r]) => m += '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="#E0F2FE" stroke="' + K.edge('#3D7DD8') + '" stroke-width="1.6" opacity=".9"/><ellipse cx="' + (x - r * .35) + '" cy="' + (y - r * .35) + '" rx="' + (r * .3) + '" ry="' + (r * .2) + '" fill="#fff"/>');
+    m += K.burst(140, 112, 18, '#FFD1E3', 9) + K.spark(186, 64, 6);
+    return {b, m, a: 'float'};
+  };
+
+  // 🧱 Block Drop — a shape falls and fills the row
+  S['block-drop'] = K => {
+    const sq = (x, y, c) => '<rect x="' + x + '" y="' + y + '" width="22" height="22" rx="5" ' + K.f(c) + '/><rect x="' + (x + 4) + '" y="' + (y + 4) + '" width="6" height="4" rx="2" fill="#fff" opacity=".6"/>';
+    let b = '<rect x="96" y="6" width="128" height="190" rx="10" ' + K.fp('#1E293B', 'opacity=".25"') + '/>';
+    const rows = [[1, 1, 1, 0, 1], [1, 1, 0, 0, 1], [0, 1, 1, 1, 1]], cols = ['#3D8BFD', '#FFC21A', '#A855F7', '#22C55E', '#FF4D8D'];
+    rows.forEach((r, y) => r.forEach((v, x) => { if(v) b += sq(104 + x * 23, 104 + y * 23 + 23, cols[(x + y) % 5]); }));
+    for(let x = 0; x < 5; x++) b += sq(104 + x * 23, 104 + 3 * 23 + 23, cols[(x + 3) % 5]);
+    b += '<rect x="100" y="173" width="120" height="26" rx="6" fill="none" stroke="#FFD84A" stroke-width="3"/>' + K.spark(240, 184, 7) + K.spark(84, 180, 6);
+    b += K.kid(256, 190, .9, {n: 3, shirt: K.c1, aL: 160, aR: 160});
+    let m = sq(173, 34, '#FF8A3D') + sq(173, 57, '#FF8A3D') + sq(173, 80, '#FF8A3D') + sq(150, 80, '#FF8A3D') + '<path d="M184 20 v-12 M196 24 v-10" ' + K.l('#FFFFFF', 2.4) + '/>';
+    return {b, m, a: 'drop'};
+  };
+
+  // ♟️ Chess — the knight jumps, the king is trapped
+  S['chess'] = K => {
+    let b = '';
+    for(let y = 0; y < 5; y++) for(let x = 0; x < 8; x++) b += '<rect x="' + (32 + x * 32) + '" y="' + (40 + y * 32) + '" width="32" height="32" ' + K.fp((x + y) % 2 ? '#8D6BE8' : '#F3E8FF') + '/>';
+    const king = (x, y, c) => '<g transform="translate(' + x + ' ' + y + ')"><path d="M-12 14 H12 L8 -6 H-8Z" ' + K.f(c) + '/><circle cx="0" cy="-10" r="7" ' + K.f(c) + '/><path d="M0 -24 V-16 M-4 -20 H4" ' + K.l(c, 3) + '/></g>';
+    const pawn = (x, y, c) => '<g transform="translate(' + x + ' ' + y + ')"><path d="M-10 12 H10 L6 -2 H-6Z" ' + K.f(c) + '/><circle cx="0" cy="-6" r="7" ' + K.f(c) + '/></g>';
+    b += king(208, 70, '#2B2D42') + pawn(144, 134, '#F6ECD6') + pawn(240, 102, '#F6ECD6') + '<g transform="translate(272 26)">' + K.burst(0, 0, 14, '#FFD84A', 8) + '<path d="M-8 2 L-4 -6 L0 2 L4 -6 L8 2 Z" ' + K.fp('#F59E0B') + '/></g>';
+    b += '<path d="M112 168 Q112 110 176 110" ' + K.l('#FF4D8D', 3, 'stroke-dasharray="4 5"') + '/>' + K.arrowHead(176, 110, 0, '#FF4D8D');
+    let m = '<g transform="translate(176 98)"><path d="M-12 14 H12 L10 0 Q12 -14 2 -20 L-8 -16 L-12 -6 L-4 -4 L-10 4Z" ' + K.f('#F6ECD6') + '/><circle cx="-2" cy="-12" r="1.8" fill="' + INK + '"/></g>' + K.spark(196, 76, 5);
+    return {b, m, a: 'hop'};
+  };
+
+  // 🔴 Checkers — jump over and get crowned
+  S['checkers'] = K => {
+    let b = '';
+    for(let y = 0; y < 5; y++) for(let x = 0; x < 8; x++) b += '<rect x="' + (32 + x * 32) + '" y="' + (40 + y * 32) + '" width="32" height="32" ' + K.fp((x + y) % 2 ? '#3A2E5C' : '#F6E3C4') + '/>';
+    const pc = (x, y, c, crown) => '<g transform="translate(' + x + ' ' + y + ')"><ellipse cx="0" cy="3" rx="12" ry="5" fill="' + dark(c, .35) + '"/><circle r="12" ' + K.f(c) + '/><circle r="7" fill="none" stroke="' + lite(c, .35) + '" stroke-width="1.6"/>' + (crown ? '<path d="M-7 3 L-5 -5 L0 0 L5 -5 L7 3Z" ' + K.fp('#FFD84A') + '/>' : '') + '</g>';
+    b += pc(80, 152, '#E2554F') + pc(144, 120, '#2B2B3A') + pc(240, 88, '#2B2B3A') + pc(112, 88, '#E2554F', 1) + pc(208, 152, '#2B2B3A');
+    b += '<path d="M112 136 Q144 70 176 92" ' + K.l('#FFD84A', 3, 'stroke-dasharray="4 5"') + '/>' + K.burst(144, 120, 15, '#FFF3A6', 8).replace('<path ', '<path opacity=".6" ');
+    let m = pc(178, 88, '#E2554F') + K.spark(196, 64, 6);
+    return {b, m, a: 'hop'};
+  };
+
+  // 🧭 Maze — find the way out
+  S['maze'] = K => {
+    const W = '#2E9E4F';
+    let b = '<g transform="translate(160 101) scale(.86) translate(-160 -101)"><rect x="30" y="16" width="260" height="170" rx="10" ' + K.f('#D9F99D') + '/>';
+    const walls = 'M30 16 H290 V186 H30Z M70 16 V70 H130 M30 110 H100 V150 M170 56 V120 H230 M130 186 V140 H200 M250 56 V100 M200 16 V56 H250 M100 70 V110 M250 140 H290';
+    b += '<path d="' + walls + '" ' + K.l(W, 9) + '/>';
+    b += '<path d="M50 166 V126 H86 V90 H150 V40 H186 V82 H240 V160 H272" ' + K.l('#FF8A3D', 2.6, 'stroke-dasharray="3 6"') + '/>';
+    b += '<g transform="translate(272 164)"><rect x="-10" y="-18" width="20" height="26" rx="8" ' + K.f('#8B5A2B') + '/><circle cx="5" cy="-4" r="2" fill="#FFD84A"/></g>' + K.star(272, 128, 8) + '</g>';
+    let m = K.kid(66, 172, .55, {n: 2, shirt: K.c2, aR: 120, aL: 30});
+    return {b, m, a: 'bob'};
+  };
+
+  // 📦 Stack It! — the tower wobbles as the last box lands
+  S['stacking-sim'] = K => {
+    let b = '<rect x="0" y="176" width="320" height="24" ' + K.f('#9A6B43') + '/>';
+    b += '<g transform="rotate(-4 160 176)"><rect x="118" y="140" width="84" height="36" rx="4" ' + K.f('#FFB45E') + '/><path d="M126 140 L194 140 L160 96Z" ' + K.f('#EF5F67') + '/><rect x="140" y="64" width="40" height="32" rx="4" ' + K.f('#7C6CF2') + '/></g>';
+    b += '<path d="M108 104 q-8 10 0 20 M98 98 q-12 16 0 32 M214 104 q8 10 0 20" ' + K.l('#3B2A20', 2) + '/>';
+    b += K.kid(256, 190, .95, {n: 0, shirt: K.c2, aL: 160, aR: 150, mouth: 'o'}) + '<path d="M60 30 H260" ' + K.l('#22A355', 2.4, 'stroke-dasharray="6 6"') + '/><path d="M64 30 V8 L80 14 L64 20" ' + K.f('#22C55E') + '/>';
+    let m = '<g transform="translate(166 32) rotate(8)"><rect x="-22" y="-14" width="44" height="28" rx="4" ' + K.f('#2EC4B6') + '/></g><path d="M150 12 v-8 M180 14 v-8" ' + K.l('#3B2A20', 2) + '/>';
+    return {b, m, a: 'sway'};
+  };
+
+  // 🤖 Code the Robot — follow the arrows to the star
+  S['robot-adventure'] = K => {
+    let b = '';
+    for(let y = 0; y < 3; y++) for(let x = 0; x < 5; x++) b += '<rect x="' + (66 + x * 38) + '" y="' + (20 + y * 38) + '" width="36" height="36" rx="5" ' + K.fp((x + y) % 2 ? '#C7D2FE' : '#E0E7FF') + '/>';
+    b += '<path d="M85 115 V77 H161 V39 H237" ' + K.l('#FFC21A', 4, 'stroke-dasharray="5 6"') + '/>' + K.star(237, 39, 14);
+    const card = (x, ang, c) => '<g transform="translate(' + x + ' 170)"><rect x="-18" y="-16" width="36" height="32" rx="6" ' + K.f(c) + '/><path d="M0 9 V-9 M-7 -2 L0 -9 L7 -2" ' + K.l('#ffffff', 3.2, 'transform="rotate(' + ang + ')"') + '/></g>';
+    b += card(86, 0, K.c1) + card(130, 90, K.c1) + card(174, 90, K.c1) + card(218, 0, K.c2) + card(262, 90, K.c2);
+    b += '<rect x="250" y="92" width="16" height="26" rx="4" ' + K.fp('#22C55E') + '/><rect x="254" y="87" width="8" height="5" rx="2" ' + K.fp('#9CA3AF') + '/><path d="M258 98 l-4 8 h8 l-4 8" ' + K.l('#FFFFFF', 2) + '/>';
+    let m = K.robot(85, 130, .58, K.c1, {wheels: 1, short: 1});
+    return {b, m, a: 'bob'};
+  };
+  // 🎈 Code Robot (mini) — arrow cards to the star
+  S['code-robot'] = K => {
+    let b = '<path d="M60 150 H160 V84 H244" ' + K.l('#FFC21A', 5, 'stroke-dasharray="6 7"') + '/>';
+    const card = (x, y, ang) => '<g transform="translate(' + x + ' ' + y + ')"><rect x="-20" y="-18" width="40" height="36" rx="8" ' + K.f(K.c1) + '/><path d="M0 10 V-10 M-8 -2 L0 -10 L8 -2" ' + K.l('#ffffff', 3.6, 'transform="rotate(' + ang + ')"') + '/></g>';
+    b += card(110, 150, 90) + card(160, 118, 0) + card(204, 84, 90);
+    b += K.robot(60, 168, .62, K.c2, {wheels: 1, short: 1});
+    let m = K.star(250, 86, 20) + K.spark(276, 112, 6) + K.spark(226, 58, 4);
+    return {b, m, a: 'pulse'};
+  };
+
+  // 🎈 Color Match — paint each blob in its twin colour
+  S['color-match'] = K => {
+    const C = ['#EF4444', '#FFC21A', '#3D7DD8', '#22C55E'];
+    let b = '';
+    C.forEach((c, i) => { const x = 68 + i * 62; b += '<path d="M' + (x - 22) + ' 150 Q' + (x - 26) + ' 120 ' + x + ' 118 Q' + (x + 26) + ' 120 ' + (x + 22) + ' 150 Q' + x + ' 162 ' + (x - 22) + ' 150Z" ' + K.f(c) + '/><path d="M' + (x - 20) + ' 52 Q' + (x - 26) + ' 30 ' + x + ' 30 Q' + (x + 24) + ' 32 ' + (x + 18) + ' 54 Q' + (x + 4) + ' 70 ' + (x - 20) + ' 52Z" ' + (i === 2 ? K.f(c) : K.fp('#FFFFFF')) + '/>'; });
+    b += '<path d="M192 80 Q194 100 192 112" ' + K.l('#3D7DD8', 2.4, 'stroke-dasharray="3 5"') + '/>';
+    let m = '<g transform="translate(250 76) rotate(-35)"><rect x="-4" y="-2" width="8" height="40" rx="3" ' + K.fp('#B7794A') + '/><path d="M-6 -2 Q0 -26 6 -2Z" ' + K.f('#EF4444') + '/></g>' + K.spark(222, 40, 6);
+    return {b, m, a: 'wiggle'};
+  };
+
+  // 🎈 Count & Match — count the apples, pick the number
+  S['count-match'] = K => {
+    const apple = (x, y) => '<g transform="translate(' + x + ' ' + y + ')"><circle r="15" ' + K.f('#EF3B3B') + '/><path d="M0 -14 Q2 -22 6 -24" ' + K.l('#5B3A1A', 2.4) + '/><path d="M3 -18 Q14 -26 18 -16 Q8 -12 3 -18Z" ' + K.f('#3CB04A') + '/></g>';
+    let b = '<path d="M50 132 Q130 150 210 132 L200 160 Q130 176 60 160Z" ' + K.f('#C98E55') + '/>';
+    [['2', 66], ['3', 160], ['4', 254]].forEach(([n, x], i) => b += '<g transform="translate(' + x + ' 178)"><rect x="-20" y="-18" width="40" height="36" rx="8" ' + K.f(i === 1 ? '#BBF7D0' : '#FFFFFF') + '/>' + K.t(0, 1, n, 22) + '</g>');
+    b += '<path d="M160 156 V150" ' + K.l('#22A355', 2) + '/>' + K.check(186, 156);
+    let m = apple(96, 112) + apple(130, 104) + apple(164, 112) + '<path d="M96 88 v-8 M130 80 v-8 M164 88 v-8" ' + K.l(K.c2, 2) + '/>' + K.t(96, 70, '1', 12, K.c2) + K.t(130, 62, '2', 12, K.c2) + K.t(164, 70, '3', 12, K.c2);
+    return {b, m, a: 'bob'};
+  };
+
+  // 🎈 Trash Pointer — the bottle goes in the right bin
+  S['trash-pointer'] = K => {
+    const bin = (x, c, sym) => '<g transform="translate(' + x + ' 176)"><path d="M-26 -50 L26 -50 L20 0 L-20 0Z" ' + K.f(c) + '/><rect x="-30" y="-58" width="60" height="10" rx="4" ' + K.f(dark(c, .15)) + '/>' + sym + '</g>';
+    let b = bin(70, '#3D7DD8', '<path d="M-8 -26 l8 -12 l8 12 M8 -26 l-4 8 h-10" ' + K.l('#ffffff', 2.6) + '/>') + bin(160, '#22A04A', '<path d="M-6 -20 Q-10 -36 4 -38 Q8 -26 -6 -20Z" ' + K.fp('#BBF7D0') + '/>') + bin(250, '#6B7280', '<circle cx="0" cy="-26" r="7" ' + K.fp('#D1D5DB') + '/>');
+    b += '<path d="M8 186 Q100 176 160 182 T312 186" ' + K.l('#5CC45A', 4) + '/>';
+    let m = '<path d="M238 40 Q150 -4 82 96" ' + K.l('#FFFFFF', 2.4, 'stroke-dasharray="3 6"') + '/><g transform="translate(96 76) rotate(-30)"><rect x="-7" y="-16" width="14" height="30" rx="5" ' + K.f('#7DD3FC') + '/><rect x="-4" y="-22" width="8" height="7" rx="2" ' + K.fp('#2563EB') + '/></g>' + K.spark(70, 98, 6);
+    return {b, m, a: 'hover'};
+  };
+
+  // ======================= pictures + cache =======================
+  const CACHE = {};
+  const enc = s => 'data:image/svg+xml;charset=utf-8,' + s.replace(/"/g, "'").replace(/%/g, '%25').replace(/&/g, '%26').replace(/#/g, '%23').replace(/</g, '%3C').replace(/>/g, '%3E').replace(/\s+/g, ' ');   // ~35% smaller than encodeURIComponent
+  function parts(id, c1, c2){
+    const key = id + c1 + c2;
+    if(CACHE[key]) return CACHE[key];
+    const f = S[id]; if(!f) return null;
+    const K1 = kit('ca' + id.replace(/[^a-z]/g, '') + 'b', c1, c2), sc = f(K1);
+    const base = svgOf(K1, sc.b, true, sc.bg);
+    const K2 = kit('ca' + id.replace(/[^a-z]/g, '') + 'm', c1, c2), sc2 = f(K2);
+    const move = svgOf(K2, sc2.m, false);
+    let rawLogo = null;   // 🎴 gr-6: the game's logo sticker = its own layer (Gameroom pops it in, hides it on thin sideways-phone pictures)
+    if(CARD_LOGO[id]){ const K3 = kit('ca' + id.replace(/[^a-z]/g, '') + 'l', c1, c2); rawLogo = svgOf(K3, CARD_LOGO[id](K3), false); }
+    return (CACHE[key] = {base: enc(base), move: enc(move), anim: sc.a || 'bob', rawBase: base, rawMove: move, logo: rawLogo ? enc(rawLogo) : null, rawLogo: rawLogo});
+  }
+  function html(id, c1, c2){
+    const p = parts(id, c1, c2); if(!p) return '';
+    return '<span class="ca-scene" aria-hidden="true"><img class="ca-b" alt="" draggable="false" decoding="async" src="' + p.base + '"><img class="ca-m ca-' + p.anim + '" alt="" draggable="false" decoding="async" src="' + p.move + '">' + (p.logo ? '<img class="ca-l" alt="" draggable="false" decoding="async" src="' + p.logo + '">' : '') + '</span>';
+  }
+  // ======================= ▶ how-to flip-books (p5-4) =======================
+  // D[id](K) → 3 frames {b: still picture, m: the part that moves in once, a: fly | slide | pop | pulse | wiggle | bob, cap: one short line}.
+  // Shown only in the ❓ How to play card (one at a time), so it costs nothing on the Gameroom grid.
+  const D = {};
+  // ➗ Algebros — find the gap → drop the 7 → both sums are true
+  function algBoard(K, placed){
+    const T = 26, St = 29, x0 = 62, y0 = 50, sx = x0 + 4 * St; let b = '';
+    b += '<rect x="40" y="30" width="176" height="160" rx="14" ' + K.fp('#FFFFFF', 'opacity=".6"') + '/>';
+    ['3', '+', '4', '='].forEach((c, i) => b += K.tile(x0 + i * St, y0, c, OP(c), T, OP(c) ? '#B4410C' : null));
+    ['−', '5', '=', '2'].forEach((c, i) => b += K.tile(sx, y0 + (i + 1) * St, c, OP(c), T, OP(c) ? '#B4410C' : null));
+    ['6', '×', '1'].forEach((c, i) => b += K.tile(x0 + i * St, y0 + 3 * St, c, OP(c), T, OP(c) ? '#B4410C' : null));
+    if(!placed) b += '<rect x="' + (sx - 16) + '" y="' + (y0 - 16) + '" width="32" height="32" rx="8" fill="none" stroke="#22A355" stroke-width="2.6" stroke-dasharray="5 4"/>';
+    b += '<rect x="214" y="168" width="70" height="9" rx="4" ' + K.f('#B7794A') + '/>';
+    return {b, sx, y0, St, x0};
+  }
+  D['number-board'] = K => {
+    const A = algBoard(K, false), P = algBoard(K, true);
+    const rack = c => ['8', '+', '9'].map((ch, i) => '<g transform="translate(' + (228 + i * 21) + ' 158) scale(.7)">' + K.tile(0, 0, ch, OP(ch), 26) + '</g>').join('') + (c ? '<g transform="translate(270 158) scale(.7)">' + K.tile(0, 0, '7', '#BBF7D0', 26) + '</g>' : '');
+    return [
+      {b: A.b + rack(true) + K.robot(250, 140, .9, K.c2), m: '<rect x="' + (A.sx - 20) + '" y="' + (A.y0 - 20) + '" width="40" height="40" rx="10" fill="none" stroke="#22A355" stroke-width="4"/>' + K.spark(A.sx - 24, A.y0 - 26, 7) + K.spark(A.sx + 26, A.y0 + 22, 5), a: 'pulse', cap: 'Find the gap in the sums'},
+      {b: A.b + rack(false) + K.robot(250, 140, .9, K.c2), m: K.tile(A.sx, A.y0, '7', '#BBF7D0') + K.spark(A.sx + 22, A.y0 - 20, 6), a: 'fly', cap: 'Drop a tile in — 3 + 4 = 7'},
+      {b: P.b + K.tile(P.sx, P.y0, '7', '#BBF7D0') + rack(false), m: K.check(P.x0 - 4, P.y0 - 30) + K.check(P.sx + 28, P.y0 + 4 * P.St) + K.robot(250, 140, .9, K.c2, {cheer: 1}) + K.burst(P.sx, P.y0, 24, '#FFF3A6', 10).replace('<path ', '<path opacity=".55" ') + K.spark(P.sx + 30, P.y0 - 24, 7), a: 'pop', cap: 'Both sums true — you score!'}
+    ];
+  };
+  // 🏎️ Turbo Trail — race → drift past the rival → through the checkpoint
+  function road(K){
+    let b = '<path d="M0 74 Q160 62 320 74 L320 200 L0 200Z" ' + K.f('#5CC45A') + '/>';
+    b += '<path d="M30 200 C95 150 150 110 151 74 L171 74 C176 110 236 150 306 200 Z" ' + K.f('#6B6F82') + '/><path d="M168 200 C178 150 165 110 161 76" ' + K.l('#ffffff', 3.5, 'stroke-dasharray="12 10"') + '/>';
+    b += '<path d="M30 200 C95 150 150 110 151 74" ' + K.l('#EF4444', 4, 'stroke-dasharray="7 7"') + '/><path d="M306 200 C236 150 176 110 171 74" ' + K.l('#EF4444', 4, 'stroke-dasharray="7 7"') + '/>';
+    b += '<rect x="140" y="50" width="3" height="24" ' + K.fp('#9CA3AF') + '/><rect x="179" y="50" width="3" height="24" ' + K.fp('#9CA3AF') + '/><rect x="140" y="45" width="42" height="9" ' + K.fp('#ffffff') + '/>';
+    for(let i = 0; i < 10; i++) for(let j = 0; j < 2; j++) if((i + j) % 2) b += '<rect x="' + (141 + i * 4) + '" y="' + (46 + j * 4) + '" width="4" height="4" fill="#2B2B3A"/>';
+    const tree = (x, y, s) => '<g transform="translate(' + x + ' ' + y + ') scale(' + s + ')"><rect x="-3" y="0" width="6" height="14" ' + K.fp('#8B5A2B') + '/><circle cx="0" cy="-6" r="12" ' + K.f('#2E9E4F') + '/></g>';
+    return b + tree(40, 92, .9) + tree(78, 78, .55) + tree(118, 70, .35) + tree(282, 96, 1) + tree(240, 80, .6) + tree(206, 72, .38);
+  }
+  D['turbo'] = K => {
+    const R = road(K), lines = y => [0, 1, 2].map(i => '<path d="M' + (120 + i * 30) + ' ' + (y + 30 + i * 4) + ' v14" ' + K.l('#ffffff', 2.6) + '/>').join('');
+    return [
+      {b: R + car(K, 172, 120, .6, K.c2, 2, '#FDE68A'), m: car(K, 166, 170, 1, K.c1, 0, '#ffffff') + lines(170), a: 'bob', cap: 'Race down the trail'},
+      {b: R + car(K, 186, 138, .72, K.c2, 4, '#FDE68A'), m: car(K, 124, 150, 1.02, K.c1, -14, '#ffffff') + [[176, 182, 10], [194, 172, 7], [160, 192, 8]].map(([x, y, r]) => '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" ' + K.fp('#E5E7EB') + '/>').join('') + [0, 1, 2].map(i => '<path d="M' + (44 + i * 6) + ' ' + (128 + i * 13) + ' L' + (78 + i * 4) + ' ' + (126 + i * 13) + '" ' + K.l('#ffffff', 2.6) + '/>').join(''), a: 'slide', cap: 'Drift past the rival'},
+      {b: R + car(K, 214, 176, .95, K.c2, 6, '#FDE68A'), m: car(K, 161, 92, .55, K.c1, 0, '#ffffff') + K.burst(161, 58, 20, '#FFF3A6', 10).replace('<path ', '<path opacity=".7" ') + K.t(161, 58, '+5s', 13, '#B4410C') + K.spark(128, 52, 6) + K.spark(196, 50, 5), a: 'pop', cap: 'Beat the clock at each checkpoint'}
+    ];
+  };
+  // 🐍 Snakize — steer to the fruit → it grows → loop round land to claim it
+  function snGrid(K){ let g = ''; for(let x = 0; x <= 320; x += 20) g += '<line x1="' + x + '" y1="0" x2="' + x + '" y2="200" stroke="' + dark(K.c1, .2) + '" stroke-width="1" opacity=".25"/>'; for(let y = 0; y <= 200; y += 20) g += '<line x1="0" y1="' + y + '" x2="320" y2="' + y + '" stroke="' + dark(K.c1, .2) + '" stroke-width="1" opacity=".25"/>'; return g; }
+  function snake(K, d, hx, hy, rot, spots){
+    let b = K.tube(d, '#22A04A', 24);
+    spots.forEach(([x, y]) => b += '<circle cx="' + x + '" cy="' + y + '" r="3.6" ' + K.fp(K.c2) + '/>');
+    return b + '<g transform="translate(' + hx + ' ' + hy + ') rotate(' + rot + ')"><ellipse cx="0" cy="0" rx="22" ry="16" ' + K.f('#22A04A') + '/><path d="M6 1 Q16 -10 22 -8 Q19 1 22 10 Q16 11 6 1Z" fill="#7F1D1D"/><circle cx="-2" cy="-11" r="6" fill="#fff" stroke="' + INK + '" stroke-width="1.5"/><circle cx="0" cy="-11" r="3" fill="#111"/></g>';
+  }
+  const apple = (K, x, y) => '<g transform="translate(' + x + ' ' + y + ')"><circle r="15" ' + K.f('#EF3B3B') + '/><path d="M0 -14 Q2 -22 6 -24" ' + K.l('#5B3A1A', 2.4) + '/><path d="M3 -18 Q14 -26 18 -16 Q8 -12 3 -18Z" ' + K.f('#3CB04A') + '/><ellipse cx="-5" cy="-5" rx="4" ry="6" fill="#fff" opacity=".55"/></g>';
+  D['snakeast'] = K => {
+    const G = snGrid(K), land = '<path d="M240 160 H320 V200 H240Z" ' + K.f(K.c2) + '/>';
+    const short = snake(K, 'M84 170 C84 140 72 120 84 96 C96 72 140 84 160 98 C176 110 196 100 204 84', 212, 74, -28, [[84, 150], [86, 104], [122, 86], [158, 98], [184, 100]]);
+    const long = snake(K, 'M40 182 C70 196 100 186 106 158 C112 128 72 120 84 96 C96 72 140 84 160 98 C176 110 196 100 204 84 C210 70 222 62 236 60', 244, 58, -10, [[60, 188], [96, 172], [98, 134], [86, 104], [122, 86], [158, 98], [184, 100], [214, 68]]);
+    return [
+      {b: land + short, m: apple(K, 252, 62) + '<path d="M222 78 L238 70" ' + K.l('#FFFFFF', 2.4, 'stroke-dasharray="3 4"') + '/>', a: 'bob', cap: 'Steer your snake to the fruit', bg: G},
+      {b: land + long, m: K.burst(256, 56, 22, '#FFF3A6', 10).replace('<path ', '<path opacity=".7" ') + K.t(256, 56, '+1', 15, '#15803D') + K.spark(282, 36, 6) + K.spark(230, 30, 5), a: 'pop', cap: 'Gulp! Your snake grows longer', bg: G},
+      {b: long, m: '<path d="M180 120 H320 V200 H160 V140 H180Z" ' + K.f(K.c2) + '/><path d="M180 120 H320 V200 H160 V140 H180Z" ' + K.l('#15803D', 3, 'stroke-dasharray="6 6"') + '/><line x1="262" y1="128" x2="262" y2="168" ' + K.l('#5B3A1A', 2.6) + '/><path d="M262 128 L284 136 L262 144Z" ' + K.f('#EF4444') + '/>' + K.spark(214, 156, 6) + K.spark(300, 186, 5), a: 'slide', cap: 'Loop round land to make it yours', bg: G}
+    ];
+  };
+  // 🏭 Artifactory — block on the lathe → shape it → keep your cup
+  function lathe(K, piece, shelfCup){
+    let b = '<rect x="0" y="170" width="320" height="30" ' + K.f('#9A6B43') + '/><rect x="40" y="40" width="96" height="7" rx="3" ' + K.f('#8B5A2B') + '/>';
+    b += '<path d="M52 40 Q48 22 56 14 L70 14 Q78 22 74 40Z" ' + K.f('#3BA0E8') + '/><circle cx="124" cy="31" r="9" ' + K.f('#E85D75') + '/>';
+    if(shelfCup) b += '<path d="M86 40 C84 30 84 22 90 18 L104 18 C110 22 110 30 108 40Z" ' + K.f('#E2B07A') + '/>';
+    b += '<rect x="36" y="146" width="250" height="14" rx="4" ' + K.f('#7C8597') + '/><rect x="52" y="160" width="14" height="14" ' + K.f('#5B6375') + '/><rect x="256" y="160" width="14" height="14" ' + K.f('#5B6375') + '/>';
+    b += '<rect x="40" y="88" width="56" height="58" rx="8" ' + K.f(K.c1) + '/><circle cx="58" cy="106" r="6" ' + K.fp('#FDE68A') + '/><rect x="96" y="104" width="12" height="30" rx="3" ' + K.fp('#A3ACBD') + '/>';
+    b += '<rect x="252" y="106" width="34" height="40" rx="7" ' + K.f(K.c1) + '/><path d="M252 119 L236 119" ' + K.l('#A3ACBD', 7) + '/>';
+    if(piece === 'block') b += '<rect x="108" y="100" width="128" height="38" rx="3" ' + K.f('#C98E55') + '/><path d="M118 108 L226 108 M118 128 L226 128" ' + K.l('#9A6338', 1.4, 'opacity=".7"') + '/>';
+    if(piece === 'half') b += '<path d="M108 104 C130 100 138 92 158 94 C176 96 176 106 182 106 L182 132 C176 132 176 142 158 144 C138 146 130 138 108 134 Z" ' + K.f('#E2B07A') + '/><rect x="180" y="100" width="56" height="38" rx="3" ' + K.f('#C98E55') + '/>';
+    return b + K.kid(292, 196, .9, {goggles: K.c2, shirt: '#3D7DD8', n: 2, aL: shelfCup ? 160 : 120, aR: shelfCup ? 150 : 20, mouth: shelfCup ? 'o' : null});
+  }
+  D['artifactory'] = K => [
+    {b: lathe(K, 'block', false), m: '<path d="M150 84 A28 10 0 0 1 196 86" ' + K.l('#7C3AED', 3) + '/>' + K.arrowHead(196, 86, 20, '#7C3AED') + '<path d="M196 152 A28 10 0 0 1 150 150" ' + K.l('#7C3AED', 3) + '/>' + K.arrowHead(150, 150, 200, '#7C3AED'), a: 'pulse', cap: 'Put a block on the spinning lathe'},
+    {b: lathe(K, 'half', false), m: '<path d="M184 138 L190 168" ' + K.l('#C0C7D4', 6) + '/><rect x="186" y="166" width="10" height="26" rx="4" transform="rotate(-11 191 179)" ' + K.f(K.c2) + '/><path d="M186 136 q14 4 16 -8 q2 -10 -8 -8 q-6 2 -2 8" ' + K.l('#E9B77A', 3) + '/><path d="M188 140 q20 10 30 0 q6 -8 -2 -10" ' + K.l('#D79A5A', 2.6) + '/>' + K.spark(214, 126, 6), a: 'wiggle', cap: 'Shape it with the chisel'},
+    {b: lathe(K, null, true), m: K.burst(97, 28, 26, '#FFF3A6', 10).replace('<path ', '<path opacity=".7" ') + '<path d="M86 40 C84 30 84 22 90 18 L104 18 C110 22 110 30 108 40Z" ' + K.f('#E2B07A') + '/>' + K.spark(126, 14, 6) + K.spark(70, 60, 5), a: 'pop', cap: 'Name it and keep your new cup!'}
+  ];
+  // ---------- batch A (p5-6): board + puzzle games, 🐍 Snakize territory ----------
+  const F = (b, m, a, cap, bg) => ({b, m, a, cap, bg});
+  // the ❓ card shows a 2:1 picture (y ≈ 20…180 of the 200 box): fit(frames, centreY, scale) shrinks a tall scene into that band
+  const fit = (fr, cy, sc) => fr.map(f => Object.assign({}, f, {b: '<g transform="translate(160 100) scale(' + sc + ') translate(-160 -' + cy + ')">' + f.b + '</g>', m: '<g transform="translate(160 100) scale(' + sc + ') translate(-160 -' + cy + ')">' + f.m + '</g>'}));
+  // 🔤 Lettercraft
+  function wbBoard(K, s){
+    const x0 = 58, y0 = 64, St = 29; let b = '<rect x="36" y="38" width="190" height="148" rx="14" ' + K.fp('#FFFFFF', 'opacity=".6"') + '/>';
+    const sc = (x, y, n) => '<text x="' + (x + 8) + '" y="' + (y + 8) + '" text-anchor="middle" dominant-baseline="central" font-family="' + FONT + '" font-weight="700" font-size="7" fill="' + INK + '">' + n + '</text>';
+    [['W', 4], ['O', 1], ['R', 1], ['D', 2]].forEach(([c, n], i) => b += K.tile(x0 + i * St, y0, c, '#FFF1D6') + sc(x0 + i * St, y0, n));
+    [['E', 1], ['A', 1], ['D', 2]].forEach(([c, n], i) => b += K.tile(x0 + 2 * St, y0 + (i + 1) * St, c, '#FFF1D6') + sc(x0 + 2 * St, y0 + (i + 1) * St, n));
+    [['P', 3], ['L', 1], null, ['Y', 4]].forEach((t, i) => t && (b += K.tile(x0 + i * St, y0 + 2 * St, t[0], '#FFF1D6') + sc(x0 + i * St, y0 + 2 * St, t[1])));
+    if(s) b += K.tile(x0 + 4 * St, y0, 'S', '#BBF7D0') + sc(x0 + 4 * St, y0, 1);
+    b += '<rect x="226" y="154" width="84" height="26" rx="8" ' + K.f('#B7794A') + '/>' + (s ? '' : K.tile(242, 167, 'S', '#FFF1D6', 22)) + K.tile(268, 167, 'T', '#FFF1D6', 22) + K.tile(294, 167, 'N', '#FFF1D6', 22);
+    return {b, sx: x0 + 4 * St, sy: y0};
+  }
+  D['word-board'] = K => fit((K => { const A = wbBoard(K, false), B = wbBoard(K, true); return [
+    F(A.b, '<rect x="' + (A.sx - 18) + '" y="' + (A.sy - 18) + '" width="36" height="36" rx="9" fill="none" stroke="#22A355" stroke-width="4"/>' + K.spark(A.sx + 24, A.sy - 22, 6), 'pulse', 'Make words crossword-style'),
+    F(A.b.replace(K.tile(242, 167, 'S', '#FFF1D6', 22), ''), K.tile(A.sx, A.sy, 'S', '#BBF7D0') + K.spark(A.sx + 20, A.sy - 22, 6), 'fly', 'Drag a letter on — WORD → WORDS'),
+    F(B.b, K.check(B.sx + 26, B.sy - 22) + K.burst(B.sx - 40, B.sy - 30, 16, '#FFF3A6', 9) + K.t(B.sx - 40, B.sy - 30, '+9', 12, '#15803D') + K.spark(B.sx + 34, B.sy + 20, 5), 'pop', 'Press ✅ — long words score big!')
+  ]; })(K), 106, 0.94);
+  // 🔢 Digitinct
+  function ngGrid(K, put){
+    const C = 30, gx = 70, gy = 34, G = [['1', '2', put ? '3' : '', '4'], ['3', '4', '1', '2'], ['2', '', '4', '1'], ['4', '1', '2', '3']]; let b = '';
+    b += '<rect x="' + (gx - 6) + '" y="' + (gy - 6) + '" width="' + (C * 4 + 12) + '" height="' + (C * 4 + 12) + '" rx="10" ' + K.f('#FFFFFF') + '/>';
+    G.forEach((r, y) => r.forEach((v, x) => { b += '<rect x="' + (gx + x * C) + '" y="' + (gy + y * C) + '" width="' + C + '" height="' + C + '" rx="4" ' + K.fp((x < 2) === (y < 2) ? '#EDE9FE' : '#FFF7E6') + '/>' + (v ? K.t(gx + x * C + C / 2, gy + y * C + C / 2 + 1, v, 18, put && x === 2 && y === 0 ? '#15803D' : INK) : ''); }));
+    b += '<path d="M' + (gx + 2 * C) + ' ' + (gy - 4) + ' V' + (gy + 4 * C + 4) + ' M' + (gx - 4) + ' ' + (gy + 2 * C) + ' H' + (gx + 4 * C + 4) + '" ' + K.l(K.c1, 3) + '/>';
+    b += '<rect x="214" y="150" width="88" height="34" rx="10" ' + K.f('#B7794A') + '/>' + ['1', '2', put ? '4' : '3'].map((c, i) => K.tile(232 + i * 26, 167, c, '#FFF1D6', 22)).join('');
+    return {b, gx, gy, C};
+  }
+  D['number-grid'] = K => fit((K => { const A = ngGrid(K, false), B = ngGrid(K, true), cx = A.gx + 2 * A.C + 15, cy = A.gy + 15; return [
+    F(A.b, '<rect x="' + (A.gx - 3) + '" y="' + (A.gy - 3) + '" width="' + (A.C * 4 + 6) + '" height="' + (A.C + 6) + '" rx="6" fill="none" stroke="' + K.c2 + '" stroke-width="3.5"/>' + K.t(cx, cy + 1, '?', 20, K.c2), 'pulse', 'Each row, column and box: 1–4 once'),
+    F(A.b, K.tile(cx, cy, '3', '#FFE08A', 28) + K.spark(cx + 22, cy - 18, 6), 'fly', 'Drag the missing number in'),
+    F(B.b, '<rect x="' + (B.gx - 3) + '" y="' + (B.gy - 3) + '" width="' + (B.C * 4 + 6) + '" height="' + (B.C + 6) + '" rx="6" fill="none" stroke="#22A355" stroke-width="3.5"/>' + K.check(B.gx + 4 * B.C + 18, B.gy + 15) + K.spark(B.gx - 12, B.gy - 10, 6) + K.spark(B.gx + 4 * B.C + 14, B.gy + 60, 5), 'pop', 'Row done! Fill every square to win')
+  ]; })(K), 106, 0.92);
+  // ⬛ Polyplot
+  function ppDots(K, lines, fills){
+    const D2 = 34, gx = 64, gy = 36; let b = '';
+    (fills || []).forEach(([x, y, c]) => b += '<rect x="' + (gx + x * D2) + '" y="' + (gy + y * D2) + '" width="' + D2 + '" height="' + D2 + '" ' + K.f(c) + '/>');
+    lines.forEach(([a, c, d, e]) => b += '<path d="M' + (gx + a * D2) + ' ' + (gy + c * D2) + ' L' + (gx + d * D2) + ' ' + (gy + e * D2) + '" ' + K.l('#3B2A20', 3) + '/>');
+    for(let y = 0; y < 4; y++) for(let x = 0; x < 5; x++) b += '<circle cx="' + (gx + x * D2) + '" cy="' + (gy + y * D2) + '" r="4.2" ' + K.fp('#3B2A20') + '/>';
+    return b;
+  }
+  const pencil = (K, x, y) => '<g transform="translate(' + x + ' ' + y + ') rotate(40)"><path d="M0 0 L8 -4 L46 -4 L46 4 L8 4 Z" ' + K.fp('#F4B400') + '/><path d="M0 0 L8 -4 L8 4Z" fill="' + INK + '"/></g>';
+  D['polyplot'] = K => {
+    const L0 = [[0, 0, 1, 0], [0, 0, 0, 1], [1, 1, 2, 1], [2, 1, 2, 2], [3, 0, 4, 0], [0, 2, 1, 2], [1, 2, 1, 3], [3, 2, 4, 2], [3, 3, 4, 3]];
+    const sq = [[1, 0, 2, 0], [1, 0, 1, 1], [2, 0, 2, 1]];   // 3 sides of the box at (1,0)
+    const gx = 64, gy = 36, D2 = 34, ln = (a, c, d, e, col, x) => '<path d="M' + (gx + a * D2) + ' ' + (gy + c * D2) + ' L' + (gx + d * D2) + ' ' + (gy + e * D2) + '" ' + K.l(col || K.c1, 4.5, x || '') + '/>';
+    const kid = K.kid(268, 186, .9, {n: 1, shirt: K.c1, aR: 150, aL: 20});
+    return [
+      F(ppDots(K, L0) + kid, ln(1, 0, 2, 0) + pencil(K, gx + 2 * D2 - 4, gy - 4), 'pop', 'Draw ONE line between two dots'),
+      F(ppDots(K, L0.concat(sq)) + kid, '<rect x="' + (gx + D2) + '" y="' + gy + '" width="' + D2 + '" height="' + D2 + '" ' + K.f(K.c1) + '/>' + ln(1, 1, 2, 1) + K.star(gx + 1.5 * D2, gy + .5 * D2, 9) + K.spark(gx + 2 * D2 + 12, gy - 6, 6), 'pop', 'Close the last side — the box is yours!'),
+      F(ppDots(K, L0.concat(sq, [[1, 1, 2, 1]]), [[1, 0, K.c1]]) + kid, ln(2, 1, 3, 1) + pencil(K, gx + 3 * D2 - 4, gy + D2 - 4) + K.t(gx + 3 * D2 + 26, gy + D2 + 22, 'again!', 13, K.c2), 'slide', 'Closed a box? You draw again'),
+      F('<g transform="translate(70 60)"><rect x="-24" y="-24" width="48" height="48" ' + K.f(K.c1) + '/>' + K.t(0, 2, '+4', 18, '#fff') + '</g><g transform="translate(176 60)"><path d="M-28 0 L-14 -24 L14 -24 L28 0 L14 24 L-14 24Z" ' + K.f(K.c2) + '/>' + K.t(0, 2, '+6', 18, '#fff') + '</g>' + kid, K.burst(176, 60, 40, '#FFF3A6', 12).replace('<path ', '<path opacity=".45" ') + K.spark(214, 26, 7) + K.spark(140, 104, 5), 'pop', 'More sides = more points!')
+    ];
+  };
+  // 🔴 Alignext (Drop)
+  function axBoard(K, top){
+    const C = 28, gx = 76, gy = 52, R = [['', '', '', top || '', '', ''], ['', '', 'r', 'y', '', ''], ['', 'r', 'y', 'y', 'r', ''], ['r', 'y', 'y', 'r', 'y', 'r']];
+    let b = '<rect x="' + (gx - 8) + '" y="' + (gy - 8) + '" width="' + (C * 6 + 16) + '" height="' + (C * 4 + 16) + '" rx="12" ' + K.f('#7C4DFF') + '/><path d="M' + (gx - 14) + ' ' + (gy + 4 * C + 8) + ' l-6 26 M' + (gx + 6 * C + 14) + ' ' + (gy + 4 * C + 8) + ' l6 26" ' + K.l('#5B3A9A', 6) + '/>';
+    R.forEach((r, y) => r.forEach((v, x) => b += '<circle cx="' + (gx + x * C + C / 2) + '" cy="' + (gy + y * C + C / 2) + '" r="11" ' + (v === 'r' ? K.f('#E63946') : v === 'y' ? K.f('#FFC21A') : K.fp('#F6ECD6')) + '/>'));
+    return {b: b + K.kid(44, 186, .8, {n: 2, shirt: '#E63946', aL: 150, aR: 30}) + K.robot(282, 186, .75, '#FFC21A', {short: 1}), C, gx, gy};
+  }
+  D['alignext'] = K => { const A = axBoard(K), B = axBoard(K, 'r'), cx = A.gx + 3 * A.C + A.C / 2; return [
+    F(A.b, '<circle cx="' + cx + '" cy="' + (A.gy - 24) + '" r="11" ' + K.f('#E63946') + '/>' + K.arrowHead(cx, A.gy - 4, 90, '#E63946', 8) + '<path d="M' + cx + ' ' + (A.gy - 10) + ' v6" ' + K.l('#E63946', 3) + '/>', 'bob', 'Drop a disc into a column'),
+    F(A.b, '<circle cx="' + cx + '" cy="' + (A.gy + A.C / 2) + '" r="11" ' + K.f('#E63946') + '/>' + K.spark(cx + 18, A.gy - 6, 6), 'drop', 'It falls to the lowest space'),
+    F(B.b, '<path d="M' + (B.gx + B.C / 2) + ' ' + (B.gy + 3.5 * B.C) + ' L' + (B.gx + 3.5 * B.C) + ' ' + (B.gy + B.C / 2) + '" ' + K.l('#FFFFFF', 5) + '/>' + K.burst(B.gx + 3.5 * B.C, B.gy + B.C / 2, 22, '#FFF3A6', 10).replace('<path ', '<path opacity=".55" ') + K.spark(B.gx + 4.5 * B.C, B.gy - 10, 7), 'pop', 'Line up 4 to win — block Robo too!')
+  ]; };
+  // 🍬 Sweet Swap
+  function sw(K, x, y, k){ return k === 0 ? '<circle cx="' + x + '" cy="' + y + '" r="12" ' + K.f('#FF4D8D') + '/><path d="M' + (x - 6) + ' ' + (y - 4) + ' q6 -6 12 0" ' + K.l('#FFE4EF', 2) + '/>'
+      : k === 1 ? '<path d="M' + (x - 18) + ' ' + (y - 7) + ' L' + (x - 10) + ' ' + y + ' L' + (x - 18) + ' ' + (y + 7) + 'Z M' + (x + 18) + ' ' + (y - 7) + ' L' + (x + 10) + ' ' + y + ' L' + (x + 18) + ' ' + (y + 7) + 'Z" ' + K.fp('#FFC21A') + '/><ellipse cx="' + x + '" cy="' + y + '" rx="11" ry="9" ' + K.f('#FFC21A') + '/>'
+      : k === 2 ? '<path d="M' + x + ' ' + (y + 11) + ' C' + (x - 18) + ' ' + (y - 2) + ' ' + (x - 8) + ' ' + (y - 16) + ' ' + x + ' ' + (y - 6) + ' C' + (x + 8) + ' ' + (y - 16) + ' ' + (x + 18) + ' ' + (y - 2) + ' ' + x + ' ' + (y + 11) + 'Z" ' + K.f('#A855F7') + '/>'
+      : '<rect x="' + (x - 11) + '" y="' + (y - 11) + '" width="22" height="22" rx="5" ' + K.f('#22C55E') + '/>'; }
+  function ssGrid(K, skip, over){
+    const G = [[1, 3, 2, 0, 1], [2, 0, 1, 2, 3], [0, 0, 3, 0, 2], [3, 2, 1, 3, 1]]; Object.assign(G[1], over && over[1] || {}); Object.assign(G[2], over && over[2] || {});
+    let b = '<rect x="58" y="16" width="204" height="168" rx="16" ' + K.fp('#FFFFFF', 'opacity=".55"') + '/>';
+    G.forEach((r, y) => r.forEach((k, x) => { if(!skip(x, y) && k != null) b += sw(K, 84 + x * 38, 42 + y * 38, k); })); return b;
+  }
+  D['sweet-swap'] = K => fit((K => [
+    F(ssGrid(K, () => false, {1: {2: 0}, 2: {2: 1}}), '<path d="M182 82 Q196 99 182 116" ' + K.l(K.c2, 3) + '/>' + K.arrowHead(182, 116, 120, K.c2) + '<path d="M138 116 Q124 99 138 82" ' + K.l(K.c2, 3) + '/>' + K.arrowHead(138, 82, -60, K.c2), 'wiggle', 'Swap two sweets next to each other'),
+    F(ssGrid(K, (x, y) => x === 2 && (y === 1 || y === 2)), sw(K, 160, 118, 0) + sw(K, 160, 80, 1) + '<rect x="64" y="104" width="186" height="28" rx="14" fill="none" stroke="#22A355" stroke-width="3" stroke-dasharray="5 4"/>', 'pop', 'Make 3 or more in a row'),
+    F(ssGrid(K, (x, y) => y === 2 && x < 4, {1: {2: 1}}), K.burst(141, 118, 34, '#FFF3A6', 12).replace('<path ', '<path opacity=".6" ') + K.t(141, 119, '+60', 16, '#B91C1C') + K.spark(84, 100, 6) + K.spark(200, 100, 6) + K.spark(141, 150, 5), 'pop', 'Pop! New sweets fall in')
+  ])(K), 100, 0.92);
+  // 🔀 Double Up
+  function duBoard(K, tiles){
+    let b = '<rect x="58" y="12" width="204" height="176" rx="16" ' + K.f('#E7D5C0') + '/>';
+    for(let y = 0; y < 4; y++) for(let x = 0; x < 4; x++) b += '<rect x="' + (68 + x * 48) + '" y="' + (22 + y * 40) + '" width="40" height="34" rx="7" ' + K.fp('#F6ECD6', 'opacity=".9"') + '/>';
+    return b + tiles.map(([x, y, n]) => duT(K, x, y, n)).join('');
+  }
+  const DUC = {2: '#9CA3AF', 4: '#F59E0B', 8: '#F28C28', 16: '#E11D48', 32: '#E11D48', 64: '#7C3AED'};
+  function duT(K, x, y, n){ const cx = 88 + x * 48, cy = 39 + y * 40, s = String(n); return '<rect x="' + (cx - 20) + '" y="' + (cy - 17) + '" width="40" height="34" rx="8" ' + K.f(DUC[n]) + '/>' + K.t(cx, cy + 1, s, s.length > 1 ? 15 : 18, '#fff'); }
+  D['double-up'] = K => fit((K => [
+    F(duBoard(K, [[2, 1, 2], [3, 3, 4], [0, 3, 8]]), duT(K, 0, 1, 2) + '<path d="M210 60 H118" ' + K.l(K.c1, 4) + '/>' + K.arrowHead(118, 60, 180, K.c1, 9), 'slide', 'Swipe — every tile slides'),
+    F(duBoard(K, [[3, 3, 4], [0, 3, 8]]), duT(K, 0, 1, 4) + K.burst(88, 79, 26, '#FFF3A6', 10).replace('<path ', '<path opacity=".5" ') + K.t(150, 79, '2 + 2 = 4', 13, K.c2), 'pop', 'Two the same join and double!'),
+    F(duBoard(K, [[0, 1, 4], [1, 3, 4], [2, 3, 2]]), duT(K, 0, 3, 16) + '<rect x="64" y="134" width="48" height="46" rx="10" fill="none" stroke="#FFD84A" stroke-width="4"/>' + K.spark(118, 130, 6) + K.spark(66, 126, 5), 'pop', 'Keep your biggest tile in a corner')
+  ])(K), 100, 0.9);
+  // 🫧 Pop Blocks
+  function pbGrid(K, G){ const C = ['#FF4D8D', '#FF9F1C', '#3D7DD8', '#22C55E']; let b = '<rect x="58" y="56" width="204" height="138" rx="12" fill="none" stroke="' + K.edge(K.c2) + '" stroke-width="3"/>';
+    G.forEach((r, y) => r.forEach((k, x) => { if(k != null) b += '<rect x="' + (66 + x * 32) + '" y="' + (62 + y * 32) + '" width="30" height="30" rx="7" ' + K.f(C[k]) + '/>'; })); return b; }
+  const bubbles = (K, cx, cy) => [[0, -16, 12], [16, -40, 8], [-14, -44, 7], [22, -10, 9], [-20, -14, 6]].map(([dx, dy, r]) => '<circle cx="' + (cx + dx) + '" cy="' + (cy + dy) + '" r="' + r + '" fill="#E0F2FE" stroke="' + K.edge('#3D7DD8') + '" stroke-width="1.6"/><ellipse cx="' + (cx + dx - r * .35) + '" cy="' + (cy + dy - r * .35) + '" rx="' + (r * .3) + '" ry="' + (r * .2) + '" fill="#fff"/>').join('');
+  D['pop-blocks'] = K => fit((K => {
+    const G1 = [[0, 1, 2, 2, 1, 3], [1, 1, 0, 3, 3, 2], [2, 3, 0, 1, 2, 2], [3, 3, 1, 1, 0, 2]];
+    const G2 = [[0, 1, 2, 2, 1, 3], [1, 1, null, 3, 3, 2], [2, 3, null, 1, 2, 2], [3, 3, 1, 1, 0, 2]];
+    const G3 = [[0, 1, null, 2, 1, 3], [1, 1, null, 3, 3, 2], [2, 3, 2, 1, 2, 2], [3, 3, 1, 1, 0, 2]];
+    return [
+      F(pbGrid(K, G1), '<rect x="128" y="90" width="38" height="70" rx="10" fill="none" stroke="#FFFFFF" stroke-width="4"/>' + '<path d="M150 150 q4 -6 10 -2 l8 10 q4 6 -2 10 l-10 4 q-6 2 -10 -4 Z" ' + K.fp('#F2C29B') + '/>', 'pulse', 'Tap a group of 2 or more'),
+      F(pbGrid(K, G2), bubbles(K, 146, 112) + K.burst(146, 126, 20, '#FFD1E3', 9).replace('<path ', '<path opacity=".7" '), 'pop', 'Pop! They burst into bubbles'),
+      F(pbGrid(K, G3), '<rect x="130" y="126" width="30" height="30" rx="7" ' + K.f('#FFD84A') + '/>' + K.star(145, 141, 10, '#FF9F1C') + K.spark(170, 118, 6) + K.t(206, 40, 'super block!', 13, K.c2), 'pop', 'Big groups make super blocks')
+    ];
+  })(K), 125, 0.85);
+  // 🧱 Block Drop
+  function bdStack(K, cleared){
+    const sq = (x, y, c) => '<rect x="' + x + '" y="' + y + '" width="22" height="22" rx="5" ' + K.f(c) + '/><rect x="' + (x + 4) + '" y="' + (y + 4) + '" width="6" height="4" rx="2" fill="#fff" opacity=".6"/>', cols = ['#3D8BFD', '#FFC21A', '#A855F7', '#22C55E', '#FF4D8D'];
+    let b = '<rect x="96" y="6" width="128" height="194" rx="10" ' + K.fp('#1E293B', 'opacity=".22"') + '/>';
+    if(!cleared){ for(let x = 0; x < 4; x++) b += sq(104 + x * 23, 150, cols[(x + 1) % 5]) + sq(104 + x * 23, 173, cols[x]); b += sq(104, 127, cols[2]) + sq(150, 127, cols[3]); }
+    else b += sq(104, 173, cols[2]) + sq(150, 173, cols[3]);
+    return {b: b + K.kid(262, 196, .9, {n: 3, shirt: K.c1, aL: cleared ? 160 : 40, aR: cleared ? 160 : 40}), sq};
+  }
+  D['block-drop'] = K => fit((K => { const A = bdStack(K, false), B = bdStack(K, true), piece = y => A.sq(196, y, '#FF8A3D') + A.sq(196, y + 23, '#FF8A3D'); return [
+    F(A.b, piece(30) + '<path d="M184 18 v-10 M210 18 v-10" ' + K.l('#FFFFFF', 2.4) + '/>' + '<path d="M236 46 a12 12 0 1 1 -6 -10" ' + K.l(K.c2, 3) + '/>' + K.arrowHead(230, 36, -100, K.c2), 'bob', 'Blocks fall — move and turn them'),
+    F(A.b, piece(150) + '<path d="M207 60 V140" ' + K.l('#FFFFFF', 2.4, 'stroke-dasharray="3 6"') + '/>', 'drop', 'Fit them in to fill a whole row…'),
+    F(B.b, '<rect x="100" y="146" width="122" height="52" rx="6" fill="#FFF3A6" opacity=".7"/>' + K.t(160, 136, '+200', 16, '#B91C1C') + K.spark(90, 160, 7) + K.spark(232, 180, 6), 'pop', '…and the rows clear!')
+  ]; })(K), 103, 0.8);
+  // 🃏 Memories Match
+  function mmCards(K, open){
+    const back = (x, y) => '<rect x="' + x + '" y="' + y + '" width="40" height="52" rx="7" ' + K.f(K.c1) + '/><path d="M' + (x + 8) + ' ' + (y + 26) + ' l12 -14 l12 14 l-12 14z" ' + K.fp(lite(K.c1, .45)) + '/>';
+    const P = [[60, 26], [106, 26], [152, 26], [198, 26], [60, 86], [106, 86], [152, 86], [198, 86], [60, 146], [106, 146], [152, 146], [198, 146]];
+    return P.map(([x, y], i) => open.indexOf(i) >= 0 ? '' : back(x, y)).join('') + K.kid(276, 190, .95, {n: 2, shirt: K.c2, aL: 40, aR: 40});
+  }
+  const mmFace = (K, x, y, k) => '<rect x="' + x + '" y="' + y + '" width="40" height="52" rx="7" ' + K.f('#FFFFFF') + '/>' + (k === 'star' ? K.star(x + 20, y + 26, 13, '#FFC21A') : '<path d="M' + (x + 26) + ' ' + (y + 14) + ' a13 13 0 1 0 0 24 a10 10 0 1 1 0 -24Z" ' + K.f('#7DD3FC') + '/>');
+  D['memory'] = K => fit((K => [
+    F(mmCards(K, [5]), mmFace(K, 106, 86, 'star'), 'pop', 'Flip a card'),
+    F(mmCards(K, [5, 11]) + mmFace(K, 106, 86, 'star'), mmFace(K, 198, 146, 'star') + '<path d="M146 112 Q180 120 196 160" ' + K.l('#22A355', 2.6, 'stroke-dasharray="3 4"') + '/>' + K.check(250, 140), 'pop', 'Find its pair — a match stays open'),
+    F(mmCards(K, [0, 7]), mmFace(K, 60, 26, 'moon') + mmFace(K, 198, 86, 'star') + '<path d="M106 46 L190 98" ' + K.l('#E11D48', 3, 'stroke-dasharray="4 5"') + '/>' + K.t(150, 64, '✕', 18, '#E11D48'), 'wiggle', 'No match? They flip back — remember!')
+  ])(K), 110, 0.84);
+  // ♟️ Chess
+  function chBoard(K){ let b = ''; for(let y = 0; y < 5; y++) for(let x = 0; x < 8; x++) b += '<rect x="' + (32 + x * 32) + '" y="' + (40 + y * 32) + '" width="32" height="32" ' + K.fp((x + y) % 2 ? '#8D6BE8' : '#F3E8FF') + '/>'; return b; }
+  const sqc = (x, y) => [48 + x * 32, 56 + y * 32];
+  const ckKing = (K, x, y, c) => '<g transform="translate(' + x + ' ' + y + ')"><path d="M-12 14 H12 L8 -6 H-8Z" ' + K.f(c) + '/><circle cx="0" cy="-10" r="7" ' + K.f(c) + '/><path d="M0 -24 V-16 M-4 -20 H4" ' + K.l(c, 3) + '/></g>';
+  const ckPawn = (K, x, y, c) => '<g transform="translate(' + x + ' ' + y + ')"><path d="M-10 12 H10 L6 -2 H-6Z" ' + K.f(c) + '/><circle cx="0" cy="-6" r="7" ' + K.f(c) + '/></g>';
+  const ckKnight = (K, x, y) => '<g transform="translate(' + x + ' ' + y + ')"><path d="M-12 14 H12 L10 0 Q12 -14 2 -20 L-8 -16 L-12 -6 L-4 -4 L-10 4Z" ' + K.f('#F6ECD6') + '/><circle cx="-2" cy="-12" r="1.8" fill="' + INK + '"/></g>';
+  D['chess'] = K => fit((K => { const B = chBoard(K), k = sqc(6, 0), rook = (x, y) => '<g transform="translate(' + x + ' ' + y + ')"><path d="M-11 13 H11 L8 -6 H-8Z M-10 -6 V-14 H-5 V-10 H-2 V-14 H2 V-10 H5 V-14 H10 V-6Z" ' + K.f('#F6ECD6') + '/></g>';
+    const base = B + ckKing(K, k[0], k[1], '#2B2D42') + ckPawn(K, ...sqc(5, 1), '#2B2D42') + ckPawn(K, ...sqc(6, 1), '#2B2D42') + ckPawn(K, ...sqc(7, 1), '#2B2D42') + rook(...sqc(1, 3)) + ckKing(K, ...sqc(2, 4), '#F6ECD6');
+    const n0 = sqc(3, 4), n1 = sqc(5, 3), dots = [[1, 3], [5, 3], [2, 2], [4, 2]].map(([x, y]) => '<circle cx="' + sqc(x, y)[0] + '" cy="' + sqc(x, y)[1] + '" r="6" fill="#22C55E" opacity=".85"/>').join('');
+    return [
+      F(base + ckKnight(K, n0[0], n0[1]), dots + '<rect x="' + (n0[0] - 16) + '" y="' + (n0[1] - 16) + '" width="32" height="32" fill="none" stroke="#FFD84A" stroke-width="3.5"/>', 'pulse', 'Tap a piece — its moves light up'),
+      F(base, ckKnight(K, n1[0], n1[1]) + '<path d="M' + n0[0] + ' ' + (n0[1] - 10) + ' V' + (n1[1] + 8) + ' H' + (n1[0] - 10) + '" ' + K.l('#FF4D8D', 3, 'stroke-dasharray="4 4"') + '/>', 'fly', 'Move it — the knight jumps in an L'),
+      F(B + ckPawn(K, ...sqc(5, 1), '#2B2D42') + ckPawn(K, ...sqc(6, 1), '#2B2D42') + ckPawn(K, ...sqc(7, 1), '#2B2D42') + ckKing(K, ...sqc(2, 4), '#F6ECD6') + ckKing(K, k[0], k[1], '#2B2D42'), rook(...sqc(1, 0)) + '<path d="M' + (sqc(1, 0)[0] + 16) + ' ' + sqc(1, 0)[1] + ' H' + (k[0] - 16) + '" ' + K.l('#E11D48', 3, 'stroke-dasharray="5 4"') + '/>' + '<circle cx="' + k[0] + '" cy="' + k[1] + '" r="18" fill="none" stroke="#E11D48" stroke-width="4"/>' + K.t(112, 38, 'Checkmate!', 14, '#E11D48'), 'pop', 'Trap the other king — checkmate!')
+    ]; })(K), 120, 0.9);
+  // 🔴 Checkers
+  function cbBoard(K){ let b = ''; for(let y = 0; y < 5; y++) for(let x = 0; x < 8; x++) b += '<rect x="' + (32 + x * 32) + '" y="' + (40 + y * 32) + '" width="32" height="32" ' + K.fp((x + y) % 2 ? '#3A2E5C' : '#F6E3C4') + '/>'; return b; }
+  const pc = (K, x, y, c, crown) => '<g transform="translate(' + x + ' ' + y + ')"><ellipse cx="0" cy="3" rx="12" ry="5" fill="' + dark(c, .35) + '"/><circle r="12" ' + K.f(c) + '/><circle r="7" fill="none" stroke="' + lite(c, .35) + '" stroke-width="1.6"/>' + (crown ? '<path d="M-7 3 L-5 -5 L0 0 L5 -5 L7 3Z" ' + K.fp('#FFD84A') + '/>' : '') + '</g>';
+  D['checkers'] = K => fit((K => { const B = cbBoard(K), R = '#E2554F', Bk = '#2B2B3A', s = sqc;
+    const others = pc(K, ...s(6, 1), Bk) + pc(K, ...s(0, 3), R) + pc(K, ...s(6, 3), Bk);
+    return [
+      F(B + others + pc(K, ...s(2, 3), Bk) + pc(K, ...s(1, 4), R), '<path d="M' + s(1, 4)[0] + ' ' + (s(1, 4)[1] - 12) + ' Q' + s(2, 3)[0] + ' ' + (s(2, 3)[1] - 40) + ' ' + s(3, 2)[0] + ' ' + (s(3, 2)[1] - 4) + '" ' + K.l('#FFD84A', 3.5, 'stroke-dasharray="4 5"') + '/>' + K.arrowHead(s(3, 2)[0], s(3, 2)[1] - 4, 70, '#FFD84A', 8), 'pulse', 'Jump over a piece to take it'),
+      F(B + others, pc(K, ...s(3, 2), R) + K.burst(s(2, 3)[0], s(2, 3)[1], 14, '#FFF3A6', 8).replace('<path ', '<path opacity=".7" '), 'fly', 'Got it! If you can jump, you must'),
+      F(B + pc(K, ...s(6, 1), Bk) + pc(K, ...s(0, 3), R) + pc(K, ...s(6, 3), Bk), pc(K, ...s(4, 0), R, 1) + K.burst(s(4, 0)[0], s(4, 0)[1], 20, '#FFD84A', 10).replace('<path ', '<path opacity=".45" ') + K.spark(s(4, 0)[0] + 26, 38, 6) + K.t(s(4, 0)[0] + 58, 40, 'King!', 14, '#B45309'), 'pop', 'Reach the far end — become a king')
+    ]; })(K), 120, 0.9);
+  // 🐍 Snakize: the 3 territory steps (🏰 Snakastle) replace the old 3rd step
+  const SNAKE_EXTRA = K => {
+    const G = snGrid(K), home = '<path d="M220 140 H320 V200 H220Z" ' + K.f(K.c2) + '/><line x1="290" y1="150" x2="290" y2="182" ' + K.l('#5B3A1A', 2.4) + '/><path d="M290 150 L310 156 L290 162Z" ' + K.f('#EF4444') + '/>';
+    const trail = d => '<path d="' + d + '" ' + K.l(dark(K.c2, .35), 4, 'stroke-dasharray="7 6"') + '/>';
+    const head = (x, y, rot) => '<g transform="translate(' + x + ' ' + y + ') rotate(' + rot + ')"><ellipse cx="0" cy="0" rx="16" ry="12" ' + K.f('#22A04A') + '/><circle cx="-1" cy="-8" r="4.5" fill="#fff" stroke="' + INK + '" stroke-width="1.3"/><circle cx="0" cy="-8" r="2.2" fill="#111"/></g>';
+    return [
+      F(home, trail('M226 150 H170 V92') + K.tube('M170 120 V96', '#22A04A', 16) + head(170, 86, -90), 'slide', 'Snakastle: leave your land, draw a trail', G),
+      F(home, '<path d="M170 92 H254 V140 H220 V150 H170Z" ' + K.f(K.c2) + '/>' + trail('M226 150 H170 V92 H254 V140') + head(254, 132, 90) + K.burst(212, 118, 22, '#FFF3A6', 10).replace('<path ', '<path opacity=".55" ') + K.spark(180, 84, 6), 'pop', 'Loop back home — inside is all yours!', G),
+      F(home + trail('M226 150 H170 V92 H234'), K.tube('M150 40 C170 60 196 70 206 90', '#9333EA', 14) + K.burst(208, 92, 16, '#FCA5A5', 9) + K.t(208, 93, '✕', 14, '#B91C1C') + head(242, 92, 0), 'wiggle', 'Careful — if someone cuts your trail, you\'re out!', G)
+    ];
+  };
+  // ---------- batch B (p5-7): action games ----------
+  // 👻💣 Soul Bopper
+  function sbMaze(K, broken){
+    let b = ''; const cell = (x, y) => [16 + x * 32, 22 + y * 34];
+    for(let y = 0; y < 5; y++) for(let x = 0; x < 9; x++){ const [X, Y] = cell(x, y);
+      if(x % 2 === 1 && y % 2 === 1) b += '<rect x="' + X + '" y="' + Y + '" width="30" height="30" rx="4" ' + K.f('#8B8FA3') + '/>';
+      else if([[1, 2], [5, 2], [6, 0], [0, 4], [7, 3]].some(([a, c]) => a === x && c === y) && !(broken && y === 2)) b += '<rect x="' + (X + 2) + '" y="' + (Y + 2) + '" width="26" height="26" rx="3" ' + K.f('#C98E55') + '/><path d="M' + (X + 4) + ' ' + (Y + 15) + ' H' + (X + 26) + ' M' + (X + 15) + ' ' + (Y + 4) + ' V' + (Y + 26) + '" ' + K.l('#8B5A2B', 1.6) + '/>'; }
+    return {b, cell};
+  }
+  const bomb = (K, x, y) => '<g transform="translate(' + x + ' ' + y + ')"><circle r="12" ' + K.f('#2B2B3A') + '/><ellipse cx="-4" cy="-5" rx="3.5" ry="2.4" fill="#fff" opacity=".5"/><rect x="-3.5" y="-17" width="7" height="5" rx="2" ' + K.fp('#6B7280') + '/><path d="M0 -17 Q4 -24 10 -22" ' + K.l('#8B5A2B', 2) + '/></g>' + K.burst(x + 11, y - 23, 6, '#FF7A1A', 8);
+  const ghost = (K, x, y) => '<g transform="translate(' + x + ' ' + y + ')"><path d="M-16 14 Q-18 -18 0 -20 Q18 -18 16 14 L10 9 L5 16 L0 9 L-5 16 L-10 9 Z" ' + K.fp('#E9E5FF') + '/><circle cx="-6" cy="-5" r="3" fill="' + INK + '"/><circle cx="6" cy="-5" r="3" fill="' + INK + '"/><ellipse cx="0" cy="4" rx="3" ry="4" fill="' + INK + '"/></g>';
+  D['soul-bopper'] = K => { const M = sbMaze(K, false), M2 = sbMaze(K, true), c = M.cell, kid = (x, y, o) => K.kid(c(x, y)[0] + 15, c(x, y)[1] + 30, .55, Object.assign({n: 3, shirt: K.c1}, o || {}));
+    const bx = c(3, 2)[0] + 15, by = c(3, 2)[1] + 16;
+    return fit([
+      F(M.b, kid(3, 2, {aR: 150}) + bomb(K, bx + 10, by + 6), 'pop', 'Plant a 💣 — it pops in a + shape'),
+      F(M.b + bomb(K, bx, by), kid(4, 1, {aL: 150, aR: 150}) + '<path d="M' + (bx + 8) + ' ' + (by - 6) + ' Q' + (bx + 30) + ' ' + (by - 10) + ' ' + (bx + 34) + ' ' + (by - 30) + '" ' + K.l('#FFFFFF', 2.6, 'stroke-dasharray="3 5"') + '/>', 'slide', 'Run round a corner to hide'),
+      F(M2.b + kid(4, 1, {aL: 160, aR: 160}), '<rect x="' + (c(1, 2)[0] + 2) + '" y="' + (by - 9) + '" width="' + (32 * 5 - 4) + '" height="18" rx="9" ' + K.fp('#FFB347') + '/>' + K.burst(bx, by, 22, '#FFD84A', 10) + K.burst(c(1, 2)[0] + 15, by, 14, '#FF7A1A', 8) + K.burst(c(5, 2)[0] + 15, by, 14, '#FF7A1A', 8) + K.star(c(5, 2)[0] + 15, by, 9, '#7DD3FC'), 'pop', 'Boom! Break blocks for power-ups'),
+      F(M2.b + kid(1, 0, {n: 1, shirt: K.c2, aL: 150, aR: 150}), ghost(K, c(5, 2)[0] + 15, by - 8) + K.spark(c(5, 2)[0] + 40, by - 30, 5, '#C4B5FD'), 'float', 'Caught? Come back as a 👻 ghost!')
+    ], 105, .86); };
+  // 🏓 SlaBrall
+  function court(K){
+    let b = '<path d="M60 70 L260 70 L310 200 L10 200Z" ' + K.f('#2FB0A0') + '/><path d="M60 70 L260 70 L310 200 L10 200Z M160 70 V200 M40 120 H280" ' + K.l('#FFFFFF', 2.4) + '/><path d="M44 112 H276" ' + K.l('#3B2A20', 3) + '/><path d="M44 112 L44 128 M276 112 L276 128 M44 126 H276" ' + K.l('#3B2A20', 2) + '/>';
+    for(let i = 0; i < 12; i++) b += '<line x1="' + (52 + i * 19) + '" y1="112" x2="' + (52 + i * 19) + '" y2="126" stroke="' + INK + '" stroke-width="1" opacity=".5"/>';
+    return b + K.kid(232, 92, .6, {n: 1, shirt: K.c2, aL: 60, aR: 20});
+  }
+  const racket = (K, x, y, r) => '<g transform="translate(' + x + ' ' + y + ') rotate(' + r + ')"><ellipse cx="0" cy="-14" rx="12" ry="15" ' + K.f('#3D7DD8') + '/><path d="M0 0 V14" ' + K.l('#8B5A2B', 5) + '/></g>';
+  const ball = (K, x, y) => '<circle cx="' + x + '" cy="' + y + '" r="8" ' + K.f('#D9F99D') + '/>';
+  // 🔥 PyraDive flip-book (pd-1): bump → set → DUNK
+  const pdCourt = K => '<path d="M20 150 L300 150 L316 198 L4 198Z" ' + K.f('#E8813A') + '/><path d="M160 74 V198" ' + K.l('#3B2A20', 4) + '/><rect x="154" y="78" width="12" height="46" ' + K.fp('#FFFFFF', 'opacity=".55"') + '/><path d="M150 78 H170" ' + K.l('#FFFFFF', 4) + '/>';
+  const pdBall = (K, x, y) => '<circle cx="' + x + '" cy="' + y + '" r="9" ' + K.f('#FFFFFF') + '/><path d="M' + (x - 7) + ' ' + (y - 3) + ' Q' + x + ' ' + (y - 7) + ' ' + (x + 7) + ' ' + (y - 2) + '" ' + K.l('#FF6B1A', 2) + '/>';
+  D['pyraspike'] = K => { const C = pdCourt(K); return fit([
+    F(C + K.kid(70, 196, 1, {n: 0, shirt: K.c1, aL: 70, aR: 70}) + K.kid(128, 196, .95, {n: 1, shirt: K.c2, aL: 30, aR: 30}), '<path d="M250 70 Q140 60 82 140" ' + K.l('#FFD84A', 3.5, 'stroke-dasharray="3 6"') + '/>' + pdBall(K, 82, 140), 'fly', '1 · 🤚 Bump it up to your setter'),
+    F(C + K.kid(70, 196, 1, {n: 0, shirt: K.c1, aL: 40, aR: 40}) + K.kid(128, 196, .95, {n: 1, shirt: K.c2, aL: 170, aR: 170}), '<path d="M128 120 Q120 40 112 92" ' + K.l('#FFD84A', 3.5, 'stroke-dasharray="3 6"') + '/>' + pdBall(K, 112, 92), 'pop', '2 · 🙌 Set it up high'),
+    F(C + K.kid(112, 150, 1, {n: 0, shirt: K.c1, aL: 150, aR: 172, mouth: 'o'}) + K.kid(232, 196, .85, {n: 2, shirt: '#2F7BEA', aL: 40, aR: 30}), '<path d="M136 64 Q190 70 222 132" ' + K.l('#FF6B1A', 4, 'stroke-dasharray="3 6"') + '/>' + pdBall(K, 222, 132) + K.burst(222, 132, 20, '#FFB627', 10).replace('<path ', '<path opacity=".55" '), 'pop', '3 · 💥 Jump and DUNK it over!')
+  ], 136, .9); };
+  // 🔍 Pokadif flip-book (pk-1): look → poke → found
+  const pkPics = (K, c2) => ['#E63946', c2].map((c, i) => { const ox = 20 + i * 150; return '<rect x="' + ox + '" y="34" width="130" height="98" rx="10" ' + K.f('#BFE6FF') + '/><circle cx="' + (ox + 40) + '" cy="82" r="16" ' + K.fp(c) + '/><path d="M' + (ox + 78) + ' 104 l16 -30 l16 30z" ' + K.fp('#FFD23F') + '/>'; }).join('');
+  D['pokadif'] = K => fit([
+    F(pkPics(K, '#3A6FE8') + K.kid(160, 198, .8, {n: 0, shirt: K.c1, aL: 30, aR: 30}), K.t(160, 160, 0, 15, '👀'), 'pop', '1 · 👀 Look at both pictures'),
+    F(pkPics(K, '#3A6FE8') + K.kid(160, 198, .8, {n: 0, shirt: K.c1, aL: 30, aR: 150}), K.t(214, 92, 0, 26, '👆'), 'pop', '2 · 👆 Poke what changed'),
+    F(pkPics(K, '#3A6FE8') + K.kid(160, 198, .8, {n: 0, shirt: K.c1, aL: 160, aR: 160, mouth: 'o'}), '<circle cx="210" cy="82" r="24" fill="none" stroke="#22B573" stroke-width="5"/><circle cx="60" cy="82" r="24" fill="none" stroke="#22B573" stroke-width="5"/>' + K.spark(240, 52, 8), 'pop', '3 · ✅ Found it! Find them all')
+  ], 136, .9);
+  // 🔬 Sciencetory flip-book (sc-1): pick → guess → test → card
+  D['sciencetory'] = K => { const bench = '<rect x="0" y="170" width="320" height="30" ' + K.f('#5B6B8C') + '/><rect x="26" y="150" width="200" height="16" rx="5" ' + K.f('#8C9BB8') + '/>', cup = '<path d="M104 150 L108 102 Q126 96 144 102 L148 150Z" ' + K.f('#C98E55') + '/>';
+    const press = y => '<rect x="58" y="40" width="12" height="112" ' + K.f('#C9D3DE') + '/><rect x="182" y="40" width="12" height="112" ' + K.f('#C9D3DE') + '/><rect x="50" y="30" width="152" height="18" rx="5" ' + K.f(K.c1) + '/><rect x="90" y="' + y + '" width="72" height="10" rx="3" ' + K.f('#A3ACBD') + '/>';
+    return fit([
+      F(bench + cup + K.kid(276, 196, .85, {shirt: '#F5F7FA', n: 1, aL: 120, aR: 30}), K.t(126, 70, '🧲', 34), 'pop', '1 · 🧰 Pick a thing you made'),
+      F(bench + press(70) + cup + K.kid(276, 196, .85, {shirt: '#F5F7FA', n: 1, aL: 160, aR: 20}), K.t(270, 50, '👍 / 👎', 24), 'pop', '2 · 🤔 Guess: will it hold?'),
+      F(bench + press(94) + cup + K.kid(276, 196, .85, {shirt: '#F5F7FA', n: 1, aL: 150, aR: 150, mouth: 'o'}), '<circle cx="250" cy="70" r="26" ' + K.fp('#FFFFFF') + '/><path d="M250 70 L268 58" ' + K.l('#E85D75', 3.4) + '/>', 'zip', '3 · 🏋️ Watch the gauge climb!'),
+      F(bench + cup + K.kid(276, 196, .85, {shirt: '#F5F7FA', n: 1, aL: 170, aR: 170}), '<rect x="60" y="30" width="140" height="90" rx="10" ' + K.fp('#FFFFFF') + '/>' + K.t(130, 60, '📋 50 kg ✅', 20) + K.t(130, 92, '⭐⭐⭐', 20), 'pop', '4 · 📋 Your test card + why')
+    ], 136, .9); };
+  D['sla-brall'] = K => { const C = court(K); return fit([
+    F(C + K.kid(106, 198, 1.05, {n: 0, shirt: K.c1, aR: 60, aL: 40}) + racket(K, 128, 150, 30), '<path d="M226 96 Q170 110 140 132" ' + K.l('#FFD84A', 3.5, 'stroke-dasharray="3 6"') + '/>' + ball(K, 140, 132), 'fly', 'Walk into the ball to hit it'),
+    F(C + K.kid(106, 198, 1.05, {n: 0, shirt: K.c1, aR: 150, aL: 40}), racket(K, 126, 120, -20) + '<path d="M140 104 Q178 52 214 58" ' + K.l('#FFD84A', 4, 'stroke-dasharray="3 6"') + '/>' + ball(K, 218, 58) + K.spark(232, 44, 6), 'pop', 'Smash, drop, lob or slice it over'),
+    F(C + K.kid(106, 198, 1.05, {n: 0, shirt: K.c1, aR: 160, aL: 160}), ball(K, 196, 84) + K.burst(196, 84, 20, '#FFF3A6', 10).replace('<path ', '<path opacity=".6" ') + '<g transform="translate(250 40)"><rect x="-30" y="-14" width="60" height="28" rx="8" ' + K.f('#2B2B3A') + '/>' + K.t(0, 1, '1 – 0', 14, '#FFD84A') + '</g>', 'pop', 'Land it where they can\'t reach — point!')
+  ], 106, .9); };
+  // ⚽ BlasOff (bo-1)
+  function boPitch(K){ let b = '<path d="M30 78 L290 78 L320 200 L0 200Z" ' + K.f('#4CB963') + '/><path d="M30 78 L290 78 L320 200 L0 200Z M160 78 V200" ' + K.l('#FFFFFF', 2.4) + '/><path d="M232 52 H300 V92 H232Z" ' + K.l('#FFFFFF', 4) + '/>'; for(let i = 1; i < 5; i++) b += '<path d="M' + (232 + i * 14) + ' 54 V90" stroke="#FFFFFF" stroke-width="1" opacity=".5"/>'; return b; }
+  const boBall = (x, y) => '<g transform="translate(' + x + ' ' + y + ')"><circle r="10" fill="#FFFFFF" stroke="' + INK + '" stroke-width="2"/><path d="M0 -4.5 L4.3 -1.4 L2.7 3.6 L-2.7 3.6 L-4.3 -1.4Z" fill="' + INK + '"/></g>';
+  D['blasoff'] = K => { const P = boPitch(K); return fit([
+    F(P + K.kid(266, 96, .6, {n: 2, shirt: '#FFD23F', aL: 60, aR: 60}), K.kid(110, 196, 1.05, {n: 0, shirt: K.c1, aL: 70, aR: 110, legR: 14}) + boBall(150, 180) + '<path d="M60 160 h-22 M66 176 h-26" ' + K.l('#FFFFFF', 3) + '/>', 'slide', 'Run with the stick (or W A S D) — the ball sticks to your feet'),
+    F(P + K.kid(110, 196, 1.05, {n: 0, shirt: K.c1, aL: 60, aR: 120, legR: 18}) + K.kid(266, 96, .6, {n: 2, shirt: '#FFD23F', aL: 60, aR: 60}), '<path d="M134 176 Q196 76 250 72" ' + K.l('#FFD84A', 4, 'stroke-dasharray="4 7"') + '/>' + boBall(252, 72) + K.spark(272, 52, 6), 'fly', 'Hold 💥 Shoot (K) for a harder shot · ⚽ Pass (J) to a friend'),
+    F(P + K.kid(96, 196, 1.0, {n: 0, shirt: K.c1, aL: 150, aR: 160, mouth: 'o'}), '<g transform="rotate(-18 266 90)">' + K.kid(266, 96, .62, {n: 2, shirt: '#FFD23F', aL: 170, aR: 150}) + '</g>' + boBall(298, 70) + '<rect x="120" y="96" width="98" height="30" rx="12" ' + K.fp('#FFF6D6') + '/>' + K.t(169, 111, '📣 RIGHT!', 14, '#E11D48'), 'pop', 'When they shoot: shout Q / E — your keeper dives that way!')
+  ], 108, .9); };
+  // 🎴 gr-td1 START — TD-Stories flip-book
+  // 🏰 TD-Stories flip-book (gr-td1): 4 steps — the wave, the skill card, the defence, the diary page
+  const tdCard = (K, x, y, c, ic, on) => '<g transform="translate(' + x + ' ' + y + ')' + (on ? ' scale(1.14)' : '') + '"><rect x="-22" y="-30" width="44" height="60" rx="7" ' + K.f('#FFFFFF') + '/><rect x="-17" y="-25" width="34" height="30" rx="5" ' + K.f(c) + '/>' + K.t(0, -10, ic, 17) + '<rect x="-15" y="11" width="30" height="5" rx="2.5" ' + K.fp('#E5E7EB') + '/><rect x="-15" y="19" width="20" height="5" rx="2.5" ' + K.fp('#E5E7EB') + '/>' + (on ? '<rect x="-25" y="-33" width="50" height="66" rx="9" fill="none" stroke="#FFD84A" stroke-width="4"/>' : '') + '</g>';
+  D['tdstories'] = K => { const L = tdLand(K), T = tdTower(K, 82, 86, 100), P = (aL, aR, mouth) => K.kid(82, 96, .6, {n: 1, shirt: K.c1, aL: aL, aR: aR, hair: '#F2B33D', mouth: mouth}) + tdCrown(K, 82, 59);
+    return fit([
+      F(L + T + P(30, 30) + tdDragon(K, 142, 188, .62, K.c2, {}), tdSuitor(K, 222, 182, .72, {aR: 95, legL: -12, legR: 10}) + tdSuitor(K, 286, 172, .62, {prince: true, shirt: '#2563EB', aR: 95, legL: 6, legR: -10, n: 2}) + '<path d="M250 150 h14 M248 162 h18" ' + K.l('#FFFFFF', 2.6) + '/>', 'slide', '1 · 🚶 Suitors march to the tower'),
+      F(L + T + P(150, 40) + tdDragon(K, 142, 188, .62, K.c2, {}), '<rect x="150" y="34" width="156" height="94" rx="14" ' + K.fp('#FFF6D6') + '/>' + tdCard(K, 180, 82, '#FF6B6B', '🔥') + tdCard(K, 228, 80, '#60A5FA', '❄️', true) + tdCard(K, 276, 82, '#4ADE80', '🌿') + K.spark(244, 44, 6), 'pop', '2 · 🃏 Each wave: pick ONE skill card'),
+      F(L + T + P(150, 150, 'o'), tdDragon(K, 142, 188, .62, K.c2, {fire: 112, mouth: 1}) + '<g transform="rotate(-24 262 176)">' + tdSuitor(K, 262, 176, .72, {aL: 160, aR: 150, mouth: 'o', flowers: false}) + '</g>' + K.burst(250, 152, 16, '#FFB627', 9).replace('<path ', '<path opacity=".6" ') + tdFlowers(K, 290, 120), 'pop', '3 · 🔥 Dragon + princess stop them!'),
+      F(L + T + P(150, 150) + tdDragon(K, 142, 188, .62, K.c2, {mouth: 1}), '<g transform="rotate(-4 236 96)"><rect x="176" y="40" width="120" height="112" rx="10" ' + K.f('#FFF6D6') + '/><path d="M236 44 V148" ' + K.l('#E8D9B5', 2) + '/><path d="M188 64 h36 M188 76 h40 M188 88 h30 M248 64 h36 M248 76 h28" ' + K.l('#B8A27A', 2.2) + '/><path d="M260 112 C246 100 248 86 260 94 C272 86 274 100 260 112Z" ' + K.fp('#FF5C9A') + '/>' + K.t(206, 120, '⭐ 3', 16, '#B45309') + '</g>' + K.spark(298, 40, 7) + K.spark(170, 52, 5, '#FF5C9A'), 'pop', '4 · 📖 Tower saved — a new diary page!')
+    ], 116, .9); };
+  // 🎴 gr-td1 END — TD-Stories flip-book
+  // 🎵 BeatCorner
+  function bcPads(K, glow){ const pad = (x, y, c, on) => '<circle cx="' + x + '" cy="' + y + '" r="' + (on ? 27 : 24) + '" ' + K.f(on ? lite(c, .25) : c) + '/><circle cx="' + x + '" cy="' + y + '" r="14" ' + K.fp(lite(c, .45)) + '/>';
+    return pad(64, 46, '#FF4D8D', glow === 0) + pad(256, 46, '#3D7DD8', glow === 1) + pad(64, 158, '#22C55E') + pad(256, 158, '#FFC21A') + '<circle cx="160" cy="102" r="30" ' + K.f(K.c1) + '/>' + K.kid(160, 128, .7, {n: 2, shirt: K.c2, aL: 150, aR: 150}); }
+  const bnote = (K, x, y, c, r) => '<g transform="translate(' + x + ' ' + y + ') rotate(' + (r || 0) + ')"><ellipse cx="0" cy="6" rx="7" ry="5.4" ' + K.fp(c) + '/><path d="M6 6 V-14 L15 -9" ' + K.l(c, 2.6) + '/></g>';
+  D['beat-corner'] = K => fit([
+    F(bcPads(K), bnote(K, 88, 62, '#FF4D8D', -12) + '<path d="M128 84 L100 68" ' + K.l('#FF4D8D', 2.6, 'stroke-dasharray="3 5"') + '/>', 'fly', 'Beats fly to the four corner buttons'),
+    F(bcPads(K, 0), '<circle cx="64" cy="46" r="34" fill="none" stroke="#FFD84A" stroke-width="5"/>' + K.burst(64, 46, 16, '#FFF3A6', 9).replace('<path ', '<path opacity=".6" ') + K.t(126, 34, 'PERFECT!', 15, '#E11D48'), 'pop', 'Tap the button just as it arrives'),
+    F(bcPads(K), '<path d="M186 82 L236 56" ' + K.l('#3D7DD8', 12, 'opacity=".55"') + '/>' + bnote(K, 214, 66, '#3D7DD8', 10) + '<path d="M248 70 q4 -6 10 -2 l8 10 q4 6 -2 10 l-10 4 q-6 2 -10 -4 Z" ' + K.fp('#F2C29B') + '/>' + K.t(222, 104, 'hold…', 13, '#3D7DD8'), 'pulse', 'Hold the button for long beats')
+  ], 102, .94);
+  // 🥊 Brawl Buddies
+  function ring(K){ return '<path d="M0 156 H320 V200 H0Z" ' + K.f('#5B3A9A') + '/><path d="M0 96 H320 M0 118 H320 M0 140 H320" ' + K.l('#FF4D6D', 3) + '/><path d="M20 90 V156 M300 90 V156" ' + K.l('#F6ECD6', 6) + '/>'; }
+  const glove = (K, x, y, c) => '<circle cx="' + x + '" cy="' + y + '" r="10" ' + K.f(c) + '/>';
+  D['brawl-buddies'] = K => { const R = ring(K), A = (x, aR) => K.kid(x, 170, 1.15, {n: 0, shirt: K.c1, aR: aR, aL: 60, legL: -14, legR: 14}) + glove(K, x + (aR > 80 ? 30 : 16), aR > 80 ? 112 : 142, '#E11D48'), Bd = (x, rot) => '<g transform="rotate(' + rot + ' ' + x + ' 170)">' + K.kid(x, 170, 1.15, {n: 3, shirt: K.c2, aL: 40, aR: 40, mouth: rot ? 'o' : null}) + '</g>' + glove(K, x - 16, 142, '#2563EB');
+    return fit([
+      F(R + Bd(234, 0), A(90, 60) + '<path d="M40 120 H64 M36 136 H60 M44 152 H66" ' + K.l('#FFFFFF', 3) + '/>', 'slide', 'Move, jump and duck in the ring'),
+      F(R + A(128, 100), Bd(196, 12) + K.burst(170, 104, 24, '#FFD84A', 12) + K.t(170, 105, 'BONK', 11, '#B91C1C') + K.star(214, 54, 6) + K.star(236, 66, 5, '#F9A8D4'), 'pop', 'Boop and bonk your buddy!'),
+      F(R + A(128, 100) + Bd(212, 0), '<path d="M180 92 Q166 120 180 150" ' + K.l('#7DD3FC', 7) + '/>' + K.t(204, 68, 'block!', 14, '#2563EB'), 'pulse', 'Walk back to block their bonk')
+    ], 112, .92); };
+  // 🎯 Pinball
+  function ptable(K, noLeft){
+    let b = '<path d="M56 10 L264 10 L290 196 L30 196Z" ' + K.f('#4B2BBF') + '/>';
+    [[110, 62, '#FF4D8D'], [208, 58, '#22C55E'], [160, 100, '#FFC21A']].forEach(([x, y, c]) => b += '<circle cx="' + x + '" cy="' + y + '" r="18" ' + K.f(c) + '/><circle cx="' + x + '" cy="' + y + '" r="8" ' + K.fp(lite(c, .8)) + '/>');
+    b += '<path d="M64 128 L92 170 M256 128 L228 170" ' + K.l('#F6ECD6', 5) + '/><path d="M244 196 V40" ' + K.l('#F6ECD6', 3) + '/>';
+    if(!noLeft) b += '<path d="M104 178 L148 190" ' + K.l('#FF4D8D', 9) + '/>';
+    return b + '<path d="M216 178 L176 186" ' + K.l('#FF4D8D', 9) + '/><circle cx="104" cy="178" r="6" ' + K.fp('#F6ECD6') + '/><circle cx="216" cy="178" r="6" ' + K.fp('#F6ECD6') + '/>';
+  }
+  const pball = (K, x, y) => '<circle cx="' + x + '" cy="' + y + '" r="8" ' + K.fp('#E5E7EB') + '/><ellipse cx="' + (x - 3) + '" cy="' + (y - 3) + '" rx="3" ry="2" fill="#fff"/>';
+  D['pinball'] = K => fit([
+    F(ptable(K), pball(K, 254, 160) + '<path d="M254 148 V96" ' + K.l('#FFD84A', 3, 'stroke-dasharray="4 5"') + '/>' + K.arrowHead(254, 96, -90, '#FFD84A') + K.t(282, 176, 'Space', 11, '#FFD84A'), 'bob', 'Space launches the ball'),
+    F(ptable(K), pball(K, 136, 70) + K.burst(118, 66, 22, '#FFF3A6', 10).replace('<path ', '<path opacity=".6" ') + K.t(150, 30, '+100', 15, '#FFD84A'), 'pop', 'Bounce off bumpers to score'),
+    F(ptable(K, true), '<path d="M104 178 L140 158" ' + K.l('#FF4D8D', 9) + '/>' + pball(K, 140, 140) + '<path d="M144 130 L160 110" ' + K.l('#FFFFFF', 2.6, 'stroke-dasharray="3 5"') + '/>' + K.t(78, 150, '←', 18, '#FFD84A'), 'fly', '← / → flip — keep the ball in!')
+  ], 104, .88);
+  // 🐸 Dodgy Hopper
+  function lanes(K, carX){
+    let b = '<rect x="0" y="0" width="320" height="44" ' + K.f('#5CC45A') + '/><rect x="0" y="44" width="320" height="52" ' + K.f('#5AB4E8') + '/><rect x="0" y="96" width="320" height="18" ' + K.f('#5CC45A') + '/><rect x="0" y="114" width="320" height="58" ' + K.f('#6B6F82') + '/><rect x="0" y="172" width="320" height="28" ' + K.f('#5CC45A') + '/><path d="M0 143 H320" ' + K.l('#FFFFFF', 3, 'stroke-dasharray="14 12"') + '/>';
+    b += '<rect x="60" y="56" width="90" height="16" rx="8" ' + K.f('#9A6B43') + '/><rect x="200" y="74" width="80" height="16" rx="8" ' + K.f('#9A6B43') + '/>';
+    const carAt = (x, y, c) => '<g transform="translate(' + x + ' ' + y + ')"><rect x="-30" y="-10" width="60" height="22" rx="7" ' + K.f(c) + '/><rect x="-14" y="-18" width="30" height="12" rx="4" ' + K.fp('#BDE6FF') + '/><circle cx="-18" cy="12" r="5" ' + K.fp('#2B2B3A') + '/><circle cx="18" cy="12" r="5" ' + K.fp('#2B2B3A') + '/></g>';
+    return b + carAt(carX, 130, '#E63946') + carAt(256, 156, '#FFC21A') + '<circle cx="290" cy="22" r="7" ' + K.fp('#FFD84A') + '/>';
+  }
+  D['hopper'] = K => fit([
+    F(lanes(K, 70), K.kid(164, 196, .62, {n: 0, shirt: K.c1, aL: 150, aR: 150}) + '<path d="M164 150 v-14" ' + K.l('#FFFFFF', 3) + '/>' + K.arrowHead(164, 136, -90, '#FFFFFF'), 'bob', 'Hop across — one tile at a time'),
+    F(lanes(K, 40), K.kid(164, 148, .62, {n: 0, shirt: K.c1, aL: 30, aR: 30}) + '<path d="M80 130 h40" ' + K.l('#FFFFFF', 2.4, 'stroke-dasharray="3 5"') + '/>' + K.t(236, 105, 'wait for a gap…', 11, '#3B2A20'), 'pulse', 'Wait for a gap — dodge the cars'),
+    F(lanes(K, 110), '<g transform="translate(0 0)">' + K.kid(106, 66, .55, {n: 0, shirt: K.c1, aL: 150, aR: 150}) + '</g><circle cx="150" cy="24" r="7" ' + K.fp('#FFD84A') + '/>' + K.spark(166, 14, 5) + '<path d="M70 64 h-20 M66 70 h-16" ' + K.l('#FFFFFF', 2.4) + '/>', 'slide', 'Ride the logs over the river')
+  ], 100, .9);
+  // 🧭 Maze
+  function mzWalls(K){ return '<rect x="30" y="16" width="260" height="170" rx="10" ' + K.f('#D9F99D') + '/><path d="M30 16 H290 V186 H30Z M70 16 V70 H130 M30 110 H100 V150 M170 56 V120 H230 M130 186 V140 H200 M250 56 V100 M200 16 V56 H250 M100 70 V110 M250 140 H290" ' + K.l('#2E9E4F', 9) + '/>'; }
+  const door = (K, open) => '<g transform="translate(272 164)"><rect x="-10" y="-18" width="20" height="26" rx="8" ' + K.f(open ? '#F6ECD6' : '#8B5A2B') + '/>' + (open ? '' : '<circle cx="5" cy="-4" r="2" fill="#FFD84A"/>') + '</g>';
+  const keyIcon = (K, x, y) => '<g transform="translate(' + x + ' ' + y + ')"><circle r="6" ' + K.fp('#FFD84A') + '/><path d="M5 0 H18 M14 0 V5 M18 0 V5" ' + K.l('#B7791F', 3) + '/></g>';
+  D['maze'] = K => { const W = mzWalls(K), P = '<path d="M50 166 V126 H86 V90 H150 V40 H186 V82 H240 V160 H272" ' + K.l('#FF8A3D', 2.6, 'stroke-dasharray="3 6"') + '/>'; return fit([
+    F(W + door(K) + keyIcon(K, 160, 40) + K.star(272, 128, 8), K.kid(50, 182, .55, {n: 2, shirt: K.c2, aR: 120}) + '<path d="M50 150 V128 H84" ' + K.l('#FF8A3D', 3, 'stroke-dasharray="3 5"') + '/>', 'bob', 'Find the way out of the maze'),
+    F(W + P + door(K) + K.star(272, 128, 8), K.kid(150, 58, .55, {n: 2, shirt: K.c2, aR: 150}) + keyIcon(K, 170, 30) + K.spark(186, 22, 6), 'pop', 'Grab 🔑 keys to open doors'),
+    F(W + P + door(K, true), K.kid(272, 180, .55, {n: 2, shirt: K.c2, aL: 160, aR: 160}) + K.burst(272, 128, 16, '#FFD84A', 10) + K.star(272, 128, 8) + K.spark(240, 112, 6), 'pop', 'Reach the 🚩 — faster = more stars')
+  ], 101, .9); };
+  // 📦 Stack It!
+  function stGround(K, n){
+    let b = '<rect x="0" y="176" width="320" height="24" ' + K.f('#9A6B43') + '/><path d="M60 46 H260" ' + K.l('#22A355', 2.4, 'stroke-dasharray="6 6"') + '/><path d="M64 46 V24 L80 30 L64 36" ' + K.f('#22C55E') + '/>';
+    b += '<rect x="118" y="140" width="84" height="36" rx="4" ' + K.f('#FFB45E') + '/>';
+    if(n > 1) b += '<path d="M126 140 L194 140 L160 96Z" ' + K.f('#EF5F67') + '/>';
+    if(n > 2) b += '<rect x="140" y="64" width="40" height="32" rx="4" ' + K.f('#7C6CF2') + '/>';
+    return b + K.kid(262, 190, .95, {n: 0, shirt: K.c2, aL: n > 2 ? 160 : 40, aR: n > 2 ? 150 : 40, mouth: n > 2 ? 'o' : null});
+  }
+  D['stacking-sim'] = K => fit([
+    F(stGround(K, 1), '<path d="M126 66 L194 66 L160 22Z" ' + K.f('#EF5F67') + '/><path d="M110 44 h-16 M210 44 h16" ' + K.l('#3B2A20', 2.6) + '/>' + K.arrowHead(94, 44, 180, '#3B2A20') + K.arrowHead(226, 44, 0, '#3B2A20'), 'bob', 'Move the shape, then drop it'),
+    F(stGround(K, 1), '<path d="M126 140 L194 140 L160 96Z" ' + K.f('#EF5F67') + '/><path d="M108 104 q-8 10 0 20 M212 104 q8 10 0 20" ' + K.l('#3B2A20', 2) + '/>', 'wiggle', 'It wobbles like real blocks!'),
+    F(stGround(K, 3), '<rect x="142" y="34" width="36" height="30" rx="4" ' + K.f('#2EC4B6') + '/>' + K.burst(72, 30, 16, '#FFD84A', 9) + K.spark(200, 30, 6), 'pop', 'Reach the goal line — wide ones at the bottom')
+  ], 104, .9);
+  // 📷 Pose Party
+  function stage(K){ return '<path d="M0 170 H320 V200 H0Z" ' + K.f('#C084FC') + '/><g transform="translate(252 104)"><path d="M0 22 L-18 74 M0 22 L18 74 M0 22 V74" ' + K.l('#3B2A20', 3) + '/><rect x="-26" y="-8" width="52" height="34" rx="7" ' + K.f('#374151') + '/><circle cx="0" cy="9" r="11" ' + K.fp('#93C5FD') + '/><circle cx="0" cy="9" r="5" fill="' + INK + '"/></g>'; }
+  const target = (K, x) => '<g transform="translate(' + x + ' 172)"><circle cx="0" cy="-62" r="10" ' + K.l('#FF4FA3', 2.6, 'stroke-dasharray="4 4"') + '/><path d="M0 -52 V-20 M0 -46 L-22 -68 M0 -46 L22 -68 M0 -20 L-16 0 M0 -20 L16 0" ' + K.l('#FF4FA3', 2.6, 'stroke-dasharray="4 4"') + '/></g>';
+  D['pose-party'] = K => fit([
+    F(stage(K) + K.kid(110, 176, 1.15, {n: 1, shirt: K.c1, aL: 20, aR: 20}), target(K, 180) + K.t(180, 70, 'copy me!', 13, '#FF4FA3'), 'pulse', 'Copy the pose with your whole body'),
+    F(stage(K) + target(K, 180), K.kid(110, 176, 1.15, {n: 1, shirt: K.c1, aL: 135, aR: 145, legL: -16, legR: 16}) + '<g transform="translate(176 48)"><circle r="18" ' + K.f('#FFFFFF') + '/>' + K.t(0, 1, '3', 22, '#E11D48') + '</g>', 'pop', 'Hold still… 3, 2, 1'),
+    F(stage(K), K.kid(110, 176, 1.15, {n: 1, shirt: K.c1, aL: 135, aR: 145, legL: -16, legR: 16, mouth: 'o'}) + K.burst(240, 86, 22, '#FFF3A6', 10) + '<path d="M86 104 L64 82 M134 104 L156 82" ' + K.l('#22C55E', 4) + '/>' + K.star(56, 40, 9) + K.star(176, 32, 7, '#F9A8D4'), 'pop', '📸 Snap! Green lines = just right')
+  ], 102, .92);
+  // 🧮 Math Quest
+  function mqPath(K){ let b = '<path d="M30 180 C80 150 60 110 120 110 C180 110 150 60 210 60 C240 60 246 74 260 78" ' + K.l('#E2B07A', 14) + '/><path d="M30 180 C80 150 60 110 120 110 C180 110 150 60 210 60 C240 60 246 74 260 78" ' + K.l('#FFF1D6', 3, 'stroke-dasharray="6 8"') + '/>';
+    [[52, 160, '+', '#22C55E'], [116, 112, '−', '#3D7DD8'], [172, 92, '×', '#FF8A3D'], [214, 58, '÷', '#A855F7']].forEach(([x, y, s, c]) => b += '<path d="M' + x + ' ' + (y + 16) + ' V' + (y - 12) + '" ' + K.l('#8B5A2B', 3) + '/><rect x="' + (x - 12) + '" y="' + (y - 26) + '" width="24" height="18" rx="4" ' + K.f(c) + '/>' + K.t(x, y - 17, s, 14, '#fff'));
+    return b + '<g transform="translate(262 82)"><rect x="-18" y="-8" width="36" height="22" rx="4" ' + K.f('#B7794A') + '/><path d="M-18 -8 Q0 -26 18 -8Z" ' + K.f('#9A6B43') + '/></g>'; }
+  const qcard = (K, x, y) => '<g transform="translate(' + x + ' ' + y + ')"><rect x="-44" y="-18" width="88" height="36" rx="10" ' + K.f('#FFFFFF') + '/>' + K.t(0, 1, '3 + 4 = ?', 15) + '</g>';
+  D['math-quest'] = K => { const P = mqPath(K); return fit([
+    F(P + K.kid(70, 176, .8, {n: 1, shirt: K.c1, aR: 40}), qcard(K, 132, 44), 'pop', 'Answer questions to travel'),
+    F(P + K.kid(70, 176, .8, {n: 1, shirt: K.c1, aR: 150}) + qcard(K, 132, 44), [['6', 92], ['7', 132], ['8', 172]].map(([n, x]) => '<g transform="translate(' + x + ' 92)"><rect x="-16" y="-14" width="32" height="28" rx="8" ' + K.f(n === '7' ? '#BBF7D0' : '#FFF1D6') + '/>' + K.t(0, 1, n, 16) + '</g>').join('') + K.check(150, 78), 'pop', 'Tap the answer — or type it'),
+    F(P, K.kid(196, 76, .8, {n: 1, shirt: K.c1, aL: 160, aR: 160}) + K.spark(238, 64, 6) + K.spark(284, 62, 5) + K.burst(262, 82, 18, '#FFF3A6', 9).replace('<path ', '<path opacity=".5" '), 'slide', 'Cross 5 worlds to the treasure!')
+  ], 104, .92); };
+  // ---------- batch C (p5-8): learning + mini games ----------
+  // 🃏 WisDeck
+  const wcard = (K, x, y, r, c, inner, n) => '<g transform="translate(' + x + ' ' + y + ') rotate(' + r + ')"><rect x="-34" y="-48" width="68" height="96" rx="8" ' + K.f('#FFFFFF') + '/><rect x="-28" y="-42" width="56" height="50" rx="5" ' + K.f(c) + '/>' + inner + '<rect x="-28" y="14" width="56" height="7" rx="3" ' + K.fp('#E5E7EB') + '/><rect x="-28" y="26" width="38" height="6" rx="3" ' + K.fp('#E5E7EB') + '/><circle cx="22" cy="34" r="9" ' + K.fp('#FFC21A') + '/>' + K.t(22, 35, n, 11) + '</g>';
+  const owlI = K => '<ellipse cx="0" cy="-15" rx="16" ry="19" ' + K.fp('#A16207') + '/><circle cx="-7" cy="-20" r="6" fill="#fff"/><circle cx="7" cy="-20" r="6" fill="#fff"/><circle cx="-7" cy="-20" r="3" fill="' + INK + '"/><circle cx="7" cy="-20" r="3" fill="' + INK + '"/><path d="M-3 -12 L0 -8 L3 -12Z" fill="#F59E0B"/>';
+  const dinoI = K => '<path d="M-20 0 Q-18 -16 -4 -18 Q4 -28 14 -22 Q20 -20 16 -14 Q10 -14 8 -8 L10 4 M-14 0 V4 M-4 0 V4" ' + K.l('#2E7D32', 5) + '/>';
+  const globeI = K => '<circle cx="0" cy="-17" r="17" ' + K.fp('#7DD3FC') + '/><path d="M-12 -24 q8 -2 10 6 q-2 6 -8 4 Z M4 -10 q6 -6 10 2 q-2 6 -8 4Z" ' + K.fp('#4ADE80') + '/>';
+  const chips = (K, y, ans, good) => ans.map((a, i) => '<g transform="translate(' + (90 + i * 70) + ' ' + y + ')"><rect x="-30" y="-13" width="60" height="26" rx="13" ' + K.f(good === i ? '#BBF7D0' : '#FFFFFF') + '/>' + K.t(0, 1, a, 12) + '</g>').join('');
+  D['wisdeck'] = K => fit([
+    F('<g transform="translate(160 44)"><rect x="-120" y="-20" width="240" height="40" rx="12" ' + K.f('#FFFFFF') + '/>' + K.t(0, 1, 'Which bird hunts at night?', 14) + '</g>', chips(K, 100, ['Owl', 'Duck', 'Hen']) + K.kid(282, 196, .8, {n: 1, shirt: K.c1, aR: 150}), 'pop', '🧠 Quiz: pick a category, answer'),
+    F('<g transform="translate(160 44)"><rect x="-120" y="-20" width="240" height="40" rx="12" ' + K.f('#FFFFFF') + '/>' + K.t(0, 1, 'Which bird hunts at night?', 14) + '</g>' + chips(K, 100, ['Owl', 'Duck', 'Hen'], 0), wcard(K, 226, 132, 8, '#FDE68A', owlI(K), '9') + K.check(70, 86) + K.spark(160, 110, 6), 'fly', 'A right answer wins that card'),
+    F(wcard(K, 100, 108, -10, '#BBF7D0', dinoI(K), '7'), wcard(K, 220, 108, 10, '#BAE6FD', globeI(K), '5') + K.t(160, 108, 'vs', 20, K.c1) + K.burst(100, 60, 14, '#FFD84A', 9) + K.t(100, 30, '7 wins!', 13, '#15803D'), 'pop', 'Play number games with the cards you won')
+  ], 104, .92);
+  // 🔢 GeoScout
+  const tower = (K, x, n, c, y0) => { let g = ''; for(let i = 0; i < n; i++) g += '<rect x="' + (x - 10) + '" y="' + ((y0 || 168) - 20 - i * 20) + '" width="20" height="20" rx="4" ' + K.f(c) + '/>'; return g + K.t(x, (y0 || 168) - 32 - (n - 1) * 20, String(n), 16); };
+  D['geoscout'] = K => { const floor = '<rect x="20" y="168" width="280" height="8" rx="4" ' + K.f('#8B5A2B') + '/>' + K.kid(286, 196, .8, {n: 1, shirt: K.c1, aR: 120}); return fit([
+    F(floor + tower(K, 100, 3, '#3D7DD8'), tower(K, 180, 2, '#FF8A3D') + '<path d="M164 120 Q140 96 116 104" ' + K.l(K.c2, 3, 'stroke-dasharray="4 4"') + '/>' + K.arrowHead(116, 104, 170, K.c2), 'slide', 'Drag a number onto another…'),
+    F(floor, tower(K, 120, 3, '#3D7DD8') + '<rect x="110" y="68" width="20" height="20" rx="4" ' + K.f('#FF8A3D') + '/><rect x="110" y="48" width="20" height="20" rx="4" ' + K.f('#FF8A3D') + '/>' + K.t(196, 90, '3 + 2 = 5', 16, K.c2) + K.burst(120, 60, 14, '#FFF3A6', 8).replace('<path ', '<path opacity=".6" '), 'pop', '…they snap together: 3 + 2 = 5'),
+    F(floor, tower(K, 100, 4, '#7C3AED') + tower(K, 170, 1, '#7C3AED') + '<path d="M120 92 L150 140" ' + K.l('#E11D48', 3, 'stroke-dasharray="4 4"') + '/>' + K.t(210, 80, '5 − 1 = 4', 16, K.c2), 'pop', 'Tap a tower to split it (−)'),
+    F('<path d="M160 70 L160 176 M120 184 H200" ' + K.l('#6B7280', 6) + '/>' + K.kid(286, 196, .8, {n: 1, shirt: K.c1, aR: 120}), '<g transform="rotate(-8 160 70)"><path d="M70 70 H250" ' + K.l('#8B5A2B', 6) + '/><path d="M56 110 Q80 122 104 110Z" ' + K.f('#C0C7D4') + '/><path d="M216 110 Q240 122 264 110Z" ' + K.f('#C0C7D4') + '/>' + tower(K, 80, 3, '#3D7DD8', 110) + tower(K, 240, 2, '#FF8A3D', 110) + '</g><circle cx="160" cy="70" r="7" ' + K.fp('#FFC21A') + '/>' + K.t(104, 160, '3 &gt; 2', 18, K.c1), 'wiggle', '⚖️ Scale: which side is heavier?')
+  ], 104, .9); };
+  // 🔤 GeoRead
+  const lbox = (K, x, y, ch, c) => '<g transform="translate(' + x + ' ' + y + ')"><path d="M-18 -16 L18 -16 L18 18 L-18 18Z" ' + K.f(c) + '/><path d="M-18 -16 L-10 -24 L26 -24 L18 -16 M18 -16 L26 -24 L26 10 L18 18" ' + K.f(dark(c, .12)) + '/>' + K.t(0, 2, ch, 22) + '</g>';
+  const catPic = K => '<circle cx="0" cy="0" r="16" ' + K.f('#F59E0B') + '/><path d="M-14 -8 L-12 -22 L-4 -14 M14 -8 L12 -22 L4 -14" ' + K.f('#F59E0B') + '/><circle cx="-6" cy="-2" r="2" fill="' + INK + '"/><circle cx="6" cy="-2" r="2" fill="' + INK + '"/><path d="M-12 4 H-4 M4 4 H12" ' + K.l('#3B2A20', 1.4) + '/>';
+  D['georead'] = K => { const shelf = '<rect x="40" y="120" width="190" height="10" rx="4" ' + K.f('#8B5A2B') + '/>', boxes = (dx) => lbox(K, 80 + (dx || 0), 100, 'c', '#FDE68A') + lbox(K, 128, 100, 'a', '#FCA5A5') + lbox(K, 176 - (dx || 0), 100, 't', '#93C5FD'); return fit([
+    F(shelf + boxes() + K.kid(268, 186, .9, {n: 2, shirt: K.c1, aR: 120}), '<g transform="translate(80 54)"><rect x="-24" y="-16" width="48" height="30" rx="12" ' + K.f('#FFFFFF') + '/>' + K.t(0, -1, 'kuh!', 14, K.c2) + '</g>' + '<path d="M100 132 q4 -6 10 -2 l8 10 q4 6 -2 10 l-10 4 q-6 2 -10 -4 Z" ' + K.fp('#F2C29B') + '/>', 'pop', 'Tap a box to hear its sound'),
+    F(shelf + K.kid(268, 186, .9, {n: 2, shirt: K.c1, aL: 150, aR: 150}), boxes(14) + K.burst(128, 76, 26, '#FFF3A6', 10).replace('<path ', '<path opacity=".55" ') + K.t(128, 40, 'c… a… t… cat!', 15, K.c2), 'pop', '💥 Bump — the sounds blend into a word'),
+    F(shelf + boxes(14), [[90, catPic(K), 1], [160, '<circle r="16" ' + K.f('#FFD84A') + '/>', 0], [230, '<path d="M-16 6 Q0 -22 16 6Z" ' + K.f('#22C55E') + '/>', 0]].map(([x, p, good]) => '<g transform="translate(' + x + ' 160)"><rect x="-24" y="-24" width="48" height="48" rx="10" ' + K.f(good ? '#BBF7D0' : '#FFFFFF') + '/>' + p + '</g>').join('') + K.check(116, 136), 'pop', 'Pick the right picture!')
+  ], 104, .9); };
+  // 👀🧠 Eyes Brain Riot
+  function ebStage(K, open){ let b = '<rect x="40" y="26" width="240" height="110" rx="10" ' + K.f('#1E1B4B') + '/><path d="M34 22 H286" ' + K.l('#B45309', 6) + '/>';
+    b += open ? '<path d="M40 26 Q70 80 54 136 L40 136Z" ' + K.f('#C81E5A') + '/><path d="M280 26 Q250 80 266 136 L280 136Z" ' + K.f('#C81E5A') + '/>' : '<path d="M40 26 H160 V136 H40Z" ' + K.f('#C81E5A') + '/><path d="M160 26 H280 V136 H160Z" ' + K.f('#C81E5A') + '/><path d="M160 26 V136" ' + K.l('#7F1D1D', 2) + '/>';
+    return b; }
+  const brain = (K, x, y) => '<g transform="translate(' + x + ' ' + y + ')"><path d="M-24 6 Q-30 -14 -12 -18 Q-6 -30 8 -24 Q26 -26 26 -8 Q32 10 12 14 Q0 22 -12 14 Q-24 16 -24 6Z" ' + K.f('#F9A8D4') + '/><path d="M-12 -14 q4 8 -2 14 M4 -20 q6 10 0 20" ' + K.l('#BE185D', 1.6) + '/></g>';
+  D['eyes-brain'] = K => fit([
+    F(ebStage(K, true) + brain(K, 260, 168), ['8', '3', '5', '1'].map((n, i) => K.tile(112 + i * 32, 82, n, '#FFF1D6', 28)).join('') + '<g transform="translate(76 172)"><ellipse rx="22" ry="13" fill="#fff" stroke="' + INK + '" stroke-width="2"/><circle r="8" ' + K.fp('#3D7DD8') + '/><circle r="3.6" fill="' + INK + '"/></g>', 'pop', '👀 Reveal — remember the number'),
+    F(ebStage(K, false), brain(K, 160, 168) + K.spark(124, 156, 6) + K.spark(196, 150, 5) + K.burst(160, 168, 30, '#FFF3A6', 10).replace('<path ', '<path opacity=".35" '), 'pulse', 'It hides — keep it in your 🧠'),
+    F(ebStage(K, false), '<rect x="70" y="56" width="180" height="40" rx="10" ' + K.f('#FFFFFF') + '/>' + ['8', '3', '5', '1'].map((n, i) => K.t(118 + i * 28, 77, n, 22, '#15803D')).join('') + K.check(244, 54) + [1, 2, 3, 4, 5, 6].map((n, i) => '<g transform="translate(' + (100 + (i % 3) * 40) + ' ' + (126 + Math.floor(i / 3) * 34) + ')"><rect x="-16" y="-14" width="32" height="28" rx="7" ' + K.f('#EDE9FE') + '/>' + K.t(0, 1, String(n), 14) + '</g>').join('') + '<g transform="translate(250 150)"><path d="M0 18 Q-14 4 0 -16 Q14 4 0 18Z" ' + K.f('#FF7A1A') + '/></g>', 'pop', 'Type it back — every right digit scores')
+  ], 102, .9);
+  // 🤖 Code the Robot
+  function rgrid(K){ let b = ''; for(let y = 0; y < 3; y++) for(let x = 0; x < 5; x++) b += '<rect x="' + (66 + x * 38) + '" y="' + (20 + y * 38) + '" width="36" height="36" rx="5" ' + K.fp((x + y) % 2 ? '#C7D2FE' : '#E0E7FF') + '/>'; return b + K.star(237, 39, 14); }
+  const ccard = (K, x, ang, c) => '<g transform="translate(' + x + ' 170)"><rect x="-18" y="-16" width="36" height="32" rx="6" ' + K.f(c) + '/><path d="M0 9 V-9 M-7 -2 L0 -9 L7 -2" ' + K.l('#ffffff', 3.2, 'transform="rotate(' + ang + ')"') + '/></g>';
+  D['robot-adventure'] = K => { const G = rgrid(K), code = [0, 90, 90, 0, 90].map((a, i) => ccard(K, 86 + i * 44, a, i < 3 ? K.c1 : K.c2)).join(''); return fit([
+    F(G + K.robot(85, 130, .58, K.c1, {wheels: 1, short: 1}), code + K.burst(262, 170, 14, '#FFF3A6', 8).replace('<path ', '<path opacity=".5" '), 'pop', 'Build your code with arrow blocks'),
+    F(G + code + '<g transform="translate(296 132)"><rect x="-22" y="-14" width="44" height="28" rx="9" ' + K.f('#22C55E') + '/>' + K.t(0, 1, '▶ Run', 11, '#fff') + '</g>', K.robot(161, 92, .58, K.c1, {wheels: 1, short: 1}) + '<path d="M85 115 V77 H150" ' + K.l('#FFC21A', 4, 'stroke-dasharray="5 6"') + '/>', 'slide', 'Press ▶ Run — the robot follows it'),
+    F(G + code, K.robot(237, 54, .58, K.c1, {wheels: 1, short: 1, cheer: 1}) + K.burst(237, 30, 18, '#FFD84A', 10).replace('<path ', '<path opacity=".55" ') + K.t(270, 142, 'use 🔁 loops!', 12, K.c2), 'pop', 'Reach the goal — loops keep it short')
+  ], 100, .92); };
+  // 🎈 Code Robot (mini)
+  D['code-robot'] = K => { const path = '<path d="M60 150 H160 V84 H244" ' + K.l('#FFC21A', 5, 'stroke-dasharray="6 7"') + '/>' + K.star(250, 86, 20), card = (x, y, ang) => '<g transform="translate(' + x + ' ' + y + ')"><rect x="-16" y="-15" width="32" height="30" rx="7" ' + K.f(K.c1) + '/><path d="M0 9 V-9 M-7 -2 L0 -9 L7 -2" ' + K.l('#ffffff', 3.4, 'transform="rotate(' + ang + ')"') + '/></g>', list = [90, 0, 90].map((a, i) => card(110 + i * 40, 32, a)).join('');
+    return fit([
+      F(path + K.robot(60, 168, .62, K.c2, {wheels: 1, short: 1}), list + '<path d="M190 52 q4 -6 10 -2 l8 10 q4 6 -2 10 l-10 4 q-6 2 -10 -4 Z" ' + K.fp('#F2C29B') + '/>', 'pop', 'Tap arrows to make a list'),
+      F(path + list + '<g transform="translate(250 32)"><rect x="-22" y="-14" width="44" height="28" rx="9" ' + K.f('#22C55E') + '/>' + K.t(0, 1, '▶ Go', 12, '#fff') + '</g>', K.robot(160, 112, .62, K.c2, {wheels: 1, short: 1}), 'slide', 'Press ▶ Go'),
+      F(path + list, K.robot(250, 104, .62, K.c2, {wheels: 1, short: 1, cheer: 1}) + K.burst(250, 70, 20, '#FFD84A', 10).replace('<path ', '<path opacity=".5" ') + K.spark(282, 50, 6), 'pop', 'You reached the ⭐!')
+    ], 100, .94); };
+  // 🎈 Color Match
+  D['color-match'] = K => { const C = ['#EF4444', '#FFC21A', '#3D7DD8', '#22C55E'], blob = (x, y, c, s) => '<path d="M' + (x - 22 * s) + ' ' + y + ' Q' + (x - 26 * s) + ' ' + (y - 30 * s) + ' ' + x + ' ' + (y - 32 * s) + ' Q' + (x + 26 * s) + ' ' + (y - 30 * s) + ' ' + (x + 22 * s) + ' ' + y + ' Q' + x + ' ' + (y + 12 * s) + ' ' + (x - 22 * s) + ' ' + y + 'Z" ' + K.f(c) + '/>';
+    const opts = C.map((c, i) => blob(68 + i * 62, 160, c, 1)).join(''), tgt = '<g>' + blob(160, 80, '#3D7DD8', 1.4) + '</g><rect x="112" y="24" width="96" height="76" rx="14" fill="none" stroke="' + INK + '" stroke-width="2" stroke-dasharray="5 5"/>';
+    return fit([
+      F(opts, tgt + K.t(160, 114, 'find this colour', 12, K.c2), 'pulse', 'Look at the colour'),
+      F(opts + tgt, '<circle cx="192" cy="150" r="32" fill="none" stroke="#22A355" stroke-width="4"/>' + K.check(222, 122) + '<path d="M198 166 q4 -6 10 -2 l8 10 q4 6 -2 10 l-10 4 q-6 2 -10 -4 Z" ' + K.fp('#F2C29B') + '/>', 'pop', 'Tap the one with the same colour'),
+      F(['<path d="M50 176 L68 144 L86 176Z" ', '<circle cx="130" cy="160" r="16" ', '<rect x="176" y="144" width="32" height="32" rx="4" ', '<path d="M240 176 L258 144 L276 176Z" '].map((p, i) => p + K.f(i === 3 ? '#EF4444' : C[i]) + '/>').join(''), '<path d="M140 100 L160 64 L180 100Z" ' + K.f('#EF4444') + '/><circle cx="258" cy="164" r="30" fill="none" stroke="#22A355" stroke-width="4"/>' + K.t(160, 30, 'colour + shape!', 13, K.c2), 'pop', 'Later: shapes too — quick but careful!')
+    ], 100, .92); };
+  // 🎈 Count & Match
+  D['count-match'] = K => { const apple = (x, y) => '<g transform="translate(' + x + ' ' + y + ')"><circle r="15" ' + K.f('#EF3B3B') + '/><path d="M0 -14 Q2 -22 6 -24" ' + K.l('#5B3A1A', 2.4) + '/><path d="M3 -18 Q14 -26 18 -16 Q8 -12 3 -18Z" ' + K.f('#3CB04A') + '/></g>';
+    const bowl = '<path d="M50 132 Q130 150 210 132 L200 160 Q130 176 60 160Z" ' + K.f('#C98E55') + '/>' + apple(96, 112) + apple(130, 104) + apple(164, 112), nums = (pick) => [['2', 66], ['3', 160], ['4', 254]].map(([n, x], i) => '<g transform="translate(' + x + ' 178)"><rect x="-20" y="-18" width="40" height="36" rx="8" ' + K.f(pick && i === 1 ? '#BBF7D0' : '#FFFFFF') + '/>' + K.t(0, 1, n, 22) + '</g>').join('');
+    return fit([
+      F(bowl + nums(), [['1', 96, 82], ['2', 130, 74], ['3', 164, 82]].map(([n, x, y]) => '<g transform="translate(' + x + ' ' + (y - 14) + ')"><circle r="11" ' + K.f('#FFFFFF') + '/>' + K.t(0, 1, n, 13, K.c2) + '</g>').join(''), 'pop', 'Count the things: 1, 2, 3'),
+      F(bowl + nums(), '<path d="M166 194 q4 -6 10 -2 l8 10 q4 6 -2 10 l-10 4 q-6 2 -10 -4 Z" ' + K.fp('#F2C29B') + '/><rect x="138" y="158" width="44" height="40" rx="10" fill="none" stroke="' + K.c2 + '" stroke-width="3.5"/>', 'pulse', 'Tap the right number'),
+      F(bowl + nums(true), K.check(190, 156) + K.star(240, 70, 10) + K.star(270, 100, 7, '#F9A8D4') + K.spark(60, 90, 6), 'pop', 'Yes, 3! Count each one with your eyes')
+    ], 104, .92); };
+  // 🎈 Trash Pointer
+  D['trash-pointer'] = K => { const bin = (x, c, sym) => '<g transform="translate(' + x + ' 176)"><path d="M-26 -50 L26 -50 L20 0 L-20 0Z" ' + K.f(c) + '/><rect x="-30" y="-58" width="60" height="10" rx="4" ' + K.f(dark(c, .15)) + '/>' + sym + '</g>';
+    const bins = bin(70, '#3D7DD8', '<path d="M-8 -26 l8 -12 l8 12 M8 -26 l-4 8 h-10" ' + K.l('#ffffff', 2.6) + '/>') + bin(160, '#22A04A', '<path d="M-6 -20 Q-10 -36 4 -38 Q8 -26 -6 -20Z" ' + K.fp('#BBF7D0') + '/>') + bin(250, '#6B7280', '<circle cx="0" cy="-26" r="7" ' + K.fp('#D1D5DB') + '/>') + '<path d="M8 186 Q100 176 160 182 T312 186" ' + K.l('#5CC45A', 4) + '/>';
+    const bottle = (x, y, r) => '<g transform="translate(' + x + ' ' + y + ') rotate(' + r + ')"><rect x="-7" y="-16" width="14" height="30" rx="5" ' + K.f('#7DD3FC') + '/><rect x="-4" y="-22" width="8" height="7" rx="2" ' + K.fp('#2563EB') + '/></g>';
+    return fit([
+      F(bins, bottle(160, 52, -10) + K.t(196, 40, '?', 22, K.c2), 'bob', 'Help keep the park clean'),
+      F(bins, '<path d="M150 50 Q100 20 74 104" ' + K.l('#FFFFFF', 2.6, 'stroke-dasharray="3 6"') + '/>' + bottle(72, 110, 20) + K.check(108, 96), 'fly', 'Drag it into the right bin'),
+      F(bins, K.t(70, 78, 'paper &amp; plastic', 11, '#2563EB') + K.t(160, 78, 'food', 12, '#15803D') + K.t(250, 78, 'the rest', 12, '#4B5563') + bottle(70, 52, 0) + '<path d="M146 50 a12 10 0 1 0 24 0Z" ' + K.f('#FDE68A') + '/><path d="M240 46 l20 0 l-4 14 l-12 0Z" ' + K.f('#D1D5DB') + '/>', 'pop', 'Blue = paper & plastic, green = food, grey = rest')
+    ], 104, .92); };
+  { const s3 = D['snakeast']; D['snakeast'] = K => s3(K).slice(0, 2).concat(SNAKE_EXTRA(K)); }   // 🐍 5 steps (Aowu: territory needs 1–2 more pictures)
+  const DCACHE = {};
+  function demo(id, c1, c2){
+    const key = id + c1 + c2; if(DCACHE[key]) return DCACHE[key];
+    const f = D[id]; if(!f) return null;
+    const tag = 'cd' + id.replace(/[^a-z]/g, '');
+    const fr = f(kit(tag + 'x', c1, c2)).map((x, i) => {
+      const Kb = kit(tag + i + 'b', c1, c2), Km = kit(tag + i + 'm', c1, c2), fb = f(Kb)[i], fm = f(Km)[i];
+      return {base: enc(svgOf(Kb, fb.b, true, fb.bg)), move: enc(svgOf(Km, fm.m, false)), a: x.a, cap: x.cap};
+    });
+    return (DCACHE[key] = fr);
+  }
+  // play(el, id, c1, c2): fills el with the flip-book and runs it (1.19 s a step, last step holds 2.07 s, loops); tap = pause / play; stops when el leaves the page.
+  function play(el, id, c1, c2){
+    const fr = demo(id, c1, c2); if(!fr) return false;
+    el.innerHTML = '<div class="ca-demo" role="img" aria-label="How ' + id + ' works"><div class="ca-stage">' + fr.map((f, i) => '<div class="ca-frame" data-i="' + i + '"><img class="ca-b" alt="" draggable="false" src="' + f.base + '"><img class="ca-dm fx-' + f.a + '" alt="" draggable="false" src="' + f.move + '"></div>').join('') +
+      '</div><div class="ca-cap"><b class="ca-n"></b><span class="ca-t"></span><i class="ca-pp" aria-hidden="true">❚❚</i></div></div>';   /* caption UNDER the picture, never over it */
+    const box = el.querySelector('.ca-demo'), frames = [...box.querySelectorAll('.ca-frame')], n = frames.length;
+    let i = -1, paused = false, timer = 0;
+    const log = (root.CA_DEMO_LOG = root.CA_DEMO_LOG || []);
+    function show(k){
+      i = k; frames.forEach((f, j) => f.classList.toggle('on', j === k));
+      const m = frames[k].querySelector('.ca-dm'); m.style.animation = 'none'; void m.offsetWidth; m.style.animation = '';
+      box.querySelector('.ca-n').textContent = (k + 1) + '/' + n; box.querySelector('.ca-t').textContent = fr[k].cap; log.push(id + ':' + k);
+    }
+    function tick(){ if(!box.isConnected){ clearTimeout(timer); return; } if(!paused) show((i + 1) % n); timer = setTimeout(tick, i === n - 1 ? 2070 : 1190); }   // p5-5 (Aowu): steps 1–2 30 % faster, the last picture holds (10 % faster)
+    box.addEventListener('click', e => { e.stopPropagation(); paused = !paused; box.classList.toggle('paused', paused); box.querySelector('.ca-pp').textContent = paused ? '▶' : '❚❚'; });
+    tick();
+    return true;
+  }
+  const api = {has: id => !!S[id], hasLogo: id => !!CARD_LOGO[id], parts, html, ids: () => Object.keys(S), hasDemo: id => !!D[id], demo, play, demoIds: () => Object.keys(D)};
+  if(typeof module !== 'undefined' && module.exports) module.exports = api; else root.CardArt = api;
+})(typeof window !== 'undefined' ? window : this);
