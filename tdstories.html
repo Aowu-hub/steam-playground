@@ -1804,7 +1804,7 @@ function startGame(ch, lvl, opt){
   paintAuto();
   $('speed-btn').textContent = '⏩'; $('goal').style.opacity = 1;
   $('goal').textContent = G.jail ? '💍 Hold off the guards until the bells stop — then crash the wedding!' : opt.bonus ? '💖 Second chance: +' + opt.bonus + ' ❤️ — keep the suitors away!' : '🏰 Keep the suitors away from the tower!';
-  showScreen('play'); BAR.fit(); renderPanel(); layout(); hudTick(true);
+  showScreen('play'); BAR.fit(); renderPanel(); layout(); BAR.fit(); fdZoomButtons(); hudTick(true);   // fd-1a2: 🤏 zoom in book 1 too
   last = 0; raf = requestAnimationFrame(loop);
   setTimeout(nextPick, FX ? 450 : 0);
 }
@@ -1819,6 +1819,7 @@ function goNow(){ if(G && G.state === 'break'){ (G.fd ? FD : TD).startWave(G); $
 /* ---------- 📐 layout: stage square + hero panel; nothing ever scrolls ---------- */
 function layout(){
   const sp = $('scr-play'); if(!sp || sp.classList.contains('hidden')) return;
+  if(G && fdLayout()) return;   // 👨‍🌾 fd-1a2: phone layouts, both books (sideways: [plants left] · map · hero 3×2 / pet 3×2 right)
   const A = $('arena'), st = $('stage'), P = $('panel');
   const W = A.clientWidth - 16, H = A.clientHeight - 6 - (parseFloat(getComputedStyle(A).paddingBottom) || 18);
   const big = Math.min(W, H) > 560, bs = big ? 56 : (Math.min(W, H) < 340 ? 40 : 46), gap = big ? 9 : 7;
@@ -1839,6 +1840,7 @@ function layout(){
   st.style.width = size + 'px'; st.style.height = sh + 'px';
   const dpr = Math.min(2, window.devicePixelRatio || 1), cv = $('cv');
   if(VIEW.px !== size || VIEW.dpr !== dpr || !BG || VIEW.ch !== S.chapter){ VIEW = {s: size / V25.W, px: size, ph: sh, dpr, ch: S.chapter}; setIso(); cv.width = Math.round(size * dpr); cv.height = Math.round(sh * dpr); BG = null; }
+  if(G) fdZoomApply();   // 👨‍🌾 fd-1a2: 🤏 zoom / pan on every size, both books
   if(pickOpen) placeHandOnGlow();
 }
 window.addEventListener('resize', () => { layout(); });
@@ -2601,7 +2603,7 @@ function bakeBG(tod){
   const vg = g.createRadialGradient(W / 2, H * 0.55, Math.min(W, H) * 0.4, W / 2, H * 0.55, Math.max(W, H) * 0.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(40,20,60,.2)'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
   return c;
 }
-function drawBG(){ setIso(); TOD.bgs = [null, null, null]; TOD.v = TOD.want = todWant(); TOD.bgs[Math.round(TOD.v)] = bakeBG(Math.round(TOD.v)); BG = TOD.bgs[Math.round(TOD.v)]; TOWER_PIC = null; ISO.fly = []; }
+function drawBG(){ setIso(); if(G) fdZoomApply(); TOD.bgs = [null, null, null]; TOD.v = TOD.want = todWant(); TOD.bgs[Math.round(TOD.v)] = bakeBG(Math.round(TOD.v)); BG = TOD.bgs[Math.round(TOD.v)]; TOWER_PIC = null; ISO.fly = []; }
 // background for this frame: the current time of day, cross-fading to the next one (baked when first needed)
 function paintBG(g, dt){
   const w = todWant(); TOD.want = w; if(TOD.v !== w){ const nx = TOD.v < w ? Math.floor(TOD.v) + 1 : Math.ceil(TOD.v) - 1; if(!TOD.bgs[nx]) TOD.bgs[nx] = bakeBG(nx); TOD.v = TOD.v < w ? Math.min(w, TOD.v + dt * 0.35) : Math.max(w, TOD.v - dt * 0.35); }
@@ -3506,20 +3508,22 @@ function fdStart(ch, lvl, opt){
   $('goal').textContent = opt.bonus ? '🎃 Second try: +' + opt.bonus + ' pumpkins — make the walk LONG!' : '🍄 Plant a maze — make the collectors walk so far they give up!';
   if(!$('fd-steps')){ const d = document.createElement('div'); d.className = 'fd-steps'; d.id = 'fd-steps'; $('stage').appendChild(d); }
   $('fd-steps').classList.remove('hidden');
-  showScreen('play'); BAR.fit(); fdRenderPanel(); layout(); fdHud(true);
+  FDZ.z = 1; FDZ.ox = FDZ.oy = 0; FDP.lmode = fdMode(); $('scr-play').classList.add('fd'); $('scr-play').classList.toggle('fd-land', fdMode() === 'land');
+  showScreen('play'); BAR.fit(); fdRenderPanel(); layout(); BAR.fit(); fdZoomButtons(); fdHud(true);
   last = 0; raf = requestAnimationFrame(loop);
   setTimeout(nextPick, FX ? 450 : 0);
 }
-function fdLeave(){ fdCloseCard(); fdCloseStory(); const s = $('fd-steps'); if(s) s.classList.add('hidden'); BAR.hide('pump'); BAR.hide('seeds'); BAR.hide('coll'); }
+function fdLeave(){ fdCloseCard(); fdCloseStory(); const s = $('fd-steps'); if(s) s.classList.add('hidden'); const zb = $('fd-zoom'); if(zb) zb.classList.add('hidden'); const sp = $('scr-play'); sp.classList.remove('fd', 'tl', 'tl-land', 'fd-port'); { const bb = $('fd-build'); if(bb) bb.remove(); } FDZ.z = 1; FDZ.ox = FDZ.oy = 0; if(typeof VIEW !== 'undefined' && VIEW.base){ VIEW.s = VIEW.base; VIEW.base = null; VIEW.px = -1; } BAR.hide('pump'); BAR.hide('seeds'); BAR.hide('coll'); }
 
 /* ---------- 🦸 panel: 🌱 build bar + 👨‍🌾 / 🐐 skill rows ---------- */
 function fdRenderPanel(){
-  if(!isFarm()) return; const P = $('panel'); P.innerHTML = ''; BTN = [];
+  if(!isFarm()) return; const P = $('panel'); P.innerHTML = ''; BTN = []; { const o = $('fd-build'); if(o) o.remove(); }
   const bb = document.createElement('div'); bb.className = 'fd-build'; bb.id = 'fd-build';
   bb.innerHTML = '<span class="fd-seeds" id="fd-seeds" title="Seeds to plant with">🌰 ' + G.seeds + '</span>' + FD.KINDS.map(k => { const K = FD.PLANTS[k], lock = K.ch > G.C.n;
     return '<button type="button" class="fd-plant' + (lock ? ' lock' : '') + (FDP.sel === k ? ' on' : '') + '" data-kind="' + k + '" data-hk="' + FD_HK[k] + '" data-sound="tap" style="--pc:' + FD_COLOR[k] + '" title="' + UI.esc(K.name + ' — ' + K.does + (lock ? ' (opens in chapter ' + K.ch + ')' : '')) + '">' + K.icon + '<span class="pr">' + (lock ? '🔒' : K.cost + '🌰') + '</span></button>'; }).join('');
   P.appendChild(bb);
   bb.querySelectorAll('.fd-plant').forEach(el => { el.onclick = () => fdSelect(el.dataset.kind); });
+  if(fdMode() === 'land') fdPlaceBuild('land');   // sideways phone: the plant column sits left of the map (the hero rows fold to 3 × 2 by CSS)
   ['farmer', 'goat'].forEach((h, hi) => {
     const T = G.trees[h], H = FD.HEROES[h], box = document.createElement('div'); box.className = 'hero'; box.dataset.h = h;
     const btns = T.buttons(), act = btns.filter(b => !b.ult && !b.combo), ult = btns.find(b => b.ult), keys = hi === 0 ? ['1', '2', '3', '4', '5', '6'] : ['Q', 'W', 'E', 'R', 'T', 'Y'];
@@ -3645,7 +3649,7 @@ function fdCloseCard(){ const c = $('fd-card'); if(c) c.remove(); FDP.card = 0; 
 function fdStory(html, btn){ fdCloseStory(); const d = document.createElement('div'); d.className = 'fd-story'; d.id = 'fd-story'; d.innerHTML = '<div class="pg">' + html + '<div style="margin-top:10px"><button class="sp-btn sp-primary sp-lg" data-sound="pop">' + (btn || 'OK ▶') + '</button></div></div>';
   $('arena').appendChild(d); if(G) G.paused = true; d.querySelector('button').onclick = () => { fdCloseStory(); if(G) G.paused = false; last = 0; }; }
 function fdCloseStory(){ const d = $('fd-story'); if(d) d.remove(); }
-document.addEventListener('pointerdown', e => { if(e.target && e.target.id === 'cv' && isFarm()) fdTap(e); });
+/* (fd-1b) taps come from fdPointer below — a drag or a pinch is not a tap */
 document.addEventListener('keydown', e => { if(!isFarm() || $('scr-play').classList.contains('hidden') || e.repeat || pickOpen) return; const k = e.key.toUpperCase(), kind = Object.keys(FD_HK).find(x => FD_HK[x] === k);
   if(kind){ fdSelect(kind); e.preventDefault(); } if(e.key === 'Escape'){ fdCloseCard(); FDP.pick = null; FDP.mode = 'plant'; } });
 
@@ -3717,7 +3721,7 @@ function fdBake(tod){
   return c;
 }
 function fdPaintBG(g, dt){
-  const key = VIEW.px + ':' + VIEW.ph + ':' + VIEW.dpr + ':' + G.C.n; if(FDP.bgKey !== key){ FDP.bgKey = key; FDP.bgs = [null, null, null]; FDP.tod = todWant(); ISO.lanterns = []; }
+  const key = VIEW.px + ':' + VIEW.ph + ':' + VIEW.dpr + ':' + G.C.n + ':' + VIEW.s.toFixed(3) + ':' + Math.round(ISO.OX) + ':' + Math.round(ISO.OY); if(FDP.bgKey !== key){ FDP.bgKey = key; FDP.bgs = [null, null, null]; FDP.tod = todWant(); ISO.lanterns = []; }
   const w = todWant(); if(FDP.tod !== w){ FDP.tod = FDP.tod < w ? Math.min(w, FDP.tod + dt * 0.35) : Math.max(w, FDP.tod - dt * 0.35); } TOD.v = FDP.tod;
   const a = Math.floor(FDP.tod), f = FDP.tod - a; if(!FDP.bgs[a]) FDP.bgs[a] = fdBake(a); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(FDP.bgs[a], 0, 0);
   if(f > 0.001){ if(!FDP.bgs[a + 1]) FDP.bgs[a + 1] = fdBake(a + 1); g.globalAlpha = f; g.drawImage(FDP.bgs[a + 1], 0, 0); g.globalAlpha = 1; }
@@ -3869,6 +3873,113 @@ function fdScene(c, o){
 }
 function fdCover(c, row){ const r = row || {}, f = (r.last || {}).farmer || {}, gt = (r.last || {}).goat || {}; fdScene(c, {kind: 'cover', fS: FD.stageOf(Number(f.t) || 1), fC: f.m || null, gS: FD.stageOf(Number(gt.t) || 1), gC: gt.m || null, collector: 'co'}); }
 function fdDiaryPic(cv, ch, when){ fdScene(cv, {kind: 'diary', fS: when === 'intro' ? (ch === 1 ? 1 : 2) : ch === 1 ? 2 : 3, gS: when === 'intro' ? (ch === 1 ? 1 : 2) : 2, collector: when === 'intro' ? (ch === 2 ? 'um' : 'co') : null, won: when === 'outro' ? true : undefined, rain: ch === 2}); }
+/* ================= 📱 fd-1a2 phone layouts + 🤏 pinch zoom (Aowu 17:49 · 17:57: both books — 🐉 Dragon Princess too) =================
+   sideways phone: ONE bar row (◀ folds Gameroom · Levels · 🏠 into its ▾ menu, score + ⏸ on the same row) · 🌱 plants in a column on the LEFT ·
+   map in the middle, filling it · skills on the RIGHT: 👨‍🌾 hero 3 × 2 on top, 🐐 pet 3 × 2 below (Aowu 17:57) ·
+   upright phone: map as tall as it can be, plants + skills compact under it · every size: pinch / wheel zoom + drag to pan (a tap still plants) */
+const FDZ = {z: 1, ox: 0, oy: 0, min: 1, max: 2.6, pts: new Map(), g: null};
+const inPlay = () => !!G && !$('scr-play').classList.contains('hidden');
+function fdMode(){ const w = innerWidth, h = innerHeight; if(h < 520 && w > h) return 'land'; if(w < 640 && h > w) return 'port'; return 'wide'; }
+(function(){ const st = document.createElement('style'); st.id = 'fd-css2'; st.textContent = [
+  '#scr-play.tl .banner{top:auto;bottom:auto;top:44px;transform:translateX(-50%);font-size:clamp(.78rem,1.4vmin + .5rem,1.15rem);padding:6px 14px;max-width:86%;border-radius:14px}',
+  '#scr-play.tl .banner.on{transform:translateX(-50%)}',
+  '#scr-play.tl-land .banner{font-size:.85rem;padding:4px 12px;top:40px}',
+  '#scr-play.tl #cv{touch-action:none;transform-origin:0 0}',
+  /* sideways phone: one bar row */
+  '#scr-play.tl-land .gb-back .gt,#scr-play.tl-land .gb-lvb,#scr-play.tl-land .gb-home,#scr-play.tl-land .gb-title,#scr-play.tl-land .gb-lvg,#scr-play.tl-land .gb-br{display:none !important}',
+  '#scr-play.tl-land .gb-fx{display:inline}#scr-play.tl-land .gb-back{padding:0 9px}',
+  '#scr-play.tl-land .arena{flex-direction:row !important;align-items:stretch;justify-content:center;gap:6px;padding-left:max(6px,env(safe-area-inset-left));padding-right:max(6px,env(safe-area-inset-right))}',
+  '#fd-left{display:none}#fd-left:empty{display:none !important}#scr-play.tl-land #fd-left{display:flex;flex-direction:column;justify-content:center;flex:0 0 auto}',
+  '#scr-play.tl-land #fd-left .fd-build{flex-direction:column;flex-wrap:nowrap;padding:6px 4px;gap:var(--bgap,6px)}',
+  '#scr-play.tl-land #fd-left .fd-seeds{font-size:.95rem;padding:0}',
+  '#scr-play.tl-land #panel{width:auto !important;flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px}',
+  /* Aowu 17:57: right side = 3 × 2 for the hero on top, 3 × 2 for the pet below */
+  '#scr-play.tl-land .hero{width:auto;padding:4px 6px 6px;margin:0}',
+  '#scr-play.tl-land .hero .hn{display:none}#scr-play.tl-land .hero .hh{justify-content:center;margin:0 0 3px;min-height:0}',
+  '#scr-play.tl-land .hero .hf{width:26px;height:26px;font-size:1rem}#scr-play.tl-land .hero .hf canvas{width:26px;height:26px}',
+  '#scr-play.tl-land .hero .btns{display:grid !important;grid-template-columns:repeat(3,var(--skk-bs,46px));gap:var(--bgap,6px);justify-content:center}',
+  '#scr-play.tl-land .hero .btns .skk-btn{margin:0}',
+  /* upright phone: compact hero rows (face + buttons on one line) */
+  '#scr-play.fd-port .hero{display:flex;align-items:center;gap:6px;padding:4px 6px}',
+  '#scr-play.fd-port .hero .hh{flex:0 0 auto;margin:0}#scr-play.fd-port .hero .hn{display:none}',
+  '#scr-play.fd-port .hero .btns{flex:1;display:flex;justify-content:space-between;gap:4px}',
+  '#scr-play.fd-port .fd-build{padding:3px 6px}#scr-play.fd-port #panel{gap:4px}',
+  '.fd-zoom{position:absolute;right:8px;bottom:8px;z-index:6;display:flex;flex-direction:column;gap:4px}',
+  '.fd-zoom button{width:36px;height:36px;border-radius:50%;border:2px solid #fff;background:rgba(255,255,255,.9);font:800 1.1rem Fredoka,sans-serif;color:#5C3B1E;box-shadow:0 2px 0 rgba(0,0,0,.15);padding:0}',
+].join('\n'); document.head.appendChild(st); })();
+// returns true when the phone layout took over (book 1's layout() then stops)
+function fdLayout(){
+  const sp = $('scr-play'), mode = fdMode(), fd = !!G.fd; sp.classList.add('tl'); sp.classList.toggle('fd', fd); sp.classList.toggle('tl-land', mode === 'land'); sp.classList.toggle('fd-port', fd && mode === 'port');
+  if(FDP.lmode !== mode){ const was = FDP.lmode; FDP.lmode = mode; if(was && G && G.trees) (fd ? fdRenderPanel : renderPanel)(); }   // turned the phone → the panel changes shape
+  if(fd) fdPlaceBuild(mode); if(mode === 'wide') return false;   // 🐉 book 1 uses the same phone layouts (no plant column)
+  const A = $('arena'), st = $('stage'), P = $('panel'), L = fd ? $('fd-left') : null; A.classList.toggle('col', mode === 'port'); if(mode === 'land'){ P.style.width = ''; P.style.flexDirection = ''; }
+  const pad = parseFloat(getComputedStyle(A).paddingBottom) || 18, W = A.clientWidth - 12, H = A.clientHeight - 6 - pad;
+  let bs, gap = 6, sw, sh;
+  if(mode === 'land'){
+    bs = Math.max(36, Math.min(54, Math.floor((H - 30 - 6 * gap) / 6), Math.floor((H - 2 * 44 - 4 * gap - 8) / 4)));   // left: seeds + 5 plants · right: 2 heroes × 2 rows (+ a small face each)
+    sp.style.setProperty('--skk-bs', bs + 'px'); sp.style.setProperty('--bgap', gap + 'px'); sp.style.setProperty('--hf', '1.4rem');
+    const lw = L && L.childElementCount ? L.getBoundingClientRect().width || bs + 12 : 0, pw = P.getBoundingClientRect().width || 3 * bs + 2 * gap + 12;
+    sw = Math.max(240, Math.floor(W - lw - pw - 12)); sh = Math.max(200, Math.floor(H));   // the sky above the island is cut (the map is the point here)
+  } else {
+    sp.style.setProperty('--bgap', gap + 'px'); sp.style.setProperty('--hf', '1.4rem');
+    bs = Math.max(38, Math.min(52, Math.floor((W - 64 - 5 * 4) / 6))); sp.style.setProperty('--skk-bs', bs + 'px');
+    A.classList.add('col'); P.style.flexDirection = 'column'; P.style.width = Math.min(W, 600) + 'px';
+    const ph = P.getBoundingClientRect().height || 3 * (bs + 14); sw = Math.floor(W); sh = Math.max(240, Math.floor(H - ph - 8));
+  }
+  st.style.width = sw + 'px'; st.style.height = sh + 'px';
+  const dpr = Math.min(2, window.devicePixelRatio || 1), cv = $('cv');
+  // the island fits the stage (upright phones crop the misty sides a little); the stage may be wider / taller than the island → it stays centred
+  isoFit(A.clientWidth, A.clientHeight);
+  const s = Math.min(sw / V25.W, sh / (mode === 'land' ? V25.R + V25.BOT + 1.6 : V25.TOP + V25.R + V25.BOT));
+  if(VIEW.px !== sw || VIEW.ph !== sh || VIEW.dpr !== dpr || VIEW.base !== s || VIEW.ch !== S.chapter){ VIEW = {s, base: s, baseKey: sw + 'x' + sh, px: sw, ph: sh, dpr, ch: S.chapter}; cv.width = Math.round(sw * dpr); cv.height = Math.round(sh * dpr); BG = null; FDZ.ox = FDZ.oy = 0; FDP.bgKey = ''; }
+  fdZoomApply(); if(pickOpen) placeHandOnGlow();
+  return true;
+}
+function fdPlaceBuild(mode){ const A = $('arena'); let L = $('fd-left'); if(!L){ L = document.createElement('div'); L.id = 'fd-left'; A.insertBefore(L, A.firstChild); }
+  const bb = $('fd-build'); if(!bb) return; if(mode === 'land'){ if(bb.parentNode !== L) L.appendChild(bb); } else if(bb.parentNode !== $('panel')) $('panel').insertBefore(bb, $('panel').firstChild); }
+// 🤏 zoom: VIEW.s = base × z, the island's centre offset (ox, oy) keeps the pinched spot under the fingers
+function fdZoomApply(){
+  if(VIEW.base == null || VIEW.baseKey !== VIEW.px + 'x' + VIEW.ph){ VIEW.base = VIEW.s; VIEW.baseKey = VIEW.px + 'x' + VIEW.ph; }
+  VIEW.s = VIEW.base * FDZ.z; setIso();
+  const padY = (VIEW.ph - (V25.TOP + V25.R + V25.BOT) * VIEW.base) / 2; ISO.OY += padY;   // a taller stage: island in the middle · a shorter one (sideways phone): the sky is cut   // a taller stage: the island sits in the middle
+  if(FDZ.z <= 1.001){ FDZ.ox = FDZ.oy = 0; }
+  const cx0 = ISO.OX, cy0 = ISO.OY + (FD.CX + FD.CY) * ISO.B;   // the farm's screen spot before the offset
+  FDZ.ox = Math.max(-cx0 + VIEW.px * 0.12, Math.min(VIEW.px * 0.88 - cx0, FDZ.ox)); FDZ.oy = Math.max(-cy0 + VIEW.ph * 0.12, Math.min(VIEW.ph * 0.88 - cy0, FDZ.oy));
+  ISO.OX += FDZ.ox; ISO.OY += FDZ.oy;
+}
+function fdZoomTo(z, mx, my){   // zoom round the screen point (mx, my)
+  z = Math.max(FDZ.min, Math.min(FDZ.max, z)); if(Math.abs(z - FDZ.z) < 0.001) return; const k = z / FDZ.z, OX0 = ISO.OX, OY0 = ISO.OY;
+  const OX1 = mx - (mx - OX0) * k, OY1 = my - (my - OY0) * k; FDZ.z = z;
+  FDZ.ox = 0; FDZ.oy = 0; fdZoomApply(); FDZ.ox = OX1 - (ISO.OX); FDZ.oy = OY1 - (ISO.OY); fdZoomApply(); FDP.pics.clear(); FDP.bgKey = ''; if(!G.fd) BG = null;
+}
+function fdPanBy(dx, dy){ if(FDZ.z <= 1.001) return; FDZ.ox += dx; FDZ.oy += dy; fdZoomApply(); FDP.bgKey = ''; if(!G.fd) BG = null; }
+function fdPointer(e){
+  if(!inPlay() || e.target.id !== 'cv') return; const cv = $('cv'), r = cv.getBoundingClientRect(), P = FDZ.pts;
+  if(e.type === 'pointerdown'){ try{ cv.setPointerCapture(e.pointerId); }catch(_){} P.set(e.pointerId, {x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY});
+    if(P.size === 2){ const [a, b] = [...P.values()]; FDZ.g = {kind: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2 - r.left, my: (a.y + b.y) / 2 - r.top, k: 1, tx: 0, ty: 0}; }
+    else if(P.size === 1) FDZ.g = {kind: 'tap', moved: 0, tx: 0, ty: 0}; return; }
+  const q = P.get(e.pointerId); if(!q) return;
+  if(e.type === 'pointermove'){ q.x = e.clientX; q.y = e.clientY; const G2 = FDZ.g; if(!G2) return;
+    if(G2.kind === 'pinch' && P.size >= 2){ const [a, b] = [...P.values()]; G2.k = Math.max(FDZ.min / FDZ.z, Math.min(FDZ.max / FDZ.z, Math.hypot(a.x - b.x, a.y - b.y) / G2.d0)); const mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top; G2.tx = mx - G2.mx * G2.k; G2.ty = my - G2.my * G2.k; G2.mx2 = mx; G2.my2 = my;
+      cv.style.transform = 'translate(' + G2.tx + 'px,' + G2.ty + 'px) scale(' + G2.k + ')'; return; }
+    if(G2.kind === 'tap'){ const dx = q.x - q.x0, dy = q.y - q.y0; if(Math.hypot(dx, dy) > 10 && FDZ.z > 1.001){ G2.kind = 'pan'; } }
+    if(G2.kind === 'pan'){ G2.tx = q.x - q.x0; G2.ty = q.y - q.y0; cv.style.transform = 'translate(' + G2.tx + 'px,' + G2.ty + 'px)'; } return; }
+  // up / cancel
+  P.delete(e.pointerId); const G2 = FDZ.g;
+  if(G2 && G2.kind === 'pinch'){ cv.style.transform = ''; const mx0 = G2.mx, my0 = G2.my;   // the first finger up commits the pinch; the other finger does nothing more
+      fdZoomTo(FDZ.z * G2.k, mx0, my0); fdPanBy((G2.mx2 != null ? G2.mx2 : mx0) - mx0, (G2.my2 != null ? G2.my2 : my0) - my0); FDZ.g = P.size ? {kind: 'wait'} : null; return; }
+  if(G2 && G2.kind === 'pan'){ cv.style.transform = ''; fdPanBy(G2.tx, G2.ty); FDZ.g = null; return; }
+  if(G2 && G2.kind === 'tap' && e.type === 'pointerup' && P.size === 0){ FDZ.g = null; if(G.fd) fdTap(e); return; }
+  if(P.size === 0) FDZ.g = null;
+}
+['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach(t => document.addEventListener(t, fdPointer, {passive: true}));
+document.addEventListener('wheel', e => { if(!inPlay() || e.target.id !== 'cv') return; e.preventDefault(); const r = $('cv').getBoundingClientRect(); fdZoomTo(FDZ.z * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX - r.left, e.clientY - r.top); }, {passive: false});
+function fdZoomButtons(){ let z = $('fd-zoom'); if(!z){ z = document.createElement('div'); z.className = 'fd-zoom'; z.id = 'fd-zoom'; z.innerHTML = '<button type="button" data-z="1" data-sound="tap" aria-label="Zoom in">＋</button><button type="button" data-z="-1" data-sound="tap" aria-label="Zoom out">－</button>'; $('stage').appendChild(z);
+    z.querySelectorAll('button').forEach(b => b.onclick = () => { fdZoomTo(FDZ.z * (b.dataset.z === '1' ? 1.3 : 1 / 1.3), VIEW.px / 2, VIEW.ph / 2); }); } z.classList.remove('hidden'); }
+// ◀ on a sideways phone: the bar's own folded menu (Gameroom · Levels · Dashboard) instead of leaving at once
+document.addEventListener('click', e => { if(!inPlay() || !$('scr-play').classList.contains('tl-land')) return; const b = e.target.closest && e.target.closest('#gbar .gb-back'); if(!b) return;
+  e.stopPropagation(); e.preventDefault(); const fm = document.querySelector('#gbar .gb-fmenu'); if(!fm) return; const hd = fm.querySelector('.gb-fhd'), lv = $('hud-level');
+  if(hd){ hd.textContent = lv ? (lv.dataset.full || lv.textContent) : ''; hd.style.display = hd.textContent ? '' : 'none'; } fm.classList.toggle('hidden'); }, true);
 /* 👨‍🌾 FARMER DELUSION — page END */
 /* ================= BOOT ================= */
 function boot(){
@@ -4162,4 +4273,4 @@ function tdResultBadge(){
 /* 🏷️ TD LOGO END */</script>
 </body>
 </html>
-<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a) END OF TDStories.html -->
+<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a+fd-1a2) END OF TDStories.html -->
