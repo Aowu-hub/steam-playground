@@ -3255,17 +3255,17 @@ function lkGoLabel(){ const b = $('go-btn'); if(!b) return; if(SET.mode === 'lin
 function lkCloseLobby(){ if(LK.lobby && LK.lobby.close) LK.lobby.close(); LK.lobby = null; }
 async function lkOpenHost(){
   lkWire(); lkCloseLobby(); const sp = SB.SPORTS[SET.sport], L = SB.LEVELS[SET.level];
-  $('link-sub').textContent = LK.tv ? '📺 This screen is the Room hostess — players tap 🔗 Join friends on their own phone (same Wi-Fi)' : 'Friends tap 🔗 Join friends on their own phone or tablet — same Wi-Fi'; showScreen('link'); lkAlt('');
+  $('link-sub').textContent = LK.tv ? '📺 This screen is the Room hostess — players join on their own phone · 1 = you vs 🤖 · 2 = 1 vs 1 · 3–4 = 2 vs 2' : 'Friends tap 🔗 Join friends on their own phone or tablet — same Wi-Fi'; showScreen('link'); lkAlt('');
   const el = $('link-lobby'); el.innerHTML = '<div class="lk"><div class="lk-msg"><span class="ui-spin a-bob">📡</span> Opening the room<span class="lk-dots"></span></div></div>';
   try{ await Link.host({game: 'SlaBrall', name: S.player, seats: 4, hostess: !!LK.tv, page: 'slabrall', label: sp.icon + ' ' + sp.name + ' · ' + LEVEL_UI[SET.level].emoji + ' ' + L.name + (LK.tv ? ' · 📺 on the TV' : '')}); }   // label + page: the 🏠 waiting room (lk-2a)
   catch(e){ UISound.play('error'); el.innerHTML = '<div class="lk"><div class="lk-msg bad">😕 ' + UI.esc(lkWhy(e)) + '</div></div>'; return; }
   if($('scr-link').classList.contains('hidden')) return;   // left while it opened
-  LK.lobby = Link.lobby(el, {title: sp.icon + ' ' + sp.name + ' · ' + LEVEL_UI[SET.level].emoji + ' ' + L.name, url: WEBAPP_URL + '?page=slabrall', minPlayers: 2, name: S.player, drawAvatar: lkAv, kind: 'link', onStart: lkGo});
+  LK.lobby = Link.lobby(el, {title: sp.icon + ' ' + sp.name + ' · ' + LEVEL_UI[SET.level].emoji + ' ' + L.name, url: WEBAPP_URL + '?page=slabrall', minPlayers: 2, soloBot: true, name: S.player, drawAvatar: lkAv, kind: 'link', onStart: lkGo});   /* 📺 st-2b: a hostess room starts with ONE player = vs 🤖 */
 }
 function lkOpenJoin(code){
   lkWire(); lkCloseLobby(); lkIdle();
   $('link-sub').textContent = 'Same Wi-Fi as the host'; showScreen('link'); lkAlt('host');
-  LK.lobby = Link.lobby($('link-lobby'), {title: '🏓 SlaBrall', name: S.player, drawAvatar: lkAv, code: code || undefined, onJoined: () => { UISound.play('success'); lkAlt(''); }});
+  LK.lobby = Link.lobby($('link-lobby'), {title: '🏓 SlaBrall', name: S.player, soloBot: true, drawAvatar: lkAv, code: code || undefined, onJoined: () => { UISound.play('success'); lkAlt(''); }});
 }
 // 📡 lk-1c: the host screen — 1 · sport, 2 · level (no 💀 Hardcore: that one is you vs the robot), then 📡 Open the room
 function lkLevelOk(i){ return !!LEVEL_UI[i] && !LEVEL_UI[i].hardcore && canPlay(i); }
@@ -3299,15 +3299,18 @@ function lkIdle(){ try{ if(window.Link && Link.status() !== 'idle') Link.leave()
 function lkGo(){
   const tv = !!(Link.hostess && Link.hostess());   // 📺 lk-5e: the TV's seat 0 is the screen — every player is on their own phone
   const list = Link.players().filter(p => p.name && p.on && !p.screen).sort((a, b) => a.seat - b.seat).slice(0, 4);
-  if(list.length < 2){ UISound.play('error'); UI.toast(tv ? '📺 Wait for 2 players to join' : '📡 Wait for a friend to join'); return; }
+  if(list.length < (tv ? 1 : 2)){ UISound.play('error'); UI.toast(tv ? '📺 Wait for a player to join' : '📡 Wait for a friend to join'); return; }   /* 📺 st-2b: on the TV one player is enough */
   const sides = list.length === 2 ? [0, 1] : [0, 1, 0, 1], seats = list.map((p, k) => ({name: p.name, side: sides[k], human: true, lseat: p.seat}));
   if(seats.length === 3) seats.push({name: 'Robot', side: 1, human: false});
+  if(seats.length === 1) seats.push({name: 'Robot', side: 1, human: false});   /* 📺 st-2b: 1 player + the TV = you vs 🤖 (the room's level) */
   LK.cfg = {link: true, id: Date.now().toString(36), sport: SET.sport, level: SET.level, theme: SET.theme, powers: SET.powers, ball: SET.ball, target: 0, seed: (Date.now() & 0xffffff) ^ 0x5b, host: S.player, tv, seats};
   LK.end = null; lkCloseLobby();
   Link.send('sbgo', LK.cfg, {sure: true});
   if(G) cancelAnimationFrame(G.raf); G = null; hideResult();
   startMatch(lkLocal(LK.cfg, 0, 'host'));
 }
+/* 📺 st-2b: opened from the 📺 Game Station — the voted level (no 💀: that one is you vs the robot on one device) + the voted sport; not saved as the TV's own picks */
+function lkStPick(p){ const l = +p.slv; if(p.slv != null && p.slv !== '' && !isNaN(l)) SET.level = Math.max(0, Math.min(4, Math.round(l))); if(p.ssp && SB.SPORTS[p.ssp]) SET.sport = p.ssp; }
 function lkAskAgain(b){ if(window.UI && UI.busy) UI.busy(b, 'sla-brall', 'Asking the TV…'); Link.ask('again'); }   // 📺 lk-5e
 function lkResultBtns(){
   if(G.link.role === 'host') return '<div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="pop" onclick="lkGo()">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="lkExit()">' + (LK.cfg && LK.cfg.tv ? '🚪 End the room' : '🎚️ Levels') + '</button></div>';
@@ -3367,11 +3370,19 @@ function lkUrlCode(cb){
   try{ if(window.google && google.script && google.script.url && google.script.url.getLocation){ google.script.url.getLocation(l => cb(((l && l.parameter) || {}).link || '')); return; } }catch(e){}
   try{ cb(new URLSearchParams(location.search).get('link') || ''); }catch(e){ cb(''); }
 }
+/* 📺 STATION (st-2b): opened from the 📺 Game Station — the TV starts by itself when the voted players are in (1 player = vs 🤖 at the voted level),
+   the players vote 🔁 again / 🎮 another game after the match (LinkKit `Station`) */
+if(window.Station) Station.game({url: WEBAPP_URL, page: 'slabrall', player: () => S.player || CURRENT_PLAYER, start: () => lkGo(), again: () => lkGo()});
 /* 📡 END LINK (lk-1b) */
 /* ✨ MODE SPOTLIGHT (modes-3): ?mode=<id> opens this game straight in that mode after the player pick · "✨ Also try" on the start page · started modes → UI.modeTried */
 const MS_GAME = 'sla-brall';
 function msOpen(id){
-  if(id === 'ltv'){ lkHostPick(); const t = $('lkh-tv'); if(t) t.classList.add('lkh-glow'); return; }   // 📺 lk-5f: from the Gameroom — the 📺 button glows
+  if(id === 'ltv'){   /* 📺 lk-5f: from the Gameroom — the 📺 button glows · st-2b: from the 📺 Game Station = no picker, the voted level + sport */
+    const pick = () => { lkHostPick(); const t = $('lkh-tv'); if(t) t.classList.add('lkh-glow'); };
+    if(!window.Station){ pick(); return; }
+    Station.params().then(p => { if(/^\d{4}$/.test(String(p.st || '')) && p.stv === '1'){ lkStPick(p); LK.tv = true; lkOpenHost(); } else pick(); });
+    return;
+  }
   if(id === 'cup'){ openCup(); return; } if(id === 'ljoin'){ lkOpenJoin(); return; } if(id === 'lhost'){ lkHostPick(); return; } if(SB.SPORT_ORDER.indexOf(id) < 0) return; /* 📡 lk-1b ?mode=ljoin */ SET.sport = id; savePrefs(); markSports(); const b = document.querySelector('#sport-list .sport.on'); if(b && b.scrollIntoView) b.scrollIntoView({block: 'nearest'});
 }
 function msNow(){ return SET.sport; }
@@ -3390,4 +3401,4 @@ msAfter('choosePlayer', () => { if(LK.urlDone) return; LK.urlDone = true;   // �
 </script>
 </body>
 </html>
-<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+lk-1b+p1d+lk-1c+cs-1+lk-2e+dv-1+tb-1+lk-5e+lk-5f+ls-1b+pz-1+24t-a+b3w5) END OF SlaBrall.html -->
+<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+lk-1b+p1d+lk-1c+cs-1+lk-2e+dv-1+tb-1+lk-5e+lk-5f+ls-1b+pz-1+24t-a+b3w5+st-2b) END OF SlaBrall.html -->

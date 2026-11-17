@@ -85,6 +85,7 @@
   .lcard .votes span{background:#FFC845;color:#3B2A78;border-radius:99px;padding:1px 6px;font:800 .7rem Nunito,sans-serif}
   .lcard.mine{outline:3px solid #FFC845}
   .lcard.rec::before{content:'⭐';position:absolute;top:4px;left:6px;font-size:.8rem}
+  .lcard{text-align:center} .lcard small{display:block;font:800 .72rem Nunito,sans-serif;opacity:.75;margin-top:1px}   /* 📺 st-2b: 🏓 sport card = icon · name · what it is (centred on the TV too) */
   .big{text-align:center;padding:26px 10px}
   .big .ic{font-size:5rem;display:block;animation:bob 1.2s ease-in-out infinite}
   .big h2{margin-top:10px}
@@ -122,6 +123,7 @@
   @media (max-height:520px){ .wrap .title{font-size:1.3rem} .sub{margin-top:0;font-size:.8rem} .phone{margin-top:4px} .phone .me{margin-bottom:4px} .phone .me canvas{width:30px;height:36px} .phone .panel{padding:10px} .phone .stage h2{font-size:1.1rem}
     .phone .shelf{grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px} .phone .gcard{min-height:74px} .phone .gcard .ic{font-size:1.5rem} .phone .gcard .lg{height:36px} .phone .gcard .lg img{max-height:36px} .phone .gcard .pl{display:none} .leave{margin-top:6px} }
   @media (max-height:520px) and (min-width:700px){ .phone{max-width:820px} }
+  @media (max-height:520px) and (min-width:600px){ .phone .lv{grid-template-columns:repeat(6,1fr);gap:8px} .phone .lcard{padding:7px 4px} .phone .lcard .e{font-size:1.45rem} }   /* 📺 st-2b: a phone held sideways = level / sport cards in ONE row (first screen) */
   @media (max-width:820px){ .tv{grid-template-columns:1fr} .qr{width:120px;height:120px} }
   @media (prefers-reduced-motion:reduce){ .gcard.win,.big .ic,.mem.in{animation:none} }
 </style>
@@ -189,9 +191,13 @@ const SHELF = [
   {k: 'chess', page: 'chess', icon: '♟️', name: 'Chess', max: 2, lvl: false, c: ['#5B6CFF', '#8F5BFF'], logo: 'chess'},
   {k: 'checkers', page: 'checkers', icon: '🔴', name: 'Checkers', max: 2, lvl: false, c: ['#FF5C7A', '#FF8A3D'], logo: 'checkers'},
   {k: 'memory', page: 'memory', icon: '🃏', name: 'Memories Match', max: 4, lvl: true, c: ['#7A5CFA', '#2BB0C8'], logo: 'memory'},
-  {k: 'lettercraft', page: 'wordboard', icon: '🔤', name: 'Lettercraft', max: 4, lvl: true, c: ['#2E7D5B', '#2EC4B6'], logo: 'lettercraft'},   // 📺 st-2a: the level = the 🤖's level + words + board
-  {k: 'algebros', page: 'numberboard', icon: '➗', name: 'Algebros', max: 4, lvl: true, c: ['#E8742A', '#FFB020'], logo: 'algebros'}   // 📺 st-2a
+  {k: 'lettercraft', page: 'wordboard', icon: '🔤', name: 'Lettercraft', max: 4, lvl: true, c: ['#2E7D5B', '#2EC4B6'], logo: 'lettercraft', kind: 'word-board'},   // 📺 st-2a: the level = the 🤖's level + words + board
+  {k: 'algebros', page: 'numberboard', icon: '➗', name: 'Algebros', max: 4, lvl: true, c: ['#E8742A', '#FFB020'], logo: 'algebros', kind: 'number-board'},   // 📺 st-2a
+  {k: 'slabrall', page: 'slabrall', icon: '🏓', name: 'SlaBrall', max: 4, lvl: true, top: 4, sports: true, c: ['#1E88E5', '#22C55E'], logo: 'slabrall', kind: 'sla-brall'}   // 📺 st-2b: phones = controllers · 1 = you vs 🤖 · 2 = 1 vs 1 · 3–4 = 2 vs 2 · levels 🌱–🌋 (💀 is you vs the robot only) · then a 🗳️ sport vote
 ];
+// 🏓 st-2b: SlaBrall's sports (same keys + order as the game's SB.SPORT_ORDER) — the players vote one after the level
+const SB_SPORTS = [['slashot', '🏒', 'SlaShot', 'Table hockey'], ['slapoof', '🥒', 'SlaPoof', 'Pickleball'], ['slaball', '🎾', 'SlaBall', 'Tennis'], ['slapong', '🏓', 'SlaPong', 'Ping-pong'], ['slabam', '🏸', 'SlaBam', 'Badminton'], ['slawall', '🧱', 'SlaWall', 'Squash']];
+const lvOf = g => LV.slice(0, ((g && g.top != null) ? g.top : 5) + 1);   // 📺 st-2b: a game may stop below 💀 Hardcore
 // 🏷️ LOGO SHELL (st-1b, Aowu 2026-11-17 "the shelf = the games' logos being created"): each card shows the game's code logo from GameLogos
 // ONLY when Aowu approved it (GameLogos.ok); else the icon + name. New logos appear by themselves once the 🏷️ logo chat approves them.
 const LOGO_OK_FALLBACK = ['snakize', 'numbergrid', 'memory', 'wisdeck', 'pokadif'];   // approved 2026-11-16 23:1x — used only while the live kit has no .ok()
@@ -268,7 +274,7 @@ async function tvTick(){
   S.st = r.state; paintCrew(); paintTvStage(); tvDecide();
 }
 function paintCrew(){
-  const st = S.st, box = $('crew'), go = st.go || {}, votes = st.votes || {}, kind = st.phase === 'lvl' ? 'lvl' : 'game';
+  const st = S.st, box = $('crew'), go = st.go || {}, votes = st.votes || {}, kind = st.phase === 'lvl' ? 'lvl' : st.phase === 'sport' ? 'sport' : 'game';   /* 📺 st-2b */
   const names = st.members.map(m => m.name);
   [...box.children].forEach(el => { if(names.indexOf(el.dataset.n) < 0) el.remove(); });
   st.members.forEach(m => {
@@ -295,13 +301,18 @@ function paintTvStage(){
   } else if(st.phase === 'lvl'){
     const g = gameOf(go.game) || {};
     el.innerHTML = '<h2>🎚️ ' + esc(g.icon + ' ' + g.name) + ' — vote the level!</h2><div class="hint">' + (go.alone ? esc(go.players[0]) + ' plays alone' + (g.k === 'memory' ? '' : ' against the 🤖') : 'The players vote · a tie = the easier level') + '</div>' +
-      '<div class="lv">' + LV.map((l, i) => '<div class="lcard"><span class="e">' + l[0] + '</span>' + l[1] + '<div class="votes">' + votesHtml((st.votes || {}).lvl, i) + '</div></div>').join('') + '</div>';
+      '<div class="lv">' + lvOf(g).map((l, i) => '<div class="lcard"><span class="e">' + l[0] + '</span>' + l[1] + '<div class="votes">' + votesHtml((st.votes || {}).lvl, i) + '</div></div>').join('') + '</div>';
+  } else if(st.phase === 'sport'){   /* 📺 st-2b: 🏓 vote the sport */
+    const g = gameOf(go.game) || {};
+    el.innerHTML = '<h2>' + esc(g.icon + ' ' + g.name) + ' — vote the sport!</h2><div class="hint">' + (go.alone ? esc(go.players[0]) + ' picks' : 'The players vote · a tie = 🎲') + (go.lvl != null ? ' · ' + LV[go.lvl][0] + ' ' + LV[go.lvl][1] : '') + '</div>' +
+      '<div class="lv">' + SB_SPORTS.map(x => '<div class="lcard" data-sp="' + x[0] + '"><span class="e">' + x[1] + '</span>' + x[2] + '<small>' + x[3] + '</small><div class="votes">' + votesHtml((st.votes || {}).sport, x[0]) + '</div></div>').join('') + '</div>';
   } else {
     const g = gameOf(go.game) || {};
-    el.innerHTML = '<div class="big"><span class="ic">' + (g.icon || '🎮') + '</span><h2>🔀 Off to ' + esc(g.name || 'the game') + '!</h2><div class="hint">' + (go.lvl != null ? LV[go.lvl][0] + ' ' + LV[go.lvl][1] : '') + '</div>' +
+    el.innerHTML = '<div class="big"><span class="ic">' + (g.icon || '🎮') + '</span><h2>🔀 Off to ' + esc(g.name || 'the game') + '!</h2><div class="hint">' + (go.lvl != null ? LV[go.lvl][0] + ' ' + LV[go.lvl][1] : '') + sportTxt(go) + '</div>' +
       '<div class="names">' + (go.players || []).map(n => '<span>🎮 ' + esc(n) + '</span>').join('') + (go.watchers || []).map(n => '<span class="w">👀 ' + esc(n) + '</span>').join('') + '</div></div>';
   }
 }
+function sportTxt(go){ const x = go && go.sport && SB_SPORTS.find(y => y[0] === go.sport); return x ? ' · ' + x[1] + ' ' + x[2] : ''; }   /* 📺 st-2b */
 function tally(map, keys){
   const n = {}; Object.keys(map || {}).forEach(k => { const v = String(map[k]); if(keys.indexOf(v) >= 0) n[v] = (n[v] || 0) + 1; });
   const top = Math.max(0, ...Object.values(n)); return Object.keys(n).filter(k => n[k] === top);
@@ -332,9 +343,24 @@ async function tvDecide(){
     if(!S.deadline) S.deadline = Date.now() + VOTE_MS * 0.75;
     if(got.length < go.players.length && Date.now() < S.deadline) return;
     S.deciding = true;
-    const tops = tally(Object.fromEntries(got.map(n => [n, votes[n]])), ['0', '1', '2', '3', '4', '5']).map(Number), lvl = Math.min(...tops);   // a tie = the easier level
+    const g = gameOf(go.game) || {};   /* 📺 st-2b */
+    const tops = tally(Object.fromEntries(got.map(n => [n, votes[n]])), lvOf(g).map((l, i) => String(i))).map(Number), lvl = tops.length ? Math.min(...tops) : 0;   // a tie = the easier level
     const map = go.game === 'memory' ? (go.players.length >= 3 || lvl >= 3 ? '8' : '6') : '';
-    const r = await Station.run('stationSet', S.code, {name: S.me, token: S.tok}, {phase: 'go', lvl, map}).catch(() => null);
+    const next = g.sports ? 'sport' : 'go';   /* 📺 st-2b: 🏓 then the players vote a sport */
+    const r = await Station.run('stationSet', S.code, {name: S.me, token: S.tok}, {phase: next, lvl, map}).catch(() => null);
+    S.deadline = 0; S.deciding = false; if(r && r.state){ S.st = r.state; paintTvStage(); if(r.state.phase === 'go') tvGo(); }
+    return;
+  }
+  if(st.phase === 'sport'){   /* 📺 st-2b: all voted = at once, else ¾ of the vote time after the first vote · a tie = 🎲 */
+    const go = st.go, votes = (st.votes && st.votes.sport) || {}, got = go.players.filter(n => votes[n]);
+    if(!got.length){ S.deadline = 0; return; }
+    if(!S.deadline) S.deadline = Date.now() + VOTE_MS * 0.75;
+    if(got.length < go.players.length && Date.now() < S.deadline) return;
+    S.deciding = true;
+    const tops = tally(Object.fromEntries(got.map(n => [n, votes[n]])), SB_SPORTS.map(x => x[0])), k = tops[Math.floor(Math.random() * tops.length)] || SB_SPORTS[0][0];
+    const x = SB_SPORTS.find(y => y[0] === k);
+    if(tops.length > 1) UI.toast('🎲 A tie — the dice picks ' + x[1] + ' ' + x[2]);
+    const r = await Station.run('stationSet', S.code, {name: S.me, token: S.tok}, {phase: 'go', sport: k}).catch(() => null);
     S.deadline = 0; S.deciding = false; if(r && r.state){ S.st = r.state; paintTvStage(); tvGo(); }
     return;
   }
@@ -343,8 +369,8 @@ async function tvDecide(){
 function tvGo(){
   const go = S.st.go; if(!go || S.went) return; S.went = true; clearInterval(S.timer);
   const g = gameOf(go.game) || {};
-  const url = WEBAPP_URL + '?page=' + go.page + '&mode=ltv&st=' + S.code + '&stv=1&stk=' + encodeURIComponent(S.tok) + (go.lvl != null ? '&slv=' + go.lvl : '') + (go.map ? '&smap=' + go.map : '') + qs();
-  setTimeout(() => UI.go(url, go.game, '🔀 Switching to ' + (g.name || 'the game')), window.ST_FAST ? 50 : 1200);
+  const url = WEBAPP_URL + '?page=' + go.page + '&mode=ltv&st=' + S.code + '&stv=1&stk=' + encodeURIComponent(S.tok) + (go.lvl != null ? '&slv=' + go.lvl : '') + (go.map ? '&smap=' + go.map : '') + (go.sport ? '&ssp=' + go.sport : '') + qs();   /* 📺 st-2b: + the sport */
+  setTimeout(() => UI.go(url, g.kind || go.game, '🔀 Switching to ' + (g.name || 'the game')), window.ST_FAST ? 50 : 1200);
 }
 
 /* ================= 📱 PHONE ================= */
@@ -393,18 +419,25 @@ function paintPhone(){
     const mine = ((st.votes || {}).lvl || {})[S.me] != null ? String(st.votes.lvl[S.me]) : (S.mine['lvl' + st.round + st.phase] || '');
     const p = S.players.find(x => x.Name === S.me), rec = AGE_LV[p && p.Age] != null ? AGE_LV[p.Age] : 1;
     el.innerHTML = '<h2>🎚️ ' + esc(g.icon + ' ' + g.name) + ' — pick a level</h2><div class="hint">' + (go.alone ? 'You play alone' + (g.k === 'memory' ? '' : ' against the 🤖') : 'Everyone votes · a tie = the easier level') + ' · ⭐ = good for you</div>' +
-      '<div class="lv">' + LV.map((l, i) => '<button class="lcard' + (mine === String(i) ? ' mine' : '') + (i === rec ? ' rec' : '') + '" data-l="' + i + '" data-sound="none"><span class="e">' + l[0] + '</span>' + l[1] + '<div class="votes">' + votesHtml((st.votes || {}).lvl, i) + '</div></button>').join('') + '</div>';
+      '<div class="lv">' + lvOf(g).map((l, i) => '<button class="lcard' + (mine === String(i) ? ' mine' : '') + (i === rec ? ' rec' : '') + '" data-l="' + i + '" data-sound="none"><span class="e">' + l[0] + '</span>' + l[1] + '<div class="votes">' + votesHtml((st.votes || {}).lvl, i) + '</div></button>').join('') + '</div>';
     el.querySelectorAll('[data-l]').forEach(b => { b.onclick = () => vote('lvl', b.dataset.l); });
+    return;
+  }
+  if(st.phase === 'sport' && playing){   /* 📺 st-2b: 🏓 pick a sport (alone = you pick) */
+    const mine = ((st.votes || {}).sport || {})[S.me] || S.mine['sport' + st.round + st.phase] || '';
+    el.innerHTML = '<h2>' + esc(g.icon + ' ' + g.name) + ' — pick a sport</h2><div class="hint">' + (go.alone ? 'You play alone against the 🤖' : 'Everyone votes · a tie = 🎲') + (go.lvl != null ? ' · ' + LV[go.lvl][0] + ' ' + LV[go.lvl][1] : '') + '</div>' +
+      '<div class="lv">' + SB_SPORTS.map(x => '<button class="lcard' + (mine === x[0] ? ' mine' : '') + '" data-sp="' + x[0] + '" data-sound="none"><span class="e">' + x[1] + '</span>' + x[2] + '<small>' + x[3] + '</small><div class="votes">' + votesHtml((st.votes || {}).sport, x[0]) + '</div></button>').join('') + '</div>';
+    el.querySelectorAll('[data-sp]').forEach(b => { b.onclick = () => vote('sport', b.dataset.sp); });
     return;
   }
   if(!playing){
     el.innerHTML = '<div class="big"><span class="ic">👀</span><h2>' + esc(g.icon + ' ' + (g.name || 'A game')) + ' is on the TV</h2><div class="hint">You watch this one — you play next! 🎉</div></div>';
     return;
   }
-  el.innerHTML = '<div class="big"><span class="ic">' + (g.icon || '🎮') + '</span><h2>🔀 Going to ' + esc(g.name) + '…</h2><div class="hint">' + (go.room ? 'Joining the TV' : 'The TV is getting ready') + '<span class="lk-dots"></span></div></div>';
+  el.innerHTML = '<div class="big"><span class="ic">' + (g.icon || '🎮') + '</span><h2>🔀 Going to ' + esc(g.name) + '…</h2><div class="hint">' + (go.sport ? sportTxt(go).slice(3) + ' · ' : '') + (go.room ? 'Joining the TV' : 'The TV is getting ready') + '<span class="lk-dots"></span></div></div>';
   if(go.room && (st.phase === 'go' || st.phase === 'play' || st.phase === 'after') && !S.went){
     S.went = true; clearInterval(S.timer);
-    UI.go(WEBAPP_URL + '?page=' + go.page + '&link=' + go.room + '&st=' + S.code + qs(), go.game, '🔀 Joining ' + g.name);
+    UI.go(WEBAPP_URL + '?page=' + go.page + '&link=' + go.room + '&st=' + S.code + qs(), g.kind || go.game, '🔀 Joining ' + g.name);   /* 📺 st-2b: the game's own loader */
   }
 }
 $('b-leave').onclick = () => UI.confirm({icon: '👋', title: 'Leave the station?', body: 'You can join again with the number on the TV.', okText: 'Leave', cancelText: 'Stay'}).then(ok => {
@@ -414,4 +447,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (st-1+st-1b+st-2a+st-2a2) END OF Station.html -->
+<!-- (st-1+st-1b+st-2a+st-2a2+st-2b) END OF Station.html -->
