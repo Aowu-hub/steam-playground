@@ -1,0 +1,1018 @@
+
+const WEBAPP_URL = SP_TV[0];
+const CURRENT_PLAYER = SP_TV[1]; window.SP_PAGE = SP_TV[2];
+UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});   // loader + menus in the player's look before the server answers
+const SESSION_START = Number(SP_TV[3]) || null;
+const DURATION_MIN = Number(SP_TV[4]) || null;
+const GAME_ID = 'stacking-sim';
+// 🎛️ p1c: the shared top bar (UiKit UI.gameBar) — ◀ where you came from · 🎚️ Levels · 🏠 | 📦 Stack It! · level | numbers | game buttons ⏸ ❓ ⚙️
+const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '📦', name: 'Stack It!', levelId: 'hud-level',
+  levels: () => leavePlay(), playing: () => !!(G && !G.over), onLeave: () => { try{ speechSynthesis.cancel(); }catch(e){} },
+  extras: [{id: 'new-tower-btn', html: '🔄<span class="gt"> New tower</span>', label: 'New pieces', onClick: () => newTower(), keep: true}]});
+var NAV_INNER = {levels: ['◀ Stack It!', () => openCover()]};   // 🧱 b3w1: the setup's top button goes back to the 🎬 cover   // 🧭 inner screens: their top button goes to the main screen
+UI.navBar(document.getElementById('back-btn'), {onclick: false});
+
+/* ================= LEVELS & WORLDS ================= */
+// goal = fraction of the stackable height of all pieces you must reach.
+const LEVELS = [
+  {name:'Basic', emoji:'🧱', kinds:['rect','rect','square','hexagon'], need:[2,2], goal:0.42, platform:0.62, wobble:0, slide:0, wind:0, ice:0,
+   blurb:'Stack 2 pieces · rectangle, square, hexagon'},
+  {name:'Junior', emoji:'🏠', kinds:['rect','square','hexagon','trap','octagon','tri'], need:[3,3], goal:0.5, platform:0.55, wobble:0, slide:0, wind:0, ice:0,
+   blurb:'Stack 3 pieces · octagon, trapezoid, triangle'},
+  {name:'Intermediate', emoji:'🗼', kinds:['rect','square','square','para','octagon','hexagon','semicircle','pentagon','circle','cross'], need:[4,5], goal:0.56, platform:0.46, wobble:0, slide:0, wind:0, ice:0,
+   blurb:'Stack 4-5 pieces on a narrow base'},
+  {name:'Hard', emoji:'🌬️', kinds:['rect','rect','square','square','trap','hexagon','octagon','para','rhombus','star','kite'], need:[5,7], goal:0.56, platform:0.44, wobble:0.6, slide:0, wind:0.6, ice:0,
+   blurb:'Stack 5-7 pieces · wobbly base and wind'},
+  {name:'Extreme', emoji:'🌪️', kinds:['rect','rect','square','square','para','octagon','hexagon','trap','hexagon','heart','star','circle'], need:[6,8], goal:0.6, platform:0.42, wobble:0, slide:1, wind:0.75, ice:0.25,
+   blurb:'Stack 6-8 pieces · moving base, storm winds, ice!'},
+  {name:'Hardcore', emoji:'💀', kinds:['rect','square','para','octagon','hexagon','trap','heart','star','circle','kite','rhombus','cross'], need:[7,9], goal:0.62, platform:0.4, wobble:0.4, slide:1, wind:0.85, ice:0.3, hardcore:true,
+   blurb:'One fallen piece and it is over · ×3 points'}
+];
+const WORLDS = {
+  building:{name:'Buildings', icon:'🏗️', gear:['roof','chimney','hardhat','legs'], colors:['#C97B5D','#D9A94D','#8FA37E','#6E93A8','#B5856A']},
+  vehicle: {name:'Vehicles', icon:'🚗', gear:['wheels','headlight','exhaust'], colors:['#E07A5F','#3D85C6','#F2CC8F','#81B29A','#7A6C9D']},
+  animal:  {name:'Animals', icon:'🐘', gear:['ears','tail','legs'], colors:['#C9A27E','#E6B655','#A3C585','#9AAFC7','#D4927F']},
+  insect:  {name:'Bugs', icon:'🐝', gear:['wings','antennae','bugLegs'], colors:['#F4C542','#E5626B','#7DBB5E','#8FB3E8','#C68FE0']},
+  dino:    {name:'Dinos', icon:'🦕', gear:['spikes','dinoTail','claws'], colors:['#7BA05B','#C4A35A','#A0785A','#6B9AC4','#D98C5F']},
+  castle:  {name:'Castle', icon:'🏰', gear:['crown','flag','sword'], colors:['#8E7CC3','#D46A9F','#F2C879','#6FA8DC','#B48CD9']},
+  candy:   {name:'Candy', icon:'🍭', gear:['sprinkles','cherry','lollistick'], colors:['#FF8FAB','#F7A8C8','#7FD1CF','#FFC94D','#A99CF0']},
+  space:   {name:'Space', icon:'🚀', gear:['antenna','jet','helmet'], colors:['#5C6BC0','#26A69A','#FFB300','#AB47BC','#42A5F5']},
+  kitchen: {name:'Kitchen', icon:'🍳', gear:['chefhat','spoon','fork'], colors:['#F4A259','#E76F51','#F6D186','#90BE6D','#B5838D']},
+  school:  {name:'School', icon:'🎒', gear:['glasses','book','pencil'], colors:['#4D96FF','#FFD93D','#6BCB77','#FF6B6B','#9D84B7']}
+};
+// Gust strength (tuned with the test harness: a centred, careful tower survives it; a lopsided one doesn't).
+const WIND_FORCE = 0.00008;
+const STEP = 1000 / 60; // physics runs at a fixed 60 steps a second (uneven steps make springs jitter)
+const AGE_START = {'4-5':0, '6-7':1, '8-9':2, '10+':3};
+const AGE_RECOMMEND = {'4-5':0, '6-7':1, '8-9':2, '10+':3};
+
+/* ================= HELPERS ================= */
+const $ = id => document.getElementById(id);
+const pick = a => a[rnd(a.length)];
+const rr = (a, b) => a + Math.random() * (b - a);
+function shuffle(a){ for(let i = a.length - 1; i > 0; i--){ const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ================= SHAPES (each one has a name and a face) ================= */
+// Outline points are in a box from -0.5 to 0.5 (x right, y down) and are
+// stretched to the piece's width/height. Concave shapes (star, heart, cross,
+// arrow) collide as their convex outline but are DRAWN with the real outline.
+// stack:true = flat top and bottom, good for building up (sets the goal).
+function regular(n, startDeg){
+  const pts = [];
+  for(let k = 0; k < n; k++){ const a = (startDeg + k * 360 / n) * Math.PI / 180; pts.push([Math.cos(a), Math.sin(a)]); }
+  return fitBox(pts);
+}
+function fitBox(pts){ // scale any outline so it fills the -0.5..0.5 box exactly
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  return pts.map(p => [(p[0] - x0) / (x1 - x0) - 0.5, (p[1] - y0) / (y1 - y0) - 0.5]);
+}
+function arcPts(cx, cy, rx, ry, a0, a1, n){ const out = []; for(let k = 0; k <= n; k++){ const a = a0 + (a1 - a0) * k / n; out.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]); } return out; }
+const STAR_PTS = (() => { const pts = []; for(let k = 0; k < 10; k++){ const r = k % 2 ? 0.42 : 1, a = (-90 + k * 36) * Math.PI / 180; pts.push([r * Math.cos(a), r * Math.sin(a)]); } return fitBox(pts); })();
+const HEART_PTS = (() => { const pts = []; for(let k = 0; k < 40; k++){ const t = k / 40 * Math.PI * 2; pts.push([16 * Math.pow(Math.sin(t), 3), -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))]); } return fitBox(pts); })();
+const SHAPES = {
+  rect:      {name:'Rectangle',     sides:'4 sides, 2 long', stack:true,  w:[120,170], h:[38,52]},
+  square:    {name:'Square',        sides:'4 equal sides',   stack:true,  w:[56,72],   h:'w'},
+  hexagon:   {name:'Hexagon',       sides:'6 sides',         stack:true,  w:[72,92],   h:0.866, pts:regular(6, 0)},
+  octagon:   {name:'Octagon',       sides:'8 sides',         stack:true,  w:[66,84],   h:'w',   pts:regular(8, 22.5)},
+  trap:      {name:'Trapezoid',     sides:'4 sides, 1 pair parallel', stack:true, w:[100,140], h:[40,52], pts:[[-.5,.5],[.5,.5],[.32,-.5],[-.32,-.5]]},
+  para:      {name:'Parallelogram', sides:'4 sides, leaning', stack:true, w:[110,140], h:[40,50], pts:[[-.5,.5],[.28,.5],[.5,-.5],[-.28,-.5]]},
+  tri:       {name:'Triangle',      sides:'3 sides',         stack:false, w:[80,110],  h:[54,68], pts:[[-.5,.5],[.5,.5],[0,-.5]], face:[0,.18]},
+  pentagon:  {name:'Pentagon',      sides:'5 sides',         stack:false, w:[66,82],   h:0.95,  pts:regular(5, -90), face:[0,.06]},
+  semicircle:{name:'Semicircle',    sides:'half a circle',   stack:false, w:[84,104],  h:0.5,   pts:fitBox(arcPts(0, 0, 1, 1, Math.PI, 2 * Math.PI, 18)), face:[0,.15]},
+  rhombus:   {name:'Rhombus',       sides:'4 equal sides, tipped', stack:false, w:[84,100], h:0.68, pts:[[0,-.5],[.5,0],[0,.5],[-.5,0]]},
+  kite:      {name:'Kite',          sides:'4 sides',         stack:false, w:[64,80],   h:[86,100], pts:[[0,-.5],[.5,-.14],[0,.5],[-.5,-.14]], face:[0,-.12]},
+  circle:    {name:'Circle',        sides:'round, no corners', stack:false, w:[48,62], h:'w', round:true},
+  oval:      {name:'Oval',          sides:'a stretched circle', stack:false, w:[72,88], h:0.62, pts:fitBox(arcPts(0, 0, 1, 1, 0, 2 * Math.PI, 24).slice(0, 24))},
+  star:      {name:'Star',          sides:'5 points',        stack:false, w:[66,82],   h:0.95,  pts:STAR_PTS, face:[0,.08], concave:true},
+  heart:     {name:'Heart',         sides:'a love shape',    stack:false, w:[64,78],   h:0.9,   pts:HEART_PTS, face:[0,-.04], concave:true},
+  cross:     {name:'Cross',         sides:'12 sides',        stack:false, w:[66,82],   h:'w',   pts:[[-.17,-.5],[.17,-.5],[.17,-.17],[.5,-.17],[.5,.17],[.17,.17],[.17,.5],[-.17,.5],[-.17,.17],[-.5,.17],[-.5,-.17],[-.17,-.17]], concave:true, small:true},
+  arrow:     {name:'Arrow',         sides:'points the way',  stack:false, w:[60,72],   h:[86,100], pts:[[0,-.5],[.5,-.02],[.18,-.02],[.18,.5],[-.18,.5],[-.18,-.02],[-.5,-.02]], face:[0,-.1], concave:true, small:true}
+};
+function outlineOf(kind){
+  const S = SHAPES[kind];
+  if(S.pts) return S.pts;
+  return [[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]];
+}
+function hullOf(pts){ // convex outline (monotone chain), used for the physics body
+  const P = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  P.forEach(p => { while(lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); });
+  P.slice().reverse().forEach(p => { while(up.length >= 2 && cross(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); });
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+
+/* ================= WORLD GEAR (ears, wings, wheels, spoons...) ================= */
+// Each piece wears 2 little things from its world, drawn BEHIND the body so
+// a piece stacked on top simply hides ears/hats (it looks tucked in).
+// Gear is decoration only — it never changes the physics.
+// Geometry helpers: where the outline's top/bottom/left/right edge is.
+function shapePts(p){
+  const S = SHAPES[p.kind];
+  if(S.round){ const pts = []; for(let k = 0; k < 24; k++){ const a = k / 24 * Math.PI * 2; pts.push([0.5 * Math.cos(a), 0.5 * Math.sin(a)]); } return pts; }
+  return outlineOf(p.kind);
+}
+function edgeAt(pts, v, axis, wantMin){ // axis 'x': y of the top/bottom edge at x = v (box units)
+  let best = null;
+  for(let i = 0; i < pts.length; i++){
+    const a = pts[i], b = pts[(i + 1) % pts.length];
+    const [a0, a1, b0, b1] = axis === 'x' ? [a[0], a[1], b[0], b[1]] : [a[1], a[0], b[1], b[0]];
+    if((v < Math.min(a0, b0)) || (v > Math.max(a0, b0)) || a0 === b0) continue;
+    const t = (v - a0) / (b0 - a0), y = a1 + (b1 - a1) * t;
+    if(best === null || (wantMin ? y < best : y > best)) best = y;
+  }
+  return best === null ? (wantMin ? -0.5 : 0.5) : best;
+}
+function topAt(p, xf){ return edgeAt(shapePts(p), xf, 'x', true); }
+function botAt(p, xf){ return edgeAt(shapePts(p), xf, 'x', false); }
+function leftAt(p, yf){ return edgeAt(shapePts(p), yf, 'y', true); }
+function rightAt(p, yf){ return edgeAt(shapePts(p), yf, 'y', false); }
+
+// Emoji come from a small picture cache (typing a colour emoji every frame lags, above all on iPhone / iPad) — same idea as AvatarKit g_emoSprite
+function g_emoSprite(ch, px){
+  const q = Math.min(256, Math.max(12, Math.ceil(px / 12) * 12)), key = ch + '|' + q; let c = EMO_CACHE.get(key);
+  if(!c){ if(EMO_CACHE.size > 600) EMO_CACHE.clear(); c = document.createElement('canvas'); c.width = c.height = Math.ceil(q * 1.4); const x = c.getContext('2d'); x.fillStyle = '#000'; x.font = q + 'px ' + EMOJI_FONT; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(ch, c.width / 2, c.height / 2 + q * 0.05); c.q = q; EMO_CACHE.set(key, c); }
+  return c;
+}
+function emoDraw(g, ch, x, y, size, alpha){ if(!ch || !(size > 0.5)) return; const m = g.getTransform ? g.getTransform() : null, sc = m ? Math.hypot(m.a, m.b) || 1 : 1, sp = g_emoSprite(ch, size * sc), d = sp.width * size / sp.q; const a0 = g.globalAlpha; g.globalAlpha = alpha == null ? 1 : alpha; g.drawImage(sp, x - d / 2, y - d / 2, d, d); g.globalAlpha = a0; }
+function gearEmoji(g, ch, x, y, size, rot){
+  g.save(); g.translate(x, y); if(rot) g.rotate(rot);
+  emoDraw(g, ch, 0, 0, size * 1.3, g.globalAlpha); g.restore();
+}
+function arm(g, x, y, side, len, lw, col){ // little bendy arm from the side, returns the hand point
+  const hx = x + side * len, hy = y - len * 0.35;
+  g.strokeStyle = col; g.lineWidth = lw; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + side * len * 0.6, y + len * 0.25, hx, hy); g.stroke();
+  return [hx, hy];
+}
+const GEAR = {
+  // ---- animals ----
+  ears(g, p, w, h, t){
+    const c = shadeColor(p.color, -0.18);
+    [-1, 1].forEach(s => { const x = s * 0.24 * w, y = topAt(p, s * 0.24) * h; g.fillStyle = c; g.beginPath(); g.arc(x, y, Math.min(w, h) * 0.15, 0, 7); g.fill(); g.fillStyle = 'rgba(255,170,180,0.8)'; g.beginPath(); g.arc(x, y, Math.min(w, h) * 0.08, 0, 7); g.fill(); });
+  },
+  tail(g, p, w, h, t){
+    const s = Math.min(w, h), x = rightAt(p, 0.15) * w, y = 0.15 * h, wag = Math.sin(t / 220) * 0.4;
+    g.strokeStyle = shadeColor(p.color, -0.25); g.lineWidth = s * 0.07; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x - s * 0.05, y); g.bezierCurveTo(x + s * 0.25, y - s * (0.05 + wag * 0.3), x + s * 0.2, y - s * (0.35 + wag * 0.2), x + s * 0.32, y - s * 0.38); g.stroke();
+  },
+  legs(g, p, w, h){
+    const s = Math.min(w, h); g.fillStyle = shadeColor(p.color, -0.3);
+    [-0.3, -0.12, 0.12, 0.3].forEach(xf => { const y = botAt(p, xf) * h; g.beginPath(); g.ellipse(xf * w, y + s * 0.02, s * 0.07, s * 0.12, 0, 0, 7); g.fill(); });
+  },
+  // ---- bugs ----
+  wings(g, p, w, h, t){
+    const flap = 0.75 + Math.abs(Math.sin(t / 90)) * 0.25, s = Math.min(w, h);
+    [-1, 1].forEach(sd => { const x = (sd < 0 ? leftAt(p, -0.15) : rightAt(p, -0.15)) * w, y = -0.15 * h;
+      g.fillStyle = 'rgba(210,240,255,0.75)'; g.strokeStyle = 'rgba(90,140,180,0.7)'; g.lineWidth = Math.max(1, s * 0.02);
+      g.save(); g.translate(x, y); g.scale(1, flap); g.rotate(sd * -0.5);
+      g.beginPath(); g.ellipse(sd * s * 0.22, -s * 0.12, s * 0.26, s * 0.15, 0, 0, 7); g.fill(); g.stroke(); g.restore(); });
+  },
+  antennae(g, p, w, h, t){
+    const s = Math.min(w, h), wob = Math.sin(t / 300) * s * 0.04;
+    [-1, 1].forEach(sd => { const x = sd * 0.12 * w, y = topAt(p, sd * 0.12) * h;
+      g.strokeStyle = '#3B2A2A'; g.lineWidth = Math.max(1.2, s * 0.03); g.beginPath(); g.moveTo(x, y + s * 0.04); g.quadraticCurveTo(x + sd * s * 0.12, y - s * 0.2, x + sd * s * 0.18 + wob, y - s * 0.32); g.stroke();
+      g.fillStyle = '#3B2A2A'; g.beginPath(); g.arc(x + sd * s * 0.18 + wob, y - s * 0.32, s * 0.045, 0, 7); g.fill(); });
+  },
+  bugLegs(g, p, w, h, t){
+    const s = Math.min(w, h); g.strokeStyle = '#3B2A2A'; g.lineWidth = Math.max(1.2, s * 0.025);
+    [-0.25, 0, 0.25].forEach((xf, k) => { const y = botAt(p, xf) * h, kick = Math.sin(t / 150 + k) * s * 0.03; g.beginPath(); g.moveTo(xf * w, y - s * 0.03); g.lineTo(xf * w - s * 0.06 + kick, y + s * 0.12); g.stroke(); });
+  },
+  // ---- vehicles ----
+  wheels(g, p, w, h, t){
+    const s = Math.min(w, h), r = s * 0.15;
+    [-0.3, 0.3].forEach(xf => { const x = xf * w, y = botAt(p, xf) * h; g.fillStyle = '#2F2F35'; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.fillStyle = '#C9CED6'; g.beginPath(); g.arc(x, y, r * 0.45, 0, 7); g.fill(); });
+  },
+  headlight(g, p, w, h, t){
+    const s = Math.min(w, h), x = rightAt(p, 0.1) * w, y = 0.1 * h;
+    g.fillStyle = 'rgba(255,240,150,0.35)'; g.beginPath(); g.moveTo(x, y); g.lineTo(x + s * 0.4, y - s * 0.15); g.lineTo(x + s * 0.4, y + s * 0.15); g.closePath(); g.fill();
+    g.fillStyle = '#FFE66D'; g.beginPath(); g.arc(x, y, s * 0.07, 0, 7); g.fill();
+  },
+  exhaust(g, p, w, h, t){
+    const s = Math.min(w, h), x = leftAt(p, 0.25) * w, y = 0.25 * h;
+    for(let k = 0; k < 3; k++){ const ph = ((t / 600) + k / 3) % 1; g.fillStyle = 'rgba(160,160,170,' + (0.5 * (1 - ph)) + ')'; g.beginPath(); g.arc(x - s * (0.1 + ph * 0.35), y - ph * s * 0.15, s * (0.05 + ph * 0.08), 0, 7); g.fill(); }
+  },
+  // ---- buildings ----
+  roof(g, p, w, h){
+    const s = Math.min(w, h), y = topAt(p, 0) * h; g.fillStyle = '#B5473E';
+    g.beginPath(); g.moveTo(-s * 0.32, y + s * 0.04); g.lineTo(0, y - s * 0.3); g.lineTo(s * 0.32, y + s * 0.04); g.closePath(); g.fill();
+  },
+  chimney(g, p, w, h, t){
+    const s = Math.min(w, h), x = 0.28 * w, y = topAt(p, 0.28) * h;
+    g.fillStyle = '#8D5A44'; g.fillRect(x - s * 0.06, y - s * 0.2, s * 0.12, s * 0.24);
+    const ph = (t / 900) % 1; g.fillStyle = 'rgba(170,170,180,' + (0.6 * (1 - ph)) + ')'; g.beginPath(); g.arc(x + ph * s * 0.1, y - s * (0.28 + ph * 0.3), s * (0.06 + ph * 0.06), 0, 7); g.fill();
+  },
+  hardhat(g, p, w, h){ gearEmoji(g, '⛑️', 0, topAt(p, 0) * h - Math.min(w, h) * 0.08, Math.min(w, h) * 0.38); },
+  // ---- dinos ----
+  spikes(g, p, w, h){
+    const s = Math.min(w, h); g.fillStyle = '#5E8C3A';
+    [-0.25, -0.08, 0.09, 0.26].forEach(xf => { const x = xf * w, y = topAt(p, xf) * h; g.beginPath(); g.moveTo(x - s * 0.07, y + s * 0.03); g.lineTo(x, y - s * 0.16); g.lineTo(x + s * 0.07, y + s * 0.03); g.closePath(); g.fill(); });
+  },
+  dinoTail(g, p, w, h, t){
+    const s = Math.min(w, h), x = leftAt(p, 0.25) * w, y = 0.25 * h, wag = Math.sin(t / 260) * s * 0.06;
+    g.fillStyle = shadeColor(p.color, -0.2); g.beginPath(); g.moveTo(x + s * 0.05, y - s * 0.12); g.quadraticCurveTo(x - s * 0.2, y - s * 0.05 + wag, x - s * 0.42, y + wag); g.quadraticCurveTo(x - s * 0.2, y + s * 0.08, x + s * 0.05, y + s * 0.1); g.closePath(); g.fill();
+  },
+  claws(g, p, w, h){ const s = Math.min(w, h); g.fillStyle = '#F4F1E8'; [-0.25, 0.25].forEach(xf => { const y = botAt(p, xf) * h; for(let k = -1; k <= 1; k++){ g.beginPath(); g.moveTo(xf * w + k * s * 0.05 - s * 0.02, y - s * 0.02); g.lineTo(xf * w + k * s * 0.05, y + s * 0.08); g.lineTo(xf * w + k * s * 0.05 + s * 0.02, y - s * 0.02); g.fill(); } }); },
+  // ---- castle ----
+  crown(g, p, w, h){ gearEmoji(g, '👑', 0, topAt(p, 0) * h - Math.min(w, h) * 0.1, Math.min(w, h) * 0.36); },
+  flag(g, p, w, h, t){
+    const s = Math.min(w, h), x = 0.3 * w, y = topAt(p, 0.3) * h;
+    g.strokeStyle = '#5B4636'; g.lineWidth = Math.max(1.5, s * 0.03); g.beginPath(); g.moveTo(x, y + s * 0.03); g.lineTo(x, y - s * 0.42); g.stroke();
+    const f = Math.sin(t / 180) * s * 0.03; g.fillStyle = '#E0679F';
+    g.beginPath(); g.moveTo(x, y - s * 0.42); g.quadraticCurveTo(x + s * 0.12, y - s * 0.38 + f, x + s * 0.24, y - s * 0.34); g.lineTo(x, y - s * 0.26); g.closePath(); g.fill();
+  },
+  sword(g, p, w, h){ const s = Math.min(w, h), [hx, hy] = arm(g, rightAt(p, 0.05) * w, 0.05 * h, 1, s * 0.22, Math.max(2, s * 0.04), shadeColor(p.color, -0.3)); gearEmoji(g, '🗡️', hx + s * 0.06, hy - s * 0.06, s * 0.3, -0.7); },
+  // ---- candy ----
+  sprinkles(g, p, w, h){ /* drawn on top of the body, see GEAR_FRONT */ },
+  cherry(g, p, w, h){ gearEmoji(g, '🍒', 0.12 * w, topAt(p, 0.12) * h - Math.min(w, h) * 0.12, Math.min(w, h) * 0.32); },
+  lollistick(g, p, w, h){ const s = Math.min(w, h), y = botAt(p, 0) * h; g.fillStyle = '#FFFFFF'; g.strokeStyle = 'rgba(0,0,0,0.15)'; g.lineWidth = 1; g.fillRect(-s * 0.035, y - s * 0.05, s * 0.07, s * 0.32); g.strokeRect(-s * 0.035, y - s * 0.05, s * 0.07, s * 0.32); },
+  // ---- space ----
+  antenna(g, p, w, h, t){
+    const s = Math.min(w, h), y = topAt(p, 0) * h, blink = Math.floor(t / 400) % 2;
+    g.strokeStyle = '#9AA3B5'; g.lineWidth = Math.max(1.5, s * 0.03); g.beginPath(); g.moveTo(0, y + s * 0.03); g.lineTo(0, y - s * 0.24); g.stroke();
+    g.fillStyle = blink ? '#FF5C8A' : '#FFD166'; g.beginPath(); g.arc(0, y - s * 0.27, s * 0.06, 0, 7); g.fill();
+  },
+  jet(g, p, w, h, t){
+    const s = Math.min(w, h); [-0.2, 0.2].forEach(xf => { const y = botAt(p, xf) * h, fl = 0.8 + Math.random() * 0.4;
+      g.fillStyle = '#7E8AA8'; g.fillRect(xf * w - s * 0.06, y - s * 0.04, s * 0.12, s * 0.08);
+      g.fillStyle = 'rgba(255,150,40,0.85)'; g.beginPath(); g.moveTo(xf * w - s * 0.05, y + s * 0.04); g.lineTo(xf * w, y + s * 0.2 * fl); g.lineTo(xf * w + s * 0.05, y + s * 0.04); g.closePath(); g.fill(); });
+  },
+  helmet(g, p, w, h){ /* front: glass bubble round the face, see GEAR_FRONT */ },
+  // ---- kitchen ----
+  chefhat(g, p, w, h){
+    const s = Math.min(w, h), y = topAt(p, 0) * h; g.fillStyle = '#FFFFFF'; g.strokeStyle = 'rgba(0,0,0,0.15)'; g.lineWidth = 1;
+    g.fillRect(-s * 0.18, y - s * 0.14, s * 0.36, s * 0.14); g.strokeRect(-s * 0.18, y - s * 0.14, s * 0.36, s * 0.14);
+    [[-0.12, -0.24], [0.12, -0.24], [0, -0.3]].forEach(([dx, dy]) => { g.beginPath(); g.arc(dx * s, y + dy * s, s * 0.13, 0, 7); g.fill(); g.stroke(); });
+  },
+  spoon(g, p, w, h, t){ const s = Math.min(w, h), [hx, hy] = arm(g, rightAt(p, 0.05) * w, 0.05 * h, 1, s * 0.22, Math.max(2, s * 0.04), shadeColor(p.color, -0.3)); gearEmoji(g, '🥄', hx + s * 0.05, hy - s * 0.08, s * 0.3, -0.5 + Math.sin(t / 300) * 0.15); },
+  fork(g, p, w, h, t){ const s = Math.min(w, h), [hx, hy] = arm(g, leftAt(p, 0.05) * w, 0.05 * h, -1, s * 0.22, Math.max(2, s * 0.04), shadeColor(p.color, -0.3)); gearEmoji(g, '🍴', hx - s * 0.05, hy - s * 0.08, s * 0.3, 0.4); },
+  // ---- school ----
+  glasses(g, p, w, h){ /* front: round glasses on the eyes, see GEAR_FRONT */ },
+  book(g, p, w, h){ const s = Math.min(w, h), [hx, hy] = arm(g, rightAt(p, 0.1) * w, 0.1 * h, 1, s * 0.2, Math.max(2, s * 0.04), shadeColor(p.color, -0.3)); gearEmoji(g, '📚', hx + s * 0.08, hy - s * 0.04, s * 0.32); },
+  pencil(g, p, w, h){ const s = Math.min(w, h), [hx, hy] = arm(g, leftAt(p, 0.1) * w, 0.1 * h, -1, s * 0.2, Math.max(2, s * 0.04), shadeColor(p.color, -0.3)); gearEmoji(g, '✏️', hx - s * 0.06, hy - s * 0.06, s * 0.3, -0.3); }
+};
+// Gear that sits ON the body (drawn after it): sprinkles, space helmet glass, glasses.
+const GEAR_FRONT = {
+  sprinkles(g, p, w, h){
+    const s = Math.min(w, h), cols = ['#FF5C8A','#FFD166','#06D6A0','#4CC9F0','#FFFFFF'];
+    let seed = p.id * 97 + 13; const R = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+    g.save(); g_shapePath(g, p, w, h); g.clip();
+    for(let k = 0; k < 14; k++){ const x = (R() - 0.5) * w * 0.9, y = (R() - 0.5) * h * 0.9; g.save(); g.translate(x, y); g.rotate(R() * 3); g.fillStyle = cols[k % cols.length]; g.fillRect(-s * 0.04, -s * 0.012, s * 0.08, s * 0.024); g.restore(); }
+    g.restore();
+  },
+  helmet(g, p, w, h, t, face){
+    const r = face.s * 0.75; g.strokeStyle = 'rgba(200,230,255,0.9)'; g.lineWidth = Math.max(1.5, r * 0.08);
+    g.fillStyle = 'rgba(200,230,255,0.18)'; g.beginPath(); g.arc(face.x, face.y + face.s * 0.1, r, 0, 7); g.fill(); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,0.6)'; g.beginPath(); g.ellipse(face.x - r * 0.4, face.y - r * 0.35, r * 0.18, r * 0.1, -0.6, 0, 7); g.fill();
+  },
+  glasses(g, p, w, h, t, face){
+    const er = face.s * 0.24; g.strokeStyle = '#2B2B2B'; g.lineWidth = Math.max(1.5, er * 0.22);
+    [-1, 1].forEach(sd => { g.beginPath(); g.arc(face.x + sd * face.s * 0.32, face.ey, er, 0, 7); g.stroke(); });
+    g.beginPath(); g.moveTo(face.x - face.s * 0.32 + er, face.ey); g.lineTo(face.x + face.s * 0.32 - er, face.ey); g.stroke();
+  }
+};
+// Two pieces of gear per piece, picked from the world's list (always different).
+function pickGear(worldKey){ const list = (WORLDS[worldKey].gear || []).slice(); return shuffle(list).slice(0, 2); }
+function drawGear(g, p, w, h, t){ (p.gear || []).forEach(k => { if(GEAR[k]) { g.save(); GEAR[k](g, p, w, h, t || 0); g.restore(); } }); }
+function drawGearFront(g, p, w, h, t, face){ (p.gear || []).forEach(k => { if(GEAR_FRONT[k]) { g.save(); GEAR_FRONT[k](g, p, w, h, t || 0, face); g.restore(); } }); }
+
+/* ================= PIECE SETS (random each time) ================= */
+// Sizes are in "units": 1 unit = 1/600 of the play area's short side, so
+// a tower feels the same on a phone and on a big screen.
+function makePieceSet(lvlIdx, worldKey){
+  const L = LEVELS[lvlIdx], W = WORLDS[worldKey];
+  const kinds = shuffle(L.kinds.slice());
+  // The first piece on the shelf is always a sturdy base block.
+  const baseAt = kinds.indexOf('rect'); if(baseAt > 0){ [kinds[0], kinds[baseAt]] = [kinds[baseAt], kinds[0]]; }
+  const colors = shuffle(W.colors.slice());
+  return kinds.map((k, i) => {
+    const S = SHAPES[k];
+    const p = {id: i, kind: k, name: S.name, color: colors[i % colors.length], rot: 0, ice: Math.random() < L.ice && !S.round, blink: Math.random() * 4000, gear: pickGear(worldKey)};
+    p.w = Math.round(rr(S.w[0], S.w[1]) - (k === 'rect' ? lvlIdx * 6 : 0));
+    p.h = S.h === 'w' ? p.w : Array.isArray(S.h) ? Math.round(rr(S.h[0], S.h[1])) : Math.round(p.w * S.h);
+    return p;
+  });
+}
+// The goal needs about N pieces: higher than the N-1 tallest flat pieces put
+// together, but reachable with the N tallest. (A pointy piece on top counts too.)
+function goalHeight(lvlIdx, pieces, need){
+  const hs = pieces.filter(p => SHAPES[p.kind].stack).map(p => p.h).sort((a, b) => b - a);
+  const n = Math.max(1, Math.min(need, hs.length));
+  let sum = 0; for(let k = 0; k < n - 1; k++) sum += hs[k];
+  return Math.round(sum + hs[n - 1] * 0.6);
+}
+
+/* ================= STATE ================= */
+let S = {players: [], progress: {}, settings: {}, avatars: {}, player: '', age: ''};
+let G = null;
+let lockHandle = null;
+const M = window.Matter || {};
+const {Engine, Bodies, Body, Composite, Constraint, Events} = M;
+
+/* ================= PHYSICS WORLD ================= */
+const cv = $('cv'), ctx = cv.getContext('2d');
+let PW = 0, PH = 0, DPR = 1, U = 1; // play area (CSS px), pixel ratio, px per unit
+function measure(){
+  const st = $('stage');
+  PW = st.clientWidth; PH = st.clientHeight;
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = Math.round(PW * DPR); cv.height = Math.round(PH * DPR);
+  // Narrow (phone) stages get bigger pieces: width counts as 480 units instead of 600.
+  U = Math.min(PW / 480, PH * 0.95 / 600);
+}
+function startGame(lvlIdx, worldKey, keepPieces){ setTimeout(cheerMount, 0); /* 📣 cs-4c */
+  if(StackCover) StackCover.hide();   /* 🧱 b3w1 */
+  if(worldKey === 'surprise') worldKey = pick(Object.keys(WORLDS));
+  const L = LEVELS[lvlIdx];
+  if(G){ cancelAnimationFrame(G.raf); G.over = true; if(G.engine){ Composite.clear(G.engine.world, false); Engine.clear(G.engine); } }
+  hideResult(); clearTimeout(showResult.t); $('praise').classList.add('hidden');
+  showScreen('play');
+  BAR.level(L.emoji + ' ' + L.name, L.hardcore ? 'hc' : ''); BAR.lives(L.hardcore ? 1 : 3); BAR.meter('goal', '🏁', 0, 'How high the tower is — reach the 🏁');
+  BAR.fit();   // 🎛️ p1c: every slot exists + bar height final BEFORE the physics world is measured
+  measure();
+  const pieces = keepPieces || makePieceSet(lvlIdx, worldKey);
+  const engine = Engine.create();
+  engine.gravity.y = 1;
+  engine.positionIterations = 10; engine.velocityIterations = 8;
+  const world = engine.world;
+  const platW = PW * L.platform, platH = 18 * U, platY = PH - 34 * U;
+  let platform;
+  const anchors = [];
+  if(L.wobble){
+    // A see-saw base: pinned in the middle, held level by soft springs.
+    platform = Bodies.rectangle(PW / 2, platY, platW, platH, {friction: 1, frictionStatic: 2, density: 0.004, frictionAir: 0.04, label: 'platform', chamfer: {radius: 6 * U}});
+    const k = 0.012 * (1 - L.wobble) + 0.0025;
+    anchors.push(
+      Constraint.create({pointA: {x: PW / 2, y: platY}, bodyB: platform, pointB: {x: 0, y: 0}, stiffness: 1, length: 0}),
+      Constraint.create({pointA: {x: PW / 2 - platW / 2, y: platY + 60 * U}, bodyB: platform, pointB: {x: -platW / 2, y: 0}, stiffness: k, damping: 0.08}),
+      Constraint.create({pointA: {x: PW / 2 + platW / 2, y: platY + 60 * U}, bodyB: platform, pointB: {x: platW / 2, y: 0}, stiffness: k, damping: 0.08})
+    );
+  } else {
+    platform = Bodies.rectangle(PW / 2, platY, platW, platH, {isStatic: true, friction: 1, frictionStatic: 2, label: 'platform', chamfer: {radius: 6 * U}});
+  }
+  Composite.add(world, [platform].concat(anchors));
+  // How many pieces this tower needs (kept when retrying the same tower).
+  let need = keepPieces && G && G.need ? G.need : L.need[0] + rnd(L.need[1] - L.need[0] + 1);
+  const room = (platY - platH / 2 - 70 * U) / U; // never above the top of the stage
+  while(need > 2 && goalHeight(lvlIdx, pieces, need) > room) need--;
+  const goalPx = Math.min(goalHeight(lvlIdx, pieces, need), room) * U;
+  G = {
+    need, lvlIdx, worldKey, L, pieces: pieces.map(p => Object.assign({}, p, {used: false})), engine, world, platform, anchors, platW, platY, platH,
+    goalY: platY - platH / 2 - goalPx, bodies: [], hearts: L.hardcore ? 1 : 3, lost: 0, held: null, ghost: null, lastDrop: 0,
+    t0: performance.now(), over: false, paused: false, steadySince: 0, wind: 0, nextWind: 0, windUntil: 0, slideT: 0, lastT: 0, raf: 0
+  };
+  G.nextWind = performance.now() + 6000 + Math.random() * 3000;
+  Events.on(engine, 'collisionStart', ev => {
+    let hard = false;
+    ev.pairs.forEach(pr => { if(Math.abs(pr.bodyA.velocity.y - pr.bodyB.velocity.y) + Math.abs(pr.bodyA.velocity.x - pr.bodyB.velocity.x) > 2.2) hard = true; });
+    if(hard) UISound.play('drop');
+  });
+  BAR.level(L.emoji + ' ' + L.name, L.hardcore ? 'hc' : '');
+  renderShelf(); updateHud();
+  showBanner('Stack ' + need + ' pieces up to the 🏁!');
+  G.lastT = performance.now();
+  G.raf = requestAnimationFrame(loop);
+}
+function newTower(){ if(G) startGame(G.lvlIdx, G.worldKey); }
+function retrySame(){ if(G) startGame(G.lvlIdx, G.worldKey, G.pieces.map(p => Object.assign({}, p, {used: false}))); }
+function leavePlay(){ if(G){ cancelAnimationFrame(G.raf); G.over = true; } showScreen('levels'); renderLevels(); }
+
+function bodyFor(p, x, y){
+  const w = p.w * U, h = p.h * U, S = SHAPES[p.kind];
+  const opts = {friction: p.ice ? 0.04 : 0.9, frictionStatic: p.ice ? 0.1 : 1.2, restitution: 0.02, density: 0.0016};
+  let b;
+  if(S.round) b = Bodies.circle(x, y, w / 2, {friction: 0.6, frictionStatic: 0.8, density: 0.0016, restitution: 0.05});
+  else if(!S.pts) b = Bodies.rectangle(x, y, w, h, Object.assign({chamfer: {radius: 4 * U}}, opts));
+  else {
+    const hull = hullOf(S.pts).map(q => ({x: q[0] * w, y: q[1] * h}));
+    b = Bodies.fromVertices(x, y, [hull], opts);
+    // fromVertices centres the body on the hull's centre of mass: remember the
+    // offset so the real (maybe concave) outline is drawn in the right place.
+    const c = M.Vertices.centre(hull);
+    b.drawOff = {x: c.x, y: c.y};
+  }
+  b.drawOff = b.drawOff || {x: 0, y: 0};
+  if(p.rot) Body.setAngle(b, p.rot * Math.PI / 2);
+  b.piece = p;
+  return b;
+}
+function pieceHalfH(p){ return ((p.rot % 2) ? p.w : p.h) * U / 2; }
+function pieceHalfW(p){ return ((p.rot % 2) ? p.h : p.w) * U / 2; }
+
+/* ================= LOOP ================= */
+function loop(now){
+  if(!G || G.over) return;
+  const dt = Math.min(33, now - G.lastT); G.lastT = now;
+  if(!G.paused){
+    const L = G.L;
+    if(L.slide){
+      // Extreme: the base glides gently side to side.
+      G.slideT += dt / 1000;
+      const nx = PW / 2 + Math.sin(G.slideT * 0.55) * PW * 0.07;
+      const vx = nx - G.platform.position.x;
+      if(G.platform.isStatic){ Body.setVelocity(G.platform, {x: vx, y: 0}); Body.setPosition(G.platform, {x: nx, y: G.platform.position.y}); }
+      else G.anchors.forEach(c => { c.pointA.x += vx; });
+    }
+    // No new gust once the tower is counting down at the goal (reward for getting there).
+    // A warning comes first, so you can stop and let the tower settle.
+    if(L.wind && !G.windUntil && !G.steadySince && !G.warned && now >= G.nextWind - 1600){
+      G.warned = true; G.windDir = Math.random() < 0.5 ? -1 : 1;
+      showBanner(L.wind >= 0.75 ? '🌪️ Storm coming ' + (G.windDir > 0 ? '→' : '←') + ' get ready!' : '💨 Wind coming ' + (G.windDir > 0 ? '→' : '←'));
+    }
+    if(L.wind && now >= G.nextWind && !G.windUntil && !G.steadySince){
+      G.wind = (G.windDir || 1) * L.wind; G.warned = false;
+      G.windUntil = now + 2200;
+      showBanner(L.wind >= 0.75 ? (G.wind > 0 ? '🌪️ STORM → hold on!' : '🌪️ ← STORM, hold on!') : (G.wind > 0 ? '💨 Wind blowing → hold on!' : '💨 ← Wind blowing, hold on!'));
+      UISound.play('whoosh');
+    }
+    if(G.windUntil && now > G.windUntil){ G.windUntil = 0; G.wind = 0; G.nextWind = now + 6000 + Math.random() * 4000; }
+    G.acc = (G.acc || 0) + dt;
+    let steps = 0;
+    while(G.acc >= STEP && steps < 3){
+      if(G.windUntil) G.bodies.forEach(b => Body.applyForce(b, b.position, {x: G.wind * WIND_FORCE * b.mass * U, y: 0}));
+      Engine.update(G.engine, STEP);
+      G.acc -= STEP; steps++;
+    }
+    if(steps === 3) G.acc = 0;
+    checkFalls(now);
+    if(!G.over) checkGoal(now);
+  }
+  if(!G.over) draw(now);
+  if(!G.over) G.raf = requestAnimationFrame(loop);
+}
+function checkFalls(now){
+  for(let i = G.bodies.length - 1; i >= 0; i--){
+    const b = G.bodies[i];
+    if(b.position.y > PH + 60 * U || b.position.x < -80 * U || b.position.x > PW + 80 * U){
+      Composite.remove(G.world, b); G.bodies.splice(i, 1);
+      G.hearts--; G.lost++; cheerSay('miss', 'fell'); /* 📣 cs-4c */
+      UISound.play('error');
+      if(!REDUCED) shakeStage();
+      updateHud();
+      if(G.hearts <= 0){ endFail(G.L.hardcore ? '💀 A piece fell!' : 'Oops, too many pieces fell!'); return; }
+      showBanner('💔 A piece fell off! ' + G.hearts + ' heart' + (G.hearts === 1 ? '' : 's') + ' left');
+    }
+  }
+  // Out of pieces and not tall enough once everything has settled.
+  if(!G.held && G.pieces.every(p => p.used) && settled() && towerTop() > G.goalY + 1 && now - G.lastDrop > 2500){
+    endFail('Out of pieces before the 🏁 line');
+  }
+}
+// "Still" means not moving compared with the base (on Extreme the base itself glides).
+function settled(){
+  const pv = G.platform.velocity;
+  const pa = G.platform.angularVelocity || 0;
+  // Measured relative to the base, so a gently rocking see-saw still counts as "still".
+  return G.bodies.every(b => Math.hypot(b.velocity.x - pv.x, b.velocity.y - pv.y) < 0.3 && Math.abs(b.angularVelocity - pa) < 0.02);
+}
+function towerTop(){
+  let top = G.platY - G.platH / 2;
+  const pv = G.platform.velocity;
+  G.bodies.forEach(b => { if(Math.hypot(b.velocity.x - pv.x, b.velocity.y - pv.y) < 1.5) b.vertices.forEach(v => { if(v.y < top) top = v.y; }); });
+  return top;
+}
+function checkGoal(now){
+  const reached = !G.held && G.bodies.length && towerTop() <= G.goalY && settled() && !G.windUntil;
+  const box = $('steady');
+  if(reached){
+    if(!G.steadySince){ G.steadySince = now; G.cdN = 0; cheerSay('close', 'steady'); /* 📣 cs-4c */ }
+    const p = Math.min(1, (now - G.steadySince) / 3000);
+    box.classList.remove('hidden');
+    box.style.setProperty('--p', Math.round(p * 100));
+    const n = Math.max(1, 3 - Math.floor((now - G.steadySince) / 1000));
+    if(n !== G.cdN){ // new number: pop it in, tick sound rising in pitch, stage glows in its colour
+      G.cdN = n;
+      $('steady-n').textContent = n; box.dataset.n = n;
+      box.classList.remove('tick'); void box.offsetWidth; box.classList.add('tick');
+      const cell = box.parentElement; cell.classList.add('counting'); cell.style.setProperty('--cdglow', {3:'#4CC9A0', 2:'#F9B233', 1:'#F25F5C'}[n]);
+      UISound.play(n === 3 ? 'tap' : n === 2 ? 'pop' : 'nav');
+    }
+    if(p >= 1){ box.classList.add('hidden'); box.parentElement.classList.remove('counting'); win(); return; }
+  } else if(G.steadySince && !G.held && now - (G.lastSteady || 0) < 400 && G.bodies.length && towerTop() <= G.goalY + 4){
+    // A tiny wobble for a moment doesn't reset the countdown (grace window).
+  } else { G.steadySince = 0; G.cdN = 0; box.classList.add('hidden'); box.parentElement.classList.remove('counting'); }
+  if(reached) G.lastSteady = now;
+  updateGoalBar();
+}
+
+/* ================= DRAWING ================= */
+function path(vs){ ctx.beginPath(); ctx.moveTo(vs[0].x, vs[0].y); for(let i = 1; i < vs.length; i++) ctx.lineTo(vs[i].x, vs[i].y); ctx.closePath(); }
+// One drawing routine for the stage AND the shelf: outline + shine + face + name.
+function shadeColor(hex, f){ // f < 0 darker, f > 0 lighter
+  const n = parseInt(hex.slice(1), 16); let r = n >> 16, g = (n >> 8) & 255, bl = n & 255;
+  const t = f < 0 ? 0 : 255, a = Math.abs(f);
+  r = Math.round(r + (t - r) * a); g = Math.round(g + (t - g) * a); bl = Math.round(bl + (t - bl) * a);
+  return 'rgb(' + r + ',' + g + ',' + bl + ')';
+}
+function g_shapePath(g, p, w, h){
+  const S = SHAPES[p.kind];
+  g.beginPath();
+  if(S.round){ g.arc(0, 0, w / 2, 0, Math.PI * 2); return; }
+  if(!S.pts){ const r = Math.min(w, h) * 0.12; if(g.roundRect){ g.roundRect(-w / 2, -h / 2, w, h, r); } else g.rect(-w / 2, -h / 2, w, h); return; }
+  S.pts.forEach((q, k) => { const X = q[0] * w, Y = q[1] * h; if(k) g.lineTo(X, Y); else g.moveTo(X, Y); });
+  g.closePath();
+}
+// mood: 'happy' | 'worried' | 'wow'
+function drawShape(g, p, w, h, mood, now, showName){
+  const S = SHAPES[p.kind];
+  g.lineJoin = 'round';
+  drawGear(g, p, w, h, now);
+  g_shapePath(g, p, w, h);
+  const grad = g.createLinearGradient(0, -h / 2, 0, h / 2);
+  grad.addColorStop(0, shadeColor(p.color, 0.18)); grad.addColorStop(1, shadeColor(p.color, -0.12));
+  g.fillStyle = grad; g.fill();
+  g.lineWidth = Math.max(2, Math.min(w, h) * 0.05); g.strokeStyle = shadeColor(p.color, -0.38); g.stroke();
+  // glossy shine along the top
+  g.save(); g_shapePath(g, p, w, h); g.clip();
+  g.fillStyle = 'rgba(255,255,255,0.28)';
+  g.beginPath(); g.ellipse(-w * 0.12, -h * 0.42, w * 0.42, h * 0.22, -0.15, 0, Math.PI * 2); g.fill();
+  if(p.ice){ g.fillStyle = 'rgba(205,238,255,0.55)'; g.fillRect(-w, -h, w * 2, h * 2); }
+  g.restore();
+  // face
+  // Long flat pieces: face on the left, name on the right (both stay big).
+  const wide = w > h * 1.8;
+  const f = S.face || [0, 0], s = wide ? h * 0.7 : Math.min(w, h) * (S.small ? 0.3 : 0.42);
+  const fx = wide ? -w / 2 + h * 0.62 : f[0] * w, fy = wide ? -h * 0.06 : f[1] * h - (showName ? s * 0.18 : 0);
+  const blink = ((now || 0) + p.blink) % 4200 < 130;
+  const ex = s * 0.32, ey = fy - s * 0.12, er = s * 0.17;
+  [-1, 1].forEach(side => {
+    const x = fx + side * ex;
+    if(mood === 'yay'){ g.strokeStyle = '#3B2A2A'; g.lineWidth = Math.max(1.5, er * 0.45); g.beginPath(); g.arc(x, ey + er * 0.3, er * 0.75, Math.PI * 1.15, Math.PI * 1.85); g.stroke(); return; }
+    if(blink && mood === 'happy'){ g.strokeStyle = '#3B2A2A'; g.lineWidth = Math.max(1.5, er * 0.4); g.beginPath(); g.moveTo(x - er * 0.8, ey); g.lineTo(x + er * 0.8, ey); g.stroke(); return; }
+    const big = mood === 'wow' ? 1.25 : mood === 'worried' ? 1.1 : 1;
+    g.fillStyle = '#FFFFFF'; g.beginPath(); g.ellipse(x, ey, er * big, er * 1.15 * big, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#3B2A2A'; g.beginPath(); g.arc(x + (mood === 'worried' ? side * er * 0.25 : 0), ey + er * 0.15, er * 0.55, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(x + er * 0.2, ey - er * 0.1, er * 0.18, 0, Math.PI * 2); g.fill();
+    if(mood === 'worried'){ g.strokeStyle = '#3B2A2A'; g.lineWidth = Math.max(1.5, er * 0.3); g.beginPath(); g.moveTo(x - side * er * 0.9, ey - er * 1.5); g.lineTo(x + side * er * 0.6, ey - er * 1.9); g.stroke(); }
+  });
+  // cheeks
+  g.fillStyle = 'rgba(255,120,140,0.45)';
+  [-1, 1].forEach(side => { g.beginPath(); g.ellipse(fx + side * ex * 1.45, ey + er * 1.3, er * 0.55, er * 0.32, 0, 0, Math.PI * 2); g.fill(); });
+  // mouth
+  const my = ey + er * 1.55;
+  g.strokeStyle = '#3B2A2A'; g.fillStyle = '#8E2B3A'; g.lineWidth = Math.max(1.5, er * 0.32); g.lineCap = 'round';
+  g.beginPath();
+  if(mood === 'wow'){ g.ellipse(fx, my + er * 0.2, er * 0.45, er * 0.6, 0, 0, Math.PI * 2); g.fill(); }
+  else if(mood === 'yay'){ g.moveTo(fx - er * 0.95, my - er * 0.2); g.quadraticCurveTo(fx, my + er * 1.5, fx + er * 0.95, my - er * 0.2); g.closePath(); g.fill(); g.stroke(); }
+  else if(mood === 'worried'){ g.moveTo(fx - er * 0.7, my + er * 0.35); g.quadraticCurveTo(fx, my - er * 0.2, fx + er * 0.7, my + er * 0.35); g.stroke(); }
+  else { g.arc(fx, my - er * 0.2, er * 0.75, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke(); }
+  drawGearFront(g, p, w, h, now, {x: fx, y: fy, s: s, ey: ey});
+  // name, written on the shape so the word and the shape go together
+  if(showName){
+    const room = wide ? w - h * 1.3 : w;
+    let fs = wide ? Math.min(h * 0.4, room * 1.6 / Math.max(5, p.name.length), 24) : Math.min(h * 0.2, w * 1.5 / Math.max(5, p.name.length), 22);
+    if(fs >= 7){
+      g.font = '700 ' + fs + "px 'Fredoka',sans-serif"; g.textAlign = 'center'; g.textBaseline = 'middle';
+      const nx = wide ? fx + h * 0.5 + room / 2 : fx;
+      const ny = wide ? 0 : Math.min(h * 0.5 - fs * 0.75, my + er + fs * 0.9);
+      g.lineWidth = Math.max(2, fs * 0.22); g.strokeStyle = 'rgba(40,30,30,0.75)'; g.strokeText(p.name, nx, ny);
+      g.fillStyle = '#FFFFFF'; g.fillText(p.name, nx, ny);
+    }
+  }
+}
+/* ----- win celebration: fireworks on the stage ----- */
+const FW_COLS = ['#FF6B9A','#FFB547','#4CC9A0','#4D96FF','#B388FF','#FFE66D'];
+function firework(x, y){
+  if(!G.fw) G.fw = [];
+  const col = pick(FW_COLS), n = REDUCED ? 8 : 26, t0 = performance.now();
+  for(let k = 0; k < n; k++){ const a = k / n * Math.PI * 2, sp = (2 + Math.random() * 2.5) * U * 60; G.fw.push({x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, col: Math.random() < 0.3 ? '#FFFFFF' : col, t0}); }
+}
+function drawFireworks(now){
+  if(!G.fw || !G.fw.length) return;
+  G.fw = G.fw.filter(f => now - f.t0 < 1100);
+  G.fw.forEach(f => {
+    const t = (now - f.t0) / 1000;
+    const x = f.x + f.vx * t, y = f.y + f.vy * t + 160 * U * t * t;
+    ctx.globalAlpha = Math.max(0, 1 - t / 1.1); ctx.fillStyle = f.col;
+    ctx.beginPath(); ctx.arc(x, y, Math.max(1.5, 4 * U), 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+function moodOf(b){
+  if(!G || !G.platform) return 'happy';
+  if(G.celebrating) return 'yay';
+  const pv = G.platform.velocity, v = Math.hypot(b.velocity.x - pv.x, b.velocity.y - pv.y), a = Math.abs((b.angularVelocity || 0) - (G.platform.angularVelocity || 0));
+  if(v > 5) return 'wow';
+  if(v > 0.7 || a > 0.035 || G.windUntil) return 'worried';
+  return 'happy';
+}
+function drawPiece(b, alpha, mood){
+  const p = b.piece;
+  ctx.globalAlpha = alpha == null ? 1 : alpha;
+  ctx.save(); ctx.translate(b.position.x, b.position.y); ctx.rotate(b.angle);
+  ctx.translate(-b.drawOff.x, -b.drawOff.y);
+  // (the body's angle already includes any turn from the ↻ button)
+  drawShape(ctx, p, p.w * U, p.h * U, mood || moodOf(b), performance.now(), true);
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+function draw(now){
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const g = ctx.createLinearGradient(0, 0, 0, PH);
+  g.addColorStop(0, '#EAF4FB'); g.addColorStop(1, '#FBF6EF');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, PW, PH);
+  // goal line
+  ctx.setLineDash([12, 9]); ctx.strokeStyle = 'rgba(201,123,93,0.9)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(0, G.goalY); ctx.lineTo(PW, G.goalY); ctx.stroke(); ctx.setLineDash([]);
+  { const s = Math.round(24 * U + 10); emoDraw(ctx, '🏁', 8 + s * 0.55, G.goalY - 2 - s * 0.5, s, ctx.globalAlpha); }
+  // wind streaks
+  if(G.windUntil){
+    ctx.strokeStyle = 'rgba(110,147,168,0.45)'; ctx.lineWidth = 2;
+    for(let i = 0; i < 9; i++){
+      const y = (i + 1) * PH / 10, off = ((now / 4 + i * 97) % (PW + 200)) - 100, x = G.wind > 0 ? off : PW - off;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 50 * Math.sign(G.wind), y); ctx.stroke();
+    }
+  }
+  // platform + post
+  const pl = G.platform;
+  ctx.fillStyle = '#9C9384'; ctx.fillRect(pl.position.x - 8 * U, pl.position.y, 16 * U, PH - pl.position.y);
+  ctx.fillStyle = '#B8AFA0'; path(pl.vertices); ctx.fill();
+  if(G.L.wobble){ emoDraw(ctx, '🌀', pl.position.x, pl.position.y + G.platH * 1.7, Math.round(16 * U + 8), ctx.globalAlpha); }
+  if(G.celebrating){ // pieces hop for joy
+    G.bodies.forEach((b, i) => { const hop = Math.abs(Math.sin(now / 160 + i * 0.7)) * 8 * U; ctx.save(); ctx.translate(0, -hop); drawPiece(b); ctx.restore(); });
+  } else G.bodies.forEach(b => drawPiece(b));
+  drawFireworks(now);
+  if(G.ghost){
+    const gb = G.ghost;
+    ctx.strokeStyle = 'rgba(55,71,79,0.25)'; ctx.setLineDash([4, 6]); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(gb.position.x, gb.position.y); ctx.lineTo(gb.position.x, PH); ctx.stroke(); ctx.setLineDash([]);
+    drawPiece(gb, 0.85, 'wow');
+  }
+}
+function shakeStage(){ const s = $('stage'); if(s.animate) s.animate([{transform: 'translateX(0)'}, {transform: 'translateX(-6px)'}, {transform: 'translateX(5px)'}, {transform: 'translateX(0)'}], {duration: 300}); }
+
+/* ================= SHELF + DRAG TO PLACE ================= */
+function renderShelf(){
+  const box = $('shelf'); box.innerHTML = '';
+  const left = G.pieces.filter(p => !p.used);
+  if(!left.length){ box.innerHTML = '<div class="shelf-empty">All pieces used!</div>'; return; }
+  left.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'piece' + (G.held && G.held.id === p.id ? ' held' : '');
+    el.setAttribute('data-sound', 'none');
+    el.setAttribute('role', 'button'); el.setAttribute('aria-label', 'Drag this piece');
+    const c = document.createElement('canvas'); c.width = 144; c.height = 144;
+    el.appendChild(c); drawPreview(c, p);
+    const nm = document.createElement('span'); nm.className = 'pn'; nm.textContent = p.name; el.appendChild(nm);
+    el.setAttribute('aria-label', 'Drag the ' + p.name);
+    if(!SHAPES[p.kind].round){
+      const r = document.createElement('button'); r.className = 'rot'; r.textContent = '↻'; r.title = 'Turn'; r.setAttribute('data-sound', 'pop');
+      r.addEventListener('pointerdown', e => e.stopPropagation());
+      r.onclick = e => { e.stopPropagation(); p.rot = (p.rot + 1) % 4; drawPreview(c, p); };
+      el.appendChild(r);
+    }
+    el.addEventListener('pointerdown', e => grab(e, p));
+    box.appendChild(el);
+  });
+}
+function drawPreview(c, p){
+  const g = c.getContext('2d'); g.clearRect(0, 0, 144, 144);
+  const k = 88 / Math.max(p.w, p.h); // room round the piece for its gear
+  g.save(); g.translate(72, 72); g.rotate(p.rot * Math.PI / 2);
+  drawShape(g, p, p.w * k, p.h * k, 'happy', 1000, false);
+  g.restore();
+}
+function toStage(e){ const r = $('stage').getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top, inside: e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom}; }
+// Drop height: just above whatever is underneath that spot (never inside the tower).
+function dropY(p, x){
+  const half = pieceHalfH(p), hw = pieceHalfW(p);
+  let top = G.platY - G.platH / 2;
+  G.bodies.forEach(b => { if(b.bounds.max.x > x - hw && b.bounds.min.x < x + hw) top = Math.min(top, b.bounds.min.y); });
+  return top - half - 6 * U;
+}
+function grab(e, p){
+  if(!G || G.over || G.paused || G.held) return;
+  e.preventDefault();
+  G.held = p;
+  UISound.play('pop');
+  sayShape(p);
+  renderShelf();
+  const move = ev => {
+    const s = toStage(ev);
+    if(!s.inside){ G.ghost = null; return; }
+    const hw = pieceHalfW(p);
+    const x = Math.max(hw, Math.min(PW - hw, s.x));
+    const y = Math.max(pieceHalfH(p) + 4, Math.min(s.y, dropY(p, x)));
+    if(!G.ghost) G.ghost = bodyFor(p, x, y);
+    Body.setPosition(G.ghost, {x, y});
+  };
+  const up = ev => {
+    window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
+    if(G.ghost && toStage(ev).inside && !G.over){
+      const b = bodyFor(p, G.ghost.position.x, G.ghost.position.y);
+      Composite.add(G.world, b); G.bodies.push(b);
+      p.used = true; G.lastDrop = performance.now();
+      UISound.play('whoosh');
+    }
+    G.ghost = null; G.held = null;
+    if(!G.over){ renderShelf(); updateHud(); }
+  };
+  window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+}
+// Say the shape's name out loud (when sounds are on) and show it with a fact,
+// so the word sticks to the shape even before a child can read.
+function sayShape(p){
+  showBanner(p.name + ' · ' + SHAPES[p.kind].sides);
+  try{
+    if(!UISound.get().enabled || !window.speechSynthesis) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(p.name);
+    u.rate = 0.9; u.pitch = 1.25; u.volume = Math.max(0.2, UISound.get().volume);
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+// Tests and keyboard users: place a piece programmatically at a stage x.
+function placePiece(id, x){
+  const p = G.pieces.find(q => q.id === id && !q.used); if(!p) return false;
+  const hw = pieceHalfW(p); x = Math.max(hw, Math.min(PW - hw, x));
+  const b = bodyFor(p, x, dropY(p, x)); Composite.add(G.world, b); G.bodies.push(b);
+  if(performance.now() - (G.cheerDrop || 0) > 2500){ G.cheerDrop = performance.now(); cheerSay('goal', 'drop'); } /* 📣 cs-4c */
+  p.used = true; G.lastDrop = performance.now(); renderShelf(); return true;
+}
+
+/* ================= HUD ================= */
+function updateHud(){
+  if(!G) return;
+  const h = Math.max(0, G.hearts);
+  BAR.lives(h, h <= 1);
+  if(lockHandle){
+    const left = lockHandle.remainingMs(); BAR.left(left, left < 120000);
+  }
+  updateGoalBar();
+}
+function updateGoalBar(){
+  if(!G) return;
+  const base = G.platY - G.platH / 2, need = base - G.goalY, have = base - towerTop();
+  BAR.meter('goal', '🏁', have / need, 'How high the tower is — reach the 🏁');
+}
+function fmt(ms){ const s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+let bannerTimer = 0;
+function showBanner(t){ const b = $('banner'); b.textContent = t; b.classList.add('on'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('on'), 2400); }
+
+/* ================= WIN / FAIL ================= */
+function win(){
+  G.over = true; cancelAnimationFrame(G.raf); cheerEnd(true); /* 📣 cs-4c */
+  const ms = performance.now() - G.t0, spare = G.pieces.filter(p => !p.used).length, lvlIdx = G.lvlIdx, L = G.L, worldKey = G.worldKey;
+  // Score: level points + a speed bonus (faster = more) + hearts kept.
+  const secs = Math.max(1, Math.round(ms / 1000)), par = 15 + 7 * G.need;
+  const speed = Math.max(0, Math.round((par - secs) * 12));
+  const score = (100 * (lvlIdx + 1) + speed + G.hearts * 50) * (L.hardcore ? 3 : 1);   // 💀 Hardcore ×3
+  const stars = 1 + (G.lost === 0 ? 1 : 0) + (secs <= par ? 1 : 0);
+  UISound.play('success');
+  const praise = pick(PRAISE), who = S.player || '';
+  celebrate(praise + (who ? ', ' + who : '') + '!');
+  confetti([WORLDS[worldKey].icon, '🏁', '⭐', '🎉', '✨', '🏆'], 44);
+  const nextOk = lvlIdx < LEVELS.length - 1;
+  const starHtml = [0, 1, 2].map(k => '<span class="st' + (k < stars ? '' : ' off') + '" style="animation-delay:' + (0.25 + k * 0.25) + 's">⭐</span>').join('');
+  stackCard({win: true, icon: '🏆', title: praise + '!', sub: (who ? who + ' built a tower of ' : 'A tower of ') + G.bodies.length + ' pieces!', stars,   /* 🧱 b3w1: the shared 🏁 result card */
+    score, stats: [[L.emoji, L.name], ['⏱', fmt(ms) + (speed ? ' · ⚡+' + speed : '')], L.hardcore ? ['💀', '×3 points'] : ['❤️', G.hearts + '/3'], ['🧱', G.bodies.length + ' pieces']],
+    save: 'Saving your progress…', confetti: false,
+    levels: () => { hideResult(); leavePlay(); }, again: () => startGame(lvlIdx, worldKey), againText: '🔄 New tower',
+    extra: [{text: '🌍 New world', id: 'btn-world', fn: () => { hideResult(); leavePlay(); chooseLevel(lvlIdx); }}],
+    next: nextOk ? () => { if(!canPlay(lvlIdx + 1)){ UI.toast('Clear this level to unlock the next one', 'err'); return; } startGame(lvlIdx + 1, worldKey); } : null, nextText: 'Next level ▶'});
+  const pr = S.progress[S.player] || (S.progress[S.player] = {unlocked: 0, tokens: []});
+  pr.unlocked = Math.max(pr.unlocked, lvlIdx + 1);
+  google.script.run
+    .withSuccessHandler(res => {
+      const best = (pr.best || [null, null, null, null, null]).slice();
+      if(res.best) best[lvlIdx] = res.best;
+      S.progress[S.player] = {unlocked: res.unlocked, tokens: res.tokens, best: best};
+      stackNote(res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>'   /* 🧱 b3w1: kept for the card if it comes later */
+        : (res.newHighScore && !res.firstTime ? '🎉 New high score!' : res.best && res.best.score ? 'Your best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Progress saved'));
+    })
+    .withFailureHandler(() => stackNote('⚠️ Could not save — your next win will save it'))
+    .saveLevelResult(GAME_ID, S.player, lvlIdx, {timeSec: secs, stars: stars, theme: worldKey, score: score});
+}
+function endFail(msg){
+  G.over = true; cancelAnimationFrame(G.raf); cheerEnd(false); /* 📣 cs-4c */
+  UISound.play('error');
+  const hc = G.L && G.L.hardcore;
+  stackCard({win: false, icon: hc ? '💀' : '🫧', title: msg, sub: hc ? '💀 Hardcore ends on the first mistake — try again!' : 'No worries — try again!',   /* 🧱 b3w1: the shared 🏁 card */
+    levels: () => { hideResult(); leavePlay(); }, again: () => retrySame(), againText: 'Same pieces',
+    extra: [{text: '🔄 New tower', id: 'btn-new', fn: () => newTower()}], ids: [['.gf-r-again', 'btn-retry'], ['.gf-r-x0', 'btn-again']]});   // the old ids: Same pieces = btn-retry, New tower = btn-again
+}
+// The card waits while the stage celebrates (G.cardDelay ms), then pops up.
+/* 📣 CHEERSQUAD (cs-4c) START — the crowd beside the play (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+// fans stand only where the bar, the play area and the controls leave room; 🙂 Calm by default
+function cheerTaken(){ return Array.from(document.querySelectorAll('#gbar, #shelf, #bd-lg, #banner, #steady:not(.hidden)')).concat(cheerTower()); }
+// the tower column: the platform (+ its Extreme glide) + 40 px, and any piece outside it (falling / overhanging) — the stand is on the floor beside it
+function cheerTower(){ const st = $('stage'); if(!G || !G.platform || !PW || !st) return []; const R = st.getBoundingClientRect(), m = 40 * U + (G.L && G.L.slide ? PW * 0.07 : 0), l0 = PW / 2 - G.platW / 2 - m, r0 = PW / 2 + G.platW / 2 + m, out = [[l0, 0, r0, PH]];
+  (G.bodies || []).forEach(b => { const B = b.bounds; if(B && (B.max.x > r0 || B.min.x < l0)) out.push([B.min.x - 10, B.min.y - 10, B.max.x + 10, B.max.y + 10]); });
+  return out.map(([l, t, r, b]) => ({getBoundingClientRect: () => ({left: R.left + l, right: R.left + r, top: R.top + t, bottom: R.top + b, width: r - l, height: b - t})})); }
+function cheerMount(){
+  if(!window.Cheer) return; Cheer.unmount(); const box = $('scr-play'); if(!G || !box || box.classList.contains('hidden')) return;
+  Cheer.mount(box, {game: 'stacking', players: [{name: S.player, side: 0, human: true}, {name: 'Rival', side: 1, human: false}], me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'overlay', floor: true,
+    zones: () => Cheer.freeZones(box, cheerTaken, {}), avoid: cheerTaken,
+    clear: b => { const B = box.getBoundingClientRect(); return !cheerTaken().some(e => { const r = e.getBoundingClientRect(); if(r.width < 2 || r.height < 2) return false; const l = r.left - B.left, t = r.top - B.top; return b.r > l - 3 && b.l < l + r.width + 3 && b.b > t - 3 && b.t < t + r.height + 3; }); }});
+  clearInterval(window.__cheerHushT); window.__cheerHushT = setInterval(() => { if(!window.Cheer || !Cheer.active()){ clearInterval(window.__cheerHushT); return; } Cheer.hush(!!G && !!G.steadySince && !G.over); }, 150);
+}
+// small wins / misses get a 1.2 s breather; big ones and the ends always play. side: whose moment (default you = 0)
+function cheerSay(kind, why, side){ if(!kind || !window.Cheer || !Cheer.active() || !G) return; const now = performance.now();
+  if((kind === 'goal' || kind === 'miss') && (G.cheerAt || 0) > now - 1200) return; if(kind === 'big' && (G.cheerBig || 0) > now - 900) return;
+  if(kind === 'goal' || kind === 'miss') G.cheerAt = now; if(kind === 'big') G.cheerBig = now; Cheer.react(kind, {side: side || 0}); }
+function cheerEnd(won){ if(window.Cheer && Cheer.active()){ Cheer.hush(false); Cheer.react(won ? 'win' : 'lose', {side: 0}); } }
+function cheerFaces(n){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces')) return;
+  const at = card.querySelector('.res-btns'); if($('result').classList.contains('hidden') || !at){ if((n || 0) < 12) cheerFaces((n || 0) + 1); return; }   /* the card can come late (Stack It!) */
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); }, n ? 350 : 900); }
+/* 📣 CHEERSQUAD END */
+function showResult(html){
+  $('result-card').innerHTML = html;
+  cheerFaces(); /* 📣 cs-4c */
+  const wait = G && G.cardDelay ? G.cardDelay : 0;
+  if(G) G.cardDelay = 0;
+  clearTimeout(showResult.t);
+  if(wait) showResult.t = setTimeout(() => $('result').classList.remove('hidden'), wait); else $('result').classList.remove('hidden');
+}
+const PRAISE = ['Amazing', 'Super builder', 'Fantastic', 'You did it', 'Awesome tower', 'Brilliant', 'Way to go', 'Tower champion'];
+// Stage party before the card: pieces hop with happy faces, fireworks, big praise, said out loud.
+function celebrate(text){
+  G.celebrating = true; G.cardDelay = REDUCED ? 300 : 1600;
+  const pr = $('praise'); pr.textContent = '🎉 ' + text; pr.classList.remove('hidden');
+  const top = Math.max(40 * U, towerTop());
+  [0, 350, 700, 1050].forEach((d, i) => setTimeout(() => { if(G && G.celebrating){ firework(PW * (0.25 + Math.random() * 0.5), top - (30 + Math.random() * 90) * U); UISound.play(i % 2 ? 'pop' : 'whoosh'); } }, d));
+  const g = G, t0 = performance.now();
+  (function party(now){ if(G !== g || !G.celebrating) return; draw(now); if(now - t0 < 4000) requestAnimationFrame(party); })(t0);
+  try{ if(UISound.get().enabled && window.speechSynthesis){ speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.pitch = 1.3; u.rate = 1; speechSynthesis.speak(u); } }catch(e){}
+  setTimeout(() => pr.classList.add('hidden'), G.cardDelay + 200);
+}
+function countUp(el, to, ms){
+  if(!el) return;
+  const t0 = performance.now() + (REDUCED ? 300 : 1600); // starts when the card appears
+  (function tick(now){ const p = Math.max(0, Math.min(1, (now - t0) / ms)); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))).toLocaleString(); if(p < 1) requestAnimationFrame(tick); })(performance.now());
+}
+function hideResult(){ $('result').classList.add('hidden'); }
+function confetti(list, count){
+  if(REDUCED) return;
+  for(let i = 0; i < (count || 24); i++){
+    const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pick(list);
+    e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's';
+    document.body.appendChild(e); setTimeout(() => e.remove(), 3800);
+  }
+}
+
+/* ================= SCREEN TURNED ================= */
+// Turning the phone mid-tower changes the play area a lot; physics can't be
+// stretched, so the same pieces start again at the new size.
+let resizeTimer = 0, lastSize = '';
+if(window.ResizeObserver) new ResizeObserver(() => window.dispatchEvent(new Event('resize'))).observe($('stage'));   /* 📱 ls-1: iPhone sideways first open — the play box changing size counts as a resize */
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if(!G || G.over || $('scr-play').classList.contains('hidden')) return;
+    const st = $('stage'), key = st.clientWidth + 'x' + st.clientHeight;
+    if(key === lastSize) return;
+    const [w0, h0] = lastSize.split('x').map(Number); lastSize = key;
+    if(!w0 || Math.abs(st.clientWidth - w0) / w0 > 0.15 || Math.abs(st.clientHeight - h0) / h0 > 0.15){
+      retrySame(); UI.toast('Screen turned — tower restarted with the same pieces');
+    }
+  }, 300);
+});
+
+/* ================= MENUS ================= */
+function showScreen(name){
+  if(name !== 'play' && window.Cheer) Cheer.unmount(); /* 📣 cs-4c */
+  ['player', 'levels', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
+  $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   /* 🧭 p1c */
+  if(name === 'play'){ const st = $('stage'); lastSize = st.clientWidth + 'x' + st.clientHeight; }
+  window.scrollTo(0, 0);
+}
+function progressOf(n){ return S.progress[n] || {unlocked: 0, tokens: []}; }
+function canPlay(i){ const p = progressOf(S.player); if(i === 5) return p.unlocked >= 5; if(i === 4) return p.unlocked >= 4; return i <= Math.max(p.unlocked, AGE_START[S.age] || 0); }
+function renderPlayers(){
+  const box = $('player-list'); box.innerHTML = '';
+  if(!S.players.length){ box.innerHTML = '<div class="empty">No players yet — add one on the Dashboard first.</div>'; return; }
+  S.players.forEach(p => {
+    const b = document.createElement('button'); b.className = 'pick'; b.setAttribute('data-sound', 'pop');
+    if(HAS_AV){ const c = document.createElement('canvas'); c.width = 144; c.height = 168; b.appendChild(c); b.insertAdjacentHTML('beforeend', '<div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age || '') + '</div>'); drawPreviewCanvas(c, myAvatar(p.Name), {name: p.Name, t: 1}); }   /* 🧑 p6 */
+    else b.innerHTML = '<div class="big">' + UI.esc(p.Name.charAt(0).toUpperCase()) + '</div><div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age || '') + '</div>';
+    b.onclick = () => choosePlayer(p.Name); box.appendChild(b);
+  });
+}
+function choosePlayer(name){
+  // Loaders and pop-ups follow this player's look; the game keeps its own art.
+  UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true})); const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : ''; $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4c */ renderLevels(); showScreen('levels'); openCover();   /* 🧱 b3w1: the 🎬 cover first */ }
+function changePlayer(){ renderPlayers(); showScreen('player'); }
+function renderLevels(){
+  const box = $('level-list'); box.innerHTML = ''; if(window.UI && UI.leaders) UI.leaders($('leaders'), 'stacking-sim', S.player);
+  const p = progressOf(S.player), rec = AGE_RECOMMEND[S.age];
+  LEVELS.forEach((L, i) => {
+    const open = canPlay(i), done = p.unlocked > i;
+    const b = document.createElement('button');
+    b.dataset.i = i;   /* 🧱 b3w1 */
+    b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (L.hardcore ? ' hardcore' : '');
+    b.setAttribute('data-sound', open ? 'pop' : 'none');
+    b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">🏅</span>' : (open ? '' : '<span class="badge">🔒</span>')) +
+      '<div class="big">' + L.emoji + '</div><div class="nm">' + L.name + '</div><div class="sub">' + L.blurb + '</div>' + bestHtml(p, i);
+    b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore!' : i === 4 ? 'Clear Hard to unlock Extreme!' : 'Clear the level before this one to unlock it'); return; } chooseLevel(i); };
+    box.appendChild(b);
+  });
+  { let i = -1; try{ i = Number(localStorage.getItem(pickKey('lv'))); }catch(e){} if(!(i >= 0 && canPlay(i))) i = canPlay(rec) ? rec : Math.max(0, [0, 1, 2, 3, 4, 5].filter(canPlay).pop() || 0);
+    chosenLevel = i; } renderWorlds(); markPicks();   /* 🧱 b3w1 */
+}
+// Best score / time / stars on a level card.
+function bestHtml(p, i){
+  const b = (p.best || [])[i];
+  if(!b || !(b.score || b.timeSec)) return '<div class="best none">' + (p.unlocked > i ? 'Finished!' : 'No score yet') + '</div>';
+  return '<div class="best">' + (b.score ? '<span>🏆 ' + Number(b.score).toLocaleString() + '</span>' : '') + (b.timeSec ? '<span>⏱ ' + fmt(b.timeSec * 1000) + '</span>' : '') + '<span>' + '⭐'.repeat(b.stars || 0) + '</span></div>';
+}
+/* 🧱 b3w1 (Game Baseline): ONE setup page — 🎚️ level → 🌍 world → ⚙️ options → ▶ Start; the picks are remembered per player */
+const gfPick = (el, on) => { if(window.GF && GF.pick) GF.pick(el, on); };   /* ✓ the ONE picked look (GameFrame) */
+let chosenLevel = 0, chosenWorld = 'surprise';
+const pickKey = k => 'sp_stack_' + k + ':' + (S.player || '');
+function chooseLevel(i, quiet){
+  chosenLevel = i; try{ localStorage.setItem(pickKey('lv'), String(i)); }catch(e){}
+  markPicks(); if(!quiet){ const w = $('world-head'); if(w && w.scrollIntoView) w.scrollIntoView({behavior: REDUCED ? 'auto' : 'smooth', block: 'start'}); }
+}
+function chooseWorld(k){ chosenWorld = k; try{ localStorage.setItem(pickKey('world'), k); }catch(e){} markPicks(); }
+function renderWorlds(){
+  const box = $('world-list'); box.innerHTML = '';
+  const mk = (k, big, nm, sub) => { const b = document.createElement('button'); b.className = 'pick' + (k === 'surprise' ? ' surprise' : ''); b.dataset.k = k; b.setAttribute('data-sound', 'pop');
+    b.innerHTML = '<div class="big">' + big + '</div><div class="nm">' + nm + '</div><div class="sub">' + sub + '</div>'; b.onclick = () => chooseWorld(k); box.appendChild(b); };
+  mk('surprise', '🎲', 'Surprise me!', 'Any world');
+  Object.keys(WORLDS).forEach(k => { const W = WORLDS[k]; mk(k, W.icon, W.name, W.colors.map(c => '<i style="display:inline-block;width:12px;height:12px;border-radius:50%;margin:0 1px;background:' + c + '"></i>').join('')); });
+  let w = 'surprise'; try{ w = localStorage.getItem(pickKey('world')) || 'surprise'; }catch(e){} chosenWorld = (w === 'surprise' || WORLDS[w]) ? w : 'surprise';
+}
+function markPicks(){
+  document.querySelectorAll('#level-list .lvl').forEach(b => { const on = Number(b.dataset.i) === chosenLevel; b.classList.toggle('sel', on); gfPick(b, on); });
+  document.querySelectorAll('#world-list .pick').forEach(b => { const on = b.dataset.k === chosenWorld; b.classList.toggle('sel', on); gfPick(b, on); });
+  const L = LEVELS[chosenLevel], W = WORLDS[chosenWorld], st = $('btn-start');
+  if(st && L) st.textContent = '▶ Start · ' + L.emoji + ' ' + L.name + ' · ' + (W ? W.icon + ' ' + W.name : '🎲 Surprise');
+}
+function startSetup(){ if(!canPlay(chosenLevel)){ UISound.play('error'); UI.toast('Pick a level that is open 🔓'); return; } startGame(chosenLevel, chosenWorld); }
+// 🎬 the cover (GameFrame): who's here + champions + how to play; ▶ Play opens the setup page
+let StackCover = null;
+const STACK_VERSION = '2.1';   /* 🧱 b3w1: shown on the cover footer — bump with each Stack It! round */
+function openCover(){
+  if(!window.GF){ showScreen('levels'); return; }
+  if(StackCover && StackCover.who !== S.player){ StackCover.destroy(); StackCover = null; }
+  if(!StackCover){ StackCover = GF.cover(document.body, {game: 'stacking-sim', title: 'Stack It!', icon: '🏗️', version: STACK_VERSION, me: S.player, players: S.players, avatarOf: myAvatar, seats: {min: 1, max: 1},
+      acts: ['beat.throw', 'beat.cheer'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms',
+      onPlay: () => { StackCover.hide(); showScreen('levels'); } }); StackCover.who = S.player; }
+  StackCover.show();
+}
+// 🏁 the shared result card comes after the stage party (G.cardDelay), like the old card
+function stackCard(o){
+  const wait = G && G.cardDelay ? G.cardDelay : 0; if(G) G.cardDelay = 0; clearTimeout(showResult.t); window.__stackNote = null;
+  const make = () => { GF.result(Object.assign({wrap: $('result'), card: $('result-card'), buddy: (window.Acting && typeof myAvatar === 'function') ? {name: S.player, av: myAvatar(S.player)} : null}, o));
+    if(o.ids) o.ids.forEach(([sel, id]) => { const e = document.querySelector('#result-card ' + sel); if(e) e.id = id; });
+    if(window.__stackNote){ const n = $('save-note'); if(n) n.innerHTML = window.__stackNote; }
+    cheerFaces();   /* 📣 cs-4c: the crowd's faces on the card */ };
+  if(wait) showResult.t = setTimeout(make, wait); else make();
+}
+function stackNote(h){ window.__stackNote = h; const n = $('save-note'); if(n) n.innerHTML = h; }
+function sessionQuery(){
+  let q = '';
+  if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER);
+  if(SESSION_START) q += '&sessionStart=' + SESSION_START;
+  if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN;
+  return q;
+}
+function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }   // 🧭 p1c: ◀ = where you came from (Gameroom if we don't know)
+
+/* ================= BOOT ================= */
+function boot(){
+  if(!window.Matter){ UI.toast('Could not load the building blocks — check the internet connection and reopen', 'err'); return; }
+  UI.loading('stacking-sim');
+  google.script.run
+    .withSuccessHandler(d => {
+      UI.loaded();
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {};
+      UISound.applySettings(S.settings);
+      const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
+      lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn,
+        homeUrl: WEBAPP_URL + '?page=home', onLock: () => { if(G) G.paused = true; }});
+      if(lockHandle) setInterval(updateHud, 1000);
+      if(CURRENT_PLAYER && S.players.some(p => p.Name === CURRENT_PLAYER)) choosePlayer(CURRENT_PLAYER);
+      else { renderPlayers(); showScreen('player'); }
+    })
+    .withFailureHandler(() => { UI.loaded(); UI.toast('Could not load players — check the connection', 'err'); renderPlayers(); showScreen('player'); })
+    .getLevelGameData(GAME_ID, CURRENT_PLAYER);
+}
+/* ================= 🧑 YOUR AVATAR (p6c — ✨ P6 / 11w round 2) =================
+   The player's own avatar beside the game: UI.buddy pictures (cached AvatarActing frames, swapped by a small timer) —
+   nothing is painted in the game loop. It reacts to the game's own moments through the wrappers below (no game logic changes). */
+const HAS_AV = typeof drawAvatar === 'function' && typeof GESTURES !== 'undefined';
+function myAvatar(name){ const a = S.avatars && S.avatars[name || S.player]; return a ? fixAv(a) : defaultAvatar(name || S.player || 'player'); }
+const BD_SAY = {};
+const BD = {on: false, who: null, list: []};
+function bdStart(){
+  BD.list.forEach(b => b && b.stop()); BD.list = []; BD.on = false;
+  const els = ['bd-lg'].map(id => document.getElementById(id)).filter(Boolean);
+  if(!HAS_AV || !UI.buddy || !window.Acting){ els.forEach(e => e.classList.add('hidden')); return; }
+  BD.who = {name: S.player, av: myAvatar(S.player)}; BD.list = els.map((e, i) => UI.buddy(e, BD.who, i ? {fps: 6} : {})).filter(Boolean); BD.on = !!BD.list.length;
+}
+function bdReact(mood, ms){ if(!BD.on) return false; let a = false; BD.list.forEach(b => { const x = b.react(mood, ms); if(x) a = x; });  return a; }
+function bdResultBig(){ const big = document.querySelector('#result-card > .big'); if(!big || !BD.on) return; const won = !!document.querySelector('#result-card h2.cheer'); const c = document.createElement('canvas'); c.className = 'res-av'; c.id = 'res-av'; c.setAttribute('aria-hidden', 'true'); big.replaceWith(c); bdResult('res-av', won); }
+function bdResult(id, won){ if(BD.on && document.getElementById(id)) UI.buddy(document.getElementById(id), BD.who, {hold: won ? 'win' : 'lose'}); }
+const bdBase = {startGame, placePiece, checkGoal, win, endFail, showResult};
+startGame = function(){ const args = arguments;  const r = bdBase.startGame.apply(this, args); bdStart(); return r; };
+placePiece = function(){ const args = arguments;  const r = bdBase.placePiece.apply(this, args); if(BD.on && performance.now() - (BD.last || 0) > 2500){ BD.last = performance.now(); bdReact('happy', 1200); } return r; };
+checkGoal = function(){ const args = arguments;  const r = bdBase.checkGoal.apply(this, args); if(G && G.steadySince && BD.steady !== G.steadySince){ BD.steady = G.steadySince; bdReact('close', 3000); } return r; };
+win = function(){ const args = arguments;  const r = bdBase.win.apply(this, args); bdReact('win', 3500); return r; };
+endFail = function(){ const args = arguments;  const r = bdBase.endFail.apply(this, args); bdReact('miss', 2400); return r; };
+showResult = function(){ const args = arguments;  const r = bdBase.showResult.apply(this, args); if(document.getElementById('res-av')) bdResult('res-av', /class="cheer"/.test(args[0])); return r; };
+/* ================= 🧑 YOUR AVATAR END (p6c) ================= */
+boot();
