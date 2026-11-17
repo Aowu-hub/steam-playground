@@ -246,6 +246,19 @@
   .btnpad.lside{left:calc(10px + env(safe-area-inset-left));top:8px;}
   .stick.rside{right:calc(10px + env(safe-area-inset-right));bottom:calc(var(--safe-b, 18px) + 4px);}
   .btnpad.rside{right:calc(10px + env(safe-area-inset-right));top:8px;}
+  /* 🌸 bo-9a petal ring (pz-2, UiKit UI.pad.petals): 💥 main + wedges 2 mm apart; the box = the ring's footprint from the corner (edge margin inside) */
+  .btnpad.solo.pz-ring{position:absolute;display:block;right:0;bottom:0;left:auto;top:auto;} .bodypad.solo.pz-ring{position:absolute;left:0;bottom:0;right:auto;top:auto;}   /* UiKit .pz-fan says relative — the ring box stays in its corner */
+  .bodypad.pz-ring .b-show{--btn:var(--btn-main);}
+  .bbtn.b-sw{--rim:#7FE3FF;}
+  .radar.rleft{right:auto;left:calc(8px + env(safe-area-inset-left));}
+  .pads .bbtn.pz-btn .ic{font-size:calc(var(--sz) * 0.38);} .pads .bbtn.pz-btn .nm{font-size:max(10px,calc(var(--sz) * 0.15));}
+  .pads .bbtn.pz-pet .pw{inset:0;border-radius:0;transform:none;-webkit-mask:none;mask:none;clip-path:var(--pd);background:var(--star);opacity:calc(var(--p,0) * 0.6);z-index:0;}
+  .pads .bbtn.pz-pet small{left:calc(50% + var(--lx,0px) + 8px);top:calc(50% + var(--ly,0px) + 6px);right:auto;bottom:auto;}
+  .pads .bbtn.pz-pet.glow,.pads .bbtn.pz-pet.mo{animation:none;}
+  .pads .bbtn.pz-pet.glow .pz-pf{animation:pz-pglow .8s ease-in-out infinite;}
+  .pads .bbtn.pz-pet.mo .pz-pf{animation:bo-pmo .42s ease-in-out infinite;} @keyframes bo-pmo{50%{stroke:#FFD23F;stroke-width:7;fill:#FFD23F;fill-opacity:.45;}}
+  .stage.pl .pads:not(.two) .shouts{bottom:min(calc(max(var(--stick) + var(--edge), var(--pzh, calc(var(--btn) + var(--btn-main) + var(--gap) + var(--edge)))) + 14px + env(safe-area-inset-bottom)), var(--shmax, 9999px));}   /* 📣 the shout arrows sit just above the ring */
+  @media (max-height:400px) and (max-width:720px){ .stage.pl .shout{width:46px;height:46px;font-size:1.25rem;} .stage.pl .shout small{font-size:0.52rem;} }   /* old iPhone SE sideways: room between the bar and the ring */
   .pads.two{--btn:clamp(56px,7.5vw,68px);--btn-main:clamp(64px,9vw,84px);--stick:clamp(100px,13vw,140px);--gap:12px;--edge:14px;}   /* 👥 two on one device: each half, never below 9 mm */
   .pads.two.short{--btn:clamp(56px,14vh,64px);--btn-main:clamp(60px,16vh,72px);--stick:clamp(96px,26vh,120px);--gap:10px;--edge:10px;} .pads.two .stick .tip{display:none;}
   @media (pointer:fine) and (min-width:900px){ .pads.kbd .stick,.pads.kbd .btnpad,.pads.kbd .swbtn{opacity:.45;} }
@@ -3190,6 +3203,8 @@ function drawRadar(){
   const cv = $('radar'); if(!radarOn()){ cv.classList.add('hidden'); return; } cv.classList.remove('hidden');
   const Sz = G.Sz, M = G.M, w = Math.round(lim(G.W * 0.19, 92, 168)), h = Math.round(w * Sz.Wh / Sz.Lh), dpr = G.dpr || 1;
   if(cv.width !== Math.round(w * dpr)){ cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.width = w + 'px'; cv.style.height = h + 'px'; }
+  { const key = G.W + 'x' + G.H + ':' + w; if(G.radarK !== key){ G.radarK = key; const bp = document.querySelector('#pads .btnpad.pz-ring'), sr = $('stage').getBoundingClientRect(); let lft = false;   /* 🌸 bo-9a: the radar never sits on the ring */
+    if(bp){ const r = bp.getBoundingClientRect(); lft = r.width > 0 && sr.top + 8 + h > r.top - 4 && sr.right - 8 - w < r.right; } cv.classList.toggle('rleft', lft); } }
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
   const flip = G.view.mode === 'behind' && G.view.side === 1 ? -1 : 1, X = x => (x * flip / Sz.Lh + 1) / 2 * (w - 6) + 3, Y = y => (-y * flip / Sz.Wh + 1) / 2 * (h - 6) + 3;
   g.fillStyle = 'rgba(30,110,60,0.85)'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 1; g.strokeRect(3, 3, w - 6, h - 6); g.beginPath(); g.moveTo(w / 2, 3); g.lineTo(w / 2, h - 3); g.stroke();
@@ -3409,6 +3424,8 @@ function buildPads(){
       bp.querySelectorAll('.bbtn').forEach(el => { el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); try{ el.setPointerCapture(e.pointerId); }catch(err){} press(el, true); $('pads').classList.remove('kbd'); if(G && !G.paused) BO.key(G.M, c.ci, el.dataset.k, true); });
         ['pointerup', 'pointercancel'].forEach(k => el.addEventListener(k, () => { press(el, false); if(G) BO.key(G.M, c.ci, el.dataset.k, false); })); });
       box.appendChild(bp);
+      if(!two && UI.pad && UI.pad.petals && window.UI_PETALS !== false){ const q = cl => bp.querySelector('.b-' + cl), slots = [q('spin'), q('hop'), q('drop')];   /* 🌸 bo-9a: two rings — body moves on the left (mirrored) */
+        bp.classList.add('pz-fan', 'pz-ring'); bp.__pzArc = () => UI.pad.petals(bp, q('show'), slots, {fit: true, side: 'left'}); bp.__pzArc(); }
     }
     // 📣 shout arrows (pop up when a shot is coming)
     const sh = document.createElement('div'); sh.className = 'shouts hidden'; sh.dataset.side = c.side; const lab = () => shoutLabels();
@@ -3423,8 +3440,14 @@ function buildPads(){
     const end = e => { if(e.pointerId !== SS.id) return; SS.id = null; SS.v = null; kn.style.transform = ''; st.classList.remove('on', 'far'); };
     st.addEventListener('pointerup', end); st.addEventListener('pointercancel', end);
     G.sticks.set(c.ci, SS);
-    box.appendChild(st); box.appendChild(pad); if(G.Sz.n > 1) box.appendChild(sw); if(!G.Sz.nokeeper) box.appendChild(sh);
-    requestAnimationFrame(() => { const r = st.getBoundingClientRect(), sb = $('stage').getBoundingClientRect(); const sr = sw.getBoundingClientRect(), gp = parseFloat(getComputedStyle(box).getPropertyValue('--gap')) || 18; if(short && !two){ sw.style.left = (r.right - sb.left + gp) + 'px'; sw.style.top = (r.bottom - sb.top - sr.height) + 'px'; } else { sw.style.left = (r.left - sb.left + r.width / 2 - sr.width / 2) + 'px'; sw.style.top = Math.max(4, r.top - sb.top - sr.height - gp) + 'px'; }   /* 🕹️ bo-pz: a round 11 mm switch button, one gap from the stick */
+    box.appendChild(st); box.appendChild(pad); const ring = !two && !!(UI.pad && UI.pad.petals) && window.UI_PETALS !== false;   /* 🌸 bo-9a petal ring (pz-2): solo only — 👥 two on one device keep their grids */
+    if(G.Sz.n > 1){ if(ring && G.kind !== 'battle'){ sw.className = 'bbtn b-sw'; sw.innerHTML = '<span class="ic">🔄</span><span class="nm">Switch</span><small>' + UI.esc(keyName(K.sw)) + '</small>'; pad.appendChild(sw); } else box.appendChild(sw); }
+    if(ring){ const slots = [B.pass, B.trick, null, B.jump, null, sw.parentNode === pad ? sw : null];   /* slots 1 ← · 2 ↖ · 3 ↙ · 4 ↗ · 5 → · 6 ↓ — same places in every game */
+      pad.classList.add('pz-fan', 'pz-ring'); pad.__pzArc = () => { const g = UI.pad.petals(pad, B.shoot, slots, {fit: true}); if(g) box.style.setProperty('--pzh', g.h + 'px'); return g; }; pad.__pzArc(); }
+    if(!G.Sz.nokeeper) box.appendChild(sh);
+    requestAnimationFrame(() => { const r = st.getBoundingClientRect(), sb = $('stage').getBoundingClientRect(); const sr = sw.getBoundingClientRect(), gp = parseFloat(getComputedStyle(box).getPropertyValue('--gap')) || 18; if(pad.__pzArc) pad.__pzArc(); const bpr = box.querySelector('.bodypad.pz-ring'); if(bpr && bpr.__pzArc) bpr.__pzArc();   /* 🌸 bo-9a */
+      const gbr = $('gbar') ? $('gbar').getBoundingClientRect() : null; if(gbr && gbr.height) box.style.setProperty('--shmax', Math.max(0, Math.round(sb.bottom - gbr.bottom - 6 - (innerHeight < 400 && innerWidth < 720 ? 46 : 54))) + 'px');   /* 📣 small phones: the arrows never go under the bar */
+      if(sw.parentNode !== box){ } else if(short && !two){ sw.style.left = (r.right - sb.left + gp) + 'px'; sw.style.top = (r.bottom - sb.top - sr.height) + 'px'; } else { sw.style.left = (r.left - sb.left + r.width / 2 - sr.width / 2) + 'px'; sw.style.top = Math.max(4, r.top - sb.top - sr.height - gp) + 'px'; }   /* 🕹️ bo-pz: a round 11 mm switch button, one gap from the stick */
       if(n === 0 && G && G.help && !box.querySelector('.hand')){ const h = document.createElement('div'); h.className = 'hand'; h.innerHTML = '👆<span>move!</span>'; h.style.left = (r.left - sb.left + r.width * 0.55) + 'px'; h.style.top = (r.top - sb.top + r.height * 0.2) + 'px'; box.appendChild(h); } });
   });
   if(window.matchMedia && matchMedia('(pointer:fine)').matches && !isTouch()) box.classList.add('kbd');
@@ -3658,4 +3681,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a+bo-5b+bo-pz+bo-5c+bo-5d+r4a+r4b+r4c+r4d+bo-7+bo-7b+bo-8) END OF BlasOff.html -->
+<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a+bo-5b+bo-pz+bo-5c+bo-5d+r4a+r4b+r4c+r4d+bo-7+bo-7b+bo-8+bo-9a) END OF BlasOff.html -->
