@@ -199,6 +199,10 @@
   .new-badge,.title-new,.feat-new{display:inline-block;background:linear-gradient(135deg,#FFC845,#FF9F1C);color:#3A2500;border-radius:10px;padding:4px 10px;font-weight:800;margin:2px;}
   .res-btns > #b-menu, .res-btns > #tg-x{order:-1;} .res-btns > #b-next{order:2;}   /* 🔘 p1a: exit on the left, main action on the right */
   .res-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;}
+  /* 🧱 b3w6c: one-page setup — ▶ Start sits at the bottom, always in reach (the picked level = GameFrame's GF.pick) */
+  .b3-start{position:sticky;bottom:0;z-index:5;display:flex;justify-content:center;padding:10px 0 calc(env(safe-area-inset-bottom, 0px) + 14px);margin-top:12px;pointer-events:none;}
+  .b3-start .sp-btn{min-width:min(420px,92%);max-width:96%;min-height:56px;font-size:1.15rem;line-height:1.2;pointer-events:auto;box-shadow:0 8px 22px rgba(0,0,0,.28);}
+  .opt-sub{font-family:'Fredoka',sans-serif;font-weight:700;font-size:.95rem;margin:6px 0 6px;color:var(--ink-soft);text-align:center;opacity:.9;}
   .confetti{position:fixed;top:-40px;z-index:390;font-size:1.6rem;pointer-events:none;animation:fall linear forwards;}
   @keyframes fall{to{transform:translateY(110vh) rotate(540deg);}}
   @media (prefers-reduced-motion: reduce){ .title .logo{animation:none;} }
@@ -233,6 +237,10 @@
 <script src="inc/AvatarActing.js"></script>
 <script src="inc/AvatarWeapons.js"></script>
 <script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-4b: the cheering crowd (CheerSquad.html) -->
+<script src="inc/GameFrame.js"></script>
+<script src="inc/GameCovers.js"></script>
+<script src="inc/CardArt.js"></script>
+<script src="inc/GameLogos.js"></script>   <!-- 🧱 b3w6c: 🎬 cover + 🏁 result card (GameFrame + GameCovers + CardArt) -->
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
 
 <section class="screen hidden" id="scr-player">
@@ -243,14 +251,16 @@
 <section class="screen hidden" id="scr-menu">
   <div class="title"><div class="logo">🔢</div><h1>Digitinct</h1><p>Fill the grid — every row, column and box gets each one once!</p>
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
-  <div class="section-head">1. Pick your pictures</div>
+  <div class="section-head">🎨 1. Pick your pictures</div>   <!-- 🧱 b3w6c: ONE setup page -->
   <div class="chips" id="theme-list"></div>
-  <div class="section-head">2. 🗺️ Pick a map <span class="mapnote">(bigger map = ×more points)</span></div>
+  <div class="section-head" id="map-head">🗺️ 2. Pick a map <span class="mapnote">(bigger map = ×more points)</span></div>
   <div class="maps" id="map-list"></div>
-  <div class="section-head" id="level-head">3. 🎚️ Pick a difficulty</div>
+  <div class="section-head" id="level-head">🎚️ 3. Pick a difficulty</div>
   <div class="levels" id="level-list"></div>
+  <div class="section-head" id="opt-head">⚙️ 4. Options</div>
   <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the play">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-4b -->
-  <details class="rules"><summary>📖 How to play</summary><ul>
+  <div class="b3-start"><button class="btn sp-btn sp-primary" id="btn-start" data-sound="pop" onclick="startSetup()">▶ Start</button></div>   <!-- 🧱 b3w6c: 📖 how-to + 🏆 leaders live on the cover -->
+  <template id="b3-rules"><ul>
     <li><b>The rule:</b> every row ↔, every column ↕ and every thick-lined box has each picture exactly <b>once</b>.</li>
     <li><b>🔒 Clues:</b> the darker squares with a frame and a corner mark are clues — they are locked. You fill the light squares.</li>
     <li><b>Play:</b> tap an empty square, then tap a picture at the bottom. Or tap a picture first, then tap squares to paint it in. Keys: arrows + 1–9, Backspace to erase.</li>
@@ -261,8 +271,7 @@
     <li><b>Drag:</b> drag a picture from the bar onto a square to drop it in — every picture set lands its own way (🐾 hop, 💥 splat, 💨 skid, ✨ poof, 🌠 beam…). Drag a picture you placed to move it, or off the board to take it back.</li>
     <li><b>A full row, column or box</b> does a happy wave — and your player jumps off the bench and runs along it! 🎉</li>
     <li><b>💀 Hardcore:</b> opens after Extreme. The fewest clues (17 on 9 × 9 — the fewest possible!), no notes check, no hints, nothing is marked. Fill it all, then press ✅ Submit — one wrong square and it's over. Points ×3!</li>
-  </ul></details>
-  <div class="ui-leaders" id="leaders"></div>
+  </ul></template>   <!-- 🧱 b3w6c: the full how-to list → the cover's 📖 How to play sheet -->
 </section>
 
 <section class="hidden" id="scr-play">
@@ -299,6 +308,7 @@ const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '�
   extras: [{id: 'voice-btn', icon: '🔈', label: 'Voice: off', onClick: () => toggleVoice()}]});
 function paintVoice(){ BAR.extra('voice-btn', {icon: voiceOn ? '🔊' : '🔈', label: voiceOn ? 'Voice: on' : 'Voice: off'}); }
 UI.navBar(document.getElementById('back-btn'), {onclick: false});
+var NAV_INNER = {menu: ['◀ Digitinct', () => openCover()]};   // 🧱 b3w6c: the setup's top button goes back to the 🎬 cover
 const $ = id => document.getElementById(id);
 const pick = a => a[rnd(a.length)];
 const randInt = (a, b) => a + rnd(b - a + 1);
@@ -476,7 +486,7 @@ function bankPuzzle(){
 function showScreen(name){
   dragAbort(); /* 🐞 dg-2 */
   ['player', 'menu', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
-  $('back-btn').classList.toggle('hidden', name === 'play'); window.scrollTo(0, 0);
+  $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER); if(name === 'play') coverOff(); window.scrollTo(0, 0);   /* 🧱 b3w6c */
 }
 function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
 function canPlay(i){ const p = progressOf(S.player); if(i === 5) return p.unlocked >= 5; if(i === 4) return p.unlocked >= 4; return i <= Math.max(p.unlocked, AGE_START[S.age] || 0); }
@@ -492,13 +502,13 @@ function renderPlayers(){
 function choosePlayer(name){
   UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
   const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
-  loadPrefs(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4b */ renderMenu(); showScreen('menu');
+  loadPrefs(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4b */ renderMenu(); showScreen('menu'); openCover();   /* 🧱 b3w6c: the 🎬 cover first */
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 // Theme row: built once per menu visit, a tap only moves the highlight (no page jump).
 function renderMenu(){
   $('theme-list').innerHTML = THEME_KEYS.map(k => '<button class="chip' + (k === theme ? ' on' : '') + '" data-sound="pop" data-theme-key="' + k + '"><span class="ic">' + THEMES[k].syms.slice(0, 4).join('') + '</span>' + THEMES[k].name + '</button>').join('');
-  $('theme-list').querySelectorAll('[data-theme-key]').forEach(b => b.onclick = () => { theme = b.dataset.themeKey; savePrefs(); $('theme-list').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); });
+  $('theme-list').querySelectorAll('[data-theme-key]').forEach(b => b.onclick = () => { theme = b.dataset.themeKey; savePrefs(); $('theme-list').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); markPicks(); });   /* 🧱 b3w6c */
   renderLevels();
 }
 function miniGrid(L){
@@ -513,7 +523,7 @@ function renderMaps(){   // 🗺️ p3b
 }
 function renderLevels(){
   renderMaps();
-  const box = $('level-list'); box.innerHTML = ''; if(window.UI && UI.leaders) UI.leaders($('leaders'), GAME_ID, S.player);
+  const box = $('level-list'); box.innerHTML = '';   /* 🧱 b3w6c: 🏆 leaders live on the cover */
   const p = progressOf(S.player), rec = AGE_START[S.age];
   LEVELS.map((D, i) => levelFor(i)).forEach((L, i) => {
     const open = canPlay(i), done = p.unlocked > i, b = document.createElement('button');
@@ -523,14 +533,49 @@ function renderLevels(){
       '<div class="big">' + L.emoji + '</div><div class="nm">' + L.name + '</div>' + miniGrid(L) + '<div class="learn">' + L.n + ' × ' + L.n + ' · ' + clues + ' clues</div>' +
       '<div class="lives">' + (L.check === 'reject' ? '↩️ wrong ones bounce back' : L.check === 'mark' ? '🟥 wrong ones go red' : '💀 ✅ Submit at the end') + '</div>' +
       '<div class="sub">' + (L.hardcore && !open ? '🔒 Beat Extreme to open 💀 Hardcore' : L.blurb) + '</div>' + (L.mult > 1 ? '<div class="lives">🗺️ ' + L.mapName + ' · ×' + L.mult + ' points</div>' : '') + bestHtml(p, i);
-    b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore' : i === 4 ? 'Pass Hard to unlock Extreme!' : 'Pass the level before to unlock it'); return; } startGame(i); };
-    box.appendChild(b);
+    b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore' : i === 4 ? 'Pass Hard to unlock Extreme!' : 'Pass the level before to unlock it'); return; } chooseLevel(i); };   /* 🧱 b3w6c: a tap picks */
+    b.dataset.i = i; box.appendChild(b);
   });
+  b3Restore();
 }
 
+/* 🧱 b3w6c (Game Baseline): ONE setup page — the picks, then ▶ Start; the level is remembered per player */
+let chosenLevel = 0;
+const setupKey = k => 'sp_' + GAME_ID.replace(/-/g, '') + '_' + k + ':' + (S.player || '');
+function chooseLevel(i, quiet){
+  chosenLevel = i; try{ localStorage.setItem(setupKey('lv'), String(i)); }catch(e){}
+  markPicks(); if(!quiet){ const w = $('opt-head'); if(w && w.scrollIntoView) w.scrollIntoView({behavior: 'smooth', block: 'center'}); }
+}
+function markPicks(){
+  document.querySelectorAll('#level-list .lvl[data-i]').forEach(b => { const on = String(b.dataset.i) === String(chosenLevel); b.classList.toggle('sel', on); if(window.GF && GF.pick) GF.pick(b, on); });
+  const L = levelFor(chosenLevel), T = THEMES[theme], st = $('btn-start');
+  if(st && L) st.textContent = '▶ Start · ' + L.emoji + ' ' + L.name + ' · ' + curMap().name + (T ? ' · ' + T.icon : '');
+}
+function b3Restore(){   // the last difficulty per player
+  let i = -1; try{ const v = localStorage.getItem(setupKey('lv')); i = v === null ? -1 : Number(v); }catch(e){} const rec0 = AGE_START[S.age] || 0;
+  chosenLevel = i >= 0 && canPlay(i) ? i : (canPlay(rec0) ? rec0 : Math.max(0, [0, 1, 2, 3, 4, 5].filter(canPlay).pop() || 0)); markPicks();
+}
+function startSetup(){ if(!canPlay(chosenLevel)){ UISound.play('error'); UI.toast('Pick a level that is open 🔓'); return; } startGame(chosenLevel); }
+// 🎬 the cover (GameFrame): who's here + champions + how to play; ▶ Play opens the setup page
+let DgCover = null;
+const DG_VERSION = '2.0';   /* 🧱 b3w6c: shown on the cover footer — bump with each round */
+function coverOff(){ if(DgCover) DgCover.hide(); }
+function b3Help(){   // the game's own full how-to list (bold labels kept) for the cover's 📖 sheet; none → UiKit's 3 lines
+  const t = $('b3-rules'); if(!t || !t.content) return undefined;
+  const L = [...t.content.querySelectorAll('li')].map(li => { const c = li.cloneNode(true); c.querySelectorAll('b').forEach(b => b.replaceWith('**' + b.textContent.trim() + '**')); return c.textContent.replace(/\s+/g, ' ').trim(); }).filter(Boolean);
+  return L.length ? L : undefined;
+}
+function openCover(){
+  if(!window.GF){ showScreen('menu'); return; }
+  if(DgCover && DgCover.who !== S.player){ DgCover.destroy(); DgCover = null; }
+  if(!DgCover){ DgCover = GF.cover(document.body, {game: GAME_ID, title: 'Digitinct', icon: '🔢', version: DG_VERSION, me: S.player, players: S.players, avatarOf: myAvatar, seats: {min: 1, max: 1},
+      acts: ['beat.jump', 'beat.cheer'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms', help: b3Help(),
+      onPlay: () => { DgCover.hide(); showScreen('menu'); } }); DgCover.who = S.player; }
+  DgCover.show();
+}
 /* ================= GAME ================= */
 function startGame(lvl, puzzle){ setTimeout(cheerMount, 0); /* 📣 cs-4b */
-  clearInterval(timerId); hideResult();
+  clearInterval(timerId); hideResult(); coverOff();   /* 🧱 b3w6c */
   const L = levelFor(lvl), T = THEMES[theme], P = puzzle || makePuzzle(L);   /* 🗺️ p3b */
   if(!P){ UI.toast('Could not make a puzzle — try again', 'err'); return; }
   const n = P.n, N = n * n;
@@ -596,6 +641,7 @@ function layout(){
   }
 }
 window.addEventListener('resize', () => { if(G) layout(); });
+if(window.ResizeObserver){ let lastWH = ''; new ResizeObserver(() => { const r = $('scr-play').getBoundingClientRect(), wh = Math.round(r.width) + 'x' + Math.round(r.height); if(wh === lastWH) return; lastWH = wh; if(G && !$('scr-play').classList.contains('hidden')) layout(); }).observe($('scr-play')); }   /* 📱 ls-1: iPhone sideways first open — follow the play screen, only when its size really changed */
 function peersOf(i){ const n = G.n, r = (i / n) | 0, c = i % n, out = []; for(let j = 0; j < n * n; j++){ if(j === i) continue; if(((j / n) | 0) === r || j % n === c || G.reg[j] === G.reg[i]) out.push(j); } return out; }
 function paintCell(i, pop){
   const d = $('board').children[i], v = G.v[i], T = THEMES[G.theme];
@@ -918,20 +964,15 @@ function finishGame(why, wrongCount){
   setTimeout(() => {
     if(G !== g) return;
     const next = solved && g.lvl < 5;
-    showResult('<div class="big">' + (solved ? (stars === 3 ? '💯' : '🏆') : '💀') + '</div><h2 class="' + (solved ? 'cheer' : '') + '">' + (solved ? (stars === 3 ? 'Perfect grid!' : 'Puzzle solved!') : '💀 Hardcore over!') + '</h2>' +
-      (solved ? '<div class="rating">' + [0, 1, 2].map(k => '<span class="st' + (k < stars ? '' : ' off') + '" style="animation-delay:' + (0.25 + k * 0.25) + 's">⭐</span>').join('') + '</div>' : '') +
-      '<div class="score-big">🏆 <span id="score-count">0</span></div>' +
-      '<div class="stats"><span>⏱ ' + fmt(secs * 1000) + '</span>' + (L.check !== 'submit' ? '<span>❌ ' + g.mistakes + ' misses</span>' : '') + '<span>💡 ' + g.hintsUsed + ' hints</span>' + (g.lines ? '<span>🎉 ' + g.lines + ' lines</span>' : '') + (L.hardcore ? '<span>💀 ×3</span>' : '') + '</div>' +
-      (!solved ? '<div class="hc-note">💀 ' + wrongCount + ' square' + (wrongCount === 1 ? ' was' : 's were') + ' wrong (shown in red). Hardcore needs every square right!</div>' : '') +
-      (solved && stars < 3 ? '<div class="tip">' + (secs > L.par ? '⏱ Finish within ' + fmt(L.par * 1000) + ' for 3 stars. ' : '') + pick(TIPS) + '</div>' : '') +
-      '<div class="save-note" id="save-note">' + (solved ? '<span class="ui-spin a-bounce">🔢</span> Saving your score…' : 'Not saved — Hardcore only counts a perfect grid.') + '</div>' +
-      '<div class="res-btns">' + (next ? '<button class="btn sp-btn sp-primary" id="b-next">' + (g.lvl === 4 ? '💀 Try Hardcore ▶' : 'Next level ▶') + '</button>' : '') + (!solved ? '<button class="btn soft sp-btn sp-secondary" id="b-look">👀 Look at it</button>' : '') +
-      '<button class="btn sp-btn ' + (next ? 'soft sp-secondary' : 'sp-primary') + '\" id="b-again">🔁 New puzzle</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🎚️ Levels</button></div>');
-    countUp($('score-count'), score, 1000);
-    $('b-again').onclick = () => startGame(g.lvl);
-    $('b-menu').onclick = () => backToMenu();
-    if($('b-look')) $('b-look').onclick = () => hideResult();
-    if($('b-next')) $('b-next').onclick = () => { const p = progressOf(S.player); p.unlocked = Math.max(p.unlocked, g.lvl + 1); S.progress[S.player] = p; startGame(g.lvl + 1); };
+    GF.result({wrap: $('result'), card: $('result-card'), win: solved, icon: solved ? (stars === 3 ? '💯' : '🏆') : '💀', title: solved ? (stars === 3 ? 'Perfect grid!' : 'Puzzle solved!') : '💀 Hardcore over!',   /* 🧱 b3w6c: the shared 🏁 card */
+      sub: !solved ? '💀 ' + wrongCount + ' square' + (wrongCount === 1 ? ' was' : 's were') + ' wrong (shown in red). Hardcore needs every square right! Not saved — Hardcore only counts a perfect grid.' : stars < 3 ? (secs > L.par ? '⏱ Finish within ' + fmt(L.par * 1000) + ' for 3 stars. ' : '') + pick(TIPS) : '',
+      stars: solved ? stars : null, score,
+      stats: [['⏱', fmt(secs * 1000)]].concat(L.check !== 'submit' ? [['❌', g.mistakes + ' misses']] : [], [['💡', g.hintsUsed + ' hints']], g.lines ? [['🎉', g.lines + ' lines']] : [], [['🗺️', L.mapName]], L.hardcore ? [['💀', '×3']] : []),
+      save: solved ? 'Saving your score…' : null, buddy: {name: S.player, av: myAvatar(S.player)}, confetti: false,
+      levels: () => backToMenu(), levelsText: '🎚️ Levels', again: () => startGame(g.lvl), againText: '🔁 New puzzle', extra: solved ? [] : [{text: '👀 Look at it', fn: () => hideResult(), id: 'b-look'}],
+      next: next ? () => { const p = progressOf(S.player); p.unlocked = Math.max(p.unlocked, g.lvl + 1); S.progress[S.player] = p; startGame(g.lvl + 1); } : null, nextText: g.lvl === 4 ? '💀 Try Hardcore ▶' : 'Next level ▶'});
+    [['btn-levels', 'b-menu'], ['btn-again', 'b-again'], ['btn-next', 'b-next']].forEach(([x, y]) => { const e = $(x); if(e) e.id = y; });   // the old ids (tests, cheer)
+    cheerFaces();   /* 📣 cs-4b: the crowd's faces on the card */
   }, solved ? 1700 : 900);
 }
 function party(text){ const p = document.createElement('div'); p.className = 'praise'; p.textContent = text; document.body.appendChild(p); setTimeout(() => p.remove(), 1600); }
@@ -1046,4 +1087,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (r16+emoji+r32+back-1+p1a+p2+p3b+cs-4b+dg-2+dg-1+dg-2b+24s-b+24u-b) END OF NumberGrid.html -->
+<!-- (r16+emoji+r32+back-1+p1a+p2+p3b+cs-4b+dg-2+dg-1+dg-2b+24s-b+24u-b+b3w6c) END OF NumberGrid.html -->
