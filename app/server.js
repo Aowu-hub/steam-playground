@@ -6774,17 +6774,46 @@ function runFn(fn, args, at) {
 }
 
 /* ---------- IndexedDB: tabs, waiting list, meta ---------- */
-let DB = null;
+let DB = null, OPENING = null;
+// 🔧 24w: iPhone / WebKit can leave an IndexedDB open hanging on a first load (no success, no error) — poke the database list and ask
+// again every 1.2 s (≤ 4 asks, the first one that answers wins). A connection the system closes is dropped, so the next call opens a new one.
 function idb() {
   if (DB) return Promise.resolve(DB);
-  return new Promise((res, rej) => {
-    const q = indexedDB.open(DB_NAME, 1);
-    q.onupgradeneeded = () => { const d = q.result; ['tabs', 'ops', 'meta', 'dead'].forEach(s => { if (!d.objectStoreNames.contains(s)) d.createObjectStore(s); }); };
-    q.onsuccess = () => { DB = q.result; res(DB); }; q.onerror = () => rej(q.error);
+  if (OPENING) return OPENING;
+  OPENING = new Promise((res, rej) => {
+    let done = false, tries = 0, lastErr = null;
+    const win = d => {
+      if (done) { try { d.close(); } catch (e) {} return; }
+      done = true; DB = d;
+      d.onversionchange = () => { try { d.close(); } catch (e) {} if (DB === d) DB = null; };
+      d.onclose = () => { if (DB === d) DB = null; };
+      try { self.postMessage({ t: 'db' }); } catch (e) {}
+      res(d);
+    };
+    const open = () => {
+      tries++;
+      let q; try { q = indexedDB.open(DB_NAME, 1); } catch (e) { lastErr = e; return; }
+      q.onupgradeneeded = () => { const d = q.result; ['tabs', 'ops', 'meta', 'dead'].forEach(s => { if (!d.objectStoreNames.contains(s)) d.createObjectStore(s); }); };
+      q.onsuccess = () => win(q.result);
+      q.onerror = () => { lastErr = q.error; if (!done && tries >= 4) { done = true; rej(lastErr); } };
+    };
+    const again = () => {
+      if (done) return;
+      if (tries >= 4) { if (lastErr) { done = true; rej(lastErr); } return; }   // still nothing: the page starts a fresh server
+      try { if (indexedDB.databases) indexedDB.databases().catch(() => {}); } catch (e) {}
+      open(); setTimeout(again, 1200);
+    };
+    open(); setTimeout(again, 1200);
   });
+  OPENING.then(() => { OPENING = null; }, () => { OPENING = null; });
+  return OPENING;
 }
-function tx(stores, mode, fn) {
-  return idb().then(d => new Promise((res, rej) => { const t = d.transaction(stores, mode); let out; t.oncomplete = () => res(out); t.onerror = t.onabort = () => rej(t.error); out = fn(t); }));
+function tx(stores, mode, fn, again) {
+  return idb().then(d => new Promise((res, rej) => {
+    let t; try { t = d.transaction(stores, mode); }
+    catch (e) { if (DB === d) DB = null; if (!again) return res(tx(stores, mode, fn, true)); return rej(e); }   // 🔧 24w: a closed connection → open a new one once
+    let out; t.oncomplete = () => res(out); t.onerror = t.onabort = () => rej(t.error); out = fn(t);
+  }));
 }
 const getAll = store => tx([store], 'readonly', t => { const o = {}; const s = t.objectStore(store); const q = s.openCursor(); q.onsuccess = () => { const c = q.result; if (c) { o[c.key] = c.value; c.continue(); } }; return o; });
 let META = {}, OPS = {};
@@ -6924,9 +6953,11 @@ async function unlink() {
 
 /* ---------- talking to the page ---------- */
 function status() {
+  if (!LOADED) return;
   self.postMessage({ t: 'status', s: { mode: META.mode || 'guest', pending: Object.keys(OPS).length, syncing: SYNCING, online: online(), lastPull: META.lastPull || 0, error: LAST_ERR, keyBad: !!META.keyBad, ver: VER, device: META.device, linked: !!isFamily() } });
 }
-const READY = load().then(() => { status(); if (isFamily()) syncSoon(META.lastPull && Date.now() - META.lastPull < 120000 && !Object.keys(OPS).length ? 60000 : 1200); });
+let LOADED = false;   // 🔧 24w: no status before the Sheet is loaded (an early one said "🧪 Guest copy" on a family device)
+const READY = load().then(() => { LOADED = true; self.postMessage({ t: 'ready' }); status(); if (isFamily()) syncSoon(META.lastPull && Date.now() - META.lastPull < 120000 && !Object.keys(OPS).length ? 60000 : 1200); });
 self.addEventListener('online', () => { status(); syncSoon(800); });
 self.addEventListener('offline', () => status());
 self.onmessage = e => {

@@ -193,6 +193,7 @@
   .pads{position:absolute;inset:0;pointer-events:none;z-index:10;--pz-stick:150px;--pz-main:92px;--pz-btn:68px;--pz-gap:18px;--pz-edge:24px;
     --stick:var(--pad-stick,var(--pz-stick));--main:var(--pad-main,var(--pz-main));--shot:var(--pad-btn,var(--pz-btn));--pgap:calc(var(--pad-gap,var(--pz-gap)) + 3px);--pedge:calc(var(--pad-edge,var(--pz-edge)) + 3px);}   /* 🕹️ pz-1 recheck: + 3 px for the glow pulse */
   .pads.port{--pz-stick:160px;--pz-btn:74px;}
+  @media (orientation:landscape) and (max-height:519px){ .pads:not(.two){--stick:calc(var(--pad-stick,var(--pz-stick)) * .9);--main:calc(var(--pad-main,var(--pz-main)) * .91);--shot:calc(var(--pad-btn,var(--pz-btn)) * .9);} }   /* 📱 pd-10 pads (Aowu 20:21): a phone on its side — stick + ring a bit smaller (inside the pz-1 ±10 %), more court shows */
   @media (max-width:420px){ .pads.port{--pz-stick:150px;--pz-btn:72px;--pz-main:80px;} }
   @media (min-width:700px) and (min-height:700px){ .pads{--pz-stick:170px;--pz-main:96px;--pz-btn:74px;--pz-gap:20px;--pz-edge:26px;} }
   @media (orientation:landscape) and (max-height:400px){ .pads{--pz-stick:128px;--pz-main:80px;--pz-btn:58px;--pz-gap:18px;--pz-edge:25px;} }
@@ -1899,7 +1900,7 @@ if(UI.GAME_HELP && UI.GAME_HELP.pyraspike && !UI.GAME_HELP.pyraspike.some(l => S
 const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '🔥', name: 'PyraDive', levelId: 'hud-level',
   levels: () => leavePlay(), playing: () => !!(G && !G.over), onLeave: () => { stopLoop(); },
   pause: {pause: () => setPaused(true), resume: () => setPaused(false)}, pauseButton: true,
-  scoreMin: '4ch', onFit: () => { if(G) resize(); }});
+  scoreMin: '4ch', fold: 'short', onFit: () => { if(G) resize(); }});   /* 📱 pd-10: a phone on its side folds ◀ · Levels · 🏠 into ◀▾ → score in the same row, one bar row */
 var NAV_INNER = {setup: ['◀ PyraDive', () => showScreen('menu')]};
 UI.navBar(document.getElementById('back-btn'), {onclick: false});
 const $ = id => document.getElementById(id);
@@ -2960,6 +2961,8 @@ function resize(){
   const dpr = Math.max(1, Math.min(2, (window.devicePixelRatio || 1)) * G.q);
   cv.width = Math.round(st.width * dpr); cv.height = Math.round(st.height * dpr); G.dpr = dpr;
   const touch = isTouch(), portrait = st.height > st.width * 1.05;
+  { const lowS = touch && !portrait && innerHeight < 520 && !(G.locals && G.locals.length > 1);   // 📱 pd-10 stick low (Aowu 20:21 "joystick can lower down a bit"): on a phone on its side the stick stays at the bottom edge margin (UiKit's 🏠 home would lift it level with 💥)
+    window.UI_PADHOME = lowS ? false : undefined; if(lowS) document.querySelectorAll('#pads .stick').forEach(s => { s.__pzTy = 0; s.style.translate = ''; }); }
   const pcs = getComputedStyle($('pads')), pv = (k, d) => parseFloat(pcs.getPropertyValue(k)) || d;   // 🕹️ pd-5c: the pz-1 sizes
   const stEl = document.querySelector('#pads .stick'), stick = (stEl && stEl.offsetWidth) || pv('--stick', 150), padH = (window.UI && UI.pad && UI.pad.geo && !(G && G.locals && G.locals.length > 1)) ? UI.pad.geo(st.width, st.height, 4, {main: pv('--main', 92) + 4, btn: pv('--shot', 68) + 4}).h + 8 : (portrait ? 2 : 1) * (pv('--shot', 68) + pv('--pad-gap', 18) + 3) + pv('--main', 92) + pv('--pad-edge', 24) + 3;   // 🕹️ pz-1: UiKit vars (+ 3 px pulse room)
   const padB = touch ? (portrait ? Math.max(st.height * 0.34, stick + 40, padH * 0.85) : Math.min(stick * 0.42, st.height * 0.2)) : 30;
@@ -2971,7 +2974,19 @@ function resize(){
 const vo = short ? {padB, padT: isHoop(G.M) ? 38 : PD.isSpark(G.M) ? 34 : 22, zoom: true, rot: false, crowd: 26, hr: PD.isSpark(G.M) ? 2.0 : isHoop(G.M) ? VIEW_HR : 2.15, fext: hp ? 0.8 : 1.0, cband: 1.7, d0: hp ? 0.5 : 0.46}
                    : {padB, padT: 42, zoom: true, rot: st.height > st.width * 1.15, crowd: 44};
   V = makeView(st.width, st.height, G.M, vo); V.short = short;   // 📱 pd-5a: upright = the turned court
+  if(short && !V.rot) padGap(st);   // 📱 pd-10 gap: centre the court between the 🕹️ stick and the 🌼 ring
   if(G.cam != null) V.camX = G.cam;
+}
+// 📱 pd-10 (Aowu 2026-11-17 20:11 "center the court in between joystick and button"): on a phone held sideways the pads sit on the two sides —
+//   the court's middle goes to the middle of the GAP between them (the ring is wider than the stick, so the screen middle put the court under the ring).
+//   Drawing only: the engine never sees V (P() / the crowd / callouts / taps all read V.cx).
+function padGap(st){
+  const els = [...document.querySelectorAll('#pads .stick, #pads .sbtn')].filter(e => e.offsetParent !== null);
+  if(!els.length){ if(!G.gapRetry){ G.gapRetry = 1; requestAnimationFrame(() => { if(G) resize(); }); } return; }
+  let L = 0, R = st.width; els.forEach(e => { const r = e.getBoundingClientRect(), mid = (r.left + r.right) / 2 - st.left;
+    if(mid < st.width / 2) L = Math.max(L, r.right - st.left); else R = Math.min(R, r.left - st.left); });
+  const gap = R - L; if(gap < 160) return; V.gapL = L; V.gapR = R;
+  V.ox = (L + R) / 2 - st.width / 2; V.cx += V.ox;   // the court's middle (mid-court line at mid depth) = the gap's middle · the scenery (hoop tent, arches…) moves with it (drawArena)
 }
 // 👀 pd-5c: every 5th frame, a control with a player (or the ball) behind it turns see-through; pressing it still works
 function padThru(M){
@@ -3173,7 +3188,8 @@ function arenaDeco(g, d, W, H, farY, top, ph, layer){
 function drawArena(g, M, t){
   const W = V.W, H = V.H, farY = farLineY(M);
   const top = Math.max(V.short ? Math.max(28, farY * 0.33) : 0, farY - Math.min(V.k * 2.4, farY - 4));   // 📱 pd-5b: short sideways = room over the fans' signs
-  const bg = arenaBg(M, W, H, farY, top, Math.floor(t * 4) % 4); g.drawImage(bg, -20, -20, W + 40, H + 40);
+  const ox = V.ox || 0, aw = W + 2 * Math.abs(ox);   // 📱 pd-10 scenery: the court moved to the pads' gap → paint the background wider and slide it the same way (the hoop tent stays over the hoop)
+  const bg = arenaBg(M, aw, H, farY, top, Math.floor(t * 4) % 4); g.drawImage(bg, ox - Math.abs(ox) - 20, -20, aw + 40, H + 40);
   // spotlights (🪩 neon = coloured beams that sweep · ☁️ Olympus = warm sun rays · 🐙 / 🦖 / 🪐 none)
   const LK = arenaLook(M);
   if(LK.spot === 'white' || LK.spot === 'sun'){ g.globalAlpha = (LK.spot === 'sun' ? 0.16 : 0.09) + 0.03 * Math.sin(t * 1.3); g.fillStyle = LK.spot === 'sun' ? '#FFF1B8' : '#FFF4D6';
@@ -4044,4 +4060,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (pd-4c+cs-pd+ck-2d+pd-4e+pd-5a+pd-7+pd-5b+pd-6a+pd-5c+pd-6b+pd-5d+pd-6b2+pd-5e+pd-6c+pd-8a+pd-8b+pd-6d+pd-5f+pd-6e+pd-9a+pd-9b+pd-9c+pd-9d) END OF PyraDive.html -->
+<!-- (pd-4c+cs-pd+ck-2d+pd-4e+pd-5a+pd-7+pd-5b+pd-6a+pd-5c+pd-6b+pd-5d+pd-6b2+pd-5e+pd-6c+pd-8a+pd-8b+pd-6d+pd-5f+pd-6e+pd-9a+pd-9b+pd-9c+pd-9d+pd-10) END OF PyraDive.html -->
