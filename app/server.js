@@ -6284,7 +6284,8 @@ function sciChemStats_(st, name) {
   const c = (Array.isArray(s.c) ? s.c : []).map(String).filter(x => /^[a-z0-9]{1,16}$/.test(x));
   const a = (Array.isArray(s.a) ? s.a : []).map(Number).filter(n => n >= 1 && n <= 118 && Math.floor(n) === n);   // ⚛️ atoms you built (sc-2b)
   const p = (Array.isArray(s.p) ? s.p : []).map(String).filter(x => SCI_PARTS_.indexOf(x) >= 0);   // 🔬 particle cards (sc-2d)
-  return { e: Array.from(new Set(e)).sort((a, b) => a - b), c: Array.from(new Set(c)), a: Array.from(new Set(a)).sort((x, y) => x - y), r: artInt_(s.r, 0, 1e6), q: artInt_(s.q, 0, 1e6), p: Array.from(new Set(p)), pr: artInt_(s.pr, 0, 1e6), th: artInt_(s.th, 0, 1e6), el: artInt_(s.el, 0, 1e6), op: artInt_(s.op, 0, 1e6), ac: artInt_(s.ac, 0, 1e6), ge: artInt_(s.ge, 0, 1e6), bi: artInt_(s.bi, 0, 1e6), co: artInt_(s.co, 0, 1e6), me: artInt_(s.me, 0, 1e6) };   // 🧬 bi sc-4b · 🌌 co sc-4c · ⚙️ me sc-4d2   // 🌍 ge sc-4a   // 🔊 ac sc-3d   // 🌈 op sc-3c   // ⚡ el sc-3b   // 🔥 th sc-3a
+  const nb = (Array.isArray(s.nb) ? s.nb : []).map(String).filter(x => /^[a-z]{2,12}\.[a-z0-9]{2,12}$/.test(x)).slice(-400);   // 📒 notebook pages game.kind (sc-5a)
+  return { nb: Array.from(new Set(nb)), e: Array.from(new Set(e)).sort((a, b) => a - b), c: Array.from(new Set(c)), a: Array.from(new Set(a)).sort((x, y) => x - y), r: artInt_(s.r, 0, 1e6), q: artInt_(s.q, 0, 1e6), p: Array.from(new Set(p)), pr: artInt_(s.pr, 0, 1e6), th: artInt_(s.th, 0, 1e6), el: artInt_(s.el, 0, 1e6), op: artInt_(s.op, 0, 1e6), ac: artInt_(s.ac, 0, 1e6), ge: artInt_(s.ge, 0, 1e6), bi: artInt_(s.bi, 0, 1e6), co: artInt_(s.co, 0, 1e6), me: artInt_(s.me, 0, 1e6) };   // 🧬 bi sc-4b · 🌌 co sc-4c · ⚙️ me sc-4d2   // 🌍 ge sc-4a   // 🔊 ac sc-3d   // 🌈 op sc-3c   // ⚡ el sc-3b   // 🔥 th sc-3a
 }
 // elements you met by crafting: every material in every thing you own
 function sciCraftElems_(name) {
@@ -6296,7 +6297,7 @@ function sciCraftElems_(name) {
 function sciChemView_(st, name) {
   const s = sciChemStats_(st, name), craft = name ? sciCraftElems_(name) : [], all = {};
   s.e.concat(craft).forEach(n => { all[n] = 1; });
-  return { e: s.e, c: s.c, a: s.a, p: s.p, craft: craft, all: Object.keys(all).map(Number).sort((a, b) => a - b), rounds: s.r, qrounds: s.q, prounds: s.pr, trounds: s.th, erounds: s.el, orounds: s.op, arounds: s.ac, gerounds: s.ge, birounds: s.bi, corounds: s.co, merounds: s.me, mats: SCI_MAT_ELEMS_ };
+  return { nb: s.nb, e: s.e, c: s.c, a: s.a, p: s.p, craft: craft, all: Object.keys(all).map(Number).sort((a, b) => a - b), rounds: s.r, qrounds: s.q, prounds: s.pr, trounds: s.th, erounds: s.el, orounds: s.op, arounds: s.ac, gerounds: s.ge, birounds: s.bi, corounds: s.co, merounds: s.me, mats: SCI_MAT_ELEMS_ };
 }
 // 🎨 how many ⚛️ atom looks a player owns (Code.gs ITEM_LINES atomskin; 0 = only Classic)
 function sciAtomSkins_(name) { try { return itemsFor_(name, activePlayers_(listProfilesFull())).owned.atomskin || 0; } catch (e) { return 0; } }
@@ -6331,6 +6332,7 @@ function sciChemSave(name, level, kind, res) {
   const found = (Array.isArray(res.found) ? res.found : []).map(Number).filter(n => n >= 1 && n <= 118 && Math.floor(n) === n).slice(0, 40);
   const built = (Array.isArray(res.built) ? res.built : []).map(String).filter(x => /^[a-z0-9]{1,16}$/.test(x)).slice(0, 20);
   const parts = SCI_P_KINDS_[kind] ? (Array.isArray(res.parts) ? res.parts : []).map(String).filter(x => SCI_PARTS_.indexOf(x) >= 0).slice(0, 17) : [];   // 🔬 sc-2d
+  const learn = (Array.isArray(res.learn) ? res.learn : []).map(String).filter(x => /^[a-z]{2,12}\.[a-z0-9]{2,12}$/.test(x) && x.split('.')[0] === kind).slice(0, 20);   // 📒 sc-5a: pages learned this round (game.kind)
   const atoms = kind === 'atom' ? (Array.isArray(res.atoms) ? res.atoms : []).map(Number).filter(n => n >= 1 && n <= 118 && Math.floor(n) === n).slice(0, 20) : [];
   const total = Math.max(1, Math.min(20, Math.floor(Number(res.total)) || 1)), right = Math.max(0, Math.min(total, Math.floor(Number(res.right)) || 0));
   const stars = Math.max(1, Math.min(3, Math.floor(Number(res.stars)) || 1)), score = Math.max(0, Math.min(30000, Math.round(Number(res.score)) || 0));
@@ -6343,13 +6345,14 @@ function sciChemSave(name, level, kind, res) {
     const newComps = built.filter(x => S.c.indexOf(x) < 0).filter((x, i, a) => a.indexOf(x) === i);
     const newAtoms = atoms.filter(n => S.a.indexOf(n) < 0).filter((n, i, a) => a.indexOf(n) === i);
     const newParts = parts.filter(x => S.p.indexOf(x) < 0).filter((x, i, a) => a.indexOf(x) === i); S.p = S.p.concat(newParts);
+    const newNotes = learn.filter(x => S.nb.indexOf(x) < 0).filter((x, i, a) => a.indexOf(x) === i); S.nb = S.nb.concat(newNotes).slice(-400);   // 📒 sc-5a
     S.e = Array.from(new Set(S.e.concat(found, atoms))).sort((a, b) => a - b); S.c = S.c.concat(newComps); S.a = S.a.concat(newAtoms).sort((a, b) => a - b);
     if (SCI_M_KINDS_[kind]) S.me++; else if (SCI_C_KINDS_[kind]) S.co++; else if (SCI_B_KINDS_[kind]) S.bi++; else if (SCI_G_KINDS_[kind]) S.ge++; else if (SCI_A_KINDS_[kind]) S.ac++; else if (SCI_O_KINDS_[kind]) S.op++; else if (SCI_E_KINDS_[kind]) S.el++; else if (SCI_T_KINDS_[kind]) S.th++; else if (SCI_P_KINDS_[kind]) S.pr++; else if (SCI_Q_KINDS_[kind]) S.q++; else S.r++;
     saveSetting('SciElements_' + name, JSON.stringify(S));
     const extra = atoms.filter(n => !had[n] && newCards.indexOf(n) < 0).filter((n, i, a) => a.indexOf(n) === i); newCards.push.apply(newCards, extra);
     const all = before.all.concat(newCards).sort((a, b) => a - b);
     const stats = SCI_M_KINDS_[kind] ? { machineRounds: 1, elements: all.length } : SCI_C_KINDS_[kind] ? { cosmicRounds: 1, elements: all.length } : SCI_B_KINDS_[kind] ? { bioRounds: 1, elements: all.length } : SCI_G_KINDS_[kind] ? { geoRounds: 1, elements: all.length } : SCI_A_KINDS_[kind] ? { acousticsRounds: 1, elements: all.length } : SCI_O_KINDS_[kind] ? { opticsRounds: 1, elements: all.length } : SCI_E_KINDS_[kind] ? { electroRounds: 1, elements: all.length } : SCI_T_KINDS_[kind] ? { thermoRounds: 1, elements: all.length } : SCI_P_KINDS_[kind] ? { particleRounds: 1, particles: S.p.length } : kind === 'atom' ? { quantumRounds: 1, atoms: S.a.length, elements: all.length } : SCI_Q_KINDS_[kind] ? { quantumRounds: 1, elements: all.length } : { chemRounds: 1, elements: all.length, compounds: S.c.length };
-    out = { kind: kind, level: lv, newCards: newCards, newComps: newComps, newAtoms: newAtoms, newParts: newParts, chem: { e: S.e, c: S.c, a: S.a, p: S.p, craft: before.craft, all: all, rounds: S.r, qrounds: S.q, prounds: S.pr, trounds: S.th, erounds: S.el, orounds: S.op, arounds: S.ac, gerounds: S.ge, birounds: S.bi, corounds: S.co, merounds: S.me }, score: score, stars: stars, stats: stats };
+    out = { kind: kind, level: lv, newNotes: newNotes, newCards: newCards, newComps: newComps, newAtoms: newAtoms, newParts: newParts, chem: { nb: S.nb, e: S.e, c: S.c, a: S.a, p: S.p, craft: before.craft, all: all, rounds: S.r, qrounds: S.q, prounds: S.pr, trounds: S.th, erounds: S.el, orounds: S.op, arounds: S.ac, gerounds: S.ge, birounds: S.bi, corounds: S.co, merounds: S.me }, score: score, stars: stars, stats: stats };
   } finally { lock.releaseLock(); }
   try { out.save = saveLevelResult(SCI_GAME_, name, lv, { score: score, stars: stars, cleared: stars >= 2, timeSec: Math.max(0, Math.round(Number(res.timeSec) || 0)),
     theme: SCI_CHEM_KINDS_[kind], stats: out.stats }); }
@@ -6421,7 +6424,7 @@ function sciRun(name, ref, test, level, guess, rig) {
   catch (e) { res.save = { err: String(e && e.message || e) }; }
   return res;
 }
-// (sc-1+sc-2a+sc-2b+sc-2b2+sc-2c+sc-2d+sc-3a+sc-3b+sc-3c+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2) END OF SciencetoryCode.gs
+// (sc-1+sc-2a+sc-2b+sc-2b2+sc-2c+sc-2d+sc-3a+sc-3b+sc-3c+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+sc-5a) END OF SciencetoryCode.gs
 
 ;
 /* ===== on the device only: the grown-up PIN arrives hashed from the family Sheet (OfflineSync.gs) ===== */
