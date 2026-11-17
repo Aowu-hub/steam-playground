@@ -2647,6 +2647,7 @@ const FEAT_DEFS = {
     breaks: { name: 'Crash tests', icon: '💥', kind: 'sum', tiers: [1, 10, 50] },
     records: { name: 'Family records', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },
     testKinds: { name: 'Different tests', icon: '⚙️', kind: 'max', tiers: [3, 6, 12] },
+    allKinds: { name: 'Science tests tried', icon: '🧪', kind: 'max', tiers: [6, 12, 17] },   // 🧪 sc-4d (12 strength + 5 science tests on your things)
     samples: { name: 'Sample tests', icon: '🧪', kind: 'sum', hidden: true },
     games: { name: 'Sciencetory runs', icon: '🔬', kind: 'sum', hidden: true },
     elements: { name: 'Element cards', icon: '📇', kind: 'max', tiers: [10, 40, 118] },   // ⚗️ sc-2a (sciChemSave: how many of the 118 you own)
@@ -2877,6 +2878,7 @@ const TITLE_DEFS = [
   { id: 'sb_cups', name: 'Cup Collector', icon: '🥇', hint: 'Win 5 SlaBrall tournaments', rule: f => featVal_(f, 'sla-brall', 'cups') >= 5 },
   { id: 'sci_rat', name: 'Lab Rat', icon: '🐀', hint: 'Run 10 tests in Sciencetory', rule: f => featVal_(f, 'sciencetory', 'tests') >= 10 },
   { id: 'sci_pilot', name: 'Test Pilot', icon: '🧑‍✈️', hint: 'Try all 12 ⚙️ Mechanic tests in Sciencetory', rule: f => featVal_(f, 'sciencetory', 'testKinds') >= 12 },
+  { id: 'sci_super', name: 'Super Tester', icon: '🦸', hint: 'Try all 17 tests on your things in Sciencetory (12 strength + 5 science)', rule: f => featVal_(f, 'sciencetory', 'allKinds') >= 17 },   // 🧪 sc-4d
   { id: 'sci_guess', name: 'Hypothesis Hero', icon: '🎯', hint: 'Guess 20 test results right in Sciencetory', rule: f => featVal_(f, 'sciencetory', 'right') >= 20 },
   { id: 'sci_elem', name: 'Element Hunter', icon: '📇', hint: 'Collect 40 element cards in ⚗️ Sciencetory Chemistry', rule: f => featVal_(f, 'sciencetory', 'elements') >= 40 },   // ⚗️ sc-2a
   { id: 'sci_mol', name: 'Molecule Maker', icon: '⚛️', hint: 'Build 20 different molecules in ⚗️ Sciencetory Chemistry', rule: f => featVal_(f, 'sciencetory', 'compounds') >= 20 },
@@ -4883,7 +4885,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -6015,7 +6017,7 @@ function artRepair(name, id) {
 
 ;
 /* ===== SciencetoryCode.gs ===== */
-/* SciencetoryCode.gs — 🔬 Sciencetory server (sc-1, ⚗️ Chemistry sc-2a, ⚛️ Quantum atom builder sc-2b, 💡 LED · ✨ glow · 🐱 cat sc-2b2, 🧫 Kitchen lab sc-2c, 🔬 Particle sc-2d). Own file: Code.gs is past 300 KB (same pattern as ArtifactoryCode.gs).
+/* SciencetoryCode.gs — 🔬 Sciencetory server (sc-1, ⚗️ Chemistry sc-2a, ⚛️ Quantum atom builder sc-2b, 💡 LED · ✨ glow · 🐱 cat sc-2b2, 🧫 Kitchen lab sc-2c, 🔬 Particle sc-2d, 🧪 5 science tests on your things sc-4d). Own file: Code.gs is past 300 KB (same pattern as ArtifactoryCode.gs).
    Plan: Drive "Sciencetory — full plan.md". Shares Artifactory's data: the Artifacts tab (things you made) + the bag (ArtifactoryCode.gs).
    ⚙️ Mechanic tests (SC-1): press · pull · twist · flex · fatigue · hardness · sharpness · drop · friction · balance · spin · float / leak.
    Every test is a pure function of the thing (material + shape + quality) — the same thing always gives the same number, no luck.
@@ -6082,6 +6084,66 @@ const SCI_TOOLS_ = { hardness: [['💅', 'fingernail'], ['🪙', 'copper coin'],
 const SCI_MULT_ = [1, 1.25, 1.5, 2, 2.5, 7.5];   // 💀 Hardcore = ×3 of Extreme
 const SCI_INF_ = 99999;
 
+/* ---------- 🧪 sc-4d: 5 SCIENCE TESTS ON YOUR THINGS ----------
+   Same flow as the 12 strength tests (set → guess → run → test card), the same "no luck" rule, and none of them can break a thing.
+   material → [☕ minutes cocoa stays warm in a cup of it, 💡 bulb brightness %, 🧲 paper clips after a magnet rub, 🌈 light through %, ✨ shine %, 🔔 ring seconds, 🔔 pitch ×]
+   kid-scale, rounded: metals let heat + electricity through · only iron + steel are magnetic (steel keeps it) · bell metal rings longest. */
+const SCI_X_MAT_ = {
+  oak: [22, 0, 0, 0, 12, 0.6, 0.5], bamboo: [20, 0, 0, 0, 15, 1.2, 0.7], teak: [22, 0, 0, 0, 15, 0.6, 0.5],
+  iron: [7, 30, 3, 0, 40, 3, 1], copper: [6, 95, 0, 0, 70, 2.5, 0.9], tin: [7, 30, 0, 0, 60, 0.8, 0.8], bronze: [7, 25, 0, 0, 60, 6, 1], silver: [5, 100, 0, 0, 95, 3.5, 1],
+  gold: [6, 75, 0, 0, 85, 1.5, 0.7], zinc: [7, 40, 0, 0, 50, 1.5, 0.9], brass: [7, 35, 0, 0, 75, 5, 1], steel: [8, 20, 8, 0, 70, 4.5, 1.1],
+  granite: [13, 0, 0, 0, 30, 1.5, 1], jade: [14, 0, 0, 20, 35, 2.5, 1.2], crystal: [12, 0, 0, 85, 45, 3, 1.3], ruby: [12, 0, 0, 50, 50, 2.5, 1.4], sapphire: [12, 0, 0, 50, 50, 2.5, 1.4], amethyst: [12, 0, 0, 60, 45, 3, 1.3],
+  clay: [15, 0, 0, 0, 10, 0.8, 0.6], glass: [12, 0, 0, 90, 40, 3.5, 1.3], sglass: [12, 0, 0, 70, 40, 3.5, 1.3],
+  fabric: [18, 0, 0, 0, 5, 0, 0], leather: [18, 0, 0, 0, 10, 0, 0], fdye: [18, 0, 0, 0, 5, 0, 0], filament: [18, 0, 0, 0, 25, 0.3, 0.7], resin: [16, 0, 0, 80, 40, 0.4, 0.7],
+  flower: [18, 0, 0, 0, 5, 0, 0], carbon: [15, 5, 0, 0, 5, 0.5, 0.6]
+};
+Object.assign(SCI_TESTS_, {
+  warm:    { icon: '☕', name: 'Keeps warm', sec: '🔥 Thermo', unit: 'min', ch: [5, 8, 10, 15, 20, 25], bk3: [10, 20], bk4: [8, 15, 25], q: 'Will it keep cocoa warm for {c} minutes?' },
+  conduct: { icon: '💡', name: 'Conducts', sec: '⚡ Electro', unit: '%', ch: [1, 1, 20, 40, 70, 90], bk3: [1, 50], bk4: [1, 30, 80], q0: 'Will the bulb light up?', q: 'Will the bulb shine at {c}% or brighter?' },
+  magnet:  { icon: '🧲', name: 'Magnetic', sec: '⚡ Electro', unit: 'clips', ch: [1, 1, 2, 4, 6, 8], bk3: [1, 5], bk4: [1, 3, 6], q0: 'Will the magnet stick to it?', q: 'Rub it with a magnet — will it pick up {c} paper clips?' },
+  light:   { icon: '🌈', name: 'Clear / shiny', sec: '🌈 Optics', unit: '%', ch: [10, 25, 40, 55, 70, 85], bk3: [30, 70], bk4: [20, 50, 80], q: 'Will {c}% of the torch light reach the meter?' },
+  ring:    { icon: '🔔', name: 'Ring tone', sec: '🔊 Acoustics', unit: 's', ch: [0.5, 1, 2, 3, 4, 5], bk3: [1, 3], bk4: [0.8, 2, 4], q: 'Tap it — will it ring for {c} seconds?' }
+});
+const SCI_STRENGTH_ = SCI_ORDER_.slice();   // the 12 strength tests (🧑‍✈️ Test Pilot)
+const SCI_X_ORDER_ = ['warm', 'conduct', 'magnet', 'light', 'ring'];
+SCI_X_ORDER_.forEach(k => { if (SCI_ORDER_.indexOf(k) < 0) SCI_ORDER_.push(k); });
+const SCI_INT_ = { warm: 1, conduct: 1, magnet: 1, light: 1 };
+const SCI_NOTES_ = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+function sciNoFitX_(a, test, F) {
+  if (test !== 'warm') return '';
+  if (F.kind === 'basket') return 'A basket has gaps — the cocoa pours straight out!';
+  if (F.floppy) return 'Soft cloth can’t hold cocoa — try a cup, bowl or goblet.';
+  if (!F.S[4] && F.kind !== 'sample') return 'It can’t hold cocoa — try a cup, bowl or goblet.';
+  return '';
+}
+function sciMeasureX_(a, test, lv) {
+  const T = SCI_TESTS_[test], F = sciFacts_(a), X = SCI_X_MAT_[F.m] || SCI_X_MAT_.oak, ch = T.ch[lv], L = F.look, ck = Math.min(1.4, F.chunk);
+  let v = 0, how = '';
+  const x = {};
+  if (test === 'warm') {   // ☕ minutes until the cocoa drops below 40 °C (it starts at 70 °C)
+    v = Math.round(X[0] * (0.85 + 0.15 * ck) * (F.hollow && F.wall < 1 ? 0.75 : 1));
+    how = X[1] >= 20 ? 'metal' : X[0] >= 16 ? 'insul' : 'mid'; if (F.hollow && F.wall < 1) x.thin = 1;
+  } else if (test === 'conduct') {   // 💡 bulb brightness with the thing in the gap
+    v = X[1]; how = v >= 70 ? 'bright' : v >= 20 ? 'dim' : v > 0 ? 'faint' : 'none';
+  } else if (test === 'magnet') {   // 🧲 paper clips it lifts after a magnet rub (steel keeps the magnetism, iron lets it go)
+    v = X[2] ? Math.max(1, Math.round(X[2] * (0.7 + 0.3 * ck))) : 0; how = !v ? 'none' : F.m === 'steel' ? 'keep' : 'soft';
+  } else if (test === 'light') {   // 🌈 % of a torch beam that reaches the meter — through it (glass, gems) or bounced off it (polished metal)
+    const qf = 0.8 + F.q / 500;
+    const thr = Math.min(100, Math.round(X[3] * qf));
+    const sh = Math.min(100, Math.round(X[4] * qf + (L.v ? 10 : 0) + (F.m === 'clay' && L.c ? 25 : 0) + (F.kind === 'gem' ? (Number(L.cut) || 0) * 5 : 0)));
+    x.mode = thr >= sh ? 'through' : 'shine'; x.thr = thr; x.sh = sh; v = Math.max(thr, sh); how = v < 20 ? 'dull' : x.mode;
+    if (L.v) x.varnish = 1; if (F.m === 'clay' && L.c) x.glaze = 1;
+  } else if (test === 'ring') {   // 🔔 seconds it keeps ringing after a tap + the note it rings (smaller = higher)
+    const rep = Number(L.rp) || 0;
+    v = F.floppy ? 0 : Math.round(X[5] * (F.S[4] ? 1.4 : 1) * (F.chunk < 0.5 ? 0.8 : 1) * (rep ? 0.5 : 1) * 10) / 10;
+    const hz = 440 * (X[6] || 0.6) / Math.sqrt(Math.max(0.3, F.chunk)) * (F.S[4] ? 0.8 : 1), semi = Math.round(12 * Math.log(hz / 261.63) / Math.LN2);
+    x.hz = Math.round(261.63 * Math.pow(2, semi / 12)); x.note = SCI_NOTES_[((semi % 12) + 12) % 12] + (4 + Math.floor(semi / 12));
+    if (rep) x.rep = 1; if (F.S[4]) x.bowl = 1;
+    how = v >= 3 ? 'ring' : v >= 0.5 ? 'short' : 'thud';
+  }
+  return { v: v, pass: v >= ch, broke: false, how: how, leak: false, x: x };
+}
+
 function sciMatOf_(a) {
   const L = a.look || {}, k = a.kind;
   if (k === 'fcharm') return 'resin';
@@ -6107,6 +6169,7 @@ function sciFacts_(a) {
 // 🚫 which tests make no sense for a thing (a scarf can't stand up …) → reason text
 function sciNoFit_(a, test) {
   const F = sciFacts_(a);
+  if (SCI_TESTS_[test] && SCI_TESTS_[test].sec) return sciNoFitX_(a, test, F);   // 🧪 sc-4d
   if (test === 'balance' && F.S[2] < 0) return 'It can’t stand up by itself — try something that stands.';
   if (test === 'balance' && F.floppy) return 'Soft cloth flops over — try something that stands.';
   if (test === 'spin' && (F.floppy || F.S[3] === 0 && ['necklace', 'tag', 'badge', 'medal', 'charm', 'key', 'flag'].indexOf(F.kind) >= 0)) return 'It can’t spin on its own — try something round.';
@@ -6115,6 +6178,7 @@ function sciNoFit_(a, test) {
 function sciOpenContainer_(F) { return !!F.S[4]; }   // cups, bowls, vases … get the 🫗 leak test, everything else the 💧 float test
 // 🧮 the measurement — returns {v (number, SCI_INF_ = never fails), pass, broke, how}
 function sciMeasure_(a, test, lv) {
+  if (SCI_TESTS_[test] && SCI_TESTS_[test].sec) return sciMeasureX_(a, test, lv);   // 🧪 sc-4d
   const T = SCI_TESTS_[test], F = sciFacts_(a), P = F.P, ch = T.ch[lv];
   const strong = F.qf * F.rep;
   let v = 0, how = '', pass = false, broke = false;
@@ -6171,7 +6235,7 @@ function sciMeasure_(a, test, lv) {
   return { v: v, pass: pass, broke: broke, how: how, leak: false };
 }
 function sciBucket_(v, edges) { let i = 0; while (i < edges.length && v >= edges[i]) i++; return i; }
-function sciRound_(test, v) { if (v >= SCI_INF_) return SCI_INF_; return test === 'press' || test === 'pull' || test === 'fatigue' ? sciNum_(v, 0) : sciNum_(v, v < 1 ? 2 : 1); }
+function sciRound_(test, v) { if (v >= SCI_INF_) return SCI_INF_; return test === 'press' || test === 'pull' || test === 'fatigue' || SCI_INT_[test] ? sciNum_(v, 0) : sciNum_(v, v < 1 ? 2 : 1); }
 
 /* ---------- data ---------- */
 function sciStats_(st, name) {
@@ -6342,16 +6406,16 @@ function sciRun(name, ref, test, level, guess, rig) {
     const stars = 1 + (rg >= 0.6 ? 1 : 0) + (right ? 1 : 0), score = Math.round((60 + 40 * rg + (right ? 100 : 0) + (fam ? 50 : 0)) * SCI_MULT_[lv]);
     const tool = SCI_TOOLS_[test] ? SCI_TOOLS_[test][lv] : null;
     res = { test: test, level: lv, value: val, inf: val >= SCI_INF_, pass: M.pass, broke: M.broke, how: M.how, leak: M.leak, unit: meta.unit, ch: meta.ch[lv], tool: tool,
-      ranges: ranges, bucket: bucket, guess: guess, right: right, rig: rg, stars: stars, score: score, m: sciMatOf_(a), kind: a.kind, sample: !!a.sample,
+      ranges: ranges, bucket: bucket, guess: guess, right: right, x: M.x || null, rig: rg, stars: stars, score: score, m: sciMatOf_(a), kind: a.kind, sample: !!a.sample,
       item: a.sample ? { id: a.id, kind: 'sample', name: a.name, look: a.look } : publicArt_(a), rec: { mine: mine, fam: fam, best: test === 'float' && !M.leak ? r.low : r.best, famPrev: fam0[test] || null },
-      kinds: Object.keys(S.t).filter(k => S.t[k].n > 0).length, stats: { tests: 1, right: right ? 1 : 0, breaks: M.broke ? 1 : 0, records: fam ? 1 : 0, testKinds: Object.keys(S.t).filter(k => S.t[k].n > 0).length, samples: a.sample ? 1 : 0 } };
+      kinds: Object.keys(S.t).filter(k => S.t[k].n > 0).length, stats: { tests: 1, right: right ? 1 : 0, breaks: M.broke ? 1 : 0, records: fam ? 1 : 0, testKinds: SCI_STRENGTH_.filter(k => S.t[k] && S.t[k].n > 0).length, allKinds: SCI_ORDER_.filter(k => S.t[k] && S.t[k].n > 0).length, samples: a.sample ? 1 : 0 } };
   } finally { lock.releaseLock(); }
   // the Archive board (Theme = section · test), feats + titles — after the lock (saveLevelResult takes it itself)
-  try { res.save = saveLevelResult(SCI_GAME_, name, res.level, { score: res.score, stars: res.stars, cleared: res.stars >= 2, timeSec: 0, theme: '⚙️ Mechanic · ' + SCI_TESTS_[test].name, stats: res.stats }); }
+  try { res.save = saveLevelResult(SCI_GAME_, name, res.level, { score: res.score, stars: res.stars, cleared: res.stars >= 2, timeSec: 0, theme: (SCI_TESTS_[test].sec || '⚙️ Mechanic') + ' · ' + SCI_TESTS_[test].name, stats: res.stats }); }
   catch (e) { res.save = { err: String(e && e.message || e) }; }
   return res;
 }
-// (sc-1+sc-2a+sc-2b+sc-2b2+sc-2c+sc-2d+sc-3a+sc-3b+sc-3c+sc-3d+sc-4a+sc-4b+sc-4c) END OF SciencetoryCode.gs
+// (sc-1+sc-2a+sc-2b+sc-2b2+sc-2c+sc-2d+sc-3a+sc-3b+sc-3c+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d) END OF SciencetoryCode.gs
 
 ;
 /* ===== on the device only: the grown-up PIN arrives hashed from the family Sheet (OfflineSync.gs) ===== */
