@@ -739,6 +739,7 @@ const MODES_ = [
   { game: 'sciencetory', id: 'optics', icon: '🌈', name: 'Sciencetory Optics', pitch: 'Rainbows, mirror mazes + magnifiers!', route: 'sciencetory', added: '2026-11-16', tried: { board: 'sciencetory', themeStart: '🌈 Optics' } },   // 🌈 sc-3c
   { game: 'sciencetory', id: 'acoustics', icon: '🔊', name: 'Sciencetory Acoustics', pitch: 'Sound waves, echoes + thunder counting!', route: 'sciencetory', added: '2026-11-17', tried: { board: 'sciencetory', themeStart: '🔊 Acoustics' } },   // 🔊 sc-3d
   { game: 'sciencetory', id: 'geo', icon: '🌍', name: 'Sciencetory Geo', pitch: 'Scratch rocks, read a compass, shake!', route: 'sciencetory', added: '2026-11-17', tried: { board: 'sciencetory', themeStart: '🌍 Geo' } },   // 🌍 sc-4a
+  { game: 'sciencetory', id: 'bio', icon: '🧬', name: 'Sciencetory Bio', pitch: 'Bones, heartbeats + hollow tubes!', route: 'sciencetory', added: '2026-11-17', tried: { board: 'sciencetory', themeStart: '🧬 Bio' } },   // 🧬 sc-4b
   { game: 'sla-brall', id: 'slashot', icon: '🏒', name: 'SlaShot', pitch: 'Table hockey — score goals!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaShot ·', feat: [['sla-brall', 'win_slashot']] } },
   { game: 'sla-brall', id: 'slapoof', icon: '🥒', name: 'SlaPoof', pitch: 'Pickleball — mind the kitchen!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaPoof ·', feat: [['sla-brall', 'win_slapoof']] } },
   { game: 'sla-brall', id: 'slaball', icon: '🎾', name: 'SlaBall', pitch: 'Tennis: 15, 30, 40, game!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaBall ·', feat: [['sla-brall', 'win_slaball']] } },
@@ -2659,6 +2660,7 @@ const FEAT_DEFS = {
     opticsRounds: { name: 'Optics rounds', icon: '🌈', kind: 'sum', tiers: [5, 20, 60] },   // 🌈 sc-3c (sciChemSave kinds prism / mixc / mirror / lens)
     acousticsRounds: { name: 'Acoustics rounds', icon: '🔊', kind: 'sum', tiers: [5, 20, 60] },   // 🔊 sc-3d (sciChemSave kinds wave / xylo / echo / thunder)
     geoRounds: { name: 'Geo rounds', icon: '🌍', kind: 'sum', tiers: [5, 20, 60] },   // 🌍 sc-4a (sciChemSave kinds scratch / rocks / compass / quake)
+    bioRounds: { name: 'Bio rounds', icon: '🧬', kind: 'sum', tiers: [5, 20, 60] },   // 🧬 sc-4b (sciChemSave kinds skel / sense / heart / tube)
   },
   // ⏱️ Pokadif Arcade feats (pk-2b)
   'pokadif-arcade': {
@@ -2883,6 +2885,7 @@ const TITLE_DEFS = [
   { id: 'sci_light', name: 'Light Bender', icon: '🌈', hint: 'Finish 20 rounds in 🌈 Sciencetory Optics', rule: f => featVal_(f, 'sciencetory', 'opticsRounds') >= 20 },   // 🌈 sc-3c
   { id: 'sci_sound', name: 'Sound Sleuth', icon: '🔊', hint: 'Finish 20 rounds in 🔊 Sciencetory Acoustics', rule: f => featVal_(f, 'sciencetory', 'acousticsRounds') >= 20 },   // 🔊 sc-3d
   { id: 'sci_rock', name: 'Rock Hound', icon: '🌍', hint: 'Finish 20 rounds in 🌍 Sciencetory Geo', rule: f => featVal_(f, 'sciencetory', 'geoRounds') >= 20 },   // 🌍 sc-4a
+  { id: 'sci_body', name: 'Body Boffin', icon: '🧬', hint: 'Finish 20 rounds in 🧬 Sciencetory Bio', rule: f => featVal_(f, 'sciencetory', 'bioRounds') >= 20 },   // 🧬 sc-4b
   { id: 'pk_eyes', name: 'Sharp Eyes', icon: '👀', hint: 'Find 50 differences in Pokadif', rule: f => featVal_(f, 'pokadif', 'found') >= 50 },
   { id: 'pk_eagle', name: 'Eagle Eye', icon: '🦅', hint: 'Finish 10 Pokadif pictures with no oops and no hint', rule: f => featVal_(f, 'pokadif', 'perfect') >= 10 },
   { id: 'pk_case', name: 'Case Closer', icon: '📁', hint: 'Solve 10 Pokadif cases', rule: f => featVal_(f, 'pokadif', 'cases') >= 10 },
@@ -4877,7 +4880,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -6209,7 +6212,7 @@ function sciChemStats_(st, name) {
   const c = (Array.isArray(s.c) ? s.c : []).map(String).filter(x => /^[a-z0-9]{1,16}$/.test(x));
   const a = (Array.isArray(s.a) ? s.a : []).map(Number).filter(n => n >= 1 && n <= 118 && Math.floor(n) === n);   // ⚛️ atoms you built (sc-2b)
   const p = (Array.isArray(s.p) ? s.p : []).map(String).filter(x => SCI_PARTS_.indexOf(x) >= 0);   // 🔬 particle cards (sc-2d)
-  return { e: Array.from(new Set(e)).sort((a, b) => a - b), c: Array.from(new Set(c)), a: Array.from(new Set(a)).sort((x, y) => x - y), r: artInt_(s.r, 0, 1e6), q: artInt_(s.q, 0, 1e6), p: Array.from(new Set(p)), pr: artInt_(s.pr, 0, 1e6), th: artInt_(s.th, 0, 1e6), el: artInt_(s.el, 0, 1e6), op: artInt_(s.op, 0, 1e6), ac: artInt_(s.ac, 0, 1e6), ge: artInt_(s.ge, 0, 1e6) };   // 🌍 ge sc-4a   // 🔊 ac sc-3d   // 🌈 op sc-3c   // ⚡ el sc-3b   // 🔥 th sc-3a
+  return { e: Array.from(new Set(e)).sort((a, b) => a - b), c: Array.from(new Set(c)), a: Array.from(new Set(a)).sort((x, y) => x - y), r: artInt_(s.r, 0, 1e6), q: artInt_(s.q, 0, 1e6), p: Array.from(new Set(p)), pr: artInt_(s.pr, 0, 1e6), th: artInt_(s.th, 0, 1e6), el: artInt_(s.el, 0, 1e6), op: artInt_(s.op, 0, 1e6), ac: artInt_(s.ac, 0, 1e6), ge: artInt_(s.ge, 0, 1e6), bi: artInt_(s.bi, 0, 1e6) };   // 🧬 bi sc-4b   // 🌍 ge sc-4a   // 🔊 ac sc-3d   // 🌈 op sc-3c   // ⚡ el sc-3b   // 🔥 th sc-3a
 }
 // elements you met by crafting: every material in every thing you own
 function sciCraftElems_(name) {
@@ -6221,7 +6224,7 @@ function sciCraftElems_(name) {
 function sciChemView_(st, name) {
   const s = sciChemStats_(st, name), craft = name ? sciCraftElems_(name) : [], all = {};
   s.e.concat(craft).forEach(n => { all[n] = 1; });
-  return { e: s.e, c: s.c, a: s.a, p: s.p, craft: craft, all: Object.keys(all).map(Number).sort((a, b) => a - b), rounds: s.r, qrounds: s.q, prounds: s.pr, trounds: s.th, erounds: s.el, orounds: s.op, arounds: s.ac, gerounds: s.ge, mats: SCI_MAT_ELEMS_ };
+  return { e: s.e, c: s.c, a: s.a, p: s.p, craft: craft, all: Object.keys(all).map(Number).sort((a, b) => a - b), rounds: s.r, qrounds: s.q, prounds: s.pr, trounds: s.th, erounds: s.el, orounds: s.op, arounds: s.ac, gerounds: s.ge, birounds: s.bi, mats: SCI_MAT_ELEMS_ };
 }
 // 🎨 how many ⚛️ atom looks a player owns (Code.gs ITEM_LINES atomskin; 0 = only Classic)
 function sciAtomSkins_(name) { try { return itemsFor_(name, activePlayers_(listProfilesFull())).owned.atomskin || 0; } catch (e) { return 0; } }
@@ -6233,12 +6236,14 @@ const SCI_CHEM_KINDS_ = { hunt: '⚗️ Chemistry · Element hunt', formula: '�
   circ: '⚡ Electro · Circuits', cond: '⚡ Electro · Conductor or insulator', mag: '⚡ Electro · Magnetic', emag: '⚡ Electro · Electromagnet',   // ⚡ sc-3b
   prism: '🌈 Optics · Prism rainbow', mixc: '🌈 Optics · Light vs paint', mirror: '🌈 Optics · Mirror maze', lens: '🌈 Optics · Magnifier',   // 🌈 sc-3c
   wave: '🔊 Acoustics · Wave viewer', xylo: '🔊 Acoustics · Xylophone', echo: '🔊 Acoustics · Echo', thunder: '🔊 Acoustics · Thunder counting',   // 🔊 sc-3d
-  scratch: '🌍 Geo · Scratch test', rocks: '🌍 Geo · Rock map', compass: '🌍 Geo · Compass', quake: '🌍 Geo · Layers + shake table' };   // 🌍 sc-4a
+  scratch: '🌍 Geo · Scratch test', rocks: '🌍 Geo · Rock map', compass: '🌍 Geo · Compass', quake: '🌍 Geo · Layers + shake table',   // 🌍 sc-4a
+  skel: '🧬 Bio · Skeleton + levers', sense: '🧬 Bio · Eyes + ears', heart: '🧬 Bio · Heartbeat', tube: '🧬 Bio · Hollow tubes' };   // 🧬 sc-4b
 const SCI_T_KINDS_ = { therm: 1, melt: 1, warm: 1, flow: 1 };   // 🔥 sc-3a
 const SCI_E_KINDS_ = { circ: 1, cond: 1, mag: 1, emag: 1 };   // ⚡ sc-3b
 const SCI_O_KINDS_ = { prism: 1, mixc: 1, mirror: 1, lens: 1 };   // 🌈 sc-3c
 const SCI_A_KINDS_ = { wave: 1, xylo: 1, echo: 1, thunder: 1 };   // 🔊 sc-3d
 const SCI_G_KINDS_ = { scratch: 1, rocks: 1, compass: 1, quake: 1 };   // 🌍 sc-4a
+const SCI_B_KINDS_ = { skel: 1, sense: 1, heart: 1, tube: 1 };   // 🧬 sc-4b
 const SCI_P_KINDS_ = { quark: 1, collide: 1 };
 const SCI_PARTS_ = ['u', 'c', 't', 'd', 's', 'b', 'e', 'mu', 'tau', 've', 'vmu', 'vtau', 'g', 'ph', 'z', 'w', 'h'];   // the 17 Standard-Model cards
 const SCI_Q_KINDS_ = { atom: 1, led: 1, glow: 1, cat: 1 };
@@ -6263,12 +6268,12 @@ function sciChemSave(name, level, kind, res) {
     const newAtoms = atoms.filter(n => S.a.indexOf(n) < 0).filter((n, i, a) => a.indexOf(n) === i);
     const newParts = parts.filter(x => S.p.indexOf(x) < 0).filter((x, i, a) => a.indexOf(x) === i); S.p = S.p.concat(newParts);
     S.e = Array.from(new Set(S.e.concat(found, atoms))).sort((a, b) => a - b); S.c = S.c.concat(newComps); S.a = S.a.concat(newAtoms).sort((a, b) => a - b);
-    if (SCI_G_KINDS_[kind]) S.ge++; else if (SCI_A_KINDS_[kind]) S.ac++; else if (SCI_O_KINDS_[kind]) S.op++; else if (SCI_E_KINDS_[kind]) S.el++; else if (SCI_T_KINDS_[kind]) S.th++; else if (SCI_P_KINDS_[kind]) S.pr++; else if (SCI_Q_KINDS_[kind]) S.q++; else S.r++;
+    if (SCI_B_KINDS_[kind]) S.bi++; else if (SCI_G_KINDS_[kind]) S.ge++; else if (SCI_A_KINDS_[kind]) S.ac++; else if (SCI_O_KINDS_[kind]) S.op++; else if (SCI_E_KINDS_[kind]) S.el++; else if (SCI_T_KINDS_[kind]) S.th++; else if (SCI_P_KINDS_[kind]) S.pr++; else if (SCI_Q_KINDS_[kind]) S.q++; else S.r++;
     saveSetting('SciElements_' + name, JSON.stringify(S));
     const extra = atoms.filter(n => !had[n] && newCards.indexOf(n) < 0).filter((n, i, a) => a.indexOf(n) === i); newCards.push.apply(newCards, extra);
     const all = before.all.concat(newCards).sort((a, b) => a - b);
-    const stats = SCI_G_KINDS_[kind] ? { geoRounds: 1, elements: all.length } : SCI_A_KINDS_[kind] ? { acousticsRounds: 1, elements: all.length } : SCI_O_KINDS_[kind] ? { opticsRounds: 1, elements: all.length } : SCI_E_KINDS_[kind] ? { electroRounds: 1, elements: all.length } : SCI_T_KINDS_[kind] ? { thermoRounds: 1, elements: all.length } : SCI_P_KINDS_[kind] ? { particleRounds: 1, particles: S.p.length } : kind === 'atom' ? { quantumRounds: 1, atoms: S.a.length, elements: all.length } : SCI_Q_KINDS_[kind] ? { quantumRounds: 1, elements: all.length } : { chemRounds: 1, elements: all.length, compounds: S.c.length };
-    out = { kind: kind, level: lv, newCards: newCards, newComps: newComps, newAtoms: newAtoms, newParts: newParts, chem: { e: S.e, c: S.c, a: S.a, p: S.p, craft: before.craft, all: all, rounds: S.r, qrounds: S.q, prounds: S.pr, trounds: S.th, erounds: S.el, orounds: S.op, arounds: S.ac, gerounds: S.ge }, score: score, stars: stars, stats: stats };
+    const stats = SCI_B_KINDS_[kind] ? { bioRounds: 1, elements: all.length } : SCI_G_KINDS_[kind] ? { geoRounds: 1, elements: all.length } : SCI_A_KINDS_[kind] ? { acousticsRounds: 1, elements: all.length } : SCI_O_KINDS_[kind] ? { opticsRounds: 1, elements: all.length } : SCI_E_KINDS_[kind] ? { electroRounds: 1, elements: all.length } : SCI_T_KINDS_[kind] ? { thermoRounds: 1, elements: all.length } : SCI_P_KINDS_[kind] ? { particleRounds: 1, particles: S.p.length } : kind === 'atom' ? { quantumRounds: 1, atoms: S.a.length, elements: all.length } : SCI_Q_KINDS_[kind] ? { quantumRounds: 1, elements: all.length } : { chemRounds: 1, elements: all.length, compounds: S.c.length };
+    out = { kind: kind, level: lv, newCards: newCards, newComps: newComps, newAtoms: newAtoms, newParts: newParts, chem: { e: S.e, c: S.c, a: S.a, p: S.p, craft: before.craft, all: all, rounds: S.r, qrounds: S.q, prounds: S.pr, trounds: S.th, erounds: S.el, orounds: S.op, arounds: S.ac, gerounds: S.ge, birounds: S.bi }, score: score, stars: stars, stats: stats };
   } finally { lock.releaseLock(); }
   try { out.save = saveLevelResult(SCI_GAME_, name, lv, { score: score, stars: stars, cleared: stars >= 2, timeSec: Math.max(0, Math.round(Number(res.timeSec) || 0)),
     theme: SCI_CHEM_KINDS_[kind], stats: out.stats }); }
@@ -6340,7 +6345,7 @@ function sciRun(name, ref, test, level, guess, rig) {
   catch (e) { res.save = { err: String(e && e.message || e) }; }
   return res;
 }
-// (sc-1+sc-2a+sc-2b+sc-2b2+sc-2c+sc-2d+sc-3a+sc-3b+sc-3c+sc-3d+sc-4a) END OF SciencetoryCode.gs
+// (sc-1+sc-2a+sc-2b+sc-2b2+sc-2c+sc-2d+sc-3a+sc-3b+sc-3c+sc-3d+sc-4a+sc-4b) END OF SciencetoryCode.gs
 
 ;
 /* ===== on the device only: the grown-up PIN arrives hashed from the family Sheet (OfflineSync.gs) ===== */
