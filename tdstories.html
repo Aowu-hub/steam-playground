@@ -2521,10 +2521,13 @@ function act2FxFrom(f, spec){ if(!f.mk){ f.mk = 1; const hd = G.heroes.dragon; i
    🌄 own sky (gradient · sun / moon · hazy hills · far castle · clouds · birds · valley mist) · 🌅 storybook day: morning → dusk (halfway) → night (last wave) ·
    🏮 lanterns along the roads light up at dusk, fireflies at night · 🎭 the tower has a round STAGE on top · 🐉 TDDragon + 👸 TDPrincess: 5 SHAPE stages
    on tiers 1 · 3 · 5 · 7 · 10, coloured by the main skill colour from tier 5, ✨ 1.2 s morph moment when a stage changes (🌱 Basic: 0.6 s, no flash). */
-const ISO = {A: 10, B: 5, OX: 0, OY: 0, zi: 0.3, O: 5, N: 26, key: '', M: null, lanterns: [], fly: []};
+const ISO = {A: 10, B: 5, OX: 0, OY: 0, zi: 0.3, O: 5, N: 26, key: '', M: null, lanterns: [], fly: [], rq: 0, rc: 1, rs: 0, rcx: 0, rcy: 0};   // 🔄 fd-1d: rq = the view is turned (rc / rs = cos / sin round rcx, rcy)
 function setIso(){ const s = VIEW.s; ISO.A = s / Math.SQRT2; ISO.B = ISO.A / 2; ISO.zi = ISO.A / 32; ISO.OX = VIEW.px / 2; ISO.OY = (V25.TOP + V25.R / 2) * s - (TD.CX + TD.CY) * ISO.B; }
-const IX = (x, y) => ISO.OX + (x - y) * ISO.A, IY = (x, y, z) => ISO.OY + (x + y) * ISO.B - (z || 0) * V25.Z * VIEW.s;
-function groundTf(g, sx, sy){ const d = VIEW.dpr; g.setTransform(d * ISO.A, d * ISO.B, -d * ISO.A, d * ISO.B, d * (ISO.OX + (sx || 0)), d * (ISO.OY + (sy || 0))); }   // draw in world units on the ground
+const IX = (x, y) => ISO.rq ? ISO.OX + ((ISO.rc - ISO.rs) * (x - ISO.rcx) - (ISO.rs + ISO.rc) * (y - ISO.rcy)) * ISO.A : ISO.OX + (x - y) * ISO.A,
+  IY = (x, y, z) => (ISO.rq ? ISO.OY + (ISO.rcx + ISO.rcy + (ISO.rc + ISO.rs) * (x - ISO.rcx) + (ISO.rc - ISO.rs) * (y - ISO.rcy)) * ISO.B : ISO.OY + (x + y) * ISO.B) - (z || 0) * V25.Z * VIEW.s;   // 🔄 fd-1d
+function groundTf(g, sx, sy){ const d = VIEW.dpr; if(ISO.rq){ const c = ISO.rc, n = ISO.rs, a = ISO.A * (c - n), b = ISO.B * (c + n), cc = -ISO.A * (n + c), dd = ISO.B * (c - n);   // 🔄 fd-1d
+    g.setTransform(d * a, d * b, d * cc, d * dd, d * (ISO.OX + (sx || 0) - a * ISO.rcx - cc * ISO.rcy), d * (ISO.OY + (sy || 0) + ISO.B * (ISO.rcx + ISO.rcy) - b * ISO.rcx - dd * ISO.rcy)); return; }
+  g.setTransform(d * ISO.A, d * ISO.B, -d * ISO.A, d * ISO.B, d * (ISO.OX + (sx || 0)), d * (ISO.OY + (sy || 0))); }   // draw in world units on the ground
 function nearRoad(x, y){ let d = 9; G.paths.forEach(P => { for(let q = 0; q <= P.len; q += 0.25){ const p = TD.ptAt(P, q); const e = Math.hypot(p.x - x, p.y - y); if(e < d) d = e; } }); return d; }
 // 🏝️ the island map for this chapter (cached): a wobbly round rim, roads run out into the fade, a few soft mounds away from the roads
 function isoIsland(){
@@ -3511,12 +3514,12 @@ function fdStart(ch, lvl, opt){
   $('goal').textContent = opt.bonus ? '🎃 Second try: +' + opt.bonus + ' pumpkins — make the walk LONG!' : '🍄 Plant a maze — make the collectors walk so far they give up!';
   if(!$('fd-steps')){ const d = document.createElement('div'); d.className = 'fd-steps'; d.id = 'fd-steps'; $('stage').appendChild(d); }
   $('fd-steps').classList.remove('hidden');
-  FDZ.z = 1; FDZ.ox = FDZ.oy = 0; FDP.lmode = fdMode(); $('scr-play').classList.add('fd'); $('scr-play').classList.toggle('fd-land', fdMode() === 'land');
+  FDZ.z = 1; FDZ.ox = FDZ.oy = 0; FDR.spin = null; fdSetRot(fdRotSaved() * Math.PI / 2); FDP.lmode = fdMode(); $('scr-play').classList.add('fd'); $('scr-play').classList.toggle('fd-land', fdMode() === 'land');
   showScreen('play'); BAR.fit(); fdRenderPanel(); layout(); BAR.fit(); fdZoomButtons(); fdHud(true);
   last = 0; raf = requestAnimationFrame(loop);
   setTimeout(nextPick, FX ? 450 : 0);
 }
-function fdLeave(){ fdCloseCard(); fdCloseStory(); const s = $('fd-steps'); if(s) s.classList.add('hidden'); const zb = $('fd-zoom'); if(zb) zb.classList.add('hidden'); const sp = $('scr-play'); sp.classList.remove('fd', 'tl', 'tl-land', 'fd-port'); { const bb = $('fd-build'); if(bb) bb.remove(); } FDZ.z = 1; FDZ.ox = FDZ.oy = 0; if(typeof VIEW !== 'undefined' && VIEW.base){ VIEW.s = VIEW.base; VIEW.base = null; VIEW.px = -1; } BAR.hide('pump'); BAR.hide('seeds'); BAR.hide('coll'); }
+function fdLeave(){ FDR.spin = null; fdSetRot(0); ISO.rq = 0; fdCloseCard(); fdCloseStory(); const s = $('fd-steps'); if(s) s.classList.add('hidden'); const zb = $('fd-zoom'); if(zb) zb.classList.add('hidden'); const sp = $('scr-play'); sp.classList.remove('fd', 'tl', 'tl-land', 'fd-port'); { const bb = $('fd-build'); if(bb) bb.remove(); } FDZ.z = 1; FDZ.ox = FDZ.oy = 0; if(typeof VIEW !== 'undefined' && VIEW.base){ VIEW.s = VIEW.base; VIEW.base = null; VIEW.px = -1; } BAR.hide('pump'); BAR.hide('seeds'); BAR.hide('coll'); }
 
 /* ---------- 🦸 panel: 🌱 build bar + 👨‍🌾 / 🐐 skill rows ---------- */
 function fdRenderPanel(){
@@ -3611,10 +3614,14 @@ function fdGuide(){
 }
 
 /* ---------- 👆 tapping the map: plant (tap twice) · open a plant · move ---------- */
-function fdCellAt(px, py){ const a = (px - ISO.OX) / ISO.A, b = (py - ISO.OY) / ISO.B, x = (a + b) / 2, y = (b - a) / 2; return {i: Math.floor(x + FD.O), j: Math.floor(y + FD.O)}; }
+function fdCellAt(px, py){ const p = fdWorldAt(px, py), x = p.x, y = p.y; return {i: Math.floor(x + FD.O), j: Math.floor(y + FD.O)}; }
+function fdWorldAt(px, py){ const a = (px - ISO.OX) / ISO.A, b = (py - ISO.OY) / ISO.B, x1 = (a + b) / 2, y1 = (b - a) / 2; if(!ISO.rq) return {x: x1, y: y1};   // 🔄 fd-1d: undo the turn
+  const dx = x1 - ISO.rcx, dy = y1 - ISO.rcy; return {x: ISO.rcx + ISO.rc * dx + ISO.rs * dy, y: ISO.rcy - ISO.rs * dx + ISO.rc * dy}; }
 function fdTap(e){
+  if(FDR.spin) return;   // 🔄 no planting mid-spin
   if(!isFarm() || pickOpen || G.paused || G.state === 'won' || G.state === 'lost' || G.state === 'pick') return;
-  const r = $('cv').getBoundingClientRect(), c = fdCellAt(e.clientX - r.left, e.clientY - r.top), P = FD.plantAt(G, c.i, c.j);
+  const r = $('cv').getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, c = fdCellAt(px, py);
+  let P = FD.plantAt(G, c.i, c.j); if(FDP.mode !== 'move'){ const H = fdPlantHit(px, py); if(H && (!P || fdDep(H.x, H.y) > fdDep(P.x, P.y))){ fdOpenCard(H); return; } }   // 👆 fd-1d: the top of a tall plant IN FRONT wins (it is what you see there)
   if(P && FDP.mode !== 'move'){ fdOpenCard(P); return; }
   if(FDP.mode === 'move'){ const mp = G.plants.find(q => q.id === FDP.moveId); if(!mp){ FDP.mode = 'plant'; return; }
     if(P && P.id === mp.id){ FDP.mode = 'plant'; FDP.moveId = 0; banner('🚚 Move cancelled'); return; }
@@ -3655,7 +3662,7 @@ function fdStory(html, btn){ fdCloseStory(); const d = document.createElement('d
   $('arena').appendChild(d); if(G) G.paused = true; d.querySelector('button').onclick = () => { fdCloseStory(); if(G) G.paused = false; last = 0; }; }
 function fdCloseStory(){ const d = $('fd-story'); if(d) d.remove(); }
 /* (fd-1b) taps come from fdPointer below — a drag or a pinch is not a tap */
-document.addEventListener('keydown', e => { if(!isFarm() || $('scr-play').classList.contains('hidden') || e.repeat || pickOpen) return; const k = e.key.toUpperCase(), kind = Object.keys(FD_HK).find(x => FD_HK[x] === k);
+document.addEventListener('keydown', e => { if(!isFarm() || $('scr-play').classList.contains('hidden') || e.repeat || pickOpen) return; if(/^[qe]$/i.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey){ fdTurn(/e/i.test(e.key) ? 1 : -1); return; } const k = e.key.toUpperCase(), kind = Object.keys(FD_HK).find(x => FD_HK[x] === k);
   if(kind){ fdSelect(kind); e.preventDefault(); } if(e.key === 'Escape'){ fdCloseCard(); FDP.pick = null; FDP.mode = 'plant'; } });
 
 /* ---------- ⏱️ loop + events ---------- */
@@ -3665,7 +3672,7 @@ function fdLoop(now){
   if(was === 'break' && G.state === 'wave'){ $('go-btn').classList.add('hidden'); if(HAND === $('go-btn') || HAND === $('cv')) hideHand(); FDP.hint = []; FDP.pick = FDP.pick && FD.canPlant(G, FDP.pick.i, FDP.pick.j, FDP.sel).ok ? FDP.pick : null; }
   fdEvents(FD.takeEvents(G)); if(!G) return;
   FT = FT.filter(f => (f.t += dt) < f.dur);
-  fdPaint(now / 1000); fdPanelTick(); fdHud(); fdGuide();
+  fdSpinStep(now); fdPaint(now / 1000); fdPanelTick(); fdHud(); fdGuide();
   if(G && (G.state === 'won' || G.state === 'lost') && !G.ended){ G.ended = 1; setTimeout(() => finish(), FX ? 1300 : 0); }
 }
 let fdLastSnd = 0;
@@ -3704,32 +3711,51 @@ function fdEvents(list){
 
 /* ---------- 🎨 the farm picture ---------- */
 const fdTo = (x, y) => ({x: IX(x, y), y: IY(x, y, 0)});
-function fdBake(tod){
-  const cv = $('cv'), c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; const g = c.getContext('2d'), s = VIEW.s, W = VIEW.px, H = VIEW.ph, d = VIEW.dpr;
+// 🔄 fd-1d: the background is built from parts so the island can spin under a still sky: 🌤️ sky (per time of day) · 🏝️ island ground + yard
+//   (per view step, with the matrix it was baked with) · 🌳 the misty edge ring (drawn live while spinning) · tint / dusk / vignette on top
+function fdSky(tod){ FDP.sky = FDP.sky || {}; const key = FDP.bgKey.replace(/:r\d$/, '') + ':' + tod; if(FDP.sky[tod] && FDP.sky[tod].key === key) return FDP.sky[tod];
+  const cv = $('cv'), c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; const g = c.getContext('2d'), W = VIEW.px, H = VIEW.ph, d = VIEW.dpr;
   const base = scenePal(), P = Object.assign({}, base, tod && !base.night ? TOD_SKY[tod] : {}), R = FD.rngOf(G.C.n * 97 + 3), M = G.map;
   g.setTransform(d, 0, 0, d, 0, 0); drawSky(g, P, W, H, R);
-  const isl = document.createElement('canvas'); isl.width = c.width; isl.height = c.height; const ig = isl.getContext('2d'), zs = ISO.zi * d, oy = ISO.OY - 2 * ISO.O * ISO.B;
+  // 🌳 a ring of trees + hay on the misty edge (not part of the farm grid) — the same seed = the same ring
+  const stand = []; for(let j = 0; j < FD.N; j++) for(let i = 0; i < FD.N; i++){ const k = j * FD.N + i; if(G.isl.solid[k] || M.isVoid(i, j) || M.al[k] < 150) continue; if(R() > 0.35) continue;
+    if(G.gates.some(Gt => Math.abs(Gt.i - i) + Math.abs(Gt.j - j) < 3)) continue; stand.push({x: FD.wx(i) + (R() - 0.5) * 0.4, y: FD.wx(j) + (R() - 0.5) * 0.4, ic: ['🌳', '🌳', '🌲', '🌾', '🌻', '🪨'][Math.floor(R() * 6)]}); }
+  stand.forEach(o => { o.big = o.ic === '🌳' || o.ic === '🌲'; o.sz = o.big ? 1.05 + R() * 0.3 : 0.55; o.r1 = R(); o.r2 = R(); });
+  FDP.sky[tod] = {key, c, stand, base}; return FDP.sky[tod]; }
+const FD_EDGE = {'🌳': ['mango', 'jtree', 'mushtree'], '🌲': ['jtree', 'mango'], '🌾': ['haybale', 'corn'], '🌻': ['sunflower', 'pumpkins', 'flowerpatch'], '🪨': ['rock', 'bush']};   // 🌳 fd-1b: IsoProps
+function fdEdge(g, stand){ const s = VIEW.s;   // g in screen px (dpr transform); far → near in the CURRENT view
+  stand.slice().sort((a, b) => fdDep(a.x, a.y) - fdDep(b.x, b.y)).forEach(o => {
+    if(fdHasProps()){ const L = FD_EDGE[o.ic], key = L[Math.floor(o.r1 * L.length)], it = fdItem('edge', key, 0, 0, {v: Math.floor(o.r2 * 4)}); if(it && fdProp(g, it, {dx: o.x + FD.O - 0.5, dy: o.y + FD.O - 0.5, scale: o.big ? 0.8 + o.r2 * 0.35 : 0.85})) return; }
+    shadow(g, o.x, o.y, o.sz * 0.4); emo(g, o.ic, IX(o.x, o.y), IY(o.x, o.y, 0) - s * o.sz * 0.45, s * o.sz); }); }
+function fdIsl(k){ FDP.isl = FDP.isl || {}; const key = FDP.bgKey.replace(/:r\d$/, ''); if(FDP.isl[k] && FDP.isl[k].key === key) return FDP.isl[k];
+  const th0 = FDR.th; fdSetRot(k * Math.PI / 2);   // bake in that view's exact angle
+  const cv = $('cv'), d = VIEW.dpr, M = fdMapK(k), isl = document.createElement('canvas'); isl.width = cv.width; isl.height = cv.height; const ig = isl.getContext('2d'), zs = ISO.zi * d, oy = ISO.OY - 2 * ISO.O * ISO.B;
   for(let cj = 0; cj < Math.ceil(M.h / Iso.CH); cj++) for(let ci = 0; ci < Math.ceil(M.w / Iso.CH); ci++){ const C = Iso._bakeChunk(M, ci, cj, zs); if(C) ig.drawImage(C.c, Math.round((ISO.OX + C.ox * ISO.zi) * d), Math.round((oy + C.oy * ISO.zi) * d)); }
   // 🏡 the yard round the farmhouse + a dirt patch at each gate (in world units, cut by the island's own edge)
-  const rc = document.createElement('canvas'); rc.width = c.width; rc.height = c.height; const rg = rc.getContext('2d'); groundTf(rg);
+  const rc = document.createElement('canvas'); rc.width = isl.width; rc.height = isl.height; const rg = rc.getContext('2d'); groundTf(rg); const m = rg.getTransform();
   rg.fillStyle = 'rgba(205,160,100,.55)'; rg.beginPath(); rg.ellipse(FD.CX + 0.3, FD.CY + 0.4, 2.6, 2.4, 0.4, 0, 7); rg.fill();
   rg.fillStyle = 'rgba(150,105,60,.35)'; G.gates.forEach(Gt => { rg.beginPath(); rg.ellipse(FD.wx(Gt.i), FD.wx(Gt.j), 0.9, 0.9, 0, 0, 7); rg.fill(); });
   rg.setTransform(1, 0, 0, 1, 0, 0); rg.globalCompositeOperation = 'destination-in'; rg.drawImage(isl, 0, 0); rg.globalCompositeOperation = 'source-over'; ig.drawImage(rc, 0, 0);
-  g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(isl, 0, 0); g.setTransform(d, 0, 0, d, 0, 0);
-  // 🌳 a ring of trees + hay on the misty edge (not part of the farm grid), far first
-  const stand = []; for(let j = 0; j < FD.N; j++) for(let i = 0; i < FD.N; i++){ const k = j * FD.N + i; if(G.isl.solid[k] || M.isVoid(i, j) || M.al[k] < 150) continue; if(R() > 0.35) continue;
-    if(G.gates.some(Gt => Math.abs(Gt.i - i) + Math.abs(Gt.j - j) < 3)) continue; stand.push({x: FD.wx(i) + (R() - 0.5) * 0.4, y: FD.wx(j) + (R() - 0.5) * 0.4, ic: ['🌳', '🌳', '🌲', '🌾', '🌻', '🪨'][Math.floor(R() * 6)]}); }
-  const EDGE = {'🌳': ['mango', 'jtree', 'mushtree'], '🌲': ['jtree', 'mango'], '🌾': ['haybale', 'corn'], '🌻': ['sunflower', 'pumpkins', 'flowerpatch'], '🪨': ['rock', 'bush']};   // 🌳 fd-1b: IsoProps
-  stand.sort((a, b) => (a.x + a.y) - (b.x + b.y)).forEach(o => { const big = o.ic === '🌳' || o.ic === '🌲', sz = big ? 1.05 + R() * 0.3 : 0.55, r1 = R(), r2 = R();
-    if(fdHasProps()){ const L = EDGE[o.ic], key = L[Math.floor(r1 * L.length)], it = fdItem('edge', key, 0, 0, {v: Math.floor(r2 * 4)}); if(it && fdProp(g, it, {dx: o.x + FD.O - 0.5, dy: o.y + FD.O - 0.5, scale: big ? 0.8 + r2 * 0.35 : 0.85})) return; }
-    shadow(g, o.x, o.y, sz * 0.4); emo(g, o.ic, IX(o.x, o.y), IY(o.x, o.y, 0) - s * sz * 0.45, s * sz); });
+  fdSetRot(th0); FDP.isl[k] = {key, c: isl, m}; return FDP.isl[k]; }
+function fdBgTop(g, base, tod, W, H){ g.setTransform(VIEW.dpr, 0, 0, VIEW.dpr, 0, 0);
   if(base.tint){ g.fillStyle = base.tint; g.fillRect(0, 0, W, H); }
   if(tod){ g.globalCompositeOperation = 'source-atop'; g.fillStyle = tod === 2 ? 'rgba(30,30,110,.40)' : 'rgba(255,120,60,.15)'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over'; }
-  const vg = g.createRadialGradient(W / 2, H * 0.55, Math.min(W, H) * 0.4, W / 2, H * 0.55, Math.max(W, H) * 0.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(40,20,60,.2)'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
-  return c;
+  const vg = g.createRadialGradient(W / 2, H * 0.55, Math.min(W, H) * 0.4, W / 2, H * 0.55, Math.max(W, H) * 0.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(40,20,60,.2)'); g.fillStyle = vg; g.fillRect(0, 0, W, H); }
+function fdBake(tod){
+  const cv = $('cv'), c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; const g = c.getContext('2d'), W = VIEW.px, H = VIEW.ph, d = VIEW.dpr, S0 = fdSky(tod);
+  g.drawImage(S0.c, 0, 0); g.drawImage(fdIsl(fdK()).c, 0, 0); g.setTransform(d, 0, 0, d, 0, 0); fdEdge(g, S0.stand);
+  fdBgTop(g, S0.base, tod, W, H); return c;
 }
+// one frame of the spin: the still sky + the island drawn through (matrix now) × (matrix it was baked with)⁻¹ + the edge ring live + tint on top
+function fdSpinBG(g){ const sp = FDR.spin, cv = $('cv'), a = Math.floor(FDP.tod), S0 = fdSky(a), W = VIEW.px, H = VIEW.ph, d = VIEW.dpr;
+  let c = FDP.spinC; if(!c || c.width !== cv.width || c.height !== cv.height){ c = FDP.spinC = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; }
+  const cg = c.getContext('2d'); cg.setTransform(1, 0, 0, 1, 0, 0); cg.clearRect(0, 0, c.width, c.height); cg.drawImage(S0.c, 0, 0);
+  const L = sp.q < 0.5 ? sp.L0 : sp.L1; groundTf(cg); const now = cg.getTransform(); cg.setTransform(now.multiply(L.m.inverse())); cg.drawImage(L.c, 0, 0);
+  cg.setTransform(d, 0, 0, d, 0, 0); fdEdge(cg, S0.stand); fdBgTop(cg, S0.base, a, W, H);
+  g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(c, 0, 0); }
 function fdPaintBG(g, dt){
-  const key = VIEW.px + ':' + VIEW.ph + ':' + VIEW.dpr + ':' + G.C.n + ':' + VIEW.s.toFixed(3) + ':' + Math.round(ISO.OX) + ':' + Math.round(ISO.OY); if(FDP.bgKey !== key){ FDP.bgKey = key; FDP.bgs = [null, null, null]; FDP.tod = todWant(); ISO.lanterns = []; }
+  if(FDR.spin){ fdSpinBG(g); return; }   // 🔄 fd-1d
+  const key = VIEW.px + ':' + VIEW.ph + ':' + VIEW.dpr + ':' + G.C.n + ':' + VIEW.s.toFixed(3) + ':' + Math.round(ISO.OX) + ':' + Math.round(ISO.OY) + ':r' + fdK(); if(FDP.bgKey !== key){ FDP.bgKey = key; FDP.bgs = [null, null, null]; FDP.tod = todWant(); ISO.lanterns = []; }
   const w = todWant(); if(FDP.tod !== w){ FDP.tod = FDP.tod < w ? Math.min(w, FDP.tod + dt * 0.35) : Math.max(w, FDP.tod - dt * 0.35); } TOD.v = FDP.tod;
   const a = Math.floor(FDP.tod), f = FDP.tod - a; if(!FDP.bgs[a]) FDP.bgs[a] = fdBake(a); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(FDP.bgs[a], 0, 0);
   if(f > 0.001){ if(!FDP.bgs[a + 1]) FDP.bgs[a + 1] = fdBake(a + 1); g.globalAlpha = f; g.drawImage(FDP.bgs[a + 1], 0, 0); g.globalAlpha = 1; }
@@ -3743,9 +3769,31 @@ const fdHasProps = () => typeof Props !== 'undefined' && !!Props.item && !!Iso.d
 function fdV(sx, sy){ return {zoom: ISO.zi, dpr: VIEW.dpr || 1, toScreen: (x, y, z) => ({x: IX(x - FD.O, y - FD.O) + (sx || 0), y: IY(x - FD.O, y - FD.O, 0) - (z || 0) * Iso.HZ * ISO.zi + (sy || 0)})}; }
 // one item per key (cached; a new state / look = a new item, pictures come from IsoProps' own cache)
 function fdItem(key, prop, i, j, o){ const k = key + '|' + prop + '|' + i + ',' + j + '|' + JSON.stringify(o || {}); let it = FDPR.it.get(k); if(it) return it;
-  if(FDPR.it.size > 400) FDPR.it.clear(); try{ it = Props.item(prop, i, j, Object.assign({look: 'farm'}, o || {})); }catch(e){ it = null; } FDPR.it.set(k, it); return it; }
-function fdProp(g, it, o){ if(!it || !it.pic) return false; o = o || {}; g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
-  const ok = Iso.drawPic(g, fdV(o.sx, o.sy), it.pic, it.x + (o.dx || 0), it.y + (o.dy || 0), it.z || 0, {alpha: o.alpha, scale: o.scale}); g.restore(); return ok; }
+  if(FDPR.it.size > 600) FDPR.it.clear(); try{ it = Props.item(prop, i, j, Object.assign({look: 'farm'}, o || {})); if(it){ it._prop = prop; it._o = o || {}; } }catch(e){ it = null; } FDPR.it.set(k, it); return it; }
+function fdProp(g, it, o){ if(!it || !it.pic) return false; o = o || {}; const R = fdRotItem(it, o); if(!R.it || !R.it.pic) return false; g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
+  const ok = Iso.drawPic(g, fdVr(o.sx, o.sy), R.it.pic, R.x, R.y, it.z || 0, {alpha: o.alpha, scale: o.scale}); g.restore(); return ok; }
+/* 🔄 fd-1d: the view turns (Aowu 21:26 · his Home Layout app = the guide): only the CAMERA turns — maze, paths, saves never change. ⟲ ⟳ (Q / E) spin 90°
+   in 0.42 s round the island (zoomed in: round the spot in the middle of the screen); the ground spins smoothly (the baked island drawn through
+   one affine matrix), things standing on it slide with the spin and switch to their turned picture half way (IsoProps rebuilds a turned MODEL, never
+   a mirror). The angle is kept per player (localStorage). Book 1 never turns (ISO.rq = 0 = the old formulas). */
+const FDR = {k: 0, th: 0, spin: null};
+function fdSetRot(th){ const q = th / (Math.PI / 2), k = Math.round(q), ex = Math.abs(q - k) < 1e-9, m = ((k % 4) + 4) % 4;
+  ISO.rc = ex ? [1, 0, -1, 0][m] : Math.cos(th); ISO.rs = ex ? [0, 1, 0, -1][m] : Math.sin(th); ISO.rcx = ISO.rcy = FD.CX; ISO.rq = ex && m === 0 ? 0 : 1; FDR.th = th; }
+const fdK = () => ((Math.round(FDR.th / (Math.PI / 2)) % 4) + 4) % 4;
+// a world point (x, y) in the turned view's own frame
+function fdRot(x, y){ if(!ISO.rq) return [x, y]; const dx = x - ISO.rcx, dy = y - ISO.rcy; return [ISO.rcx + ISO.rc * dx - ISO.rs * dy, ISO.rcy + ISO.rs * dx + ISO.rc * dy]; }
+const fdDep = (x, y) => { const r = fdRot(x, y); return r[0] + r[1]; };   // far → near in the turned view
+// the raw diamond projection (map coords of the TURNED frame → screen)
+function fdVr(sx, sy){ return {zoom: ISO.zi, dpr: VIEW.dpr || 1, toScreen: (x, y, z) => ({x: ISO.OX + ((x - FD.O) - (y - FD.O)) * ISO.A + (sx || 0), y: ISO.OY + ((x - FD.O) + (y - FD.O)) * ISO.B - (z || 0) * Iso.HZ * ISO.zi + (sy || 0)})}; }
+// a prop in the turned view: its footprint centre turns with the view, its picture is the model turned by 3 × k (turn 0 front +y · 1 +x · 2 −y · 3 −x)
+function fdRotItem(it, o, kf){ o = o || {}; const k = kf != null ? kf : fdK(); let it2 = it;
+  if(k && it._prop){ const oo = Object.assign({}, it._o); oo.turn = ((oo.turn | 0) + 3 * k) % 4; it2 = fdItem('rot', it._prop, 0, 0, oo) || it; }
+  const w = it.w || 1, d = it.d || 1, r = fdRot(it.x + (o.dx || 0) + w / 2 - FD.O, it.y + (o.dy || 0) + d / 2 - FD.O), w2 = it2.w || w, d2 = it2.d || d;
+  return {it: it2, x: r[0] + FD.O - w2 / 2, y: r[1] + FD.O - d2 / 2}; }
+// the turned map for view step k (cells rotated round the island centre: turned cell (i', j') = old (j', N − 1 − i'), k times), cached per chapter
+function fdMapK(k){ if(!k) return G.map; FDP.mapk = FDP.mapk || {}; const key = G.C.n + ':' + k + ':' + G.map.id; if(FDP.mapk[k] && FDP.mapk[k].key === key) return FDP.mapk[k].m; const N = FD.N, M0 = G.map;
+  const m = Iso.map({w: N, h: N, theme: M0.theme, seed: M0.seed, base: M0.base, cell: (i, j) => { let a = i, b = j; for(let q = 0; q < k; q++){ const t = a; a = b; b = N - 1 - t; } const c = M0.get(a, b); return c ? {t: c.t, h: c.h, fade: c.fade, block: c.block} : {t: 'void'}; }});
+  FDP.mapk[k] = {key, m}; return m; }
 const fdPileN = () => Math.max(0, Math.min(12, Math.ceil(G.hearts || 0)));
 function fdHouseIt(){ return fdItem('house', 'farmhouse', FD.HOUSE[0][0], FD.HOUSE[0][1], {v: (G.C.n - 1) % 4}); }
 function fdGateIt(Gt){ const a = Gt.ang || 0, along = Math.abs(Math.cos(a)) > Math.abs(Math.sin(a));   // the gate spans ACROSS the walk
@@ -3774,18 +3822,28 @@ function fdDrawPic(g, p, x, y, sx, sy, a){ g.save(); g.translate(x, y); if(sx !=
 const FD_PK = () => VIEW.s / 30;   // plant painters: a plant fills its tile (it is a WALL too)
 // 🌱 fd-1c draw one plant prop (+ its 🐣 morph moment: the old shape until the white silhouette peaks, then the new shape bounces in under the sparkles)
 const FDPM = new Map();
-const FD_PSC = [1, 1.45, 1.2, 1, 1, 1];   // a seed / sprout is drawn a bit bigger so the first maze walls read as walls (like the draft painters)
+const FD_PSC = [1, 1.6, 1.45, 1.3, 1.2, 1.15];   // fd-1d (Aowu 21:26): plants ~1.3× (seeds 1.6×) — easy to see + tap; giants grow less so the maze stays readable
+// 👻 fd-1d: a plant standing IN FRONT of the spot you are aiming at (tap-preview, 🚚 move, or the mouse) goes see-through
+function fdAim(){ return FDP.pick ? {i: FDP.pick.i, j: FDP.pick.j} : FDP.hover || null; }
+function fdCovers(P){ const a = fdAim(); if(!a || (a.i === P.i && a.j === P.j)) return false; const ax = FD.wx(a.i), ay = FD.wx(a.j);
+  if(fdDep(P.x, P.y) <= fdDep(ax, ay)) return false; const px = IX(P.x, P.y), py = IY(P.x, P.y, 0), qx = IX(ax, ay), qy = IY(ax, ay, 0), h = fdPlantH(P);
+  return Math.abs(qx - px) < ISO.A * 0.9 && qy < py && qy > py - h; }
+// how tall a plant stands on screen (its prop height × the size boost)
+function fdPlantH(P){ let h = 40; try{ const it = fdPlantIt(P); const gh = it && it.grow && it.grow.h; h = (gh && (typeof gh === 'object' ? gh[it.state] : gh)) || 40; }catch(e){} return h * ISO.zi * (FD_PSC[P.st] || 1) + ISO.B * 0.6; }
+// 👆 a tap on the TOP part of a tall plant picks that plant (not the hidden square behind it); frontmost first
+function fdPlantHit(px, py){ let best = null, bd = -1e9; G.plants.forEach(P => { const x = IX(P.x, P.y), y = IY(P.x, P.y, 0), h = fdPlantH(P);
+    if(Math.abs(px - x) < ISO.A * 0.55 && py < y - ISO.B * 0.9 && py > y - h){ const d = fdDep(P.x, P.y); if(d > bd){ bd = d; best = P; } } }); return best; }
 function fdPlantNow(g, P, born, sw, sx, sy){ const it = fdPlantIt(P); if(!it || !it.pic) return false; const m = FDPM.get(P.id); let q = 1; born *= FD_PSC[P.st] || 1;
   if(m){ q = (performance.now() - m.t0) / m.dur; if(q >= 1 || !FX) FDPM.delete(P.id); }
-  const sel = FDP.selP === P.id ? 0.8 : 1;
+  const sel = (FDP.selP === P.id ? 0.8 : 1) * (fdCovers(P) ? 0.42 : 1);
   if(q < 1){ const old = q < 0.45 && m.from ? fdPlantIt(P, m.from.st, m.from.br) : null, pop = q < 0.45 ? 1 : 1 + 0.18 * Math.sin(Math.min(1, (q - 0.45) / 0.4) * Math.PI);
     fdProp(g, old || it, {sx, sy, scale: born * sw * (old ? 1 + 0.12 * q / 0.45 : pop), alpha: sel});
-    g.save(); try{ Props.morphFx(g, fdV(), it, q, {flash: m.flash}); }catch(e){} g.restore(); return true; }   // g already carries the shake
+    g.save(); try{ const R = fdRotItem(it, {}); Props.morphFx(g, fdVr(), Object.assign({}, R.it, {x: R.x, y: R.y}), q, {flash: m.flash}); }catch(e){} g.restore(); return true; }   // g already carries the shake
   return fdProp(g, it, {sx, sy, scale: born * sw, alpha: sel}); }
 function plantPic(P){ const s = VIEW.s, k = FD_PK(), w = s * 3, h = s * 3.6; return fdPic('p:' + P.kind + P.st + ':' + P.br, w, h, w / 2, h - s * 0.35, (g, x, y) => FG.draw(g, P.kind, P.st, Math.max(0, P.br), x, y, k * (P.st === 1 ? 1.7 : P.st === 2 ? 1.25 : 1), 0)); }
 function housePic(){ const s = VIEW.s, k = VIEW.s / 40, w = s * 5.2, h = s * 5.2; return fdPic('house', w, h, w / 2, h - s * 0.6, (g, x, y) => FP.house(g, x, y, k, 0)); }
 function fdPaint(t){
-  const cv = $('cv'), g = cv.getContext('2d'), s = VIEW.s; if(!G) return;
+  const cv = $('cv'), g = cv.getContext('2d'), s = VIEW.s; if(!G || !(VIEW.px > 0 && VIEW.ph > 0 && s > 0)) return;   // fd-1d: never paint into a stage with no size (a leave mid-frame)
   { const dtF = Math.min(0.1, Math.max(0, t - (fdPaint.lt || t))); fdPaint.lt = t; fdPaintBG(g, dtF); }
   let sx = 0, sy = 0; if(SHAKE > 0 && FX){ SHAKE = Math.max(0, SHAKE - 1 / 60); sx = (Math.random() - 0.5) * s * 0.25 * SHAKE * 3; sy = (Math.random() - 0.5) * s * 0.18 * SHAKE * 3; }
   screenTf(g); if(sx || sy) g.translate(sx, sy);
@@ -3811,18 +3869,18 @@ function fdPaint(t){
   // standing things, far → near (depth = x + y)
   const items = [];
   const PR = fdHasProps();
-  if(PR){ G.gates.forEach(Gt => { const it = fdGateIt(Gt); items.push({y: FD.wx(Gt.i) + FD.wx(Gt.j) - 0.05, d: () => fdProp(g, it, {sx, sy})}); });   // 🚪 fd-1b
-    const n = fdPileN(); if(n > 0){ const it = fdItem('pile', 'pumpkinpile', FD.PILE.i, FD.PILE.j, {state: n}); items.push({y: FD.wx(FD.PILE.i) + FD.wx(FD.PILE.j), d: () => fdProp(g, it, {sx, sy})}); } }   // 🎃 = your hearts
-  (G.rocks || []).forEach(r => items.push({y: r.x + r.y, d: () => { if(PR && fdProp(g, fdItem('rock', 'rock', r.i, r.j, {v: r.v}), {sx, sy})) return; shadow(g, r.x, r.y, 0.42); g.fillStyle = ['#B9B3A8', '#A9A397', '#C4BEB2'][r.v]; g.strokeStyle = '#2A1C14'; g.lineWidth = Math.max(1, s * 0.03); g.beginPath(); g.ellipse(IX(r.x, r.y), IY(r.x, r.y, 0) - s * 0.18, s * 0.42, s * 0.3, 0, 0, 7); g.fill(); g.stroke(); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(IX(r.x, r.y) - s * 0.12, IY(r.x, r.y, 0) - s * 0.3, s * 0.14, s * 0.07, -0.3, 0, 7); g.fill(); }}));
-  G.traps.forEach(T => { if(T.kind === 'lava') return; items.push({y: T.x + T.y - 0.1, d: () => { const ic = T.kind === 'pop' ? '🌶️' : T.kind === 'mine' ? '💩' : T.kind === 'push' ? '🪣' : T.kind === 'root' ? '🧶' : T.kind === 'stun' ? '🕳️' : '🌵'; emo(g, ic, IX(T.x, T.y), IY(T.x, T.y, 0.18), s * 0.5, T.seen ? 0.5 : 1); }}); });
-  G.plants.forEach(P => items.push({y: P.x + P.y, d: () => { const born = Math.min(1, (G.t - P.born) / 0.35), sw = 1 + Math.sin(t * 2 + P.id) * 0.02 + (P.aim > 0.3 ? 0.06 : 0);
+  if(PR){ G.gates.forEach(Gt => { const it = fdGateIt(Gt); items.push({y: fdDep(FD.wx(Gt.i), FD.wx(Gt.j)) - 0.05, d: () => fdProp(g, it, {sx, sy})}); });   // 🚪 fd-1b
+    const n = fdPileN(); if(n > 0){ const it = fdItem('pile', 'pumpkinpile', FD.PILE.i, FD.PILE.j, {state: n}); items.push({y: fdDep(FD.wx(FD.PILE.i), FD.wx(FD.PILE.j)), d: () => fdProp(g, it, {sx, sy})}); } }   // 🎃 = your hearts
+  (G.rocks || []).forEach(r => items.push({y: fdDep(r.x, r.y), d: () => { if(PR && fdProp(g, fdItem('rock', 'rock', r.i, r.j, {v: r.v}), {sx, sy})) return; shadow(g, r.x, r.y, 0.42); g.fillStyle = ['#B9B3A8', '#A9A397', '#C4BEB2'][r.v]; g.strokeStyle = '#2A1C14'; g.lineWidth = Math.max(1, s * 0.03); g.beginPath(); g.ellipse(IX(r.x, r.y), IY(r.x, r.y, 0) - s * 0.18, s * 0.42, s * 0.3, 0, 0, 7); g.fill(); g.stroke(); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(IX(r.x, r.y) - s * 0.12, IY(r.x, r.y, 0) - s * 0.3, s * 0.14, s * 0.07, -0.3, 0, 7); g.fill(); }}));
+  G.traps.forEach(T => { if(T.kind === 'lava') return; items.push({y: fdDep(T.x, T.y) - 0.1, d: () => { const ic = T.kind === 'pop' ? '🌶️' : T.kind === 'mine' ? '💩' : T.kind === 'push' ? '🪣' : T.kind === 'root' ? '🧶' : T.kind === 'stun' ? '🕳️' : '🌵'; emo(g, ic, IX(T.x, T.y), IY(T.x, T.y, 0.18), s * 0.5, T.seen ? 0.5 : 1); }}); });
+  G.plants.forEach(P => items.push({y: fdDep(P.x, P.y), d: () => { const born = Math.min(1, (G.t - P.born) / 0.35), sw = 1 + Math.sin(t * 2 + P.id) * 0.02 + (P.aim > 0.3 ? 0.06 : 0);
     if(PR && fdPlantNow(g, P, born, sw, sx, sy)){} else { const pic = plantPic(P); fdDrawPic(g, pic, IX(P.x, P.y), IY(P.x, P.y, 0), born, sw * born, FDP.selP === P.id ? 0.8 : 1); } if(FDP.selP === P.id){ g.strokeStyle = '#FFC93C'; g.lineWidth = 2; g.beginPath(); g.ellipse(IX(P.x, P.y), IY(P.x, P.y, 0), s * 0.6, s * 0.3, 0, 0, 7); g.stroke(); } }}));
-  G.blockers.forEach(b => items.push({y: b.x + b.y, d: () => { if(PR && b.k === 'hay' && fdProp(g, fdItem('hay', 'haybale', b.i, b.j, {v: b.id % 2}), {sx, sy})){ bar(g, IX(b.x, b.y), IY(b.x, b.y, 1.1), s * 0.7, b.hp / b.hpMax, '#22A867'); return; }   // 🌾 fd-1b
+  G.blockers.forEach(b => items.push({y: fdDep(b.x, b.y), d: () => { if(PR && b.k === 'hay' && fdProp(g, fdItem('hay', 'haybale', b.i, b.j, {v: b.id % 2}), {sx, sy})){ bar(g, IX(b.x, b.y), IY(b.x, b.y, 1.1), s * 0.7, b.hp / b.hpMax, '#22A867'); return; }   // 🌾 fd-1b
     const ic = {hay: '🌾', wool: '☁️', sheep: '🐑', chicken: '🐔'}[b.k] || '🐑'; shadow(g, b.x, b.y, 0.4); emo(g, ic, IX(b.x, b.y), IY(b.x, b.y, 0.4 + (b.k === 'sheep' || b.k === 'chicken' ? Math.abs(Math.sin(t * 8 + b.id)) * 0.12 : 0)), s * 0.75); bar(g, IX(b.x, b.y), IY(b.x, b.y, 1.1), s * 0.7, b.hp / b.hpMax, '#22A867'); }}));
-  G.helpers.forEach(H => items.push({y: H.x + H.y, d: () => { if(PR && fdProp(g, fdItem('crow', 'scarecrow', 0, 0, {v: H.id % 3}), {sx, sy, dx: H.x + FD.O - 0.5, dy: H.y + FD.O - 0.5})) return; FP.crow(g, IX(H.x, H.y), IY(H.x, H.y, 0), s / 44, t); }}));   // 🧑‍🌾 fd-1b
-  items.push({y: FD.CX + FD.CY + 0.5, d: () => { if(!(PR && fdProp(g, fdHouseIt(), {sx, sy}))){ const hp = housePic(); fdDrawPic(g, hp, IX(FD.CX + 1, FD.CY + 1), IY(FD.CX + 1, FD.CY + 1, 0), 1, 1); } fdFarmer(g, t, sx, sy); }});
-  { const H = G.heroes.goat; items.push({y: H.x + H.y, d: () => fdGoat(g, t)}); }
-  G.enemies.forEach(e => items.push({y: e.x + e.y, d: () => fdCollector(g, e, t, s)}));
+  G.helpers.forEach(H => items.push({y: fdDep(H.x, H.y), d: () => { if(PR && fdProp(g, fdItem('crow', 'scarecrow', 0, 0, {v: H.id % 3}), {sx, sy, dx: H.x + FD.O - 0.5, dy: H.y + FD.O - 0.5})) return; FP.crow(g, IX(H.x, H.y), IY(H.x, H.y, 0), s / 44, t); }}));   // 🧑‍🌾 fd-1b
+  items.push({y: fdDep(FD.CX, FD.CY) + 0.5, d: () => { if(!(PR && fdProp(g, fdHouseIt(), {sx, sy}))){ const hp = housePic(); fdDrawPic(g, hp, IX(FD.CX + 1, FD.CY + 1), IY(FD.CX + 1, FD.CY + 1, 0), 1, 1); } fdFarmer(g, t, sx, sy); }});
+  { const H = G.heroes.goat; items.push({y: fdDep(H.x, H.y), d: () => fdGoat(g, t)}); }
+  G.enemies.forEach(e => items.push({y: fdDep(e.x, e.y), d: () => fdCollector(g, e, t, s)}));
   items.sort((a, b) => a.y - b.y).forEach(it => it.d());
   if(G.rain || (G.state === 'break' && G.C.rain && G.C.rain.includes(G.wave + 1) && Math.sin(t) > 2)) fdRain(g, t);
   paintLights(g, t);
@@ -3852,12 +3910,12 @@ function fdFarmer(g, t, sx, sy){ const H = G.heroes.farmer, hk = VIEW.s / 40, it
   const x = p ? p.x : IX(FD.CX + 1, FD.CY + 1) - 24 * hk, feet = p ? p.y : IY(FD.CX + 1, FD.CY + 1, 0) - 57 * hk, k = VIEW.s / (p ? 46 : 36);   // on the porch: collector-sized, so the house still reads as a house
   fdMorphDraw(g, 'farmer', x, feet, k, t, (st, col) => TDFarmer.draw(g, st, col, x, feet, k, t, {dir: H.ax != null && IX(H.ax, H.ay) < x ? -1 : 1, pose: H.atkT && G.t - H.atkT < 0.3 ? {armR: -2.2} : {}})); }
 function fdGoat(g, t){ const H = G.heroes.goat, x = IX(H.x, H.y), feet = IY(H.x, H.y, 0) + (H.mv ? -Math.abs(Math.sin(t * 12)) * VIEW.s * 0.12 : 0), k = VIEW.s / 30;
-  shadow(g, H.x, H.y, 0.38); fdMorphDraw(g, 'goat', x, feet, k, t, (st, col) => TDGoat.draw(g, st, col, x, feet, k, t, {dir: H.tx < H.x ? -1 : 1})); }
+  shadow(g, H.x, H.y, 0.38); fdMorphDraw(g, 'goat', x, feet, k, t, (st, col) => TDGoat.draw(g, st, col, x, feet, k, t, {dir: ISO.rq ? (fdFaceL(H, x) ? -1 : 1) : H.tx < H.x ? -1 : 1})); }
 const FD_COL_KEY = {c: 'co', k: 'ck', u: 'um', boss1: 'co', boss2: 'um'};
 function fdCollector(g, e, t, s){
   const key = FD_COL_KEY[e.type] || 'co', sz = e.S.size || 1, set = charSet('fc:' + key + (e.boss ? 'B' : ''), {name: e.S.name, av: FCOL.av(key)}, Math.round(s * 1.35 * sz), Math.round(s * 1.75 * sz));
   const quitA = e.gone ? Math.max(0, 1 - (G.t - (e.quitT || G.t)) / 1.4) : 1; if(quitA <= 0) return;
-  const x = IX(e.x, e.y), y = IY(e.x, e.y, 0) - (e.gone ? (G.t - e.quitT) * s * 0.6 : 0), flip = (e.face || 1) < 0, moving = !e.gone && !(e.stunT > 0 || e.sleepT > 0 || e.stopT > 0);
+  const x = IX(e.x, e.y), y = IY(e.x, e.y, 0) - (e.gone ? (G.t - e.quitT) * s * 0.6 : 0), flip = ISO.rq ? fdFaceL(e, x) : (e.face || 1) < 0, moving = !e.gone && !(e.stunT > 0 || e.sleepT > 0 || e.stopT > 0);
   shadow(g, e.x, e.y, 0.3 * sz, 0.18 * quitA);
   const fr = moving ? set.walk[Math.floor((e.steps + e.prog) * 4) % WALK_N] : set.still;
   drawPic(g, fr, x, y, set.w, set.h, flip, e.gone ? Math.sin(G.t * 20) * 0.2 : e.hit > 0 ? Math.sin(t * 50) * 0.05 : 0, quitA, set);
@@ -4034,13 +4092,50 @@ function fdPointer(e){
   if(P.size === 0) FDZ.g = null;
 }
 ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach(t => document.addEventListener(t, fdPointer, {passive: true}));
+document.addEventListener('pointermove', e => { if(e.pointerType !== 'mouse' || !isFarm() || !inPlay()) return; if(e.target.id !== 'cv'){ FDP.hover = null; return; } const r = $('cv').getBoundingClientRect(), c = fdCellAt(e.clientX - r.left, e.clientY - r.top); FDP.hover = FD.buildable(G, c.i, c.j) ? c : null; }, {passive: true});   // 🖱️ fd-1d
 document.addEventListener('wheel', e => { if(!inPlay() || e.target.id !== 'cv') return; e.preventDefault(); const r = $('cv').getBoundingClientRect(); fdZoomTo(FDZ.z * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX - r.left, e.clientY - r.top); }, {passive: false});
-function fdZoomButtons(){ let z = $('fd-zoom'); if(!z){ z = document.createElement('div'); z.className = 'fd-zoom'; z.id = 'fd-zoom'; z.innerHTML = '<button type="button" data-z="1" data-sound="tap" aria-label="Zoom in">＋</button><button type="button" data-z="-1" data-sound="tap" aria-label="Zoom out">－</button>'; $('stage').appendChild(z);
-    z.querySelectorAll('button').forEach(b => b.onclick = () => { fdZoomTo(FDZ.z * (b.dataset.z === '1' ? 1.3 : 1 / 1.3), VIEW.px / 2, VIEW.ph / 2); }); } z.classList.remove('hidden'); }
+function fdZoomButtons(){ let z = $('fd-zoom'); if(!z){ z = document.createElement('div'); z.className = 'fd-zoom'; z.id = 'fd-zoom'; z.innerHTML = '<button type="button" data-z="1" data-sound="tap" aria-label="Zoom in">＋</button><button type="button" data-z="-1" data-sound="tap" aria-label="Zoom out">－</button>'; $('stage').appendChild(z); fdRotButtons(z);
+    z.querySelectorAll('button[data-z]').forEach(b => b.onclick = () => { fdZoomTo(FDZ.z * (b.dataset.z === '1' ? 1.3 : 1 / 1.3), VIEW.px / 2, VIEW.ph / 2); }); } z.classList.remove('hidden'); }
 // ◀ on a sideways phone: the bar's own folded menu (Gameroom · Levels · Dashboard) instead of leaving at once
 document.addEventListener('click', e => { if(!inPlay() || !$('scr-play').classList.contains('tl-land')) return; const b = e.target.closest && e.target.closest('#gbar .gb-back'); if(!b) return;
   e.stopPropagation(); e.preventDefault(); const fm = document.querySelector('#gbar .gb-fmenu'); if(!fm) return; const hd = fm.querySelector('.gb-fhd'), lv = $('hud-level');
   if(hd){ hd.textContent = lv ? (lv.dataset.full || lv.textContent) : ''; hd.style.display = hd.textContent ? '' : 'none'; } fm.classList.toggle('hidden'); }, true);
+/* 🔄 fd-1d turning the view — like Aowu's Home Layout (turnPlan): 90° steps, 0.42 s cubic in-out, round the spot in the middle of the screen, Q / E keys,
+   remembered per player, a short note after turning. ⟲ 🧭 ⟳ sit on top of ＋ －; 🧭 = back to the book's own view. */
+const fdRotKey = () => 'sp_fd_rot:' + (S.player || '');
+function fdRotSaved(){ try{ const v = parseInt(localStorage.getItem(fdRotKey()), 10); return v >= 0 && v < 4 ? v : 0; }catch(e){ return 0; } }
+function fdTurn(dir, to){ if(!isFarm() || FDR.spin || !G) return false; const k0 = fdK(), k1 = to != null ? to : (((k0 + dir) % 4) + 4) % 4; if(k1 === k0) return false;
+  let step = k1 - k0; if(step > 2) step -= 4; if(step < -2) step += 4;   // the short way round (🧭 from 3 → 0 = one step ⟳)
+  fdCloseCard(); FDP.pick = null; const from = FDR.th, toTh = from + step * Math.PI / 2;
+  // the spot in the middle of the screen stays put when zoomed in (at zoom 1 the island turns round its own middle)
+  const W0 = FDZ.z > 1.001 ? fdWorldAt(VIEW.px / 2, VIEW.ph / 2) : null;
+  const L0 = fdIsl(k0), L1 = fdIsl(k1); fdWarm(k1);
+  if(!FX){ fdSetRot(toTh); fdTurnEnd(W0); return true; }
+  FDR.spin = {from, to: toTh, t0: performance.now(), dur: 420, q: 0, L0, L1, W0}; UISound.play('whoosh'); return true; }
+function fdSpinStep(now){ const sp = FDR.spin; if(!sp) return; const t = Math.min(1, (now - sp.t0) / sp.dur), e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  sp.q = t; if(t >= 1){ fdSetRot(sp.to); FDR.spin = null; fdTurnEnd(sp.W0); return; }
+  fdSetRot(sp.from + (sp.to - sp.from) * e); if(sp.W0) fdKeep(sp.W0); }
+function fdKeep(W0){ const px = IX(W0.x, W0.y), py = IY(W0.x, W0.y, 0); FDZ.ox += VIEW.px / 2 - px; FDZ.oy += VIEW.ph / 2 - py; fdZoomApply(); }
+function fdTurnEnd(W0){ const k = fdK(); fdSetRot(k * Math.PI / 2); FDR.k = k; if(W0) fdKeep(W0); FDP.bgKey = ''; FDP.pics.clear();
+  try{ localStorage.setItem(fdRotKey(), String(k)); }catch(e){}
+  fdRotBadge(); banner(k ? '🔄 Map turned — tap 🧭 to turn it back' : '🧭 Back to the book\'s own view'); fdHints(); }
+// bake the turned pictures before the spin needs them (the switch half way must not stall a frame)
+function fdWarm(k){ if(!fdHasProps()) return; const step = Iso.stepFor(ISO.zi * (VIEW.dpr || 1)), list = [fdHouseIt()].concat(G.gates.map(fdGateIt), (G.rocks || []).map(r => fdItem('rock', 'rock', r.i, r.j, {v: r.v})));
+  list.forEach(it => { if(!it) return; try{ const R = fdRotItem(it, {}, k); if(R.it && R.it.pic) R.it.pic.bake(step); }catch(e){} }); }
+function fdRotButtons(z){ if(z.querySelector('.fd-rot')) return; const r = document.createElement('div'); r.className = 'fd-rot';
+  r.innerHTML = '<button type="button" data-r="-1" data-sound="tap" aria-label="Turn the map left" title="Turn left (Q)">⟲</button><button type="button" data-r="0" data-sound="tap" aria-label="Back to the first view" title="Back to the first view" class="fd-compass"><i>🧭</i></button><button type="button" data-r="1" data-sound="tap" aria-label="Turn the map right" title="Turn right (E)">⟳</button>';
+  z.prepend(r); r.querySelectorAll('button').forEach(b => b.onclick = ev => { ev.stopPropagation(); const d = +b.dataset.r; if(d) fdTurn(d); else fdTurn(0, 0); }); fdRotBadge(); }
+function fdRotBadge(){ const c = document.querySelector('#fd-zoom .fd-compass'); if(!c) return; const k = FDR.spin ? null : fdK(); c.classList.toggle('on', !!k); const i = c.querySelector('i'); if(i) i.style.transform = 'rotate(' + (-(k || 0) * 90) + 'deg)'; }
+// which way someone faces in a turned view: by where they moved ON SCREEN
+function fdFaceL(o, x){ if(o._lx != null && Math.abs(x - o._lx) > 0.05) o._fl = x < o._lx; o._lx = x; return o._fl != null ? o._fl : (o.face || 1) < 0; }
+(function(){ const st = document.createElement('style'); st.id = 'fd-css-rot'; st.textContent = [
+  '.fd-zoom .fd-rot{display:flex;gap:4px;margin-bottom:2px}',
+  '.fd-zoom .fd-rot button{font-size:1.25rem;line-height:1}',
+  '.fd-zoom .fd-compass i{display:inline-block;font-style:normal;font-size:1rem;transition:transform .42s cubic-bezier(.65,0,.35,1)}',
+  '.fd-zoom .fd-compass.on{background:#FFF3C4;border-color:#FFC93C}',
+  '.fd-zoom{align-items:flex-end}',
+  // a sideways phone: ONE row along the bottom (the cloud band) so the buttons never sit on the island
+  '#scr-play.tl-land .fd-zoom{flex-direction:row;align-items:center;bottom:6px} #scr-play.tl-land .fd-zoom .fd-rot{margin:0}'].join('\n'); document.head.appendChild(st); })();
 /* 👨‍🌾 FARMER DELUSION — page END */
 /* ================= BOOT ================= */
 function boot(){
@@ -4334,4 +4429,4 @@ function tdResultBadge(){
 /* 🏷️ TD LOGO END */</script>
 </body>
 </html>
-<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a+fd-1a2+fd-1b+fd-1c) END OF TDStories.html -->
+<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a+fd-1a2+fd-1b+fd-1c+fd-1d) END OF TDStories.html -->
