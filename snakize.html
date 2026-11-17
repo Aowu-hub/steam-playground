@@ -1723,7 +1723,7 @@ function startGame(opts){
     cam: [{x: 0, y: 0, z: 1, ready: false}, {x: 0, y: 0, z: 1, ready: false}], shake: 0, lastHud: {}};
   savePrefs();
   showScreen('play'); buildControls(); layout();
-  cheerMount();   /* 📣 cs-2b: the crowd for this game (Off = nothing) */
+  cheerMount(); calloutSetup(); /* 💬 24t-f */   /* 📣 cs-2b: the crowd for this game (Off = nothing) */
   if(window.GameComic) GameComic._reset(mode);   /* 💥 ck-2c (G.hold in loop() = a comic page is open) */
   BAR.level(opts.label || (MODES[mode].icon + ' ' + SN.LEVEL_NAMES[lvl] + (endless ? ' ♾️' : '')), lvl === 5 ? 'hc' : '');
   BAR.meter('grow', '🎯', 0, 'Progress'); if(humans > 1) BAR.meter('grow1', '🎯', 0, 'Player 2 progress'); else BAR.hide('grow1');
@@ -1793,7 +1793,7 @@ function handleEvents(){
     else if(e.k === 'gold'){ cheerSay('goal', e.s); (G.hood || (G.hood = {}))[e.s] = performance.now(); blip(1.6); react(e.s, gestK('cheer'), 1); addFx({k: 'txt', x: e.x, y: e.y, txt: '+3 ✨', gold: true}); if(me) banner('✨ Golden ' + T.gold + ' +3!', 'gold', 1100); }
     else if(e.k === 'bad'){ UISound.play('bump'); addFx({k: 'txt', x: e.x, y: e.y, txt: '🤢 −2'}); }
     else if(e.k === 'power'){ cheerSay('goal', e.s, 'power'); UISound.play('unlock'); addFx({k: 'txt', x: e.x, y: e.y, txt: SN.POWERS[e.p].icon, gold: true}); if(me) banner(SN.POWERS[e.p].icon + ' ' + SN.POWERS[e.p].name, 'good', 1400); react(e.s, gestK('cheer'), 0.9); }
-    else if(e.k === 'grow10'){ cheerSay('big', e.s, 'grow'); if(me){ UISound.play('unlock'); react(e.s, gestK('wave'), 1.4); bigWord('🐍 ' + e.len + '!'); } }
+    else if(e.k === 'grow10'){ cheerSay('big', e.s, 'grow'); if(me){ UISound.play('unlock'); react(e.s, gestK('wave'), 1.4); bigWord('🐍 ' + e.len + '!', e.s, 'good'); } }
     else if(e.k === 'faster'){ UISound.play('key'); setTimeout(() => UISound.play('key'), 120); banner('⚡ Faster!', 'gold', 900); }
     else if(e.k === 'portal'){ UISound.play('whoosh'); }
     else if(e.k === 'bump'){ cheerSay(s && s.human && s.lives === 1 ? 'close' : 'miss', e.s, 'bump');   /* 📣 cs-2b: cheerSay('miss', e.s, 'bump') */ UISound.play('error'); G.shake = 0.35; if(s) addFx({k: 'stars', s: e.s, t: 0, life: 1.3}); if(me && s.alive) banner(s.lives > 0 ? '💫 Bonk! ' + '❤️'.repeat(s.lives) + ' left' : '💫 Bonk!', 'bad', 1200); }
@@ -1814,7 +1814,7 @@ function handleEvents(){
     else if(e.k === 'questDone'){ cheerSay('goal', e.s, 'quest'); UISound.play('success'); react(e.s, gestK('cheer'), 1.2); }
     else if(e.k === 'questFail'){ }
     else if(e.k === 'lead'){ UISound.play('unlock'); addFx({k: 'txt', x: e.x, y: e.y, txt: '🚩 ' + e.n, gold: true}); banner('🚩 ' + e.n + '/' + G.M.story.flags.length, 'good', 900); }
-    else if(e.k === 'claim'){ cheerSay(e.cells >= 25 ? 'big' : 'goal', e.s, 'claim'); if(me){ UISound.play('success'); react(e.s, PLANT, PLANT.d); addFx({k: 'txt', x: e.x, y: e.y, txt: '🚩 +' + e.cells, gold: true}); if(e.cells >= 25) bigWord('🏰 +' + e.cells + '!'); } else addFx({k: 'txt', x: e.x, y: e.y, txt: '🚩'}); }
+    else if(e.k === 'claim'){ cheerSay(e.cells >= 25 ? 'big' : 'goal', e.s, 'claim'); if(me){ UISound.play('success'); react(e.s, PLANT, PLANT.d); addFx({k: 'txt', x: e.x, y: e.y, txt: '🚩 +' + e.cells, gold: true}); if(e.cells >= 25) bigWord('🏰 +' + e.cells + '!', e.s, 'big'); } else addFx({k: 'txt', x: e.x, y: e.y, txt: '🚩'}); }
     else if(e.k === 'cut'){ cheerSay('miss', e.s, 'cut'); if(e.by >= 0 && e.by !== e.s) cheerSay('goal', e.by, 'cutter'); const by = e.by >= 0 && e.by !== e.s ? M.snakes[e.by] : null; addFx({k: 'txt', x: e.x, y: e.y, txt: '✂️'});
       if(me){ UISound.play('error'); G.shake = 0.3; banner(e.why === 'self' ? '🙈 Your own trail — back home!' : e.why === 'long' ? '🐍 Trail too long — back home! Eat to grow.' : e.why === 'fire' ? '🔥 Fire burnt your trail — back home!' : e.why === 'wall' ? '🧱 The edge — back home!' : '✂️ ' + (by ? snakeName(by) : 'Someone') + ' cut your trail — back home!', 'bad', 1500); }
       else if(by && by.human){ UISound.play('unlock'); react(e.by, gestK('cheer'), 1); banner('✂️ You cut ' + snakeName(s) + '\'s trail!', 'gold', 1200); } }
@@ -1829,7 +1829,7 @@ function addFx(f){ if(!G) return; f.t = 0; f.life = f.life || 0.9; G.fx.push(f);
 function tickFx(dt){ if(!G) return; G.fx.forEach(f => f.t += dt); G.fx = G.fx.filter(f => f.t < f.life); G.reacts.forEach((r, i) => { if(r){ r.t += dt; if(r.t > r.d && !r.keep) G.reacts[i] = null; } }); if(G.shake > 0) G.shake = Math.max(0, G.shake - dt); }
 let bannerT = 0;
 function banner(txt, kind, ms){ const b = $('banner'); if(!b || !txt) return; b.textContent = txt; b.className = 'banner on ' + (kind || ''); clearTimeout(bannerT); bannerT = setTimeout(() => b.classList.remove('on'), ms || 1400); }
-function bigWord(txt){ if(!FX) return; const h = $('bigword-host'); const d = document.createElement('div'); d.className = 'big-word'; d.textContent = txt; h.appendChild(d); setTimeout(() => d.remove(), 1100); }
+function bigWord(txt, who, rank){ if(!FX) return; /* 💬 24t-f bigWord */ if(window.UI && UI.callout && UI.callout.active()){ UI.callout(txt, {who, rank}); return; } const h = $('bigword-host'); const d = document.createElement('div'); d.className = 'big-word'; d.textContent = txt; h.appendChild(d); setTimeout(() => d.remove(), 1100); }
 // tiny synth: a blip per eat (pitch from the world's scale) + an optional music loop
 let AC = null;
 function ac(){ try{ if(!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); if(AC.state === 'suspended') AC.resume(); }catch(e){ AC = null; } return AC; }
@@ -1883,6 +1883,29 @@ function nextSkill(s){ if(s.useStart && s.start && s.cd <= 0) return s.start; if
 let CV = null, CTX = null, VW = 0, VH = 0, DPR = 1;
 /* 📣 CHEERSQUAD (cs-2b) START — the crowd around the board (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
 // sides: every human snake = its own side (its index); bots / the board = the 😈 rival's side
+/* 💬 24t-f: words during play (UiKit UI.callout) — the board + riders stay clear, crowd fans can say it */
+function snHeadAt(g, si, x, y, k){ try { const m = g.getTransform(), sc = Math.hypot(m.c, m.d) / DPR;
+  (G.heads || (G.heads = {}))[si] = {x: (m.a * x + m.c * y + m.e) / DPR, y: (m.b * x + m.d * y + m.f) / DPR, h: k * 80 * sc, w: k * 34 * sc, t: performance.now()}; } catch(e){} }
+function snHeads(){ const out = [], now = performance.now(); if(!G || !G.heads || !CV) return out; const r = CV.getBoundingClientRect();
+  Object.keys(G.heads).forEach(i => { const h = G.heads[i], s = G.M.snakes[i]; if(!h || now - h.t > 400 || !s) return; out.push({i: +i, x: r.left + h.x, y: r.top + h.y, h: h.h, w: h.w}); }); return out; }
+function calloutSetup(){ if(!(window.UI && UI.callout) || !G) return;
+  const meI = () => { if(!G) return 0; const S0 = G.M.snakes; const p = S0.find(q => q.human && q.name === S.player) || S0.find(q => q.human); return p ? p.i != null ? p.i : S0.indexOf(p) : 0; };
+  const idx = w => typeof w === 'number' ? w : w && typeof w.i === 'number' ? w.i : meI();
+  UI.callout.setup({
+    get me(){ return meI(); },
+    at: w => { const h = snHeads().find(q => q.i === idx(w)); return h ? {x: h.x, y: h.y - h.h - 4} : null; },
+    side: w => { if(!G) return null; const s = G.M.snakes[idx(w)]; if(!s) return null; const hs = G.M.snakes.filter(x => x.human); return s.human ? hs.indexOf(s) : 1; },
+    crowd: () => window.Cheer && Cheer.active() ? CV : null,
+    poly: () => { if(!G || !CV) return null; const r = CV.getBoundingClientRect(), F = cheerField();
+      if(F) return [[r.left + F.x, r.top + F.y], [r.left + F.x + F.w, r.top + F.y], [r.left + F.x + F.w, r.top + F.y + F.h], [r.left + F.x, r.top + F.y + F.h]];
+      const m = Math.max(34, Math.min(r.width, r.height) * 0.14);   /* 🧭 / zoomed 🏰 fill the screen: only a thin frame along the edges is free */
+      return [[r.left + m, r.top + m], [r.right - m, r.top + m], [r.right - m, r.bottom - m], [r.left + m, r.bottom - m]]; },
+    keep: () => { if(!G) return []; const out = [];
+      snHeads().forEach(h => out.push({l: h.x - h.w - 6, r: h.x + h.w + 6, t: h.y - h.h - 8, b: h.y + h.w}));
+      if(G.mode === 'gate' && CV){ const r = CV.getBoundingClientRect(), R = Math.min(56, Math.min(VW, VH) * 0.12) + 6; out.push({l: r.left + VW - 2 * R - 10, r: r.left + VW, t: r.top, b: r.top + 2 * R + 14}); }   /* 🗺️ minimap */
+      document.querySelectorAll('#gbar, #corners .corner, .ctl-side, .ctl-wrap, .quest:not(.hidden), #offer:not(.hidden), #banner.on').forEach(e => { const q = e.getBoundingClientRect(); if(q.width) out.push({l: q.left, t: q.top, r: q.right, b: q.bottom}); });
+      return out; }
+  }); }
 function cheerMount(){
   if(!window.Cheer) return; Cheer.unmount();
   const M = G.M, hs = M.snakes.filter(s => s.human), bots = M.snakes.some(s => !s.human);
@@ -1951,6 +1974,7 @@ function rideK(cellPx){ return Math.max(0.26, cellPx * 1.25 / 70); }
 // 🧑 the rider on the snake head: holds on, leans into turns, does moves; falls off with dizzy stars on a bump
 function drawRider(g, si, x, y, k, face, lean, t, opts){
   opts = opts || {};
+  if(g === CTX && G) snHeadAt(g, si, x, y, k);   /* 💬 24t-f head */
   const s = G.M.snakes[si], av = G.avs[si]; if(!av) return;
   const r = G.reacts[si];
   const a = {name: s.name, av, dir: face >= 0 ? 1 : -1, gest: r && r.g ? {g: r.g, t: r.t} : null};
@@ -2269,7 +2293,7 @@ document.addEventListener('visibilitychange', () => { if(document.hidden && G &&
 function togglePause(){ if(!G || G.over) return; G.paused = !G.paused; UI.pauseIcon($('pause-btn'), G.paused); banner(G.paused ? '⏸ Paused — P or ▶ to go on' : '▶ Go!', 'good', G.paused ? 600000 : 700); }
 function pauseGame(){ if(G && !G.over && !G.paused) togglePause(); }
 function leavePlay(){ if(G && !G.over){ G.paused = true; UI.confirm({icon: '🐍', title: 'Leave this game?', body: 'The game ends and is not saved.', okText: 'Leave', cancelText: 'Stay'}).then(ok => { if(ok) backToMenu(); else if(G){ G.paused = false; UI.pauseIcon($('pause-btn'), false); } }); return; } backToMenu(); }
-function backToMenu(){ if(window.Cheer) Cheer.unmount(); stopLoop(); musicStop(); hideResult(); G = null; KEYHELD.clear(); if(window.afterGameMenu && window.afterGameMenu()) return; renderMenu(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); /* 💬 24t-f off */ if(window.UI && UI.callout) UI.callout.setup(null); stopLoop(); musicStop(); hideResult(); G = null; KEYHELD.clear(); if(window.afterGameMenu && window.afterGameMenu()) return; renderMenu(); showScreen('menu'); }
 
 
 /* ================= 💥 COMICS (ck-2c) — ComicKit wires itself through this (Comic.WIRES.snakeast); the game never calls Comic directly ================= */
@@ -2284,6 +2308,7 @@ window.GameComic = (function(){ const L = []; return {
 /* ================= RESULT + SAVE ================= */
 function gameOver(){
   const M = G.M; G.over = true; musicStop();
+  if(window.UI && UI.callout) UI.callout.setup(null); /* 💬 24t-f game over */
   cheerEnd();   /* 📣 cs-2b: win / lose crowd */
   if(window.GameComic) GameComic._feed(G.mode, [{k: 'gameOver', winner: M.winner, why: M.why}], M);   /* 💥 ck-2c: winner page */
   const hs = humanIdx(), solo = hs.length === 1, me = M.snakes[0], won = M.winner === 0;
@@ -2375,7 +2400,7 @@ function saveText(res, cleared){
   const h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New high score!' : cleared ? (res.best && res.best.score ? 'Best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Saved') : '✅ Feats saved — win to unlock the next level';
   return featText(res.feats, h);
 }
-function showResult(html){ $('result-card').innerHTML = String(html).replace('<div class="res-btns">', '<div id="comic-strip-slot"></div><div class="res-btns">');   /* 💥 ck-2c: comic copy on the card */ $('result').classList.remove('hidden'); cheerFaces();   /* 📣 cs-2b */ }
+function showResult(html){ /* 💬 24t-f result */ if(window.UI && UI.callout) UI.callout.setup(null); $('result-card').innerHTML = String(html).replace('<div class="res-btns">', '<div id="comic-strip-slot"></div><div class="res-btns">');   /* 💥 ck-2c: comic copy on the card */ $('result').classList.remove('hidden'); cheerFaces();   /* 📣 cs-2b */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pickOne(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
@@ -2659,4 +2684,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a+p3e+cs-2b+ck-2c+pz-1+24n+24s+b3w5b+24u-d1) END OF Snakize.html -->
+<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a+p3e+cs-2b+ck-2c+pz-1+24n+24s+b3w5b+24u-d1+24t-f) END OF Snakize.html -->
