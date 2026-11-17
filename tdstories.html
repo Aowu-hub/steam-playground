@@ -122,8 +122,14 @@
     padding:10px 18px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(.95rem,3.6vmin,1.6rem);text-align:center;box-shadow:0 6px 0 rgba(0,0,0,.15);transition:all .3s cubic-bezier(.2,1.5,.4,1);max-width:90%;}
   .banner.on{opacity:1;transform:translate(-50%,-50%) scale(1);}
   .banner.gold{background:linear-gradient(135deg,#FFF3B0,#FFC845);} .banner.bad{background:linear-gradient(135deg,#FFE0E6,#FFB3C3);}
-  .gobtn{position:absolute;left:50%;bottom:9%;transform:translateX(-50%);z-index:5;animation:goPulse 1.1s ease-in-out infinite;}
-  @keyframes goPulse{50%{transform:translateX(-50%) scale(1.08);}}
+  /* 🔔 fd-1e themed Go! button: picture medallion (canvas) + label pill; the wind-up / hit is painted, so no CSS pulse */
+  .gobtn{position:absolute;left:50%;bottom:5%;transform:translateX(-50%);z-index:5;display:flex;flex-direction:column;align-items:center;background:none;border:0;padding:0;margin:0;cursor:pointer;font:inherit;-webkit-tap-highlight-color:transparent;--gob:clamp(60px,12vmin,96px);}
+  .gobtn canvas{width:var(--gob);height:var(--gob);display:block;filter:drop-shadow(0 3px 0 rgba(42,28,20,.22));transition:transform .08s;}
+  .gobtn:active canvas{transform:scale(.95);}
+  .gobtn .gob-lb{margin-top:-9px;padding:2px 12px 3px;border-radius:999px;background:#fff;border:2.5px solid #2A1C14;color:#2A1C14;font-weight:800;font-size:clamp(12px,calc(1.4vmin + 6px),17px);line-height:1.15;white-space:nowrap;box-shadow:0 3px 0 rgba(42,28,20,.25);font-variant-numeric:tabular-nums;}
+  .gobtn.gob-hit .gob-lb{background:#FFD23F;}
+  .gobtn:focus-visible canvas{filter:drop-shadow(0 0 4px #FFD23F) drop-shadow(0 3px 0 rgba(42,28,20,.22));}
+  @media (max-height:520px){ .gobtn{--gob:clamp(50px,15vh,70px);bottom:3%;} .gobtn .gob-lb{margin-top:-7px;} }
   .hand{position:fixed;z-index:60;font-size:2.2rem;pointer-events:none;transition:left .35s,top .35s;filter:drop-shadow(0 3px 0 rgba(0,0,0,.25));animation:handBob .9s ease-in-out infinite;}
   @keyframes handBob{50%{margin-top:10px;}}
   .autobtn{position:absolute;top:6px;right:6px;z-index:4;min-width:40px;height:38px;border:none;border-radius:12px;background:rgba(255,255,255,.88);font-size:.85rem;font-weight:800;font-family:Fredoka,sans-serif;cursor:pointer;box-shadow:0 3px 0 rgba(0,0,0,.15);padding:0 6px;}
@@ -238,7 +244,7 @@
       <div class="banner" id="banner"></div>
       <div id="combo-slot"></div>
       <button class="autobtn" id="auto-btn" data-sound="tap" title="Auto skills: off" onclick="toggleAuto()">🤖 Auto</button>
-      <button class="sp-btn sp-primary gobtn hidden" id="go-btn" data-sound="pop" onclick="goNow()">▶ Go!</button>
+      <button class="gobtn hidden" id="go-btn" data-sound="none" onclick="goNow()" aria-label="Go! Start the wave"><canvas class="gob-cv" aria-hidden="true"></canvas><span class="gob-lb">▶ Go!</span></button>
     </div>
     <div class="panel" id="panel"></div>
   </div>
@@ -1811,12 +1817,12 @@ function startGame(ch, lvl, opt){
   setTimeout(nextPick, FX ? 450 : 0);
 }
 function stopLoop(){ cancelAnimationFrame(raf); raf = 0; }
-function leavePlay(){ stopLoop(); hideHand(); fdLeave(); const s = document.querySelector('#scr-play .skk-sheet'); if(s) s.remove(); pickOpen = false; G = null; hideResult(); openBook(S.book); }
+function leavePlay(){ stopLoop(); hideHand(); fdLeave(); goStop(); const s = document.querySelector('#scr-play .skk-sheet'); if(s) s.remove(); pickOpen = false; G = null; hideResult(); openBook(S.book); }
 function toggleSpeed(){ if(!G) return; speedOn = !speedOn; G.speed = speedOn ? 2 : 1; $('speed-btn').textContent = speedOn ? '⏩×2' : '⏩'; $('speed-btn').classList.toggle('on', speedOn); UI.toast(speedOn ? '⏩ Double speed' : '▶ Normal speed'); }
 function toggleAuto(){ autoOn = !autoOn; try{ localStorage.setItem('sp_td_auto:' + S.player, autoOn ? '1' : '0'); }catch(e){} if(G){ Object.keys(G.auto).forEach(k => { G.auto[k] = autoOn; }); }
   paintAuto(); UI.toast(autoOn ? '🤖 Skills go off by themselves' : '👆 You tap the skills'); }
 function paintAuto(){ const b = $('auto-btn'); if(!b) return; b.textContent = autoOn ? '🤖 Auto ✅' : '🤖 Auto'; b.title = 'Auto skills: ' + (autoOn ? 'on' : 'off'); b.classList.toggle('on', autoOn); }
-function goNow(){ if(G && G.state === 'break'){ (G.fd ? FD : TD).startWave(G); $('go-btn').classList.add('hidden'); } }
+/* 🔔 fd-1e: goNow() lives in the GO BUTTONS block (the tap plays the hit, the wave starts on CONTACT) */
 
 /* ---------- 📐 layout: stage square + hero panel; nothing ever scrolls ---------- */
 function layout(){
@@ -1913,7 +1919,7 @@ function nextPick(){
 function afterPicks(){
   if(G && G.fd) return fdAfterPicks();   // 👨‍🌾 fd-1
   if(!G) return; if(G.state === 'break'){ const n = G.wave + 2, boss = G.C.waves[n - 1].some(g => TD.SUITORS[g[0]].boss);
-    banner(boss ? '👑 BOSS WAVE: ' + TD.SUITORS[G.C.boss].name + '!' : '🌊 Wave ' + n + ' of ' + G.C.waves.length + ' — get ready!', boss ? 'bad' : ''); $('go-btn').classList.remove('hidden');
+    banner(boss ? '👑 BOSS WAVE: ' + TD.SUITORS[G.C.boss].name + '!' : '🌊 Wave ' + n + ' of ' + G.C.waves.length + ' — get ready!', boss ? 'bad' : ''); goShow();
     if(LEVELS[G.lvl].guide && G.wave < 0) showHandAt($('go-btn')); }
 }
 
@@ -1932,8 +1938,8 @@ function loop(now){
   raf = requestAnimationFrame(loop); if(!G) return;
   if(G.fd) return fdLoop(now);   // 👨‍🌾 fd-1
   const dt = last ? Math.min(0.1, Math.max(0, (now - last) / 1000)) : 0; last = now;
-  const was = G.state; TD.step(G, dt);
-  if(was === 'break' && G.state === 'wave'){ $('go-btn').classList.add('hidden'); if(HAND === $('go-btn')) hideHand(); }
+  const was = G.state; goAuto(); TD.step(G, dt);   /* 🔔 fd-1e: CONTACT starts the wave in this tick */
+  if(was === 'break' && G.state === 'wave'){ goHide(); if(HAND === $('go-btn')) hideHand(); }
   handleEvents(TD.takeEvents(G));
   FT = FT.filter(f => (f.t += dt) < f.dur);
   paintFrame(now / 1000); panelTick(); hudTick(); guideTick();
@@ -3572,7 +3578,7 @@ function fdHud(force){
   BAR.count('coll', '📋', FD.liveAll(G).length + G.spawnQ.length, 'Collectors still coming');
   const st = FD.stepsOf(G), mx = Math.max.apply(null, st), el = $('fd-steps');
   if(el){ const plus = mx - G.baseSteps, t = '👣 ' + mx + ' steps' + (plus > 0 ? ' · +' + plus + ' from your maze' : ' — plant to make it longer!'); if(el.dataset.t !== t){ el.dataset.t = t; el.innerHTML = '👣 <b>' + mx + '</b> steps' + (plus > 0 ? ' · +' + plus + ' from your maze 🍄' : ' — plant to make it longer!'); } }
-  const go = $('go-btn'); if(G.state === 'break' && go && !go.classList.contains('hidden')){ const left = G.breakLen > 0 ? Math.max(0, Math.ceil(G.breakLen + (G.freeMoveT > 0 ? 10 : 0) - G.wt)) : 0; const t = left ? '▶ Go! · ' + left : '▶ Go!'; if(go.textContent !== t) go.textContent = t; }
+  goLabel();   // 🔔 fd-1e: label + ring live in the GO BUTTONS block
 }
 
 /* ---------- 🃏 picks + break ---------- */
@@ -3598,7 +3604,7 @@ function fdAfterPicks(){
   if(!G || !G.fd) return; layout();
   if(G.state === 'break'){ const n = G.wave + 2, boss = G.C.waves[n - 1].some(g => FD.FOES[g[0]].boss), rain = G.C.rain && G.C.rain.includes(n - 1);
     banner(boss ? '👑 BOSS WAVE: ' + FD.FOES[G.C.boss].name + '!' : (rain ? '🌧️ ' : '🌊 ') + 'Wave ' + n + ' of ' + G.C.waves.length + ' — plant your maze, then ▶ Go!', boss ? 'bad' : '');
-    const go = $('go-btn'); go.classList.remove('hidden'); fdHints();
+    goShow(); fdHints();   // 🔔 fd-1e
     if(LEVELS[G.lvl].guide && G.wave < 0) setTimeout(() => fdHandOnSpot(), FX ? 300 : 0); }
 }
 // 👆 / 👻 the best spots glow (🌱 Basic + 🐣 Junior, and while a "new route" break is open)
@@ -3668,8 +3674,8 @@ document.addEventListener('keydown', e => { if(!isFarm() || $('scr-play').classL
 /* ---------- ⏱️ loop + events ---------- */
 function fdLoop(now){
   const dt = last ? Math.min(0.1, Math.max(0, (now - last) / 1000)) : 0; last = now;
-  const was = G.state; FD.step(G, dt);
-  if(was === 'break' && G.state === 'wave'){ $('go-btn').classList.add('hidden'); if(HAND === $('go-btn') || HAND === $('cv')) hideHand(); FDP.hint = []; FDP.pick = FDP.pick && FD.canPlant(G, FDP.pick.i, FDP.pick.j, FDP.sel).ok ? FDP.pick : null; }
+  const was = G.state; goAuto(); FD.step(G, dt);   /* 🔔 fd-1e: CONTACT starts the wave in this tick */
+  if(was === 'break' && G.state === 'wave'){ goHide(); if(HAND === $('go-btn') || HAND === $('cv')) hideHand(); FDP.hint = []; FDP.pick = FDP.pick && FD.canPlant(G, FDP.pick.i, FDP.pick.j, FDP.sel).ok ? FDP.pick : null; }
   fdEvents(FD.takeEvents(G)); if(!G) return;
   FT = FT.filter(f => (f.t += dt) < f.dur);
   fdSpinStep(now); fdPaint(now / 1000); fdPanelTick(); fdHud(); fdGuide();
@@ -4137,6 +4143,215 @@ function fdFaceL(o, x){ if(o._lx != null && Math.abs(x - o._lx) > 0.05) o._fl = 
   // a sideways phone: ONE row along the bottom (the cloud band) so the buttons never sit on the island
   '#scr-play.tl-land .fd-zoom{flex-direction:row;align-items:center;bottom:6px} #scr-play.tl-land .fd-zoom .fd-rot{margin:0}'].join('\n'); document.head.appendChild(st); })();
 /* 👨‍🌾 FARMER DELUSION — page END */
+/* ================= 🔔 GO BUTTONS (fd-1e) — a themed Go! per map (Aowu 2026-11-17 22:03 / 22:15) =================
+   The tap plays 5 beats: ready → anticipation (wind-up) → CONTACT (the wave starts HERE, inside the game loop tick) → follow-through → settle.
+   🔔 farm ch 1 bell + 🐓 rooster · 🌧️ ch 2 rain roof (drips before rain waves) + 🚧 back gate plank once the new route is open ·
+   📯 Dra-Princess herald horn + 🐉 roar · 🐚 / 🏮 for the later books. The timer running out plays the SAME hit (never a silent start).
+   Ring round the button = time left in the break. Painters: Test Harness/farmer-draft/gobtn_draft.js (one dark rim, no emoji). */
+(function(){
+  const RIM = '#2A1C14';
+  const G = {};
+  function rr(g, x, y, w, h, r){ g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+  function ink(g, w){ g.lineWidth = w || 2.2; g.strokeStyle = RIM; g.lineJoin = 'round'; g.lineCap = 'round'; g.stroke(); }
+  function swingOf(beat, q, t){   // bell / horn angle (radians) per beat
+    if(beat === 'idle') return Math.sin(t * 2.2) * 0.06;
+    if(beat === 'anticipation') return -0.55 * Math.sin(q * Math.PI / 2);          // pulled back
+    if(beat === 'contact') return 0.42;                                              // struck, held
+    if(beat === 'follow') return 0.42 * Math.cos(q * Math.PI * 1.6) * (1 - q);       // overshoot + settle
+    return 0;
+  }
+  /* ---------- 🔔 farm bell on a post + 🐓 rooster ---------- */
+  function post(g, rain){
+    g.fillStyle = '#8B5A2B'; rr(g, 26, 26, 8, 74, 2); g.fill(); ink(g);            // post
+    g.fillStyle = '#A06A35'; rr(g, 26, 24, 54, 8, 3); g.fill(); ink(g);            // beam
+    g.fillStyle = '#6E9E4A'; g.beginPath(); g.ellipse(36, 101, 26, 5, 0, 0, 7); g.fill(); ink(g, 1.6);   // grass tuft
+    if(rain){   // little tin rain roof over the beam
+      g.fillStyle = '#7FA7C9'; g.beginPath(); g.moveTo(16, 24); g.lineTo(52, 8); g.lineTo(88, 24); g.lineTo(84, 28); g.lineTo(52, 14); g.lineTo(20, 28); g.closePath(); g.fill(); ink(g);
+      g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 1.2; for(let i = 0; i < 4; i++){ g.beginPath(); g.moveTo(26 + i * 8, 22 - i * 3.4); g.lineTo(28 + i * 8, 25 - i * 3.4); g.stroke(); }
+    }
+  }
+  function bell(g, ang, gold){
+    g.save(); g.translate(64, 32); g.rotate(ang);
+    g.fillStyle = gold ? '#F2C14E' : '#D9A23A';
+    g.beginPath(); g.moveTo(-5, 2); g.quadraticCurveTo(-7, 8, -9, 20); g.quadraticCurveTo(-15, 30, -17, 34); g.lineTo(17, 34); g.quadraticCurveTo(15, 30, 9, 20); g.quadraticCurveTo(7, 8, 5, 2); g.closePath(); g.fill(); ink(g);
+    g.fillStyle = 'rgba(255,255,255,.45)'; g.beginPath(); g.ellipse(-6, 18, 2.4, 8, 0.25, 0, 7); g.fill();
+    g.fillStyle = '#7A4E1E'; g.beginPath(); g.arc(0, 36, 3.6, 0, 7); g.fill(); ink(g, 1.6);           // clapper
+    g.fillStyle = '#C0392B'; rr(g, -3, -2, 6, 6, 2); g.fill(); ink(g, 1.6);                           // red rope knot
+    g.restore();
+  }
+  function rooster(g, beat, q, t){   // one-piece: body + tail + head; leans back on anticipation, crows on contact
+    let lean = 0, open = 0, puff = 1;
+    if(beat === 'idle') lean = Math.sin(t * 1.4) * 0.04;
+    if(beat === 'anticipation'){ lean = -0.32 * q; puff = 1 + 0.12 * q; }
+    if(beat === 'contact'){ lean = 0.22; open = 1; puff = 1.12; }
+    if(beat === 'follow'){ lean = 0.22 * (1 - q); open = 1 - q * 0.6; puff = 1.12 - 0.12 * q; }
+    g.save(); g.translate(46, 24); g.rotate(lean);
+    g.fillStyle = '#2F6E3A'; g.beginPath(); g.moveTo(-6, -6); g.quadraticCurveTo(-20, -24, -12, -30); g.quadraticCurveTo(-8, -18, -2, -12); g.closePath(); g.fill(); ink(g, 1.8);   // tail
+    g.fillStyle = '#E8833A'; g.beginPath(); g.ellipse(0, -9, 10 * puff, 8 * puff, 0, 0, 7); g.fill(); ink(g, 1.8);                  // body
+    g.fillStyle = '#F6B26B'; g.beginPath(); g.ellipse(-1, -8, 5, 4, 0.3, 0, 7); g.fill();                                           // wing light
+    g.fillStyle = '#F4E3C3'; g.beginPath(); g.arc(8, -20, 6, 0, 7); g.fill(); ink(g, 1.8);                                         // head
+    g.fillStyle = '#D93A2B'; g.beginPath(); g.moveTo(4, -25); g.quadraticCurveTo(6, -31, 8, -26); g.quadraticCurveTo(10, -32, 12, -25); g.closePath(); g.fill(); ink(g, 1.4);   // comb
+    g.fillStyle = '#F2B233'; g.beginPath(); g.moveTo(13, -21 - open * 2); g.lineTo(19 + open * 2, -20); g.lineTo(13, -18 + open * 2); g.closePath(); g.fill(); ink(g, 1.4);   // beak
+    g.fillStyle = RIM; g.beginPath(); g.arc(9.5, -21.5, 1.2, 0, 7); g.fill();
+    g.restore();
+    if(open > 0.3){   // crow lines (no words in the picture)
+      g.strokeStyle = 'rgba(42,28,20,' + (0.8 * open) + ')'; g.lineWidth = 1.8;
+      for(let i = 0; i < 3; i++){ g.beginPath(); g.arc(66, 2, 6 + i * 5, -0.9, 0.2); g.stroke(); }
+    }
+  }
+  function backGate(g){   // 🚧 the back gate plank leaning on the post (ch 2, after Mr. Umbrella's new route)
+    g.save(); g.translate(86, 96); g.rotate(-0.18);
+    for(let i = 0; i < 2; i++){ g.fillStyle = '#FFFFFF'; rr(g, -14, -24 + i * 12, 28, 7, 2); g.fill(); ink(g, 1.6);
+      g.save(); rr(g, -14, -24 + i * 12, 28, 7, 2); g.clip(); g.fillStyle = '#D93A2B'; for(let s = -14; s < 16; s += 8){ g.beginPath(); g.moveTo(s, -24 + i * 12); g.lineTo(s + 4, -24 + i * 12); g.lineTo(s + 1, -17 + i * 12); g.lineTo(s - 3, -17 + i * 12); g.fill(); } g.restore(); }
+    g.fillStyle = '#8B5A2B'; rr(g, -12, -26, 4, 26, 1); g.fill(); ink(g, 1.4); rr(g, 8, -26, 4, 26, 1); g.fill(); ink(g, 1.4);
+    g.restore();
+  }
+  function rings(g, x, y, q, col){   // sound rings at contact / follow
+    for(let i = 0; i < 3; i++){ const r = 10 + (q * 30) + i * 9, a = Math.max(0, 0.85 - q - i * 0.18); if(a <= 0) continue;
+      g.strokeStyle = col.replace('A', a.toFixed(2)); g.lineWidth = 3 - i * 0.6; g.beginPath(); g.arc(x, y, r, 0, 7); g.stroke(); }
+  }
+  function drops(g, t){ g.fillStyle = '#5B8DB8'; for(let i = 0; i < 3; i++){ const y = 30 + ((t * 40 + i * 13) % 26); g.beginPath(); g.ellipse(22 + i * 30, y, 1.4, 2.6, 0, 0, 7); g.fill(); } }
+  G.bell = function(g, beat, q, t, o){ post(g, false); bell(g, swingOf(beat, q, t)); rooster(g, beat, q, t); if(beat === 'contact' || beat === 'follow') rings(g, 64, 62, beat === 'contact' ? 0 : q, 'rgba(255,214,90,A)'); };
+  G.bellRain = function(g, beat, q, t, o){ if(o && o.raining) drops(g, t); post(g, true); bell(g, swingOf(beat, q, t)); rooster(g, beat, q, t); if(o && o.backGate) backGate(g); if(beat === 'contact' || beat === 'follow') rings(g, 64, 62, beat === 'contact' ? 0 : q, 'rgba(255,214,90,A)'); };
+  /* ---------- 📯 Dra-Princess: herald horn on a banner pole + 🐉 dragon roar ---------- */
+  G.horn = function(g, beat, q, t){
+    // banner pole
+    g.fillStyle = '#7A5A3A'; rr(g, 84, 22, 6, 80, 2); g.fill(); ink(g);
+    const wave = Math.sin(t * 3) * 3;
+    g.fillStyle = '#8E44AD'; g.beginPath(); g.moveTo(90, 24); g.quadraticCurveTo(104, 28 + wave, 112, 26); g.lineTo(106, 38); g.lineTo(112, 50); g.quadraticCurveTo(102, 48 - wave, 90, 50); g.closePath(); g.fill(); ink(g);
+    g.fillStyle = '#F2C14E'; g.beginPath(); g.arc(100, 37, 4, 0, 7); g.fill();          // crown dot
+    // 🐉 dragon head + neck (one piece), inhales on anticipation, ROARS on contact
+    let inh = 0, open = 0.15;
+    if(beat === 'anticipation'){ inh = q; open = 0.05; }
+    if(beat === 'contact'){ inh = -0.3; open = 1; }
+    if(beat === 'follow'){ inh = -0.3 * (1 - q); open = 1 - q * 0.7; }
+    if(beat === 'idle') inh = Math.sin(t * 1.6) * 0.15;
+    g.save(); g.translate(28, 92); g.rotate(-0.15 - inh * 0.25);
+    g.fillStyle = '#4CAF6E';
+    g.beginPath(); g.moveTo(-10, 8); g.quadraticCurveTo(-14, -30, 4, -44 - inh * 4); g.lineTo(22, -46 - inh * 4);
+    g.lineTo(36, -40 - open * 6); g.lineTo(26, -34); g.lineTo(36, -26 + open * 8); g.lineTo(18, -26); g.quadraticCurveTo(6, -14, 10, 8); g.closePath(); g.fill(); ink(g);
+    g.fillStyle = '#9BE3A9'; g.beginPath(); g.ellipse(-2, -12, 5 + inh * 2, 14, 0.1, 0, 7); g.fill();     // belly puffs
+    g.fillStyle = '#F2C14E'; g.beginPath(); g.moveTo(6, -46); g.lineTo(2, -56); g.lineTo(12, -48); g.closePath(); g.fill(); ink(g, 1.5);   // horn
+    g.fillStyle = RIM; g.beginPath(); g.arc(16, -40, 1.6, 0, 7); g.fill();
+    if(open > 0.5){ g.fillStyle = 'rgba(255,140,60,' + (open * 0.8) + ')'; g.beginPath(); g.moveTo(34, -32); g.lineTo(52, -42); g.lineTo(50, -24); g.closePath(); g.fill(); }
+    g.restore();
+    // 📯 herald horn (princess's), lifted on anticipation, TOOT on contact
+    const lift = beat === 'anticipation' ? q : (beat === 'contact' ? 1 : beat === 'follow' ? 1 - q * 0.5 : 0);
+    g.save(); g.translate(62, 64 - lift * 8); g.rotate(-0.35 - lift * 0.25 + (beat === 'idle' ? Math.sin(t * 2) * 0.04 : 0));
+    g.fillStyle = '#F2C14E'; g.beginPath(); g.moveTo(-22, -2); g.lineTo(6, -3); g.quadraticCurveTo(16, -12, 22, -14); g.lineTo(22, 14); g.quadraticCurveTo(16, 12, 6, 3); g.lineTo(-22, 2); g.closePath(); g.fill(); ink(g);
+    g.fillStyle = '#C0392B'; g.beginPath(); g.moveTo(-8, 3); g.lineTo(2, 3); g.lineTo(0, 16); g.lineTo(-4, 12); g.lineTo(-8, 16); g.closePath(); g.fill(); ink(g, 1.5);   // pennant
+    g.restore();
+    if(beat === 'contact' || beat === 'follow') rings(g, 90, 46, beat === 'contact' ? 0 : q, 'rgba(255,214,90,A)');
+  };
+  /* ---------- later books (placeholders for the theme table) ---------- */
+  G.conch = function(g, beat, q, t){ g.save(); g.translate(60, 60); g.rotate(swingOf(beat, q, t) * 0.5);
+    g.fillStyle = '#F7B7A3'; g.beginPath(); g.moveTo(-28, 10); g.quadraticCurveTo(-10, -30, 26, -16); g.quadraticCurveTo(30, 0, 20, 14); g.quadraticCurveTo(0, 22, -28, 10); g.closePath(); g.fill(); ink(g);
+    g.strokeStyle = '#D9826B'; g.lineWidth = 2; for(let i = 0; i < 3; i++){ g.beginPath(); g.arc(8, -2, 6 + i * 6, 2.4, 4.6); g.stroke(); } g.restore();
+    if(beat === 'contact' || beat === 'follow') rings(g, 30, 64, beat === 'contact' ? 0 : q, 'rgba(120,220,255,A)'); };
+  G.lantern = function(g, beat, q, t){ g.save(); g.translate(60, 26); g.rotate(swingOf(beat, q, t) * 0.6);
+    g.strokeStyle = RIM; g.lineWidth = 2; g.beginPath(); g.moveTo(0, -10); g.lineTo(0, 6); g.stroke();
+    g.fillStyle = '#E2453A'; g.beginPath(); g.ellipse(0, 30, 22, 26, 0, 0, 7); g.fill(); ink(g);
+    g.fillStyle = '#F2C14E'; rr(g, -12, 2, 24, 6, 2); g.fill(); ink(g, 1.5); rr(g, -12, 52, 24, 6, 2); g.fill(); ink(g, 1.5);
+    const glow = beat === 'contact' ? 1 : beat === 'follow' ? 1 - q : 0.25; g.fillStyle = 'rgba(255,230,140,' + glow * 0.8 + ')'; g.beginPath(); g.ellipse(0, 30, 10, 16, 0, 0, 7); g.fill(); g.restore(); };
+  /* ---------- the button face: medallion + countdown ring + label ---------- */
+  const SKIN = {bell: {a: '#7CC25A', b: '#3E8E3A', ring: '#FFD23F'}, bellRain: {a: '#8DB8D8', b: '#4F7FA8', ring: '#FFD23F'},
+    horn: {a: '#B07CD8', b: '#6B3FA0', ring: '#FFD23F'}, conch: {a: '#5FC8D8', b: '#257E96', ring: '#FFE7A0'}, lantern: {a: '#E2604F', b: '#8E2A22', ring: '#FFD23F'}};
+  G.face = function(g, theme, beat, q, t, o){
+    o = o || {}; const S = SKIN[theme];
+    const press = beat === 'anticipation' ? 1 - 0.06 * q : beat === 'contact' ? 1.08 : beat === 'follow' ? 1.08 - 0.08 * q : 1 + Math.sin(t * 3.4) * 0.02;
+    g.save(); g.translate(60, 60); g.scale(press, press); g.translate(-60, -60);
+    const gr = g.createRadialGradient(52, 44, 6, 60, 60, 58); gr.addColorStop(0, S.a); gr.addColorStop(1, S.b);
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.arc(60, 64, 56, 0, 7); g.fill();
+    g.fillStyle = gr; g.beginPath(); g.arc(60, 60, 56, 0, 7); g.fill(); ink(g, 3);
+    if(o.left != null && o.of){ g.strokeStyle = 'rgba(255,255,255,.25)'; g.lineWidth = 6; g.beginPath(); g.arc(60, 60, 51, 0, 7); g.stroke();
+      g.strokeStyle = S.ring; g.lineWidth = 6; g.beginPath(); g.arc(60, 60, 51, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (o.left / o.of)); g.stroke(); }
+    g.save(); g.beginPath(); g.arc(60, 60, 48, 0, 7); g.clip(); const farm = theme === 'bell' || theme === 'bellRain'; if(farm){ g.translate(12, 22); g.scale(0.78, 0.78); } else { g.translate(8, 2); g.scale(0.88, 0.88); }
+    G[theme](g, beat, q, t, o); g.restore();
+    g.restore();
+  };
+  G.BEATS = [{k: 'ready', ms: 60, ease: 'sineInOut'}, {k: 'anticipation', ms: 180, ease: 'cubicOut'}, {k: 'contact', ms: 90, ease: 'quartOut', contact: true, stop: 60},
+    {k: 'follow', ms: 240, ease: 'backOut'}, {k: 'settle', ms: 140, ease: 'sineInOut'}];
+  (typeof window !== 'undefined' ? window : globalThis).GOB = G;
+})();
+const GO_LEAD = 0.24, GO_TOTAL = 0.71;   // ready 60 + anticipation 180 ms → contact; + contact 90 + follow 240 + settle 140
+const GOX = {run: null, raf: 0, size: 0, n: 0, log: []};
+window.GO_LOG = GOX.log;
+function goEl(){ return $('go-btn'); }
+function goTheme(){ if(G && G.fd) return G.C && G.C.n >= 2 ? 'bellRain' : 'bell'; return ({draprincess: 'horn', coral: 'conch', market: 'lantern'})[S.book] || 'horn'; }
+function goLimit(){ if(!G) return 0; const bl = G.goHold != null ? G.goHold : G.breakLen;
+  return G.fd ? (bl > 0 ? bl + (G.freeMoveT > 0 ? 10 : 0) : 0) : (bl != null ? bl : 2.6); }
+function goOpts(){ const o = {}; if(G && G.fd && G.C){ o.raining = !!(G.C.rain && G.C.rain.includes(G.wave + 1)); o.backGate = !!(G.C.newGate && G.routeDone); }
+  const lim = goLimit(); if(lim > 0 && G && G.state === 'break' && !GOX.run){ o.of = lim; o.left = Math.max(0, lim - G.wt); } return o; }
+function goLabel(){ const b = goEl(); if(!b || !G) return; const lim = goLimit(), left = lim > 0 && G.state === 'break' && !GOX.run ? Math.max(0, Math.ceil(lim - G.wt)) : 0,
+  t = left ? '▶ Go! · ' + left : '▶ Go!', lb = b.querySelector('.gob-lb'); if(lb && lb.textContent !== t) lb.textContent = t; }
+function goShow(){ const b = goEl(); if(!b) return; if(GOX.run && (GOX.run.g !== G || GOX.run.fired)) GOX.run = null;   // a new break: an old hit's follow-through never hides the new button
+  b.dataset.theme = goTheme(); b.classList.remove('hidden', 'gob-hit'); GOX.size = 0; goLabel(); goPlace(); if(!GOX.raf) GOX.raf = requestAnimationFrame(goFrame); }
+// 👣 on the farm the steps line sits bottom-left: lift the button above it when they would touch (phones held upright, tablets)
+function goPlace(){ const b = goEl(), st = $('stage'), sp = $('fd-steps'); if(!b || !st) return; const was = b.style.bottom; b.style.bottom = '';
+  if(G && G.fd && sp && !sp.classList.contains('hidden') && getComputedStyle(sp).display !== 'none'){ const r = b.getBoundingClientRect(), q = sp.getBoundingClientRect(), R = st.getBoundingClientRect();
+    if(q.width && r.left < q.right + 4 && r.right > q.left - 4 && r.bottom > q.top - 4) b.style.bottom = Math.round(R.bottom - q.top + 4) + 'px'; }
+  if(b.style.bottom !== was) GOX.size = 0; }
+function goHide(){ const b = goEl(); if(!b) return; if(GOX.run && !GOX.run.done){ GOX.run.hideAfter = true; return; } b.classList.add('hidden'); b.classList.remove('gob-hit'); }
+function goStop(){ GOX.run = null; const b = goEl(); if(b){ b.classList.add('hidden'); b.classList.remove('gob-hit'); } if(GOX.raf){ cancelAnimationFrame(GOX.raf); GOX.raf = 0; } }
+// called by the game loops BEFORE they step: CONTACT starts the wave in the same tick; the break timer starts the hit 0.24 s early
+function goAuto(){ if(!G) return; const r = GOX.run;
+  if(r){ if(r.due && !r.fired && !G.paused) goContact(); return; }
+  if(G.state !== 'break' || G.paused) return; const b = goEl(); if(!b || b.classList.contains('hidden')) return;
+  const lim = goLimit(); if(lim > 0 && G.wt + GO_LEAD * (G.speed || 1) >= lim) goHit(true); }
+function goNow(){ if(G && G.state === 'break') goHit(false); }
+function goHit(auto){
+  if(!G || G.state !== 'break' || GOX.run) return;
+  const g = G; if(g.goHold == null){ g.goHold = g.breakLen; g.breakLen = 1e9; }   // the hit owns the start: the engine's own timer waits for CONTACT
+  GOX.n++; GOX.run = {g, t: 0, last: performance.now(), auto: !!auto, due: false, fired: false, done: false, crow: GOX.n % 3};
+  GOX.log.push({k: 'tap', auto: !!auto, at: performance.now(), wave: g.wave, theme: goTheme()}); goSound('wind');
+  if(!window.FX){ GOX.run.due = true; goContact(); return; }   // tests with FX 0: at once
+  if(!GOX.raf) GOX.raf = requestAnimationFrame(goFrame);
+}
+function goContact(){ const r = GOX.run; if(!r || r.fired) return; r.fired = true; const g = r.g;
+  if(g.goHold != null){ g.breakLen = g.goHold; g.goHold = null; }
+  if(g !== G || g.state !== 'break'){ goEnd(); return; }
+  (g.fd ? FD : TD).startWave(g);
+  GOX.log.push({k: 'contact', at: performance.now(), beatT: r.t, wave: g.wave, state: g.state, theme: goTheme(), crow: r.crow});
+  goSound('hit'); const b = goEl(); if(b) b.classList.add('gob-hit'); if(HAND === b) hideHand();
+  if(!window.FX) goEnd();
+}
+function goEnd(){ const r = GOX.run; if(r) r.done = true; GOX.run = null; const b = goEl(); if(!b) return; b.classList.remove('gob-hit');
+  if(!G || G.state !== 'break' || (r && r.hideAfter)) b.classList.add('hidden'); else goLabel(); }
+// beat at time t (s) → [painter beat, q]
+function goBeat(r){ if(!r) return ['idle', 0]; let t = r.t; if(!r.fired) t = Math.min(t, GO_LEAD + 0.03);
+  if(t < 0.06) return ['idle', 0]; if(t < GO_LEAD) return ['anticipation', (t - 0.06) / 0.18];
+  if(t < GO_LEAD + 0.09 || !r.fired) return ['contact', 0]; if(t < GO_LEAD + 0.33) return ['follow', (t - GO_LEAD - 0.09) / 0.24]; return ['follow', 1]; }
+function goFrame(now){
+  GOX.raf = 0; const b = goEl(); if(!b) return; const r = GOX.run;
+  if(r){ const dt = Math.min(0.1, Math.max(0, (now - r.last) / 1000)); r.last = now; if(!(G && G.paused) || r.fired) r.t += dt;   // ⏸ holds the wind-up, never the follow-through
+    if(!r.fired && r.t >= GO_LEAD) r.due = true;
+    if(r.fired && r.t >= GO_TOTAL) goEnd(); }
+  if(b.classList.contains('hidden') && !GOX.run) return;   // hidden → stop drawing
+  goPaint(now / 1000); if(!GOX.run){ goLabel(); if((GOX.f = (GOX.f || 0) + 1) % 15 === 0) goPlace(); }
+  GOX.raf = requestAnimationFrame(goFrame);
+}
+function goPaint(t){
+  const b = goEl(), c = b && b.querySelector('canvas'); if(!c || typeof GOB === 'undefined') return;
+  const px = Math.round(c.getBoundingClientRect().width) || 0; if(!px) return; const d = Math.min(3, window.devicePixelRatio || 1), W = Math.round(px * d);
+  if(c.width !== W){ c.width = c.height = W; }
+  const g = c.getContext('2d'), bt = goBeat(GOX.run), o = goOpts(); if(GOX.run) o.crow = GOX.run.crow;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, W); g.setTransform(W / 128, 0, 0, W / 128, 4 * W / 128, 4 * W / 128);
+  try{ GOB.face(g, b.dataset.theme || goTheme(), bt[0], Math.max(0, Math.min(1, bt[1])), t, o); }catch(e){}
+}
+// 🔊 shared tone maker only (UISound) — 🔇 silences it like every other sound
+function goSound(k){ const U = window.UISound; if(!U || !U.isOn || !U.isOn()) return; const th = goTheme();
+  try{
+    if(k === 'wind'){ U.noise(0.18, {gain: 0.1, from: 300, to: 1400}); return; }
+    if(th === 'bell' || th === 'bellRain'){ U.note('E6', 1.4, {instrument: 'bell', gain: 0.32}); U.note('B5', 1.1, {instrument: 'bell', gain: 0.18, delay: 0.02});
+      const v = GOX.run ? GOX.run.crow : 0, f = [520, 600, 460][v];   // 🐓 3 different crows
+      U.tone(f, 0.12, {type: 'sawtooth', gain: 0.06, slide: f * 1.5, delay: 0.14}); U.tone(f * 1.5, [0.38, 0.3, 0.5][v], {type: 'sawtooth', gain: 0.05, slide: f * [1.1, 1.3, 0.9][v], delay: 0.26}); }
+    else if(th === 'horn'){ U.note('G4', 0.42, {instrument: 'flute', gain: 0.3}); U.note('D5', 0.5, {instrument: 'flute', gain: 0.24, delay: 0.18});
+      U.noise(0.7, {gain: 0.24, from: 900, to: 120, delay: 0.1}); U.tone(110, 0.6, {type: 'sawtooth', gain: 0.07, slide: 70, delay: 0.1}); }
+    else if(th === 'conch') U.tone(196, 0.8, {type: 'triangle', gain: 0.2, slide: 220});
+    else U.note('C5', 1, {instrument: 'bell', gain: 0.3});
+  }catch(e){}
+}
+/* 🔔 GO BUTTONS END */
 /* ================= BOOT ================= */
 function boot(){
   UI.loading('tdstories');
@@ -4429,4 +4644,4 @@ function tdResultBadge(){
 /* 🏷️ TD LOGO END */</script>
 </body>
 </html>
-<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a+fd-1a2+fd-1b+fd-1c+fd-1d) END OF TDStories.html -->
+<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a+fd-1a2+fd-1b+fd-1c+fd-1d+fd-1e) END OF TDStories.html -->
