@@ -1250,6 +1250,10 @@ const LEVEL_GAMES = {
     badges: ['Diary Basic', 'Diary Junior', 'Diary Intermediate', 'Diary Hard', 'Diary Extreme', 'Diary Hardcore'],
     levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
   },
+  'td-farmer': {   // 👨‍🌾 TD-Stories book 2 · Farmer Delusion (fd-1) — Theme column = "📖 Ch N · title"
+    badges: ['Farm Basic', 'Farm Junior', 'Farm Intermediate', 'Farm Hard', 'Farm Extreme', 'Farm Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
   // 🏭 Artifactory: ⭐ blueprint challenges — one Archive board, the Theme column says the station ("🌀 Lathe · Cup"); the detail card shows the best per station
   'artifactory': {
     badges: ['Maker Basic', 'Maker Junior', 'Maker Intermediate', 'Maker Hard', 'Maker Extreme', 'Maker Hardcore'],
@@ -1478,6 +1482,7 @@ function getLevelGameData(gameId, player) {
   if (gameId === 'geoscout' || gameId === 'number-board' || gameId === 'eyes-brain') out.numberSkins = numberSkinsOwned_(players);   // 🎨 number looks each player may use (item line + GeoScout Journey chapters)
   if (gameId === 'wisdeck') { out.wisCards = wisCardRows_(); out.wisDaily = wisDaily_(); const all = activePlayers_(listProfilesFull()); out.wdBack = {}; all.forEach(p => { try { out.wdBack[p.Name] = itemsFor_(p.Name, all).owned.wdback || 0; } catch (e) { out.wdBack[p.Name] = 0; } }); }   // 🃏 sheet-tab cards + 📅 today's family board + 🂠 card backs owned
   if (gameId === 'wisdeck') { out.progressCount = {}; out.progressJack = {}; players.forEach(p => { out.progressCount[p.Name] = levelProgressFor_(p.Name, 'wiscount'); out.progressJack[p.Name] = levelProgressFor_(p.Name, 'wisjack'); }); }   // 🃏 WisDeck page shows all three boards   // 👀🧠 🎯 today's family number + 🏅 brain levels + 🔢 keypad skins owned   // ⬛ field journal + line trails owned   // 👻💣 battle unlocks (+ bomb skins, round 4)
+  if (gameId === 'td-draprincess') { out.progressFarmer = {}; players.forEach(p => { out.progressFarmer[p.Name] = levelProgressFor_(p.Name, 'td-farmer'); }); }   // 👨‍🌾 fd-1: TD-Stories shows book 2's board too
   if (gameId === 'alignext') { out.progressOmni = {}; players.forEach(p => { out.progressOmni[p.Name] = levelProgressFor_(p.Name, 'omnifile'); }); }   // 🔴 Alignext page shows both boards (Drop + ❌⭕ Omnifile)
   if (gameId === 'pokadif') { out.progressCase = {}; players.forEach(p => { out.progressCase[p.Name] = levelProgressFor_(p.Name, 'pokadif-case'); }); }   // 📖 pk-3a: the page shows the Detective Adventure board too
   if (gameId === 'pokadif') { out.progressArcade = {}; players.forEach(p => { out.progressArcade[p.Name] = levelProgressFor_(p.Name, 'pokadif-arcade'); }); }   // 🔍 pk-2b: the page shows the ⏱️ Arcade board too
@@ -2122,6 +2127,20 @@ const FEATS_HEADERS = [
 ];
 const FEATS_WIDTH = FEATS_HEADERS.length;
 const FEAT_DEFS = {
+  'td-farmer': {   // 👨‍🌾 TD-Stories · Farmer Delusion (fd-1)
+    games: { name: 'Farmer Delusion chapters played', icon: '🎮', kind: 'sum', hidden: true },
+    quits: { name: 'Collectors who gave up', icon: '😭', kind: 'sum', tiers: [50, 500, 3000] },
+    waves: { name: 'Farm waves held', icon: '🌊', kind: 'sum', tiers: [10, 100, 500] },
+    perfect: { name: 'Perfect farm waves (no 🎃 lost)', icon: '✨', kind: 'sum', tiers: [10, 100, 400] },
+    plants: { name: 'Maze plants planted', icon: '🍄', kind: 'sum', tiers: [50, 500, 3000] },
+    grows: { name: 'Plants grown a stage', icon: '🌱', kind: 'sum', tiers: [20, 200, 1000] },
+    steps: { name: 'Longest maze walk', icon: '👣', kind: 'max', unit: 'steps', tiers: [40, 80, 140] },
+    evolves: { name: 'Farm hero evolutions', icon: '⭐', kind: 'sum', tiers: [2, 20, 100] },
+    ultimates: { name: 'Farm ultimates unlocked', icon: '☄️', kind: 'sum', tiers: [1, 10, 50] },
+    combos: { name: 'Farm combo skills found', icon: '🤝', kind: 'sum', tiers: [1, 10, 40] },
+    casts: { name: 'Farm skills used', icon: '🪄', kind: 'sum', hidden: true },
+    chapters: { name: 'Farm chapters done', icon: '📔', kind: 'max', tiers: [1, 2, 6] },
+  },
   'td-draprincess': {   // 🏰 TD-Stories · 🐉👑 Dra-Princess Diary (td-1)
     games: { name: 'Dra-Princess chapters played', icon: '🎮', kind: 'sum', hidden: true },
     bonks: { name: 'Suitors bonked away', icon: '💫', kind: 'sum', tiers: [50, 500, 3000] },
@@ -4860,7 +4879,7 @@ function saveMathPrefs(name, prefs) {
 }
 // 🧬 SkillKit saves (td-1, plan "TD-Stories — full plan.md" §6): ONE Settings row per player per game — "SkillTree_<game>_<Name>" =
 // {ch: chapters done (only grows), last: {<hero>: SkillKit tree.save()}, lastForms} — picks + evolve forms, never a log.
-const SKILL_TREE_GAMES_ = ['td-draprincess'];
+const SKILL_TREE_GAMES_ = ['td-draprincess', 'td-farmer'];   // 👨‍🌾 fd-1
 // 💾 b1c (🧱 Game Baseline §5): shared save files — 3 per player per game, one Settings row each (+ ⭐ main). GameFrame `GF.saves()` keeps a device
 // copy too (instant, offline) and sends a file here at checkpoints / when leaving. A file = {meta: {title, chapter, level, playSec, av…}, data: {…}, at}.
 const SAVE_SLOTS_ = 3, SAVE_MAX_ = 40000;
@@ -4903,7 +4922,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
