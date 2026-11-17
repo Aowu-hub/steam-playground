@@ -59,6 +59,11 @@
   .pick .big{font-size:2.2rem;line-height:1;} .pick .nm{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1rem;} .pick .sub{font-size:0.75rem;color:var(--ink-soft);font-weight:700;}
   .pick canvas{width:72px;height:84px;}
   .section-head{font-family:'Fredoka',sans-serif;font-weight:700;font-size:1.05rem;margin:18px 0 10px;color:var(--ink-soft);text-align:center;}
+  /* 🔬 sc-7: one-page setup — ▶ Start stays in reach at the bottom (the picked level glows via GameFrame's GF.pick) */
+  .b3-start{position:sticky;bottom:0;z-index:5;display:flex;justify-content:center;padding:10px 0 calc(env(safe-area-inset-bottom, 0px) + 14px);margin-top:12px;pointer-events:none;}
+  .b3-start .sp-btn{min-width:min(420px,92%);max-width:96%;min-height:56px;font-size:1.15rem;line-height:1.2;pointer-events:auto;box-shadow:0 8px 22px rgba(0,0,0,.28);}
+  #level-list .lvl.sel{outline:4px solid var(--mustard,#FFC94A);outline-offset:2px;}
+  @media (max-height:520px){ #scr-menu .who{display:none;} #lab-head{margin:6px 0 4px;} }   /* 🔬 sc-7: phones held sideways — the cover already says who plays, so every lab box stays on the first screen */
   .levels{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
   @media (min-width:1100px){ .levels{grid-template-columns:repeat(6,1fr);} }
   @media (max-width:640px){ .levels{grid-template-columns:repeat(2,1fr);} .title h1{font-size:1.8rem;} }
@@ -899,6 +904,10 @@
 <script src="inc/AvatarWeapons.js"></script>
 <script src="inc/ChemTable.js"></script>
 <script src="inc/AtomSkins.js"></script>
+<script src="inc/GameFrame.js"></script>
+<script src="inc/GameCovers.js"></script>
+<script src="inc/CardArt.js"></script>
+<script src="inc/GameLogos.js"></script>   <!-- 🔬 sc-7: 🎬 cover (GameFrame + GameCovers + CardArt + GameLogos) -->
 </head>
 <body ontouchstart="">
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goBack()">◀ Back</button>
@@ -912,19 +921,20 @@
   <div class="title"><div class="logo">🔬</div><h1>Sciencetory</h1>
     <div class="tagline"><span>🤔 Guess</span><span>🔬 Test</span><span>💡 Learn</span></div>
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
+  <div class="section-head" id="lab-head">🔬 1. Pick a lab</div>   <!-- 🔬 sc-7: ONE setup page -->
   <div id="mode-list"></div>
-  <div class="section-head" id="level-head">Pick a level</div>
+  <div class="section-head" id="level-head">🎚️ 2. Pick a level</div>
   <div class="levels" id="level-list"></div>
   <div class="comics-slot" id="comics-slot-menu"></div>
-  <details class="rules"><summary>📖 How the lab works</summary><ul>
+  <div class="b3-start"><button class="btn sp-btn sp-primary" id="btn-start" data-sound="pop" onclick="startSetup()">▶ Start</button></div>   <!-- 🔬 sc-7: 📖 how-to + 🏆 leaders live on the cover -->
+  <template id="b3-rules"><ul>
     <li><b>1 · Pick a test + a thing:</b> any thing you made in 🏭 Artifactory — or a 🧪 lab sample if you have nothing yet.</li>
     <li><b>2 · Set it in the rig:</b> tap 🗜️ when it is in the green middle.</li>
     <li><b>3 · Guess first:</b> 👍 / 👎 — scientists always guess before they test (that's a <i>hypothesis</i>). A right guess = bonus points!</li>
     <li><b>4 · Watch the gauge</b> and read your 📋 test card: the number, a ⭐ family record and <b>why</b> it happened.</li>
     <li><b>🧪 = can break.</b> A broken thing is never lost — fix it with 🔧 Repair in Artifactory.</li>
     <li>🌱 <b>Basic:</b> the next step glows and your lab buddy gives hints. From ⚡ Hard you guess a <b>range</b> instead of yes / no.</li>
-  </ul></details>
-  <div class="ui-leaders" id="leaders"></div>
+  </ul></template>   <!-- 🔬 sc-7: the lab rules → the cover's 📖 How to play sheet -->
 </section>
 
 <section class="screen hidden" id="scr-lab">
@@ -1103,6 +1113,7 @@ const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '�
 BAR.score(0); BAR.miss(0); BAR.count('tests', '🧪', 0, 'Tests run today');
 var NAV_INNER = {lab: ['◀ Sciencetory', () => { const f = SET.labFrom; if(f && SEC3[f]){ SET.labFrom = ''; SET.sec = f; openSec3(SET.level); } else showScreen('menu'); }], chem: ['◀ Sciencetory', () => { renderMenu(); showScreen('menu'); }], table: ['◀ Chemistry', () => openChem(SET.level)], qhub: ['◀ Sciencetory', () => { renderMenu(); showScreen('menu'); }], xhub: ['◀ Chemistry', () => openChem(SET.level)], phub: ['◀ Sciencetory', () => { renderMenu(); showScreen('menu'); }], pzoo: ['◀ Particle', () => openParticle(SET.level)]};
 UI.navBar(document.getElementById('back-btn'), {onclick: false});
+NAV_INNER.menu = ['◀ Sciencetory', () => openCover()];   // 🔬 sc-7: the setup's top button goes back to the 🎬 cover
 const $ = id => document.getElementById(id);
 let SCI_FX = 1;   // the harness sets 0: no waits, no confetti — whole tests run at once
 function scPick(a){ return a[Math.floor(Math.random() * a.length)]; }
@@ -1216,6 +1227,7 @@ function showScreen(name){
   ['player', 'menu', 'lab', 'play', 'chem', 'table', 'hunt', 'formula', 'qhub', 'atom', 'led', 'glow', 'cat', 'xhub', 'exp', 'phub', 'pzoo', 'qk', 'col', 'shub', 'l3'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
   $('back-btn').classList.toggle('hidden', name === 'play' || name === 'hunt' || name === 'formula' || name === 'atom' || name === 'led' || name === 'glow' || name === 'cat' || name === 'exp' || name === 'qk' || name === 'col' || name === 'l3'); UI.navScreen($('back-btn'), name, NAV_INNER); window.scrollTo(0, 0);
   if(name !== 'lab') labHand(null);
+  if(name !== 'menu') coverOff();   /* 🔬 sc-7: any lab / play screen hides the cover */
 }
 function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
 function canPlay(i){ const p = progressOf(S.player); if(i === 5) return p.unlocked >= 5; if(i === 4) return p.unlocked >= 4; return i <= Math.max(p.unlocked, AGE_START[S.age] || 0); }
@@ -1234,7 +1246,7 @@ function choosePlayer(name){
   loadPrefs(); $('who-name').textContent = name; S.tests = Number(ls(store('today:' + new Date().toDateString()))) || 0; BAR.count('tests', '🧪', S.tests, 'Tests run today');
   const ml = UI.modeLink ? UI.modeLink(MODE_LINK) : '';
   if(ml && SECTIONS.some(s => s.k === ml && !s.soon)){ SET.sec = ml; }
-  renderMenu(); showScreen('menu'); msAlso();
+  renderMenu(); showScreen('menu'); msAlso(); if(!ml && !THING_LINK) openCover();   /* 🔬 sc-7: the 🎬 cover first — links go straight on */
   if(!same && S.loadedFor !== name){ UI.call('getSciPlayer', [name], {kind: 'sciencetory', text: 'Opening your lab'}).then(r => { S.things = r.things || []; S.sci = r.sci || {t: {}}; S.fam = r.fam || {}; if(r.chem) CHEM = r.chem; if(r.atomSkins != null) S.atomSkins = r.atomSkins; S.loadedFor = name; afterThings(); }).catch(() => {}); }
   else afterThings();
   if(ml && !THING_LINK){ UI.toast('⚙️ Mechanic lab — now pick a level'); if(UI.modePoint) UI.modePoint($('level-list')); }
@@ -1257,13 +1269,12 @@ function renderMenu(){
     if(s && s.soon){ UISound.play('error'); UI.toast('🔜 ' + s.icon + ' ' + s.name + ' opens in the next lab update (' + s.soon + ') — try ⚙️ Mechanic now!'); return 'stop'; }
     SET.sec = k; markModes(); return false; }});
   ml.querySelectorAll('.ui-mbtn').forEach(b => { if(SECTIONS.find(s => s.k === b.dataset.k && s.soon)) b.classList.add('soon'); });
-  markModes(); renderLevels();
-  if(window.UI && UI.leaders) UI.leaders($('leaders'), GAME_ID, S.player);
+  markModes(); renderLevels();   /* 🔬 sc-7: 🏆 leaders live on the cover */
 }
 var QUANT_LVL = [['⚖️ protons + guides', 'The next step glows · atoms H to Ne · LED steps with numbers'], ['🔢 numbers', 'Atomic numbers · pick your own light · 10 cat boxes'], ['⚪ + neutrons', 'Neutrons + mass numbers · LEDs without numbers · odd chances'], ['📛 names', 'Names only · real-world LEDs · glow on a time limit'], ['⚡ ions + mixes', 'Ions · mix LED light · 30 cat boxes'], ['💀 one try', 'Timers + one try in every Quantum game']];   // sc-2b2: covers all four games   // sc-2b
 function SEC_LVL(){ return SET.sec === 'chem' ? CHEM_LVL : SET.sec === 'quantum' ? QUANT_LVL : SET.sec === 'particle' ? PART_LVL : SEC3[SET.sec] ? SEC3[SET.sec].lvl : null; }
 var CHEM_LVL = [['🔤 letters + glow', 'Match the letters · the row lights up · easy molecules'], ['🔤 letters', 'Find the letters on the whole table · 2–3 kinds of atoms'], ['🔢 numbers', 'Find the atomic number · extra atoms in the kit'], ['📛 names', 'The name only — find its letters yourself · 💡 formula costs points'], ['💡 facts', 'A fact, the name hidden · the molecule name only'], ['💡 facts · ⏱️', '15 s a clue, no numbers · one check per molecule']];   // sc-2a2: ⚗️ level cards
-function markModes(){ if($('level-list') && $('level-list').children.length) setTimeout(renderLevels, 0); $('mode-list').querySelectorAll('.ui-mbtn').forEach(b => b.classList.toggle('on', b.dataset.k === SET.sec)); const s = SECTIONS.find(x => x.k === SET.sec) || SECTIONS[3]; $('level-head').textContent = 'Pick a level — ' + s.icon + ' ' + s.name + ' lab'; }
+function markModes(){ if($('level-list') && $('level-list').children.length) setTimeout(renderLevels, 0); $('mode-list').querySelectorAll('.ui-mbtn').forEach(b => b.classList.toggle('on', b.dataset.k === SET.sec)); const s = SECTIONS.find(x => x.k === SET.sec) || SECTIONS[3]; $('level-head').textContent = '🎚️ 2. Pick a level — ' + s.icon + ' ' + s.name + ' lab'; if(window.markPicks) markPicks(); }   /* 🔬 sc-7 */
 function openSection(lv){ SET.labFrom = ''; if(SET.sec === 'chem') openChem(lv); else if(SET.sec === 'quantum') openQuantum(lv); else if(SET.sec === 'particle') openParticle(lv); else if(SEC3[SET.sec]) openSec3(lv); else openLevel(lv); }
 function renderLevels(){
   const box = $('level-list'); box.innerHTML = ''; const p = progressOf(S.player), rec = AGE_START[S.age];
@@ -1272,9 +1283,45 @@ function renderLevels(){
     b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (U.hardcore ? ' hardcore' : ''); b.setAttribute('data-sound', open ? 'pop' : 'none'); b.dataset.lv = i;
     b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">🏅</span>' : open ? '' : '<span class="badge">🔒</span>') +
       '<div class="big">' + U.emoji + '</div><div class="nm">' + U.name + '</div><div class="learn">' + (SEC_LVL() ? SEC_LVL()[i][0] : i >= 3 ? 'guess a range' : 'guess 👍 / 👎') + '</div><div class="sub">' + (U.hardcore && !open ? '🔒 Beat Extreme to open 💀 Hardcore' : SEC_LVL() ? SEC_LVL()[i][1] : U.blurb) + '</div>' + bestHtml(p, i);
-    b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore' : 'Get ⭐⭐ on the level before to unlock it'); return; } openSection(i); };
-    box.appendChild(b);
+    b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore' : 'Get ⭐⭐ on the level before to unlock it'); return; } chooseLevel(i); };   /* 🔬 sc-7: a tap picks, ▶ Start opens */
+    b.dataset.i = i; box.appendChild(b);
   });
+  b3Restore();
+}
+
+/* 🔬 sc-7 (Game Baseline): ONE setup page — 🔬 lab + 🎚️ level, then ▶ Start; the level is remembered per player */
+let chosenLevel = 0;
+const setupKey = k => 'sp_sciencetory_' + k + ':' + (S.player || '');
+function chooseLevel(i, quiet){
+  chosenLevel = i; try{ localStorage.setItem(setupKey('lv'), String(i)); }catch(e){}
+  markPicks(); if(!quiet){ const w = $('btn-start'); if(w && w.scrollIntoView) w.scrollIntoView({behavior: 'smooth', block: 'nearest'}); }
+}
+function markPicks(){
+  document.querySelectorAll('#level-list .lvl[data-i]').forEach(b => { const on = String(b.dataset.i) === String(chosenLevel); b.classList.toggle('sel', on); if(window.GF && GF.pick) GF.pick(b, on); });
+  const U = LEVEL_UI[chosenLevel], sec = SECTIONS.find(x => x.k === SET.sec) || SECTIONS[3], st = $('btn-start');
+  if(st && U) st.textContent = '▶ Start · ' + sec.icon + ' ' + sec.name + ' · ' + U.emoji + ' ' + U.name;
+}
+function b3Restore(){   // the last level per player (else the age start, else the highest open one)
+  let i = -1; try{ const v = localStorage.getItem(setupKey('lv')); i = v === null ? -1 : Number(v); }catch(e){} const rec0 = AGE_START[S.age] || 0;
+  chosenLevel = i >= 0 && canPlay(i) ? i : (canPlay(rec0) ? rec0 : Math.max(0, [0, 1, 2, 3, 4, 5].filter(canPlay).pop() || 0)); markPicks();
+}
+function startSetup(){ if(!canPlay(chosenLevel)){ UISound.play('error'); UI.toast('Pick a level that is open 🔓'); return; } coverOff(); openSection(chosenLevel); }
+// 🎬 the cover (GameFrame): who's here + 🏆 champions + 📖 how the lab works; ▶ Play opens the setup page
+let SciCover = null;
+const SCI_VERSION = '7.0';   /* 🔬 sc-7: shown on the cover footer — bump with each round */
+function coverOff(){ if(SciCover) SciCover.hide(); }
+function b3Help(){   // the lab's own rules list (bold labels kept) for the cover's 📖 sheet; none → UiKit's 3 lines
+  const t = $('b3-rules'); if(!t || !t.content) return undefined;
+  const L = [...t.content.querySelectorAll('li')].map(li => { const c = li.cloneNode(true); c.querySelectorAll('b').forEach(b => b.replaceWith('**' + b.textContent.trim() + '**')); return c.textContent.replace(/\s+/g, ' ').trim(); }).filter(Boolean);
+  return L.length ? L : undefined;
+}
+function openCover(){
+  if(!window.GF){ showScreen('menu'); return; }
+  if(SciCover && SciCover.who !== S.player){ SciCover.destroy(); SciCover = null; }
+  if(!SciCover){ SciCover = GF.cover(document.body, {game: GAME_ID, title: 'Sciencetory', icon: '🔬', version: SCI_VERSION, me: S.player, players: S.players, avatarOf: myAvatar, seats: {min: 1, max: 1},
+      acts: ['beat.cheer', 'beat.jump'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms', help: b3Help(),
+      onPlay: () => { SciCover.hide(); showScreen('menu'); } }); SciCover.who = S.player; }
+  SciCover.show();
 }
 
 /* ================= 🧪 LAB SCREEN: pick a test + a thing ================= */
@@ -3041,7 +3088,7 @@ function boot(){
       const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
       lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
       if(CURRENT_PLAYER && S.players.some(p => p.Name === CURRENT_PLAYER)){ S.player = ''; choosePlayer(CURRENT_PLAYER); } else { renderPlayers(); showScreen('player'); }
-      if(UI.guideOnce) UI.guideOnce('sciencetory', [UI.gameHelp(GAME_ID, 'Sciencetory', '🔬')].filter(Boolean));
+      /* 🔬 sc-7: first-visit help = the cover's 📖 How to play */
     }).withFailureHandler(() => { UI.loaded(); UI.toast('Could not load the lab — check the connection', 'err'); renderPlayers(); showScreen('player'); })
     .getSciencetoryData(CURRENT_PLAYER);
 }
@@ -5458,4 +5505,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (sc-1+sc-2a+sc-2a2+sc-2b+sc-2b2+sc-2c+sc-2d+ls-1b+sc-2e+sc-2f+sc-3a+sc-3b+sc-3c+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+sc-5a+sc-5b1+sc-5b1b+sc-5b2+sc-5b2b+sc-5b3+sc-6) END OF Sciencetory.html -->
+<!-- (sc-1+sc-2a+sc-2a2+sc-2b+sc-2b2+sc-2c+sc-2d+ls-1b+sc-2e+sc-2f+sc-3a+sc-3b+sc-3c+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+sc-5a+sc-5b1+sc-5b1b+sc-5b2+sc-5b2b+sc-5b3+sc-6+sc-7) END OF Sciencetory.html -->
