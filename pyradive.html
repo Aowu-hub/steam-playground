@@ -2506,6 +2506,7 @@ function handleEvents(list){
     GC_LOG.push(Object.assign({mode: GAME_ID}, e)); if(GC_LOG.length > 600) GC_LOG.shift();
     GC_LISTEN.forEach(fn => { try{ fn(GAME_ID, e, M); }catch(err){} });
     cheerEvent(e, M); /* 📣 cs-pd */
+    coachEvent(e, M); /* 🧑‍🏫 pd-6d */
     const b = M.ball, p = e.p != null ? M.players[e.p] : null;
     switch(e.k){
       case 'serve': snd('whoosh'); spark(b.x, b.y, b.z, e.pyra ? '#FF6B1A' : '#FFFFFF', e.kind === 'jump' ? 16 : 10);
@@ -3176,10 +3177,33 @@ function beatKeyOf(p){ const a = p.act; if(!a) return null; const k = BEAT_OF[(a
 const FEET_OF = {dig: 'pyradive.kpass', bump: 'pyradive.knee', set: 'pyradive.header', dink: 'pyradive.heel', drive: 'pyradive.kserve', serve: 'pyradive.kserve'};
 function feetOn(M){ return PD.isStrike(M) && hasBeat('pyradive.kpass'); }
 function feetKeyOf(p){ const a = p.act; if(!a) return null; const k = a === 'dunk' ? (p.style === 'bicycle' ? 'pyradive.bicycle' : p.z > 0.1 ? 'pyradive.kroll' : 'pyradive.kserve') : FEET_OF[a]; return hasBeat(k) ? k : null; }
-function feetLow(z){ return z < 0.75 ? 'pyradive.kpass' : z < 1.75 ? 'pyradive.knee' : 'pyradive.header'; }   // the body part by the ball's height (= doTouch: dig < 0.75 m ≤ bump < 1.75 m ≤ set)
+function feetLow(z){ return z < 0.75 ? 'pyradive.kpass' : z < 1.75 ? 'pyradive.knee' : 'pyradive.header'; }
+/* ⚡ pd-6d (plan `claude/pyradive-pd6d-plan.md`): ⚡ PyraSpark table touches by BODY PART — the engine names the part (p.lastPart foot · thigh · chest · head, by
+   the ball's height) and the picture follows: keep it (Dig · Trap · Pop · Dink · Edge) = 🦶 foot edge · 🦵 thigh trap · 🫁 chest trap · 🗣️ head pop · send it (Drive) =
+   swinging kick · knee · chest · header · ⚡ dunk = SPARK SMASH · serve = swinging kick (🧑‍🏫 the Coach: an underarm toss-feed, 👉 points at the zone first, 👏 / 💪 after).
+   Contact = the engine's touch frame; the receiver winds up for the part the ball will meet (top of its bounce). The engine is untouched. */
+const SPARK_SOFT = {foot: 'pyradive.sfoot', thigh: 'pyradive.strap', chest: 'pyradive.schest', head: 'pyradive.shead'}, SPARK_SEND = {foot: 'pyradive.kserve', thigh: 'pyradive.knee', chest: 'pyradive.schest', head: 'pyradive.header'};
+const SPARK_H = [[0.55, 'foot'], [1.05, 'thigh'], [1.45, 'chest'], [9, 'head']], SPARK_L = ['foot', 'thigh', 'chest', 'head'];   // = the engine's SPARK_PART (ball height over the feet)
+function sparkOn(M){ return PD.isSpark(M) && hasBeat('pyradive.strap'); }
+function isCoach(M, p){ return !!(M.drill && p.team === 1 && !isHoop(M)); }
+function sparkServeKey(M, p){ return isCoach(M, p) ? 'pyradive.toss' : 'pyradive.kserve'; }
+function sparkPartAt(M, p, hz){ let part = 'head'; for(const h of SPARK_H) if(hz < h[0]){ part = h[1]; break; } if(M.level >= 3 && p.lastPart === part){ const i = SPARK_L.indexOf(part); part = SPARK_L[i + (i < 3 ? 1 : -1)]; } return part; }   // = sparkPart (Hard+: never the same part twice)
+function sparkKeyOf(M, p){ const a = p.act; if(!a) return null;
+  const k = a === 'dunk' ? 'pyradive.ssmash' : a === 'drive' && M.serveFresh && M.lastP === p.id && M.n === 0 ? sparkServeKey(M, p) : a === 'drive' ? SPARK_SEND[p.lastPart] : a === 'dive' || a === 'block' ? null : SPARK_SOFT[p.lastPart];
+  return hasBeat(k) ? k : null; }
+/* 🎬 pd-6d beat events for 💥 Comics + 📣 Cheer: GameComic.listen gets {k: 'beat', p, team, act, beat: 'anticipation' | 'contact' | 'follow', t} from the beat timeline
+   (Acting.play onBeat) — people's moves + the big robot moves only, never into GameComic.log(), never changes play. */
+const BEAT_BIG = {'pyradive.spike': 1, 'pyradive.ssmash': 1, 'pyradive.kroll': 1, 'pyradive.bicycle': 1, 'pyradive.block': 1, 'pyradive.fblock': 1, 'pyradive.serve': 1, 'pyradive.kserve': 1, 'pyradive.dive': 1};
+function beatEv(M, p, key){ if(!GC_LISTEN.length || !(PD.isPerson(p) || BEAT_BIG[key])) return {};   // contact = onContact (the real touch frame — a held wind-up never sends it)
+  const send = name => { const e = {k: 'beat', p: p.id, team: p.team, act: key, beat: name, t: M.t, h: p.human || null}; GC_LISTEN.forEach(fn => { try{ fn(GAME_ID, e, M); }catch(err){} }); };
+  return {onBeat: name => { if(name === 'anticipation' || name === 'follow') send(name); }, onContact: () => send('contact')}; }
+// 🧑‍🏫 the Coach reacts to your drill shots (⚡ table drills): 👏 a zone / combo / 3-touch score · 💪 "again!" after a miss
+function coachEvent(e, M){ if(!M.drill || isHoop(M) || !sparkOn(M)) return; const c = M.players.find(q => q.team === 1); if(!c) return;
+  const k = e.k === 'drillHit' && (e.kind === 'zone' || e.kind === 'combo' || e.kind === 'three') ? 'pyradive.cclap' : e.k === 'drillMiss' || (e.k === 'drillLife' && e.lives > 0) ? 'pyradive.cagain' : null;
+  if(k && hasBeat(k)) (c.bt || (c.bt = {})).react = {k, t: M.t}; }   // the body part by the ball's height (= doTouch: dig < 0.75 m ≤ bump < 1.75 m ≤ set)
 // 🖼️ beat frames are rounded a little (angles to 1/6 rad, body shifts to 2 px) so blended in-betweens share pictures — the cache stays small with 11 moves
 function bQ(pose){ const o = {}; for(const n in pose){ const v = pose[n]; o[n] = typeof v !== 'number' ? v : n === 'dy' ? Math.round(v / 2) * 2 : n === 'sx' || n === 'sy' ? Math.round(v * 25) / 25 : n === 'platform' ? Math.round(v * 2) / 2 : Math.round(v * 6) / 6; } return o; }
-function bRun(M, p, key, t0, contactAt){ const B = p.bt; B.run = Acting.play({name: p.name, av: p.av}, key, {t0, contactAt, from: B.last || undefined, speed: M.level === 0 ? 1.15 : 1}); B.key = key; B.t0 = t0; B.cap = null; return B.run; }
+function bRun(M, p, key, t0, contactAt){ const B = p.bt; B.run = Acting.play({name: p.name, av: p.av}, key, Object.assign({t0, contactAt, from: B.last || undefined, speed: M.level === 0 ? 1.15 : 1}, beatEv(M, p, key) /* 🎬 pd-6d */)); B.key = key; B.t0 = t0; B.cap = null; return B.run; }
 function bHold(M, p, key, t0, tc){ bRun(M, p, key, t0, tc); p.bt.cap = tc - 0.03; }   // play up to just short of contact and wait there for the real touch
 function beatPose(M, p){
   if(!p.av || !beatsOn()) return null;
@@ -3236,6 +3260,27 @@ function beatPose(M, p){
     }
     else if(held && !B.air){ B.run = null; B.key = null; B.cap = null; }
   }
+  else if(sparkOn(M)){   // ⚡ pd-6d
+    const sk = p.act && p.actT < 0.15 ? sparkKeyOf(M, p) : null, b = M.ball, held = B.cap != null, coach = isCoach(M, p), R = B.react;
+    // 1 · the real touch (the serve too): contact = the engine's touch moment
+    if(sk){ const tc = Math.round((now - p.actT) * 1000) / 1000; if(B.touch !== tc){ B.touch = tc; bRun(M, p, sk, tc, tc); } }
+    // 2 · 🧑‍🏫 the Coach reacts to your shot (👏 / 💪) — set by coachEvent()
+    else if(coach && R && B.reactT !== R.t){ B.reactT = R.t; bRun(M, p, R.k, now, now + 0.2); }
+    // 3 · 🚀 serve: a robot winds up just before it hits (swinging kick · the Coach's toss-feed, 👉 pointing at the glowing zone first) — a person's serve plays from contact
+    else if(M.phase === 'serve' && b.held === p.id && p.z === 0 && !PD.isPerson(p)){
+      const tc = now - M.phaseT + M.serveWait, lead = tc - now, sk2 = sparkServeKey(M, p), sid = Math.round((now - M.phaseT) * 10);
+      if(lead > 0 && lead <= BEAT_LEAD && hasBeat(sk2)){ if(!(B.key === sk2 && held)) bHold(M, p, sk2, now, tc); }
+      else if(coach && M.drill.k === 'zone' && lead > BEAT_LEAD + 0.5 && B.point !== sid && hasBeat('pyradive.cpoint')){ B.point = sid; bRun(M, p, 'pyradive.cpoint', now, now + 0.2); }
+    }
+    // 4 · the receiver winds up for the body part the ball will meet (the top of its bounce on our half · a partner's lob)
+    else if(M.phase === 'rally' && M.recv[T] === p.id && p.z === 0 && !(p.lunge > 0) && (!p.act || p.actT > 0.5)){
+      if(B.pr == null || B.pr.h !== b.hitT || B.pr.s !== M.side){ const pr = PD.sparkPredict(M, 9); B.pr = {h: b.hitT, s: M.side, t: now + pr.t, x: pr.x, y: pr.y, z: pr.z}; }
+      const lead = B.pr.t - now, near = Math.hypot(B.pr.x - p.x, B.pr.y - p.y) < 2.0, key = SPARK_SOFT[sparkPartAt(M, p, B.pr.z - p.z)];
+      if(near && key && hasBeat(key) && lead > 0 && lead <= BEAT_LEAD){ if(!(B.key === key && held)) bHold(M, p, key, now, B.pr.t); }
+      else if(held && !B.air && lead <= 0){ B.run = null; B.key = null; B.cap = null; }
+    }
+    else if(held && !B.air){ B.run = null; B.key = null; B.cap = null; }
+  }
   // 🦘 take-off and 🛬 landing (every sport) — volleyball: 🧱 block · 🦘 jump serve · 💥 attack jump get their own act
   const feet = feetOn(M);   // 🦶 pd-6c
   if(p.z > 0.02 && !B.air){
@@ -3248,6 +3293,7 @@ function beatPose(M, p){
     else if(feet && p.block > 0 && hasBeat('pyradive.fblock')) bRun(M, p, 'pyradive.fblock', now, now + 0.07);   // 🦶 pd-6c 🧱 back to the net, legs up
     else if(feet && !(p.act && p.actT < 0.2) && (isHoop(M) ? M.ball.z - p.z > 1.4 : (p.want && p.want.key === 'drive') || spiker)){   // 🦶 pd-6c attack jump: 🌀 roll strike (🔥 armed / a high Hoop ball = 🚲 bicycle)
       const k = isHoop(M) || p.pyraArm ? 'pyradive.bicycle' : 'pyradive.kroll'; if(hasBeat(k)){ bHold(M, p, k, now, now + 0.3); B.bike = k === 'pyradive.bicycle'; } else bRun(M, p, 'pyradive.jump', now, now); }
+    else if(sparkOn(M) && p.want && p.want.key === 'drive' && !(p.act && p.actT < 0.2) && hasBeat('pyradive.ssmash')) bHold(M, p, 'pyradive.ssmash', now, now + 0.3);   // ⚡ pd-6d SPARK SMASH in the air
     else if(!p.block && !(p.act && p.actT < 0.4) && !(M.phase === 'serve' && M.ball.held === p.id)) bRun(M, p, 'pyradive.jump', now, now);
   }
   else if(p.z <= 0.02 && B.air){ B.air = false; if(!p.dive) bRun(M, p, feet && B.bike && hasBeat('pyradive.rollup') ? 'pyradive.rollup' : 'pyradive.land', now, now); B.bike = false; }   // 🦶 pd-6c: a 🚲 bicycle lands on the back + rolls up
@@ -3260,7 +3306,7 @@ function beatPose(M, p){
 // 🖼️ pictures of the beat frames are painted ahead (warm-up) for people, so the first touch never waits for new pictures (the most common moves only — the rest paint on demand)
 function beatWarmPoses(M){
   if(!beatsOn()) return [];
-  const out = [], keys = (feetOn(M) ? ['pyradive.kpass', 'pyradive.knee', 'pyradive.header', 'pyradive.kserve'] /* 🦶 pd-6c */ : PD.noHands(M) ? [] : ['pyradive.bump', 'pyradive.set', 'pyradive.spike']).concat(['pyradive.jump', 'pyradive.land']).filter(hasBeat);
+  const out = [], keys = (feetOn(M) ? ['pyradive.kpass', 'pyradive.knee', 'pyradive.header', 'pyradive.kserve'] /* 🦶 pd-6c */ : sparkOn(M) ? ['pyradive.strap', 'pyradive.shead', 'pyradive.sfoot', 'pyradive.schest'] /* ⚡ pd-6d */ : PD.noHands(M) ? [] : ['pyradive.bump', 'pyradive.set', 'pyradive.spike']).concat(['pyradive.jump', 'pyradive.land']).filter(hasBeat);
   keys.forEach(k => { const run = Acting.play({name: 'warm', av: {}}, k, {t0: 0, speed: M.level === 0 ? 1.15 : 1}), end = run.start[run.start.length - 1] + run.D[run.D.length - 1].ms;
     for(let ms = 0; ms <= end + 1; ms += BEAT_STEP * 1000){ const f = run.at(ms / 1000); if(f.pose) out.push(Object.assign({}, IDLE_POSE, bQ(f.pose))); } });
   return out;
@@ -3416,11 +3462,11 @@ function drawPlayer(g, M, p, t, o){
   // the next touch: a ring under the feet (your own team)
   if(live) ctlUnder(g, M, p, fx, fy, kAv, t);   /* 🎮 pd-8a */
   if(live && M.phase === 'rally' && M.recv[p.team] === p.id && !ctlDriven(M, p)){ g.save(); g.translate(fx, fy); g.scale(1, 0.38); g.strokeStyle = TEAM_COL[p.team]; g.lineWidth = 3; g.globalAlpha = 0.85; g.beginPath(); g.arc(0, 0, 22 * kAv * 1.4, 0, 7); g.stroke(); g.restore(); }
-  const gest = M.phase !== 'rally' && p.gest && GEST[p.gest.k] ? {g: GESTURES.find(x => x.k === GEST[p.gest.k]) || GESTURES[0], t: Math.min(p.gest.t, 1.3)} : null;
+  const gest = M.phase !== 'rally' && p.gest && GEST[p.gest.k] && !(p.bt && p.bt.reactT != null && M.t - p.bt.reactT < 1.2) /* 🧑‍🏫 pd-6d */ ? {g: GESTURES.find(x => x.k === GEST[p.gest.k]) || GESTURES[0], t: Math.min(p.gest.t, 1.3)} : null;
   if(!p.av) p.av = playAv(defaultAvatar(p.name));
   if(!p.av._h) p.av._h = String(p.id) + Math.random().toString(36).slice(2, 6);
   const a = {name: p.name, av: p.av, dir: p.dir, gest};
-  const bp = gest || !live ? null : beatPose(M, p), special = feetOn(M) ? !!p.dive /* 🦶 pd-6c */ : PD.noHands(M) ? (p.dive || (p.block > 0 && p.z > 0) || (M.phase === 'serve' && (M.ball.held === p.id || M.feeder === p.id)) || (p.act && p.actT < 0.4)) : !!(p.act && p.actT < 0.4 && !beatKeyOf(p) && !(p.act === 'dive' && p.bt && p.bt.key === 'pyradive.dive'));   // 🎬 pd-6a · 🏐 pd-6b: every volleyball move has its beats
+  const bp = gest || !live ? null : beatPose(M, p), special = feetOn(M) || sparkOn(M) ? !!p.dive /* 🦶 pd-6c · ⚡ pd-6d */ : PD.noHands(M) ? (p.dive || (p.block > 0 && p.z > 0) || (M.phase === 'serve' && (M.ball.held === p.id || M.feeder === p.id)) || (p.act && p.actT < 0.4)) : !!(p.act && p.actT < 0.4 && !beatKeyOf(p) && !(p.act === 'dive' && p.bt && p.bt.key === 'pyradive.dive'));   // 🎬 pd-6a · 🏐 pd-6b: every volleyball move has its beats
   const pose = gest ? null : bp && !special ? Object.assign({}, IDLE_POSE, bp.pose) : Object.assign({}, IDLE_POSE, p.walkT && p.z === 0 && !p.act ? walkPose(p.walkT) : p.z > 0 ? AIR_POSE : null, poseOf(M, p, t) || {});
   // ground shadow (smaller + lighter in the air), then the cached body picture
   const sh = 1 - Math.min(0.55, p.z / 1.4); g.fillStyle = 'rgba(0,0,0,' + (0.22 * sh).toFixed(3) + ')'; g.beginPath(); g.ellipse(fx, fy, 15 * kAv * sh, 6 * kAv * sh, 0, 0, 7); g.fill();
@@ -3826,4 +3872,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pd-4c+cs-pd+ck-2d+pd-4e+pd-5a+pd-7+pd-5b+pd-6a+pd-5c+pd-6b+pd-5d+pd-6b2+pd-5e+pd-6c+pd-8a+pd-8b) END OF PyraDive.html -->
+<!-- (pd-4c+cs-pd+ck-2d+pd-4e+pd-5a+pd-7+pd-5b+pd-6a+pd-5c+pd-6b+pd-5d+pd-6b2+pd-5e+pd-6c+pd-8a+pd-8b+pd-6d) END OF PyraDive.html -->
