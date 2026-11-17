@@ -991,6 +991,7 @@ function startGame(lvl){
   if(tg && LX.pending){ G.lx = LX.pending; LX.pending = null; }   // 📡 lk-3d
   const names = G.lx ? G.lx.seats.map(x => x.name) : tg ? together.players.slice() : [S.player];
   names.forEach(n => G.players.push({name: n, bot: false, rack: [], score: 0, eqs: 0, best: 0, bingos: 0}));
+  if(G.lx) G.lx.seats.forEach((x, k) => { if(x && x.bot != null && G.players[k]){ G.players[k].bot = true; G.players[k].blvl = x.bot; } });   /* 📺 st-2a: the TV's 🤖 robot seat */
   if(!tg) G.players.push({name: 'Robot', bot: true, rack: [], score: 0, eqs: 0, best: 0, bingos: 0});
   G.players.forEach(P => refill(P));
   /* fair start: the first player can always make a first sentence (new tiles until one fits) */
@@ -1254,7 +1255,8 @@ function endTurn(){
 }
 function botTurn(force){ if(window.Cheer) Cheer.hush(false); /* 📣 cs-3b */   // 📡 lk-3d: force = 🤖 plays for a player whose device dropped out
   if(!G || G.over || (!cur().bot && !force)) return;
-  const P = cur(), moves = findMoves(P.rack, G.L.bot >= 0.9 ? 1400 : 900), m = chooseMove(moves, force ? 0.3 : G.L.bot);
+  const P = cur(), bs = P.bot && P.blvl != null && LEVELS[P.blvl] ? LEVELS[P.blvl].bot : G.L.bot;   /* 📺 st-2a: the robot seat's own level */
+  const moves = findMoves(P.rack, bs >= 0.9 ? 1400 : 900), m = chooseMove(moves, force ? 0.3 : bs);
   if(!m){
     if(G.bag.length){ const keep = P.rack.find(x => x.t === '='), ids = P.rack.filter(x => x !== keep).slice(0, 4).map(x => x.id); doSwap(P, ids); G.passes = 0; setMsg(THEMES[G.theme].bot + ' Robot swapped ' + ids.length + ' tiles', 'bot'); showBanner('🔁 Robot swapped tiles', 'bot'); }
     else { G.passes++; setMsg(THEMES[G.theme].bot + ' Robot passed', 'bot'); }
@@ -1639,15 +1641,16 @@ function finishGame(why, bad){
 }
 function togetherOver(g, secs){
   const order = g.players.slice().sort((a, b) => b.score - a.score), top = order[0].score, winners = order.filter(p => p.score === top);
-  if(!(g.lx && g.lx.role === 'guest')) g.players.forEach(P => { if(P.eqs) google.script.run.withFailureHandler(() => {}).saveFeats(P.name, GAME_ID, {equations: P.eqs, bestMove: P.best, bingos: P.bingos, togetherGames: 1}); });
-  party('🏆 ' + winners.map(w => w.name).join(' & ') + (winners.length > 1 ? ' tie!' : ' wins!')); confetti(['➗', '⭐', '🎉', '🏆'], 40); UISound.play('success');
-  say(winners.map(w => w.name).join(' and ') + (winners.length > 1 ? ' tie!' : ' wins!'));
+  const vb = g.players.some(P => P.bot), wt = s => vb ? (winners.length > 1 ? 'A tie with the Robot!' : winners[0].bot ? 'The Robot won this one!' : winners[0].name + ' beat the Robot!') : s;   /* 📺 st-2a: vs the TV's 🤖 */
+  if(!(g.lx && g.lx.role === 'guest')) g.players.forEach(P => { if(P.eqs && !P.bot) google.script.run.withFailureHandler(() => {}).saveFeats(P.name, GAME_ID, {equations: P.eqs, bestMove: P.best, bingos: P.bingos, togetherGames: 1}); });
+  party((vb && winners[0].bot && winners.length === 1 ? '🤖 ' : '🏆 ') + wt(winners.map(w => w.name).join(' & ') + (winners.length > 1 ? ' tie!' : ' wins!'))); confetti(['➗', '⭐', '🎉', '🏆'], 40); UISound.play('success');
+  say(wt(winners.map(w => w.name).join(' and ') + (winners.length > 1 ? ' tie!' : ' wins!')));
   setTimeout(() => {
     if(G !== g) return;
-    showResult('<div class="big">🏆</div><h2 class="cheer">' + UI.esc(winners.map(w => w.name).join(' & ')) + (winners.length > 1 ? ' tie!' : ' wins!') + '</h2>' +
+    showResult('<div class="big">' + (vb && winners[0].bot && winners.length === 1 ? '🤖' : '🏆') + '</div><h2 class="cheer">' + UI.esc(wt(winners.map(w => w.name).join(' & ') + (winners.length > 1 ? ' tie!' : ' wins!'))) + '</h2>' +
       '<div class="standings">' + order.map((P, k) => '<div class="' + (P.score === top ? 'win' : '') + '"><span>' + ['🥇', '🥈', '🥉', '4️⃣'][k] + ' ' + UI.esc(P.name) + '</span><span>' + P.score + ' · ✏️ ' + P.eqs + '</span></div>').join('') + '</div>' +
       '<div class="stats"><span>⏱ ' + fmt(secs * 1000) + '</span><span>🔁 ' + g.L.rounds + ' rounds</span></div>' +
-      '<div class="save-note">👨‍👩‍👧 Play-together games count for badges, not levels</div>' +
+      '<div class="save-note">' + (vb ? '📺 Games vs the 🤖 on the TV count for badges, not levels' : '👨‍👩‍👧 Play-together games count for badges, not levels') + '</div>' +
       (g.lx ? lxResultBtns(g) : '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🎚️ Levels</button></div>'));
     if(g.lx){ lxResultWire(g); return; } $('b-again').onclick = () => startGame('together'); $('b-menu').onclick = () => backToMenu();
   }, 1600);
@@ -1738,6 +1741,12 @@ boot();
 const LX = {wired: false, lobby: null, pending: null, cfg: null, autoT: 0, talk: {}};
 const LX_TALK = ['Hmm… 🤔', 'I’ve got a sum! 💡', 'Don’t peek! 🙈', 'Which number… 🔢', 'Almost ready! ⏳', 'This one’s big! 🌟', 'Shh, counting… 🤫', 'Watch this! 😎', 'Carry the one… ✏️', 'Ooh, a ×3 square! ✨', 'Hello everyone! 👋', 'Plus or times? 🤯'];
 function lxSend(kind, d){ if(!G || !G.lx) return; G.lx.sent = true; setActs(false); setMsg('<span class="ui-spin a-bounce">📨</span> Sending to the host…', ''); Link.send(kind, Object.assign({tn: G.lx.tn}, d), {sure: true}); }
+function lxTo(k){ const x = G && G.lx && G.lx.seats[k]; return !!x && k !== G.lx.seat && x.lseat !== 'bot'; }   /* 📺 st-2a: a seat on another device (not the TV's 🤖) */
+function lxBotLvl(){ if(LX.botLvl != null) return LX.botLvl; return ({easy: 1, medium: 2, hard: 4})[together.diff] || 1; }   /* 📺 st-2a: the station's level vote, else the words the TV picked */
+function lxStLevel(v){   /* 📺 st-2a: the station's level → the robot + words + board + rounds (not saved as the TV's own picks) */
+  const l = Math.max(0, Math.min(5, Math.round(+v) || 0)); LX.botLvl = l;
+  together.diff = l < 2 ? 'easy' : l < 4 ? 'medium' : 'hard'; together.size = l < 3 ? 11 : 15; together.rounds = (LEVELS[l] || LEVELS[1]).rounds;
+}
 function lxSeatOf(lseat){ return G && G.lx ? G.lx.seats.findIndex(x => x.lseat === lseat) : -1; }
 function lxAv(cv, p){ const g = cv.getContext('2d'); g.clearRect(0, 0, cv.width, cv.height); drawPreviewCanvas(cv, myAvatar(p.name), {name: p.name, t: 1}); }
 function lxCloseLobby(){ if(LX.lobby && LX.lobby.close) LX.lobby.close(); LX.lobby = null; }
@@ -1777,12 +1786,12 @@ async function lxOpenHost(tv){
   try{ await Link.host({game: 'Algebros', name: S.player, seats: 4, hostess: !!tv, page: 'numberboard', label: lxLabel() + (tv ? ' · 📺 on the TV' : '')}); }
   catch(e){ UISound.play('error'); el.innerHTML = '<div class="lk"><div class="lk-msg bad">😕 ' + UI.esc((e && e.message) || 'Could not open the room') + '</div></div>'; return; }
   if($('scr-link').classList.contains('hidden')) return;
-  LX.lobby = Link.lobby(el, {title: lxLabel(), url: WEBAPP_URL + '?page=numberboard', minPlayers: 2, name: S.player, drawAvatar: lxAv, kind: 'number-board', onStart: lxHostGo});
+  LX.lobby = Link.lobby(el, {title: lxLabel(), url: WEBAPP_URL + '?page=numberboard', minPlayers: 2, soloBot: true, name: S.player, drawAvatar: lxAv, kind: 'number-board', onStart: lxHostGo});
 }
 function lxJoin(code){
   lxWire(); lxCloseLobby(); lxIdle();
   $('lx-sub').textContent = 'Same Wi-Fi as the host — or 🌍 anywhere'; showScreen('link'); lxAlt('host');
-  LX.lobby = Link.lobby($('lx-lobby'), {title: '➗ Algebros', name: S.player, drawAvatar: lxAv, code: code || undefined, kind: 'number-board', onJoined: () => { UISound.play('success'); lxAlt(''); }});
+  LX.lobby = Link.lobby($('lx-lobby'), {title: '➗ Algebros', name: S.player, soloBot: true, drawAvatar: lxAv, code: code || undefined, kind: 'number-board', onJoined: () => { UISound.play('success'); lxAlt(''); }});
 }
 function lxAlt(k){ const a = $('lx-alt'); if(!a) return; a.innerHTML = k === 'host' ? '<button class="btn soft sp-btn sp-secondary" data-sound="pop" onclick="lxHostPick()">📡 Host a game instead</button>' : ''; }
 function lxExit(){
@@ -1801,12 +1810,13 @@ function lxLeavePlay(){
 function lxHostGo(){
   const tv = !!(Link.hostess && Link.hostess());   // 📺 lk-5d: the TV holds no player
   const list = Link.players().filter(p => p.name && p.on && !p.screen).sort((a, b) => a.seat - b.seat).slice(0, 4);
-  if(list.length < 2){ UISound.play('error'); UI.toast(tv ? '📺 Wait for 2 players to join' : '📡 Wait for a friend to join'); return; }
+  if(list.length < (tv ? 1 : 2)){ UISound.play('error'); UI.toast(tv ? '📺 Wait for a player to join' : '📡 Wait for a friend to join'); return; }   /* 📺 st-2a: 1 player + the TV = vs 🤖 */
   LX.cfg = {id: Date.now().toString(36), diff: together.diff, size: together.size, rounds: together.rounds, theme, host: S.player, tv, seats: list.map(p => ({name: p.name, lseat: p.seat}))};
+  if(tv && list.length === 1) LX.cfg.seats.push({name: 'Robot', lseat: 'bot', bot: lxBotLvl()});   /* 📺 st-2a: the 🤖 plays the voted / picked level */
   lxCloseLobby(); hideResult(); closeSheet(); const o = document.querySelector('.lx-over'); if(o) o.remove();
   LX.pending = {role: 'host', seat: tv ? -1 : 0, tn: 0, seats: LX.cfg.seats.map(x => Object.assign({}, x)), id: LX.cfg.id, tv};
   startGame('together');                                   // the engine runs here; G.lx comes from LX.pending
-  G.players.forEach((P, k) => { if(k !== G.lx.seat) Link.send('nbgo', {cfg: LX.cfg, seat: k, st: lxState(k)}, {sure: true, to: G.lx.seats[k].lseat}); });
+  G.players.forEach((P, k) => { if(lxTo(k)) Link.send('nbgo', {cfg: LX.cfg, seat: k, st: lxState(k)}, {sure: true, to: G.lx.seats[k].lseat}); });
 }
 function lxState(k){
   return {id: G.lx.id, tn: G.lx.tn, cur: G.cur, round: G.round, passes: G.passes, bagN: G.bag.length, over: G.over, last: G.last,
@@ -1814,7 +1824,7 @@ function lxState(k){
     players: G.players.map(P => ({name: P.name, score: P.score, eqs: P.eqs, best: P.best, bingos: P.bingos, away: !!P.away})),
     rack: (G.players[k] || {rack: []}).rack.map(x => ({id: x.id, t: x.t}))};
 }
-function lxSync(){ if(!G || !G.lx || G.lx.role !== 'host') return; G.players.forEach((P, k) => { if(k !== G.lx.seat) Link.send('nbstate', lxState(k), {sure: true, to: G.lx.seats[k].lseat}); }); }
+function lxSync(){ if(!G || !G.lx || G.lx.role !== 'host') return; G.players.forEach((P, k) => { if(lxTo(k)) Link.send('nbstate', lxState(k), {sure: true, to: G.lx.seats[k].lseat}); }); }
 function lxBeginTurn(first){
   $('acts').classList.toggle('lx-tvhide', G.lx.seat < 0);   // 📺 lk-5d: no play buttons on the TV
   const P = cur(), mine = G.cur === G.lx.seat, tv = G.lx.seat < 0; G.pend = []; G.sel = null; G.swap = null; G.cursor = null; G.ghost = []; G.lx.sent = false;
@@ -1822,13 +1832,16 @@ function lxBeginTurn(first){
   updateScores(); hudTick(); paintAll(); renderRack(false); setActs(mine);
   $('turnbar').textContent = mine ? '🎲 Your turn, ' + P.name : (tv ? '🎲 ' : '✏️ ') + P.name + (tv ? '’s turn' : ' is thinking…');
   if(mine){ setMsg(G.cells.every(c => !c) ? '⭐ Start over the star in the middle — make a sentence like 3 + 4 = 7' : 'Tap a tile, then a square', ''); say(P.name + ', your turn!'); }
+  else if(P.bot) setMsg('<span class="ui-spin a-bounce think">' + THEMES[G.theme].bot + '</span> Robot is thinking…', 'bot');   /* 📺 st-2a */
   else if(tv){ setMsg('📺 ' + UI.esc(P.name) + ' is making a number sentence on their own device…', ''); say(P.name + ', your turn!'); }   // 📺 lk-5d: the TV calls the next player
   else setMsg('✏️ ' + UI.esc(P.name) + ' is thinking — plan your next number sentence!', '');
-  if(first) showBanner('📡 ' + G.players.length + ' devices — make the best number sentences!', 'gold');
+  if(first) showBanner((G.players.some(P => P.bot) ? '🤖 ' + G.players[0].name + ' vs the Robot' : '📡 ' + G.players.length + ' devices') + ' — make the best number sentences!', 'gold');
   clearTimeout(LX.autoT);
   if(G.lx.role === 'host' && !mine && P.away) LX.autoT = setTimeout(() => lxAuto(P), LX_AUTO_MS);
+  if(G.lx.role === 'host' && P.bot) LX.autoT = setTimeout(() => { if(G && G.lx && !G.over && cur() === P && !G.busy) botTurn(); }, LX_BOT_MS);   /* 📺 st-2a: the TV's 🤖 */
 }
 const LX_AUTO_MS = window.LX_AUTO_MS || 20000;
+const LX_BOT_MS = window.LX_BOT_MS || 900;   /* 📺 st-2a */
 function lxAuto(P){ if(!G || G.over || cur() !== P || !P.away || G.busy) return; showBanner('🤖 Robot plays for ' + P.name, 'bot'); botTurn(true); }
 function lxHostMove(kind, d, lseat){
   const k = lxSeatOf(lseat), P = G && G.players[k];
@@ -1929,12 +1942,15 @@ function lxWire(){
   addEventListener('pagehide', () => { try{ if(Link.status() !== 'idle') Link.leave(); }catch(e){} });
 }
 // the host tells everyone when the game ends (final scores)
-(function(){ const f = finishGame; finishGame = function(why, bad){ if(G && G.lx && G.lx.role === 'host' && !G.over){ const k0 = G.lx.seat; G.players.forEach((P, k) => { if(k !== k0) Link.send('nbend', {why, st: Object.assign(lxState(k), {over: true})}, {sure: true, to: G.lx.seats[k].lseat}); }); } return f.apply(this, arguments); }; })();
+(function(){ const f = finishGame; finishGame = function(why, bad){ if(G && G.lx && G.lx.role === 'host' && !G.over){ const k0 = G.lx.seat; G.players.forEach((P, k) => { if(k !== k0 && lxTo(k)) Link.send('nbend', {why, st: Object.assign(lxState(k), {over: true})}, {sure: true, to: G.lx.seats[k].lseat}); }); } return f.apply(this, arguments); }; })();
 // 🔗 QR / waiting room: ?page=numberboard&link=<code> → the number pad (the waiting room leaves it empty to type)
 function lxUrlCode(cb){
   try{ if(window.google && google.script && google.script.url && google.script.url.getLocation){ google.script.url.getLocation(l => cb(((l && l.parameter) || {}).link || '')); return; } }catch(e){}
   try{ cb(new URLSearchParams(location.search).get('link') || ''); }catch(e){ cb(''); }
 }
+/* 📺 STATION (st-2a): opened from the 📺 Game Station — the TV starts by itself when the voted players are in (1 player = vs 🤖 at the voted level),
+   the players vote 🔁 again / 🎮 another game after the match (LinkKit `Station`) */
+if(window.Station) Station.game({url: WEBAPP_URL, page: 'numberboard', player: () => S.player || CURRENT_PLAYER, start: () => lxHostGo(), again: () => lxHostGo()});
 /* 📡 END LINK (lk-3d) */
 
 /* ✨ MODE SPOTLIGHT (modes-3): ?mode=<id> opens this game straight in that mode after the player pick · "✨ Also try" on the start page · started modes → UI.modeTried */
@@ -1942,7 +1958,10 @@ const MS_GAME = 'number-board';
 function msOpen(id){
   if(id === 'together') openTogether();
   if(id === 'lhost') lxHostPick(); if(id === 'ljoin') lxJoin();   // 📡 lk-3d
-  if(id === 'ltv') lxHostPick(true);   // 📺 lk-5f: from the Gameroom's 📺 Room hostess
+  if(id === 'ltv'){   // 📺 lk-5f: from the Gameroom's 📺 Room hostess · st-2a: from the 📺 Game Station = no picker, the voted level
+    if(!window.Station){ lxHostPick(true); return; }
+    Station.params().then(p => { if(/^\d{4}$/.test(String(p.st || '')) && p.stv === '1'){ if(p.slv != null && p.slv !== '') lxStLevel(p.slv); lxOpenHost(true); } else lxHostPick(true); });
+  }
 }
 function msNow(){ return ''; }
 function msWrap(fn, idOf){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ try{ const id = idOf.apply(this, arguments); if(id && UI.modeTried) UI.modeTried(S.player || CURRENT_PLAYER, MS_GAME, id); }catch(e){} return f.apply(this, arguments); }; }
@@ -1959,4 +1978,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.chips', {rows: 3}); }</script>
 </body>
 </html>
-<!-- (11v+emoji+r32+back-1+modes-3+gs-4+p1a+p1a-3+p2+p4c+cs-3b+lk-3d+lk-5a+lk-5d+lk-5f+dg-2+dg-2b+gb-1+24h+al-1) END OF NumberBoard.html -->
+<!-- (11v+emoji+r32+back-1+modes-3+gs-4+p1a+p1a-3+p2+p4c+cs-3b+lk-3d+lk-5a+lk-5d+lk-5f+dg-2+dg-2b+gb-1+24h+al-1+st-2a) END OF NumberBoard.html -->
