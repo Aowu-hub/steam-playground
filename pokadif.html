@@ -2167,9 +2167,20 @@ function renderFile(){
 }
 
 /* ================= PLAY ================= */
+/* 💬 24t-c: words during play (UiKit UI.callout) — never over the two pictures, the detective or the goal line */
+function calloutSetup(){ if(!(window.UI && UI.callout)) return;
+  const R = id => { const e = $(id); if(!e || e.offsetParent === null) return null; const q = e.getBoundingClientRect(); return q.width > 4 && q.height > 4 ? q : null; };
+  const pics = () => ['pic-a', 'pic-b'].map(R).filter(Boolean);
+  UI.callout.setup({
+    me: null,
+    at: () => { const q = R('bd-det'); return q ? {x: q.left + q.width / 2, y: q.top - 4} : null; },
+    side: () => 0,
+    inside: (x, y) => pics().some(q => x >= q.left && x <= q.right && y >= q.top && y <= q.bottom),
+    keep: () => pics().concat(['det', 'goal', 'strip'].map(R).filter(Boolean)).map(r => ({l: r.left - 2, t: r.top - 2, r: r.right + 2, b: r.bottom + 2}))
+  }); }
 function startCase(lvl){
   hideResult(); stopTicker();
-  stopBlink(); storyReset(); clearMarks();
+  stopBlink(); storyReset(); clearMarks(); calloutSetup(); /* 💬 24t-c */
   if(SET.mode === 'detective') return storyStart(lvl);
   if(SET.mode === 'race') return raceStart(lvl);   // 👥 pk-4d
   const mode = MODES.some(m => m.k === SET.mode && !m.soon) ? SET.mode : 'spot', L = PK.LEVELS[lvl], O = PK.ODD[lvl];
@@ -2309,7 +2320,7 @@ function pictureDone(){
   G.total.found += L.n; G.total.points += pts; if(!G.pOops && !G.pHints) G.total.perfect++;
   G.total.quick = G.total.quick ? Math.min(G.total.quick, Math.max(1, secs)) : Math.max(1, secs);
   G.picLog.push({theme: G.scene.theme, secs, oops: G.pOops, hints: G.pHints, pts});
-  bigWord('🎉 ' + pkPick(PRAISE), '+' + pts + ' points'); bdReact('joy', 1800); UISound.play('unlock');
+  bigWord('🎉 ' + pkPick(PRAISE), '+' + pts + ' points', 'good'); bdReact('joy', 1800); UISound.play('unlock');
   moment('picdone', {n: G.pic, secs, oops: G.pOops, hints: G.pHints});
   pkWait(1500).then(() => {
     if(!G || G.over) return;
@@ -2374,10 +2385,10 @@ function tick(){
 }
 function setPaused(on){ if(G){ G.paused = !!on; G.last = performance.now(); } }
 function pauseGame(){ setPaused(true); }
-function leavePlay(){ stopTicker(); stopBlink(); storyReset(); if(G) G.over = true; hideResult(); clearMarks(); renderMenu(); showScreen('menu'); }
+function leavePlay(){ /* 💬 24t-c off */ if(window.UI && UI.callout) UI.callout.setup(null); stopTicker(); stopBlink(); storyReset(); if(G) G.over = true; hideResult(); clearMarks(); renderMenu(); showScreen('menu'); }
 
 /* ---------- words + confetti ---------- */
-function bigWord(txt, small){ if(!FX) return; const e = document.createElement('div'); e.className = 'big-word'; e.innerHTML = UI.esc(txt) + (small ? '<small>' + UI.esc(small) + '</small>' : ''); $('bigword-host').appendChild(e); setTimeout(() => e.remove(), 1300); }
+function bigWord(txt, small, rank, stopped){ if(!FX) return; /* 💬 24t-c bigWord */ if(window.UI && UI.callout && UI.callout.active()){ UI.callout(txt + (small ? ' · ' + small : ''), {rank: rank || 'good', stopped: !!stopped}); return; } const e = document.createElement('div'); e.className = 'big-word'; e.innerHTML = UI.esc(txt) + (small ? '<small>' + UI.esc(small) + '</small>' : ''); $('bigword-host').appendChild(e); setTimeout(() => e.remove(), 1300); }
 function confetti(list, count){ if(!FX) return; for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pkPick(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 
 /* ================= RESULT + SAVES ================= */
@@ -2438,7 +2449,7 @@ function saveText(res, cleared){
   const h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New best for this level!' : cleared ? (res.best && res.best.score ? 'Best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Saved') : '✅ Saved — solve the case to unlock the next level';
   return featText(res.feats, h);
 }
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+function showResult(html){ /* 💬 24t-c result */ if(window.UI && UI.callout) UI.callout.setup(null); $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
 function hideResult(){ $('result').classList.add('hidden'); }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
 function goBack(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
@@ -2496,7 +2507,7 @@ function onOdd(i, e){
     G.total.found++; G.total.points += pts; if(!G.pOops && !G.pHints) G.total.perfect++;
     const dots = $('dots').children; if(dots[G.pic]) dots[G.pic].classList.add('on');
     UISound.play('success'); bdReact('joy', 1400);
-    goal((od.say || ODD_SAY[od.sub] || '🎉 Found it!') + ' +' + pts, 'yay'); bigWord('🎯 ' + pkPick(PRAISE), '+' + pts);
+    goal((od.say || ODD_SAY[od.sub] || '🎉 Found it!') + ' +' + pts, 'yay'); bigWord('🎯 ' + pkPick(PRAISE), '+' + pts, 'good');
     moment('found', {i, type: od.type, sub: od.sub, n: G.total.found});
     pkWait(1300).then(() => { if(!G || G.over) return; if(G.pic + 1 >= G.rounds) return finishCase(true); nextOdd(); });
     return;
@@ -2522,10 +2533,10 @@ function arcPictureDone(){
   G.busy = true; G.pics++; arcClock(); BAR.count('pic', '📸', G.pics + '/' + G.rounds, 'Pictures to the 🏁');
   if(!G.pOops && !G.pHints) G.total.perfect++;
   G.total.quick = G.total.quick ? Math.min(G.total.quick, Math.max(1, Math.round(G.pSecs))) : Math.max(1, Math.round(G.pSecs));
-  if(G.pics >= G.rounds){ G.finished = true; bigWord('🏁 FINISH!', '⏱ ' + PK.mmss(G.run)); UISound.play('success'); bdReact('win', 1800); confetti(['🏁', '⏱️', '⭐'], 22); moment('finish', {n: G.pics, time: Math.round(G.run)}); pkWait(1400).then(() => { if(G && !G.over) arcFinish(); }); return; }
+  if(G.pics >= G.rounds){ G.finished = true; bigWord('🏁 FINISH!', '⏱ ' + PK.mmss(G.run), 'big', true); UISound.play('success'); bdReact('win', 1800); confetti(['🏁', '⏱️', '⭐'], 22); moment('finish', {n: G.pics, time: Math.round(G.run)}); pkWait(1400).then(() => { if(G && !G.over) arcFinish(); }); return; }
   const cp = G.pics % PK.CHECK_EVERY === 0;
-  if(cp){ G.cps++; G.splits.push(Math.round(G.run)); bigWord('✅ Checkpoint ' + G.cps + '!', '⏱ ' + PK.mmss(G.run) + ' · ' + (G.rounds - G.pics) + ' to go'); UISound.play('unlock'); bdReact('joy', 1800); confetti(['⏱️', '✅', '⭐'], 14); }
-  else { bigWord('📸 ' + pkPick(PRAISE), G.pics + '/' + G.rounds); UISound.play('success'); bdReact('happy', 1200); }
+  if(cp){ G.cps++; G.splits.push(Math.round(G.run)); bigWord('✅ Checkpoint ' + G.cps + '!', '⏱ ' + PK.mmss(G.run) + ' · ' + (G.rounds - G.pics) + ' to go', 'big'); UISound.play('unlock'); bdReact('joy', 1800); confetti(['⏱️', '✅', '⭐'], 14); }
+  else { bigWord('📸 ' + pkPick(PRAISE), G.pics + '/' + G.rounds, 'good'); UISound.play('success'); bdReact('happy', 1200); }
   moment(cp ? 'checkpoint' : 'picdone', {n: G.pics, cps: G.cps, time: Math.round(G.run)});
   pkWait(cp ? 1300 : 800).then(() => {
     if(!G || G.over) return;
@@ -2534,7 +2545,7 @@ function arcPictureDone(){
   });
 }
 function timeUp(){ if(!G || G.over || G.timeUp) return; G.timeUp = true; G.busy = true; UISound.play('error');
-  G.scene.diffs.forEach((d, i) => { if(!G.found[i]) ['A', 'B'].forEach(s => mark(s, 'miss', d.x, d.y, d.hit)); }); bigWord('⏱️ Time\'s up!'); moment('timeup', {pics: G.pics, goal: G.rounds}); pkWait(1400).then(() => { if(G && !G.over) arcFinish(); }); }
+  G.scene.diffs.forEach((d, i) => { if(!G.found[i]) ['A', 'B'].forEach(s => mark(s, 'miss', d.x, d.y, d.hit)); }); bigWord('⏱️ Time\'s up!', '', 'big', true); moment('timeup', {pics: G.pics, goal: G.rounds}); pkWait(1400).then(() => { if(G && !G.over) arcFinish(); }); }
 function arcFinish(){
   if(!G || G.over) return; G.over = true; stopTicker(); hideHand();
   const T = G.total, run = Math.round(G.run || 0), r = {found: T.found, pictures: G.pics, finished: !!G.finished, time: run}, score = PK.arcadeScore(G.level, r), stars = PK.arcadeStars(G.level, r), cleared = !!G.finished, L = G.L, secs = Math.round(G.secs);
@@ -2622,7 +2633,7 @@ function stepDone(){
   if(!G || G.over) return; G.busy = true; hideHand();
   const st = G.step, secs = Math.round(G.pSecs), pts = PK.storyPoints(G.level, {oops: G.pOops, hints: G.pHints, secs});
   G.total.points += pts; if(!G.pOops && !G.pHints) G.total.perfect++;
-  bigWord('✅ ' + VERB_SAY[st.verb] + ' — done!', '+' + pts + ' points'); bdReact('joy', 1600); UISound.play('unlock');
+  bigWord('✅ ' + VERB_SAY[st.verb] + ' — done!', '+' + pts + ' points', 'good'); bdReact('joy', 1600); UISound.play('unlock');
   G.marks.filter(m => m.cls === 'glow').forEach(dropMark);
   const K = G.K, C = K.C, cards = [];
   if(st.verb === 'find'){ G.clues.boot = K.thief.boot; cards.push({icon: '👣', kicker: '🧩 Clue 1', title: 'The thief wears ' + K.thief.boot[1] + ' boots!', text: 'Every one of those prints is a <b style="color:' + K.thief.boot[0] + '">' + K.thief.boot[1] + '</b> boot. Remember it!', btn: '📝 Got it', kind: 'clue', clue: 'boot'}); }
@@ -2635,7 +2646,7 @@ function stepDone(){
 }
 function caseSolved(){
   if(!G || G.over) return; G.busy = true;
-  const K = G.K, C = K.C; bigWord('📁 CASE CLOSED!'); UISound.play('success'); confetti([C.icon, '🔍', '⭐', '🕵️'], 20);
+  const K = G.K, C = K.C; bigWord('📁 CASE CLOSED!', '', 'big', true); UISound.play('success'); confetti([C.icon, '🔍', '⭐', '🕵️'], 20);
   moment('caught', {thief: K.thief.name});
   const Ls = C.lessons[2]; G.chapters = 3; if(G.lessons.indexOf(2) < 0){ G.lessons.push(2); const seen = caseSeen(); seen['L:' + C.id + ':2'] = 1; caseSeenSave(seen); }
   pkWait(1100).then(() => { if(!G || G.over) return; moment('lesson', {i: 2}); storyCard({icon: Ls.icon, kicker: '🎓 Lesson card 3 of 3 · ' + C.topic, title: Ls.title, text: Ls.text, btn: '📁 Close the case', kind: 'lesson', lesson: 2}).then(() => finishStory(true)); });
@@ -3053,4 +3064,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d+pk-4a+pk-4b+pk-4c+pk-4d+pk-5a+pk-5b+pk-5c+pk-5d+pk-6a+pk-6b+pk-6c+pk-6d) END OF Pokadif.html -->
+<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d+pk-4a+pk-4b+pk-4c+pk-4d+pk-5a+pk-5b+pk-5c+pk-5d+pk-6a+pk-6b+pk-6c+pk-6d+24t-c) END OF Pokadif.html -->
