@@ -213,6 +213,7 @@
 <script src="inc/BallSkins.js"></script>
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
+<script src="inc/AvatarActs.js"></script>
 <script src="inc/AvatarWeapons.js"></script>
 <script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-3c: the cheering crowd (CheerSquad.html) -->
 <script src="inc/GameFrame.js"></script>
@@ -687,12 +688,14 @@ function grade(n, err){
   const big = n.kind === 'big' ? 2 : 1;
   addScore(GRADES[gi][1] * big); G.health = Math.min(100, G.health + (gi === 0 ? 2 : 1));
   popText(n.lane, GRADES[gi][2], gi); burst(n.lane, gi, big);
+  if(typeof bcbGraded === 'function') bcbGraded(n);   /* 🎬 b3b4: contact = this press */
   if(G.combo > 0 && G.combo % 25 === 0){ G.dance.mood = 'cheer'; G.dance.moodT = 0; showBanner('🔥 ' + G.combo + ' combo!', 'gold'); hitSnd(4); }
   else hitSnd(gi, n.lane);
 }
 function miss(n){
   n.res = 'miss'; n.holding = false; G.counts.miss++; G.combo = 0; G.missRow++; G.judged++;
   G.health = Math.max(0, G.health - (G.L.noFail ? 0 : G.L.hardcore ? 12 : 7)); popText(n.lane, 'Miss', 3);
+  if(G.missRow >= 2 && typeof bcbMissed === 'function') bcbMissed();   /* 🎬 b3b4 */
   if(G.missRow >= 2){ G.dance.mood = 'oops'; G.dance.moodT = 0; }
   cheerMiss(); /* 📣 cs-3c */
   missSnd();
@@ -710,6 +713,7 @@ function update(){
   schedule();
   // missed beats
   for(const n of G.notes){ if(n.t - t > 1) break; if(!n.res && (t - n.t) * spb > w[2]) miss(n); if(G.over) return; }
+  if(typeof bcbCornerAhead === 'function') bcbCornerAhead(t);   /* 🎬 b3b4: the wind-up for the next note */
   // holds + slides in progress
   for(const n of G.notes){ if(n.t > t) break;
     if(n.holding && n.kind === 'hold'){ if(!laneHeld(n.lane)){ n.holding = false; if(t >= n.t + n.d - w[2] / spb) tailDone(n); else tailBreak(n); } else if(t >= n.t + n.d){ n.holding = false; tailDone(n); } else tick(n, t); }
@@ -823,16 +827,72 @@ function isTouch(){ return !!(window.matchMedia && matchMedia('(pointer: coarse)
 const DANCE = ['dance', 'robot', 'moonwalk', 'starjump', 'dab', 'guitar', 'hop', 'floss', 'windmill', 'shuffle', 'breakspin', 'poplock', 'disco', 'jumpsplit', 'electric', 'backflip', 'chicken'];
 const EPIC = ['floss', 'windmill', 'shuffle', 'breakspin', 'poplock', 'disco', 'jumpsplit', 'electric', 'backflip', 'chicken'];
 // 💃 Space / the middle pad: your avatar jumps into the middle of the field and does an epic dance
-function centerDance(){ if(!G || centerAmount(nowBeat()) > 0) return; const now = performance.now(); if(G.centerD && now - G.centerD.t0 < 500) return; G.centerD = {t0: now, gest: {g: gestureByKey(pick(EPIC)) || gestureByKey('dance'), t: 0}}; }
+function centerDance(){ if(!G || centerAmount(nowBeat()) > 0) return; const now = performance.now(); if(G.centerD && now - G.centerD.t0 < 500) return; G.centerD = {t0: now, t0s: nowSec(), gest: {g: gestureByKey(pick(EPIC)) || gestureByKey('dance'), t: 0}}; if(typeof bcbStart === 'function') bcbStart(bcbCenterH(), 'beatcorner.leap', nowSec() + 0.35, {fx: () => burst(6, 0, 2)}); }   /* 🎬 b3b4: contact = the landing */
 function drawCenterDancer(g){
-  const C = G.centerD; if(!C) return; const age = (performance.now() - C.t0) / 1000, LIFE = 1.9; if(age > LIFE){ G.centerD = null; return; }
+  const C = G.centerD; if(!C) return; const age = C.t0s != null ? nowSec() - C.t0s : (performance.now() - C.t0) / 1000, LIFE = 1.9;   /* 🎬 b3b4: the song clock */ if(age > LIFE){ G.centerD = null; return; }
   const S0 = VIEW.S, k = S0 / 420, j = Math.min(1, age / 0.35), fromX = VIEW.cx + S0 * 0.55, fromY = VIEW.cy + S0 * 0.45;
   const x = fromX + (VIEW.cx - fromX) * j, y = fromY + (VIEW.cy + S0 * 0.09 - fromY) * j - Math.sin(j * Math.PI) * S0 * 0.18, fade = age > LIFE - 0.3 ? (LIFE - age) / 0.3 : 1;
   if(C.gest && j >= 1){ C.gest.t += 1 / 60 * (G.song.bpm / 100); if(C.gest.t > C.gest.g.d) C.gest.t = 0; }
   g.save(); g.globalAlpha = fade; g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(VIEW.cx, VIEW.cy + S0 * 0.09, 26 * k, 7 * k, 0, 0, 7); g.fill();
-  try{ drawAvatar(g, {name: S.player, av: myAvatar(S.player), dir: 1, walkT: 0, jumpH: j < 1 ? 20 : 0, gest: j >= 1 ? C.gest : null}, x, y, k * 0.95, {t: performance.now() / 1000}); }catch(e){}
+  const LF = typeof bcbFrame === 'function' ? bcbFrame(G.bcbC) : null;   /* 🎬 b3b4: the leap act, then the epic dance */
+  if(LF){ try{ Acting.draw(g, {name: S.player, av: myAvatar(S.player)}, x, y, k * 0.95, LF, {t: performance.now() / 1000}); }catch(e){} }
+  else try{ drawAvatar(g, {name: S.player, av: myAvatar(S.player), dir: 1, walkT: 0, jumpH: j < 1 ? 20 : 0, gest: j >= 1 ? C.gest : null}, x, y, k * 0.95, {t: performance.now() / 1000}); }catch(e){}
   g.restore();
 }
+/* 🎬 BEATCORNER BEATS (b3b4, 🧱 baseline chat, 2026-11-18) START — every avatar ACTION = 3–5 beats on the shared timeline (Acting.play).
+   The notes are known ahead, so the wind-up starts ≈ 0.2 s before the next note (contact planned on the note, held there); CONTACT = the
+   player's real press (bcbHit: a late press skips the wind-up, no press lets it go). 🕺 corner dancer: top corners punch up, bottom corners
+   stomp + point (mirrored for the left) · 🔥 every 25 combo = a burst · 😅 2 misses in a row = a stumble · 💃 centre pad = a leap whose contact
+   is the LANDING in the middle (✨ burst there) · 🎹 the hand over the coming key presses on the press (left / right side of the keys) · ✨ chord
+   = both hands · 🥁 the stick goes up on that side and strikes on the press · kick = a body bounce · cymbal = a big swing · a miss = oops.
+   Clock = the song's own clock (stops on ⏸ and while 🌱 Basic waits, so the wind-up waits in the air). Acts: 🎭 BLOCK `beatcorner`. */
+const BCB_HAS = typeof Acting !== 'undefined' && typeof Acting.play === 'function', BCB_LEAD = 0.2;
+window.BCB_LOG = window.BCB_LOG || [];
+function bcbStart(H, act, contactAt, o){
+  o = o || {}; if(!BCB_HAS || !H || !Acting.act(act)) return null;
+  const now = H.clock(), cur = H.act, from = cur && cur.run.last && !cur.run.done ? cur.run.last : undefined;
+  const run = Acting.play(H.who(), act, {t0: now, contactAt, from, speed: H.slow ? 1.1 : 1, onContact: r => {
+    window.BCB_LOG.push({where: H.id, act, t: H.clock(), at: r.contactT}); if(window.BCB_LOG.length > 150) window.BCB_LOG.shift(); if(o.fx) try{ o.fx(); }catch(e){} }});
+  H.act = {act, run, wait: !!o.wait, dir: o.dir || 1, note: o.note || null};
+  run.at(contactAt != null && contactAt <= now + 1e-6 ? Math.max(now, run.contactT) + 1e-6 : now); return H.act;
+}
+function bcbHit(H, act, o){ if(H) bcbStart(H, act, H.clock(), o); }
+// the wind-up for a known note: only when nothing is still before its contact, once per note
+function bcbAhead(H, note, act, at, o){
+  if(!H || !note || H.aheadFor === note) return; const now = H.clock(), dt = at - now;
+  if(dt > BCB_LEAD || dt < -0.05) return; const A = H.act; if(A && !A.run.fired && !A.wait) return;
+  H.aheadFor = note; bcbStart(H, act, at + 0.06, Object.assign({wait: true, note}, o || {}));
+}
+// the frame to draw now (null = the game's own pose / gesture); a waiting wind-up holds just before contact, then lets go
+function bcbFrame(H){
+  const A = H && H.act; if(!A) return null; const now = H.clock();
+  if(A.wait && !A.run.fired && now >= A.run.contactT - 0.02){ if(now > A.run.contactT + 0.25){ H.act = null; return null; } return A.run.last; }
+  const f = A.run.at(now); if(f.done){ H.act = null; return null; } return f;
+}
+// 🕺 corner mode
+function bcbDanceH(){ if(!G) return null; return G.bcbD || (G.bcbD = {id: 'dance', clock: () => nowSec(), who: () => ({name: S.player, av: myAvatar(S.player)}), act: null, slow: G.lvl === 0}); }
+function bcbLaneAct(lane){ const p = baseSpot(Math.min(lane, 5)) || [1, -1]; return {act: p[1] > 0 ? 'beatcorner.down' : 'beatcorner.up', dir: p[0] < 0 ? -1 : 1}; }
+function bcbGraded(n){ const H = bcbDanceH(); if(!H) return;
+  if(G.combo > 0 && G.combo % 25 === 0){ bcbHit(H, 'beatcorner.cheer'); return; }
+  const L = bcbLaneAct(n.lane); bcbHit(H, L.act, {dir: L.dir}); }
+function bcbMissed(){ const H = bcbDanceH(); if(H) bcbHit(H, 'beatcorner.stumble'); }
+function bcbCornerAhead(t){ const H = bcbDanceH(); if(!H) return;
+  const n = G.notes.find(q => !q.res && q.lane < 6 && q.t >= t - 0.05); if(!n) return;
+  const L = bcbLaneAct(n.lane); bcbAhead(H, n, L.act, n.t * G.spb, {dir: L.dir}); }
+function bcbDancer(g, av, x, y, k){ const H = bcbDanceH(), f = bcbFrame(H); if(!f) return false;
+  try { Acting.draw(g, {name: S.player, av}, x, y, k, f, {t: performance.now() / 1000, dir: H.act ? H.act.dir : 1}); } catch(e){ return false; } return true; }
+// 💃 centre pad: the leap lands in the middle (contact = landing, 0.35 s after the press)
+function bcbCenterH(){ if(!G) return null; return G.bcbC || (G.bcbC = {id: 'center', clock: () => nowSec(), who: () => ({name: S.player, av: myAvatar(S.player)}), act: null}); }
+// 🎹 / 🥁 parts
+function bcbPartH(P){ return P.bcb || (P.bcb = {id: P.kind, clock: () => igNowSec(), who: () => ({name: P.who, av: myAvatar(P.who)}), act: null, slow: I && I.lvl === 0}); }
+function bcbKeyAct(k){ const V = I && I.view; if(!V || !V.whites) return 'beatcorner.keyR'; return (pkPos(k) - V.wLo) / Math.max(1, V.whites - 1) < 0.5 ? 'beatcorner.keyL' : 'beatcorner.keyR'; }
+function bcbDrumAct(id){ const pc = DP[id]; if(!pc) return 'beatcorner.drumC'; return pc.type === 'kick' ? 'beatcorner.kick' : pc.type === 'cymbal' ? 'beatcorner.cymbal' : pc.x < 0.45 ? 'beatcorner.drumL' : pc.x > 0.55 ? 'beatcorner.drumR' : 'beatcorner.drumC'; }
+function bcbIgAhead(){ if(!I || I.over || I.free) return;
+  for(const P of I.parts){ const n = igNextNote(P); if(!n) continue; bcbAhead(bcbPartH(P), n, P.kind === 'drums' ? bcbDrumAct(n.piece) : bcbKeyAct(n.key), n.t * I.spb); } }
+function bcbPart(g, P, x, y, k, now){ if(I && I.over && I.win3) return false; let f = bcbFrame(P.bcb); if(!f) return false;
+  if(P.kind === 'drums') f = Object.assign({}, f, {pose: Object.assign({item: '🥢', itemHand: 'R'}, f.pose)});   // the drummer's sticks
+  try { Acting.draw(g, {name: P.who, av: myAvatar(P.who)}, x, y, k, f, {t: now / 1000}); } catch(e){ return false; } return true; }
+/* 🎬 BEATCORNER BEATS END */
 function gestureByKey(k){ return (typeof GESTURES !== 'undefined' && GESTURES.find(x => x.k === k)) || null; }
 function drawDancer(){
   const cv = $('dancer'); if(!cv || !cv.width) return;
@@ -850,6 +910,7 @@ function drawDancer(){
   g.fillStyle = 'rgba(0,0,0,0.18)'; g.beginPath(); g.ellipse(w / 2, h - 6, 22 * k, 6 * k, 0, 0, 7); g.fill();
   try{   // r32: sized so every dance move (backflip, windmill…) + ride-on / wings / sword stays inside the dancer box
     const av = myAvatar(S.player), P = avatarPlace(av, S.player, w, h - 6, w / 2, h - 6, k, DANCE.concat(EPIC, ['shrug', 'cheer']));
+    if(!(typeof bcbDancer === 'function' && bcbDancer(g, av, P.x, P.y - bounce * P.k / k, P.k)))   /* 🎬 b3b4: an act plays over the groove */
     drawAvatar(g, {name: S.player, av, dir: 1, walkT: 0, gest: D.gest}, P.x, P.y - bounce * P.k / k, P.k, {t: performance.now() / 1000});
   }catch(e){}
 }
@@ -1297,6 +1358,7 @@ function pnKeyMidi(P, k){ return 60 + k + 12 * P.oct; }
 function pnPress(P, k, src){
   if(!I || I.over || I.paused || k < 0 || k > 17) return;
   P.held['k' + k] = src || 'key'; P.flash[k] = performance.now(); P.lastKey = k; P.lastHitAt = performance.now();
+  if(typeof bcbHit === 'function') bcbHit(bcbPartH(P), bcbKeyAct(k));   /* 🎬 b3b4: contact = the key press */
   if(TEST_CLOCK == null && AU.ctx) pianoTone(AU.ctx.currentTime, pnKeyMidi(P, k), 0.9);
   if(I.free){ if(I.rec && I.rec.on){ const tt = igNowSec() - I.rec.t0; if(tt > -0.12) I.rec.notes.push({t: tt, k, oct: P.oct, d: 0.25, open: true}); } return; }
   const t = igBeat(), w = I.win, spb = I.spb;
@@ -1315,7 +1377,7 @@ function pnRelease(P, k){
 function pnBig(P, down, src){
   if(!I || I.over || I.paused) return;
   const t = igBeat();
-  if(down){ P.held.big = src || 'key'; P.flash.big = performance.now();
+  if(down){ P.held.big = src || 'key'; P.flash.big = performance.now(); if(typeof bcbHit === 'function') bcbHit(bcbPartH(P), 'beatcorner.chord');   /* 🎬 b3b4 */
     const n = P.notes.find(q => q.kind === 'big' && !q.res && Math.abs(q.t - t) * I.spb <= I.win[2]);
     if(n){ igGrade(P, n, Math.abs(n.t - t) * I.spb); if(n.res !== 'miss'){ P.bigs++; if(n.d) n.holding = true; } P.mood = 'big'; P.moodT = performance.now(); if(TEST_CLOCK == null && AU.ctx) [0, 4, 7, 12].forEach(iv => pianoTone(AU.ctx.currentTime, 60 + iv + 12 * P.oct, 0.9, 0.09)); } }
   else { delete P.held.big; const h = P.notes.find(q => q.holding && q.kind === 'big'); if(h){ h.holding = false; if(t >= h.t + h.d - I.win[2] / I.spb) igTailDone(P, h); else igTailBreak(P, h); } }
@@ -1340,6 +1402,7 @@ function igGrade(P, n, err){
 }
 function igMiss(P, n){
   P.missKey = n.piece || n.key; P.missAt = performance.now();
+  if(typeof bcbHit === 'function') bcbHit(bcbPartH(P), P.kind === 'drums' ? 'beatcorner.dOops' : 'beatcorner.pOops');   /* 🎬 b3b4 */
   n.res = 'miss'; n.holding = false; P.counts.miss++; P.combo = 0; P.missRow++;
   P.health = Math.max(0, P.health - (I.lvl <= 1 ? 0 : I.L.hardcore ? 12 : 7)); igPop(P, n.piece || n.key, 'Miss', 3);
   if(P.missRow >= 3){ P.mood = 'oops'; P.moodT = performance.now(); }
@@ -1353,6 +1416,7 @@ function igAddScore(P, v){ P.score += Math.round(v * (1 + Math.min(P.combo, 200)
 function igAcc(P){ const c = P.counts, n = c.perfect + c.great + c.good + c.miss; return n ? (c.perfect + c.great * 0.7 + c.good * 0.4) / n : 0; }
 function igUpdate(){
   if(I.guided && !I.waiting){ const t0 = igBeat(); for(const P of I.parts){ const n = igNextNote(P); if(n && t0 >= n.t){ igWaitStart(P, n); break; } } }
+  if(typeof bcbIgAhead === 'function') bcbIgAhead();   /* 🎬 b3b4: the wind-up for each part's next note */
   const t = igBeat(), spb = I.spb, w = I.win;
   igSchedule();
   for(const P of I.parts){
@@ -1627,6 +1691,7 @@ function igDrawPianist(g, P, now, box){
   if(I.over && I.win3){ pose = {armL: 0.2, armR: 0.2, rot: Math.sin(Math.min(1, (now - I.endAt) / 1500) * Math.PI) * 0.4, dy: -10, eyes: 'closed', fx: '🎉'}; }
   else if(big){ const p = (now - P.moodT) / 600; pose = {armL: 2.8 * Math.sin(p * Math.PI) + 0.6, armR: 2.8 * Math.sin(p * Math.PI) + 0.6, dy: -Math.sin(p * Math.PI) * 6, mouth: 'open', eyes: 'happy', fx: '✨'}; }
   else { const reach = (f - 0.5) * 1.1, left = f < 0.5; pose = {armL: 1.3 + Math.max(0, -reach) - (left ? press * 0.18 : 0), armR: 1.3 + Math.max(0, reach) - (!left ? press * 0.18 : 0), dy: nod * 0.6, eyes: cool ? 'happy' : 'open', mouth: oops ? 'open' : 'smile', fx: oops ? '😅' : cool ? '😎' : ''}; }
+  if(!(typeof bcbPart === 'function' && bcbPart(g, P, cx, fy, k, now)))   /* 🎬 b3b4: an act plays over the pose */
   try{ drawAvatar(g, {name: P.who, av: myAvatar(P.who), dir: 1, walkT: 0}, cx, fy, k, {t: now / 1000, pose, noShadow: true}); }catch(e){}
   // the piano in front (covers the legs)
   g.fillStyle = dark ? '#1B1530' : '#3B2A20'; rrect(g, cx - pw / 2, pianoTop, pw, ph, 8); g.fill();
@@ -1932,6 +1997,7 @@ function dmPress(P, id, src){
   if(!I || I.over || I.paused) return; const pc = DP[id]; if(!pc) return;
   const kit = I.mode === 'band' ? I.DL.kit || kitFor(I.lvl) : kitFor(I.lvl); if(!kit.some(p => p.id === id)) return;
   P.held[id] = src || 'key'; P.flash[id] = performance.now(); P.lastPiece = id; P.lastHitAt = performance.now(); P.wob = P.wob || {}; P.wob[id] = performance.now();
+  if(typeof bcbHit === 'function') bcbHit(bcbPartH(P), bcbDrumAct(id));   /* 🎬 b3b4: contact = the strike */
   if(pc.type === 'kick') I.shake = performance.now();
   drumSound(id, id === 'hihat' && kit.some(p => p.id === 'pedal') && !P.held.pedal);
   const t = igBeat(), w = I.win, cand = P.notes.find(n => !n.res && n.piece === id && Math.abs(n.t - t) * I.spb <= w[2]);
@@ -2045,6 +2111,7 @@ function igDrawDrummer(g, P, now, box){
   let pose;
   if(I.over && I.win3){ const p = (now - I.endAt) / 1000; pose = {armL: 2.6, armR: 2.6 + Math.sin(p * 18) * 0.4, dy: -6, mouth: 'open', eyes: 'happy', item: '🥢', itemHand: 'R', fx: '💥'}; }
   else { const up = 1.9 - hit * 0.9; pose = {armL: side <= 0 ? up : 1.5, armR: side >= 0 ? up : 1.5, dy: nod * 0.6, eyes: cool ? 'happy' : 'open', mouth: oops ? 'open' : 'smile', item: '🥢', itemHand: 'R', fx: oops ? '😅' : cool ? '😎' : ''}; }
+  if(!(typeof bcbPart === 'function' && bcbPart(g, P, cx, fy, k, now)))   /* 🎬 b3b4: an act plays over the pose */
   try{ drawAvatar(g, {name: P.who, av: myAvatar(P.who), dir: 1, walkT: 0}, cx, fy, k, {t: now / 1000, pose, noShadow: true}); }catch(e){}
   // the kit in front (front view: bass drum + snare + a cymbal)
   const kr = 20 * k; g.fillStyle = dark ? '#3A2D5C' : '#C2588F'; g.beginPath(); g.arc(cx, kitTop + kr, kr, 0, 7); g.fill(); g.fillStyle = '#F3EEDC'; g.beginPath(); g.arc(cx, kitTop + kr, kr * 0.78, 0, 7); g.fill();
@@ -2595,4 +2662,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.chips', {rows: 3}); }</script>
 </body>
 </html>
-<!-- (bc-5+back-1+modes-3+bc-6+bc-7+bc-8+mg-1+p1c+p2+p3a+cs-3c+b3w4) END OF BeatCorner.html -->
+<!-- (bc-5+back-1+modes-3+bc-6+bc-7+bc-8+mg-1+p1c+p2+p3a+cs-3c+b3w4+b3b4) END OF BeatCorner.html -->
