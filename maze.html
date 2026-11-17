@@ -555,15 +555,17 @@ function tryMove(dir, now){
   if(dx){ const f = dx > 0 ? -1 : 1; if(f !== G.face){ G.faceFrom = G.face; G.face = f; G.turnT0 = now; } }
   G.from = G.pos; G.pos = nc; G.moving = true; G.moveT0 = now; G.idle = null; G.idleSince = now;
   G.moveDur = (lv.liquid === 'flood' && inLiquid(nc)) ? STEP_MS * 2.6 : STEP_MS;
+  mzbStep(nc, now);   /* 🎬 b3b1 */
   return true;
 }
 function bump(now){
   autoDir = -1;
   if(now > G.bumpUntil){
-    UISound.play('bump'); G.bumpUntil = now + 260;
+    G.bumpUntil = now + 260;
     if(!G.anim) G.anim = {type: 'bump', t0: now, dur: 240};
-    burst(G.pos, ['💨'], 1, 0.25, 0.35);
-    if(G.av){ G.bonkUntil = now + 700; G.idle = null; G.idleSince = now; burst(G.pos, ['💫', '⭐'], 2, 0.35, 0.26); }   // 🧑 bonk: hand on the head, eyes shut, stars
+    const bonkFx = () => { UISound.play('bump'); burst(G.pos, ['💨'], 1, 0.25, 0.35); if(G.av) burst(G.pos, ['💫', '⭐'], 2, 0.35, 0.26); };
+    if(G.av){ G.bonkUntil = now + 700; G.idle = null; G.idleSince = now; }   // 🧑 bonk: hand on the head, eyes shut, stars
+    if(!mzbStart('bonk', now, null, bonkFx)) bonkFx();   /* 🎬 b3b1: lean in → splat → the bump lands on contact */
   }
 }
 function arrive(now){
@@ -592,6 +594,7 @@ function hit(now, why){
   if(G.moving){ G.moving = false; G.from = G.pos; }
   cheerSay('miss', 'hit'); /* 📣 cs-4c */
   G.anim = {type: 'hurt', t0: now, dur: REDUCED ? 150 : 750, why: why};
+  mzbStart('hurt', now);   /* 🎬 b3b1 */
   G.frozenUntil = now + G.anim.dur;
   burst(G.pos, ['💥'], 1, 0.1, 0.5);
   if(effectsOn()) shake();
@@ -602,6 +605,7 @@ function finishHurt(now){
   G.pos = G.flag; G.from = G.flag; G.moving = false;
   G.invulnUntil = now + 1200;
   G.anim = {type: 'appear', t0: now, dur: 420};
+  mzbStart('pop', now);   /* 🎬 b3b1 */
   burst(G.flag, ['✨'], 4, 0.6);
   showBanner(why + (G.flag === G.lv.start ? ' Back to the start!' : ' Back to your 🚩!'));
 }
@@ -829,21 +833,63 @@ function drawHeroAvatar(now, hx, hy, H, blink){
   G.lastNow = now;
   const A = G.anim, a = {name: S.player, av: G.av, dir: 1, walkT: G.moving ? G.walkT + 0.01 : 0, gest: null};
   let pose = null;
-  if(A && A.type === 'win') a.gest = {g: gestByKey('wave') || GESTURES[0], t: (now - A.t0) / 1000};   // 👋 waves at the exit
+  const F = mzbFrame(now);   /* 🎬 b3b1 */
+  if(F){ if(F.face === 'dizzy') H.dizzy = true; }
+  else if(A && A.type === 'win') a.gest = {g: gestByKey('wave') || GESTURES[0], t: (now - A.t0) / 1000};   // 👋 waves at the exit
   else if(A && (A.type === 'hurt' || A.type === 'burn' || A.type === 'ko')) pose = {eyes: 'closed', mouth: 'open', armL: 2.3, armR: 2.3};
   else if(A && A.type === 'happy') pose = {armL: 2.8, armR: 2.8, mouth: 'open', eyes: 'happy'};
   else if(now < G.bonkUntil) pose = {eyes: 'closed', mouth: 'open', armL: 0.4, armR: 2.75};   // 🤕 bonk: hand on the head
   else a.gest = idleGesture(now);
   const k = CS / 90;
+  if(F && F.pose.dy){ H.oy += F.pose.dy * k; F.pose.dy = 0; }   /* 🎬 b3b1: jumps lift the whole avatar, so the mz-head clamp sees them */
   mzClampLift(H, hy);   // 🧑 mz-head: a jump on the top row stays inside the frame
   ctx.save();
   ctx.globalAlpha = (blink ? 0.35 : 1) * H.alpha;
   ctx.translate(hx + H.ox, hy + H.oy); ctx.rotate(-G.rot * Math.PI / 2); ctx.rotate(H.rot); ctx.scale(-H.sx, H.sy);   // heroPose: face 1 = left, the avatar's dir 1 = right
   let okDraw = true;
-  try { drawAvatar(ctx, a, 0, CS * 0.4, k, {t: now / 1000, pose}); } catch(e){ okDraw = false; }
+  try { if(F) Acting.draw(ctx, a, 0, CS * 0.4, k, F, {t: now / 1000, dir: 1}); else drawAvatar(ctx, a, 0, CS * 0.4, k, {t: now / 1000, pose}); } catch(e){ okDraw = false; }
   ctx.restore();
   return okDraw;
 }
+/* 🎬 MAZE BEATS (b3b1, 🧱 baseline chat, 2026-11-17) START — every avatar ACTION = 3–5 beats on the shared timeline (Acting.play):
+   ready → anticipation → contact → follow-through → settle. The GAME owns contact: a ⭐ / 🔑 / 🚩 / 🏁 lands on ARRIVAL (the run starts
+   when the step starts, contactAt = arrival), a wall bonk ~90 ms after the press (lean in → splat; the bump sound + 💫 fire on contact),
+   a trap / lava at once (anticipation skipped). Acts live in AvatarActing 🎭 BLOCK `maze`. Without Acting the old poses are drawn. */
+const HAS_ACT = HAS_AV && typeof Acting !== 'undefined' && typeof Acting.play === 'function';
+const MZB_ACTS = {bonk: 'maze.bonk', grab: 'maze.grab', key: 'maze.key', flag: 'maze.flag', hurt: 'maze.hurt', pop: 'maze.pop', win: 'maze.win', ko: 'maze.ko', burn: 'maze.burn'};
+const MZB_HOLD = {win: 1, ko: 1, burn: 1, hurt: 0}, MZB_CUT = {bonk: 1, pop: 1}, MZB_LEAD = 90;
+const MZB_OWN = {bump: 1, happy: 1, spin: 1, win: 1, ko: 1, hurt: 1, appear: 1};   // G.anim types whose whole-body moves now come from the beats
+window.MZB_LOG = window.MZB_LOG || [];
+function mzbStart(kind, now, atMs, fx, hold){
+  if(!HAS_ACT || !G || !G.av || !Acting.act(MZB_ACTS[kind])) return false;
+  const prev = G.act && G.act.run.last, at = atMs != null ? atMs : (kind === 'bonk' || kind === 'ko') ? now + MZB_LEAD : now;
+  const run = Acting.play({name: S.player, av: G.av}, MZB_ACTS[kind], {t0: now / 1000, contactAt: at / 1000, from: prev || undefined,
+    speed: G.lv && G.lv.lvlIdx === 0 ? 1.15 : 1,
+    onContact: r => { window.MZB_LOG.push({kind, t: r.contactT * 1000, at}); if(window.MZB_LOG.length > 60) window.MZB_LOG.shift(); if(fx) fx(); }});
+  G.act = {kind, run, at, hold: !!(hold || MZB_HOLD[kind]), cut: !!MZB_CUT[kind]};
+  return true;
+}
+// a step starts: an action that lands on arrival begins now (its anticipation fills the step); else a bonk / pop that has landed lets the walk take over
+function mzbStep(nc, now){
+  if(!HAS_ACT || !G.av) return;
+  const lv = G.lv, at = now + G.moveDur;
+  const kind = nc === lv.goal ? 'win' : (lv.stars.has(nc) && !G.gotStars.has(nc)) ? 'grab' : (lv.keys.has(nc) && !G.gotKeys.has(nc)) ? 'key' : (lv.flags.indexOf(nc) !== -1 && !G.reached.has(nc)) ? 'flag' : null;
+  if(kind) mzbStart(kind, now, at, null, kind === 'win');
+  else if(G.act && G.act.cut && G.act.run.fired) G.act = null;
+}
+function mzbFrame(now){
+  const A = G.act; if(!A) return null;
+  const f = A.run.at(now / 1000);
+  if(f.done && !A.hold){ G.act = null; return null; }
+  return f;
+}
+function mzbOwns(A, now){
+  if(!G.av || !G.act || !MZB_OWN[A.type]) return false;
+  const p = Math.min(1, (now - A.t0) / A.dur);
+  if(p >= 1 && (A.type === 'bump' || A.type === 'happy' || A.type === 'spin' || A.type === 'appear')) G.anim = null;
+  return true;
+}
+/* 🎬 MAZE BEATS END */
 function heroPose(now, t){
   const H = {ox: 0, oy: 0, sx: 1, sy: 1, rot: 0, alpha: 1, shadow: 1, dizzy: false, burn: false};
   if(G.moving){
@@ -857,7 +903,8 @@ function heroPose(now, t){
   let face = G.face;
   if(now - G.turnT0 < 170){ const k = (now - G.turnT0) / 170; face = G.faceFrom + (G.face - G.faceFrom) * k; if(Math.abs(face) < 0.15) face = 0.15 * Math.sign(G.face); }
   const A = G.anim;
-  if(A){
+  if(A && mzbOwns(A, now)){ /* 🎬 b3b1: the beats move the body */ }
+  else if(A){
     const p = Math.min(1, (now - A.t0) / A.dur), up = Math.sin(p * Math.PI);
     if(A.type === 'bump'){ H.ox += Math.sin(p * Math.PI * 4) * CS * 0.06 * (1 - p); H.sx *= 1 + 0.16 * (1 - p); H.sy *= 1 - 0.12 * (1 - p); }
     if(A.type === 'happy'){ H.oy -= up * CS * 0.45; H.rot += REDUCED ? 0 : p * Math.PI * 2; H.sx *= 1 + up * 0.25; H.sy *= 1 + up * 0.25; H.shadow *= 1 - up * 0.5; }
@@ -1120,8 +1167,9 @@ function lose(now, why, msg){
   if(G.over) return;
   G.over = true; cancelAnimationFrame(rafId); G.loseWhy = why || 'lava'; G.loseMsg = msg || ''; cheerEnd(false); /* 📣 cs-4c */
   UISound.play('error');
-  if(G.loseWhy === 'wall' && G.av){ burst(G.pos, ['💫', '⭐', '💥'], 6, 0.7, 0.36); playOutro('ko', REDUCED ? 200 : 1000, showLose); return; }   // 💀 bonked out: wobble and tip over
+  if(G.loseWhy === 'wall' && G.av){ const koFx = () => { UISound.play('bump'); burst(G.pos, ['💫', '⭐', '💥'], 6, 0.7, 0.36); }; if(!mzbStart('ko', now, null, koFx)) koFx(); /* 🎬 b3b1 */ playOutro('ko', REDUCED ? 200 : 1000, showLose); return; }   // 💀 bonked out: wobble and tip over
   burst(G.pos, ['🔥', '💨', '🔥'], 6, 0.7, 0.42);
+  mzbStart(G.loseWhy === 'lava' ? 'burn' : 'hurt', now, null, null, true);   /* 🎬 b3b1 */
   playOutro('burn', REDUCED ? 200 : 1000, showLose);
 }
 function showLose(){
@@ -1394,4 +1442,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (11w-1+emoji+r33+back-1+p1b+p3e+cs-4c+b2+b2fix+b2fix2+mz-head+pz-1+24u-c) END OF Maze.html -->
+<!-- (11w-1+emoji+r33+back-1+p1b+p3e+cs-4c+b2+b2fix+b2fix2+mz-head+pz-1+24u-c+b3b1) END OF Maze.html -->

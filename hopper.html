@@ -468,9 +468,10 @@ function hop(dirName, opt){
   G.a.gest = null; p.stillT = 0; p.ride = null; G.started = true;
   if(dx) G.a.dir = dx;
   p.hop = {fx: fromX, fr: p.row, tx: nx, tr: nr, t: 0, drift: !!(opt && opt.drift)};
+  hpbHop(nx, nr);   /* 🎬 b3b2 */
   UISound.play('tap');
 }
-function bump(dx, dr){ G.a.land = 0.12; UISound.play('error'); if(dx) G.a.dir = dx; }
+function bump(dx, dr){ G.a.land = 0.12; if(dx) G.a.dir = dx; const fx = () => UISound.play('error'); if(!hpbStart('bump', G.t + 0.07, fx)) fx(); }   /* 🎬 b3b2: lean → splat, the sound on contact */
 function landed(){
   const p = G.p, row = rowAt(p.row);
   if(p.row > G.maxRow){
@@ -483,7 +484,7 @@ function landed(){
     if(it === '🪙'){ G.coins++; G.score += (G.L.mult || 1) * 25; delete row.items[p.x]; UISound.play('pop'); addFx('+25', p.x, p.row, '#FFD23F'); coinJoy(); }
     else if(it === '💎'){ G.gems++; G.score += (G.L.mult || 1) * 100; cheerSay('goal', 'gem'); delete row.items[p.x]; UISound.play('success'); addFx('+100 💎', p.x, p.row, '#7FE7FF'); coinJoy(true); }
     else if(it === '❤️'){ if(G.lives < G.L.lives) G.lives++; delete row.items[p.x]; UISound.play('unlock'); showBanner('❤️ Extra life!', 'gold'); }
-    else if(it === '🍌'){ delete row.items[p.x]; showBanner('🍌 Whoops — slippery!'); const nr = p.row + 1, t2 = rowAt(nr); if(!(t2.type === 'safe' && t2.blocks[p.x])){ p.hop = {fx: p.x, fr: p.row, tx: p.x, tr: nr, t: 0, slip: true}; } }
+    else if(it === '🍌'){ delete row.items[p.x]; showBanner('🍌 Whoops — slippery!'); const nr = p.row + 1, t2 = rowAt(nr); if(!(t2.type === 'safe' && t2.blocks[p.x])){ p.hop = {fx: p.x, fr: p.row, tx: p.x, tr: nr, t: 0, slip: true}; hpbStart('slip', G.t); /* 🎬 b3b2 */ } }
     else if(it === '🕳️'){ delete row.items[p.x]; hit('🕳️ Into a hole!'); return; }
     if(row.check && !row.checked){ row.checked = true; G.checkpoints++; G.score += (G.L.mult || 1) * 200; showBanner('🏁 Checkpoint ' + G.checkpoints + '! +200', 'gold'); cheerSay('goal', 'cp'); UISound.play('success'); cheer(); say('Checkpoint!'); }
   }
@@ -515,15 +516,50 @@ function hit(text, water){
   G.dead = true; G.lives--; cheerSay(G.lives === 1 ? 'close' : 'miss'); UISound.play('error'); G.shake = 0.35; showBanner(text || '💫 Bonk!', 'bad');
   for(let i = 0; i < 10; i++) G.fx.push({ch: water ? (G.T.water.lava ? '🔥' : G.T.water.void ? '☁️' : '💦') : pick(['💫', '⭐', '✨']), x: p.x + 0.5 + rand(-0.6, 0.6), row: p.row + rand(-0.2, 0.5), t: 0, life: 0.9, vy: rand(0.6, 1.6)});
   G.a.gest = {g: GESTURES.find(x => x.k === 'spin'), t: 0};
+  hpbStart(water ? 'splash' : 'hit', G.t);   /* 🎬 b3b2 */
   setTimeout(() => {
     if(!G) return;
     if(G.lives <= 0){ finishGame(); return; }
     const back = Math.max(p.safeRow, Math.floor(G.scroll) + 1); let r = back; while(rowAt(r).type !== 'safe') r++;
     let x = p.safeX; const row = rowAt(r); if(row.blocks[x]) x = [4, 3, 5, 2, 6, 1, 7, 0, 8].find(c => !row.blocks[c]);
     p.row = r; p.x = x; p.hop = null; p.ride = null; p.invuln = 1.6; G.dead = false; G.a.gest = null; G.queue = [];
+    hpbStart('pop', G.t);   /* 🎬 b3b2 */
     showBanner('❤️ ' + G.lives + ' ' + (G.lives === 1 ? 'life' : 'lives') + ' left — go go go!');
   }, 950);
 }
+
+/* 🎬 HOPPER BEATS (b3b2, 🧱 baseline chat, 2026-11-17) START — every avatar ACTION = 3–5 beats on the shared timeline (Acting.play):
+   a hop's CONTACT = the landing (coins, water, goal are decided there): the press = take-off, the tuck fills the hop (contactAt = landing),
+   then land squash → rebound. 🪙 / 💎 hops = grab + twirl · goal / 🏁 checkpoint hops = land → burst up · 🧱 bump = lean → splat (sound on
+   contact, ~70 ms) · 🚗 hit / 💦 splash at once · ✨ pop back in · 🍌 slip. Clock = G.t (stops with ⏸). Acts: AvatarActing 🎭 BLOCK `hopper`. */
+const HPB_HAS = typeof Acting !== 'undefined' && typeof Acting.play === 'function';
+const HPB_ACTS = {hop: 'hopper.hop', grab: 'hopper.grab', cheer: 'hopper.cheer', bump: 'hopper.bump', hit: 'hopper.hit', splash: 'hopper.splash', pop: 'hopper.pop', slip: 'hopper.slip'};
+window.HPB_LOG = window.HPB_LOG || [];
+function hpbStart(kind, atT, fx){
+  if(!HPB_HAS || !G || !G.a || !G.a.av || !Acting.act(HPB_ACTS[kind])) return false;
+  const prev = G.act && G.act.run.last;
+  const run = Acting.play({name: S.player, av: G.a.av}, HPB_ACTS[kind], {t0: G.t, contactAt: atT, from: prev || undefined, speed: G.lvl === 0 ? 1.15 : 1,
+    onContact: r => { window.HPB_LOG.push({kind, t: G.t, at: r.contactT}); if(window.HPB_LOG.length > 60) window.HPB_LOG.shift(); if(fx) fx(); }});
+  G.act = {kind, run}; run.at(G.t); return true;
+}
+// a hop starts: what it lands on decides the act (the landing = contact)
+function hpbHop(nx, nr){
+  const row = rowAt(nr), it = row.type === 'safe' ? row.items[nx] : null;
+  const goal = !G.cleared && nr > G.maxRow && nr >= G.L.goal, cp = row.type === 'safe' && row.check && !row.checked;
+  hpbStart(it === '🪙' || it === '💎' ? 'grab' : goal || cp ? 'cheer' : 'hop', G.t + HOP_T);
+}
+// each update tick: advance the act (fires its contact in the same tick as the game event)
+function hpbTick(){
+  const A = G.act; if(!A) return;
+  const f = A.run.at(G.t);
+  if(f.done){ G.act = null; const gs = G.a.gest; if(gs && (gs.g === COIN_SPIN || gs.g.k === 'spin')) G.a.gest = null; else if(gs && A.kind === 'cheer') gs.t = 0; }   // the old one-pose reaction is replaced; a cheer dance starts fresh after the burst
+}
+function hpbDraw(g, x, y, k, t){
+  const A = G.act, F = A && A.run.last;
+  if(F && !F.done){ const sv = G.a.land; G.a.land = 0; try { Acting.draw(g, G.a, x, y, k, F, {t, keep: true}); } catch(e){ drawAvatar(g, G.a, x, y, k, {t}); } G.a.land = sv; }
+  else drawAvatar(g, G.a, x, y, k, {t});
+}
+/* 🎬 HOPPER BEATS END */
 
 /* ---------- each frame ---------- */
 function update(dt){
@@ -549,6 +585,7 @@ function update(dt){
     else if(p.x < -0.45 || p.x > COLS - 0.55) hit('🌊 Carried away!', true);
   }
   G.a.land = Math.max(0, G.a.land - dt);
+  hpbTick();   /* 🎬 b3b2 */
   if(G.a.gest){ G.a.gest.t += dt; if(G.a.gest.t >= G.a.gest.g.d) G.a.gest = null; }
   // collisions with movers and trains
   if(!G.dead && !p.hop && p.invuln <= 0){
@@ -712,7 +749,7 @@ function draw(t){
     if(G.pet && Math.round(G.pet.row) === r){ const pe = eqOf(G.a.av, 'pet'); if(pe) drawPetItem(g, pe, colX(G.pet.x) + C / 2, oy(G.pet.row) + C * 0.85, C / 95, t, S.player, G.a.dir); }
     if(Math.round(p.row + (p.hop ? (p.hop.tr - p.hop.fr) * Math.min(1, p.hop.t) : 0)) === r || (r === r0 && false)){
       const prow = p.hop ? p.hop.fr + (p.hop.tr - p.hop.fr) * Math.min(1, p.hop.t) : p.row;
-      if(!(p.invuln > 0 && Math.sin(t * 30) > 0)) drawAvatar(g, G.a, colX(p.x) + C / 2, oy(prow) + C * 0.86, C / 80, {t});
+      if(!(p.invuln > 0 && Math.sin(t * 30) > 0)) hpbDraw(g, colX(p.x) + C / 2, oy(prow) + C * 0.86, C / 80, t);   /* 🎬 b3b2 */
       if(G.conf) drawConfRing(g, colX(p.x) + C / 2, oy(prow) + C * 0.5, C, t);
     }
   }
@@ -927,4 +964,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (r9+back-1+p1c+cs-2a+b3w1+pz-1+24u-c) END OF Hopper.html -->
+<!-- (r9+back-1+p1c+cs-2a+b3w1+pz-1+24u-c+b3b2) END OF Hopper.html -->
