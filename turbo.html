@@ -640,11 +640,11 @@ function resume(){ if(G && G.paused && !G.over){ G.pausedTotal += performance.no
 function doJump(power){
   const p = G.p; if(p.z > 0.05 || G.count > 0) return false;
   if(!power){ if(p.jumpCool > 0){ UISound.play('bump'); return false; } p.jumpCool = 2.2; }
-  p.vz = power || 9; G.jumps++; UISound.play('whoosh'); return true;
+  p.vz = power || 9; G.jumps++; UISound.play('whoosh'); if(typeof tbbPlay === 'function') tbbPlay('jump', G.t + 2 * p.vz / GRAV + 0.04, {wait: true}); return true;   /* 🎬 b3b3: contact = the landing */
 }
 function crash(text, kind){
   const p = G.p; if(p.inv > 0 || p.spin > 0) return;
-  p.spin = 0.9; p.spinDir = Math.random() < 0.5 ? -1 : 1; p.v = Math.min(p.v, 6); p.inv = 1.8; p.boost = 0; p.stars = 1.6; G.crashes++; G.shake = 0.35; cheerSay('miss'); UISound.play('error'); showBanner(duoTag() + text, 'bad');
+  p.spin = 0.9; p.spinDir = Math.random() < 0.5 ? -1 : 1; p.v = Math.min(p.v, 6); p.inv = 1.8; p.boost = 0; p.stars = 1.6; G.crashes++; G.shake = 0.35; if(typeof tbbHit === 'function') tbbHit('crash'); /* 🎬 b3b3 */ cheerSay('miss'); UISound.play('error'); showBanner(duoTag() + text, 'bad');
   if(G.L.oneCrash && G.hardOut == null && !G.finished){ G.hardOut = G.t; showBanner('💀 ' + text + ' — Hardcore ends here!', 'bad'); }   // 💀 Hardcore: one crash ends the race
   for(let i = 0; i < 10; i++) G.fx.push({ch: kind === 'water' ? '💦' : pick(['💫', '⭐', '💥']), d: p.d + rand(-1, 2), x: p.ax - roadCx(p.d) + rand(-1.5, 1.5), t: 0, life: 0.8, vy: rand(4, 12), s: rand(0.8, 1.4)});
 }
@@ -652,6 +652,7 @@ function rel(){ return G.p.ax - roadCx(G.p.d); }
 function update(dt){
   const p = G.p, L = G.L, T = G.T, held = p.held, W = !G.duo || G.cur === 0;   // W = this pass also moves the world (2 players: only the first pass)
   if(W){ G.t += dt; G.flash = Math.max(0, G.flash - dt); } G.shake = Math.max(0, G.shake - dt);
+  if(typeof tbbFrozen === 'function' && tbbFrozen()) return;   /* 🎬 b3b3: 💥 hit-stop */
   // countdown lights
   if(W && G.count > 0){ const before = Math.ceil(G.count); G.count -= dt; const after = Math.ceil(G.count);
     if(after !== before && after > 0){ UISound.play('key'); showBanner(['', '🟢 GO!', '🟡 ' + after, '🔴 ' + after][after] || ('🔴 ' + after)); }
@@ -679,7 +680,7 @@ function update(dt){
   // move forward
   const dPrev = p.d; p.d += p.v * dt; if(racing) G.score += (G.L.mult || 1) * (p.d - dPrev) * 1;
   // jumping
-  if(p.z > 0 || p.vz > 0){ p.vz -= GRAV * dt; p.z += p.vz * dt; if(p.z <= 0){ p.z = 0; p.vz = 0; G.shake = Math.max(G.shake, 0.08); UISound.play('drop'); } }
+  if(p.z > 0 || p.vz > 0){ p.vz -= GRAV * dt; p.z += p.vz * dt; if(p.z <= 0){ p.z = 0; p.vz = 0; G.shake = Math.max(G.shake, 0.08); UISound.play('drop'); if(typeof tbbHit === 'function') tbbHit('jump'); } }   /* 🎬 b3b3 */
   p.jumpCool = Math.max(0, p.jumpCool - dt); p.inv = Math.max(0, p.inv - dt);
   if(G.hardOut != null && G.t - G.hardOut > 0.9){ finishGame(); return; }
   if(racing){ G.timeLeft -= dt; G.raceTime += dt; if(G.rec){ while(G.rec.length / 3 <= G.raceTime / GSTEP && G.rec.length < 12000) G.rec.push(Math.round(p.d * 10), Math.round(rel() * 10), Math.round(p.z * 10)); } const s = Math.ceil(G.timeLeft); if(G.timeLeft <= 10 && s < G.lastBeep && s > 0){ G.lastBeep = s; if(s === 5) cheerSay('close'); UISound.play('key'); } if(G.timeLeft <= 0){ G.timeLeft = 0; if(G.duo){ G.finished = true; G.cleared = false; G.finishT = G.t; showBanner('⏰ ' + G.who + ' ran out of time!', 'bad'); UISound.play('pop'); } else finishGame(); return; } }
@@ -704,22 +705,23 @@ function update(dt){
       if(!o.passed && o.d < p.d - (o.len + CAR_L) / 2){ o.passed = true; if(!o.hit){ G.overtakes++; G.score += (G.L.mult || 1) * 20; const gap = Math.abs(o.x - px) - (o.w + CAR_W) / 2; if(gap < 0.6 && p.z < 0.3){ G.nearMiss++; cheerSay('big', 'close'); G.score += (G.L.mult || 1) * 30; addFx('😱 +30 Close!', p.d, px, '#FFFFFF'); } } }
       if(ov && xo && p.z < o.h && !o.hit){ if(p.inv <= 0 && p.spin <= 0){ o.hit = true; o.v = Math.max(o.v, p.v * 0.6); crash('💥 Bonk! Watch the traffic!'); } }
     } else if(o.kind === 'block'){ if(ov && xo && p.z < o.h && !o.hit && p.inv <= 0){ o.hit = true; crash('💥 Crash! ' + o.ch); } }
-    else if(o.kind === 'coin'){ if(!o.got && ov && xo && (o.air ? p.z > 0.6 : p.z < 1.6)){ o.got = true; G.coins++; G.score += (G.L.mult || 1) * 25; UISound.play('pop'); addFx('+25', o.d, o.x, '#FFD23F'); } }
+    else if(o.kind === 'coin'){ if(!o.got && ov && xo && (o.air ? p.z > 0.6 : p.z < 1.6)){ o.got = true; G.coins++; G.score += (G.L.mult || 1) * 25; UISound.play('pop'); if(typeof tbbHit === 'function') tbbHit('coin'); /* 🎬 b3b3 */ addFx('+25', o.d, o.x, '#FFD23F'); } }
     else if(o.kind === 'ramp'){ if(!o.used && ov && xo && p.z < 0.1){ o.used = true; doJump(12); G.score += (G.L.mult || 1) * 75; addFx('🚀 +75 ' + T.ramp + '!', p.d, px, '#FFC845'); } }
-    else if(o.kind === 'boost'){ if(!o.used && ov && xo && p.z < 0.2){ o.used = true; p.boost = 2.2; UISound.play('unlock'); showBanner('⚡ TURBO BOOST!', 'gold'); cheerSay('big', 'boost'); } }
-    else if(o.kind === 'oil'){ if(!o.used && ov && xo && p.z < 0.1 && p.inv <= 0){ o.used = true; p.spin = 0.7; p.spinDir = Math.random() < 0.5 ? -1 : 1; p.slide = p.spinDir * 3; UISound.play('whoosh'); showBanner('🌀 Whoa — ' + T.oil[0] + '!'); } }
-    else if(o.kind === 'pot'){ if(!o.used && ov && xo && p.z < 0.1){ o.used = true; p.v *= 0.55; G.shake = 0.25; UISound.play('bump'); showBanner('😵 Bumpy — ' + T.pot + '!'); } }
+    else if(o.kind === 'boost'){ if(!o.used && ov && xo && p.z < 0.2){ o.used = true; p.boost = 2.2; UISound.play('unlock'); if(typeof tbbHit === 'function') tbbHit('boost'); /* 🎬 b3b3 */ showBanner('⚡ TURBO BOOST!', 'gold'); cheerSay('big', 'boost'); } }
+    else if(o.kind === 'oil'){ if(!o.used && ov && xo && p.z < 0.1 && p.inv <= 0){ o.used = true; p.spin = 0.7; p.spinDir = Math.random() < 0.5 ? -1 : 1; p.slide = p.spinDir * 3; UISound.play('whoosh'); if(typeof tbbHit === 'function') tbbHit('skid'); /* 🎬 b3b3 */ showBanner('🌀 Whoa — ' + T.oil[0] + '!'); } }
+    else if(o.kind === 'pot'){ if(!o.used && ov && xo && p.z < 0.1){ o.used = true; p.v *= 0.55; G.shake = 0.25; UISound.play('bump'); if(typeof tbbHit === 'function') tbbHit('bump'); /* 🎬 b3b3 */ showBanner('😵 Bumpy — ' + T.pot + '!'); } }
     else if(o.kind === 'flood'){ if(!o.told && p.d > o.d && p.d < o.d + o.len){ o.told = true; showBanner('💦 ' + T.flood[0] + ' — sloooow!'); UISound.play('whoosh'); } }
   }
   if(p.inFlood && p.v > 4 && Math.random() < dt * 25) G.fx.push({ch: '💧', d: p.d - 1, x: px + rand(-1.2, 1.2), t: 0, life: 0.5, vy: rand(3, 7), s: 0.6});
   if(p.offroad && p.v > 5 && Math.random() < dt * 14) G.fx.push({dust: true, d: p.d - 2, x: px + rand(-1, 1), t: 0, life: 0.6, vy: 0, s: 1});
   // checkpoints + finish
   const cpAt = (G.cpDone + 1) * L.cp;
-  if(cpAt < L.length && p.d >= cpAt){ G.cpDone++; G.timeLeft += L.cpTime; G.score += (G.L.mult || 1) * 200; G.lastBeep = 99; showBanner(duoTag() + '🏁 Checkpoint! +' + L.cpTime + ' s', 'gold'); cheerSay('goal', 'cp'); UISound.play('success'); say('Checkpoint!'); }
-  if(!G.finished && p.d >= L.length){ G.finished = true; G.cleared = true; G.place = G.duo ? 1 + G.duo.filter((P, j) => j !== G.cur && P.finished && P.cleared).length : 1 + G.rivals.filter(r => r.d > p.d).length + G.ghosts.filter(gh => gh.timeSec < G.raceTime).length; G.finishT = G.t; G.score += (G.L.mult || 1) * Math.round(G.timeLeft) * 20 + [500, 250, 100, 0][G.place - 1];
+  if(cpAt < L.length && p.d >= cpAt){ G.cpDone++; if(typeof tbbHit === 'function') tbbHit('check'); /* 🎬 b3b3 */ G.timeLeft += L.cpTime; G.score += (G.L.mult || 1) * 200; G.lastBeep = 99; showBanner(duoTag() + '🏁 Checkpoint! +' + L.cpTime + ' s', 'gold'); cheerSay('goal', 'cp'); UISound.play('success'); say('Checkpoint!'); }
+  if(!G.finished && p.d >= L.length){ G.finished = true; G.cleared = true; if(typeof tbbHit === 'function') tbbHit('win'); /* 🎬 b3b3 */ G.place = G.duo ? 1 + G.duo.filter((P, j) => j !== G.cur && P.finished && P.cleared).length : 1 + G.rivals.filter(r => r.d > p.d).length + G.ghosts.filter(gh => gh.timeSec < G.raceTime).length; G.finishT = G.t; G.score += (G.L.mult || 1) * Math.round(G.timeLeft) * 20 + [500, 250, 100, 0][G.place - 1];
     party('🏁 ' + PLACES[G.place - 1] + '! ' + pick(PRAISE) + ', ' + (G.who || S.player) + '!'); UISound.play('success'); say(G.duo ? (G.place === 1 ? G.who + ' wins!' : G.who + ' finished!') : G.place === 1 ? 'You win!' : 'Finished!'); confetti(['🏁', '⭐', '🎉', G.T.icon], 36); }
   if(!G.duo && G.finished && G.t - G.finishT > 1.6){ finishGame(); return; }
   busyUpdate(dt, W, racing);
+  if(typeof tbbTick === 'function' && !G.over) tbbTick();   /* 🎬 b3b3 */
   if(G.over) return;
   // disasters: a red circle first, then the strike
   const disRate = L.disasters || G.stormRate || 0;
@@ -755,7 +757,7 @@ function updateRival(rv, dt, racing){
   // a little bump if you touch
   if(Math.abs(rv.d - p.d) < CAR_L - 0.3 && Math.abs(rv.x - rel()) < CAR_W - 0.2 && p.z < 1){ const s = Math.sign(rel() - rv.x) || 1; p.slide = s * 4; rv.x -= s * 0.3; if(rv.bump <= 0){ rv.bump = 1; UISound.play('bump'); } }
   rv.bump = Math.max(0, rv.bump - dt);
-  if(!rv.passedMe && rv.d < p.d - CAR_L && G.t > 4){ rv.passedMe = true; G.overtakes++; cheerSay('goal', 'rival'); G.score += (G.L.mult || 1) * 100; addFx('🏎️ +100 Passed ' + rv.name + '!', p.d, rel(), '#FFC845'); }
+  if(!rv.passedMe && rv.d < p.d - CAR_L && G.t > 4){ rv.passedMe = true; if(typeof tbbHit === 'function') tbbHit('pass'); /* 🎬 b3b3 */ G.overtakes++; cheerSay('goal', 'rival'); G.score += (G.L.mult || 1) * 100; addFx('🏎️ +100 Passed ' + rv.name + '!', p.d, rel(), '#FFC845'); }
   if(rv.d > p.d + CAR_L) rv.passedMe = false;
 }
 function addFx(text, d, x, col){ G.fx.push({text, col, d, x, t: 0, life: 1, vy: 6}); }
@@ -1492,7 +1494,7 @@ function drvDraw(g, name, W, Ln, ride){
   g.drawImage(pic, pic.width * 0.12, 0, pic.width * 0.76, sh, -s / 2, cy - s * 0.66, s, s * (sh / (pic.width * 0.76)));
 }
 const drvBase = {startGame, cheerSay, showResult};
-startGame = function(){ const r = drvBase.startGame.apply(this, arguments); drvWarm(S.player); return r; };
+startGame = function(){ const r = drvBase.startGame.apply(this, arguments); drvWarm(S.player); try { tbbBake(S.player); if(G && G.duo) G.duo.forEach(P => tbbBake(P.who)); } catch(e){} return r; };   /* 🎬 b3b3 */
 cheerSay = function(kind, why){ const r = drvBase.cheerSay.apply(this, arguments); if(G){ const who = G.who || S.player; drvMood(who, kind === 'miss' ? 'oops' : kind === 'start' ? 'idle' : kind === 'close' ? 'happy' : 'happy', kind === 'goal' ? 2 : 1.4); } return r; };
 showResult = function(html){ const r = drvBase.showResult.apply(this, arguments);
   const big = document.querySelector('#result-card > .big'); if(big && window.UI && UI.buddy && window.Acting){ const won = !!document.querySelector('#result-card h2.cheer');
@@ -1500,6 +1502,82 @@ showResult = function(html){ const r = drvBase.showResult.apply(this, arguments)
     drvMood(S.player, won ? 'win' : 'oops', 4); }
   return r; };
 /* ================= 🧑 YOUR AVATAR DRIVES END (p6f) ================= */
+/* 🎬 TURBO BEATS (b3b3, 🧱 baseline chat, 2026-11-17) START — the driver's every ACTION = 3–5 beats on the shared timeline (Acting.play).
+   The game owns contact (tbbHit = the event tick): 🦘 a jump's contact = the LANDING (the hop up + holding on fill the air time) · 💥 crash /
+   🌀 oil / 😵 pothole at once — a crash freezes the whole race 70 ms on contact (hit-stop, the race clock stops too, ghosts stay fair) ·
+   ⚡ boost pad / 🏁 checkpoint / 🏆 finish: the wind-up starts as it comes (≈ 0.25 s ahead, held until it really happens, dropped if you
+   steer past) · 🏎️ passing a rival · 🪙 a coin (max one every 0.4 s). Pictures are baked once per driver (2 a beat, one shared size, extra room
+   above + beside for arms up) — the race loop never paints the avatar. Each driver has its own act on G.p (👥 2 players). Acts: 🎭 BLOCK `turbo`. */
+const TBB_HAS = typeof Acting !== 'undefined' && typeof Acting.play === 'function';
+const TBB_ACTS = {jump: 'turbo.jump', crash: 'turbo.crash', skid: 'turbo.skid', bump: 'turbo.bump', boost: 'turbo.boost', check: 'turbo.check', pass: 'turbo.pass', coin: 'turbo.coin', win: 'turbo.win'};
+const TBB_PRI = {coin: 1, pass: 1, bump: 2, skid: 2, jump: 3, boost: 3, check: 3, win: 4, crash: 5};
+const TBB_MOODS = {happy: 'cheer', oops: 'shock', win: 'victory'};
+const TBB_W = 72, TBB_H = 84, TBB_PAD = 18, TBB_TOP = 30, TBB_DPR = 2, TBB_STEPS = 2, TBB_CROP = 0.56;
+const TBB = {pics: {}};
+window.TBB_LOG = window.TBB_LOG || [];
+// 🧑 bake: the grip pose sets the size (same as before), every beat 2 pictures, moods too — spread over idle time when a race starts
+function tbbBake(name){
+  if(!TBB_HAS || !name || TBB.pics[name]) return; const B = TBB.pics[name] = {ready: false, acts: {}, moods: {}};
+  const who = {name, av: myAvatar(name)}, ric = window.requestIdleCallback ? (f => requestIdleCallback(f, {timeout: 700})) : (f => setTimeout(f, 40));
+  const grip = Acting.play(who, 'tb.grip', {t0: 0}).at(0), fit = Acting.fit(who, [Object.assign({}, grip, {id: 'tbb-grip'})], TBB_W, TBB_H);
+  const pic = f => { const c = document.createElement('canvas'); c.width = (TBB_W + TBB_PAD * 2) * TBB_DPR; c.height = (TBB_H + TBB_TOP) * TBB_DPR;
+    const g = c.getContext('2d'); g.scale(TBB_DPR, TBB_DPR); try { Acting.draw(g, who, fit.x + TBB_PAD, fit.y + TBB_TOP, fit.k, f, {t: 0}); } catch(e){} return c; };
+  B.grip = pic(grip);
+  const kinds = Object.keys(TBB_ACTS).filter(k => Acting.act(TBB_ACTS[k]));
+  kinds.forEach((k, n) => ric(() => { try {
+    const run = Acting.play(who, TBB_ACTS[k], {t0: 0});
+    B.acts[k] = run.beats.map((b, i) => { const L = []; for(let st = 1; st <= TBB_STEPS; st++) L.push(pic(run.at((run.start[i] + Math.max(1, run.D[i].tr) * st / TBB_STEPS - 0.01) / 1000))); return L; });
+    } catch(e){}
+    if(n === kinds.length - 1){ Object.keys(TBB_MOODS).forEach(m => { try { B.moods[m] = pic(Acting.has('acts', TBB_MOODS[m]) ? Acting.play(who, TBB_MOODS[m], {t0: 0}).at(0.2) : grip); } catch(e){} }); B.ready = true; } }));
+}
+function tbbName(){ return G && (G.who || S.player); }
+// start an act (contactAt = when the game will fire; o.wait = hold the wind-up until tbbHit says it really happened)
+function tbbPlay(kind, contactAt, o){
+  o = o || {}; const p = G && G.p; if(!TBB_HAS || !p || !Acting.act(TBB_ACTS[kind])) return null;
+  const A = p.tbb; if(A && !A.run.done && A.kind !== kind && TBB_PRI[A.kind] > TBB_PRI[kind]) return null;
+  const name = tbbName(), from = A && A.run.last && !A.run.done ? A.run.last : undefined;
+  const run = Acting.play({name, av: myAvatar(name)}, TBB_ACTS[kind], {t0: G.t, contactAt, from, speed: G.lvl === 0 ? 1.1 : 1,
+    onContact: r => { window.TBB_LOG.push({kind, who: name, t: G.t, at: r.contactT}); if(window.TBB_LOG.length > 80) window.TBB_LOG.shift(); }});
+  p.tbb = {kind, run, name, wait: !!o.wait}; run.at(contactAt <= G.t + 1e-6 ? Math.max(G.t, run.contactT) + 1e-6 : G.t); return p.tbb;   // contact NOW really fires now (no float crumbs)
+}
+// the game event happens NOW → contact now (a waiting wind-up snaps straight into its contact pose; else a fresh act with contact at once)
+function tbbHit(kind){
+  const p = G && G.p; if(!p) return; const A = p.tbb;
+  if(kind === 'coin'){ if(G.t - (p.tbbCoin || -9) < 0.4 || (A && !A.run.done && A.kind !== 'coin')) return; p.tbbCoin = G.t; }
+  if(A && A.kind === kind && !A.run.fired) tbbPlay(kind, G.t);
+  else tbbPlay(kind, G.t);
+}
+// look ahead: ⚡ pad / 🏁 checkpoint / 🏆 finish within ≈ 0.25 s → the wind-up starts (contact waits for the real thing)
+function tbbAhead(){
+  const p = G.p, L = G.L; if(p.v < 4 || G.count > 0 || p.secret || (p.tbb && !p.tbb.run.done)) return;
+  const lead = 0.25, at = d => d / p.v;
+  if(!G.finished){ const tf = at(L.length - p.d); if(tf > 0 && tf < lead){ tbbPlay('win', G.t + tf + 0.03, {wait: true}); return; } }
+  const cpAt = (G.cpDone + 1) * L.cp; if(cpAt < L.length){ const tc = at(cpAt - p.d); if(tc > 0 && tc < lead){ tbbPlay('check', G.t + tc + 0.03, {wait: true}); return; } }
+  if(p.z > 0.2) return; const px = rel();
+  for(const o of G.objs){ if(o.kind !== 'boost' || o.used) continue;
+    const tb = at(o.d - p.d - ((o.len + CAR_L) / 2 - 0.3));
+    if(tb > 0 && tb < lead && Math.abs(o.x - px) < (o.w + CAR_W) / 2 - 0.25){ tbbPlay('boost', G.t + tb + 0.03, {wait: true}); return; } }
+}
+// each update tick (per driver): advance the act; a waiting wind-up holds just before contact, then lets go if nothing happened
+function tbbTick(){
+  const p = G.p, A = p.tbb; if(!A){ tbbAhead(); return; }
+  if(A.wait && !A.run.fired && G.t >= A.run.contactT - 0.02){ if(G.t > A.run.contactT + 0.2) p.tbb = null; return; }
+  const f = A.run.at(G.t); if(f.done){ p.tbb = null; tbbAhead(); }
+}
+// 💥 hit-stop: while the contact frame says stop, the race (this driver + the world in solo) stands still
+function tbbFrozen(){ const A = G.p.tbb; if(!A || !A.run.last || !A.run.last.stop) return false; return !!A.run.at(G.t).stop; }
+const tbbDrvDraw = drvDraw;
+drvDraw = function(g, name, W, Ln, ride){
+  const B = TBB.pics[name]; if(!B || !B.ready) return tbbDrvDraw.apply(this, arguments);
+  const A = G && G.p && G.p.tbb && G.p.tbb.name === name ? G.p.tbb : null, f = A && A.run.last;
+  let pic = null;
+  if(f && !f.done){ const L = B.acts[A.kind] && B.acts[A.kind][f.i]; pic = L && L[Math.max(0, Math.min(TBB_STEPS - 1, Math.ceil(f.q * TBB_STEPS) - 1))]; }
+  if(!pic){ let m = DRV.mood[name] || 'idle'; if(m !== 'win' && performance.now() > (DRV.until[name] || 0)) m = 'idle'; pic = B.moods[m] || B.grip; }
+  const s = W * (ride === 'horse' || ride === 'bike' || ride === 'dragon' ? 0.78 : 0.66), cy = (ride === 'rocket' || ride === 'shuttle' ? 0.12 : 0.05) * Ln;
+  const D = TBB_DPR, sw = TBB_W * 0.76 * D, sc = s / sw, sx = (TBB_PAD + TBB_W * 0.12) * D, sh = (TBB_TOP + TBB_H * TBB_CROP) * D;
+  g.drawImage(pic, sx - TBB_PAD * D, 0, sw + TBB_PAD * 2 * D, sh, -s / 2 - TBB_PAD * D * sc, cy - s * 0.66 - TBB_TOP * D * sc, s + TBB_PAD * 2 * D * sc, sh * sc);
+};
+/* 🎬 TURBO BEATS END */
 boot();
 /* ✨ MODE SPOTLIGHT (modes-3): ?mode=<id> opens this game straight in that mode after the player pick · "✨ Also try" on the start page · started modes → UI.modeTried */
 const MS_GAME = 'turbo';
@@ -1561,4 +1639,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (11o+r33+modes-3+p1c+cs-2a+p6f+b3w1+pz-1+24m+24u-c) END OF Turbo.html -->
+<!-- (11o+r33+modes-3+p1c+cs-2a+p6f+b3w1+pz-1+24m+24u-c+b3b3) END OF Turbo.html -->
