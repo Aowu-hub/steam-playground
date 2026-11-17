@@ -1,4 +1,4 @@
-<!-- IsoPropsLab.html — 🌳 IsoProps lab (ip-1, hidden: ?page=isoprops). Not in the Gameroom. Browse the shared 2.5D props, switch map looks,
+<!-- IsoPropsLab.html — 🌳 IsoProps lab (ip-1 + ip-2 🏗️ Town, hidden: ?page=isoprops). Not in the Gameroom. Browse the shared 2.5D props, switch map looks,
      tap or drag props onto a real IsoKit map, turn / re-look / move / remove them, and watch friends walk through the doors (🫥 see-through). -->
 <!DOCTYPE html>
 <html>
@@ -73,6 +73,11 @@
     #tray .sp-btn{min-height:36px;padding:4px 8px;} #tray .sp-btn:not(.on) .bl{display:none;} .tab{min-height:36px;min-width:38px;padding:5px 8px;} .tab:not(.on) .bl{display:none;}
     #selbar{left:calc(var(--tray-w) + (100vw - var(--tray-w)) / 2);bottom:calc(8px + env(safe-area-inset-bottom));} #selbar .sp-btn .bl{display:none;}
     #tip{left:calc(var(--tray-w) + (100vw - var(--tray-w)) / 2);} #hud{max-width:calc(100vw - 420px);} }
+  /* 🏗️ town tool (ip-2): size chips + 🎲 new town + 📌 the hand-made sample; one info line */
+  #townrow .tab{min-height:40px;}
+  #towninfo{font-weight:800;font-size:.74rem;color:var(--ink-soft);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px 2px;}
+  #tray.towning #tabs, #tray.towning #cards{display:none !important;}
+  @media (max-height:520px) and (orientation:landscape){ #tray.towning{justify-content:flex-start;} #towninfo{white-space:normal;text-align:left;} }
   .hidden{display:none !important;}
 </style>
 <script src="inc/UiKit.js"></script>
@@ -100,11 +105,14 @@
     <button id="t-look" class="sp-btn sp-secondary sp-sm" data-sound="none"><span class="bi">🎨</span> <span class="bl">Jungle</span></button>
     <button id="t-walk" class="sp-btn sp-secondary sp-sm on" data-sound="none"><span class="bi">🧍</span> <span class="bl">Walk</span></button>
     <button id="t-village" class="sp-btn sp-secondary sp-sm" data-sound="none"><span class="bi">🏘️</span> <span class="bl">Village</span></button>
+    <button id="t-town" class="sp-btn sp-secondary sp-sm" data-sound="none"><span class="bi">🏗️</span> <span class="bl">Town</span></button>
     <button id="t-clear" class="sp-btn sp-secondary sp-sm" data-sound="none"><span class="bi">🧹</span> <span class="bl">Clear</span></button>
     <button id="t-fit" class="sp-btn sp-secondary sp-sm" data-sound="none"><span class="bi">🔍</span> <span class="bl">Fit</span></button>
   </div>
   <div class="row" id="tabs"></div>
   <div id="cards"></div>
+  <div class="row hidden" id="townrow"></div>
+  <div id="towninfo" class="hidden"></div>
 </div>
 <div id="loading"><div class="ic">🌳</div><p id="load-text">Planting the little village…</p><div class="bar"><i id="load-bar"></i></div></div>
 
@@ -120,7 +128,7 @@ const sound = k => { try{ if(window.UI && UI.sound) UI.sound(k); }catch(e){} };
 const shake = el => { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); };
 
 /* ---------- 🗺️ the test map: 18 × 18 meadow, a river with water on the left, two paths ---------- */
-const N = 18;
+let N = 18;   // the sample map; 🏗️ Town maps are 16 / 22 / 30 (ip-2)
 function makeMap(){ return Iso.map({w: N, h: N, theme: 'meadow', seed: 5, cell: (i, j) => {
   if(i === 2 || i === 3) return {t: 'water', h: 0};
   if(j === 9 || (i === 9 && j < 17)) return {t: 'path', h: 0, cost: 0.6};
@@ -185,8 +193,8 @@ $('s-x').onclick = () => { drop(); select(null); };
 /* ---------- 🧍 friends walking through (rule 12: avatar size 0.6 → ≈ 48 px, doors fit) ---------- */
 const NAMES = ['Mia', 'Leo', 'Ploy', 'Kai'];
 function makeWalkers(){ S.walkers.forEach(w => { const k = S.items.indexOf(w.it); if(k >= 0) S.items.splice(k, 1); }); S.walkers = [];
-  if(!S.walk) return; const free = []; for(let j = 0; j < N; j++) for(let i = 0; i < N; i++) if(S.M.walk(i, j) && !Props.at(S.M, i, j)) free.push([i, j]);
-  NAMES.forEach((name, n) => { const who = {name, av: typeof defaultAvatar === 'function' ? defaultAvatar(name) : {}}, sp = [[9, 5], [12, 9], [9, 12], [6, 9]][n];
+  if(!S.walk) return; const free = []; for(let j = 0; j < S.M.h; j++) for(let i = 0; i < S.M.w; i++) if(S.M.walk(i, j) && !Props.at(S.M, i, j)) free.push([i, j]);
+  NAMES.forEach((name, n) => { const who = {name, av: typeof defaultAvatar === 'function' ? defaultAvatar(name) : {}}, sp = S.town ? townSpot(n, free) : [[9, 5], [12, 9], [9, 12], [6, 9]][n];
     const w = {who, x: sp[0] + 0.5, y: sp[1] + 0.5, path: null, pi: 0, wait: n * 0.6, dist: 0, flip: false, frames: [], free};
     for(let f = 0; f < Iso.WALK_N; f++) w.frames.push(Iso.avatar(who, {pose: 'walk', f, size: 0.6}));
     w.it = {x: w.x, y: w.y, z: 0, pic: w.frames[0], walker: true}; S.walkers.push(w); S.items.push(w.it); }); }
@@ -223,7 +231,8 @@ function tip(s){ $('tip').textContent = s; $('tip').style.opacity = 1; clearTime
 /* ---------- 👆 taps on the map ---------- */
 function tap(cell, px, py){ if(S.hold){ const r = $('iso').getBoundingClientRect(); ghostAt(px + r.left, py + r.top); if(S.ghost && S.ghost.ok){ placeHeld(); } else { sound('error'); tip('❌ it doesn’t fit there — try a free, flat spot'); } return; }
   const it = Props.hit(S.V, S.items, px, py) || (cell && Props.at(S.M, cell.i, cell.j)); select(it && it !== S.sel ? it : null); if(it) sound('tap'); }
-$('iso').addEventListener('pointermove', e => { if(S.hold && !S.drag && e.pointerType === 'mouse') ghostAt(e.clientX, e.clientY); });
+const hover = e => { if(S.hold && !S.drag && e.pointerType === 'mouse') ghostAt(e.clientX, e.clientY); };
+$('iso').addEventListener('pointermove', hover);
 
 /* ---------- 🎨 map looks, tools, layout ---------- */
 function setLook(k){ S.look = k; S.props.forEach(it => { const n = Props.item(it.prop, it.x, it.y, {v: it.v, turn: it.turn, look: k, z: it.z}); it.pic = n.pic; it.frames = n.frames; it.look = k; });
@@ -235,7 +244,7 @@ $('t-clear').onclick = () => { [...S.props].forEach(del); drop(); makeWalkers();
 // the map fills the free area; a phone held upright starts closer (pan to explore, 🔍 Fit shows all)
 function fitMap(close){ S.V.fit(); const p = pads(), fw = S.V.W - p.l - p.r, fh = S.V.H - p.t - p.b; if(close && fh > fw * 1.15) S.V.zoomAt(S.V.zoom * 1.6, p.l + fw / 2, p.t + fh / 2); }
 $('t-fit').onclick = () => { fitMap(false); sound('tap'); };
-function village(){ [...S.props].forEach(del); S.missed = []; VILLAGE.forEach(([k, i, j, o]) => add(k, i, j, o)); select(null); drop(); makeWalkers(); }
+function village(){ if(S.town || S.M.w !== 18){ S.town = null; N = 18; S.props = []; S.items = []; S.sel = null; newView(makeMap()); } [...S.props].forEach(del); S.missed = []; VILLAGE.forEach(([k, i, j, o]) => add(k, i, j, o)); select(null); drop(); makeWalkers(); }
 function pads(){ const h = $('hud').getBoundingClientRect(), tr = $('tray').getBoundingClientRect(), sb = $('selbar');
   if(wide()) return {t: Math.round(h.bottom) + 6, b: 12, l: Math.round(tr.right) + 6, r: 6};
   return {t: Math.round(h.bottom) + 6, b: Math.round(innerHeight - tr.top) + 8, l: 6, r: 6}; }
@@ -243,19 +252,44 @@ function placeUi(){ const tr = $('tray').getBoundingClientRect(); document.docum
   if(S.V) S.V.setPad(pads()); }   // 💬 Tell us finds its own free spot (UiKit UI.avoid keeps it off words + buttons)
 setInterval(placeUi, 800); let lastWide = null; addEventListener('resize', () => requestAnimationFrame(() => { if(wide() !== lastWide){ lastWide = wide(); renderCards(); } placeUi(); }));
 
+/* ---------- 🏗️ town tool (ip-2): Props.town lays out a whole village on a fresh map — 🎲 every seed mixes the road styles ---------- */
+const TOWN_N = {hamlet: 16, village: 22, town: 30}, TOWN_SIZES = [['hamlet', '🏡 Hamlet'], ['village', '🏘️ Village'], ['town', '🏰 Town']];
+function newView(M){ const old = $('iso'); if(S.V && S.V._ro) S.V._ro.disconnect(); if(S.V){ const cv = document.createElement('canvas'); cv.id = 'iso'; old.replaceWith(cv); cv.addEventListener('pointermove', hover); }
+  S.M = M; S.V = Iso.view($('iso'), M, {min: 0.35, max: 3, pad: pads()}); S.V.onTap = tap; placeUi(); }
+function townMap(size, seed){ const n = TOWN_N[size], river = seed % 3 === 1 ? 1 : (seed % 3 === 2 && size !== 'hamlet' ? 2 : 0);
+  const M = Iso.map({w: n, h: n, theme: 'meadow', seed, cell: (i, j) => { if(river === 1 && i < 2) return {t: 'water', h: 0}; if(river === 2 && j >= n - 2) return {t: 'water', h: 0};
+    const r = Math.abs(Math.sin(i * 12.9898 + j * 78.233 + seed) * 43758.5453 % 1); return {t: r < 0.08 ? 'flower' : 'grass', h: 0}; }});
+  return {M, area: river === 1 ? {i: 3, j: 1, w: n - 4, d: n - 2} : river === 2 ? {i: 1, j: 1, w: n - 2, d: n - 4} : null}; }
+function makeTown(size, seed){ select(null); drop(); S.props = []; S.items = []; S.tsize = size; S.tseed = seed; N = TOWN_N[size];
+  const G = townMap(size, seed); newView(G.M); const t0 = performance.now(), T = Props.town(G.M, {size, seed, look: S.look, area: G.area || undefined}); T.ms = performance.now() - t0;
+  S.town = T; T.items.forEach(it => { S.props.push(it); S.items.push(it); }); S.placed = S.props.length; S.missed = T.missed.slice();
+  makeWalkers(); fitMap(true); townInfo(); info(); return T; }
+// walkers start on the town's plaza (the cells nearest T.spawn)
+function townSpot(n, free){ const sp = S.town.spawn || {x: S.M.w / 2, y: S.M.h / 2}; const near = free.slice().sort((a, b) => Math.hypot(a[0] + 0.5 - sp.x, a[1] + 0.5 - sp.y) - Math.hypot(b[0] + 0.5 - sp.x, b[1] + 0.5 - sp.y)); return near[n * 2] || near[0] || [0, 0]; }
+function townInfo(){ const T = S.town; if(!T){ $('towninfo').textContent = '📌 the hand-made sample village'; return; }
+  $('towninfo').textContent = '🎲 seed ' + T.seed + ' · ' + T.style.replace('+', ' + ') + ' · 🏠 ' + T.count.homes + ' · 🛒 ' + T.count.shops + ' · 🌳 ' + T.count.trees + ' · ' + T.count.items + ' props'; }
+function renderTownRow(){ const row = $('townrow'); row.innerHTML = '';
+  const chip = (id, txt, on, fn) => { const b = document.createElement('button'); b.className = 'tab' + (on ? ' on' : ''); b.id = id; b.setAttribute('data-sound', 'none'); label(b, txt); b.onclick = () => { fn(); renderTownRow(); sound('tap'); }; row.appendChild(b); };
+  TOWN_SIZES.forEach(([k, t]) => chip('tw-' + k, t, S.town && S.tsize === k, () => makeTown(k, S.tseed || 7)));
+  chip('tw-new', '🎲 New town', false, () => { makeTown(S.tsize || 'village', ((S.tseed || 7) * 31 + 17) % 997); sound('success'); });
+  chip('tw-sample', '📌 Sample', !S.town, () => { village(); fitMap(true); townInfo(); }); }
+function townMode(on){ S.towning = on; $('tray').classList.toggle('towning', on); $('t-town').classList.toggle('on', on); $('townrow').classList.toggle('hidden', !on); $('towninfo').classList.toggle('hidden', !on);
+  if(on){ if(!S.town) makeTown('village', 7); renderTownRow(); townInfo(); tip('🎲 every town mixes its roads — tap 🎲 New town for another'); } else renderCards(); placeUi(); }
+$('t-town').onclick = () => { townMode(!S.towning); sound('tap'); };
+
 /* ---------- 🔧 start ---------- */
 async function start(){ renderTabs(); renderCards(); lastWide = wide(); label($('t-look'), '🎨 ' + Props.LOOKS[S.look].name);
-  S.M = makeMap(); S.V = Iso.view($('iso'), S.M, {min: 0.35, max: 3, pad: pads()}); S.V.onTap = tap; placeUi();
+  newView(makeMap());
   if(document.fonts && document.fonts.ready) await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 1500))]);
   village(); fitMap(true);
   await Props.warm(S.props, S.V, {onProgress: f => { $('load-bar').style.width = Math.round(f * 100) + '%'; }});
   $('loading').style.opacity = 0; setTimeout(() => $('loading').classList.add('hidden'), 350); setTimeout(() => { $('tip').style.opacity = 0; }, 5000);
   S.loop = Iso.loop({update: step, render}); S.ready = true; }
-S.add = add; S.del = del; S.holdKey = holdKey; S.drop = drop; S.ghostAt = ghostAt; S.placeHeld = placeHeld; S.select = select; S.setLook = setLook; S.village = village; S.reshape = reshape; S.tap = tap; S.pads = pads;
+S.add = add; S.del = del; S.holdKey = holdKey; S.drop = drop; S.ghostAt = ghostAt; S.placeHeld = placeHeld; S.select = select; S.setLook = setLook; S.village = village; S.makeTown = makeTown; S.townMode = townMode; S.reshape = reshape; S.tap = tap; S.pads = pads;
 window.PLAB = S;
 start();
 })();
 </script>
 </body>
 </html>
-<!-- (ip-1) END OF IsoPropsLab.html -->
+<!-- (ip-2) END OF IsoPropsLab.html -->
