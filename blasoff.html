@@ -402,8 +402,8 @@ var BO = (function () {
     {name: 'Junior', half: 105, spd: 0.76, react: 0.42, tackle: 0.22, tkCd: 2.3, press: 1, smart: 0, passAcc: 0.66, shotAcc: 0.42, range: 13, keeper: 0.5, aim: 2, offside: 0, fouls: 0, cards: 0, stamina: 0, slide: 0, draw: 'golden', trickFail: 0.06, steal: 0.82, guided: 1},
     {name: 'Intermediate', half: 120, spd: 0.85, react: 0.32, tackle: 0.34, tkCd: 1.7, press: 1, smart: 0, passAcc: 0.76, shotAcc: 0.52, range: 15, keeper: 0.55, aim: 1, offside: 0, fouls: 1, cards: 0, stamina: 0, slide: 1, draw: 'golden', trickFail: 0.12, steal: 0.72, guided: 0},
     {name: 'Hard', half: 120, spd: 0.92, react: 0.25, tackle: 0.44, tkCd: 1.3, press: 2, smart: 0, passAcc: 0.83, shotAcc: 0.6, range: 16, keeper: 0.6, aim: 1, offside: 1, fouls: 1, cards: 0, stamina: 1, slide: 1, draw: 'pens', trickFail: 0.18, steal: 0.64, guided: 0},
-    {name: 'Extreme', half: 180, spd: 0.875, react: 0.2, tackle: 0.5, tkCd: 1.05, press: 2, smart: 1, passAcc: 0.88, shotAcc: 0.75, range: 17, keeper: 0.57, aim: 0, offside: 2, fouls: 1, cards: 1, stamina: 1, slide: 1, draw: 'pens', trickFail: 0.25, steal: 0.58, guided: 0},
-    {name: 'Hardcore', half: 180, spd: 0.86, react: 0.16, tackle: 0.54, tkCd: 0.85, press: 3, smart: 1, passAcc: 0.92, shotAcc: 0.75, range: 18, keeper: 0.58, aim: 0, offside: 2, fouls: 1, cards: 1, stamina: 1, slide: 1, draw: 'pens', trickFail: 0.3, steal: 0.52, guided: 0, hardcore: true}
+    {name: 'Extreme', half: 180, spd: 0.875, react: 0.2, tackle: 0.5, tkCd: 1.05, press: 2, smart: 1, passAcc: 0.88, shotAcc: 0.68, range: 17, keeper: 0.57, aim: 0, offside: 2, fouls: 1, cards: 1, stamina: 1, slide: 1, draw: 'pens', trickFail: 0.25, steal: 0.58, guided: 0},
+    {name: 'Hardcore', half: 180, spd: 0.86, react: 0.16, tackle: 0.54, tkCd: 0.85, press: 3, smart: 1, passAcc: 0.92, shotAcc: 0.69, range: 18, keeper: 0.58, aim: 0, offside: 2, fouls: 1, cards: 1, stamina: 1, slide: 1, draw: 'pens', trickFail: 0.3, steal: 0.58, guided: 0, hardcore: true, hcBy: 4}
   ];
   var RUN = 5.4, SPRINT = 7.4, ACC = 22;
   // ⚡ bo-2c: how long a critical-moment prompt stays (s) per level · 🎯 penalty marker speed per level
@@ -1372,7 +1372,7 @@ var BO = (function () {
     M.phase = 'goal'; M.phaseT = 0; M.goalSide = side;
     ev(M, 'goal', {side: side, by: by ? by.i : -1, assist: assist, own: !!own, kind: kind, score: M.score.slice(), golden: M.golden});
     if (M.golden || (M.S.firstTo && M.score[side] >= M.S.firstTo)) { endMatch(M); return; }
-    if (M.L.hardcore && M.score[1 - side] < M.score[side] - 2 && !sideHuman(M, side) && sideHuman(M, 1 - side)) { M.hcLost = true; }
+    if (M.L.hardcore && M.score[1 - side] <= M.score[side] - (M.L.hcBy || 3) && !sideHuman(M, side) && sideHuman(M, 1 - side)) { M.hcLost = true; }
   }
   function out(M, where, s) {
     var b = M.ball, S = M.S, ls = b.lastSide < 0 ? 0 : b.lastSide;
@@ -2045,7 +2045,7 @@ const LEVEL_UI = [
   {emoji: '🔥', blurb: 'Robots mark + tackle. Slide tackles and fouls are on.'},
   {emoji: '⚡', blurb: 'Offside, stamina, a penalty shootout if it ends level.'},
   {emoji: '🌋', blurb: 'Smart robots, yellow cards — and no aim help.'},
-  {emoji: '💀', blurb: 'The strongest robots. 3 goals behind = game over · ×3 points.', hardcore: true}
+  {emoji: '💀', blurb: 'The strongest robots. 4 goals behind = game over · ×3 points.', hardcore: true}
 ];
 const AGE_START = {'4-5': 0, '6-7': 0, '8-9': 1, '10+': 2};
 const TEAM_COL = ['#2F80ED', '#E5484D'], TEAM_KIT = [5, 0], KEEPER_KIT = [2, 3], SEAT_COL = ['#FFD23F', '#FF6FD8'];
@@ -3551,7 +3551,7 @@ function finishMatch(){
   UISound.play(myWin ? 'success' : draw ? 'pop' : 'error');
   const head = G.mode === 'duo' ? (draw ? '<div class="big">🤝</div><h2>A draw!</h2>' : '<div class="big">👑</div><h2 class="cheer">' + UI.esc(G.tn[win]) + ' win' + pensTxt + '!</h2>')
     : myWin ? '<div class="big">🏆</div><h2 class="cheer">You beat the ' + UI.esc(G.tn[1 - mySide]) + '!' + pensTxt + '</h2>' : draw ? '<div class="big">🤝</div><h2>A draw — so close!</h2>'
-    : '<div class="big">' + (M.hcLost ? '💀' : '🤖') + '</div><h2>' + (M.hcLost ? '3 goals behind — game over' : 'The robots win this time' + pensTxt) + '</h2>';
+    : '<div class="big">' + (M.hcLost ? '💀' : '🤖') + '</div><h2>' + (M.hcLost ? (M.L.hcBy || 3) + ' goals behind — game over' : 'The robots win this time' + pensTxt) + '</h2>';
   const me = M.players.find(p => p.name === G.humans[0].name && p.side === mySide) || {g: {}}, myScore = scoreFor(G.humans[0]);
   const tip = myWin ? '' : '<div class="note">💡 ' + pickOne(COACH) + '</div>';
   const next = myWin && G.level < 5 && G.mode !== 'duo';
@@ -3683,4 +3683,4 @@ msAfter('choosePlayer', name => {
 </script>
 </body>
 </html>
-<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a+bo-5b+bo-pz+bo-5c+bo-5d+r4a+r4b+r4c+r4d+bo-7+bo-7b+bo-8+bo-9a+bo-9b+bo-9c) END OF BlasOff.html -->
+<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a+bo-5b+bo-pz+bo-5c+bo-5d+r4a+r4b+r4c+r4d+bo-7+bo-7b+bo-8+bo-9a+bo-9b+bo-9c+bo-9c2) END OF BlasOff.html -->
