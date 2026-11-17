@@ -322,6 +322,13 @@
   .ahint{position:absolute;left:50%;top:14%;transform:translateX(-50%);z-index:14;background:#FFF8D6;color:#4A3B00;border:2px solid #FFC845;border-radius:16px;padding:6px 14px;font-weight:800;font-size:0.85rem;max-width:min(90%,560px);text-align:center;box-shadow:0 6px 18px rgba(0,0,0,0.25);pointer-events:none;animation:hintin .3s;}
   @keyframes hintin{from{opacity:0;transform:translate(-50%,8px);}}
   @media (max-width:560px){ .hchip{flex-basis:160px;padding-right:6px;} .hchip .hpn{display:none;} .hav{width:32px;height:32px;} .hav canvas{width:26px !important;height:26px !important;} .hav .dring{width:32px;height:32px;} .ck{min-width:30px;height:36px;font-size:0.95rem;} }  .comics-slot:empty,.comic-strip-slot:empty{display:none;} .comics-slot{display:flex;justify-content:center;margin:8px 0;} .comic-strip-slot{margin:8px auto;max-width:100%;}   /* 💥 ck-room */
+  /* 🥊 24z SIDEWAYS OVERLAY (✨ polish chat): one player, phone / tablet on its side — the stage runs the whole width, stick + ring float over it */
+  #scr-play.side.ovl .arena{position:relative;}
+  #scr-play.side.ovl .ctl{position:absolute;bottom:0;z-index:6;opacity:.62;transition:opacity .15s;}
+  #scr-play.side.ovl .ctl.pz-l{left:0;} #scr-play.side.ovl .ctl.pz-r{right:0;}
+  #scr-play.side.ovl .ctl.on{opacity:.95;}
+  /* 📱 phones held upright: the 🌸 ring's invisible box poked 15 px past the right edge (page slid sideways); its buttons end inside — clip the empty box */
+  #scr-play.port .ctl-wrap{overflow-x:clip;}
 </style>
 <script src="inc/UiKit.js"></script>
 <script src="inc/BallSkins.js"></script>
@@ -2382,11 +2389,12 @@ function layoutPlay(){
   const portrait = H > W * 1.05, side = touch && !portrait;
   sp.classList.toggle('side', side); sp.classList.toggle('port', touch && portrait); sp.classList.toggle('two', two); sp.classList.toggle('tight', touch && portrait && two);
   G.touch = touch;
+  sp.classList.remove('ovl'); /* 🥊 24z */ G.sideL = G.sideR = 0;
   if(!touch){ bottom.innerHTML = legendHtml(); }
   else if(side){
     if(two){ arena.insertBefore(ctlEl(0, 'pad+btn'), arena.firstChild); arena.appendChild(ctlEl(1, 'pad+btn')); }
     else { const L = ctlEl(0, 'pad'), R = ctlEl(0, 'btn'); arena.insertBefore(L, arena.firstChild); arena.appendChild(R);
-      if(window.UI && UI.pad){ L.classList.add('pz-l'); R.classList.add('pz-r'); pzFan(R.querySelector('.tbtns'), pzRingOrder(), on => { if(G) G.tbBlk[0] = on; }); } }
+      if(window.UI && UI.pad){ L.classList.add('pz-l'); R.classList.add('pz-r'); pzFan(R.querySelector('.tbtns'), pzRingOrder(), on => { if(G) G.tbBlk[0] = on; }); if(H < 560) sp.classList.add('ovl'); } }   /* 🥊 24z ovl: short screens (phones on their side); tablets keep their tall stage */
   } else {
     const w = document.createElement('div'); w.className = 'ctl-wrap';
     if(two){ w.appendChild(ctlEl(0, 'pad+btn')); w.appendChild(ctlEl(1, 'btn+pad')); }
@@ -2395,7 +2403,14 @@ function layoutPlay(){
   }
   pzArcAll($('scr-play'));
   requestAnimationFrame(resize); resize();
+  bbSidePads(); /* 🥊 24z */ requestAnimationFrame(bbSidePads);
 }
+/* 🥊 24z: how much of the stage the floating stick / ring cover (half of each is kept clear for the fighters) + see-through until a thumb is on them */
+function bbSidePads(){ if(!G) return; const sp = $('scr-play'), st = $('stage'); if(!sp.classList.contains('ovl') || !st){ G.sideL = G.sideR = 0; return; }
+  const r = st.getBoundingClientRect(), L = sp.querySelector('.ctl.pz-l'), R = sp.querySelector('.ctl.pz-r'), w = e => e ? e.getBoundingClientRect() : null, a = w(L), b = w(R);
+  G.sideL = a ? Math.max(0, (a.right - r.left) * 0.5) : 0; G.sideR = b ? Math.max(0, (r.right - b.left) * 0.5) : 0;
+  [L, R].forEach(e => { if(!e || e.__ovl) return; e.__ovl = 1; const on = () => e.classList.add('on'), off = () => e.classList.remove('on');
+    e.addEventListener('pointerdown', on); ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(k => e.addEventListener(k, () => { if(!e.querySelector('.down, .tpad.on, .pz-shield')) off(); })); document.addEventListener('pointerup', off); }); }
 function pzRingOrder(){ return ['bonk', 'grab', 'power', 'dodge', 'block', G && G.M.sq[0].length > 1 ? 'tag' : null]; }   // 🌸 pz-2 (Aowu 09:33 + 15:01): 7 slots — 💨 Dodge stays in 3v3, 🛡️ Block = slot 5 (holding 👊 still blocks), 🔁 Swap (tag a buddy in) = slot 6, empty in 1v1   // 🕹️ pz-1: 🤼 Grab = its own one-tap button · 3v3 → 🔁 Tag takes 💨 Dodge's spot (dodge = → → / ← ← on the stick) · 🛡️ = hold 👊 or walk back
 function legendHtml(){
   const duo = G.M.duo, A = KEYS[0], B = KEYS[1];
@@ -2748,13 +2763,14 @@ function view(W, H, st){
   const a = st.M.f[0], b = st.M.f[1], span = Math.abs(a.x - b.x);
   const tall = H > W * 0.9, want = Math.max(tall ? 3.8 : 7.2, Math.min(2 * BB.ARENA + 1.8, span + (tall ? 2.9 : 5.2))), mid = (a.x + b.x) / 2;
   const cam = st.cam; if(st.preview || !cam.ready){ cam.w = want; cam.cx = mid; cam.ready = !st.preview; } else { cam.w += (want - cam.w) * 0.08; cam.cx += (mid - cam.cx) * 0.1; }
-  const s = Math.min(W / cam.w, H / 4.6), halfW = W / s / 2, lim = BB.ARENA + 0.9;
+  const pl = st.preview ? 0 : (st.sideL || 0), pr = st.preview ? 0 : (st.sideR || 0), IW = Math.max(W * 0.5, W - pl - pr), OX = pl + IW / 2, hd = pl || pr ? 3.7 : 4.6;   /* 🥊 24z camera */
+  const s = Math.min(IW / cam.w, H / hd), halfW = IW / s / 2, lim = BB.ARENA + 0.9;
   const cx = Math.max(-lim + halfW, Math.min(lim - halfW, cam.cx));
   // rise with a high juggle so nobody flies out of the top
   const top = Math.max(st.M.f[0].y, st.M.f[1].y) + 2.3, roomUp = (H - Math.max(s * 0.55, H * 0.14)) / s, wantUp = Math.max(0, top - roomUp + 0.3);
   if(st.preview) cam.up = 0; else cam.up = (cam.up || 0) + (wantUp - (cam.up || 0)) * 0.12;
   const floorY = H - Math.max(s * 0.55, H * 0.14) + cam.up * s;
-  return {s, cx: halfW * 2 > 2 * lim ? 0 : cx, floorY, W, H, X: x => W / 2 + (x - (halfW * 2 > 2 * lim ? 0 : cx)) * s, Y: y => floorY - y * s};
+  return {s, cx: halfW * 2 > 2 * lim ? 0 : cx, floorY, W, H, X: x => OX + (x - (halfW * 2 > 2 * lim ? 0 : cx)) * s, Y: y => floorY - y * s};
 }
 function drawScene(g, W, H, st, still){
   const V = view(W, H, st), T = THEMES[st.theme], M = st.M, t = st.t || 0; if(st === G) G.V = V; /* 💬 24t-e */
@@ -4076,4 +4092,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (11i-I+back-1+r35+modes-3+mg-1+ck-room+p1c+p2+p3a+ck-2b+cs-2c+ls-1b+pz-1+pz-2+b3w5b+24t-e+24u-d1) END OF BrawlBuddies.html -->
+<!-- (11i-I+back-1+r35+modes-3+mg-1+ck-room+p1c+p2+p3a+ck-2b+cs-2c+ls-1b+pz-1+pz-2+b3w5b+24t-e+24u-d1+24z) END OF BrawlBuddies.html -->
