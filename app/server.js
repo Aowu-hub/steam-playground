@@ -52,12 +52,14 @@ var REMOTE_FAIL_TEST_ = false;   // set by doGet from ?netfail=1
 function remoteMap_() { return typeof REMOTE_MAP_ !== 'undefined' ? REMOTE_MAP_ : { base: REMOTE_BASE_, cdn: REMOTE_CDN_, n: {} }; }
 const REMOTE_NET_JS_ = "window.SP_NET||(window.SP_NET={ok:{},bad:[],alt:function(f,b,i,n){if(!SP_NET.ok[f])document.write('<script charset=\"utf-8\" src=\"'+b+'\" integrity=\"'+i+'\" crossorigin=\"anonymous\" onload=\"SP_NET.ok[\\''+f+'\\']=1\" onerror=\"SP_NET.fail(\\''+n+'\\')\"><\\/script>')},css:function(l,b,n){if(l.getAttribute('data-alt'))return SP_NET.fail(n);l.setAttribute('data-alt','1');l.href=b},fail:function(n){SP_NET.bad.push(n);if(SP_NET.card)return;SP_NET.card=1;var show=function(){var d=document.createElement('div');d.id='sp-netcard';d.setAttribute('role','alert');d.style.cssText='position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(18,14,40,.9);font:16px/1.4 system-ui,-apple-system,Segoe UI,sans-serif';d.innerHTML='<div style=\"background:#fff;color:#222;border-radius:22px;padding:26px 24px;max-width:340px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.45)\"><div style=\"font-size:56px;line-height:1.1\">📡</div><div style=\"font-size:22px;font-weight:800;margin:8px 0 4px\">Can\\'t load this page</div><div style=\"color:#555\">Check the internet, then try again.</div><button type=\"button\" style=\"margin-top:18px;font:inherit;font-size:19px;font-weight:800;color:#fff;background:#7b4fe0;border:0;border-radius:999px;padding:12px 28px;min-height:48px;cursor:pointer\">🔁 Try again</button><div style=\"margin-top:12px;font-size:11px;color:#999\">'+SP_NET.bad.join(' · ')+'</div></div>';d.querySelector('button').onclick=function(){var r=document.referrer;try{if(/^https:\\/\\/script\\.google\\.com\\/macros\\//.test(r)){window.top.location.href=r;return}}catch(e){}location.reload()};document.body.appendChild(d)};if(document.body)show();else document.addEventListener('DOMContentLoaded',show)}});";
 function remoteTag_(n) {
-  const M = remoteMap_(), x = REMOTE_FAIL_TEST_ ? 'x-netfail-' : '';
-  return '<script>' + REMOTE_NET_JS_ + '</script>\n' + (M.n[n] || []).map(p => {
+  const M = remoteMap_(), x = REMOTE_FAIL_TEST_ ? 'x-netfail-' : '', all = M.n[n] || [], lazy = {};
+  all.forEach(p => { if (p[0] === 'lazy') lazy[p[3]] = { src: M.base + x + p[1], alt: M.cdn + x + p[1], integrity: p[2] }; });   // 🏷️ gl-r24: GameLogos logos load on demand (GameLogos.need)
+  const more = Object.keys(lazy).length ? '\n<script>window.' + n + '&&' + n + '.sources&&' + n + '.sources(' + JSON.stringify(lazy) + ')</script>' : '';
+  return '<script>' + REMOTE_NET_JS_ + '</script>\n' + all.filter(p => p[0] !== 'lazy').map(p => {
     const f = p[1], a = M.base + x + f, b = M.cdn + x + f, sri = ' integrity="' + p[2] + '" crossorigin="anonymous"' + (p[3] ? ' id="' + p[3] + '"' : '');   // 📦 sm-1: a block's id travels with it
     if (p[0] === 'css') return '<link rel="stylesheet" href="' + a + '"' + sri + ' onerror="SP_NET.css(this,\'' + b + '\',\'' + n + '\')">';
     return '<script charset="utf-8" src="' + a + '"' + sri + ' onload="SP_NET.ok[\'' + f + '\']=1"></script>\n<script>SP_NET.alt(\'' + f + '\',\'' + b + '\',\'' + p[2] + '\',\'' + n + '\')</script>';
-  }).join('\n');
+  }).join('\n') + more;
 }
 // on-demand data (WisStock, WisDeck pictures): the file's code when it is in the project (📲 offline app), else {src, alt, integrity}
 function remoteBody_(n) {
@@ -4924,7 +4926,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d+gl-r24) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
