@@ -958,6 +958,8 @@ function newsFor_(players, now) {
     const days = birthdayIn_(st['Birthday_' + p.Name], now);
     if (days >= 0 && days <= 7) out.push({ kind: 'birthday', player: p.Name, days: days, date: String(st['Birthday_' + p.Name]) });
   });
+  const fc = jsonSetting_(st, 'FamilyCup', null), fcAt = fc && fc.at ? Date.parse(fc.at) : NaN;   // 👑 bo-10b Family cup 🏆 for a day
+  if (fc && names[fc.captain] && t - fcAt >= -60000 && t - fcAt < day) out.push({ kind: 'trophy', id: 'blasoff', route: 'blasoff', name: 'BlasOff', icon: '👑', player: fc.captain, by: fc.by, team: fc.team, level: fc.level, at: fc.at });
   comicNews_().forEach(n => out.push(n));   // 🏅 ck-1b Comic of the day
   return out;
 }
@@ -1014,6 +1016,18 @@ function birthdayIn_(mmdd, now) {
   return Math.round((next - today) / 86400000);
 }
 // 🎂 Admin: set a player's birthday ('MM-DD', or '' to clear). Needs the grown-up PIN.
+// 👑 bo-10b (⚽ BlasOff): a finished Family cup — the winning family captain lifts the 🏆 on the Dashboard for a day
+// (Settings FamilyCup, newest cup wins; `name` = who played it, `captain` = whose team won — a family member, maybe simulated).
+function saveFamilyCup(name, info) {
+  info = info || {};
+  const names = {}; listProfilesFull().forEach(p => { names[p.Name] = true; });
+  const by = String(name || ''), cap = String(info.captain || '');
+  if (!names[by] || !names[cap]) return { ok: false };
+  const rec = { captain: cap, by: by, team: String(info.team || cap + "'s team").slice(0, 40), size: Math.max(0, Math.min(11, Number(info.size) || 0)),
+    level: Math.max(0, Math.min(5, Math.floor(Number(info.level) || 0))), at: new Date().toISOString() };
+  saveSetting('FamilyCup', JSON.stringify(rec));
+  return { ok: true, cup: rec };
+}
 function savePlayerBirthday(name, mmdd, adminPin) {
   if (!verifyAdminPin(adminPin)) throw new Error('The grown-up PIN is not right.');
   if (!name || !listProfilesFull().some(p => p.Name === name)) throw new Error('Pick a player first.');
@@ -4933,7 +4947,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d+gl-r24+av-r0e3+ip-4a) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d+gl-r24+av-r0e3+ip-4a+bo-10b) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -6506,6 +6520,7 @@ return {"include": typeof include === 'function' ? include : undefined,
 "getDashboardData": typeof getDashboardData === 'function' ? getDashboardData : undefined,
 "getModesFor": typeof getModesFor === 'function' ? getModesFor : undefined,
 "markModeTried": typeof markModeTried === 'function' ? markModeTried : undefined,
+"saveFamilyCup": typeof saveFamilyCup === 'function' ? saveFamilyCup : undefined,
 "savePlayerBirthday": typeof savePlayerBirthday === 'function' ? savePlayerBirthday : undefined,
 "getGameroomData": typeof getGameroomData === 'function' ? getGameroomData : undefined,
 "getAchievementsData": typeof getAchievementsData === 'function' ? getAchievementsData : undefined,
