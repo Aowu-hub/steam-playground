@@ -1322,7 +1322,7 @@ function startGame(cfgOver){
   G = {id: GID, M, cfg, t0: performance.now(), busy: true, ver: 1, sver: -1, view: null, zoom: 1, panX: 0, panY: 0, sel: -1, hover: -1, ghost: null, route: [], mode: null, target: null, fx: [], av: [], timerEnd: 0, cursor: 0, undoWin: false, factShown: {}, heads: [], over: false, raf: 0, lastChain: [], replay: null, disp: null, vis: {m: {}, s: {}, c: {}}, tw: [], proj: []};
   M.P.forEach((p, i) => { G.av.push({x: M.dots[p.at].x, y: M.dots[p.at].y, path: null, walkT: 0, dir: 1, gest: FX ? {g: gestK('cheer'), t: 0} : null, gestEnd: 1.4, rest: null, dizzy: 0, hold: null}); });
   M.P.forEach((p, i) => G.heads.push(headPic(i)));
-  showScreen('play'); layoutPlay(); buildCards(); buildActbar(); paintFast(); cheerMount(); /* 📣 cs-3c */
+  showScreen('play'); layoutPlay(); buildCards(); buildActbar(); paintFast(); cheerMount(); calloutSetup(); /* 💬 24t-b */ /* 📣 cs-3c */
   if(!$('scr-play').dataset.bound) bindBoard();
   G.raf = requestAnimationFrame(frame);
   banner(M.coop ? '🛡️ Defend the base! ' + M.waves + ' waves are coming' : M.fort ? '🏰 Close boxes next to your base to build!' : '⬛ Close a shape to own it!', 'good');
@@ -1562,7 +1562,7 @@ function boing(freq, len, type, vol, slide){
 function chalk(){ try{ if(!UISound.get().enabled) return; AC = AC || new (window.AudioContext || window.webkitAudioContext)(); const n = AC.sampleRate * 0.12, b = AC.createBuffer(1, n, AC.sampleRate), d = b.getChannelData(0); for(let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n) * 0.35;
   const s = AC.createBufferSource(), f = AC.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2400; s.buffer = b; s.connect(f); f.connect(AC.destination); s.start(); }catch(e){} }
 function banner(text, kind){ const b = $('banner'); b.textContent = text; b.className = 'banner on' + (kind ? ' ' + kind : ''); clearTimeout(banner.t); banner.t = setTimeout(() => b.classList.remove('on'), 2300); }
-function bigWord(text){ if(!FX) return; const host = $('bigword-host'); host.innerHTML = ''; const d = document.createElement('div'); d.className = 'big-word'; d.textContent = text; host.appendChild(d); setTimeout(() => d.remove(), 1200); }
+function bigWord(text, who, rank){ if(!FX) return; /* 💬 24t bigWord */ if(window.UI && UI.callout && UI.callout.active()){ UI.callout(text, {who, rank}); return; } const host = $('bigword-host'); host.innerHTML = ''; const d = document.createElement('div'); d.className = 'big-word'; d.textContent = text; host.appendChild(d); setTimeout(() => d.remove(), 1200); }
 function factPop(theme){ if(!FX) return; const T = THEMES[theme], n = Math.floor(Math.random() * T.facts.length), d = document.createElement('div'); d.className = 'factpop'; d.textContent = T.coin[0] + ' Did you know? ' + T.facts[n]; $('stage').appendChild(d); setTimeout(() => d.remove(), 4200); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pickOne(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 const cOf = id => G.M.creatures.find(c => c.id === id);
@@ -1577,7 +1577,7 @@ function handleEvents(list){
     switch(e.k){
       case 'close': boing(520 + e.chain * 60, 0.18, 'triangle', 0.14, 900); addFx({k: 'pop', f: e.f, p: e.p, life: 0.6});
         if(G.av[e.p]){ G.av[e.p].rest = {f: e.f, t: 0.9}; } fxAtFace(e.f, '+' + Math.round(e.v * 10) / 10, {txt: true, col: seatCol(e.p)});
-        if(e.chain === 3 || e.chain === 5 || e.chain >= 7) bigWord(e.chain + ' boxes in a row!');
+        if(e.chain === 3 || e.chain === 5 || e.chain >= 7) bigWord(e.chain + ' boxes in a row!', e.p, e.chain >= 5 ? 'big' : 'good');
         G.lastChain.push({f: e.f, turn: M.turn}); break;
       case 'catch': { const c = cOf(e.c), art = kindArt(M.theme, e.kind); boing(880, 0.25, 'sine', 0.12, 1320); fxAtFace(e.f, art[0], {big: true});
         if(G.av[e.p]){ G.av[e.p].hold = {ch: art[0], t: 1.4}; gesture(e.p, 'cheer', 1.2); }
@@ -1598,7 +1598,7 @@ function handleEvents(list){
       case 'theme': { const t = THEME_MOVE[M.theme]; fxAtDot(e.d, t[0]); banner(t[0] + ' ' + nm + ': ' + t[1] + '!', 'good'); break; }
       case 'reveal': { const a = kindArt(M.theme, e.kind); fxAtDot(e.d, '🐾'); banner('🐾 Footprints! A hidden ' + a[0] + ' ' + a[1] + ' is near', 'gold'); break; }
       case 'warn': { const E = PP.EVENTS[e.ev]; banner('⚠️ Next turn: ' + E.icon + ' ' + E.name + '!', 'bad'); boing(330, 0.2, 'square', 0.08, 300); break; }
-      case 'event': { const E = PP.EVENTS[e.ev]; bigWord(E.icon + ' ' + E.name + '!'); banner(E.icon + ' ' + E.name + ': ' + E.text, 'gold'); if(e.ev === 'comet' || e.ev === 'stampede' || e.ev === 'meteor') G.shake = 0.5; if(e.f != null) fxAtFace(e.f, E.icon, {big: true}); if(e.reveal) G.sonar = performance.now() + 2000; boing(200, 0.5, 'sawtooth', 0.1, 600); break; }
+      case 'event': { const E = PP.EVENTS[e.ev]; bigWord(E.icon + ' ' + E.name + '!', null, 'good'); banner(E.icon + ' ' + E.name + ': ' + E.text, 'gold'); if(e.ev === 'comet' || e.ev === 'stampede' || e.ev === 'meteor') G.shake = 0.5; if(e.f != null) fxAtFace(e.f, E.icon, {big: true}); if(e.reveal) G.sonar = performance.now() + 2000; boing(200, 0.5, 'sawtooth', 0.1, 600); break; }
       case 'card': if(!M.P[e.p].bot) banner('🃏 ' + nm + ' got a card: ' + PP.CARDS[e.card].icon + ' ' + PP.CARDS[e.card].name, 'gold'); break;
       case 'decoy': banner('🎭 Decoy trap! ' + nm + ' is dizzy', 'bad'); if(G.av[e.p]) G.av[e.p].dizzy = 1.5; break;
       case 'dizzy': banner('💫 ' + nm + ' is dizzy — no bonus turn', 'bad'); break;
@@ -1612,7 +1612,7 @@ function handleEvents(list){
       case 'wake': banner('🔔 A lazy one woke up — it\'s calm now!', 'good'); break;
       case 'open': fxAtFace(e.f, '💥'); break;
       case 'skipped': banner('⏭️ ' + nm + ' misses this turn', 'bad'); break;
-      case 'build': { const B = PP.BUILD.find(b => b && b.k === e.b); fxAtFace(e.f, bldIcon(e.b), {big: true}); bigWord(B.icon + ' ' + B.name + '!'); boing(400, 0.3, 'triangle', 0.14, 800); if(G.av[e.p]) gesture(e.p, 'flex', 1.2); break; }
+      case 'build': { const B = PP.BUILD.find(b => b && b.k === e.b); fxAtFace(e.f, bldIcon(e.b), {big: true}); bigWord(B.icon + ' ' + B.name + '!', e.p, 'good'); boing(400, 0.3, 'triangle', 0.14, 800); if(G.av[e.p]) gesture(e.p, 'flex', 1.2); break; }
       case 'shoot': addFx({k: 'shot', f: e.f, at: e.at, e: e.e, b: e.b, life: 0.5}); break;
       case 'rock': addFx({k: 'arc', f: e.f, to: e.to, ch: '🪨', life: 0.7}); break;
       case 'fire': addFx({k: 'arc', f: e.f, to: e.to, ch: '🔥', life: 0.7}); break;
@@ -1622,7 +1622,7 @@ function handleEvents(list){
       case 'monster': fxAtDot(e.at, e.boss ? '👑' : '❗'); break;
       case 'monsterdown': banner('🎯 Monster beaten! +2 🪙', 'good'); boing(700, 0.2, 'square', 0.08, 1400); break;
       case 'chew': fxAtFace(e.f, '🦷'); break;
-      case 'wave': bigWord((e.boss ? '👑 Boss wave ' : '🌊 Wave ') + e.n + '!'); break;
+      case 'wave': bigWord((e.boss ? '👑 Boss wave ' : '🌊 Wave ') + e.n + '!', null, 'big'); break;
       case 'outp': banner('💥 ' + nm + ' has no boxes left — out!', 'bad'); break;
       case 'repair': fxAtFace(e.f, '❤️'); break;
       case 'guarded': fxAtFace(e.f, '🧱'); break;
@@ -1937,6 +1937,19 @@ function cheerBoard(){ const r = $('cv').getBoundingClientRect(), M = G.M, v = G
   const l = r.left + Math.max(0, WX(0) - sc * 0.5), t = r.top + Math.max(0, WY(0) - head), rr2 = r.left + Math.min(G.cw, WX(M.w) + sc * 0.5), b = r.top + Math.min(G.ch, WY(M.h) + sc * 0.5);
   return {left: l, top: t, right: rr2, bottom: b, width: rr2 - l, height: b - t}; }
 function cheerTaken(){ return Array.from(document.querySelectorAll('#scr-play .hud, .top-btn, #side-l .pcard, #side-r .pcard, #strip:not(.hidden), #actbar, #cap, #zoombox:not(.hidden)')).concat(G ? [{getBoundingClientRect: cheerBoard}] : []); }
+/* 💬 24t-b: words during play (UiKit UI.callout) — the board + avatars stay clear, crowd fans can say it */
+function calloutSetup(){ if(!(window.UI && UI.callout) || !G) return;
+  const avk = () => Math.max(0.16, Math.min(0.62, G.view.sc * 0.95 / 95));
+  const spot = i => { if(!G || !G.view || !G.M.P[i] || G.M.P[i].out) return null; const A = G.av[i]; if(!A) return null; const r = $('cv').getBoundingClientRect(); let x = A.x, y = A.y;
+    if(A.rest && !A.path){ const F = G.M.faces[A.rest.f]; if(F){ x = F.cx; y = F.cy + 0.18; } } return {x: r.left + WX(x), y: r.top + WY(y), k: avk()}; };
+  const meI = () => { if(!G) return -1; const M = G.M; let i = M.P.findIndex(p => !p.bot && p.name === S.player); if(i < 0) i = M.P.findIndex(p => !p.bot); return i; };
+  UI.callout.setup({
+    get me(){ return meI(); },
+    at: w => { const i = typeof w === 'number' && w >= 0 ? w : meI(), q = spot(i); return q ? {x: q.x, y: q.y - 118 * q.k - 6} : null; },
+    side: w => { const i = typeof w === 'number' && w >= 0 ? w : meI(); return i >= 0 ? cheerSide(i) : null; },
+    poly: () => { if(!G || !G.view) return null; const b = cheerBoard(); return [[b.left, b.top], [b.right, b.top], [b.right, b.bottom], [b.left, b.bottom]]; },
+    keep: () => { if(!G || !G.view) return []; const out = []; G.M.P.forEach((p, i) => { const q = spot(i); if(!q) return; const w = Math.max(18, 40 * q.k); out.push({l: q.x - w, r: q.x + w, t: q.y - 120 * q.k, b: q.y + 14 * q.k + 4}); }); return out; }
+  }); }
 function cheerMount(){
   if(!window.Cheer || !G) return; Cheer.unmount(); const M = G.M, box = $('scr-play');
   const players = M.teams ? [0, 1].map(t => ({name: t ? '🔵 Team 2' : '🟠 Team 1', side: t, human: M.P.some(p => !p.bot && p.team === t)})) : M.P.map((p, i) => ({name: p.name, side: i, human: !p.bot}));
@@ -1958,14 +1971,14 @@ function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!car
   const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
   const at = card.querySelector('.res-btns'); if(!at) return; at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); }, 900); }
 /* 📣 CHEERSQUAD END */
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-3c */ }
+function showResult(html){ /* 💬 24t-b result */ if(window.UI && UI.callout) UI.callout.setup(null); $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-3c */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function leavePlay(){
   if(!G) return; if(G.over){ backToMenu(); return; }
   UI.confirm ? UI.confirm('Leave this game?', 'The map will be lost.', 'Leave', 'Keep playing').then(ok => { if(ok) backToMenu(); }) : backToMenu();
 }
 function pauseGame(){ if(G) G.timerEnd = 0; }
-function backToMenu(){ if(window.Cheer) Cheer.unmount(); if(G) cancelAnimationFrame(G.raf); G = null; GID++; hideResult(); closeSheet(); renderMenu(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); /* 💬 24t-b off */ if(window.UI && UI.callout) UI.callout.setup(null); if(G) cancelAnimationFrame(G.raf); G = null; GID++; hideResult(); closeSheet(); renderMenu(); showScreen('menu'); }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
 function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
 window.feedbackContext = () => ({page: 'Polyplot', game: GAME_ID, level: G ? G.M.level : SET.level, mode: SET.mode});
@@ -2067,4 +2080,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.themes', {rows: 2}); UI.pageRows('.maps', {rows: 2}); UI.pageRows('.trails', {rows: 2}); }</script>
 </body>
 </html>
-<!-- (pp-5+back-1+modes-3+mg-1+p1d+p2+p3a+cs-3c+ls-1b+b3w4) END OF Polyplot.html -->
+<!-- (pp-5+back-1+modes-3+mg-1+p1d+p2+p3a+cs-3c+ls-1b+b3w4+24t-b) END OF Polyplot.html -->
