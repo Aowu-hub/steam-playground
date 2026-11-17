@@ -3852,6 +3852,20 @@ function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&playe
 function goBack(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
 window.feedbackContext = () => ({page: 'PyraDive', game: GAME_ID, level: G ? G.level : SET.level, mode: SET.mode});
 window.addEventListener('resize', () => { if(G && !$('scr-play').classList.contains('hidden')){ resize(); buildPads(); } });
+(function(){   // 📱 ls-1b OWN SIDEWAYS GUARD (pd-5f, from ✨ polish ls-1b): iPhone sideways can skip the last 'resize' → watch the play box itself
+  if(!window.ResizeObserver) return;
+  const box = id => { const e = document.getElementById(id); return e ? e.clientWidth + 'x' + e.clientHeight : '-'; };
+  const watch = (scr, boxes, ok, run) => { let last = null, n = 0, t0 = 0, later = 0;
+    const check = () => { const s = document.getElementById(scr);
+      if(!s || s.classList.contains('hidden') || !ok()){ last = null; return; }          // only while that screen is open
+      const k = [scr].concat(boxes).map(box).join('|'); if(k === last) return;                          // same size → nothing (no loops)
+      const now = Date.now(); if(now - t0 > 1000){ t0 = now; n = 0; }
+      if(++n > 4){ if(!later) later = setTimeout(() => { later = 0; check(); }, 1000); return; }   // safety net: ≤ 4 runs a second
+      last = k; const R = window.LS1B_RUNS || (window.LS1B_RUNS = {}); R[scr] = (R[scr] || 0) + 1;   // run count per screen (tests + device checks)
+      try{ run(); }catch(e){ if(window.console) console.warn('ls-1b', scr, e); } };
+    const ro = new ResizeObserver(check); [scr].concat(boxes).forEach(id => { const e = document.getElementById(id); if(e) ro.observe(e); }); };
+  watch('scr-play', [], () => !!G, () => { resize(); buildPads(); });
+})();   // 📱 ls-1b END
 
 /* ================= BOOT ================= */
 function boot(){
@@ -3872,4 +3886,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pd-4c+cs-pd+ck-2d+pd-4e+pd-5a+pd-7+pd-5b+pd-6a+pd-5c+pd-6b+pd-5d+pd-6b2+pd-5e+pd-6c+pd-8a+pd-8b+pd-6d) END OF PyraDive.html -->
+<!-- (pd-4c+cs-pd+ck-2d+pd-4e+pd-5a+pd-7+pd-5b+pd-6a+pd-5c+pd-6b+pd-5d+pd-6b2+pd-5e+pd-6c+pd-8a+pd-8b+pd-6d+pd-5f) END OF PyraDive.html -->
