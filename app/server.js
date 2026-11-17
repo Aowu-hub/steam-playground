@@ -40,7 +40,7 @@ function ss_() {
 // head with a raw print scriptlet calling include('UiKit').
 // 🚪 AS-1 one door: include('AvatarKit') also brings the files listed here (same order), so no page has to change when the avatar family grows.
 // Keep each list on ONE line — the test harness (gasmock.js) and the 📲 offline builder (build.js) read these two lines from this file.
-const INCLUDE_ALSO_ = {AvatarKit: ['AvatarActing', 'AvatarWeapons'], GameFrame: ['GameCovers', 'CardArt', 'GameLogos']};   // 🧱 b1b: one line brings the 🎬 cover frame + cover art + flip-books · 24j-a: + 🏷️ GameLogos (cover logo slot) · 🗡️ av-r0b: + AvatarWeapons (the Weapons family of the Batstick designer)
+const INCLUDE_ALSO_ = {AvatarKit: ['AvatarActing', 'AvatarWeapons'], GameFrame: ['GameCovers', 'CardArt', 'GameLogos'], IsoProps: ['IsoPropsWorld']};   /* 🌍 ip-3d: + IsoPropsWorld (the country buildings — the IsoProps kit passed 300 KB, so it is 2 files; pages still write only include('IsoProps')) */   // 🧱 b1b: one line brings the 🎬 cover frame + cover art + flip-books · 24j-a: + 🏷️ GameLogos (cover logo slot) · 🗡️ av-r0b: + AvatarWeapons (the Weapons family of the Batstick designer)
 const INCLUDE_GROUPS_ = {avatar: ['BallSkins', 'AvatarKit']};
 // 📦 size-1 → sm-0 (2026-11-14): includes that are NOT in this project (Apps Script refuses to save a project over ≈ 10.45 MB)
 // load from the family site instead. WHICH ones is steam-source tools/remote.json; the file names + sha384 fingerprints are in
@@ -4924,7 +4924,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
