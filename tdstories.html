@@ -65,6 +65,7 @@
   @keyframes bookIn{from{opacity:0;transform:translateY(-40px) rotate(-8deg);}to{opacity:1;transform:none;}}
   .book:hover{transform:translateY(-8px) rotate(-2deg);}
   .book .bi{font-size:clamp(1.8rem,7vw,3.6rem);filter:drop-shadow(0 4px 0 rgba(0,0,0,.2));animation:bob 2.6s ease-in-out infinite;}
+  .book .bcv{display:block;width:100%;max-width:190px;aspect-ratio:5/4;height:auto;min-height:0;flex:0 1 auto;margin-top:-14px;filter:drop-shadow(0 4px 0 rgba(0,0,0,.18));animation:bob 2.6s ease-in-out infinite;}   /* 🎬 td-scenes cover */
   .book .bt{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(.78rem,2.3vw,1.25rem);line-height:1.1;text-shadow:0 2px 0 rgba(0,0,0,.25);}
   .book .bs{font-size:clamp(.6rem,1.6vw,.82rem);font-weight:800;opacity:.95;line-height:1.2;}
   .book .bb{margin-top:4px;}
@@ -1010,10 +1011,11 @@ function openShelf(){
     el.style.setProperty('--b1', b.b1); el.style.setProperty('--b2', b.b2);
     const done = b.soon ? 0 : chaptersDone();
     el.innerHTML = (b.soon ? '<span class="rib">🔜 Coming soon</span>' : (done ? '<span class="rib">📖 ' + done + ' / 6</span>' : '<span class="rib">✨ NEW</span>')) +
-      '<span class="bi">' + b.icon + '</span><span class="bt">' + UI.esc(b.title) + '</span><span class="bs">' + UI.esc(b.sub) + '</span>' +
+      (b.soon ? '<span class="bi">' + b.icon + '</span>' : '<canvas class="bcv" width="400" height="320" aria-hidden="true"></canvas>') + '<span class="bt">' + UI.esc(b.title) + '</span><span class="bs">' + UI.esc(b.sub) + '</span>' +
       (!b.soon && saveRow().last ? '<span class="bb">' + SkillKit.barHtml(lastBar()) + '</span>' : '');
     el.onclick = () => { if(b.soon){ UISound.play('error'); el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); UI.toast('📖 ' + b.title + ' is still being written — Dra-Princess Diary first!'); return; } openBook(b.id); };
-    box.appendChild(el); });
+    box.appendChild(el);
+    const cv = el.querySelector('.bcv'); if(cv) try{ let row = {}; try{ row = JSON.parse(S.settings['SkillTree_td-' + b.id + '_' + S.player] || '{}') || {}; }catch(e){} scCover(cv, row); }catch(e){ cv.outerHTML = '<span class="bi">' + b.icon + '</span>'; } });   // 🎬 td-scenes: your heroes on the cover
   showScreen('menu');
 }
 function lastBar(){ const r = saveRow(); if(!r.last) return []; return String((r.last.dragon || {}).p || '').split(',').concat(String((r.last.princess || {}).p || '').split(',')).map(x => x.split(':')[0]).filter(c => COLS.includes(c)); }
@@ -1079,58 +1081,193 @@ const DIARY_SKY = {1: ['#CDEBFF', '#FFF3D9'], 2: ['#FFC6A8', '#FFF3D9'], 3: ['#F
 const DIARY_CAST = {1: ['kn', 'sq'], 2: ['kn', 'pr'], 3: ['pr', 'pr'], 4: ['wz', 'gc'], 5: ['kg', 'kn'], 6: ['boss6', 'pr']};
 const DIARY_OOPS = {1: ['boss1', '💦'], 2: ['boss2', '✨'], 3: ['boss3', '💦'], 4: ['boss4', '🧹'], 5: ['boss5', '💰'], 6: ['boss6', '🌹']};
 function diaryChar(type, v, w, h){ return atScale(60, () => charSet('s:' + type + ':' + v, {name: 'Suitor ' + type + v, av: suitorAv(type, v)}, w || 84, h || 108)); }
+/* 🎬 TD SCENES (td-scenes) START — 📚 shelf cover · 📔 diary pages · 🏁 result cards drawn with the SAME heroes as play:
+   🐉 TDDragon (5 shape stages, skill colour) + 👸 TDPrincess (AvatarKit avatar wearing her stage) + the 🎭 stage tower, on a little floating island.
+   Which stage / colour a picture shows:
+   · chapter intro = how far the STORY is (SC_STORY) in your colours · chapter outro + result = what you REALLY built (stage + main colour of that match)
+   · shelf cover = your last build (or the hatchling + tiara princess when the book is new) · the Dragon's moves = act-2's DMOVES looped (roar, breath, wing …) */
+const SC_STORY = {1: [1, 1], 2: [1, 2], 3: [2, 2], 4: [3, 3], 5: [4, 4], 6: [5, 4], ending: [5, 5]};   // [dragon stage, princess stage] the story has reached
+const SC_DEF = {dragon: 'A', princess: 'E'};
+const SC_DK = [0, 1.6, 1.4, 1.25, 1.15, 1.1];   // dragon size per stage in pictures: small stages a bit bigger so they still read, big ones still bigger (k × stage sc)                                                         // colours before you ever picked a main colour (🔴 fire dragon · 🟣 charm princess)
+function scBuild(row){ const r = row || saveRow(), d = (r.last || {}).dragon || {}, p = (r.last || {}).princess || {};
+  return {dS: d.t ? TDDragon.stageOf(d.t) : 0, dC: d.m || null, pS: p.t ? TDPrincess.stageOf(p.t) : 0, pC: p.m || null}; }
+// the heroes a scene shows: {dS, dC, pS, pC}; mode 'story' = story stage + your colours, 'built' = your last build (never below stage 1)
+function scHeroes(key, mode){ const st = SC_STORY[key] || SC_STORY[1], b = scBuild();
+  const dC = b.dC || SC_DEF.dragon, pC = b.pC || SC_DEF.princess;
+  if(mode === 'built' && b.dS) return {dS: b.dS, dC, pS: b.pS || 1, pC};
+  if(mode === 'best') return {dS: Math.max(st[0], b.dS), dC, pS: Math.max(st[1], b.pS), pC};
+  return {dS: st[0], dC, pS: st[1], pC}; }
+// 🐉 a looping act-2 move as a pose (the same beats + eases the game plays) — period in s, the move plays at the start of each loop
+function scDPose(move, t, period){ const B = (typeof DMOVES !== 'undefined' && DMOVES[move]) || null; if(!B) return {};
+  let ms = (t % (period || 2)) * 1000, prev = {}; const ease = (e, x) => window.Acting && Acting.ease ? Acting.ease(e || 'sineInOut')(x) : x;
+  for(const b of B){ if(ms <= b.ms){ const q = ease(b.ease, Math.max(0, Math.min(1, ms / b.ms))), out = {}, keys = new Set(Object.keys(prev).concat(Object.keys(b.pose)));
+      keys.forEach(k => { const a = prev[k] || 0, z = b.pose[k] || 0; out[k] = a + (z - a) * q; }); return out; }
+    ms -= b.ms; prev = b.pose; }
+  return {}; }
+// 🏝️ a floating storybook island (grass top, earth underside fading into the sky, little roots) — the same island the chapters are played on
+function scIsland(g, cx, top, rx, ry, grass, edge){
+  const ug = g.createLinearGradient(0, top, 0, top + ry * 3.6); ug.addColorStop(0, '#9A6A44'); ug.addColorStop(0.55, 'rgba(122,82,52,.75)'); ug.addColorStop(1, 'rgba(122,82,52,0)');
+  g.fillStyle = ug; g.beginPath(); g.moveTo(cx - rx, top); g.bezierCurveTo(cx - rx * 0.85, top + ry * 2.1, cx - rx * 0.3, top + ry * 3.3, cx, top + ry * 3.6); g.bezierCurveTo(cx + rx * 0.3, top + ry * 3.3, cx + rx * 0.85, top + ry * 2.1, cx + rx, top); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(90,60,35,.35)'; g.lineWidth = 2; for(let i = 0; i < 7; i++){ const x = cx - rx * 0.7 + i * rx * 0.23; g.beginPath(); g.moveTo(x, top + ry * 0.8); g.quadraticCurveTo(x + 6, top + ry * (1.6 + (i % 3) * 0.3), x - 4, top + ry * (2.1 + (i % 2) * 0.5)); g.stroke(); }
+  g.fillStyle = edge || '#6FAE55'; g.beginPath(); g.ellipse(cx, top + 5, rx, ry, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = grass || '#9AD47C'; g.beginPath(); g.ellipse(cx, top, rx, ry, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.18)'; g.beginPath(); g.ellipse(cx - rx * 0.25, top - ry * 0.3, rx * 0.5, ry * 0.35, 0, 0, Math.PI * 2); g.fill(); }
+function scCloud(g, x, y, r, a){ g.fillStyle = 'rgba(255,255,255,' + (a || 0.85) + ')'; [[0, 0, 1], [-0.9, 0.25, 0.7], [0.9, 0.25, 0.75], [0.35, -0.35, 0.7]].forEach(([dx, dy, rr]) => { g.beginPath(); g.arc(x + dx * r, y + dy * r, rr * r, 0, Math.PI * 2); g.fill(); }); }
+function scSky(g, W, H, top, bot, night, t){
+  const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, top); sky.addColorStop(1, bot); g.fillStyle = sky; g.fillRect(0, 0, W, H);
+  if(night){ for(let i = 0; i < 46; i++){ g.fillStyle = 'rgba(255,255,255,' + (0.35 + 0.5 * Math.abs(Math.sin(t * 0.7 + i))) + ')'; g.fillRect((i * 97) % W, (i * 53) % (H * 0.55), 2, 2); }
+    g.fillStyle = '#FFF6C8'; g.beginPath(); g.arc(W - 90, 58, 24, 0, Math.PI * 2); g.fill(); g.fillStyle = top; g.beginPath(); g.arc(W - 80, 52, 21, 0, Math.PI * 2); g.fill(); }
+  else { const sg = g.createRadialGradient(W - 110, 60, 4, W - 110, 60, 70); sg.addColorStop(0, 'rgba(255,250,210,.95)'); sg.addColorStop(1, 'rgba(255,250,210,0)'); g.fillStyle = sg; g.beginPath(); g.arc(W - 110, 60, 70, 0, Math.PI * 2); g.fill();
+    scCloud(g, W * 0.18, 52, 18, 0.8); scCloud(g, W * 0.52, 34, 14, 0.7); scCloud(g, W * 0.86, 120, 16, 0.6); }
+  g.fillStyle = night ? 'rgba(60,60,110,.45)' : 'rgba(255,255,255,.35)'; g.beginPath(); g.moveTo(0, H * 0.72); for(let x = 0; x <= W; x += W / 8) g.lineTo(x, H * 0.72 - 18 - Math.sin(x * 0.013) * 16); g.lineTo(W, H); g.lineTo(0, H); g.fill();   // hazy far hills
+  [[0.08, 0.6, 26], [0.93, 0.5, 20]].forEach(([fx, fy, r]) => { scIsland(g, W * fx, H * fy, r, r * 0.3, night ? '#5E7A8A' : '#BFE3B0', night ? '#4C6576' : '#9CCB8C'); });   // little far islands
+}
+// 🎭 the stage tower picture at any size (the play tower; works with no match running)
+function scTower(form, col, s, jail){ const keepG = G, keepS = VIEW.s; try{ G = {jail: !!jail}; VIEW.s = s; return stageTowerPic(form, col); } finally{ VIEW.s = keepS; G = keepG; } }   // jail = the 💒 wedding look (Jailbreak chapter)
+const scForm = pS => pS >= 5 ? 2 : pS >= 3 ? 1 : 0;   // princess stage → tower form (wood · rose · crystal)
+// 👸 + 🐉 + tower in one go: returns where things are
+function scHeroGroup(g, o){
+  const T = scTower(o.form != null ? o.form : scForm(o.pS), o.pS >= 3 ? o.pC : null, o.s, o.jail), ox = o.x - T.cx, oy = o.feet - T.base;
+  g.drawImage(T.c, ox, oy, T.w, T.h);
+  const fx = ox + T.cx, fy = oy + T.top, k = o.s / 52 * (o.pk || 1) * (o.pS >= 5 ? 0.88 : 1);   // the Sage hovers + carries a tall staff: a bit smaller so she stays inside the picture
+  TDPrincess.draw(g, o.pS, o.pC, fx, fy, k, o.t, {act: o.pAct, dir: o.pDir || 1});
+  if(T.front) g.drawImage(T.front, ox, oy, T.w, T.h);
+  return {fx, fy, k, T, top: oy}; }
+// 🏰 the wedding castle ("I OBJECT!!"): white walls, two round towers with pink cone roofs, bells, a balcony over the gate — returns the balcony spot (princess feet), the gate and a front layer (balcony railing)
+function scCastle(g, cx, base, u, t){
+  const W1 = '#FFFFFF', W2 = '#DCD2E4', R1 = '#FFB3D1', R2 = '#F06C9B', TR = '#FFD36B', kw = 200 * u, kh = 150 * u, tw = 54 * u, th = 168 * u;
+  const lin = (x0, x1, a) => { const gr = g.createLinearGradient(x0, 0, x1, 0); a.forEach((c, i) => gr.addColorStop(i / (a.length - 1), c)); return gr; };
+  g.fillStyle = 'rgba(0,0,0,.12)'; g.beginPath(); g.ellipse(cx, base, kw * 0.75, 14 * u, 0, 0, Math.PI * 2); g.fill();
+  // keep
+  g.fillStyle = lin(cx - kw / 2, cx + kw / 2, [W2, W1, W1, W2]); g.fillRect(cx - kw / 2, base - kh, kw, kh);
+  g.fillStyle = W2; for(let i = 0; i < 8; i++) g.fillRect(cx - kw / 2 + i * kw / 7.4, base - kh - 14 * u, 15 * u, 16 * u);
+  g.strokeStyle = 'rgba(200,160,200,.25)'; g.lineWidth = 1.5; for(let y = base - kh + 14 * u; y < base; y += 14 * u){ g.beginPath(); g.moveTo(cx - kw / 2, y); g.lineTo(cx + kw / 2, y); g.stroke(); }
+  // keep roof + heart flag
+  g.fillStyle = R2; g.beginPath(); g.moveTo(cx - 46 * u, base - kh - 14 * u); g.lineTo(cx, base - kh - 70 * u); g.lineTo(cx + 46 * u, base - kh - 14 * u); g.fill();
+  g.fillStyle = R1; g.beginPath(); g.moveTo(cx - 46 * u, base - kh - 14 * u); g.lineTo(cx, base - kh - 70 * u); g.lineTo(cx, base - kh - 14 * u); g.fill();
+  emo(g, '💗', cx, base - kh - 82 * u, 22 * u);
+  // two round towers
+  [-1, 1].forEach(sd => { const x = cx + sd * (kw / 2 + tw * 0.15);
+    g.fillStyle = lin(x - tw / 2, x + tw / 2, [W2, W1, W2]); g.fillRect(x - tw / 2, base - th, tw, th); g.beginPath(); g.ellipse(x, base, tw / 2, 7 * u, 0, 0, Math.PI); g.fill();
+    g.fillStyle = TR; g.fillRect(x - tw / 2 - 3 * u, base - th - 4 * u, tw + 6 * u, 8 * u);
+    g.fillStyle = sd < 0 ? R1 : R2; g.beginPath(); g.moveTo(x - tw / 2 - 6 * u, base - th - 2 * u); g.lineTo(x, base - th - 56 * u); g.lineTo(x + tw / 2 + 6 * u, base - th - 2 * u); g.fill();
+    g.strokeStyle = '#7A4A6A'; g.lineWidth = 2; g.beginPath(); g.moveTo(x, base - th - 56 * u); g.lineTo(x, base - th - 76 * u); g.stroke(); g.fillStyle = R2; g.beginPath(); g.moveTo(x, base - th - 76 * u); g.lineTo(x + 18 * u * sd, base - th - 70 * u); g.lineTo(x, base - th - 64 * u); g.fill();
+    g.fillStyle = '#6A4AA0'; g.beginPath(); g.ellipse(x, base - th * 0.62, 6 * u, 10 * u, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#FFE38A'; g.beginPath(); g.ellipse(x, base - th * 0.62 + 1, 3.6 * u, 7 * u, 0, 0, Math.PI * 2); g.fill();
+    emo(g, '🔔', x, base - th + 26 * u, 24 * u); });
+  // bunting between the towers
+  g.strokeStyle = TR; g.lineWidth = 2; const bx0 = cx - kw / 2, bx1 = cx + kw / 2, by = base - kh + 6 * u; g.beginPath(); g.moveTo(bx0, by); g.quadraticCurveTo(cx, by + 26 * u, bx1, by); g.stroke();
+  for(let i = 1; i < 10; i++){ const q = i / 10, x = bx0 + (bx1 - bx0) * q, y = by + 26 * u * 2 * q * (1 - q) * 2 * 0.5; g.fillStyle = i % 2 ? R2 : '#9FD8FF'; g.beginPath(); g.moveTo(x - 6 * u, y); g.lineTo(x + 6 * u, y); g.lineTo(x, y + 12 * u); g.fill(); }
+  // gate (open, dark inside) + rose arch
+  const gx = cx, gy = base, gw = 56 * u, gh = 74 * u; g.fillStyle = '#3A2A40'; g.beginPath(); g.moveTo(gx - gw / 2, gy); g.lineTo(gx - gw / 2, gy - gh + gw / 2); g.arc(gx, gy - gh + gw / 2, gw / 2, Math.PI, 0); g.lineTo(gx + gw / 2, gy); g.fill();
+  g.strokeStyle = '#4E9A3A'; g.lineWidth = 3; g.beginPath(); g.arc(gx, gy - gh + gw / 2, gw / 2 + 6 * u, Math.PI, 0); g.stroke(); for(let i = 0; i <= 6; i++){ const a = Math.PI + i * Math.PI / 6; g.fillStyle = '#FF4D7A'; g.beginPath(); g.arc(gx + Math.cos(a) * (gw / 2 + 6 * u), gy - gh + gw / 2 + Math.sin(a) * (gw / 2 + 6 * u), 4 * u, 0, Math.PI * 2); g.fill(); }
+  // balcony over the gate: floor drawn now, railing as a front layer
+  const bY = base - kh + 54 * u; g.fillStyle = TR; g.beginPath(); g.ellipse(cx, bY, 50 * u, 12 * u, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = '#FFF4F8'; g.beginPath(); g.ellipse(cx, bY - 2 * u, 46 * u, 10 * u, 0, 0, Math.PI * 2); g.fill();
+  const front = document.createElement('canvas'); front.width = g.canvas.width; front.height = g.canvas.height; const f = front.getContext('2d'); f.setTransform(g.getTransform());
+  f.strokeStyle = TR; f.lineWidth = 3; f.beginPath(); f.ellipse(cx, bY - 14 * u, 50 * u, 12 * u, 0, 0.15, Math.PI - 0.15); f.stroke(); for(let i = -4; i <= 4; i++){ const x = cx + i * 11 * u, y = bY + Math.sqrt(Math.max(0, 1 - Math.pow(i * 11 / 50, 2))) * 12 * u; f.beginPath(); f.moveTo(x, y - 2 * u); f.lineTo(x, y - 14 * u); f.stroke(); }
+  f.fillStyle = R2; [-1, 1].forEach(sd => { f.beginPath(); f.arc(cx + sd * 50 * u, bY - 14 * u, 4 * u, 0, Math.PI * 2); f.fill(); });
+  return {x: cx, y: bY, gx, gy, front}; }
+// 🏰 the castle island — the King's wedding castle on its own little floating island, in the background of EVERY scene (Aowu 2026-11-17 11:27 "if there is a castle island it needs to be in all other scenes")
+function scCastleIsland(g, x, y, u, t, night){
+  scIsland(g, x, y, 150 * u, 30 * u, night ? '#7FA08A' : '#BFE3B0', night ? '#647F6E' : '#9CCB8C');
+  const c = scCastle(g, x, y + 6 * u, u, t); g.drawImage(c.front, 0, 0);
+}
+// 🗼 the princess's tower on a far island (background of the "I OBJECT!!" page, which happens AT the castle)
+function scTowerIsland(g, x, y, s, pS, pC, t){ scIsland(g, x, y, 4.2 * s, 0.85 * s, '#BFE3B0', '#9CCB8C'); const T = scTower(scForm(pS), pS >= 3 ? pC : null, s); g.drawImage(T.c, x - T.cx, y + 2 - T.base, T.w, T.h); if(T.front) g.drawImage(T.front, x - T.cx, y + 2 - T.base, T.w, T.h); }
+function scDragon(g, o){ const out = {}; TDDragon.draw(g, o.dS, o.dS >= 3 ? o.dC : null, o.x, o.feet, o.k, o.t, {pose: o.pose || {}, dir: o.dir || 1, out, noShadow: !!o.noShadow}); return out; }
+function scFlame(g, out, to, s, col, q, t){ if(!out.mouth || typeof flame !== 'function') return; const C = ({A: ['#FFF6B0', '#FF8A3D', '#E8341C'], B: ['#FFFFFF', '#8FC4FF', '#3A6BFF'], C: ['#FFF0C8', '#E8A65A', '#8A4A1C'], D: ['#FFFFE0', '#B6F5A0', '#22A867'], E: ['#FFF0FA', '#FF8FD0', '#B45AE8']})[col] || ['#FFF6B0', '#FF8A3D', '#E8341C'];
+  const m = g.getTransform().inverse().transformPoint(new DOMPoint(out.mouth[0], out.mouth[1])); flame(g, [m.x, m.y], to, s, C, q, t); }
+
+// 📔 the diary picture (840 × 300): replaces the old ride-on dragon + plain-dress princess
 function drawDiaryPicture(cv, ch, when){
   const g = cv.getContext('2d'), W = cv.width, H = cv.height, t = performance.now() / 1000, jail = ch === 'jail', key = jail ? 'jail' : when === 'ending' ? 'ending' : ch;
-  g.clearRect(0, 0, W, H);
-  const sk = DIARY_SKY[jail && when === 'outro' ? 6 : key] || DIARY_SKY[1], sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, sk[0]); sky.addColorStop(1, sk[1]); g.fillStyle = sky; g.fillRect(0, 0, W, H);
-  if(ch === 4 && !jail){ for(let i = 0; i < 40; i++){ g.fillStyle = 'rgba(255,255,255,' + (0.4 + 0.5 * Math.abs(Math.sin(t + i))) + ')'; g.fillRect((i * 97) % W, (i * 53) % 150, 2, 2); } g.fillStyle = '#FFF6C8'; g.beginPath(); g.arc(W - 90, 60, 26, 0, Math.PI * 2); g.fill(); g.fillStyle = sk[0]; g.beginPath(); g.arc(W - 80, 54, 22, 0, Math.PI * 2); g.fill(); }
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
+  const sk = DIARY_SKY[jail && when === 'outro' ? 6 : key] || DIARY_SKY[1];
   try{
     const Rd = atScale(60, () => readerSet());
-    if(jail && when === 'intro'){   // ⛓️ the dungeon: bricks, bars, a dragon with a ribbon on his wings
-      g.fillStyle = '#6E6880'; g.fillRect(0, 0, W, H); g.strokeStyle = 'rgba(30,25,45,.35)'; g.lineWidth = 2;
-      for(let y = 0; y < H; y += 30){ g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); for(let x = (y / 30) % 2 ? 0 : 30; x < W; x += 60){ g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 30); g.stroke(); } }
-      g.fillStyle = '#4A4458'; g.fillRect(0, H - 40, W, 40);
-      const D = atScale(60, () => dragonSet(1)); paintChar(g, D, D.fly[Math.floor(t * 4) % D.fly.length], W / 2 - 40, 255, 150, false); emo(g, '🎀', W / 2 - 50, 150, 44); emo(g, '😤', W / 2 + 10, 110, 34);
-      g.fillStyle = '#2E2A3A'; for(let x = W / 2 - 180; x <= W / 2 + 100; x += 34) g.fillRect(x, 20, 9, H - 60); g.fillRect(W / 2 - 190, 20, 300, 10); g.fillRect(W / 2 - 190, H - 50, 300, 10);
-      emo(g, '⛓️', W / 2 - 200, 230, 40); emo(g, '🔑', 90, 250, 34); emo(g, '🔔', W - 230, 70, 40); emo(g, '💒', W - 230, 150, 70);
-      paintChar(g, Rd, Rd.act('cheer')[Math.floor(t * 6) % 6], W - 110, 285, 120, true); return; }
-    if(jail){   // 💥 "I OBJECT!!" — the chapel doors fly open, the groom lands in the cake
-      g.fillStyle = '#B9E0A0'; g.beginPath(); g.ellipse(W / 2, H + 40, W * 0.7, 110, 0, 0, Math.PI * 2); g.fill();
-      g.fillStyle = '#FFFFFF'; g.fillRect(W / 2 + 60, 70, 150, 190); g.fillStyle = '#FF9EC4'; g.beginPath(); g.moveTo(W / 2 + 45, 74); g.lineTo(W / 2 + 135, 10); g.lineTo(W / 2 + 225, 74); g.fill(); emo(g, '🔔', W / 2 + 135, 52, 30);
-      g.fillStyle = '#5A3418'; g.fillRect(W / 2 + 108, 190, 54, 70); emo(g, '💥', W / 2 + 135, 205, 60);
-      const D = atScale(95, () => dragonSet(2)); paintChar(g, D, D.fly[Math.floor(t * 8) % D.fly.length], W / 2 - 60, 250 + Math.sin(t * 3) * 6, 230, false); emo(g, '🔥', W / 2 + 40, 150, 56);
-      const Gr = diaryChar('groom', 0); paintChar(g, Gr, Gr.act('dizzy')[Math.floor(t * 6) % 6], 120, 280, 110, false); emo(g, '🎂', 120, 268, 56);
-      const Pz = atScale(70, () => princessSet(1)); paintChar(g, Pz, Pz.act('cheer')[Math.floor(t * 6) % 6], W / 2 + 230, 285, 115, true);
-      g.save(); g.font = '900 54px Fredoka, Nunito, sans-serif'; g.textAlign = 'center'; g.lineJoin = 'round'; g.translate(250, 62); g.rotate(-0.06 + Math.sin(t * 6) * 0.02);
+    // 💍 Jailbreak + "I OBJECT!!" + the ending use the SAME page layout as the chapters: sky · far islands · floating island · centre tower with the Princess on top · Dragon on the right · cast left · reader right
+    if(jail && when === 'intro'){   // ⛓️ dusk: the tower has turned into the 💒 wedding tower (the Princess on top, shy), the Dragon (your stage) sulks in a cage on the island, the groom + a guard march in
+      const H0 = scHeroes(S.jail ? S.jail.ch : 1, 'built');
+      scSky(g, W, H, '#7E7A92', '#E3D6EA', true, t); scCastleIsland(g, 212, 116, 0.3, t, true); scIsland(g, W / 2, H - 22, W * 0.47, 36, '#A9C79A', '#86A878');
+      scHeroGroup(g, {x: W / 2 - 10, feet: H - 12, s: 46, pk: 1.2, pS: H0.pS || 1, pC: H0.pC, t, pAct: 'shy', jail: true});
+      emo(g, '🔔', W / 2 - 92, 62, 34); emo(g, '🔔', W / 2 + 76, 62, 34);
+      const cx = W / 2 + 200, cb = 252, cw = 150, ch2 = 150;   // 🐉 the cage
+      g.fillStyle = 'rgba(46,42,58,.35)'; g.beginPath(); g.ellipse(cx, cb, cw * 0.55, 12, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(80,72,100,.25)'; g.fillRect(cx - cw / 2, cb - ch2, cw, ch2);
+      const out = scDragon(g, {dS: H0.dS, dC: H0.dC, x: cx, feet: cb - 6, k: SC_DK[H0.dS] * 0.9, t, dir: -1, noShadow: true, pose: {hy: 5, ha: 0.5, lean: 0.12, wing: 0.55, ws: -0.1, tail: -0.1, shake: Math.sin(t * 1.3) > 0.85 ? 0.8 : 0, rise: -((TDDragon.STAGES[H0.dS] || {}).fly || 0) * 14}});
+      g.fillStyle = '#2E2A3A'; for(let x = cx - cw / 2; x <= cx + cw / 2 + 1; x += cw / 6) g.fillRect(x - 4, cb - ch2, 8, ch2);
+      g.fillRect(cx - cw / 2 - 8, cb - ch2 - 8, cw + 16, 12); g.fillRect(cx - cw / 2 - 8, cb - 6, cw + 16, 12);
+      g.beginPath(); g.moveTo(cx - cw / 2 - 8, cb - ch2 - 6); g.quadraticCurveTo(cx, cb - ch2 - 46, cx + cw / 2 + 8, cb - ch2 - 6); g.lineWidth = 8; g.strokeStyle = '#2E2A3A'; g.stroke(); g.fillRect(cx - 3, cb - ch2 - 60, 6, 30);
+      emo(g, '🎀', cx - 34, cb - 60, 34); emo(g, '😤', cx - 30, cb - ch2 + 30, 32); emo(g, '🔒', cx + cw / 2 - 4, cb - 70, 30); emo(g, '🔑', cx + 120, 286, 28);
+      const Gr = diaryChar('groom', 0), K = diaryChar('kn', 1); paintChar(g, Gr, Gr.walk[Math.floor(t * 14) % 8], 120, 290, 120, false); emo(g, '💍', 152, 236, 30);
+      paintChar(g, K, K.walk[Math.floor(t * 14 + 3) % 8], 215, 292, 110, false);
+      paintChar(g, Rd, Rd.act('cheer')[Math.floor(t * 6) % 6], W - 46, 290, 104, true); return; }
+    if(jail){   // 💥 "I OBJECT!!" — same layout, but the wedding happens in a 🏰 CASTLE: the Dragon (your stage) breathes REAL fire at the castle gate, the gate bursts, the Princess cheers from the balcony, the groom flies into the cake
+      const H0 = scHeroes(S.jail ? S.jail.ch : 1, 'built');
+      scSky(g, W, H, '#FFC6E0', '#FFF0F6', false, t); scTowerIsland(g, W - 80, 96, 9, H0.pS || 1, H0.pC, t); scIsland(g, W / 2, H - 22, W * 0.47, 36);
+      const bal = scCastle(g, W / 2 - 10, H - 14, 1, t);
+      TDPrincess.draw(g, H0.pS || 1, H0.pC, bal.x, bal.y, (H0.pS >= 5 ? 0.88 : 1) * 1.05, t, {act: 'cheer'});
+      g.drawImage(bal.front, 0, 0);
+      const out = scDragon(g, {dS: H0.dS, dC: H0.dC, x: W / 2 + 228, feet: 214, k: SC_DK[H0.dS] * 0.92, t, dir: -1, pose: scDPose('breath', 0.345, 1)});
+      scFlame(g, out, [bal.gx + 8, bal.gy - 22], 46, H0.dS >= 3 ? H0.dC : 'A', 0.22, t); emo(g, '💥', bal.gx, bal.gy - 26, 62);
+      g.fillStyle = '#5A3418'; g.save(); g.translate(bal.gx - 34, bal.gy + 4); g.rotate(-0.8); g.fillRect(-22, -42, 20, 42); g.restore(); g.save(); g.translate(bal.gx + 34, bal.gy + 4); g.rotate(0.8); g.fillRect(2, -42, 20, 42); g.restore();   // the gate doors fly off
+      emo(g, '🧱', bal.gx + 50, bal.gy - 78, 20); emo(g, '🧱', bal.gx - 52, bal.gy - 70, 16); emo(g, '💫', 205, 205, 30);
+      const Gr = diaryChar('groom', 0); paintChar(g, Gr, Gr.act('dizzy')[Math.floor(t * 6) % 6], 120, 286, 112, false); emo(g, '🎂', 120, 276, 58);
+      g.save(); g.font = '900 48px Fredoka, Nunito, sans-serif'; g.textAlign = 'center'; g.lineJoin = 'round'; g.translate(150, 64); g.rotate(-0.07 + Math.sin(t * 6) * 0.02);
       g.lineWidth = 10; g.strokeStyle = '#2A1E3A'; g.strokeText('I OBJECT!!', 0, 0); g.fillStyle = '#FFD84D'; g.fillText('I OBJECT!!', 0, 0); g.restore();
-      paintChar(g, Rd, Rd.act('cheer')[Math.floor(t * 6) % 6], W - 70, 290, 105, true); return; }
-    if(when === 'ending'){   // 🏯 the dragon castle on the mountain + tea with the suitors
-      g.fillStyle = '#B98BC9'; g.beginPath(); g.moveTo(0, 230); g.lineTo(220, 70); g.lineTo(420, 210); g.lineTo(600, 90); g.lineTo(W, 230); g.lineTo(W, H); g.lineTo(0, H); g.fill();
-      g.fillStyle = '#C9452E'; g.fillRect(170, 80, 110, 90); g.fillRect(150, 60, 34, 110); g.fillRect(266, 60, 34, 110); for(let i = 0; i < 6; i++) g.fillRect(150 + i * 28, 48, 16, 16);
-      g.fillStyle = '#7A2A1C'; g.fillRect(208, 128, 34, 42); emo(g, '🚩', 167, 40, 28); emo(g, '🚩', 283, 40, 28);
-      g.fillStyle = '#9AD47C'; g.beginPath(); g.ellipse(W / 2, H + 40, W * 0.7, 110, 0, 0, Math.PI * 2); g.fill();
-      const D = atScale(60, () => dragonSet(2)), Pz = atScale(70, () => princessSet(2)); paintChar(g, D, D.fly[Math.floor(t * 6) % D.fly.length], 420, 150 + Math.sin(t * 2) * 8, 150, true);
-      paintChar(g, Pz, Pz.act('cheer')[Math.floor(t * 6) % 6], 520, 285, 115, false); emo(g, '❤️', 470, 80, 36);
-      const K = diaryChar('kn', 0), Q = diaryChar('pr', 1); paintChar(g, K, K.still, 640, 290, 95, true); paintChar(g, Q, Q.still, 730, 292, 95, true); emo(g, '🫖', 690, 265, 34); emo(g, '☕', 650, 232, 22); emo(g, '☕', 742, 232, 22);
-      paintChar(g, Rd, Rd.act('cheer')[Math.floor(t * 6) % 6], 90, 290, 110, false); return; }
-    // 🏰 a normal chapter page: the tower, the Princess on top, Ember flying by, this chapter's suitors (intro) or the boss in trouble (outro)
-    g.fillStyle = ch === 5 ? '#C9D97A' : '#9AD47C'; g.beginPath(); g.ellipse(W / 2, H + 40, W * 0.7, 110, 0, 0, Math.PI * 2); g.fill();
-    const L = towerLook(ch >= 5 ? 2 : ch >= 3 ? 1 : 0);
-    g.fillStyle = L.wall1; g.fillRect(W / 2 - 55, 70, 110, 190); g.fillStyle = L.wall2; for(let i = 0; i < 5; i++) g.fillRect(W / 2 - 55 + i * 25, 52, 15, 20);
-    g.fillStyle = L.roof1; g.beginPath(); g.moveTo(W / 2 - 65, 56); g.lineTo(W / 2, 4); g.lineTo(W / 2 + 65, 56); g.fill();
-    g.fillStyle = '#6B4A2F'; g.fillRect(W / 2 - 18, 210, 36, 50);
-    const pf = ch >= 5 ? 2 : ch >= 3 || (when === 'outro' && ch >= 2) ? 1 : 0, df = ch >= 4 ? 2 : ch >= 2 || when === 'outro' ? 1 : 0;
-    const Pz = atScale(70, () => princessSet(pf)), D = atScale(60, () => dragonSet(df));
-    paintChar(g, Pz, Pz.still, W / 2, 160, 115, false); paintChar(g, D, D.fly[Math.floor(t * 8) % D.fly.length], W / 2 + 165, 150 + Math.sin(t * 2) * 6, 120 + df * 12, true);
+      paintChar(g, Rd, Rd.act('cheer')[Math.floor(t * 6) % 6], W - 46, 290, 104, true); return; }
+    if(when === 'ending'){   // 🏯 same layout, happily ever after: the crystal stage tower with the Sage on top, the Heart Dragon beside her (your colours), the dragon castle on a far island, tea with the suitors
+      const H0 = scHeroes('ending', 'best');
+      scSky(g, W, H, '#FF9E7A', '#FFE0B8', false, t);
+      scCastleIsland(g, 170, 150, 0.5, t); emo(g, '💗', 170, 40, 26);   // 🏰 the same castle island — now the suitors come over for tea
+      scIsland(g, W / 2, H - 22, W * 0.47, 36);
+      scHeroGroup(g, {x: W / 2 - 10, feet: H - 12, s: 46, pk: 1.2, pS: H0.pS, pC: H0.pC, t, pAct: 'cheer', form: 2});
+      scDragon(g, {dS: H0.dS, dC: H0.dC, x: W / 2 + 205, feet: 218, k: SC_DK[H0.dS] * 0.95, t, dir: -1, pose: scDPose('wing', t, 1.6)});
+      emo(g, '❤️', W / 2 + 70, 40, 34);
+      const K = diaryChar('kn', 0), Q = diaryChar('pr', 1); paintChar(g, K, K.still, 110, 290, 110, false); paintChar(g, Q, Q.still, 215, 292, 110, true);
+      emo(g, '🫖', 163, 270, 34); emo(g, '☕', 125, 222, 22); emo(g, '☕', 200, 222, 22);
+      paintChar(g, Rd, Rd.act('cheer')[Math.floor(t * 6) % 6], W - 46, 290, 104, true); return; }
+    // 🏰 a normal chapter page: the floating island, the stage tower with the Princess on top, the Dragon beside it, this chapter's suitors (intro) or the boss in trouble (outro)
+    const night = ch === 4, H0 = scHeroes(ch, when === 'outro' ? 'built' : 'story');
+    scSky(g, W, H, sk[0], sk[1], night, t); scCastleIsland(g, 212, 116, 0.3, t, night); scIsland(g, W / 2, H - 22, W * 0.47, 36, ch === 5 ? '#C9D97A' : '#9AD47C', ch === 5 ? '#A9B95A' : '#6FAE55');
+    scHeroGroup(g, {x: W / 2 - 10, feet: H - 12, s: 46, pk: 1.2, pS: H0.pS, pC: H0.pC, t, pAct: when === 'outro' ? 'cheer' : null});
+    const dx = W / 2 + 200, dFeet = when === 'outro' ? 232 : 224;
+    scDragon(g, {dS: H0.dS, dC: H0.dC, x: dx, feet: dFeet, k: SC_DK[H0.dS] * 0.95, t, dir: -1, pose: when === 'outro' ? scDPose('roar', 0.55, 2) : scDPose('wing', t, 1.4)});
+    if(when === 'outro' && H0.dS >= 1) emo(g, '❤️', W / 2 + 60, 40, 34);
     if(when === 'intro'){ const [a, b] = DIARY_CAST[ch] || DIARY_CAST[1], K = diaryChar(a, 0, a.startsWith('boss') ? 100 : 84, a.startsWith('boss') ? 128 : 108), Q = diaryChar(b, 1);
       paintChar(g, K, K.walk[Math.floor(t * 14) % 8], 120, 290, a.startsWith('boss') ? 140 : 120, false); emo(g, TD.SUITORS[a].prop || '💐', 152, 232, 30);
       paintChar(g, Q, Q.walk[Math.floor(t * 14 + 3) % 8], 215, 292, 110, false); if(TD.SUITORS[b].front) emo(g, TD.SUITORS[b].front, 262, 278, 40);
       if(ch === 2 || ch === 3) emo(g, '👼', 70, 150, 46); if(ch === 4) emo(g, '🐭', 300, 280, 30); if(ch === 5) emo(g, '👑', 60, 140, 40); if(ch === 6) emo(g, '💘', 60, 140, 46); }
-    else { const [bt, oops] = DIARY_OOPS[ch] || DIARY_OOPS[1], K = diaryChar(bt, 0, 100, 128); emo(g, '💫', 140, 110, 46); paintChar(g, K, K.act('dizzy')[Math.floor(t * 6) % 6], 120, 255, 120, false); emo(g, oops, 190, 220, 44); emo(g, '❤️', W / 2 + 70, 50, 40); }
-    paintChar(g, Rd, Rd.act('cheer')[Math.floor(t * 6) % 6], W - 120, 285, 120, true);
+    else { const [bt, oops] = DIARY_OOPS[ch] || DIARY_OOPS[1], K = diaryChar(bt, 0, 100, 128); emo(g, '💫', 120, 150, 40); paintChar(g, K, K.act('dizzy')[Math.floor(t * 6) % 6], 120, 255, 120, false); emo(g, oops, 190, 220, 44); }
+    paintChar(g, Rd, Rd.act('cheer')[Math.floor(t * 6) % 6], W - 80, 288, 112, true);
   }catch(e){ console.warn(e); }
 }
 
+// 🏁 result card picture (240 × 240): the heroes you REALLY built this match — win: the Dragon roars, the Princess cheers · lose: both droop, a 💍 floats
+function scResultTick(c, o){ const g = c.getContext('2d'), t = performance.now() / 1000, W = c.width, H = c.height; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
+  g.save(); g.scale(W / 240, H / 240);
+  const sky = g.createRadialGradient(120, 120, 10, 120, 120, 125); sky.addColorStop(0, o.won ? 'rgba(255,236,170,.85)' : 'rgba(205,200,225,.8)'); sky.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = sky; g.fillRect(0, 0, 240, 240);
+  scCastleIsland(g, 46, 92, 0.17, t, o.jail && !o.won);
+  scIsland(g, 120, 206, 104, 20, o.jail && !o.won ? '#9C93AE' : '#9AD47C', o.jail && !o.won ? '#7E7690' : '#6FAE55');
+  const dS = o.dS || 1, dk = SC_DK[dS] * 0.68, won = o.won;
+  const pose = won ? scDPose('roar', t, 2.2) : {hy: 5, ha: 0.5, lean: 0.12, wing: 0.55, tail: -0.1};
+  if(o.jail){ scDragon(g, {dS, dC: o.dC, x: 116, feet: 204, k: dk * 1.25, t, pose: won ? scDPose('breath', t, 1.8) : pose, dir: 1});
+    if(!won){ g.fillStyle = 'rgba(46,42,58,.85)'; for(let x = 40; x < 210; x += 26) g.fillRect(x, 44, 7, 150); g.fillRect(34, 40, 182, 8); } }
+  else { scDragon(g, {dS, dC: o.dC, x: 78, feet: 200, k: dk, t, pose, dir: 1});
+    TDPrincess.draw(g, o.pS || 1, o.pC, 172, 210, 1.05, t, {act: won ? 'cheer' : 'dizzy', dir: -1}); }
+  emo(g, won ? (o.jail ? '💥' : '💖') : (o.jail ? '⛓️' : '💍'), 120, 26, 30 + Math.sin(t * 4) * 2);
+  g.restore(); }
+function scResult(c, o){ if(!c) return; let alive = true; const tick = () => { if(!alive || !document.body.contains(c)) return; try{ scResultTick(c, o); }catch(e){ alive = false; return; } setTimeout(() => requestAnimationFrame(tick), 70); }; tick(); }
+
+// 📚 shelf cover: your heroes on the book (last build — or the hatchling + tiara princess for a new book)
+function scCover(c, row){ const g = c.getContext('2d'), W = c.width, H = c.height, t = performance.now() / 1000, b = scBuild(row), H0 = b.dS ? {dS: b.dS, dC: b.dC || SC_DEF.dragon, pS: b.pS || 1, pC: b.pC || SC_DEF.princess} : {dS: 1, dC: null, pS: 1, pC: null};
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H); g.save(); g.scale(W / 200, H / 160);
+  const gl = g.createRadialGradient(100, 86, 6, 100, 86, 96); gl.addColorStop(0, 'rgba(255,255,255,.5)'); gl.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gl; g.fillRect(0, 0, 200, 160);
+  scCastleIsland(g, 30, 74, 0.13, t);
+  scIsland(g, 100, 146, 80, 13);
+  scHeroGroup(g, {x: 78, feet: 150, s: 24, pk: 1.35, pS: H0.pS, pC: H0.pC, t, pAct: null});
+  scDragon(g, {dS: H0.dS, dC: H0.dC, x: 150, feet: 118, k: SC_DK[H0.dS] * 0.42, t, dir: -1, pose: scDPose('wing', t, 1.6)});
+  g.restore(); }
+/* 🎬 TD SCENES (td-scenes) END */
 /* ================= 🎮 PLAY ================= */
 function startGame(ch, lvl, opt){
   opt = opt || {}; S.chapter = ch; S.level = lvl; stopLoop(); hideResult(); S.jail = opt.jail ? {ch, lvl} : null;
@@ -1987,7 +2124,7 @@ function stageTowerPic(form, col){
   { const g2 = fg; const railF = (a0, a1) => { g2.strokeStyle = L.trim; g2.lineWidth = 2.2 * u; g2.beginPath(); for(let a = a0; a <= a1 + 1e-6; a += (a1 - a0) / 24){ const x = cx + Math.cos(a) * SR * 0.97, y = top + Math.sin(a) * sry * 0.97 - 12 * u; a === a0 ? g2.moveTo(x, y) : g2.lineTo(x, y); } g2.stroke();
       for(let k = 0; k <= 8; k++){ const a = a0 + (a1 - a0) * k / 8, x = cx + Math.cos(a) * SR * 0.97, y = top + Math.sin(a) * sry * 0.97; g2.beginPath(); g2.moveTo(x, y); g2.lineTo(x, y - 12 * u); g2.stroke(); } };
     railF(Math.PI * 0.08, Math.PI * 0.92); }
-  return {c, front, w, h, base: base + ry, top, cx, SR, sry, form, col, L, s, jail: G.jail};
+  return {c, front, w, h, base: base + ry, top, cx, SR, sry, form, col, L, s, jail: !!(G && G.jail)};
 }
 // ✨ morph moments: when a hero's stage changes, a 1.2 s cocoon → swell → burst → new shape (🌱 Basic 0.6 s, no flash)
 const MORPH = {dragon: null, princess: null, seen: {dragon: 1, princess: 1}};
@@ -2335,13 +2472,7 @@ function finish(){
     '<div class="res-btns"><button class="sp-btn sp-secondary" id="b-menu">🎚️ Levels</button><button class="sp-btn sp-secondary" id="b-again">🔁 Play again</button>' +
     (won ? '<button class="sp-btn sp-primary" id="b-diary">📔 Read the diary ▶</button>' : '<button class="sp-btn sp-primary" id="b-jail">🐉 Jailbreak! ▶</button>') + '</div>');
   countUp($('score-count'), G.score, 1100);
-  try{ const c = $('res-cv'), g = c.getContext('2d'); let i = 0; const tick = () => { if(!$('res-cv')) return; g.clearRect(0, 0, 240, 240);
-    const D = atScale(42, () => dragonSet(dT.form)), Pz = atScale(68, () => princessSet(pT.form)), Rd = atScale(60, () => readerSet());
-    const pp = won ? Pz.act('cheer') : Pz.act('dizzy'), rr = won ? Rd.act('cheer') : Rd.act('dizzy');
-    g.fillStyle = 'rgba(255,200,230,.35)'; g.beginPath(); g.ellipse(120, 200, 105, 24, 0, 0, Math.PI * 2); g.fill();
-    paintChar(g, D, D.fly[i % D.fly.length], 62, 150 - Math.sin(i * 0.8) * 4, 110, false);
-    paintChar(g, Pz, pp[i % pp.length], 150, 205, 120, true); paintChar(g, Rd, rr[i % rr.length], 205, 210, 95, true); i++;
-    emo(g, won ? '💖' : '💍', 120, 30, 34); setTimeout(() => requestAnimationFrame(tick), 140); }; tick(); }catch(e){}
+  try{ scResult($('res-cv'), {won, dS: TDDragon.stageOf(dT.tier), dC: dT.main || null, pS: TDPrincess.stageOf(pT.tier), pC: pT.main || null}); }catch(e){}   // 🎬 td-scenes: the heroes you really built
   $('b-again').onclick = () => startGame(ch, lvl);
   $('b-menu').onclick = () => { hideResult(); G = null; openBook(S.book); };
   if($('b-diary')) $('b-diary').onclick = () => { hideResult(); G = null; openDiary(ch, lvl, 'outro'); };
@@ -2356,12 +2487,7 @@ function finishJail(){
   showResult(head + '<canvas id="res-cv" width="240" height="240"></canvas><div class="builds"><span>🐉 ' + UI.esc(dT.formName()) + ' ' + SkillKit.barHtml(dT.bar(), {star: !!dT.ult}) + '</span>' +
     '<span style="color:var(--ink-soft)">💫 ' + G.stats.bonks + ' guards bonked · 🔔 ' + G.stats.waves + ' / 5 bells</span></div>' +
     '<div class="res-btns"><button class="sp-btn sp-secondary" id="b-menu">🎚️ Levels</button>' + (won ? '<button class="sp-btn sp-primary" id="b-object">📔 "I OBJECT!!" ▶</button>' : '<button class="sp-btn sp-primary" id="b-again">🔁 Break out again</button>') + '</div>');
-  try{ const c = $('res-cv'), g = c.getContext('2d'); let i = 0; const tick = () => { if(!$('res-cv')) return; g.clearRect(0, 0, 240, 240);
-    const D = atScale(58, () => dragonSet(Math.max(1, dT.form))), Rd = atScale(60, () => readerSet()), rr = won ? Rd.act('cheer') : Rd.act('dizzy');
-    g.fillStyle = won ? 'rgba(255,200,230,.35)' : 'rgba(120,110,140,.3)'; g.beginPath(); g.ellipse(120, 200, 105, 24, 0, 0, Math.PI * 2); g.fill();
-    paintChar(g, D, D.fly[i % D.fly.length], 95, 150 - Math.sin(i * 0.8) * 4, 120, false); paintChar(g, Rd, rr[i % rr.length], 195, 210, 95, true);
-    if(!won){ g.fillStyle = 'rgba(46,42,58,.85)'; for(let x = 40; x < 170; x += 26) g.fillRect(x, 60, 7, 130); }
-    emo(g, won ? '💥' : '⛓️', 120, 30, 34); i++; setTimeout(() => requestAnimationFrame(tick), 140); }; tick(); }catch(e){}
+  try{ scResult($('res-cv'), {won, jail: true, dS: TDDragon.stageOf(dT.tier), dC: dT.main || null}); }catch(e){}   // 🎬 td-scenes: your dragon, caged or free
   $('b-menu').onclick = () => { hideResult(); G = null; S.jail = null; openBook(S.book); };
   if($('b-again')) $('b-again').onclick = () => startGame(from.ch, from.lvl, {jail: true});
   if($('b-object')) $('b-object').onclick = () => { hideResult(); G = null; openDiary('jail', lvl, 'outro'); };
@@ -2697,4 +2823,4 @@ function tdResultBadge(){
 /* 🏷️ TD LOGO END */</script>
 </body>
 </html>
-<!-- (td-2+td-logo+iso2-b+act-2) END OF TDStories.html -->
+<!-- (td-2+td-logo+iso2-b+act-2+td-scenes) END OF TDStories.html -->
