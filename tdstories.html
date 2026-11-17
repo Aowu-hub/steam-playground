@@ -3491,6 +3491,7 @@ const FD_COLOR = {mush: '#E5484D', corn: '#F2B92A', sun: '#FFB020', pepper: '#E8
   '.fd-card .hd{display:flex;align-items:center;gap:8px;font:800 1.05rem Fredoka,Nunito,sans-serif;color:#5C3B1E} .fd-card .hd .ic{font-size:1.7rem} .fd-card .hd small{display:block;font:600 .8rem Nunito,sans-serif;color:#8A6A48}',
   '.fd-card .st{display:flex;gap:4px} .fd-card .st i{width:16px;height:8px;border-radius:4px;background:#E8D9BE} .fd-card .st i.on{background:#7CC25A}',
   '.fd-card .row{display:flex;gap:6px;flex-wrap:wrap} .fd-card .row .sp-btn{flex:1 1 40%;min-height:44px;font-size:.9rem}',
+  '.fd-card .hd .ic .fd-pp{display:block} .fd-card .fd-gp{flex-direction:column;gap:2px} .fd-card .fd-gp .fd-pp{display:block;flex:0 0 auto;pointer-events:none;filter:drop-shadow(0 2px 2px rgba(0,0,0,.25))} .fd-card .fd-gp br{display:none}',
   '.fd-card .x{position:absolute;right:6px;top:4px;border:0;background:none;font-size:1.2rem;cursor:pointer;width:36px;height:36px}',
   '.fd-story{position:absolute;inset:0;z-index:35;display:flex;align-items:center;justify-content:center;background:rgba(40,25,10,.45)}',
   '.fd-story .pg{background:#FFF6E2;border:4px solid #fff;border-radius:20px;max-width:min(92%,460px);padding:14px 16px;text-align:center;font:600 1rem Nunito,sans-serif;color:#4A3420;box-shadow:0 8px 30px rgba(0,0,0,.3);animation:fdPop .3s ease-out both}',
@@ -3642,6 +3643,8 @@ function fdOpenCard(P){
     '<div class="st">' + [1, 2, 3, 4, 5].map(n => '<i class="' + (n <= P.st ? 'on' : '') + '"></i>').join('') + '</div><div class="row">' + grow + '</div>' +
     '<div class="row"><button class="sp-btn sp-secondary" data-a="move">🚚 Move · ' + (mv ? mv + '🌰' : 'FREE') + '</button><button class="sp-btn sp-secondary" data-a="pull">♻️ Pull up · +' + Math.floor(P.spent / 2) + '🌰</button></div>';
   $('arena').appendChild(box); FDP.card = P.id; FDP.selP = P.id;
+  if(fdHasProps()){ const ic = box.querySelector('.hd .ic'); if(ic){ ic.textContent = ''; ic.appendChild(fdPlantCanvas(P.kind, P.st, P.br, 46)); }   // 🌱 fd-1c: the plant now
+    box.querySelectorAll('[data-g]').forEach(b => { const br = b.dataset.g === 'x' ? P.br : Number(b.dataset.g); b.prepend(fdPlantCanvas(P.kind, P.st + 1, br, 40)); b.classList.add('fd-gp'); }); }   // + what it becomes
   box.querySelector('.x').onclick = () => fdCloseCard();
   box.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { const br = b.dataset.g === 'x' ? undefined : Number(b.dataset.g); if(FD.grow(G, P.id, br)){ UISound.play('unlock'); fdOpenCard(P); } else UISound.play('error'); });
   box.querySelector('[data-a="pull"]').onclick = () => { FD.pull(G, P.id); UISound.play('pop'); fdCloseCard(); fdHints(); };
@@ -3669,7 +3672,7 @@ let fdLastSnd = 0;
 function fdEvents(list){
   list.forEach(e => {
     if(e.k === 'plant'){ burst(e.x, e.y, 0.3, ['🌱', '✨'], 4); }
-    if(e.k === 'grow'){ burst(e.x, e.y, 0.8, ['✨', '🌱', '⭐'], e.st >= 4 ? 10 : 5); floatText(e.x, e.y - 0.8, e.st === 5 ? '⭐ Giant!' : '🌱 Stage ' + e.st, '#22A867', 1.1); FDP.pics.clear(); }
+    if(e.k === 'grow'){ FDPM.set(e.id, {t0: performance.now(), dur: G.lvl === 0 ? 600 : 1200, flash: G.lvl !== 0, from: {st: e.st - 1, br: e.st - 1 >= 4 ? e.br : -1}}); burst(e.x, e.y, 0.8, ['✨', '🌱', '⭐'], e.st >= 4 ? 10 : 5); floatText(e.x, e.y - 0.8, e.st === 5 ? '⭐ Giant!' : '🌱 Stage ' + e.st, '#22A867', 1.1); FDP.pics.clear(); }
     if(e.k === 'pull'){ floatText(e.x, e.y - 0.6, '♻️ +' + e.back + '🌰', '#8A6A48', 1); }
     if(e.k === 'move'){ burst(e.x, e.y, 0.3, ['🚚', '✨'], 3); }
     if(e.k === 'noPlant') fdWhy(e.why, e);
@@ -3747,12 +3750,38 @@ const fdPileN = () => Math.max(0, Math.min(12, Math.ceil(G.hearts || 0)));
 function fdHouseIt(){ return fdItem('house', 'farmhouse', FD.HOUSE[0][0], FD.HOUSE[0][1], {v: (G.C.n - 1) % 4}); }
 function fdGateIt(Gt){ const a = Gt.ang || 0, along = Math.abs(Math.cos(a)) > Math.abs(Math.sin(a));   // the gate spans ACROSS the walk
   return fdItem('gate', 'farmgate', Gt.i, Gt.j, {turn: along ? 1 : 0, state: G.C.newGate && G.C.newGate.gate === Gt.name ? 'new' : 'open'}); }
+/* 🌱 fd-1c: the plants ARE IsoProps growing props (ip-3c) — one line per kind, the state IS the stage: 1 seed · 2 sprout · 3 young · 4a / 5a branch ① ·
+   4b / 5b branch ② (each a new SHAPE, branch = its SkillKit colour). Every grow plays the 🐣 morph moment (Props.morphFx: 1.2 s, 🌱 Basic 0.6 s, no flash);
+   the grow card shows the plant now + what each button turns it into. Without IsoProps the FG draft painters stay. */
+const FD_PLINE = {mush: 'growmush', corn: 'growcorn', sun: 'growsun', pepper: 'growpepper', pump: 'growpump'};
+const fdBr = br => br === 1 ? 'b' : 'a';
+function fdPlantIt(P, st, br){ const line = FD_PLINE[P.kind]; return line ? fdItem('plant', line, P.i, P.j, {stage: st || P.st, branch: fdBr(br != null ? br : P.br)}) : null; }
+// a small picture of a plant (kind · stage · branch) for the grow card: the prop's own canvas, fitted into px × px
+function fdPlantCanvas(kind, st, br, px){ const c = document.createElement('canvas'), d = Math.min(3, devicePixelRatio || 1); c.width = c.height = Math.round(px * d); c.style.width = c.style.height = px + 'px'; c.className = 'fd-pp';
+  try{ const src = Props.canvas(FD_PLINE[kind], {look: 'farm', stage: st, branch: fdBr(br), k: 1.5, s: d}), b = fdTrim(src), f = Math.min(c.width / b.w, c.height / b.h);
+    c.getContext('2d').drawImage(src, b.x, b.y, b.w, b.h, (c.width - b.w * f) / 2, c.height - b.h * f, b.w * f, b.h * f); }catch(e){} return c; }
+// the painted box of a picture (a prop canvas has room round it for the rim + live layer) — measured once
+const FD_TRIM = new WeakMap();
+function fdTrim(src){ let b = FD_TRIM.get(src); if(b) return b; b = {x: 0, y: 0, w: src.width, h: src.height};
+  try{ const W = src.width, H = src.height, a = src.getContext('2d').getImageData(0, 0, W, H).data; let x0 = W, y0 = H, x1 = -1, y1 = -1;
+    for(let y = 0; y < H; y++) for(let x = 0; x < W; x++) if(a[(y * W + x) * 4 + 3] > 12){ if(x < x0) x0 = x; if(x > x1) x1 = x; if(y < y0) y0 = y; if(y > y1) y1 = y; }
+    if(x1 >= x0) b = {x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1}; }catch(e){} FD_TRIM.set(src, b); return b; }
 // a plant / house picture baked once per size (plants sway a little when drawn)
 function fdPic(key, w, h, fx, fy, paint){ const dpr = VIEW.dpr || 1, k2 = key + '@' + Math.round(VIEW.s * 10) + '@' + dpr; let p = FDP.pics.get(k2); if(p) return p;
   if(FDP.pics.size > 120) FDP.pics.clear(); const c = document.createElement('canvas'); c.width = Math.ceil(w * dpr); c.height = Math.ceil(h * dpr); const g = c.getContext('2d'); g.scale(dpr, dpr); paint(g, fx, fy);
   p = {c, w, h, fx, fy}; FDP.pics.set(k2, p); return p; }
 function fdDrawPic(g, p, x, y, sx, sy, a){ g.save(); g.translate(x, y); if(sx !== 1 || sy !== 1) g.scale(sx, sy); if(a != null) g.globalAlpha = a; g.drawImage(p.c, -p.fx, -p.fy, p.w, p.h); g.restore(); }
 const FD_PK = () => VIEW.s / 30;   // plant painters: a plant fills its tile (it is a WALL too)
+// 🌱 fd-1c draw one plant prop (+ its 🐣 morph moment: the old shape until the white silhouette peaks, then the new shape bounces in under the sparkles)
+const FDPM = new Map();
+const FD_PSC = [1, 1.45, 1.2, 1, 1, 1];   // a seed / sprout is drawn a bit bigger so the first maze walls read as walls (like the draft painters)
+function fdPlantNow(g, P, born, sw, sx, sy){ const it = fdPlantIt(P); if(!it || !it.pic) return false; const m = FDPM.get(P.id); let q = 1; born *= FD_PSC[P.st] || 1;
+  if(m){ q = (performance.now() - m.t0) / m.dur; if(q >= 1 || !FX) FDPM.delete(P.id); }
+  const sel = FDP.selP === P.id ? 0.8 : 1;
+  if(q < 1){ const old = q < 0.45 && m.from ? fdPlantIt(P, m.from.st, m.from.br) : null, pop = q < 0.45 ? 1 : 1 + 0.18 * Math.sin(Math.min(1, (q - 0.45) / 0.4) * Math.PI);
+    fdProp(g, old || it, {sx, sy, scale: born * sw * (old ? 1 + 0.12 * q / 0.45 : pop), alpha: sel});
+    g.save(); try{ Props.morphFx(g, fdV(), it, q, {flash: m.flash}); }catch(e){} g.restore(); return true; }   // g already carries the shake
+  return fdProp(g, it, {sx, sy, scale: born * sw, alpha: sel}); }
 function plantPic(P){ const s = VIEW.s, k = FD_PK(), w = s * 3, h = s * 3.6; return fdPic('p:' + P.kind + P.st + ':' + P.br, w, h, w / 2, h - s * 0.35, (g, x, y) => FG.draw(g, P.kind, P.st, Math.max(0, P.br), x, y, k * (P.st === 1 ? 1.7 : P.st === 2 ? 1.25 : 1), 0)); }
 function housePic(){ const s = VIEW.s, k = VIEW.s / 40, w = s * 5.2, h = s * 5.2; return fdPic('house', w, h, w / 2, h - s * 0.6, (g, x, y) => FP.house(g, x, y, k, 0)); }
 function fdPaint(t){
@@ -3786,8 +3815,8 @@ function fdPaint(t){
     const n = fdPileN(); if(n > 0){ const it = fdItem('pile', 'pumpkinpile', FD.PILE.i, FD.PILE.j, {state: n}); items.push({y: FD.wx(FD.PILE.i) + FD.wx(FD.PILE.j), d: () => fdProp(g, it, {sx, sy})}); } }   // 🎃 = your hearts
   (G.rocks || []).forEach(r => items.push({y: r.x + r.y, d: () => { if(PR && fdProp(g, fdItem('rock', 'rock', r.i, r.j, {v: r.v}), {sx, sy})) return; shadow(g, r.x, r.y, 0.42); g.fillStyle = ['#B9B3A8', '#A9A397', '#C4BEB2'][r.v]; g.strokeStyle = '#2A1C14'; g.lineWidth = Math.max(1, s * 0.03); g.beginPath(); g.ellipse(IX(r.x, r.y), IY(r.x, r.y, 0) - s * 0.18, s * 0.42, s * 0.3, 0, 0, 7); g.fill(); g.stroke(); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(IX(r.x, r.y) - s * 0.12, IY(r.x, r.y, 0) - s * 0.3, s * 0.14, s * 0.07, -0.3, 0, 7); g.fill(); }}));
   G.traps.forEach(T => { if(T.kind === 'lava') return; items.push({y: T.x + T.y - 0.1, d: () => { const ic = T.kind === 'pop' ? '🌶️' : T.kind === 'mine' ? '💩' : T.kind === 'push' ? '🪣' : T.kind === 'root' ? '🧶' : T.kind === 'stun' ? '🕳️' : '🌵'; emo(g, ic, IX(T.x, T.y), IY(T.x, T.y, 0.18), s * 0.5, T.seen ? 0.5 : 1); }}); });
-  G.plants.forEach(P => items.push({y: P.x + P.y, d: () => { const pic = plantPic(P), born = Math.min(1, (G.t - P.born) / 0.35), sw = 1 + Math.sin(t * 2 + P.id) * 0.02 + (P.aim > 0.3 ? 0.06 : 0);
-    fdDrawPic(g, pic, IX(P.x, P.y), IY(P.x, P.y, 0), born, sw * born, FDP.selP === P.id ? 0.8 : 1); if(FDP.selP === P.id){ g.strokeStyle = '#FFC93C'; g.lineWidth = 2; g.beginPath(); g.ellipse(IX(P.x, P.y), IY(P.x, P.y, 0), s * 0.6, s * 0.3, 0, 0, 7); g.stroke(); } }}));
+  G.plants.forEach(P => items.push({y: P.x + P.y, d: () => { const born = Math.min(1, (G.t - P.born) / 0.35), sw = 1 + Math.sin(t * 2 + P.id) * 0.02 + (P.aim > 0.3 ? 0.06 : 0);
+    if(PR && fdPlantNow(g, P, born, sw, sx, sy)){} else { const pic = plantPic(P); fdDrawPic(g, pic, IX(P.x, P.y), IY(P.x, P.y, 0), born, sw * born, FDP.selP === P.id ? 0.8 : 1); } if(FDP.selP === P.id){ g.strokeStyle = '#FFC93C'; g.lineWidth = 2; g.beginPath(); g.ellipse(IX(P.x, P.y), IY(P.x, P.y, 0), s * 0.6, s * 0.3, 0, 0, 7); g.stroke(); } }}));
   G.blockers.forEach(b => items.push({y: b.x + b.y, d: () => { if(PR && b.k === 'hay' && fdProp(g, fdItem('hay', 'haybale', b.i, b.j, {v: b.id % 2}), {sx, sy})){ bar(g, IX(b.x, b.y), IY(b.x, b.y, 1.1), s * 0.7, b.hp / b.hpMax, '#22A867'); return; }   // 🌾 fd-1b
     const ic = {hay: '🌾', wool: '☁️', sheep: '🐑', chicken: '🐔'}[b.k] || '🐑'; shadow(g, b.x, b.y, 0.4); emo(g, ic, IX(b.x, b.y), IY(b.x, b.y, 0.4 + (b.k === 'sheep' || b.k === 'chicken' ? Math.abs(Math.sin(t * 8 + b.id)) * 0.12 : 0)), s * 0.75); bar(g, IX(b.x, b.y), IY(b.x, b.y, 1.1), s * 0.7, b.hp / b.hpMax, '#22A867'); }}));
   G.helpers.forEach(H => items.push({y: H.x + H.y, d: () => { if(PR && fdProp(g, fdItem('crow', 'scarecrow', 0, 0, {v: H.id % 3}), {sx, sy, dx: H.x + FD.O - 0.5, dy: H.y + FD.O - 0.5})) return; FP.crow(g, IX(H.x, H.y), IY(H.x, H.y, 0), s / 44, t); }}));   // 🧑‍🌾 fd-1b
@@ -3883,15 +3912,20 @@ function fdFinish(){
 }
 
 /* ---------- 🖼️ story pictures (shelf cover · diary · result) with the SAME heroes ---------- */
+// 🌳 fd-1c: an IsoProps prop in a story picture — its own canvas at scale k, standing with its footprint centre on (x, feet)
+function fdScProp(g, key, o, x, feet, k){ if(!fdHasProps()) return false; try{ o = Object.assign({look: 'farm'}, o || {}); const it = Props.item(key, 0, 0, o), c = Props.canvas(key, Object.assign({}, o, {k, s: 1})), A = c._g;
+  const bx = x - (it.w / 2 - it.d / 2) * 32 * k, by = feet - (it.w / 2 + it.d / 2) * 16 * k; g.drawImage(c, bx - A.ax * k, by - A.ay * k); return true; }catch(e){ return false; } }
 function fdScene(c, o){
   if(!c) return; o = o || {}; const g = c.getContext('2d'), W = c.width, H = c.height, t = 0.4, u = Math.min(W, H) / 240, night = o.night;
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
   scSky(g, W, H, night ? '#2C2F6B' : o.rain ? '#9DB6CF' : '#8ED6FF', night ? '#8A7FC8' : o.rain ? '#E2ECF4' : '#FFF6E0', night, t);
   const cx = W * 0.5, top = H * 0.6; scIsland(g, cx, top, W * 0.46, H * 0.16, '#B5E58A', '#8CCB64');
   scCloud(g, W * 0.18, H * 0.2, 18 * u, 0.8); scCloud(g, W * 0.82, H * 0.14, 14 * u, 0.7);
-  FP.house(g, cx + 34 * u, top + 6 * u, u * 0.62, t);
+  if(!fdScProp(g, 'farmhouse', {v: Math.max(0, (o.ch || 1) - 1) % 4}, cx + 40 * u, top + 10 * u, u * 0.62)) FP.house(g, cx + 34 * u, top + 6 * u, u * 0.62, t);   // 🌳 fd-1c
   const kinds = o.kind === 'cover' ? ['mush', 'corn', 'mush', 'sun'] : ['mush', 'mush', 'corn', 'mush'];
-  kinds.forEach((k, i) => FG.draw(g, k, Math.min(5, (o.fS || 2) + (i % 2)), i % 2, cx - 70 * u + i * 24 * u, top + 26 * u - (i % 2) * 6 * u, u * 0.55, t));
+  kinds.forEach((k, i) => { const st = Math.min(5, Math.max(o.kind === 'cover' ? 3 : 2, (o.fS || 2) + (i % 2))), x = cx - 70 * u + i * 24 * u, y = top + 26 * u - (i % 2) * 6 * u;
+    if(!fdScProp(g, FD_PLINE[k], {stage: st, branch: fdBr(i % 2)}, x, y, u * 0.8)) FG.draw(g, k, st, i % 2, x, y, u * 0.55, t); });
+  if(o.kind === 'cover') fdScProp(g, 'pumpkinpile', {state: 6}, cx + 18 * u, top + 30 * u, u * 0.6);
   TDFarmer.draw(g, o.fS || 1, o.fC || null, cx - 6 * u, top + 30 * u, u * 0.62, t, {dir: 1, pose: o.won === false ? {} : {armR: -2.4, armL: 2.2}});
   TDGoat.draw(g, o.gS || 1, o.gC || null, cx + 30 * u, top + 38 * u, u * 0.62, t, {dir: -1});
   if(o.collector) FCOL.draw(g, o.collector, cx + 82 * u, top + 30 * u, u * 0.55, t, {dir: -1});
@@ -3899,7 +3933,7 @@ function fdScene(c, o){
   if(o.won) emo(g, '📄', cx + 80 * u, top - 10 * u, 16 * u);
 }
 function fdCover(c, row){ const r = row || {}, f = (r.last || {}).farmer || {}, gt = (r.last || {}).goat || {}; fdScene(c, {kind: 'cover', fS: FD.stageOf(Number(f.t) || 1), fC: f.m || null, gS: FD.stageOf(Number(gt.t) || 1), gC: gt.m || null, collector: 'co'}); }
-function fdDiaryPic(cv, ch, when){ fdScene(cv, {kind: 'diary', fS: when === 'intro' ? (ch === 1 ? 1 : 2) : ch === 1 ? 2 : 3, gS: when === 'intro' ? (ch === 1 ? 1 : 2) : 2, collector: when === 'intro' ? (ch === 2 ? 'um' : 'co') : null, won: when === 'outro' ? true : undefined, rain: ch === 2}); }
+function fdDiaryPic(cv, ch, when){ fdScene(cv, {kind: 'diary', ch, fS: when === 'intro' ? (ch === 1 ? 1 : 2) : ch === 1 ? 2 : 3, gS: when === 'intro' ? (ch === 1 ? 1 : 2) : 2, collector: when === 'intro' ? (ch === 2 ? 'um' : 'co') : null, won: when === 'outro' ? true : undefined, rain: ch === 2}); }
 /* ================= 📱 fd-1a2 phone layouts + 🤏 pinch zoom (Aowu 17:49 · 17:57: both books — 🐉 Dragon Princess too) =================
    sideways phone: ONE bar row (◀ folds Gameroom · Levels · 🏠 into its ▾ menu, score + ⏸ on the same row) · 🌱 plants in a column on the LEFT ·
    map in the middle, filling it · skills on the RIGHT: 👨‍🌾 hero 3 × 2 on top, 🐐 pet 3 × 2 below (Aowu 17:57) ·
@@ -4300,4 +4334,4 @@ function tdResultBadge(){
 /* 🏷️ TD LOGO END */</script>
 </body>
 </html>
-<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a+fd-1a2+fd-1b) END OF TDStories.html -->
+<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a+fd-1a2+fd-1b+fd-1c) END OF TDStories.html -->
