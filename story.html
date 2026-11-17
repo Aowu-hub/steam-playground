@@ -1,4 +1,4 @@
-<!-- StoryLab.html — 📜 StoryKit lab (av-r0e3, hidden: ?page=story). Not in the Gameroom. 🗺️ a little islet with quest people (❗ markers by kind × state, 📍 pins, 👣 footsteps, 📖 tracker)
+<!-- StoryLab.html — 📜 StoryKit lab (av-r0e3+av-r0e4, hidden: ?page=story). Not in the Gameroom. 🗺️ a little islet with quest people (❗ markers by kind × state, 📍 pins, 👣 footsteps, 📖 tracker)
      · 💬 talk scenes (Grandma Noi · Toucanoo · 👑 Grand Yak) · 📋 quest board · 📜 the Chronicle · 🃏 quest card + QUEST DONE. -->
 <!DOCTYPE html>
 <html>
@@ -65,7 +65,7 @@ UI.navBar(document.getElementById('back-btn'), {});
   document.getElementById('top').style.setProperty('--nav-w', fix ? Math.ceil(n.getBoundingClientRect().right - app.getBoundingClientRect().left + 6) + 'px' : '0px'); })();
 (function(){
 'use strict';
-const St = window.Story, $ = id => document.getElementById(id), cv = $('cv'), g = cv.getContext('2d'), stage = $('stage'), ME = CURRENT_PLAYER || 'Aowu';
+const St = window.Story, $ = id => document.getElementById(id), cv = $('cv'), g = cv.getContext('2d'), G0 = g, stage = $('stage'), ME = CURRENT_PLAYER || 'Aowu';
 // 🐘 Pudding's face (a game can give any person its own painter)
 function elephant(q, px){ const k = px / 70; q.save(); q.translate(px * 0.42, px * 0.86); q.scale(-k, k); const grey = q2 => { const gr = q2.createLinearGradient(0, -40, 0, 0); gr.addColorStop(0, '#D8D2E4'); gr.addColorStop(1, '#A8A0BC'); return gr; };
   q.lineJoin = 'round'; q.strokeStyle = '#2A1C14'; q.lineWidth = 3;
@@ -150,11 +150,13 @@ function frame(now){ size(); S.t = now / 1000; g.setTransform(S.dpr, 0, 0, S.dpr
   const tq = ST.tracked(); ST.active().forEach(id => ST.pins(id).forEach(p => { const [sx, sy] = P(p.x + 0.5, p.y + 0.5); St.pin(g, sx, sy, SZ.pin, p.n, id === tq ? p.state : (p.state === 'done' ? 'done' : 'later'), St.KIND[St.get(id).kind].col, S.t); }));
   items.forEach(it => it.draw());
   const list = Object.keys(POS).map(id => ({id: 'lab.' + id, x: POS[id][0], y: POS[id][1]})), near = St.nearest(list, {x: S.me[0], y: S.me[1]}, 6);
-  near.forEach(p => { const m = ST.markerFor(p.id); if(!m) return; const [sx, sy] = P(p.x + 0.5, p.y + 0.5), h = p.id === 'lab.board' ? avPx() * 0.7 : p.id === 'lab.pudding' ? avPx() * 0.62 : avPx() * 1.02;
-    if(p.float) St.markerAt(g, sx, sy - h, SZ.marker, m, S.t); else { const [mx, my] = P(S.me[0], S.me[1]); if(sx < 0 || sx > S.W || sy < 0 || sy > S.H) St.edgeArrow(g, S.W, S.H, mx, my, sx, sy, St.KIND[m.kind].col, 1); } });
+  near.forEach(p => { const m = ST.markerFor(p.id); if(!m) return; const [sx, sy] = P(p.x + 0.5, p.y + 0.5), h = figTop(p.id, k);   // 📏 each mark sits just above its own head (av-r0e4b)
+    if(p.float) St.markerOver(g, sx, sy, h, SZ.marker, m, S.t); else { const [mx, my] = P(S.me[0], S.me[1]); if(sx < 0 || sx > S.W || sy < 0 || sy > S.H) St.edgeArrow(g, S.W, S.H, mx, my, sx, sy, St.KIND[m.kind].col, 1); } });
   requestAnimationFrame(frame); }
-function drawPerson(id, x, y, k){ const p = St.person(id), [sx, sy] = P(x, y); if(p.av) drawAvatar(g, {av: Object.assign({}, defaultAvatar(p.av), p.look || {}), name: p.av, dir: -1}, sx, sy, k, {t: S.t, still: true});
-  else if(p.ck && window.Creatures){ const def = Creatures.get(p.ck); if(def) Creatures.drawFor(g, def, sx, sy, avPx() * 0.72, {t: S.t}); }
+// 📏 a person's height from its own pixels (StoryKit headTop, cached per size step) — the toucan is short, Grandma Noi tall
+function figTop(id, k){ const ap = Math.round(avPx()); return St.headTop(id + '@' + ap, (q, x, y) => drawPerson(id, 0, 0, k, true, q, [x, y]), ap); }
+function drawPerson(id, x, y, k, still, q, at){ const g = q || G0, p = St.person(id), [sx, sy] = at || P(x, y); if(p.av) drawAvatar(g, {av: Object.assign({}, defaultAvatar(p.av), p.look || {}), name: p.av, dir: -1}, sx, sy, k, {t: S.t, still: true});
+  else if(p.ck && window.Creatures){ const def = Creatures.get(p.ck); if(def) Creatures.drawFor(g, def, sx, sy, avPx() * 0.72, {t: still ? 0 : S.t}); }
   else if(p.paint){ const px = avPx() * (id === 'lab.board' ? 0.8 : 0.7); g.save(); g.translate(sx - px / 2, sy - px * 0.92); p.paint(g, px, 'happy', S.t); g.restore(); } }
 // taps: a person → talk; a pin → walk there + do the step
 function hitPerson(px, py){ let best = null, bd = 1e9; Object.keys(POS).forEach(id => { const [sx, sy] = P(POS[id][0] + 0.5, POS[id][1] + 0.5), d = Math.hypot(px - sx, py - (sy - avPx() * 0.45)); if(d < avPx() * 0.6 && d < bd){ bd = d; best = 'lab.' + id; } }); return best; }
@@ -187,11 +189,11 @@ function dock(){ const D = $('dock'); D.innerHTML = ''; const row = document.cre
   if(S.view === 'talk') chipRow(row, [['noi', '👵', 'Grandma Noi'], ['toucanoo', '🐦', 'Toucanoo'], ['yak', '👑', 'Grand Yak'], ['basic', '🌱', S.basic ? 'Basic: reads aloud' : 'Basic off']], null, k => { if(k === 'basic'){ S.basic = !S.basic; dock(); return; } closeOverlays(); tapPerson('lab.' + k); });
   else chipRow(row, [['slime', '🫧', 'Beat a slime'], ['reset', '🔄', 'Start over'], ['basic', '🌱', S.basic ? 'Basic on' : 'Basic off']], null, k => { if(k === 'slime'){ const o = ST.event({do: 'beat', what: 'slime'}); note(o.length ? '🫧 slimes ' + o[0].n + ' / ' + o[0].of : '📋 take the daily job at the board first'); if(o[0] && o[0].ready) St.done(stage, o[0].id); tracker(); }
     else if(k === 'reset'){ fresh(); S.me = [4.5, 7.5]; closeOverlays(); tracker(); note('🔄 fresh story'); } else { S.basic = !S.basic; dock(); } }); }
-window.SK_LAB = {S, st: () => ST, setView, tapPerson, tapPin, hitPin, P, POS, fresh, tracker, closeOverlays};
+window.SK_LAB = {S, st: () => ST, figTop: id => figTop(id, avPx() / 104), avPx, setView, tapPerson, tapPin, hitPin, P, POS, fresh, tracker, closeOverlays};
 chipRow($('views'), VIEWS, 'map', setView); dock(); note('👆 tap a person with a ❗ · tap a 📍 to do the step'); requestAnimationFrame(frame); setTimeout(tracker, 50);
 window.addEventListener('resize', () => setTimeout(tracker, 60));
 })();
 </script>
 </body>
 </html>
-<!-- (av-r0e3) END OF StoryLab.html -->
+<!-- (av-r0e3+av-r0e4) END OF StoryLab.html -->
