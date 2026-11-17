@@ -2122,6 +2122,28 @@ function makeBtns(si){
   });
   return d;
 }
+/* 🐍 24s SNAKE-AWARE STICK (✨ polish chat, Aowu 2026-11-17 07:09 "it is 8 direction playing in 4 so sometime a left can go up").
+   The thumb can push any way, the grid snake only goes ↑ ↓ ◀ ▶ and only ever turns 90°. So the stick reads the part of the push
+   that can turn the snake: heading ↑ / ↓ → only ◀ ▶ count, heading ◀ ▶ → only ↑ ↓ count ("heading" = the last queued turn).
+   • a slanted push (up-left while going up) = the useful turn from ~27° off the heading line (was: within 32° of the turn line);
+   • a push along the heading = "keep going" (cancels a waiting stick turn, r36) — a straight-ish push never turns by itself;
+   • a turn just made is HELD while the thumb still points that way (the next turn needs ×1.25 more), so a held diagonal never zigzags;
+   • the pad's own ▲ ▼ ◀ ▶ glow shows the turn. 🧭 Snakigate (free steering) and keys / swipes are unchanged. */
+const SN_STICK = {on: 0.5, off: 0.3, perp: 0.45, ratio: 0.5, hold: 1.25};
+function snStickDir(v, base, st){
+  const K = SN_STICK, cur = st && st.dir;
+  if(v.m < (cur ? K.off : K.on)) return null;
+  const horiz = d => d === 'l' || d === 'r', comp = d => d === 'r' ? v.x : d === 'l' ? -v.x : d === 'd' ? v.y : -v.y;
+  if(!base) return Math.abs(v.x) >= Math.abs(v.y) ? (v.x > 0 ? 'r' : 'l') : (v.y > 0 ? 'd' : 'u');   // no snake: plain 4-way
+  const H = horiz(base), perp = H ? v.y : v.x, par = H ? v.x : v.y;
+  let d = null;
+  if(Math.abs(perp) >= K.perp && Math.abs(perp) >= Math.abs(par) * K.ratio) d = H ? (perp > 0 ? 'd' : 'u') : (perp > 0 ? 'r' : 'l');   // the useful turn
+  else if(Math.abs(par) >= (cur ? K.off : K.perp)) d = H ? (par > 0 ? 'r' : 'l') : (par > 0 ? 'd' : 'u');                              // along the heading = keep going
+  if(d && cur && st.turned && d !== cur && comp(cur) > 0 && comp(d) < comp(cur) * K.hold) d = cur;                                      // hold a turn just made
+  return d;
+}
+function snHeading(si){ const s = G && G.M && G.M.snakes && G.M.snakes[si]; return s ? (s.q && s.q.length ? s.q[s.q.length - 1] : s.dir) || null : null; }
+window.snStickDir = snStickDir; window.snHeading = snHeading;
 function makePad(si){
   const p = document.createElement('div'); p.className = 'tpad'; p.dataset.seat = si;
   p.innerHTML = '<div class="knob"></div><span class="ar u">▲</span><span class="ar d">▼</span><span class="ar l">◀</span><span class="ar r">▶</span>';
@@ -2138,9 +2160,9 @@ function makePad(si){
     if(!dir) return;
     p.querySelectorAll('.ar').forEach(x => x.classList.toggle('lit', x.classList.contains(dir)));
     if(p.__dir !== dir){ p.__dir = dir; turnSeat(si, dir, true); try{ navigator.vibrate && navigator.vibrate(8); }catch(err){} } };
-  p.addEventListener('pointerdown', e => { e.preventDefault(); id = e.pointerId; try{ p.setPointerCapture(id); }catch(err){} p.__dir = null; p.__lit = null; move(e, true); });
+  p.addEventListener('pointerdown', e => { e.preventDefault(); id = e.pointerId; try{ p.setPointerCapture(id); }catch(err){} p.__dir = null; p.__lit = null; p.__st = null; move(e, true); });
   UI.onFastMove(p, e => { if(e.pointerId === id) move(e); });
-  const end = e => { if(e.pointerId !== id) return; id = null; knob.style.transform = ''; p.__dir = null; p.__lit = null; p.querySelectorAll('.ar').forEach(a => a.classList.remove('lit')); };
+  const end = e => { if(e.pointerId !== id) return; id = null; knob.style.transform = ''; p.__dir = null; p.__lit = null; p.__st = null; p.querySelectorAll('.ar').forEach(a => a.classList.remove('lit')); };
   p.addEventListener('pointerup', end); p.addEventListener('pointercancel', end);
   return p;
 }
@@ -2525,4 +2547,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.themes', {rows: 2}); UI.pageRows('.skins', {rows: 2}); }</script>
 </body>
 </html>
-<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a+p3e+cs-2b+ck-2c+pz-1+24n) END OF Snakize.html -->
+<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a+p3e+cs-2b+ck-2c+pz-1+24n+24s) END OF Snakize.html -->
