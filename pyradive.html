@@ -994,7 +994,7 @@ var PD = (function () {
     // K on a high ball near the net = jump + dunk in one press (people) — the jump starts now
     // 💥 pd-6b2 run-up: your team's ball still going up (or high and far) → run to the spot under its way down, jump at the right moment
     var bb = M.ball, ttd = bb.vz < 0 ? (bb.z - 2.9) / Math.max(0.5, -bb.vz) : 9;
-    if ((key === 'drive' || key === 'dink') && !isStrike(M) && p.z === 0 && !p.dive && M.side === p.team && M.n >= 1 && bb.held == null && uOf(p.team, bb.x) > 0 && uOf(p.team, bb.x) < 3.6 && bb.z > 1.4 && ttd > 0.32) { p.approach = { key: key, t: 1.6 }; p.want = { key: key, t: 0.6 }; ev(M, 'approach', { p: p.id }); }
+    if ((key === 'drive' || (key === 'dink' && !isStrike(M))) && p.z === 0 && !p.dive && M.side === p.team && M.n >= 1 && bb.held == null && uOf(p.team, bb.x) > 0 && uOf(p.team, bb.x) < 3.6 && bb.z > 1.4 && ttd > 0.32) { p.approach = { key: key, t: 1.6 }; p.want = { key: key, t: 0.6 }; ev(M, 'approach', { p: p.id }); }
     else if (key === 'drive' && p.z === 0 && !p.dive && M.ball.z > 2.0 && uOf(p.team, p.x) < 3.2 && hyp(M.ball.x - p.x, M.ball.y - p.y) < 2.4) jump(M, p, true);
     return true;
   }
@@ -1757,7 +1757,7 @@ var PD = (function () {
 
   return { DT: DT, ARENA_GRAV: ARENA_GRAV, MODES: MODES, MODE_ORDER: MODE_ORDER, LEVELS: LEVELS, FILL: FILL, PYRA_COST: PYRA_COST, METER_MAX: METER_MAX, ROLE_ICON: ROLE_ICON, ROLE_NAME: ROLE_NAME, STRIKE_NAME: STRIKE_NAME, actName: actName, isStrike: isStrike, ACT_NAME: ACT_NAME,
     pyraName: pyraName, SPIRITS: SPIRITS, SPIRITS_DUO: SPIRITS_DUO, SPIRITS_TRIO: SPIRITS_TRIO, armTeam: armTeam, SPIRIT_COST: SPIRIT_COST, spiritGo: spiritGo, slotOf: slotOf, newMatch: newMatch, step: step, tick: tick, input: input, press: press, release: release, takeEvents: takeEvents, simulate: simulate,
-    canReach: canReach, doTouch: doTouch, sparkTouch: sparkTouch, sparkTick: sparkTick, sparkReach: sparkReach, sparkPredict: sparkPredict, SPARK: SPARK, isSpark: isSpark, noHands: noHands, hoopTouch: hoopTouch, hoopTick: hoopTick, hoopReach: hoopReach, HOOP: { Z: HOOP_Z, R: HOOP_R, RING: RING, PTS: HOOP_PTS, NAME: HOOP_NAME, T: HOOP_T }, serve: serve, feedServe: feedServe, feederOf: feederOf, feedSpot: feedSpot, circleSpot: circleSpot, jumpServe: jumpServe, botServe: botServe, startServe: startServe, predict: predict, assign: assign, nextNOf: nextNOf, fill: fill, isPerson: isPerson, uOf: uOf, sgn: sgn, baseOf: baseOf, guideFor: guideFor,
+    canReach: canReach, doTouch: doTouch, sparkTouch: sparkTouch, sparkTick: sparkTick, sparkReach: sparkReach, sparkPredict: sparkPredict, SPARK: SPARK, isSpark: isSpark, noHands: noHands, hoopTouch: hoopTouch, hoopTick: hoopTick, hoopReach: hoopReach, HOOP: { Z: HOOP_Z, R: HOOP_R, RING: RING, PTS: HOOP_PTS, NAME: HOOP_NAME, T: HOOP_T, UP: FEED_UP }, serve: serve, feedServe: feedServe, feederOf: feederOf, feedSpot: feedSpot, circleSpot: circleSpot, jumpServe: jumpServe, botServe: botServe, startServe: startServe, predict: predict, assign: assign, nextNOf: nextNOf, fill: fill, isPerson: isPerson, uOf: uOf, sgn: sgn, baseOf: baseOf, guideFor: guideFor,
     BALL_R: BALL_R, DRILL: DRILL, PARTY: PARTY, zoneRect: zoneRect, drillEnd: drillEnd, partyTick: partyTick, SPIRIT: null };   // 🔥🔥 SPIRIT = R2 hook: Spirit Dive supers (full meter) plug in here
 })();
 if (typeof module !== 'undefined') module.exports = PD;
@@ -3027,6 +3027,14 @@ const BEAT_HAS = {};
 function beatsOn(){ return typeof Acting !== 'undefined' && Acting.play && Acting.beatsOf && !!Acting.beatsOf('pyradive.bump'); }
 function hasBeat(key){ return key && (BEAT_HAS[key] != null ? BEAT_HAS[key] : (BEAT_HAS[key] = !!(beatsOn() && Acting.beatsOf(key)))); }
 function beatKeyOf(p){ const a = p.act; if(!a) return null; const k = BEAT_OF[(a === 'serve' || a === 'drive') && p.z > 0.1 ? 'dunk' : a]; return hasBeat(k) ? k : null; }
+/* 🦶 pd-6c (plan `claude/pyradive-actions-plan.md` §12): takraw FEET moves in 🦶 PyraStrike + ⭕ Hoop — the engine names the touch (p.act + p.style),
+   the picture follows: dig → 🦶 inside pass · bump → 🦵 knee · set → 🗣️ header · dink → 👠 heel · drive / serve / a dunk from the floor → swinging kick ·
+   a dunk in the air → 🌀 roll strike (🚲 bicycle when p.style = 'bicycle', then it lands on the back + rolls up) · 🧱 block = back to the net, legs up ·
+   🧺 the toss (Strike tosser · Hoop self-toss). Contact = the engine's touch frame, wind-ups held just short of it. ⚡ Spark keeps its poses (pd-6d). */
+const FEET_OF = {dig: 'pyradive.kpass', bump: 'pyradive.knee', set: 'pyradive.header', dink: 'pyradive.heel', drive: 'pyradive.kserve', serve: 'pyradive.kserve'};
+function feetOn(M){ return PD.isStrike(M) && hasBeat('pyradive.kpass'); }
+function feetKeyOf(p){ const a = p.act; if(!a) return null; const k = a === 'dunk' ? (p.style === 'bicycle' ? 'pyradive.bicycle' : p.z > 0.1 ? 'pyradive.kroll' : 'pyradive.kserve') : FEET_OF[a]; return hasBeat(k) ? k : null; }
+function feetLow(z){ return z < 0.75 ? 'pyradive.kpass' : z < 1.75 ? 'pyradive.knee' : 'pyradive.header'; }   // the body part by the ball's height (= doTouch: dig < 0.75 m ≤ bump < 1.75 m ≤ set)
 // 🖼️ beat frames are rounded a little (angles to 1/6 rad, body shifts to 2 px) so blended in-betweens share pictures — the cache stays small with 11 moves
 function bQ(pose){ const o = {}; for(const n in pose){ const v = pose[n]; o[n] = typeof v !== 'number' ? v : n === 'dy' ? Math.round(v / 2) * 2 : n === 'sx' || n === 'sy' ? Math.round(v * 25) / 25 : n === 'platform' ? Math.round(v * 2) / 2 : Math.round(v * 6) / 6; } return o; }
 function bRun(M, p, key, t0, contactAt){ const B = p.bt; B.run = Acting.play({name: p.name, av: p.av}, key, {t0, contactAt, from: B.last || undefined, speed: M.level === 0 ? 1.15 : 1}); B.key = key; B.t0 = t0; B.cap = null; return B.run; }
@@ -3054,17 +3062,53 @@ function beatPose(M, p){
     }
     else if(B.cap != null && !B.air){ B.run = null; B.key = null; B.cap = null; }   // the ball went elsewhere: let go (the next run blends from here)
   }
+  else if(feetOn(M)){   // 🦶 pd-6c
+    const fk = p.act && p.actT < 0.15 ? feetKeyOf(p) : null, hoop = isHoop(M), b = M.ball, held = B.cap != null;
+    // 1 · the real touch: contact = the engine's touch moment
+    if(fk){ const tc = Math.round((now - p.actT) * 1000) / 1000; if(B.touch !== tc){ B.touch = tc; bRun(M, p, fk, tc, tc); B.bike = fk === 'pyradive.bicycle'; } }
+    // 2 · 🧺 the toss — Strike: the tosser lets go when the feed starts · Hoop: the holder throws it up to himself (the launch)
+    else if(hoop && M.phase === 'rally' && M.tosser === p.id && M.lastP == null && now - b.hitT < 0.2 && hasBeat('pyradive.toss')){ if(B.touch !== b.hitT){ B.touch = b.hitT; bRun(M, p, 'pyradive.toss', b.hitT, b.hitT); } }
+    else if(M.phase === 'serve' && hasBeat('pyradive.toss') && (hoop ? b.held === p.id : M.feeder === p.id && b.held !== p.id)){
+      const sv = hoop ? p : M.players.find(q => q.id === b.held), fed = !hoop && sv && sv.feed;
+      if(fed){ if(B.touch !== fed.t0){ B.touch = fed.t0; bRun(M, p, 'pyradive.toss', fed.t0, fed.t0); } }
+      else {   // a robot decides when: the wind-up shows just before (a person's tap plays it from the release)
+        const tc = hoop ? (PD.isPerson(p) ? null : now - M.phaseT + PD.HOOP.UP) : (sv && !PD.isPerson(sv) && !PD.isPerson(p) ? now - M.phaseT + M.serveWait : null);
+        if(tc != null && tc - now > 0 && tc - now <= BEAT_LEAD){ if(!(B.key === 'pyradive.toss' && held)) bHold(M, p, 'pyradive.toss', now, tc); }
+      }
+    }
+    // 3 · 🦶 the server: swing leg draws back while the toss flies, the kick lands when the ball reaches the foot (= the engine's serve)
+    else if(!hoop && M.phase === 'serve' && b.held === p.id && p.feed && hasBeat('pyradive.kserve')){
+      if(!(B.key === 'pyradive.kserve' && held)) bHold(M, p, 'pyradive.kserve', now, p.feed.t0 + (p.feed.T || 0.6));
+    }
+    // 4 · wind-up before the ball arrives — Strike: the receiver of touch 1 / 2 (a low 3rd ball too) by the height it will meet the body
+    else if(!hoop && M.phase === 'rally' && M.recv[T] === p.id && M.cp[T] && p.z === 0 && !p.dive && (!p.act || p.actT > 0.5)){
+      const n = M.side === T ? M.n : 0, cp = M.cp[T], tc = M.assignT + cp.t, lead = tc - now, key = n <= 1 || cp.z < 1.75 ? feetLow(cp.z) : null;
+      if(key && hasBeat(key) && lead > 0 && lead <= BEAT_LEAD && !(B.key === key && held)) bHold(M, p, key, now, tc);
+      else if(!key && held && !B.air){ B.run = null; B.key = null; B.cap = null; }
+    }
+    // 4b · ⭕ Hoop: the next touch comes when the ball drops into reach (≈ 2.4 m over the feet) — a header for robots, people when they pressed
+    else if(hoop && M.phase === 'rally' && M.recv[T] === p.id && p.z === 0 && (!PD.isPerson(p) || p.want) && (!p.act || p.actT > 0.5) && hasBeat('pyradive.header')){
+      if(B.pr == null || B.pr.h !== b.hitT){ const pr = PD.predict(M, 2.4).at; B.pr = {h: b.hitT, t: now + pr.t, x: pr.x, y: pr.y}; }
+      const lead = B.pr.t - now, near = Math.hypot(B.pr.x - p.x, B.pr.y - p.y) < 1.4;
+      if(near && lead > 0 && lead <= BEAT_LEAD && !(B.key === 'pyradive.header' && held)) bHold(M, p, 'pyradive.header', now, B.pr.t);
+    }
+    else if(held && !B.air){ B.run = null; B.key = null; B.cap = null; }
+  }
   // 🦘 take-off and 🛬 landing (every sport) — volleyball: 🧱 block · 🦘 jump serve · 💥 attack jump get their own act
+  const feet = feetOn(M);   // 🦶 pd-6c
   if(p.z > 0.02 && !B.air){
-    B.air = true;
+    B.air = true; if(feet) B.bike = false;
     const spiker = M.phase === 'rally' && M.side === T && M.n === 2 && (M.spiker[T] === p.id || M.recv[T] === p.id);
     const attack = (p.want && (p.want.key === 'drive' || p.want.key === 'dink')) || spiker;
     if(hands && p.block > 0 && hasBeat('pyradive.block')) bRun(M, p, 'pyradive.block', now, now + 0.07);
     else if(hands && p.jumpServe && hasBeat('pyradive.spike')) bHold(M, p, 'pyradive.spike', now, now + Math.max(0.14, p.vz / BEAT_G));
     else if(hands && attack && !(p.act && p.actT < 0.2) && hasBeat('pyradive.spike')) bHold(M, p, 'pyradive.spike', now, now + 0.3);
+    else if(feet && p.block > 0 && hasBeat('pyradive.fblock')) bRun(M, p, 'pyradive.fblock', now, now + 0.07);   // 🦶 pd-6c 🧱 back to the net, legs up
+    else if(feet && !(p.act && p.actT < 0.2) && (isHoop(M) ? M.ball.z - p.z > 1.4 : (p.want && p.want.key === 'drive') || spiker)){   // 🦶 pd-6c attack jump: 🌀 roll strike (🔥 armed / a high Hoop ball = 🚲 bicycle)
+      const k = isHoop(M) || p.pyraArm ? 'pyradive.bicycle' : 'pyradive.kroll'; if(hasBeat(k)){ bHold(M, p, k, now, now + 0.3); B.bike = k === 'pyradive.bicycle'; } else bRun(M, p, 'pyradive.jump', now, now); }
     else if(!p.block && !(p.act && p.actT < 0.4) && !(M.phase === 'serve' && M.ball.held === p.id)) bRun(M, p, 'pyradive.jump', now, now);
   }
-  else if(p.z <= 0.02 && B.air){ B.air = false; if(!p.dive) bRun(M, p, 'pyradive.land', now, now); }
+  else if(p.z <= 0.02 && B.air){ B.air = false; if(!p.dive) bRun(M, p, feet && B.bike && hasBeat('pyradive.rollup') ? 'pyradive.rollup' : 'pyradive.land', now, now); B.bike = false; }   // 🦶 pd-6c: a 🚲 bicycle lands on the back + rolls up
   if(!B.run) return null;
   const step = p.human ? BEAT_STEP : BEAT_STEP * 1.6, tq = B.t0 + Math.round((now - B.t0) / step) * step,   // robots: 12 frames a second is plenty (fewer pictures)
      f = B.run.at(B.cap != null ? Math.min(tq, B.cap) : tq);
@@ -3074,7 +3118,7 @@ function beatPose(M, p){
 // 🖼️ pictures of the beat frames are painted ahead (warm-up) for people, so the first touch never waits for new pictures (the most common moves only — the rest paint on demand)
 function beatWarmPoses(M){
   if(!beatsOn()) return [];
-  const out = [], keys = (PD.noHands(M) ? [] : ['pyradive.bump', 'pyradive.set', 'pyradive.spike']).concat(['pyradive.jump', 'pyradive.land']).filter(hasBeat);
+  const out = [], keys = (feetOn(M) ? ['pyradive.kpass', 'pyradive.knee', 'pyradive.header', 'pyradive.kserve'] /* 🦶 pd-6c */ : PD.noHands(M) ? [] : ['pyradive.bump', 'pyradive.set', 'pyradive.spike']).concat(['pyradive.jump', 'pyradive.land']).filter(hasBeat);
   keys.forEach(k => { const run = Acting.play({name: 'warm', av: {}}, k, {t0: 0, speed: M.level === 0 ? 1.15 : 1}), end = run.start[run.start.length - 1] + run.D[run.D.length - 1].ms;
     for(let ms = 0; ms <= end + 1; ms += BEAT_STEP * 1000){ const f = run.at(ms / 1000); if(f.pose) out.push(Object.assign({}, IDLE_POSE, bQ(f.pose))); } });
   return out;
@@ -3176,7 +3220,7 @@ function drawPlayer(g, M, p, t, o){
   if(!p.av) p.av = playAv(defaultAvatar(p.name));
   if(!p.av._h) p.av._h = String(p.id) + Math.random().toString(36).slice(2, 6);
   const a = {name: p.name, av: p.av, dir: p.dir, gest};
-  const bp = gest || !live ? null : beatPose(M, p), special = PD.noHands(M) ? (p.dive || (p.block > 0 && p.z > 0) || (M.phase === 'serve' && (M.ball.held === p.id || M.feeder === p.id)) || (p.act && p.actT < 0.4)) : !!(p.act && p.actT < 0.4 && !beatKeyOf(p) && !(p.act === 'dive' && p.bt && p.bt.key === 'pyradive.dive'));   // 🎬 pd-6a · 🏐 pd-6b: every volleyball move has its beats
+  const bp = gest || !live ? null : beatPose(M, p), special = feetOn(M) ? !!p.dive /* 🦶 pd-6c */ : PD.noHands(M) ? (p.dive || (p.block > 0 && p.z > 0) || (M.phase === 'serve' && (M.ball.held === p.id || M.feeder === p.id)) || (p.act && p.actT < 0.4)) : !!(p.act && p.actT < 0.4 && !beatKeyOf(p) && !(p.act === 'dive' && p.bt && p.bt.key === 'pyradive.dive'));   // 🎬 pd-6a · 🏐 pd-6b: every volleyball move has its beats
   const pose = gest ? null : bp && !special ? Object.assign({}, IDLE_POSE, bp.pose) : Object.assign({}, IDLE_POSE, p.walkT && p.z === 0 && !p.act ? walkPose(p.walkT) : p.z > 0 ? AIR_POSE : null, poseOf(M, p, t) || {});
   // ground shadow (smaller + lighter in the air), then the cached body picture
   const sh = 1 - Math.min(0.55, p.z / 1.4); g.fillStyle = 'rgba(0,0,0,' + (0.22 * sh).toFixed(3) + ')'; g.beginPath(); g.ellipse(fx, fy, 15 * kAv * sh, 6 * kAv * sh, 0, 0, 7); g.fill();
@@ -3579,4 +3623,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (pd-4c+cs-pd+ck-2d+pd-4e+pd-5a+pd-7+pd-5b+pd-6a+pd-5c+pd-6b+pd-5d+pd-6b2+pd-5e) END OF PyraDive.html -->
+<!-- (pd-4c+cs-pd+ck-2d+pd-4e+pd-5a+pd-7+pd-5b+pd-6a+pd-5c+pd-6b+pd-5d+pd-6b2+pd-5e+pd-6c) END OF PyraDive.html -->
