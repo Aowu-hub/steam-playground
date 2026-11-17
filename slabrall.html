@@ -2304,6 +2304,71 @@ window.addEventListener('resize', () => { if(G){ resize(); buildPads(); } });
   watch('scr-play', [], () => !!G, () => { resize(); buildPads(); });
 })();   // 📱 ls-1b END
 
+/* 🎬 SLABRALL BEATS (b3b5, 🧱 baseline chat, 2026-11-18) START — every swing = 3–5 beats on the shared timeline (Acting.play).
+   The ENGINE owns contact: its 'hit' / 'serve' event = the contact tick (sbbEvent re-times the act so contact lands right then).
+   The page watches the ball: when it will reach a player's reach in ≈ 0.25 s the wind-up starts (forehand / backhand by the ball's side on
+   screen, smash for a high ball, the shot already queued if any) and is held there until the hit — or let go if the ball never comes.
+   The server holds a serve stance while waiting (overhand 🎾 🧱 · underhand 🥒 🏸 🏓 · 🏒 push). A point = ✊ for the winners, 😩 for the others.
+   Clock = M.t (stops with ⏸ / comics). 📡 guests get contact-first acts from the host's events. Acts: 🎭 BLOCK `slabrall` (AvatarActs). */
+const SBB_HAS = typeof Acting !== 'undefined' && typeof Acting.play === 'function', SBB_LEAD = 0.28;
+window.SBB_LOG = window.SBB_LOG || [];
+// per-player act state lives OUTSIDE the engine's player objects (📡 the host sends those objects as pictures): a WeakMap
+const SBB_M = new WeakMap();
+function sbbH(p){ let H = SBB_M.get(p); if(!H){ H = {act: null, back: false}; SBB_M.set(p, H); } return H; }
+function sbbStart(p, act, contactAt, o){
+  o = o || {}; const M = G && G.M; if(!SBB_HAS || !M || !p || !Acting.act(act)) return null;
+  const now = M.t, H = sbbH(p), cur = H.act, from = cur && cur.run.last && !cur.run.done ? cur.run.last : undefined;
+  const run = Acting.play({name: p.name, av: p.av}, act, {t0: now, contactAt, from, onContact: r => {
+    window.SBB_LOG.push({p: p.i, act, t: G && G.M ? G.M.t : now, at: r.contactT}); if(window.SBB_LOG.length > 200) window.SBB_LOG.shift(); }});
+  H.act = {act, run, wait: !!o.wait, hold: !!o.hold, key: o.key || null};
+  run.at(contactAt != null && contactAt <= now + 1e-6 ? Math.max(now, run.contactT) + 1e-6 : now); return H.act;
+}
+function sbbShotAct(p, shot, jump){
+  const sp = G.M.sp; if(sp.kind === 'puck') return 'slabrall.push';
+  if(jump === 'v') return 'slabrall.jumpsmash'; if(jump === 'h' || p.diveT > 0) return 'slabrall.dive';
+  return shot === 'smash' ? 'slabrall.smash' : shot === 'lob' ? 'slabrall.lob' : shot === 'drop' ? 'slabrall.drop' : shot === 'slice' ? 'slabrall.slice' : sbbH(p).back ? 'slabrall.back' : 'slabrall.drive';
+}
+function sbbServeAct(){ const sp = G.M.sp; return sp.kind === 'puck' ? 'slabrall.push' : sp.serve === 'under' || sp.pongServe ? 'slabrall.under' : 'slabrall.serve'; }
+// the engine's events (host / solo: right after the step; 📡 guests: when their picture reaches the event)
+function sbbEvent(e){
+  const M = G && G.M; if(!SBB_HAS || !M) return; const p = e.p != null ? M.players[e.p] : null;
+  if(e.k === 'hit' && p) sbbStart(p, sbbShotAct(p, e.shot, e.jump), M.t);
+  else if(e.k === 'serve' && p) sbbStart(p, sbbServeAct(), M.t);
+  else if(e.k === 'legendmiss' && p) sbbStart(p, 'slabrall.whiff', M.t);
+  else if(e.k === 'jump' && p && !e.ok && e.kind === 'h'){ const A = sbbH(p).act; if(!(A && A.run.t0 === M.t)) sbbStart(p, 'slabrall.dive', M.t); }   // a dive that missed
+  else if(e.k === 'point') M.players.forEach(q => sbbStart(q, q.side === e.side ? 'slabrall.yes' : 'slabrall.aww', M.t));
+}
+// look ahead: the ball will reach this player's reach in ≈ 0.25 s → the wind-up starts (one per ball flight); the server holds a stance
+function sbbAhead(){
+  const M = G && G.M; if(!SBB_HAS || !M || M.score.done) return; const sp = M.sp;
+  if(M.state === 'serve'){ const b = M.balls[0]; if(b && b.held != null){ const p = M.players[b.held], H = p && sbbH(p);
+    if(p && (!H.act || H.act.run.done || (H.act.key !== 'serve' && H.act.run.fired))) sbbStart(p, sbbServeAct(), M.t + 0.3, {wait: true, hold: true, key: 'serve'}); } return; }
+  if(M.state !== 'play') return;
+  M.balls.forEach(b => { if(!b.live || !b.real || b.held != null) return; let best = null, bt = 1e9;
+    M.players.forEach(p => { if(p.diveT > 0 || p.air > 0) return;
+      if(!sp.squash && sp.kind !== 'puck' && b.owner === p.side) return;          // it just left this side
+      if(sp.squash && b.owner === p.side) return;                                  // squash: the other side's turn
+      const rx = b.x - p.x, ry = b.y - p.y, d = Math.hypot(rx, ry) || 1e-3, cl = -(rx * (b.vx - (p.vx || 0)) + ry * (b.vy - (p.vy || 0))) / d;   // closing speed: the ball AND the player's run
+      let tc; if(sp.kind === 'puck'){ if((b.x < 0) !== (p.side === 0)) return; tc = (d - SB.reachOf(M, p) - (sp.puckR || 0.4)) / Math.max(cl, 4); }   // 🏒 the puck on your half: the mallet chases it
+      else { if(cl < 0.5) return; tc = (d - SB.reachOf(M, p)) / cl; } if(tc < 0 || tc > SBB_LEAD) return; if(sp.kind === 'puck') sbbWind(M, b, p, tc); else if(tc < bt){ bt = tc; best = p; } });   // 🏒 every paddle near the puck · net games: the one who will reach it first
+    if(best) sbbWind(M, b, best, bt);
+  });
+}
+function sbbWind(M, b, p, tc){ const sp = M.sp, H = sbbH(p), key = 'b' + (b.hits || 0) + ':' + M.balls.indexOf(b) + (sp.kind === 'puck' ? ':' + Math.floor(M.t * 2) : '');   // 🏒 a puck has no hit count: one wind-up per half second at most
+  if(H.aheadKey === key) return; const A = H.act; if(A && !A.run.fired) return;   // already winding up / not yet hit
+  const q = p.queued, act = sp.kind === 'puck' ? 'slabrall.push' : q && q !== 'normal' ? sbbShotAct(p, q) : (b.z > 1.7 && !sp.table ? 'slabrall.smash' : H.back ? 'slabrall.back' : 'slabrall.drive');
+  H.aheadKey = key; sbbStart(p, act, M.t + tc + 0.06, {wait: true, key}); }
+// the frame to draw now (null = the game's own pose / gesture); a waiting wind-up holds just before contact, then lets go
+function sbbFrame(p){
+  const M = G && G.M, H = p && SBB_M.get(p), A = H && H.act; if(!A || !M) return null; const now = M.t;
+  if(A.wait && !A.run.fired && now >= A.run.contactT - 0.02){
+    const keep = A.hold ? (M.state === 'serve' && M.balls[0] && M.balls[0].held === p.i) : now <= A.run.contactT + 0.35;
+    if(!keep){ H.act = null; H.aheadKey = null; return null; } return A.run.last; }   // let go; the same flight may wind up again
+  const f = A.run.at(now); if(f.done){ H.act = null; return null; } return f;
+}
+// forehand / backhand: is the nearest real ball on this player's facing side on screen?
+function sbbSide(V, M, p, fx, dir){ const b = M.balls.find(q => q.live && q.real); if(!b) return; const q = V.P(b.x, b.y, b.z || 0); sbbH(p).back = (q[0] - fx) * dir < -4; }
+/* 🎬 SLABRALL BEATS END */
 /* ---------- loop ---------- */
 function frame(now){
   if(!G) return;
@@ -2314,7 +2379,7 @@ function frame(now){
     readInputs();
     G.acc += dt; let n = 0;
     while(G.acc >= SB.DT && n < 12){ SB.step(G.M, SB.DT); G.acc -= SB.DT; n++; }
-    const evs = SB.takeEvents(G.M); handleEvents(evs); if(G.lk && evs.length) G.lk.evs.push.apply(G.lk.evs, evs);
+    const evs = SB.takeEvents(G.M); handleEvents(evs); if(typeof sbbAhead === 'function') sbbAhead(); /* 🎬 b3b5 */ if(G.lk && evs.length) G.lk.evs.push.apply(G.lk.evs, evs);
     if(G.M.score.done && !G.over) finishMatch();
   }
   if(G && G.link && G.link.role === 'host') lkHostTick(now);
@@ -2471,6 +2536,7 @@ function cheerEnd(){ if(!window.Cheer || !Cheer.active() || !G) return; const wi
 const WHY = {floor: 'it touched the floor', net: 'into the net', out: 'out!', own: 'on their own side', twice: 'bounced twice', past: 'got past', ace: 'ACE!', kitchen: 'kitchen volley!', wall: 'hit the glass first', serve: 'serve fault', goal: 'GOAL!', legend: 'LEGENDARY GOAL!', stuck: 'too long a rally', hardcore: ''};
 function handleEvents(list){
   const M = G.M;
+  if(typeof sbbEvent === 'function') list.forEach(sbbEvent);   /* 🎬 b3b5: contact = the engine's event */
   list.forEach(e => {
     if(e.k === 'hit'){ UISound.play(e.shot === 'smash' ? 'whoosh' : 'pop'); const p = M.players[e.p]; if(e.perfect && p.human && !FX){ bigWord('PERFECT!'); } if(e.shot === 'smash' && p.human && !FX) floatAt(p, '💥 SMASH', 0.9);   // st-1: with effects on, the Sla… callouts say it
       if(e.rally === 10 || e.rally === 20 || e.rally === 30) banner('🔁 ' + e.rally + '-hit rally!', 'gold');
@@ -3046,7 +3112,11 @@ function drawPlayer(g, V, M, p, t){
   let jumpH = 0; if(p.air > 0){ const u = 1 - p.air / SB.JUMP_AIR; jumpH = Math.sin(Math.PI * Math.min(1, u)) * ks * 0.95 / k; Object.assign(pose, {armL: 2.3, legL: 0.45, legR: -0.35}); }
   if(p.diveT > 0){ const u = 1 - p.diveT / SB.DIVE_T, amt = u < 0.55 ? 1.35 * Math.min(1, u / 0.12) : 1.35 * Math.max(0, 1 - (u - 0.55) / 0.45), q = V.P(p.x + (p.diveDx || 0), p.y + (p.diveDy || 1), 0), sgn = q[0] >= feet[0] ? 1 : -1; pose.rot = sgn * amt * dir; pose.armL = 1.6; }
   const fromBack = !gest && ((V.mode === 'behind' && p.side === V.camSide) || V.mode === 'iso');   // 🔙 we see the backs of the people on the camera side
-  drawAvatar(g, {name: p.name, av: p.av, dir, walkT: walking && !(p.stand > 0) ? t : 0, gest, jumpH, fromBack}, back[0], back[1], k, {t, pose: gest ? undefined : pose});
+  if(typeof sbbSide === 'function') sbbSide(V, M, p, back[0], dir);   /* 🎬 b3b5: forehand / backhand */
+  const SF = typeof sbbFrame === 'function' ? sbbFrame(p) : null;
+  if(SF){ const P2 = Object.assign({}, pose, SF.pose); if(p.diveT > 0 && pose.rot != null) P2.rot = pose.rot; if(p.stun > 0 && pose.rot != null) P2.rot = (P2.rot || 0) + pose.rot;   /* 🎬 b3b5: the act's body, the game's own tip / wobble */
+    try { Acting.draw(g, {name: p.name, av: p.av, dir, walkT: walking && !(p.stand > 0) ? t : 0, jumpH, fromBack}, back[0], back[1], k, Object.assign({}, SF, {pose: P2}), {t, keep: true}); } catch(e){ drawAvatar(g, {name: p.name, av: p.av, dir, walkT: 0, gest, jumpH, fromBack}, back[0], back[1], k, {t, pose}); } }
+  else drawAvatar(g, {name: p.name, av: p.av, dir, walkT: walking && !(p.stand > 0) ? t : 0, gest, jumpH, fromBack}, back[0], back[1], k, {t, pose: gest ? undefined : pose});
   // name tag + power
   // small name tag (sb2-1: never bigger than 13 px — the near player was a giant label in the old portrait view)
   const tag = [back[0], back[1] - k * (92 + jumpH)], fs = Math.round(Math.max(9, Math.min(13, ks * 0.3))); g.font = '800 ' + fs + 'px Nunito, sans-serif'; g.textAlign = 'center'; g.fillStyle = 'rgba(0,0,0,0.45)';
@@ -3460,4 +3530,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+lk-1b+p1d+lk-1c+cs-1+lk-2e+dv-1+tb-1+lk-5e+lk-5f+ls-1b+pz-1+24t-a+b3w5+st-2b+lk-6c+24u-d1) END OF SlaBrall.html -->
+<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+lk-1b+p1d+lk-1c+cs-1+lk-2e+dv-1+tb-1+lk-5e+lk-5f+ls-1b+pz-1+24t-a+b3w5+st-2b+lk-6c+24u-d1+b3b5) END OF SlaBrall.html -->
