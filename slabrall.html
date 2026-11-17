@@ -2089,6 +2089,7 @@ function startMatch(cfg){
     view: viewFor(M), help: SET.help !== false, aimTold: false,
     comics: !!FX && !lnk && M.players.some(p => p.human && Comic.enabled(p.name)), /* 📡 linked: no comic pauses (they would stop every device) */ plog: newPlog(), mlog: [], nextStrip: 2 + Math.floor(Math.random() * 3), lastImpact: -99, camY: 0};
   cheerMount();   // 📣 cs-1: the crowd for this match (Off = nothing)
+  calloutSetup();   /* 💬 24t */
   BAR.level(cup ? '🏆 ' + cup.round : sp.icon + ' ' + sp.name + ' · ' + LEVEL_UI[level].emoji + ' ' + SB.LEVELS[level].name, SB.LEVELS[level].hardcore ? 'hc' : '');
   G.tn = [teamName(0), teamName(1)];   // 🎛️ p1c: the two sides = two player cards (🧡 left · 🩵 right, a letter badge on small phones), the server glows
   BAR.players([0, 1].map(i => ({k: i, av: (Array.from(G.tn[i] || '?')[0] || '?').toUpperCase(), name: G.tn[i], score: 0, col: i ? '#18B8A6' : '#FF7A1A'})));
@@ -2261,7 +2262,7 @@ function leavePlay(){
   const lb = G.link ? (G.link.role === 'host' ? 'This ends the match on every device.' : 'A 🤖 robot plays for you until you come back.') : null;   // 📡 lk-1b
   UI.confirm({icon: '◀', title: 'Leave this match?', body: lb || (G.cup ? 'You can play this tournament match again from the bracket.' : 'This match won\'t be saved.'), okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(!G) return; G.paused = was; if(ok){ if(G.link) lkExit(); else if(G.cup) backToBracket(); else backToMenu(); } });
 }
-function backToMenu(){ if(window.Cheer) Cheer.unmount(); if(G && G.link){ lkExit(); return; } if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); $('pads').innerHTML = ''; renderMenu(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); /* 💬 24t off */ if(window.UI && UI.callout) UI.callout.setup(null); if(G && G.link){ lkExit(); return; } if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); $('pads').innerHTML = ''; renderMenu(); showScreen('menu'); }
 
 /* ---------- input ---------- */
 document.addEventListener('keydown', e => {
@@ -2416,7 +2417,7 @@ function handleEvents(list){
     else if(e.k === 'game'){ setTimeout(() => banner('🏆 Game to ' + teamName(e.side) + '!', 'gold'), 900); if(G.stripNext) comicStripNow(); }
     else if(e.k === 'orb'){ UISound.play('unlock'); banner(['⚪ Power orb!', '🔵 Rare power orb!', '🟡 LEGENDARY orb!'][e.tier] + ' Hit the ball through it!', 'gold'); }
     else if(e.k === 'gotpower'){ const p = M.players[e.p], P = SB.POWERS[e.power]; UISound.play('unlock'); banner(P.icon + ' ' + p.name + ' got ' + P.name + (p.human && !p.remote ? ' — press ' + keyName(keySetsOf(p)[0].power) + ' or ⚡' : ''), 'gold'); }
-    else if(e.k === 'power'){ const p = M.players[e.p], P = SB.POWERS[e.power]; UISound.play('whoosh'); bigWord(P.icon + ' ' + P.name); if(FX) say(P.name); }
+    else if(e.k === 'power'){ const p = M.players[e.p], P = SB.POWERS[e.power]; UISound.play('whoosh'); bigWord(P.icon + ' ' + P.name, p); if(FX) say(P.name); }
     else if(e.k === 'legendmiss'){ banner('⭐ Too strong! Only a PERFECT hit sends a Legendary back', 'bad'); }
     else if(e.k === 'mirage'){ bigWord('🎭 Fooled you!'); }
     else if(e.k === 'broken'){ bigWord('💔 Broken spin!'); }
@@ -2432,7 +2433,7 @@ function handleEvents(list){
 }
 let bannerTimer = 0;
 function banner(text, kind){ const b = $('banner'); b.textContent = text; b.className = 'banner on' + (kind ? ' ' + kind : ''); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('on'), 2000); }
-function bigWord(text){ if(!FX) return; const host = $('bigword-host'); host.innerHTML = ''; const d = document.createElement('div'); d.className = 'big-word'; d.textContent = text; host.appendChild(d); setTimeout(() => d.remove(), 950); }
+function bigWord(text, who){ if(!FX) return; /* 💬 24t bigWord */ if(UI.callout && UI.callout.active()){ UI.callout(text, {who, rank: UI.callout.guess(text) === 'big' ? 'big' : 'good'}); return; } const host = $('bigword-host'); host.innerHTML = ''; const d = document.createElement('div'); d.className = 'big-word'; d.textContent = text; host.appendChild(d); setTimeout(() => d.remove(), 950); }
 function floatAt(p, text, life){ G.fx.push({k: 'txt', x: p.x, y: p.y, z: 2.4, txt: text, t: 0, life: life || 0.8}); }
 
 /* ---------- 💥 comics (sb2-3) — ComicKit: impact panels, Sla… callouts, strips. Off (💬 chip) = small callouts only ---------- */
@@ -2441,7 +2442,25 @@ const SLA_SHOT = {smash: 'Sla… SMASH!', lob: 'Sla… LOB!', drop: 'Sla… plop
 function logHit(e){ const hp = G.M.players[e.p]; if(hp && hp.human && !hp.auto && !hp.remote && !e.jump){ const w = e.perfect ? 'Sla… PERFECT!' : SLA_SHOT[e.shot]; if(w && performance.now() - (G.lastSla || 0) > 1200){ G.lastSla = performance.now(); sla(hp, w); } }
   const L = G.plog; L.rally = e.rally; L.lastHit = e.p; L.lastShot = e.shot; L.lastJump = e.jump || null; if(e.shot === 'smash') L.smash = true; if(e.shot === 'drop') L.drop = true;
   if(e.rally === 15) comicImpact(G.M.players[e.p], 'Sla… 15 HITS!', 'rally', 'smash', '🔁 What a rally!'); }
-function sla(p, text){ if(!FX) return; Comic.callout(text, {small: !G.comics, say: G.comics}); }
+function sla(p, text){ if(!FX) return; /* 💬 24t sla */ if(UI.callout && UI.callout.active()){ UI.callout(text, {who: p, say: G.comics}); return; } Comic.callout(text, {small: !G.comics, say: G.comics}); }
+/* 💬 24t-a: words during play (UiKit UI.callout) — the court + people + ball stay clear, crowd fans on #court can say it */
+function calloutSetup(){ if(!(window.UI && UI.callout)) return;
+  const scr = (x, y, z) => { if(!G || !V) return null; const c = $('court').getBoundingClientRect(), d = V.dpr || 1, q = V.P(x, y, z || 0); return {x: c.left + q[0] / d, y: c.top + q[1] / d}; };
+  const pl = w => !G ? null : typeof w === 'number' ? G.M.players[w] : w && w.side != null ? w : null;
+  const me = () => G && (G.M.players.find(p => p.human && !p.remote && !p.auto) || G.M.players.find(p => p.human));
+  UI.callout.setup({
+    get me(){ return me(); },
+    at: w => { const p = pl(w) || me(); if(!p) return null; const h = scr(p.x, p.y, 2.25); return h ? {x: h.x, y: h.y - 6} : null; },
+    side: w => { const p = pl(w) || me(); return p ? p.side : null; },
+    crowd: () => $('court'),
+    poly: () => { if(!G || !V) return null; const S = G.sp, P = [scr(-S.Lh, -S.Wh), scr(S.Lh, -S.Wh), scr(S.Lh, S.Wh), scr(-S.Lh, S.Wh)]; return P.some(q => !q) ? null : P.map(q => [q.x, q.y]); },
+    inside: (x, y) => { if(!G || !V) return false; const S = G.sp, P = [scr(-S.Lh, -S.Wh), scr(S.Lh, -S.Wh), scr(S.Lh, S.Wh), scr(-S.Lh, S.Wh)]; if(P.some(q => !q)) return false;
+      let ins = false; for(let i = 0, j = 3; i < 4; j = i++){ const a = P[i], b = P[j]; if(((a.y > y) !== (b.y > y)) && (x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x)) ins = !ins; } return ins; },
+    keep: () => { if(!G) return []; const out = [];
+      G.M.players.forEach(p => { const f = scr(p.x, p.y, 0), h = scr(p.x, p.y, 2.3); if(!f || !h) return; const w = Math.max(26, Math.abs(f.y - h.y) * 0.45); out.push({l: f.x - w, r: f.x + w, t: h.y - 18, b: f.y + 8}); });
+      (G.M.balls || []).forEach(b => { if(!b) return; const q = scr(b.x, b.y, b.z || 0), g = scr(b.x, b.y, 0); if(!q) return; out.push({l: q.x - 26, r: q.x + 26, t: q.y - 26, b: Math.max(q.y, g ? g.y : q.y) + 14}); });
+      return out; }
+  }); }
 function comicImpact(p, words, design, pose, sub){
   if(!p) return false; const M = G.M; if(!G.comics || M.t - G.lastImpact < 10){ sla(p, words); return false; }   // Off / too soon → just the callout
   G.lastImpact = M.t; Comic.impact({who: {name: p.name, av: p.av}, words, design, pose, sub, ms: 1100, ball: comicBall}); return true;
@@ -3035,7 +3054,7 @@ function saveText(res, cleared){
   const h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New high score!' : cleared ? (res.best && res.best.score ? 'Best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Saved') : '✅ Feats saved — win to unlock the next level';
   return featText(res.feats, h);
 }
-function showResult(html){ $('result-card').innerHTML = html; slaResultBadge(); $('result').classList.remove('hidden'); }   // 🏷️ lg-1 badge on top
+function showResult(html){ /* 💬 24t result */ if(window.UI && UI.callout) UI.callout.setup(null); $('result-card').innerHTML = html; slaResultBadge(); $('result').classList.remove('hidden'); }   // 🏷️ lg-1 badge on top
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pickOne(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
@@ -3294,4 +3313,4 @@ msAfter('choosePlayer', () => { if(LK.urlDone) return; LK.urlDone = true;   // �
 </script>
 </body>
 </html>
-<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+lk-1b+p1d+lk-1c+cs-1+lk-2e+dv-1+tb-1+lk-5e+lk-5f+ls-1b+pz-1) END OF SlaBrall.html -->
+<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+lk-1b+p1d+lk-1c+cs-1+lk-2e+dv-1+tb-1+lk-5e+lk-5f+ls-1b+pz-1+24t-a) END OF SlaBrall.html -->
