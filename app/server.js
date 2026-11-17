@@ -40,7 +40,8 @@ function ss_() {
 // head with a raw print scriptlet calling include('UiKit').
 // 🚪 AS-1 one door: include('AvatarKit') also brings the files listed here (same order), so no page has to change when the avatar family grows.
 // Keep each list on ONE line — the test harness (gasmock.js) and the 📲 offline builder (build.js) read these two lines from this file.
-const INCLUDE_ALSO_ = {AvatarKit: ['AvatarActing', 'AvatarWeapons'], GameFrame: ['GameCovers', 'CardArt', 'GameLogos'], IsoProps: ['IsoPropsWorld']};   /* 🌍 ip-3d: + IsoPropsWorld (the country buildings — the IsoProps kit passed 300 KB, so it is 2 files; pages still write only include('IsoProps')) */   // 🧱 b1b: one line brings the 🎬 cover frame + cover art + flip-books · 24j-a: + 🏷️ GameLogos (cover logo slot) · 🗡️ av-r0b: + AvatarWeapons (the Weapons family of the Batstick designer)
+const INCLUDE_ALSO_ = {AvatarKit: ['AvatarActing', 'AvatarWeapons'], GameFrame: ['GameCovers', 'CardArt', 'GameLogos'], IsoProps: ['IsoLook_jungle', 'IsoLook_cherry', 'IsoLook_desert', 'IsoLook_snow', 'IsoLook_farm', 'IsoLook_grow', 'IsoLook_lava', 'IsoLook_coral', 'IsoLook_moon', 'IsoLook_castle']};   /* 📦 ip-4a: IsoProps = the engine + one IsoLook_<name> file per look (pages still write only include('IsoProps'); online the INCLUDE_LAZY_ ones load on demand with Props.need) */   // 🧱 b1b: one line brings the 🎬 cover frame + cover art + flip-books · 24j-a: + 🏷️ GameLogos (cover logo slot) · 🗡️ av-r0b: + AvatarWeapons (the Weapons family of the Batstick designer)
+const INCLUDE_LAZY_ = {IsoProps: {to: 'Props', of: {IsoLook_cherry: 'cherry', IsoLook_desert: 'desert', IsoLook_snow: 'snow', IsoLook_lava: 'lava', IsoLook_coral: 'coral', IsoLook_moon: 'moon', IsoLook_castle: 'castle'}}};   // 📦 ip-4a: ONLINE these come as Props.sources({name: {src, alt, integrity}}) instead of a tag (Props.need loads them); offline app + tests inline them (INCLUDE_ALSO_). 🔁 jungle · farm · grow stay eager for one round
 const INCLUDE_GROUPS_ = {avatar: ['BallSkins', 'AvatarKit']};
 // 📦 size-1 → sm-0 (2026-11-14): includes that are NOT in this project (Apps Script refuses to save a project over ≈ 10.45 MB)
 // load from the family site instead. WHICH ones is steam-source tools/remote.json; the file names + sha384 fingerprints are in
@@ -67,8 +68,13 @@ function remoteBody_(n) {
   catch (e) { const M = remoteMap_(), p = (M.n[n] || [])[0]; return p ? { src: M.base + p[1], alt: M.cdn + p[1], integrity: p[2] } : ''; }
 }
 function include(name) {
-  const M = remoteMap_().n;
-  return [name].concat(INCLUDE_ALSO_[name] || []).map(n => M[n] ? remoteTag_(n) : HtmlService.createHtmlOutputFromFile(n).getContent()).join('\n');
+  const M = remoteMap_().n, L = INCLUDE_LAZY_[name] || null, lazy = {};   // 📦 ip-4a: an INCLUDE_LAZY_ file on the site = one sources line, loaded on demand (Props.need)
+  const out = [name].concat(INCLUDE_ALSO_[name] || []).map(n => {
+    const p = L && L.of[n] && M[n], one = p && p.length === 1 && p[0][0] === 'js' ? p[0] : null;
+    if (one) { const R = remoteMap_(), x = REMOTE_FAIL_TEST_ ? 'x-netfail-' : ''; lazy[L.of[n]] = { src: R.base + x + one[1], alt: R.cdn + x + one[1], integrity: one[2] }; return null; }
+    return M[n] ? remoteTag_(n) : HtmlService.createHtmlOutputFromFile(n).getContent();
+  }).filter(t => t !== null).join('\n');
+  return out + (Object.keys(lazy).length ? '\n<script>window.' + L.to + '&&' + L.to + '.sources&&' + L.to + '.sources(' + JSON.stringify(lazy) + ')</script>' : '');
 }
 function includeGroup(group) { return (INCLUDE_GROUPS_[group] || []).map(include).join('\n'); }
 
@@ -4927,7 +4933,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d+gl-r24+av-r0e3) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d+gl-r24+av-r0e3+ip-4a) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
