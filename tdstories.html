@@ -187,6 +187,7 @@
 <script src="inc/AvatarActing.js"></script>
 <script src="inc/SkillKit.js"></script>
 <script src="inc/IsoKit.js"></script>
+<script src="inc/ActionFX.js"></script>
 </head>
 <body ontouchstart="">
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goBack()">◀ Back</button>
@@ -397,7 +398,19 @@ const TD_LOOKS = {
     c_spikes: 'thorn', c_net: 'honey', c_splash: 'water', pc_more: 'thorn', pc_quick: 'nature', d_reflect: 'crystal', d_shield: 'holy', d_heal: 'nature', d_dome: 'bubble', pd_thorns: 'rose', pd_last: 'star',
     e_daze: 'love', e_push: 'music', e_sleep: 'dream', e_ew: 'goo', e_charm: 'love', pe_slow: 'ice', pe_flee: 'ghost', u_meteor: 'rose', u_army: 'rainbow', u_field: 'thorn', u_fort: 'holy', u_charm: 'love', x_burst: 'love', x_guard: 'holy', x_wall: 'candy'},
 };
-const withLooks = (h, items) => items.map(it => Object.assign({look: TD_LOOKS[h][it.key]}, it));
+/* 🎬 act-2: the REAL move of every skill (Aowu 2026-11-17 plan §iso-2) — 🐉 dragon moves = the page's TDDragon beat moves ·
+   👸 princess moves = 🎬 ActionFX / 🎭 actions-block acts (SkillKit.actionOf reads skin.act) · _basic = the auto attack */
+const TD_MOVES = {
+  dragon: {_basic: 'spit', a_cone: 'breath', a_bounce: 'spit', a_tornado: 'wing', a_meteor: 'sky', b_minion: 'roar', b_gold: 'tail', b_haste: 'wing',
+    c_lava: 'breath', c_mine: 'tail', c_pit: 'tail', d_armor: 'roar', d_shield: 'wing', e_push: 'wing', e_sleep: 'breath', e_fear: 'roar', e_pull: 'roar',
+    u_meteor: 'sky', u_army: 'roar', u_field: 'tail', u_fort: 'wing', u_charm: 'breath', x_burst: 'breath', x_guard: 'wing', x_wall: 'tail'},
+  princess: {_basic: 'move.slash.across', a_whip: 'act.whip', a_swarm: 'move.cast.wide', a_storm: 'move.cast.rain', a_shot: 'move.punch.palm',
+    b_tower: 'move.cast.raise', b_minion: 'act.summon', b_flyer: 'move.cast.skycall', b_wall: 'move.defend.brace', b_decoy: 'move.cast.snap',
+    c_spikes: 'move.cast.slam', c_net: 'move.cast.spin', c_splash: 'move.cast.orbthrow', d_reflect: 'move.defend.parry', d_shield: 'act.shield', d_heal: 'act.heal',
+    d_dome: 'move.defend.bubble', e_daze: 'move.cast.blast', e_push: 'move.cast.sweep', e_sleep: 'move.cast.orb', e_ew: 'move.kick.front', e_charm: 'move.cast.beam',
+    u_meteor: 'move.power.ultimate', u_army: 'move.power.victory', u_field: 'move.cast.rune', u_fort: 'move.cast.staff', u_charm: 'move.cast.pray',
+    x_burst: 'move.power.combo', x_guard: 'move.power.aura', x_wall: 'move.power.levelup'}};
+const withLooks = (h, items) => items.map(it => Object.assign({look: TD_LOOKS[h][it.key]}, TD_MOVES[h][it.key] ? {[h === 'dragon' ? 'move' : 'act']: TD_MOVES[h][it.key]} : null, it));
 const PACKS = {
   dragon: SK.pack('td-draprincess:dragon', withLooks('dragon', [
     {key: 'a_cone', name: 'Fire Breath', icon: '🔥'}, {key: 'a_bounce', name: 'Bounce Fireball', icon: '🔁'}, {key: 'a_tornado', name: 'Fire Tornado', icon: '🌀'}, {key: 'a_meteor', name: 'Sky Fire', icon: '☄️'},
@@ -444,7 +457,7 @@ function newMatch(o){
     jail: !!C.jail, from: o.from || null, hearts: L.hearts + (o.bonusHearts | 0), heartsMax: L.hearts + (o.bonusHearts | 0), bonusHearts: o.bonusHearts | 0, shieldHp: 0, shieldT: 0, domeT: 0, armorT: 0, armorV: 0, reflectN: 0, reflectT: 0, hasteT: 0, hasteV: 0, lastUsed: 0,
     score: 0, spawnQ: [], idN: 1, cd: {dragon: {}, princess: {}}, readyT: {dragon: {}, princess: {}}, jam: {dragon: {}, princess: {}}, auto: {dragon: !!o.auto, princess: !!o.auto},
     heroes: {dragon: {x: CX + 2.55, y: CY, ang: 0, atk: 0.5, dazeT: 0, sleepy: 0}, princess: {x: CX, y: CY - 0.25, atk: 0.8, dazeT: 0}},
-    stats: {bonks: 0, waves: 0, evolves: 0, ultimates: 0, combos: 0, perfect: 0, casts: 0, hearts: 0}, lostThisWave: 0, enCd: {}, mods: {}};
+    stats: {bonks: 0, waves: 0, evolves: 0, ultimates: 0, combos: 0, perfect: 0, casts: 0, hearts: 0}, lostThisWave: 0, enCd: {}, mods: {}, pend: {dragon: [], princess: []}, instant: !!o.instant};
   const glowN = L.glow;
   M.trees = {
     dragon: SK.tree({pack: PACKS.dragon, hero: 'dragon', forms: HEROES.dragon.forms, cards: L.cards, glow: glowN > 0, rng, combos: COMBOS}),
@@ -561,11 +574,45 @@ function canAim(M, h, key){
   return L.some(e => dist(e.x, e.y, from.x, from.y) <= reach);
 }
 // every effect a cast makes remembers its skill (so the page paints it in that skill's 🎨 SkillKit look)
-function cast(M, h, key, opt){ M._src = {hero: h, key}; try{ return castSkill(M, h, key, opt); } finally{ M._src = null; } }
+function cast(M, h, key, opt){ opt = opt || {}; if(!M.instant && !opt.now) return queueCast(M, h, key, opt); M._src = {hero: h, key}; try{ return castSkill(M, h, key, opt); } finally{ M._src = null; } }
+/* ---------- 🎬 act-2: the game fires on CONTACT (Checklist §17) ----------
+   cast() puts the skill in the hero's queue: 'windup' event {hero, key, move, at, w, aim} → the page plays the move with contactAt = at
+   (engine time) → at `at` the skill really happens (castSkill) → 'cast' event. Nothing to hit any more at contact = 'fizzle' (cooldown back).
+   Auto attacks wind up too (basic). WIND = seconds from the start of the move to its contact. */
+const WIND = {breath: 0.34, spit: 0.24, sky: 0.4, wing: 0.3, roar: 0.4, tail: 0.3, cast: 0.3, big: 0.44, basicD: 0.2, basicP: 0.22, trick: 0.36};
+function moveOf(M, h, key){ const e = M.trees[h].pack.get(key), sk = (e && e.skin) || {}; if(h === 'dragon') return sk.move || 'breath'; return e && (e.kind === 'ultimate' || e.kind === 'combo') ? 'big' : 'cast'; }
+function windOf(M, h, key){ return WIND[moveOf(M, h, key)] || 0.3; }
+function aimOf(M, h){ const o = h === 'dragon' ? heroPos(M, h) : {x: CX, y: CY}, t = closest(M, o.x, o.y, 99); return t ? {x: t.x, y: t.y} : null; }
+function queueCast(M, h, key, opt){
+  if(M.state !== 'wave' || M.paused) return false;
+  const s = skillOf(M, h, key); if(!s || !ready(M, h, key)) return false;
+  if(!opt.force && !canAim(M, h, key)) return false;
+  const Q = M.pend[h], w = windOf(M, h, key), start = Math.max(M.t, Q.length ? Q[Q.length - 1].at + 0.12 : M.t), at = start + w;
+  M.cd[h][key] = cdOf(M, h, key) + (M.jam[h][key] || 0) + (at - M.t); M.jam[h][key] = 0; M.stats.casts++;
+  Q.push({key, start, at, w, move: moveOf(M, h, key), aim: aimOf(M, h), kind: s.e.kind, col: s.e.col, started: false});
+  pendTick(M); return true;
+}
+function pendTick(M){
+  ['dragon', 'princess'].forEach(h => { const Q = M.pend[h];
+    while(Q.length){ const p = Q[0];
+      if(!p.started && M.t >= p.start - 1e-9){ p.started = true; p.aim = aimOf(M, h) || p.aim; ev(M, 'windup', {hero: h, key: p.key, move: p.move, at: p.at, w: p.w, aim: p.aim, kind: p.kind, col: p.col}); }
+      if(p.started && M.t >= p.at - 1e-9){ Q.shift(); contactCast(M, h, p); continue; }
+      break; }
+    const H = M.heroes[h], b = H.bw; if(b && M.t >= b.at - 1e-9){ H.bw = null; const rg = HEROES[h].range * (1 + (heroMods(M, h).rangeMul || 0)) + 1.5, o = h === 'dragon' ? H : {x: CX, y: CY};
+      const t = live(M).find(e => e.id === b.id && dist(e.x, e.y, o.x, o.y) <= rg) || closest(M, o.x, o.y, rg); if(t) heroBasic(M, h, t); } });
+}
+function contactCast(M, h, p){ let ok = false; M._src = {hero: h, key: p.key}; try{ ok = castSkill(M, h, p.key, {force: true, pend: true}); } finally{ M._src = null; }
+  if(!ok){ M.cd[h][p.key] = Math.min(M.cd[h][p.key] || 0, 0.5); M.stats.casts = Math.max(0, M.stats.casts - 1); ev(M, 'fizzle', {hero: h, key: p.key}); } }
+// the auto attack itself (on its contact)
+function heroBasic(M, h, t){
+  if(h === 'dragon'){ const hd = M.heroes.dragon; fx(M, 'fireball', {x: hd.x, y: hd.y, x2: t.x, y2: t.y, dur: 0.28}); hit(M, t, HEROES.dragon.dmg, {hero: 'dragon', col: 'A'}); return; }
+  fx(M, 'swat', {x: CX, y: CY, x2: t.x, y2: t.y, dur: 0.35}); hit(M, t, HEROES.princess.dmg, {hero: 'princess', col: 'A'}); if(!t.gone && !t.boss) t.d = Math.max(0, t.d - 0.35); }
+function basicGo(M, h, t){ if(M.instant){ heroBasic(M, h, t); return; } const w = h === 'dragon' ? WIND.basicD : WIND.basicP; M.heroes[h].bw = {id: t.id, at: M.t + w};
+  ev(M, 'windup', {hero: h, key: '_basic', basic: true, move: h === 'dragon' ? 'spit' : 'basic', at: M.t + w, w, aim: {x: t.x, y: t.y}}); }
 function castSkill(M, h, key, opt){
   opt = opt || {};
   if(M.state !== 'wave' || M.paused) return false;
-  const s = skillOf(M, h, key); if(!s || !ready(M, h, key)) return false;
+  const s = skillOf(M, h, key); if(!s || (!opt.pend && !ready(M, h, key))) return false;
   if(!opt.force && !canAim(M, h, key)) return false;
   const {e, n} = s, hp = heroPos(M, h), m = heroMods(M, h), rng = (m.rangeMul || 0) + 1, src = {hero: h, col: e.col, key};
   const D = v => durOf(M, h, v, e.col), sumMul = 1 + (m.summonMul || 0);
@@ -630,7 +677,7 @@ function castSkill(M, h, key, opt){
     default: done = false;
   }
   if(!done) return false;
-  M.cd[h][key] = cdOf(M, h, key) + (M.jam[h][key] || 0); M.jam[h][key] = 0; M.stats.casts++;
+  if(!opt.pend){ M.cd[h][key] = cdOf(M, h, key) + (M.jam[h][key] || 0); M.jam[h][key] = 0; M.stats.casts++; }
   ev(M, 'cast', {hero: h, key, col: e.col, kind: e.kind, name: e.name, icon: e.icon});
   return true;
 }
@@ -651,6 +698,7 @@ function tick(M, dt){
   // 🦸 heroes
   const hd = M.heroes.dragon, hpz = M.heroes.princess, haste = M.hasteT > 0 ? 1 + M.hasteV : 1;
   if(M.hasteT > 0) M.hasteT -= dt;
+  pendTick(M);   // 🎬 act-2: queued skills + auto attacks land on their contact
   hd.ang += dt * 0.55; const L0 = live(M); let tx = 0, ty = 0; L0.forEach(e => { tx += e.x - CX; ty += e.y - CY; });
   const want = L0.length ? Math.atan2(ty, tx) : hd.ang; let da = want - hd.ang; while(da > Math.PI) da -= 2 * Math.PI; while(da < -Math.PI) da += 2 * Math.PI; hd.ang += da * Math.min(1, dt * 0.8);
   hd.x = CX + Math.cos(hd.ang) * 2.55; hd.y = CY + Math.sin(hd.ang) * 2.4;
@@ -658,9 +706,9 @@ function tick(M, dt){
   if(hd.dazeT > 0) hd.dazeT -= dt; if(hpz.dazeT > 0) hpz.dazeT -= dt;
   const dm = heroMods(M, 'dragon'), pm = heroMods(M, 'princess');
   hd.atk -= dt * haste * (1 + (dm.rateMul || 0)) * (hd.sleepy ? 0.55 : 1);
-  if(hd.atk <= 0 && hd.dazeT <= 0){ const t = closest(M, hd.x, hd.y, HEROES.dragon.range * (1 + (dm.rangeMul || 0))); if(t){ hd.atk = HEROES.dragon.rate; fx(M, 'fireball', {x: hd.x, y: hd.y, x2: t.x, y2: t.y, dur: 0.28}); hit(M, t, HEROES.dragon.dmg, {hero: 'dragon', col: 'A'}); } else hd.atk = 0.1; }
+  if(hd.atk <= 0 && hd.dazeT <= 0 && !hd.bw && !M.pend.dragon.length){ const t = closest(M, hd.x, hd.y, HEROES.dragon.range * (1 + (dm.rangeMul || 0))); if(t){ hd.atk = HEROES.dragon.rate; basicGo(M, 'dragon', t); } else hd.atk = 0.1; }
   hpz.atk -= dt * haste * (1 + (pm.rateMul || 0));
-  if(!M.jail && hpz.atk <= 0 && hpz.dazeT <= 0){ const t = closest(M, CX, CY, HEROES.princess.range * (1 + (pm.rangeMul || 0))); if(t){ hpz.atk = HEROES.princess.rate; fx(M, 'swat', {x: CX, y: CY, x2: t.x, y2: t.y, dur: 0.35}); hit(M, t, HEROES.princess.dmg, {hero: 'princess', col: 'A'}); if(!t.gone && !t.boss) t.d = Math.max(0, t.d - 0.35); } else hpz.atk = 0.1; }
+  if(!M.jail && hpz.atk <= 0 && hpz.dazeT <= 0 && !hpz.bw && !M.pend.princess.length){ const t = closest(M, CX, CY, HEROES.princess.range * (1 + (pm.rangeMul || 0))); if(t){ hpz.atk = HEROES.princess.rate; basicGo(M, 'princess', t); } else hpz.atk = 0.1; }
   // ⏳ cooldowns (haste speeds them up) + auto-cast
   ['dragon', 'princess'].forEach(h => { Object.keys(M.cd[h]).forEach(k => { if(M.cd[h][k] > 0) M.cd[h][k] -= dt * haste; });
     M.trees[h].buttons().forEach(b => { const rd = ready(M, h, b.key) && canAim(M, h, b.key); M.readyT[h][b.key] = rd ? (M.readyT[h][b.key] || 0) + dt : 0;
@@ -683,7 +731,7 @@ function tick(M, dt){
   M.flyers = M.flyers.filter(f => f.t < f.dur);
   M.traps.forEach(T => { T.t += dt; if(T.fx === 'lava'){ live(M).forEach(e => { if(dist(e.x, e.y, T.x, T.y) <= T.r){ hit(M, e, T.n.dot * dt, T.src); e.slowT = Math.max(e.slowT, 0.3); e.slowF = Math.max(e.slowF, T.n.slow); } }); return; }
     live(M).forEach(e => { if(T.charges <= 0 || (T.seen && T.seen[e.id]) || dist(e.x, e.y, T.x, T.y) > T.r) return; (T.seen || (T.seen = {}))[e.id] = 1;   /* each suitor sets a trap off once */
-      if(e.charge > 0){ e.charge = 0; fx(M, 'charge', {x: e.x, y: e.y, dur: 0.8}); ev(M, 'suitorSkill', {type: e.type, skill: 'charge'}); return; }
+      if(e.charge > 0){ e.charge = 0; fx(M, 'charge', {x: e.x, y: e.y, dur: 0.8}); ev(M, 'suitorSkill', {id: e.id, type: e.type, skill: 'charge'}); return; }
       if(M.mods.suitors.enDodge && M.rng() < M.mods.suitors.enDodge){ fx(M, 'hop', {x: e.x, y: e.y, dur: 0.6}); return; }
       T.charges--; fx(M, 'trap', {x: T.x, y: T.y, dur: 0.5, icon: T.icon});
       if(T.fx === 'dmg') hit(M, e, T.n.dmg, T.src);
@@ -712,6 +760,7 @@ function autoWants(M, h, b){
   return true;
 }
 function endWave(M){
+  ['dragon', 'princess'].forEach(h => { (M.pend[h] || []).forEach(p => { M.cd[h][p.key] = 0; }); M.pend[h] = []; M.heroes[h].bw = null; });   // 🎬 act-2
   M.enemies.forEach(e => { if(e.charmT > 0){ e.gone = 1; e.goneT = 0.5; } });
   M.stats.waves++; if(!M.lostThisWave) M.stats.perfect++;
   const wb = Math.round((40 + 15 * (M.wave + 1)) * M.L.mult); M.score += wb;
@@ -747,30 +796,30 @@ function charmHelper(M, e, r){
 }
 // 📜 every suitor on the map runs faster and gets a shield
 function decree(M, e, dur, v, sh){ live(M).forEach(x => { x.rushT = Math.max(x.rushT || 0, dur); x.rushV = Math.max(x.rushV || 0, v); x.shield = Math.max(x.shield, sh * M.L.hp); });
-  fx(M, 'decree', {x: e.x, y: e.y, r: 3, dur: 1}); ev(M, 'suitorSkill', {type: e.type, skill: 'decree'}); }
-function serenade(M, e, off){ M.towers.forEach(T => { T.offT = Math.max(T.offT || 0, off); }); fx(M, 'serenade', {x: e.x, y: e.y, r: 4, dur: 1.2}); ev(M, 'suitorSkill', {type: e.type, skill: 'serenade'}); }
+  fx(M, 'decree', {x: e.x, y: e.y, r: 3, dur: 1}); ev(M, 'suitorSkill', {id: e.id, type: e.type, skill: 'decree'}); }
+function serenade(M, e, off){ M.towers.forEach(T => { T.offT = Math.max(T.offT || 0, off); }); fx(M, 'serenade', {x: e.x, y: e.y, r: 4, dur: 1.2}); ev(M, 'suitorSkill', {id: e.id, type: e.type, skill: 'serenade'}); }
 function callIn(M, e, type, n){ for(let i = 0; i < n; i++) spawn(M, type, (e.pi + i) % M.paths.length, Math.max(0, (i % M.paths.length === 0 ? e.d : 0.4) - 0.6 - i * 0.3)); }
 function newSkills(M, e, dt){
   const S = e.S, hd = M.heroes.dragon;
   if(S.cart){ let fed = 0; M.minions.forEach(m => { if(m.hp > 0 && dist(m.x, m.y, e.x, e.y) <= 2.2){ m.eatT = Math.max(m.eatT || 0, 0.5); fed++; } });
     M.flyers.forEach(f => { if(dist(f.x, f.y, e.x, e.y) <= 2.2){ f.eatT = Math.max(f.eatT || 0, 0.5); fed++; } });
-    if(fed && e.skT <= 0){ e.skT = 4; fx(M, 'choc', {x: e.x, y: e.y, dur: 0.8}); ev(M, 'suitorSkill', {type: e.type, skill: 'choc'}); } }
-  if(S.emperor && !e.parade && e.hp < e.hpMax * 0.5){ e.parade = 1; callIn(M, e, 'cu', 4); callIn(M, e, 'pr', 2); ev(M, 'suitorSkill', {type: e.type, skill: 'parade'}); }   // 💘 tired → a heart parade
+    if(fed && e.skT <= 0){ e.skT = 4; fx(M, 'choc', {x: e.x, y: e.y, dur: 0.8}); ev(M, 'suitorSkill', {id: e.id, type: e.type, skill: 'choc'}); } }
+  if(S.emperor && !e.parade && e.hp < e.hpMax * 0.5){ e.parade = 1; callIn(M, e, 'cu', 4); callIn(M, e, 'pr', 2); ev(M, 'suitorSkill', {id: e.id, type: e.type, skill: 'parade'}); }   // 💘 tired → a heart parade
   if(e.skT > 0) return;
-  if(S.potion){ e.skT = 9; if(!charmHelper(M, e, 4.5)){ live(M).forEach(x => { if(dist(x.x, x.y, e.x, e.y) < 2.2) x.hp = Math.min(x.hpMax, x.hp + x.hpMax * 0.2); }); fx(M, 'potion', {x: e.x, y: e.y, dur: 0.8}); } ev(M, 'suitorSkill', {type: e.type, skill: 'potion'}); }
+  if(S.potion){ e.skT = 9; if(!charmHelper(M, e, 4.5)){ live(M).forEach(x => { if(dist(x.x, x.y, e.x, e.y) < 2.2) x.hp = Math.min(x.hpMax, x.hp + x.hpMax * 0.2); }); fx(M, 'potion', {x: e.x, y: e.y, dur: 0.8}); } ev(M, 'suitorSkill', {id: e.id, type: e.type, skill: 'potion'}); }
   else if(S.decree){ e.skT = 10; decree(M, e, 3, 0.3, 6); }
   else if(S.serenadeAll){ e.skT = 7; serenade(M, e, 3); hd.dazeT = Math.max(hd.dazeT, 1.6); fx(M, 'kiss', {x: e.x, y: e.y, x2: hd.x, y2: hd.y, dur: 0.6});
     if((e.calls = (e.calls || 0) + 1) % 2 === 0) callIn(M, e, 'sq', 3); }
   else if(S.archmage){ e.skT = 7.5; let n = 0; if(charmHelper(M, e, 7)) n++; if(charmHelper(M, e, 7)) n++;
     const P = M.paths[e.pi]; fx(M, 'blink', {x: e.x, y: e.y, dur: 0.6}); e.d = Math.min(P.len - 2.2, e.d + 1.4); const p = ptAt(P, e.d); e.x = p.x; e.y = p.y; fx(M, 'blink', {x: e.x, y: e.y, dur: 0.6});
-    ev(M, 'suitorSkill', {type: e.type, skill: 'blink'}); if(!n && (e.calls = (e.calls || 0) + 1) % 2 === 0) callIn(M, e, 'wz', 1); }
-  else if(S.goldbeard){ e.skT = 8; decree(M, e, 3.5, 0.35, 10); if((e.calls = (e.calls || 0) + 1) % 2 === 0){ callIn(M, e, 'sq', 3); fx(M, 'coins', {x: e.x, y: e.y, dur: 1}); ev(M, 'suitorSkill', {type: e.type, skill: 'hire'}); } }
+    ev(M, 'suitorSkill', {id: e.id, type: e.type, skill: 'blink'}); if(!n && (e.calls = (e.calls || 0) + 1) % 2 === 0) callIn(M, e, 'wz', 1); }
+  else if(S.goldbeard){ e.skT = 8; decree(M, e, 3.5, 0.35, 10); if((e.calls = (e.calls || 0) + 1) % 2 === 0){ callIn(M, e, 'sq', 3); fx(M, 'coins', {x: e.x, y: e.y, dur: 1}); ev(M, 'suitorSkill', {id: e.id, type: e.type, skill: 'hire'}); } }
   else if(S.emperor){ e.skT = 6; const ph = (e.phase = ((e.phase || 0) + 1) % 3);
     if(ph === 1){ serenade(M, e, 2.5); hd.dazeT = Math.max(hd.dazeT, 1.2); fx(M, 'kiss', {x: e.x, y: e.y, x2: hd.x, y2: hd.y, dur: 0.6}); }
-    else if(ph === 2){ charmHelper(M, e, 7); charmHelper(M, e, 7); fx(M, 'potion', {x: e.x, y: e.y, dur: 0.8}); ev(M, 'suitorSkill', {type: e.type, skill: 'potion'}); }
+    else if(ph === 2){ charmHelper(M, e, 7); charmHelper(M, e, 7); fx(M, 'potion', {x: e.x, y: e.y, dur: 0.8}); ev(M, 'suitorSkill', {id: e.id, type: e.type, skill: 'potion'}); }
     else decree(M, e, 3, 0.3, 10);
  }
-  else if(S.groom){ e.skT = 6; hd.dazeT = Math.max(hd.dazeT, 2); fx(M, 'ring', {x: e.x, y: e.y, x2: hd.x, y2: hd.y, dur: 0.6}); ev(M, 'suitorSkill', {type: e.type, skill: 'ring'});
+  else if(S.groom){ e.skT = 6; hd.dazeT = Math.max(hd.dazeT, 2); fx(M, 'ring', {x: e.x, y: e.y, x2: hd.x, y2: hd.y, dur: 0.6}); ev(M, 'suitorSkill', {id: e.id, type: e.type, skill: 'ring'});
     if((e.calls = (e.calls || 0) + 1) % 2 === 0) callIn(M, e, 'gd', 2); }
   else e.skT = 99;
 }
@@ -782,11 +831,13 @@ function moveEnemy(M, e, dt){
   if(e.burnT > 0) hit(M, e, e.burnD * dt, {col: 'A'}); if(e.gone) return;
   // suitor skills
   e.skT -= dt;
-  if(e.S.arrow && e.skT <= 0 && e.charmT <= 0){ e.skT = 8; const bs = M.trees.princess.buttons().filter(b => !b.ult && !b.combo); if(bs.length){ const b = bs[Math.floor(M.rng() * bs.length)]; M.cd.princess[b.key] = (M.cd.princess[b.key] || 0) + 4; fx(M, 'arrow', {x: e.x, y: e.y, x2: CX, y2: CY, dur: 0.6}); ev(M, 'suitorSkill', {type: e.type, skill: 'arrow', key: b.key}); } }
-  if(e.S.bomb && !e.bombed && e.charmT <= 0){ const t = M.towers.find(T => dist(T.x, T.y, e.x, e.y) < 3 && T.offT <= 0); if(t){ e.bombed = true; t.offT = 5; fx(M, 'flowerbomb', {x: t.x, y: t.y, dur: 1}); ev(M, 'suitorSkill', {type: e.type, skill: 'bomb'}); } }
-  if(e.S.bouquet && e.skT <= 0){ e.skT = 6; M.heroes.dragon.dazeT = 2; fx(M, 'bouquet', {x: e.x, y: e.y, x2: M.heroes.dragon.x, y2: M.heroes.dragon.y, dur: 0.7}); ev(M, 'suitorSkill', {type: e.type, skill: 'bouquet'});
+  if(!M.instant && e.skT <= 0 && trickTimed(e.S)){ if(e.wind) e.wind = 0; else if(e.charmT <= 0 && e.stunT <= 0 && e.sleepT <= 0){ e.wind = 1; e.skT = WIND.trick; e.stopT = Math.max(e.stopT, WIND.trick + 0.25);
+    ev(M, 'trickWind', {id: e.id, type: e.type, at: M.t + WIND.trick, w: WIND.trick}); } }   // 🎬 act-2: the trick's wind-up, the skill fires on contact
+  if(e.S.arrow && e.skT <= 0 && e.charmT <= 0){ e.skT = 8; const bs = M.trees.princess.buttons().filter(b => !b.ult && !b.combo); if(bs.length){ const b = bs[Math.floor(M.rng() * bs.length)]; M.cd.princess[b.key] = (M.cd.princess[b.key] || 0) + 4; fx(M, 'arrow', {x: e.x, y: e.y, x2: CX, y2: CY, dur: 0.6}); ev(M, 'suitorSkill', {id: e.id, type: e.type, skill: 'arrow', key: b.key}); } }
+  if(e.S.bomb && !e.bombed && e.charmT <= 0){ const t = M.towers.find(T => dist(T.x, T.y, e.x, e.y) < 3 && T.offT <= 0); if(t){ e.bombed = true; t.offT = 5; fx(M, 'flowerbomb', {x: t.x, y: t.y, dur: 1}); ev(M, 'suitorSkill', {id: e.id, type: e.type, skill: 'bomb'}); } }
+  if(e.S.bouquet && e.skT <= 0){ e.skT = 6; M.heroes.dragon.dazeT = 2; fx(M, 'bouquet', {x: e.x, y: e.y, x2: M.heroes.dragon.x, y2: M.heroes.dragon.y, dur: 0.7}); ev(M, 'suitorSkill', {id: e.id, type: e.type, skill: 'bouquet'});
     if((e.calls = (e.calls || 0) + 1) % 2 === 0) for(let i = 0; i < 2; i++) spawn(M, 'sq', e.pi, Math.max(0, e.d - 0.6 - i * 0.6)); }
-  if(e.S.shine && e.skT <= 0){ e.skT = 7; e.shine = 3; M.heroes.princess.dazeT = 2; fx(M, 'shine', {x: e.x, y: e.y, dur: 1}); ev(M, 'suitorSkill', {type: e.type, skill: 'shine'}); }
+  if(e.S.shine && e.skT <= 0){ e.skT = 7; e.shine = 3; M.heroes.princess.dazeT = 2; fx(M, 'shine', {x: e.x, y: e.y, dur: 1}); ev(M, 'suitorSkill', {id: e.id, type: e.type, skill: 'shine'}); }
   if(e.charmT <= 0 && e.stunT <= 0 && e.sleepT <= 0) newSkills(M, e, dt);
   if(e.gone) return;
   // where to go
@@ -802,7 +853,7 @@ function moveEnemy(M, e, dt){
     if(M.decoys.some(d => d.pi === e.pi && Math.abs(d.d - e.d) <= d.r) && !e.boss){ v = 0; e.tea = 1; } else e.tea = 0;
     const w = M.walls.find(w => w.pi === e.pi && w.d > e.d - 0.05 && w.d - e.d < 0.45);
     if(w && !(e.S.climb)){ v = 0; w.hp -= (e.boss ? 25 : 8) * dt; e.atWall = 1; } else e.atWall = 0;
-    if(w && e.S.climb && !e.climbed){ e.climbed = 1; fx(M, 'ladder', {x: e.x, y: e.y, dur: 0.8}); ev(M, 'suitorSkill', {type: e.type, skill: 'ladder'}); }
+    if(w && e.S.climb && !e.climbed){ e.climbed = 1; fx(M, 'ladder', {x: e.x, y: e.y, dur: 0.8}); ev(M, 'suitorSkill', {id: e.id, type: e.type, skill: 'ladder'}); }
     const m = M.minions.find(m => m.pi === e.pi && !(m.eatT > 0) && m.d >= e.d - 0.1 && m.d - e.d < 0.55);
     if(m){ v = 0; m.hp -= (e.boss ? 30 : 7) * dt; m.fight = 1; }
   }
@@ -810,6 +861,7 @@ function moveEnemy(M, e, dt){
   const p = ptAt(P, e.d); e.x = p.x; e.y = p.y; e.ang = p.ang;
   if(e.d >= P.len && e.charmT <= 0) reachTower(M, e);
 }
+function trickTimed(S){ return !!(S.arrow || S.bouquet || S.shine || S.potion || S.decree || S.serenadeAll || S.archmage || S.goldbeard || S.emperor || S.groom); }
 function L_charmHit(M, e, dt){ live(M).forEach(x => { if(x !== e && x.pi === e.pi && Math.abs(x.d - e.d) < 0.6){ hit(M, x, 9 * dt, {hero: 'princess', col: 'E'}); } }); }
 function reachTower(M, e){
   const back = (n) => { e.d = Math.max(0, e.d - n); e.stunT = Math.max(e.stunT, 0.6); };
@@ -841,7 +893,7 @@ function simulate(o){
   }
   return {won: M.state === 'won', wave: M.wave + 1, hearts: M.hearts, score: M.score, stats: M.stats, M};
 }
-return {W, CX, CY, TOWER_R, LEVELS, SUITORS, BOOKS, PATHS, PACKS, COMBOS, HEROES, buildPath, ptAt, newMatch, offer, take, startWave, step, cast, ready, canAim, cdOf, skillOf, takeEvents, simulate, live, rngOf, STEP};
+return {W, CX, CY, TOWER_R, LEVELS, SUITORS, BOOKS, PATHS, PACKS, COMBOS, HEROES, TD_MOVES, WIND, moveOf, buildPath, ptAt, newMatch, offer, take, startWave, step, cast, ready, canAim, cdOf, skillOf, takeEvents, simulate, live, rngOf, STEP};
 })();
 // ENGINE END
 </script>
@@ -1083,6 +1135,7 @@ function drawDiaryPicture(cv, ch, when){
 function startGame(ch, lvl, opt){
   opt = opt || {}; S.chapter = ch; S.level = lvl; stopLoop(); hideResult(); S.jail = opt.jail ? {ch, lvl} : null;
   G = TD.newMatch({book: S.book, chapter: ch, level: lvl, auto: autoOn, jail: !!opt.jail, bonusHearts: opt.bonus || 0});
+  act2Reset(); if(window.ActionFX) ActionFX.opts.shake = lvl > 0;   // 🎬 act-2 (🌱 Basic: no shake)
   G.breakLen = lvl === 0 ? 4 : 2.6; FT = []; guideUsed = 0; pickOpen = false; speedOn = false; G.speed = 1;
   if(UI.modeTried) UI.modeTried(S.player, GAME_ID, S.book);
   const L = LEVELS[lvl]; BAR.level(L.emoji + ' ' + L.name + ' · ' + (G.jail ? '💍 Jailbreak' : 'Ch ' + ch), L.hardcore ? 'hc' : '');
@@ -1224,6 +1277,7 @@ function hudTick(force){
 let lastBonkSnd = 0;
 function handleEvents(list){
   list.forEach(e => {
+    act2Event(e);   // 🎬 act-2: moves start on 'windup', suitors' tricks, fizzles
     if(e.k === 'bonk'){ burst(e.x, e.y, 0.7, ['⭐', '✨', '💫'], e.boss ? 14 : 5); if(e.boss) SHAKE = 0.45; if(e.pts) floatText(e.x, e.y - 0.6, '+' + e.pts, '#FFB020', 0.9); if(e.boss){ banner('💫 BONK! ' + TD.SUITORS[e.type].name + ' gives up!', 'gold'); UISound.play('success'); if(FX) confetti(['💐', '💫', '⭐']); actAvatar('cheer', 2.5); }
       if(performance.now() - lastBonkSnd > 120){ lastBonkSnd = performance.now(); UISound.play('pop'); } }
     if(e.k === 'heart'){ SHAKE = Math.max(SHAKE, 0.25); burst(e.x, e.y, 1, ['💔', '💍'], 3); UISound.play('bump'); floatText(e.x, e.y - 0.8, '💍 Marry me?!', '#E5484D', 1.2); floatText(TD.CX, TD.CY - 1.6, '−' + e.n + ' ❤️', '#E5484D', 1.1); actAvatar('facepalm', 1.4);
@@ -1301,7 +1355,7 @@ function charSet(key, who, w, h){
   const dpr = VIEW.dpr || 1, B = measurePaint(g => { drawAvatar(g, {name: who.name, av: who.av, dir: 1}, 0, 0, 1, {t: 0.3}); drawAvatar(g, {name: who.name, av: who.av, dir: 1, walkT: WALK_P / 4}, 0, 0, 1, {t: 0.5}); });
   const k = Math.min((w - 4) / (B.x1 - B.x0), (h - 4) / (B.y1 - B.y0)) * 0.9, fx = Math.round(w / 2 - (B.x0 + B.x1) / 2 * k), fy = Math.round(h - 2 - Math.max(0, B.y1) * k), e = {top: B.y0};
   const mk = paint => { const c = document.createElement('canvas'); c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); const g = c.getContext('2d'); g.scale(dpr, dpr); paint(g); return c; };
-  const set = {w, h, fx, fy, head: Math.max(10, -e.top * k), walk: [], acts: {}};
+  const set = {k, who, w, h, fx, fy, head: Math.max(10, -e.top * k), walk: [], acts: {}};
   for(let i = 0; i < WALK_N; i++) set.walk.push(mk(g => drawAvatar(g, {name: who.name, av: who.av, dir: 1, walkT: 0.001 + i / WALK_N * WALK_P}, fx, fy, k, {t: i / WALK_N})));
   set.still = mk(g => drawAvatar(g, {name: who.name, av: who.av, dir: 1}, fx, fy, k, {t: 0.3}));
   set.act = act => { if(set.acts[act]) return set.acts[act]; const out = [];
@@ -1365,21 +1419,23 @@ const TDDragon = (() => {
   function star(g, x, y, r, col){ g.fillStyle = col; g.beginPath(); for(let i = 0; i < 8; i++){ const a = i * Math.PI / 4, rr = i % 2 ? r * 0.35 : r; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } g.closePath(); g.fill(); }
   function heart(g, x, y, r, col){ g.fillStyle = col; g.beginPath(); g.moveTo(x, y + r * 0.9); g.bezierCurveTo(x - r * 1.4, y - r * 0.2, x - r * 0.6, y - r * 1.2, x, y - r * 0.4); g.bezierCurveTo(x + r * 0.6, y - r * 1.2, x + r * 1.4, y - r * 0.2, x, y + r * 0.9); g.fill(); }
   function draw(g, stage, col, x, feet, k, t, o){
-    o = o || {}; t = t || 0; const S = STAGES[stage] || STAGES[1], C = COL[stage >= 3 && col ? col : '_'], K = k * S.sc, flap = o.flap != null ? o.flap : Math.sin(t * 7);
+    o = o || {}; t = t || 0; const PS = o.pose || {}, S = STAGES[stage] || STAGES[1], C = COL[stage >= 3 && col ? col : '_'], K = k * S.sc, flap = PS.wing != null ? PS.wing : o.flap != null ? o.flap : Math.sin(t * 7);   // 🎬 act-2: o.pose = a move's pose
     const hover = S.fly ? (6 + S.fly * 14 + Math.sin(t * 3) * 2 * S.fly) : 0;
     g.save(); g.translate(x, feet); if(o.dir === -1) g.scale(-1, 1); g.lineJoin = 'round'; g.lineCap = 'round';
     // shadow
     if(!o.noShadow) g.fillStyle = 'rgba(0,0,0,.14)'; else g.fillStyle = 'rgba(0,0,0,0)'; g.beginPath(); g.ellipse(0, 0, S.bodyX * K * 1.1 / (1 + hover / 60), 5 * K, 0, 0, 7); g.fill();
-    g.translate(0, -hover * K);
+    if(o.out) o.out.feet = pt(g, 0, 0);
+    g.translate((PS.bx || 0) * K + (PS.shake ? Math.sin(t * 83) * PS.shake * K : 0), -(hover + (PS.rise || 0)) * K); if(PS.sy) g.scale(1 - PS.sy * 0.5, 1 + PS.sy);   // 🎬 recoil · shake · rise · squash
     if(S.aura){ const R = 80 * K, au = g.createRadialGradient(0, -24 * K, R * 0.15, 0, -24 * K, R); au.addColorStop(0, C[4] + '00'); au.addColorStop(0.6, C[4] + '55'); au.addColorStop(1, C[4] + '00'); g.fillStyle = au; g.beginPath(); g.arc(0, -24 * K, R, 0, 7); g.fill();
       for(let i = 0; i < 10; i++){ const a = i * 0.63 + t * 1.5, r = (40 + (i % 3) * 14) * K; star(g, -Math.abs(Math.cos(a)) * r - 10 * K, -24 * K + Math.sin(a) * r * 0.55, (2 + (i % 3)) * K, i % 2 ? '#FFFFFF' : '#FFE680'); } }
     const by = -(S.leg + S.bodyY) * K, bx = 0, ol = Math.max(1.6, 2.2 * K);
+    if(PS.lean){ g.translate(0, by); g.rotate(PS.lean); g.translate(0, -by); }   // 🎬 + = leans toward the target
     const line = () => { g.strokeStyle = INK; g.lineWidth = ol; g.stroke(); };
     // wing (far side) — bat wing with finger bones, span by stage, flapping
-    const wing = (side) => { if(S.wing <= 0) return; const sp = 30 * S.wing * K, root = [bx - 2 * K, by - S.bodyY * 0.55 * K], rot = -0.15 + flap * 0.32 + (side ? 0 : -0.12), sq = 1 - Math.max(0, flap) * 0.25;
+    const wing = (side) => { if(S.wing <= 0) return; const sp = 30 * S.wing * K * (1 + (PS.ws || 0)), root = [bx - 2 * K, by - S.bodyY * 0.55 * K], rot = -0.15 + flap * 0.32 + (side ? 0 : -0.12), sq = 1 - Math.max(0, flap) * 0.25;
       const P = ([u, v]) => { const x = u * sp, y = v * sp * sq; return [root[0] + x * Math.cos(rot) - y * Math.sin(rot), root[1] + x * Math.sin(rot) + y * Math.cos(rot)]; };
-      if(S.wing < 0.4){ const a = P([-0.2, -0.9]), b = P([-0.75, -0.35]), c = P([-0.25, 0.15]); g.fillStyle = side ? C[2] : shade(C[2], 0.85); g.beginPath(); g.moveTo(root[0], root[1]); g.quadraticCurveTo(a[0], a[1], b[0], b[1]); g.quadraticCurveTo(c[0], c[1] - 2 * K, root[0] + 2 * K, root[1] + 3 * K); g.closePath(); g.fill(); line(); return; }
-      const W = P([-0.32, -0.95]), F = [P([-1.05, -0.62]), P([-1.12, -0.12]), P([-0.78, 0.28])], H = P([-0.2, 0.2]), inw = (a, b) => { const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; return [m[0] + (root[0] - m[0]) * 0.28, m[1] + (root[1] - m[1]) * 0.28]; };
+      if(S.wing < 0.4){ const a = P([-0.2, -0.9]), b = P([-0.75, -0.35]), c = P([-0.25, 0.15]); if(side && o.out) o.out.wing = pt(g, b[0], b[1]); g.fillStyle = side ? C[2] : shade(C[2], 0.85); g.beginPath(); g.moveTo(root[0], root[1]); g.quadraticCurveTo(a[0], a[1], b[0], b[1]); g.quadraticCurveTo(c[0], c[1] - 2 * K, root[0] + 2 * K, root[1] + 3 * K); g.closePath(); g.fill(); line(); return; }
+      const W = P([-0.32, -0.95]), F = [P([-1.05, -0.62]), P([-1.12, -0.12]), P([-0.78, 0.28])], H = P([-0.2, 0.2]), _o = side && o.out ? (o.out.wing = pt(g, F[0][0], F[0][1])) : 0, inw = (a, b) => { const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; return [m[0] + (root[0] - m[0]) * 0.28, m[1] + (root[1] - m[1]) * 0.28]; };
       g.fillStyle = side ? C[2] : shade(C[2], 0.85); g.beginPath(); g.moveTo(root[0], root[1]); g.quadraticCurveTo(P([-0.05, -0.75])[0], P([-0.05, -0.75])[1], W[0], W[1]); g.lineTo(F[0][0], F[0][1]);
       let q = inw(F[0], F[1]); g.quadraticCurveTo(q[0], q[1], F[1][0], F[1][1]); q = inw(F[1], F[2]); g.quadraticCurveTo(q[0], q[1], F[2][0], F[2][1]); q = inw(F[2], H); g.quadraticCurveTo(q[0], q[1], H[0], H[1]); g.closePath(); g.fill(); line();
       g.strokeStyle = shade(C[0], 0.72); g.lineWidth = ol * 1.15; F.forEach(f => { g.beginPath(); g.moveTo(W[0], W[1]); g.lineTo(f[0], f[1]); g.stroke(); });   // finger bones
@@ -1387,9 +1443,11 @@ const TDDragon = (() => {
     wing(0);
     // tail — longer each stage, curls up, spade tip
     const tl = S.tail * K, tx0 = bx - S.bodyX * 0.85 * K, ty0 = by + 2 * K;
+    g.save(); if(PS.tail){ g.translate(tx0, ty0); g.rotate(PS.tail); g.translate(-tx0, -ty0); }   // 🎬 tail swipe: + = up, − = down
     g.beginPath(); g.moveTo(tx0, ty0 - 5 * K); g.bezierCurveTo(tx0 - tl * 0.5, ty0 - 2 * K, tx0 - tl * 0.8, ty0 + 6 * K, tx0 - tl, ty0 - tl * 0.25); g.lineTo(tx0 - tl + 1 * K, ty0 - tl * 0.25 + 3 * K);
     g.bezierCurveTo(tx0 - tl * 0.75, ty0 + 10 * K, tx0 - tl * 0.45, ty0 + 7 * K, tx0, ty0 + 6 * K); g.closePath(); g.fillStyle = C[0]; g.fill(); line();
     if(stage >= 2){ const sx = tx0 - tl, sy = ty0 - tl * 0.25; g.fillStyle = C[3]; g.beginPath(); g.moveTo(sx + 2 * K, sy); g.lineTo(sx - 6 * K, sy - 6 * K); g.lineTo(sx - 4 * K, sy + 3 * K); g.lineTo(sx + 2 * K, sy + 4 * K); g.closePath(); g.fill(); line(); }
+    if(o.out) o.out.tail = pt(g, tx0 - tl, ty0 - tl * 0.25); g.restore();
     // back legs, body, belly
     const legs = (dx, far) => { g.fillStyle = far ? shade(C[0], 0.82) : C[0]; g.beginPath(); g.roundRect(bx + dx * K - 4 * K, by + S.bodyY * 0.4 * K, 8 * K, S.leg * K + S.bodyY * 0.6 * K, 4 * K); g.fill(); line(); g.fillStyle = '#FFFFFF'; [-2.5, 0, 2.5].forEach(c => { g.beginPath(); g.arc(bx + dx * K + c * K, -hover * 0 + (S.leg + S.bodyY) * K + by - 0.5 * K, 1 * K, 0, 7); g.fill(); }); };
     if(!S.fly || S.fly < 1){ legs(-S.bodyX * 0.5, 1); legs(S.bodyX * 0.45, 1); }
@@ -1403,17 +1461,24 @@ const TDDragon = (() => {
     if(S.fly < 1){ legs(-S.bodyX * 0.38, 0); legs(S.bodyX * 0.55, 0); } else { [[-S.bodyX * 0.42, -0.9], [S.bodyX * 0.42, -0.5]].forEach(([dx, a]) => { const px = bx + dx * K, py = by + S.bodyY * 0.78 * K; g.fillStyle = shade(C[0], 0.9); g.beginPath(); g.ellipse(px, py, 4.2 * K, 7 * K, a, 0, 7); g.fill(); line();
       g.fillStyle = '#FFFFFF'; [-1.6, 1.6].forEach(c => { g.beginPath(); g.arc(px + Math.cos(a + 1.57) * 6 * K + c * K, py + Math.sin(a + 1.57) * 6 * K, 0.9 * K, 0, 7); g.fill(); }); }); }   // legs tucked back while flying   // tucked legs when flying
     // neck + head (head is relatively bigger when young: S.head)
-    const nx = bx + S.bodyX * 0.7 * K, ny = by - S.bodyY * 0.35 * K, hx = nx + (6 + S.neck * 0.55) * K, hy = ny - (6 + S.neck) * K, hr = 13 * S.head * K;
+    const nx = bx + S.bodyX * 0.7 * K, ny = by - S.bodyY * 0.35 * K, hx = nx + (6 + S.neck * 0.55 + (PS.hx || 0)) * K, hy = ny - (6 + S.neck - (PS.hy || 0)) * K, hr = 13 * S.head * K;
     if(S.neck > 0){ g.strokeStyle = INK; g.lineWidth = 12 * K + ol * 2; g.beginPath(); g.moveTo(nx, ny); g.quadraticCurveTo(nx + S.neck * 0.1 * K, hy + 4 * K, hx - hr * 0.3, hy); g.stroke(); g.strokeStyle = C[0]; g.lineWidth = 12 * K; g.stroke();
       if(S.belly){ g.strokeStyle = S.belly >= 3 ? '#FFE680' : C[1]; g.lineWidth = 4 * K; g.beginPath(); g.moveTo(nx + 4 * K, ny + 2 * K); g.quadraticCurveTo(nx + S.neck * 0.1 * K + 5 * K, hy + 6 * K, hx - hr * 0.1, hy + hr * 0.5); g.stroke(); } }
+    if(o.out) o.out.chest = pt(g, bx + S.bodyX * 0.45 * K, by);
+    g.save(); if(PS.ha){ g.translate(hx, hy); g.rotate(PS.ha); g.translate(-hx, -hy); }   // 🎬 head angle (− = up)
     if(S.mane){ g.fillStyle = C[3]; for(let i = 0; i < 5; i++){ const a = Math.PI * (0.75 + i * 0.12); g.beginPath(); g.ellipse(hx + Math.cos(a) * hr * 1.05, hy + Math.sin(a) * hr * 1.05, 5 * K, 2.6 * K, a, 0, 7); g.fill(); } }
     // horns (behind head) — none → nubs → curved → crown horns
     if(S.horn > 0){ const hl = 14 * S.horn * K; [[-0.35, 0.82], [0.05, 1]].forEach(([dx, sc]) => { const x0 = hx + dx * hr, y0 = hy - hr * 0.75; g.fillStyle = S.horn >= 1 ? '#FFF0C8' : C[3];
         g.beginPath(); g.moveTo(x0 - 3 * K, y0 + 2 * K); g.quadraticCurveTo(x0 - hl * 0.6 * sc, y0 - hl * 0.4 * sc, x0 - hl * 0.55 * sc, y0 - hl * sc); g.quadraticCurveTo(x0 - hl * 0.1, y0 - hl * 0.4 * sc, x0 + 3 * K, y0 + 1 * K); g.closePath(); g.fill(); line(); }); }
     g.fillStyle = C[0]; g.beginPath(); g.ellipse(hx, hy, hr, hr * 0.9, 0, 0, 7); g.fill(); line();                                                   // head
-    const snL = hr * (0.55 + (stage - 1) * 0.08), bOpen = o.breath ? 0.35 : 0;
-    g.beginPath(); g.ellipse(hx + hr * 0.75, hy + hr * 0.2, snL, hr * 0.48, bOpen * 0.3, 0, 7); g.fill(); line();                                     // snout (longer each stage)
-    if(o.breath){ g.fillStyle = '#5A1E2A'; g.beginPath(); g.moveTo(hx + hr * 0.6, hy + hr * 0.3); g.lineTo(hx + hr * 0.75 + snL, hy + hr * 0.15); g.lineTo(hx + hr * 0.7 + snL, hy + hr * 0.75); g.closePath(); g.fill(); }
+    const snL = hr * (0.55 + (stage - 1) * 0.08), mo = Math.max(o.breath ? 1 : 0, PS.mouth || 0), bOpen = mo * 0.35;
+    g.beginPath(); g.ellipse(hx + hr * 0.75, hy + hr * 0.2, snL, hr * 0.48, -mo * 0.22, 0, 7); g.fill(); line();                                     // snout (longer each stage)
+    if(mo > 0.04){ const ux = hx + hr * 0.78 + snL * 0.95, uy = hy + hr * (0.3 - 0.3 * mo), lx = hx + hr * 0.72 + snL * 0.85, ly = hy + hr * (0.5 + 0.8 * mo);   // 🎬 the jaw drops open with the move
+      g.fillStyle = '#5A1E2A'; g.beginPath(); g.moveTo(hx + hr * 0.42, hy + hr * 0.36); g.lineTo(ux, uy); g.lineTo(lx, ly); g.closePath(); g.fill();
+      g.fillStyle = '#FF7AA8'; g.beginPath(); g.ellipse(hx + hr * 0.6 + snL * 0.5, hy + hr * (0.42 + 0.35 * mo), snL * 0.32, hr * 0.12 * mo + 0.2, 0.3, 0, 7); g.fill();
+      g.fillStyle = '#FFFFFF'; [0.45, 0.75].forEach(u => { const tx = hx + hr * 0.5 + (ux - hx - hr * 0.5) * u, ty = hy + hr * 0.36 + (uy - hy - hr * 0.36) * u; g.beginPath(); g.moveTo(tx - 1.6 * K, ty); g.lineTo(tx + 1.6 * K, ty); g.lineTo(tx, ty + 3 * K * mo); g.closePath(); g.fill(); });
+      g.fillStyle = C[0]; g.beginPath(); g.ellipse(hx + hr * 0.62 + snL * 0.42, hy + hr * (0.58 + 0.42 * mo), snL * 0.78, hr * 0.24, 0.12 + mo * 0.5, 0, 7); g.fill(); line(); }
+    if(o.out) o.out.mouth = pt(g, hx + hr * 0.75 + snL, hy + hr * (0.36 + 0.2 * mo));
     g.fillStyle = INK; g.beginPath(); g.arc(hx + hr * 0.75 + snL * 0.75, hy + hr * 0.05, 1.3 * K, 0, 7); g.fill();                                       // nostril
     const er = 4.2 * S.eye * K; g.fillStyle = '#FFFFFF'; g.beginPath(); g.ellipse(hx + hr * 0.22, hy - hr * 0.18, er, er * 1.15, 0, 0, 7); g.fill(); line();
     g.fillStyle = INK; g.beginPath(); g.arc(hx + hr * 0.3, hy - hr * 0.15, er * 0.6, 0, 7); g.fill(); g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(hx + hr * 0.36, hy - hr * 0.28, er * 0.22, 0, 7); g.fill();
@@ -1422,10 +1487,12 @@ const TDDragon = (() => {
       g.fillStyle = '#C9A2FF'; g.beginPath(); g.arc(hx - hr * 0.2, hy - hr * 0.85, 1.6 * K, 0, 7); g.fill(); }                                             // eggshell hat
     if(S.mane){ g.strokeStyle = '#FFE680'; g.lineWidth = 1.6 * K; [[0.2, 1], [0.35, 1.25]].forEach(([dy, l]) => { g.beginPath(); g.moveTo(hx + hr * 0.7 + snL * 0.6, hy + hr * dy); g.quadraticCurveTo(hx + hr + snL * l, hy + hr * (dy + 0.4), hx + hr * 0.8 + snL * l, hy + hr * (dy + 1)); g.stroke(); }); }   // whiskers
     if(S.crown){ const cy = hy - hr * 0.95; g.fillStyle = '#FFD84D'; g.beginPath(); g.moveTo(hx - hr * 0.45, cy + 3 * K); [[-0.45, -4], [-0.22, 0], [0, -6], [0.22, 0], [0.45, -4]].forEach(([dx, dy]) => g.lineTo(hx + dx * hr, cy + dy * K)); g.lineTo(hx + hr * 0.45, cy + 3 * K); g.closePath(); g.fill(); line(); g.fillStyle = C[3]; g.beginPath(); g.arc(hx, cy - 1 * K, 1.8 * K, 0, 7); g.fill(); }
+    g.restore();   // 🎬 head angle
     if(S.heart){ const cx2 = bx + S.bodyX * 0.45 * K, cy2 = by - 1 * K, hg = g.createRadialGradient(cx2, cy2, 0, cx2, cy2, 12 * K); hg.addColorStop(0, 'rgba(255,255,255,.95)'); hg.addColorStop(1, 'rgba(255,120,190,0)'); g.fillStyle = hg; g.beginPath(); g.arc(cx2, cy2, 12 * K, 0, 7); g.fill(); heart(g, cx2, cy2, 5.5 * K, '#FF4D8D'); }
     wing(1);   // near wing over the body
     g.restore();
   }
+  function pt(g, x, y){ const T = g.getTransform(); return [T.a * x + T.c * y + T.e, T.b * x + T.d * y + T.f]; }   // 🎬 a point → device pixels (the page maps it back)
   function shade(hex, f){ const n = parseInt(hex.slice(1), 16), c = s => Math.max(0, Math.min(255, Math.round(((n >> s) & 255) * f))); return '#' + [16, 8, 0].map(s => c(s).toString(16).padStart(2, '0')).join(''); }
   // ✨ the morph moment (standard): 0–0.35 glow cocoon wraps the old shape · 0.35–0.55 white silhouette swells · 0.55 burst + new shape pops in · 0.55–1 confetti + settle
   function morph(g, from, to, col, x, feet, k, q, t){
@@ -1654,6 +1721,131 @@ const TDPrincess = (() => {
   return {COL, NAME5, ITEM5, SHAPE5, STAGES, stageOf, av, draw, wear, nameOf};
 })();
 window.TDPrincess = TDPrincess; window.AK_WEAR = TDPrincess.wear;   // 👗 AvatarKit artWearAt → av.cw.<slot> = {td} (iso2-a hook)
+/* ================= 🎬 act-2 — REAL MOVES (🏰 TD-Stories chat, 2026-11-17, plan §iso-2 🎬 row) =================
+   The game fires on CONTACT: TD.cast queues the skill → 'windup' event (engine time `at` = its contact) → the hero plays its
+   move on the shared 🎬 beat timeline (Acting.play, contactAt = at, clock = G.t so a pause / pick freezes it too) → at `at`
+   the engine really casts. Every move = ready → anticipation (the opposite move first) → CONTACT → follow-through → settle.
+   🐉 TDDragon (own painter) — pose fields lean · hx / hy (head) · ha (head angle) · mouth · wing (flap) · ws (spread) · tail · sy · rise · bx · shake:
+     breath (head pulls back → LUNGE + fire from the MOUTH → recoil) · spit (fireball) · sky (fire up into the sky) · wing (wing beat) · roar · tail (tail swipe)
+   👸 TDPrincess (an AvatarKit avatar) — one 🎬 ActionFX / 🎭 actions-block move per skill (TD.TD_MOVES.princess = skin.act → SkillKit.actionOf)
+   🤴 suitors — their trick: 'trickWind' → wind-up → contact = the skill; tricks that answer the world (charge, ladder, flower bomb, chocolate) play from contact. */
+const DMOVES = {   // 5 beats: ready · anticipation · CONTACT · follow-through · settle  ({ms, ease, pose}) — dragon units (the princess ≈ 90 tall)
+  breath: [{ms: 60, pose: {}},
+           {ms: 220, ease: 'cubicOut', pose: {hx: -7, hy: -5, ha: -0.3, sy: 0.09, lean: -0.14, wing: -0.35, mouth: 0.05}},   // 🫁 breathes in: head pulls back + up, chest puffs
+           {ms: 70, pose: {hx: 10, hy: 3, ha: 0.2, mouth: 1, lean: 0.16, sy: -0.06, wing: 0.35, ws: 0.15}, contact: true},      // 🔥 LUNGE — fire leaves the mouth
+           {ms: 300, ease: 'backOut', pose: {hx: -4, hy: -1, ha: -0.12, mouth: 0.85, bx: -6, lean: -0.1, wing: 0.1}},              // ↩️ recoil: the blast pushes the head + body back
+           {ms: 180, pose: {mouth: 0.15}}],
+  spit:   [{ms: 40, pose: {}},
+           {ms: 150, ease: 'cubicOut', pose: {hx: -5, hy: -3, ha: -0.18, sy: 0.05, lean: -0.08}},
+           {ms: 60, pose: {hx: 7, hy: 2, ha: 0.14, mouth: 0.9, lean: 0.1}, contact: true},
+           {ms: 190, ease: 'backOut', pose: {hx: -2, mouth: 0.35, bx: -2.5, lean: -0.03}},
+           {ms: 120, pose: {}}],
+  sky:    [{ms: 60, pose: {}},
+           {ms: 240, ease: 'cubicOut', pose: {hx: -3, hy: 4, ha: 0.35, sy: 0.12, lean: 0.12, wing: 0.4}},                     // crouches, head down
+           {ms: 80, pose: {hx: 5, hy: -9, ha: -0.75, mouth: 1, lean: -0.3, sy: -0.08, wing: -0.9, ws: 0.3, rise: 4}, contact: true},  // 🔥 fire straight up
+           {ms: 340, ease: 'backOut', pose: {hx: 3, hy: -6, ha: -0.55, mouth: 0.8, lean: -0.2, wing: -0.4, ws: 0.15, rise: 2}},
+           {ms: 200, pose: {mouth: 0.1}}],
+  wing:   [{ms: 50, pose: {wing: 0}},
+           {ms: 230, ease: 'cubicOut', pose: {wing: -1.15, ws: 0.3, rise: 5, sy: 0.07, lean: -0.12, hy: -2}},                  // wings up HIGH, body rises
+           {ms: 80, pose: {wing: 1.05, ws: 0.4, rise: -3, sy: -0.09, lean: 0.14, hy: 2}, contact: true},                       // 💨 the big down beat
+           {ms: 270, ease: 'backOut', pose: {wing: -0.45, ws: 0.12, rise: 6, lean: -0.04}},
+           {ms: 170, pose: {wing: 0}}],
+  roar:   [{ms: 60, pose: {}},
+           {ms: 250, ease: 'cubicOut', pose: {hx: -5, hy: 3, ha: 0.4, sy: 0.11, lean: 0.12, mouth: 0.1, wing: -0.2}},          // head down, draws in a big breath
+           {ms: 90, pose: {hx: 6, hy: -7, ha: -0.5, mouth: 1, ws: 0.4, wing: -0.95, lean: -0.16, shake: 1.6}, contact: true, stop: 50},   // 🦁 ROAR
+           {ms: 430, ease: 'sineOut', pose: {hx: 4, hy: -5, ha: -0.35, mouth: 0.9, shake: 1, wing: -0.6, ws: 0.3, lean: -0.1}},
+           {ms: 200, pose: {mouth: 0.1}}],
+  tail:   [{ms: 50, pose: {tail: 0}},
+           {ms: 230, ease: 'cubicOut', pose: {tail: 1.15, lean: 0.12, bx: 2.5, sy: 0.06, hx: -2}},                            // tail swings up high behind
+           {ms: 70, pose: {tail: -0.42, lean: -0.14, bx: -2.5, sy: -0.07, hx: 2}, contact: true},                             // 💥 SWIPE down — the hit
+           {ms: 280, ease: 'backOut', pose: {tail: -0.2, lean: -0.05}},
+           {ms: 180, pose: {tail: 0}}]};
+(function(){ if(!window.Acting || !Acting.add) return; const acts = {};
+  Object.keys(DMOVES).forEach(m => { acts['td.dragon.' + m] = {beats: DMOVES[m].map(b => ({pose: {}, ms: b.ms, ease: b.ease, contact: !!b.contact, stop: b.stop || 0})), tags: ['td', 'dragon']}; });
+  Acting.add({acts}, {by: 'TD-Stories chat', block: 'td-act2', game: 'td-stories', date: '2026-11-17'}); })();
+// 🤴 each suitor's trick (their own move; the thing they throw = their prop)
+const TRICK_ACT = {cu: 'act.shoot', pr: 'move.throw.lob', wz: 'move.cast.orbthrow', kg: 'move.cast.raise', gc: 'move.throw.double', sq: 'move.jump.rising', kn: 'move.defend.bash',
+  boss1: 'move.throw.overhand', boss2: 'move.power.aura', boss3: 'move.cast.wide', boss4: 'move.cast.spin', boss5: 'move.cast.raise', boss6: 'move.cast.skycall', groom: 'move.throw.overhand'};
+const EL_OF = {fire: 'fire', lava: 'fire', ice: 'ice', storm: 'zap', nature: 'nature', thorn: 'nature', blossom: 'nature', honey: 'light', holy: 'light', sun: 'light', gold: 'light', star: 'light',
+  shadow: 'shadow', ghost: 'shadow', dream: 'shadow', cosmic: 'shadow', moon: 'shadow', love: 'candy', candy: 'candy', rose: 'candy', paper: 'light', water: 'water', bubble: 'water', crystal: 'ice', music: 'candy', goo: 'nature', rainbow: 'candy', wind: 'water', rock: 'fire', steel: 'light'};
+const HACT = {dragon: null, princess: null}, SACT = {}, DM = {}, PZ = {x: 0, y: 0, k: 1};
+function act2Reset(){ HACT.dragon = HACT.princess = null; Object.keys(SACT).forEach(k => delete SACT[k]); if(window.ActionFX) ActionFX.clear(); }
+const actNow = () => G ? G.t : 0;
+// the dragon's pose at a moment: Acting.play keeps the beat clock (contactAt, hit-stop) → we blend TDDragon's own fields with the beat's ease
+function dPoseAt(A, t){ const f = A.run.at(t), B = DMOVES[A.move], i = f.i, cur = B[i].pose, prev = i ? B[i - 1].pose : (A.from || {}),
+    nm = ['ready', 'anticipation', 'contact', 'follow', 'settle'][i], e = Acting.ease(B[i].ease || (Acting.DEF_EASE && Acting.DEF_EASE[nm]) || 'quadInOut'), q = e(f.q), P = {};
+  Object.keys(prev).concat(Object.keys(cur)).forEach(k => { if(k in P) return; const a = prev[k] || 0, b = cur[k] || 0; P[k] = a + (b - a) * q; });
+  return {pose: P, f}; }
+function act2Event(e){
+  if(!G) return;
+  if(e.k === 'windup' && e.hero === 'dragon' && DMOVES[e.move] && window.Acting){
+    const now = actNow(), old = HACT.dragon, from = old && !old.done ? (old.last || {}) : {};
+    const run = Acting.play({name: 'Dragon'}, 'td.dragon.' + e.move, {t0: now, contactAt: e.at, onContact: r => dragonContact(HACT.dragon && HACT.dragon.run === r ? HACT.dragon : null)});
+    HACT.dragon = {run, move: e.move, key: e.key, basic: !!e.basic, aim: e.aim, from, t0: now, at: e.at, tail: []}; return; }
+  if(e.k === 'windup' && e.hero === 'princess' && window.Acting){
+    const mv = e.basic ? TD.TD_MOVES.princess._basic : (SkillKit.actionOf(G.trees.princess.pack.get(e.key)) || 'move.cast.bolt'), st = heroStage('princess'), col = heroCol('princess');
+    const dir = e.aim && IX(e.aim.x, e.aim.y) < IX(TD.CX, TD.CY) - 1 ? -1 : 1, who = {name: 'Princess', av: TDPrincess.av(st, col), dir};
+    const L = skillLook(e.basic ? null : {hero: 'princess', key: e.key}, 'swat'), el = EL_OF[L.key] || 'candy';
+    const run = Acting.play(who, mv, {t0: actNow(), contactAt: e.at, onContact: r => fxAt(mv, PZ.x, PZ.y, PZ.k, dir, el, r.contactT, !e.basic)});
+    HACT.princess = {run, mv, key: e.key, basic: !!e.basic, dir, at: e.at}; return; }
+  if((e.k === 'trickWind' || e.k === 'suitorSkill') && e.id != null){
+    const x = G.enemies.find(q => q.id === e.id); if(!x || x.gone) return; const mv = TRICK_ACT[x.type]; if(!mv || !window.Acting) return;
+    if(e.k === 'suitorSkill' && SACT[e.id] && !SACT[e.id].done) return;   // it wound up already → this is its contact
+    const at = e.k === 'trickWind' ? e.at : actNow();   // a trick that answers the world plays from its contact
+    SACT[e.id] = {run: Acting.play({name: 'suitor'}, mv, {t0: actNow(), contactAt: at, onContact: r => { const A = SACT[e.id]; if(A && A.at) fxAt(mv, A.at[0], A.at[1], A.at[2], A.at[3], 'candy', r.contactT, false); }}), mv, done: false}; return; }
+  if(e.k === 'fizzle') floatText(e.hero === 'dragon' ? G.heroes.dragon.x : TD.CX, (e.hero === 'dragon' ? G.heroes.dragon.y : TD.CY) - 1, '💨', '#7A5C88', 0.7);
+}
+// 🎬 an ActionFX contact effect at the act's hit point (the move's own feeling), quiet for auto attacks
+function fxAt(mv, x, y, k, dir, el, t, loud){ if(!window.ActionFX || !FX) return; const A = Acting.act && Acting.act(mv); const fx = A && A.fx; if(!fx || !ActionFX.style(fx.key)) return;
+  const p = fx.at || [20, -38]; ActionFX.at(fx.key, {x: x + p[0] * k * dir, y: y + p[1] * k, k, dir, element: el, t, sound: !!loud, shake: !!loud}); }
+// 🐉 what the dragon's move does at contact (sound + an extra punch for roar / tail)
+function dragonContact(A){ if(!A || !FX) return; const s = VIEW.s;
+  if(A.move === 'roar'){ SHAKE = Math.max(SHAKE, 0.22); try{ UISound.play('boom'); }catch(e){} }
+  if(A.move === 'tail' && DM.tail && window.ActionFX) ActionFX.at('jump.pound', {x: DM.tail[0], y: DM.tail[1], k: s / 60, dir: A.dir || 1, t: actNow(), sound: !A.basic});
+  if(A.move === 'wing'){ try{ UISound.play('whoosh'); }catch(e){} } }
+// called by drawDragonHero: pose + facing while a move plays
+function act2Dragon(o, x){ const A = HACT.dragon; if(!A) return; const t = actNow(), P = dPoseAt(A, t); A.last = P.pose; if(P.f.done){ HACT.dragon = null; return; }
+  o.pose = P.pose; if(A.aim){ const ax = IX(A.aim.x, A.aim.y); A.dir = A.move === 'sky' ? (o.dir || 1) : ax < x - 2 ? -1 : 1; o.dir = A.dir; } A.f = P.f; }
+// called by drawDragonHero after painting: anchors (mouth / tail / wing / chest) back into page pixels
+function act2DragonOut(g, o){ if(!o.out) return; const m = g.getTransform().inverse(); Object.keys(o.out).forEach(k => { const p = m.transformPoint(new DOMPoint(o.out[k][0], o.out[k][1])); DM[k] = [p.x, p.y]; });
+  const A = HACT.dragon; if(A && A.move === 'tail' && DM.tail){ A.tail.push([DM.tail[0], DM.tail[1], actNow()]); if(A.tail.length > 12) A.tail.shift(); } }
+// 👸 called by drawTower: her frame + where she stands (for the contact effect)
+function act2Princess(o, x, feet, k, st){ const S = TDPrincess.STAGES[st] || TDPrincess.STAGES[1], kk = k * S.sc; PZ.x = x; PZ.y = feet - (S.lift || 0) * kk; PZ.k = kk;
+  const A = HACT.princess; if(!A) return; const f = A.run.at(actNow()); if(f.done){ HACT.princess = null; return; } if(f.prop) delete f.prop; o.act = f; o.dir = A.dir; }
+// 🤴 called by drawSuitor: a suitor doing their trick is drawn live (everyone else stays cached pictures)
+function act2Suitor(g, e, set, x, fy, w, flip, alpha, t){ const A = SACT[e.id]; if(!A) return false; if(e.gone){ delete SACT[e.id]; return false; }
+  const f = A.run.at(actNow()); if(f.done){ A.done = true; delete SACT[e.id]; return false; } const sc = w / set.w, k = set.k * sc, dir = flip ? -1 : 1;
+  A.at = [x, fy, k, dir]; if(f.prop) f.prop = Object.assign({}, f.prop, {ch: e.S.prop || f.prop.ch});
+  g.save(); g.globalAlpha = alpha; Acting.draw(g, Object.assign({}, set.who, {dir}), x, fy, k, f, {t, dir}); g.restore(); return true; }
+// ✨ the dragon's move effects in the air: 🔥 fire from the mouth · 🦁 roar rings · 💨 wing gust · 💫 tail trail — and the ActionFX layer
+function act2Air(g, s, t){
+  const now = actNow(), A = HACT.dragon;
+  if(A && FX){ const ct = A.run.contactT, since = now - ct, L = skillLook(A.basic ? null : {hero: 'dragon', key: A.key}, A.move === 'breath' || A.move === 'sky' ? 'cone' : 'push'), C = L.c || ['#FFF6B0', '#FF8A3D', '#E8341C'];
+    if((A.move === 'breath' || A.move === 'sky') && DM.mouth && since >= 0 && since < 0.5){
+      const m = DM.mouth, to = A.move === 'sky' ? [m[0] + (A.dir || 1) * s * 0.6, m[1] - s * 4.2] : A.aim ? [IX(A.aim.x, A.aim.y), IY(A.aim.x, A.aim.y, 0.3)] : [m[0] + (A.dir || 1) * s * 3, m[1] + s];
+      flame(g, m, to, s, C, since / 0.5, t); }
+    if(A.move === 'roar' && DM.mouth && since >= 0 && since < 0.7){ const m = DM.mouth, d = A.dir || 1;
+      for(let i = 0; i < 3; i++){ const q = since / 0.7 - i * 0.16; if(q <= 0 || q >= 1) continue; const r = s * (0.4 + q * 2.6); g.strokeStyle = 'rgba(255,255,255,' + (0.85 * (1 - q)).toFixed(3) + ')'; g.lineWidth = s * 0.09 * (1 - q * 0.6); g.lineCap = 'round';
+        g.beginPath(); g.arc(m[0], m[1], r, d > 0 ? -0.75 : Math.PI - 0.75, d > 0 ? 0.75 : Math.PI + 0.75); g.stroke(); g.strokeStyle = C[1]; g.globalAlpha = 0.6 * (1 - q); g.lineWidth = s * 0.04; g.stroke(); g.globalAlpha = 1; } }
+    if(A.move === 'wing' && DM.wing && since >= 0 && since < 0.45){ const q = since / 0.45, w = DM.wing, d = A.dir || 1;
+      g.lineCap = 'round'; for(let i = 0; i < 3; i++){ const y0 = w[1] + s * (0.3 + i * 0.35) + q * s * 0.9, x0 = w[0] - d * s * 0.2 * i; g.strokeStyle = 'rgba(255,255,255,' + (0.8 * (1 - q)).toFixed(3) + ')'; g.lineWidth = s * 0.07;
+        g.beginPath(); g.moveTo(x0 - s * 0.9, y0); g.quadraticCurveTo(x0, y0 + s * 0.35, x0 + s * 0.9, y0); g.stroke(); }
+      if(DM.feet){ for(let i = 0; i < 6; i++){ const a = i / 6 * Math.PI * 2, r = s * (0.3 + q * 1.4); g.fillStyle = 'rgba(255,255,255,' + (0.45 * (1 - q)).toFixed(3) + ')'; g.beginPath(); g.ellipse(DM.feet[0] + Math.cos(a) * r, DM.feet[1] + Math.sin(a) * r * V25.K, s * 0.22 * (1 - q * 0.5), s * 0.13 * (1 - q * 0.5), 0, 0, 7); g.fill(); } } }
+    if(A.move === 'tail' && A.tail.length > 1){ const pts = A.tail.filter(p => now - p[2] < 0.18 && p[2] >= ct - 0.12); if(pts.length > 1){ g.lineCap = 'round'; g.lineJoin = 'round';
+      for(let i = 1; i < pts.length; i++){ const a = 1 - (now - pts[i][2]) / 0.18; g.strokeStyle = 'rgba(255,240,180,' + Math.max(0, a * 0.9).toFixed(3) + ')'; g.lineWidth = s * 0.16 * a; g.beginPath(); g.moveTo(pts[i - 1][0], pts[i - 1][1]); g.lineTo(pts[i][0], pts[i][1]); g.stroke(); } } } }
+  if(window.ActionFX && FX) ActionFX.draw(g, now);
+}
+// 🔥 a tapered flame jet from the mouth (look colours core → main → deep), licking + flickering blobs
+function flame(g, m, to, s, C, q, t){ const dx = to[0] - m[0], dy = to[1] - m[1], L = Math.hypot(dx, dy) || 1, a = Math.atan2(dy, dx), reach = Math.min(1, q * 3.2), fade = q < 0.6 ? 1 : 1 - (q - 0.6) / 0.4, len = L * reach;
+  g.save(); g.translate(m[0], m[1]); g.rotate(a); g.globalAlpha = fade;
+  const gr = g.createLinearGradient(0, 0, len, 0); gr.addColorStop(0, C[0]); gr.addColorStop(0.35, C[1]); gr.addColorStop(1, C[2] + '00');
+  g.fillStyle = gr; g.beginPath(); g.moveTo(0, -s * 0.06); for(let i = 0; i <= 10; i++){ const u = i / 10, w = s * (0.08 + u * 0.55) * (1 + Math.sin(t * 40 + i * 1.7) * 0.12); g.lineTo(len * u, -w); }
+  for(let i = 10; i >= 0; i--){ const u = i / 10, w = s * (0.08 + u * 0.55) * (1 + Math.sin(t * 37 + i * 2.3) * 0.12); g.lineTo(len * u, w); } g.closePath(); g.fill();
+  for(let i = 0; i < 7; i++){ const u = ((t * 2.6 + i * 0.37) % 1) * reach, r = s * (0.07 + u * 0.32); g.fillStyle = i % 2 ? C[0] : C[1]; g.globalAlpha = fade * (1 - u) * 0.9; g.beginPath(); g.arc(L * u, Math.sin(t * 23 + i) * s * 0.12 * u, r, 0, 7); g.fill(); }
+  g.restore(); g.globalAlpha = 1; }
+// 🔥 fire / bolts the dragon spits start at its MOUTH (the first frame of a dragon-made effect remembers where the mouth was)
+function act2FxFrom(f, spec){ if(!f.mk){ f.mk = 1; const hd = G.heroes.dragon; if(DM.mouth && f.x2 != null && Math.abs(f.x - hd.x) + Math.abs(f.y - hd.y) < 1e-6 && (f.k === 'fireball' || (f.sk && f.sk.hero === 'dragon'))) f.m = DM.mouth.slice(); }
+  if(f.m){ spec.x = f.m[0]; spec.y = f.m[1]; } return spec; }
 /* ================= 🏝️ iso-2 (iso2-b): TD-Stories on the IsoKit island (🏰 TD-Stories chat, 2026-11-17, plan §iso-2) =================
    Diamond projection (same as IsoKit): IX(x, y) / IY(x, y, z) · ground things in world units through groundTf (an affine map) ·
    the island = an IsoKit map (void outside, fading edge cells) baked into the background once per chapter + time of day ·
@@ -1819,6 +2011,7 @@ function drawTower(g, t){
   const swat = pz.atk > HEROES_RATE_P - 0.3, act = G.jail ? 'shy' : performance.now() < AV_T && AV_ACT === 'cheer' ? 'cheer' : null, o = {act: act && window.Acting && Acting.has && Acting.has('acts', act) ? act : null, pose: swat ? {armR: 2.2} : null, dir: 1};
   const rs = readerSet(), ract = performance.now() < AV_T ? rs.act(AV_ACT === 'facepalm' ? 'dizzy' : 'cheer') : null, rpic = ract ? ract[Math.floor(t * 7) % ract.length] : rs.still;
   drawPic(g, rpic, fx + T.SR * 0.62, fy + T.sry * 0.35, rs.w, rs.h, true, 0, 1, rs);
+  act2Princess(o, fx - s * 0.12, fy + T.sry * 0.1, k, st);   // 🎬 act-2: her move
   if(q >= 0) princessMorph(g, MORPH.princess, col, fx - s * 0.12, fy + T.sry * 0.1, k, q, t, o); else TDPrincess.draw(g, st, col, fx - s * 0.12, fy + T.sry * 0.1 - Math.abs(Math.sin(t * 2)) * s * 0.02, k, t, o);
   if(pz.dazeT > 0) emo(g, '✨', fx, fy - s * 1.5, s * 0.45);
   g.drawImage(T.front, ox, oy, T.w, T.h);
@@ -1833,9 +2026,10 @@ function drawDragonHero(g, t){
   const s = VIEW.s, hd = G.heroes.dragon, st = heroStage('dragon'), col = heroCol('dragon'), lift = st >= 3 ? 1.6 + Math.sin(t * 3) * 0.12 : Math.abs(Math.sin(t * 6)) * 0.12, k = s / 46;
   const goingLeft = hd.px != null ? IX(hd.x, hd.y) < IX(hd.px, hd.py) - 0.01 : false; if(hd.px == null || Math.abs(hd.x - hd.px) + Math.abs(hd.y - hd.py) > 1e-4) hd.face = goingLeft ? -1 : 1; hd.px = hd.x; hd.py = hd.y;
   shadow(g, hd.x, hd.y, 0.3 + 0.12 * st, 0.18);
-  const x = IX(hd.x, hd.y), feet = IY(hd.x, hd.y, lift), q = morphQ('dragon'), o = {dir: hd.face || 1, noShadow: true};
+  const x = IX(hd.x, hd.y), feet = IY(hd.x, hd.y, lift), q = morphQ('dragon'), o = {dir: hd.face || 1, noShadow: true, out: {}};
+  act2Dragon(o, x);   // 🎬 act-2: the move's pose + it faces its target
   if(q >= 0){ g.save(); if(o.dir < 0){ g.translate(x, 0); g.scale(-1, 1); g.translate(-x, 0); } TDDragon.morph(g, MORPH.dragon.from, MORPH.dragon.to, col, x, feet, k, q, t); g.restore(); }
-  else { g.globalAlpha = hd.dazeT > 0 ? 0.75 : 1; TDDragon.draw(g, st, col, x, feet, k, t, o); g.globalAlpha = 1; }
+  else { g.globalAlpha = hd.dazeT > 0 ? 0.75 : 1; TDDragon.draw(g, st, col, x, feet, k, t, o); g.globalAlpha = 1; act2DragonOut(g, o); }
   if(hd.sleepy) emo(g, '💤', x + s * 0.5, feet - s * 1.2, s * 0.45); if(hd.dazeT > 0) emo(g, '💐', x - s * 0.45, feet - s * 1.1, s * 0.45);
 }
 // 🖼️ the hero face in the skill panel = the same painters
@@ -1911,6 +2105,7 @@ function paintFrame(t){
   { const dtF = Math.min(0.1, Math.max(0, t - (paintFrame.lt || t))); paintFrame.lt = t; paintBG(g, dtF); }   // 🌅 iso-2 time of day
   let sx = 0, sy = 0; if(SHAKE > 0 && FX){ SHAKE = Math.max(0, SHAKE - 1 / 60); sx = (Math.random() - 0.5) * s * 0.25 * SHAKE * 3; sy = (Math.random() - 0.5) * s * 0.18 * SHAKE * 3; }
   // ☁️ cloud shadows drift over the meadow
+  if(window.ActionFX && FX){ const sh = ActionFX.shake(actNow()); sx += sh.x; sy += sh.y; }   // 🎬 act-2
   screenTf(g); if(sx || sy) g.translate(sx, sy);
   groundTf(g, sx, sy);
   for(let i = 0; i < 3; i++){ const x = ((t * 0.35 + i * 6.3) % 22) - 3, y = 3 + i * 4.6; g.fillStyle = 'rgba(40,60,90,.07)'; g.beginPath(); g.ellipse(x, y, 2.2, 1.3, 0, 0, Math.PI * 2); g.ellipse(x + 1.4, y + 0.4, 1.6, 1, 0, 0, Math.PI * 2); g.fill(); }
@@ -1943,6 +2138,7 @@ function paintFrame(t){
   paintLights(g, t);   // 🏮 iso-2 dusk / night lights
   // ✨ air effects + 💬 words
   drawSkillZones(g, s, t);
+  act2Air(g, s, t);   // 🎬 act-2: fire from the mouth, roar rings, wing gust, tail trail + ActionFX
   G.fx.forEach(f => { if(!drawSkillFx(g, f, s, t, 'air')) drawFx(g, f, s, t); drawSkillFxAlso(g, f, s, t); });
   PARTS = PARTS.filter(p => (p.t += 1 / 60) < p.dur); PARTS.forEach(p => { const k = p.t / p.dur; emo(g, p.ic, IX(p.x, p.y) + p.vx * k * s, IY(p.x, p.y, p.z) + (p.vy * k + 2.2 * k * k) * s, s * p.sz * (1 - k * 0.4), 1 - k); });
   g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -1988,7 +2184,7 @@ function drawSuitor(g, e, t, s){
   const fr = e.charmT > 0 ? set.act('love') : (e.stunT > 0 || e.sleepT > 0 || e.rootT > 0 || e.confT > 0) ? set.act('dizzy') : null;
   const pic = fr ? fr[Math.floor(t * 6 + e.id) % fr.length] : still ? set.still : set.walk[Math.floor((t * 1.9 + e.id * 0.37) * WALK_N) % WALK_N];
   const alpha = e.hitT > 0 && FX ? 0.55 + 0.45 * Math.cos(e.hitT * 70) : 1, fy = IY(e.x, e.y, hop);
-  drawPic(g, pic, IX(e.x, e.y), fy, w, h, flip, 0, alpha, set);
+  if(!act2Suitor(g, e, set, IX(e.x, e.y), fy, w, flip, alpha, t)) drawPic(g, pic, IX(e.x, e.y), fy, w, h, flip, 0, alpha, set);   // 🎬 act-2: a trick is drawn live
   if(S.prop && e.type !== 'bd') emo(g, S.prop, IX(e.x, e.y) + (flip ? -1 : 1) * set.head * 0.34, fy - set.head * 0.42, set.head * 0.34, alpha, flip);
   if(S.front) emo(g, S.front, IX(e.x, e.y) + (flip ? -1 : 1) * w * 0.42, fy - s * 0.28, s * 0.62, alpha, flip);   // 🛒 the gift cart rolls in front
   if(e.shine > 0 || e.shield > 0){ g.strokeStyle = e.shine > 0 ? 'rgba(255,240,140,.95)' : 'rgba(150,200,255,.9)'; g.lineWidth = s * 0.07; g.beginPath(); g.ellipse(IX(e.x, e.y), fy - set.head * 0.5, set.head * 0.42, set.head * 0.58, 0, 0, Math.PI * 2); g.stroke(); }
@@ -2060,7 +2256,7 @@ const FX_STAMP = {choc: '🍫', potion: '💘', decree: '📜', serenade: '🎵'
 // paints f if SkillKit owns it on this layer → true (the old painter is skipped)
 function drawSkillFx(g, f, s, t, layer){
   const d = SKFX[f.k]; if(!d || !FX_OK) return false; if(d[0] !== layer) return true;   // owned by SkillKit, drawn in the other pass
-  const p = Math.min(1, f.t / f.dur), spec = d[1](f, s), L = skillLook(f.sk, f.k), seed = f.seed || (f.seed = 1 + Math.random() * 99);
+  const p = Math.min(1, f.t / f.dur), spec = act2FxFrom(f, d[1](f, s)), L = skillLook(f.sk, f.k), seed = f.seed || (f.seed = 1 + Math.random() * 99);
   SkillKit.fx.draw(g, Object.assign(spec, {p, t, look: L, sq: V25.K, seed}));
   if(spec.also) SkillKit.fx.draw(g, Object.assign({}, spec, spec.also, {p, t, look: L, seed}));
   if(layer === 'air' && FX_STAMP[f.k]) emo(g, FX_STAMP[f.k], spec.x, spec.y - s * (0.9 + p * 0.8), s * 0.6, Math.min(1, (1 - p) * 2));
@@ -2501,4 +2697,4 @@ function tdResultBadge(){
 /* 🏷️ TD LOGO END */</script>
 </body>
 </html>
-<!-- (td-2+td-logo+iso2-b) END OF TDStories.html -->
+<!-- (td-2+td-logo+iso2-b+act-2) END OF TDStories.html -->
