@@ -63,6 +63,11 @@
   .gcard{border:0;border-radius:20px;padding:14px 10px 12px;color:#fff;text-align:center;position:relative;cursor:pointer;min-height:150px;
     box-shadow:0 6px 0 rgba(0,0,0,.28);transition:transform .18s, box-shadow .18s;font-family:'Fredoka',sans-serif;}
   .gcard .ic{font-size:3rem;line-height:1.1;display:block;filter:drop-shadow(0 4px 0 rgba(0,0,0,.2))}
+  /* 🏷️ st-1b logo shell: an approved GameLogos logo replaces the icon + name (the name stays for readers) */
+  .gcard .lg{display:flex;align-items:center;justify-content:center;height:86px;margin:0 auto}
+  .gcard .lg img{max-width:100%;max-height:86px;filter:drop-shadow(0 4px 0 rgba(0,0,0,.25));animation:pop .45s cubic-bezier(.2,1.6,.4,1)}
+  .gcard.has-logo .nm{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .phone .gcard .lg{height:64px}.phone .gcard .lg img{max-height:64px}
   .gcard .nm{font-size:1.25rem;font-weight:700;display:block;margin-top:4px}
   .gcard .pl{font:800 .8rem Nunito,sans-serif;opacity:.9;display:block}
   .gcard .votes{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-top:8px;min-height:26px}
@@ -161,6 +166,7 @@
   </section>
 </div>
 <script src="inc/UiKit.js"></script>
+<script src="inc/GameLogos.js"></script>   <!-- 🏷️ st-1b: the shelf shows each game's APPROVED code logo (🏷️ logo chat's kit) -->
 <script src="inc/AvatarKit.js"></script>
 <script src="inc/AvatarActing.js"></script>
 <script src="inc/LinkKit.js"></script>
@@ -173,10 +179,21 @@ const esc = s => UI.esc(s);
 // 🎮 the shelf = every game that plays on own devices with a 📺 Room hostess (more as the 📡 chat links them)
 // max = players at once · lvl = the players vote a level when they play TOGETHER (alone always votes: the 🤖's level / the board)
 const SHELF = [
-  {k: 'chess', page: 'chess', icon: '♟️', name: 'Chess', max: 2, lvl: false, c: ['#5B6CFF', '#8F5BFF']},
-  {k: 'checkers', page: 'checkers', icon: '🔴', name: 'Checkers', max: 2, lvl: false, c: ['#FF5C7A', '#FF8A3D']},
-  {k: 'memory', page: 'memory', icon: '🃏', name: 'Memories Match', max: 4, lvl: true, c: ['#7A5CFA', '#2BB0C8']}
+  {k: 'chess', page: 'chess', icon: '♟️', name: 'Chess', max: 2, lvl: false, c: ['#5B6CFF', '#8F5BFF'], logo: 'chess'},
+  {k: 'checkers', page: 'checkers', icon: '🔴', name: 'Checkers', max: 2, lvl: false, c: ['#FF5C7A', '#FF8A3D'], logo: 'checkers'},
+  {k: 'memory', page: 'memory', icon: '🃏', name: 'Memories Match', max: 4, lvl: true, c: ['#7A5CFA', '#2BB0C8'], logo: 'memory'}
 ];
+// 🏷️ LOGO SHELL (st-1b, Aowu 2026-11-17 "the shelf = the games' logos being created"): each card shows the game's code logo from GameLogos
+// ONLY when Aowu approved it (GameLogos.ok); else the icon + name. New logos appear by themselves once the 🏷️ logo chat approves them.
+const LOGO_OK_FALLBACK = ['snakize', 'numbergrid', 'memory', 'wisdeck', 'pokadif'];   // approved 2026-11-16 23:1x — used only while the live kit has no .ok()
+const LOGO_KINDS = ['main', 'wide', 'badge'];   // main = the tall cover logo (fills the card best)
+function logoOk(id){ const L = window.GameLogos; if(!L || !id) return false; try{ return L.ok ? !!L.ok(id) : (L.has(id) && LOGO_OK_FALLBACK.indexOf(id) >= 0); }catch(e){ return false; } }
+function logoHtml(g, px){
+  if(!logoOk(g.logo)) return '';
+  try{ const ks = GameLogos.kinds(g.logo), k = LOGO_KINDS.find(x => ks.indexOf(x) >= 0) || ks[0]; const u = k && GameLogos.url(g.logo, k, undefined, px); return u ? '<span class="lg"><img alt="' + esc(g.name) + '" src="' + u + '"></span>' : ''; }catch(e){ return ''; }
+}
+function cardTop(g, px){ const l = logoHtml(g, px); return l ? l : '<span class="ic">' + g.icon + '</span>'; }
+try{ if(window.GameLogos && GameLogos.ready) GameLogos.ready(() => setTimeout(() => { if(S.st){ if(S.tv) paintTvStage(); else paintPhone(); } }, 0)); }catch(e){}   // repaint once the logo fonts are in
 const LV = [['🌱', 'Basic'], ['🐣', 'Junior'], ['🔥', 'Intermediate'], ['⚡', 'Hard'], ['🌋', 'Extreme'], ['💀', 'Hardcore']];
 const AGE_LV = {'4-5': 0, '6-7': 1, '8-9': 2, '10+': 3};   // ⭐ the level that suits each age group (same as the games' AGE_RECOMMEND)
 const VOTE_MS = window.ST_VOTE_MS || 20000;   // after the first vote: 20 s for everyone else (all voted = at once)
@@ -260,7 +277,7 @@ function paintTvStage(){
     el.innerHTML = '<h2>' + (on.length ? '🗳️ Vote for the next game on your phone!' : '📱 Join on your phone to play') + '</h2>' +
       '<div class="hint">' + (on.length ? 'One player · one vote — the most votes wins (a tie = 🎲)' + (S.deadline ? ' · ⏱️ ' + Math.ceil(left / 1000) + ' s' : '') : 'Play together — or alone against the 🤖') + '</div>' +
       '<div class="bar"><i style="width:' + (S.deadline ? Math.round(100 - left / VOTE_MS * 100) : 0) + '%"></i></div>' +
-      '<div class="shelf">' + SHELF.map(g => '<div class="gcard' + (S.win === g.k ? ' win' : '') + '" style="background:linear-gradient(135deg,' + g.c[0] + ',' + g.c[1] + ')"><span class="ic">' + g.icon + '</span><span class="nm">' + esc(g.name) + '</span><span class="pl">' + (g.max > 2 ? '1–' + g.max + ' players' : '1–2 players') + '</span><div class="votes">' + votesHtml((st.votes || {}).game, g.k) + '</div></div>').join('') + '</div>';
+      '<div class="shelf">' + SHELF.map(g => '<div class="gcard' + (S.win === g.k ? ' win' : '') + (logoOk(g.logo) ? ' has-logo' : '') + '" data-g="' + g.k + '" style="background:linear-gradient(135deg,' + g.c[0] + ',' + g.c[1] + ')">' + cardTop(g, 220) + '<span class="nm">' + esc(g.name) + '</span><span class="pl">' + (g.max > 2 ? '1–' + g.max + ' players' : '1–2 players') + '</span><div class="votes">' + votesHtml((st.votes || {}).game, g.k) + '</div></div>').join('') + '</div>';
   } else if(st.phase === 'lvl'){
     const g = gameOf(go.game) || {};
     el.innerHTML = '<h2>🎚️ ' + esc(g.icon + ' ' + g.name) + ' — vote the level!</h2><div class="hint">' + (go.alone ? esc(go.players[0]) + ' plays alone' + (g.k === 'memory' ? '' : ' against the 🤖') : 'The players vote · a tie = the easier level') + '</div>' +
@@ -353,7 +370,7 @@ function paintPhone(){
     const mine = ((st.votes || {}).game || {})[S.me] || S.mine['game' + st.round + st.phase] || '';
     const on = st.members.filter(m => m.on), got = on.filter(m => ((st.votes || {}).game || {})[m.name]);
     el.innerHTML = '<h2>🗳️ Vote for the next game</h2><div class="hint">' + got.length + ' of ' + on.length + ' voted · tap again to change</div>' +
-      '<div class="shelf">' + SHELF.map(g => '<button class="gcard' + (mine === g.k ? ' mine' : '') + '" data-g="' + g.k + '" data-sound="none" style="background:linear-gradient(135deg,' + g.c[0] + ',' + g.c[1] + ')"><span class="ic">' + g.icon + '</span><span class="nm">' + esc(g.name) + '</span><span class="pl">' + (g.max > 2 ? '1–' + g.max : '1–2') + ' players</span><div class="votes">' + votesHtml((st.votes || {}).game, g.k) + '</div></button>').join('') + '</div>';
+      '<div class="shelf">' + SHELF.map(g => '<button class="gcard' + (mine === g.k ? ' mine' : '') + (logoOk(g.logo) ? ' has-logo' : '') + '" data-g="' + g.k + '" data-sound="none" style="background:linear-gradient(135deg,' + g.c[0] + ',' + g.c[1] + ')">' + cardTop(g, 160) + '<span class="nm">' + esc(g.name) + '</span><span class="pl">' + (g.max > 2 ? '1–' + g.max : '1–2') + ' players</span><div class="votes">' + votesHtml((st.votes || {}).game, g.k) + '</div></button>').join('') + '</div>';
     el.querySelectorAll('[data-g]').forEach(b => { b.onclick = () => vote('game', b.dataset.g); });
     return;
   }
@@ -383,4 +400,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (st-1) END OF Station.html -->
+<!-- (st-1+st-1b) END OF Station.html -->
