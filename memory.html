@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<script>window.SP_BUILD={"page":"memory","routes":{"home":"index.html","gameroom":"gameroom.html","minigames":"minigames.html","stacking":"stacking.html","setup":"setup.html","achievements":"achievements.html","maze":"maze.html","robot":"robot.html","checkers":"checkers.html","chess":"chess.html","pinball":"pinball.html","hopper":"hopper.html","turbo":"turbo.html","memory":"memory.html","mathquest":"mathquest.html","doubleup":"doubleup.html","blockdrop":"blockdrop.html","popblocks":"popblocks.html","numbergrid":"numbergrid.html","numberboard":"numberboard.html","wordboard":"wordboard.html","sweetswap":"sweetswap.html","beatcorner":"beatcorner.html","slabrall":"slabrall.html","blasoff":"blasoff.html","brawlbuddies":"brawlbuddies.html","alignext":"alignext.html","soulbopper":"soulbopper.html","snakize":"snakize.html","polyplot":"polyplot.html","wisdeck":"wisdeck.html","eyesbrain":"eyesbrain.html","georead":"georead.html","geoscout":"geoscout.html","pokadif":"pokadif.html","pyradive":"pyradive.html","artifactory":"artifactory.html","tdstories":"tdstories.html","sciencetory":"sciencetory.html","isotest":"isotest.html","isoprops":"isoprops.html","avateer":"avateer.html","creatures":"creatures.html","fxgallery":"fxgallery.html","moodlab":"moodlab.html","station":"station.html","workshop":"workshop.html","room":"room.html","collection":"collection.html","poseparty":"poseparty.html"}};</script>
+<script>window.SP_BUILD={"page":"memory","routes":{"home":"index.html","gameroom":"gameroom.html","minigames":"minigames.html","stacking":"stacking.html","setup":"setup.html","achievements":"achievements.html","maze":"maze.html","robot":"robot.html","checkers":"checkers.html","chess":"chess.html","pinball":"pinball.html","hopper":"hopper.html","turbo":"turbo.html","memory":"memory.html","mathquest":"mathquest.html","doubleup":"doubleup.html","blockdrop":"blockdrop.html","popblocks":"popblocks.html","numbergrid":"numbergrid.html","numberboard":"numberboard.html","wordboard":"wordboard.html","sweetswap":"sweetswap.html","beatcorner":"beatcorner.html","slabrall":"slabrall.html","blasoff":"blasoff.html","brawlbuddies":"brawlbuddies.html","alignext":"alignext.html","soulbopper":"soulbopper.html","snakize":"snakize.html","polyplot":"polyplot.html","wisdeck":"wisdeck.html","eyesbrain":"eyesbrain.html","georead":"georead.html","geoscout":"geoscout.html","pokadif":"pokadif.html","pyradive":"pyradive.html","artifactory":"artifactory.html","tdstories":"tdstories.html","sciencetory":"sciencetory.html","isotest":"isotest.html","isoprops":"isoprops.html","avateer":"avateer.html","creatures":"creatures.html","loot":"loot.html","fxgallery":"fxgallery.html","moodlab":"moodlab.html","station":"station.html","workshop":"workshop.html","room":"room.html","collection":"collection.html","poseparty":"poseparty.html"}};</script>
 <script src="app/boot.js"></script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -629,13 +629,18 @@ function markPicks(){
 function startSetup(){ if(!canPlay(PICK.lvl)){ UISound.play('error'); UI.toast('Pick a level that is open 🔓'); return; } startGame(PICK.lvl); }
 // 🎬 the cover (GameFrame): who's here (you + up to 3 friends on this device) + champions + how to play; ▶ Play opens the setup page
 let MemCover = null;
+/* 📡 lk-6b: the room on the 🎬 cover — 🎮 Host and play (2–4) · 📺 Room hostess (1–4, no robot) · 🔗 Join a friend; the host's picks sit in the room card */
+const MEM_ROOM = {game: 'Memories Match', title: '🃏 Memories Match', page: 'memory', kind: 'memory', seats: 4, min: 2, url: WEBAPP_URL + '?page=memory', name: () => S.player, av: () => myAvatar(S.player), drawAvatar: (cv, p) => lxAv(cv, p), bot: false,
+  label: tv => '🃏 Memories Match · 2–4 players' + (tv ? ' · 📺 on the TV' : ''), picks: el => lxCoverPicks(el),
+  onLink: () => { LX.viaCover = true; LX.phone = {}; }, onJoined: () => { try{ Link.send('mmhi', {phone: isPhone()}, {sure: true}); }catch(e){} }, onStart: () => { LX.viaCover = true; lxHostGo(); }};
 const MM_HELP = ['Flip two cards — find the matching **pairs**! A pair stays up and you go again.', 'Pick a 🗺️ **map** (4×4 up to 10×10), then a 🎚️ **level**: peeks, look-alike cards, 🔀 swaps…', '💀 **Hardcore**: see every card, then watch them 🌀 scramble — and 2 cards swap after every miss!', 'Up to 4 players take turns: a pair = go again, the most pairs wins. Fewer misses = more ⭐.', '⏱️ **Time attack** (one player): find every pair before the clock runs out — under the par time = ⭐⭐⭐.', '🔗 **STEAM pairs**: the two cards of a pair are DIFFERENT but belong together — 3+4 ↔ 7 · 🐔 ↔ 🐣 · 🔑 ↔ 🔒 · a picture ↔ its shadow · 🪐 ↔ Saturn.', '📱 **Own devices**: 2–4 players, each on their own phone or tablet — only the player whose turn it is can flip; 📺 Room hostess puts the cards on the TV.'];
 function openCover(){
   if(!window.GF){ showScreen('menu'); return; }
   if(MemCover && MemCover.who !== S.player){ MemCover.destroy(); MemCover = null; }
   if(!MemCover){ MemCover = GF.cover(document.body, {game: 'memory', title: 'Memories Match', icon: '🃏', version: MM_VERSION, me: S.player, players: S.players, avatarOf: myAvatar, seats: {min: 1, max: 4},
-      help: MM_HELP, acts: ['beat.cheer', 'beat.wave', 'beat.jump'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms', own: () => { MemCover.hide(); lxChoose(); },   // 📱 mm-4: own devices = the 📡 LinkKit lobby
+      help: MM_HELP, acts: ['beat.cheer', 'beat.wave', 'beat.jump'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms', own: C => { if(!(window.Link && Link.cover)){ MemCover.hide(); lxChoose(); return; } lxWire(); Link.cover(C, MEM_ROOM); },   /* 📡 lk-6b: the room lives on the cover (LinkKit Link.cover) */
       onPlay: line => { MemCover.hide(); SEATS = line.map(s => s.name); if(!SEATS.length) SEATS = [S.player]; renderSetup(); showScreen('menu'); } }); MemCover.who = S.player; }
+  if(window.Link && Link.cover && Link.cover.active(MemCover)){ Link.cover.show(MemCover); return; }   /* 📡 lk-6b: the room is still open → back to its cover */
   MemCover.show();
 }
 
@@ -858,6 +863,7 @@ function finishGame(){
     const base = {wrap: $('result'), card: $('result-card'), save: 'Saving…', confetti: ['🃏', '⭐', '🎉', G.D.icon],
       levels: () => thisGame.lx ? lxExit() : backToMenu(), again: () => thisGame.lx ? lxAgain() : startGame(lvl), againText: thisGame.lx ? '🔁 Play again · new cards' : '🔄 Play again'};   /* 📡 mm-4 */
     if(thisGame.lx) base.levelsText = thisGame.lx.role === 'host' ? '🚪 End the room' : '🚪 Leave';
+    if(thisGame.lx && LX.viaCover) base.extra = [{text: '◀ Room', fn: () => lxToCover(), id: 'b-room'}];   /* 📡 lk-6b: back to the cover, the room stays open */
     if(solo){
       GF.result(Object.assign(base, {win: true, icon: '🏆', title: G.mode === 'time' ? '⏱️ Beat the clock!' : 'All ' + G.pairs + ' pairs!', sub: (G.mode === 'time' ? 'Time attack · par ' + fmt(M.par * 1000) + ' · ' : '') + M.name + ' · ' + L.emoji + ' ' + L.name, stars: me.stars,
         stats: [['🏆', me.score.toLocaleString()], ['⏱', fmt(secs * 1000)], ['❌', me.miss + ' misses'], ['🔥', 'best streak ' + me.best]].concat(me.miss === 0 ? [['💯', 'perfect!']] : []).concat(G.swaps ? [['🔀', G.swaps + ' swaps']] : []),
@@ -993,6 +999,12 @@ function lxPicks(on){
     '<div class="lxp-note">' + (M.n === 10 ? '🟥 10×10 is for tablets + computers — a phone in the room plays 8×8' : 'Tap to change · everyone plays the same board') + '</div>';
   el.querySelectorAll('.lxp').forEach(b => b.onclick = () => { lxCycle(b.dataset.k); lxPicks(true); });
 }
+function lxCoverPicks(el){   /* 📡 lk-6b: the host's picks inside the cover's room card — tap a chip to change it (same cycle as the lobby's) */
+  if(!mapOk(mapOf(PICK.map))) PICK.map = '8'; if(!canPlay(PICK.lvl)) PICK.lvl = 0;
+  const stM = PICK.mode === 'steam', M = mapOf(PICK.map), L = LEVELS[PICK.lvl] || LEVELS[0], D = stM ? ST_DECKS[PICK.sdeck] || ST_DECKS.smix : DECKS[PICK.deck] || DECKS.mix;
+  el.innerHTML = '<button class="lkc-chip" data-k="mode" data-sound="none">' + (stM ? '🔗 STEAM' : '🃏 Classic') + '</button><button class="lkc-chip" data-k="map" data-sound="none">🗺️ ' + M.name + '</button><button class="lkc-chip" data-k="lvl" data-sound="none">' + L.emoji + ' ' + L.name + '</button><button class="lkc-chip" data-k="deck" data-sound="none">' + D.icon + ' ' + D.name + '</button>';
+  el.querySelectorAll('.lkc-chip').forEach(b => b.onclick = e => { e.stopPropagation(); lxCycle(b.dataset.k); lxCoverPicks(el); });
+}
 function lxCycle(k){
   const nx = (ks, v) => ks[(ks.indexOf(v) + 1) % ks.length];
   if(k === 'map') PICK.map = nx(MAPS.filter(mapOk).map(m => m.k), PICK.map);
@@ -1029,6 +1041,12 @@ function lxExit(){
   const o = document.querySelector('.lx-over'); if(o) o.remove();
   if(G && G.lx){ if(window.Cheer) Cheer.unmount(); clearInterval(timerId); hideResult(); G = null; $('hand').classList.add('hidden'); $('peek').classList.add('hidden'); }
   SEATS = [S.player]; renderSetup(); showScreen('menu');
+  if(LX.viaCover){ LX.viaCover = false; openCover(); }   /* 📡 lk-6b: a cover room ends on the cover */
+}
+function lxToCover(){   /* 📡 lk-6b: ◀ Room — leave the finished board, keep the room: back to the cover, its line and ▶ Start */
+  clearTimeout(LX.autoT); LX.cfg = null; LX.pending = null; const o = document.querySelector('.lx-over'); if(o) o.remove();
+  if(G && G.lx){ if(window.Cheer) Cheer.unmount(); clearInterval(timerId); hideResult(); G = null; $('hand').classList.add('hidden'); $('peek').classList.add('hidden'); }
+  SEATS = [S.player]; renderSetup(); showScreen('menu'); openCover();
 }
 function lxLeavePlay(){
   if(G.over){ lxExit(); return; }
@@ -1238,4 +1256,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (11n+r32+back-1+modes-3+p1b+p1d+cs-3b+mm-1+mm-2+mm-3+mm-4+mm-5+st-1+24u-c) END OF Memory.html -->
+<!-- (11n+r32+back-1+modes-3+p1b+p1d+cs-3b+mm-1+mm-2+mm-3+mm-4+mm-5+st-1+24u-c+lk-6b) END OF Memory.html -->

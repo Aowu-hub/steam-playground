@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<script>window.SP_BUILD={"page":"checkers","routes":{"home":"index.html","gameroom":"gameroom.html","minigames":"minigames.html","stacking":"stacking.html","setup":"setup.html","achievements":"achievements.html","maze":"maze.html","robot":"robot.html","checkers":"checkers.html","chess":"chess.html","pinball":"pinball.html","hopper":"hopper.html","turbo":"turbo.html","memory":"memory.html","mathquest":"mathquest.html","doubleup":"doubleup.html","blockdrop":"blockdrop.html","popblocks":"popblocks.html","numbergrid":"numbergrid.html","numberboard":"numberboard.html","wordboard":"wordboard.html","sweetswap":"sweetswap.html","beatcorner":"beatcorner.html","slabrall":"slabrall.html","blasoff":"blasoff.html","brawlbuddies":"brawlbuddies.html","alignext":"alignext.html","soulbopper":"soulbopper.html","snakize":"snakize.html","polyplot":"polyplot.html","wisdeck":"wisdeck.html","eyesbrain":"eyesbrain.html","georead":"georead.html","geoscout":"geoscout.html","pokadif":"pokadif.html","pyradive":"pyradive.html","artifactory":"artifactory.html","tdstories":"tdstories.html","sciencetory":"sciencetory.html","isotest":"isotest.html","isoprops":"isoprops.html","avateer":"avateer.html","creatures":"creatures.html","fxgallery":"fxgallery.html","moodlab":"moodlab.html","station":"station.html","workshop":"workshop.html","room":"room.html","collection":"collection.html","poseparty":"poseparty.html"}};</script>
+<script>window.SP_BUILD={"page":"checkers","routes":{"home":"index.html","gameroom":"gameroom.html","minigames":"minigames.html","stacking":"stacking.html","setup":"setup.html","achievements":"achievements.html","maze":"maze.html","robot":"robot.html","checkers":"checkers.html","chess":"chess.html","pinball":"pinball.html","hopper":"hopper.html","turbo":"turbo.html","memory":"memory.html","mathquest":"mathquest.html","doubleup":"doubleup.html","blockdrop":"blockdrop.html","popblocks":"popblocks.html","numbergrid":"numbergrid.html","numberboard":"numberboard.html","wordboard":"wordboard.html","sweetswap":"sweetswap.html","beatcorner":"beatcorner.html","slabrall":"slabrall.html","blasoff":"blasoff.html","brawlbuddies":"brawlbuddies.html","alignext":"alignext.html","soulbopper":"soulbopper.html","snakize":"snakize.html","polyplot":"polyplot.html","wisdeck":"wisdeck.html","eyesbrain":"eyesbrain.html","georead":"georead.html","geoscout":"geoscout.html","pokadif":"pokadif.html","pyradive":"pyradive.html","artifactory":"artifactory.html","tdstories":"tdstories.html","sciencetory":"sciencetory.html","isotest":"isotest.html","isoprops":"isoprops.html","avateer":"avateer.html","creatures":"creatures.html","loot":"loot.html","fxgallery":"fxgallery.html","moodlab":"moodlab.html","station":"station.html","workshop":"workshop.html","room":"room.html","collection":"collection.html","poseparty":"poseparty.html"}};</script>
 <script src="app/boot.js"></script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -742,14 +742,19 @@ function startSetup(){
 }
 // 🎬 the cover: who's here (you + a friend on this device, or 📱 own devices → the 📡 lobby) + champions + how to play
 let CheckersCover = null;
+/* 📡 lk-6b: the room on the 🎬 cover — 🎮 Host and play · 📺 Room hostess · 🔗 Join a friend; ▶ on the cover starts the linked game */
+const CHECKERS_ROOM = {game: 'Checkers', title: '🔴 Checkers', page: 'checkers', kind: 'checkers', seats: 2, min: 2, url: WEBAPP_URL + '?page=checkers', name: () => S.player, av: () => myAvatar(S.player), drawAvatar: (cv, p) => lxAv(cv, p),
+  label: tv => '🔴 Checkers · 2 players' + (tv ? ' · 📺 on the TV' : ''), bot: () => { const p = Link.players().find(x => x.name && x.on && !x.screen && x.seat > 0); return (LEVELS[lxBotLvl(p && p.name)] || LEVELS[1]).bot; },
+  onLink: () => { LX.viaCover = true; }, onStart: () => { LX.viaCover = true; lxHostGo(); }};
 const CHECKERS_VERSION = '2.0';   /* 🧱 b3w2: shown on the cover footer — bump with each Checkers round */
 function openCover(){
   if(!window.GF){ showScreen('menu'); return; }
   if(CheckersCover && CheckersCover.who !== S.player){ CheckersCover.destroy(); CheckersCover = null; }
   if(!CheckersCover){ CheckersCover = GF.cover(document.body, {game: 'checkers', title: 'Checkers', icon: '🔴', version: CHECKERS_VERSION, me: S.player, players: S.players.concat([{Name: 'Guest'}]), avatarOf: myAvatar, seats: {min: 1, max: 2},
       help: CHECKERS_HELP, acts: ['beat.jump', 'beat.bow'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms',
-      own: () => { CheckersCover.hide(); lxChoose(); },   // 📡 own devices = the LinkKit lobby, unchanged (the lineup feed = 📡 LinkKit chat later)
+      own: C => { if(!(window.Link && Link.cover)){ CheckersCover.hide(); lxChoose(); return; } lxWire(); Link.cover(C, CHECKERS_ROOM); },   /* 📡 lk-6b: the room lives on the cover (LinkKit Link.cover) */
       onPlay: line => { CheckersCover.hide(); if(line.length > 1){ CH.mode = 'duo'; CH.friend = line[1].name; } else CH.mode = 'bot'; renderSetup(); showScreen('menu'); } }); CheckersCover.who = S.player; }
+  if(window.Link && Link.cover && Link.cover.active(CheckersCover)){ Link.cover.show(CheckersCover); return; }   /* 📡 lk-6b: the room is still open → back to its cover */
   if(CheckersCover.mode === 'own') CheckersCover.setMode('solo');
   CheckersCover.show();
 }
@@ -1563,6 +1568,7 @@ function lxExit(){
   if(G && G.lx){ if(window.Cheer) Cheer.unmount(); clearTimeout(botTimer); clearInterval(tickHandle); danceStop(); hideResult(); G = null; }
   $('scr-play').classList.remove('lx-flip', 'lx-tv'); ['me', 'op'].forEach(k => $('pl-' + k).classList.remove('lx-you'));
   renderLevels(); showScreen('menu');
+  if(LX.viaCover){ LX.viaCover = false; openCover(); }   /* 📡 lk-6b: a cover room ends on the cover */
 }
 function lxLeavePlay(){
   if(G.over){ lxExit(); return; }
@@ -1666,11 +1672,18 @@ function lxApply(st){
   if(st.end && !G.over) endGame(st.end.winner, st.end.why);
 }
 function lxResultBtns(){
-  if(G.lx.role === 'host') return '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again · colours swap</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 End the room</button></div>';
-  if(G.lx.tv && Link.captain && Link.captain() === Link.seat()) return '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again · colours swap</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 Leave</button></div>';   // 📺 the first player may start the next game
-  return '<div class="note lk-wait">⏳ ' + UI.esc(G.lx.tv ? 'The TV or the first player' : ((LX.cfg && LX.cfg.host) || 'The host')) + ' can start the next game<span class="lk-dots"></span></div><div class="res-btns"><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 Leave</button></div>';
+  const room = LX.viaCover ? '<button class="btn soft sp-btn sp-secondary" id="b-room">◀ Room</button>' : '';   /* 📡 lk-6b */
+  if(G.lx.role === 'host') return '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again · colours swap</button>' + room + '<button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 End the room</button></div>';
+  if(G.lx.tv && Link.captain && Link.captain() === Link.seat()) return '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again · colours swap</button>' + room + '<button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 Leave</button></div>';   // 📺 the first player may start the next game
+  return '<div class="note lk-wait">⏳ ' + UI.esc(G.lx.tv ? 'The TV or the first player' : ((LX.cfg && LX.cfg.host) || 'The host')) + ' can start the next game<span class="lk-dots"></span></div><div class="res-btns">' + room + '<button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 Leave</button></div>';
 }
-function lxResultWire(){ const a = $('b-again'); if(a) a.onclick = () => { if(G && G.lx && G.lx.role !== 'host'){ UI.busy(a, 'checkers', 'Asking the TV…'); Link.ask('again'); } else lxHostGo(); }; $('b-menu').onclick = () => lxExit(); }
+function lxResultWire(){ const a = $('b-again'); if(a) a.onclick = () => { if(G && G.lx && G.lx.role !== 'host'){ UI.busy(a, 'checkers', 'Asking the TV…'); Link.ask('again'); } else lxHostGo(); }; $('b-menu').onclick = () => lxExit(); const r = $('b-room'); if(r) r.onclick = () => lxToCover(); }   /* 📡 lk-6b: ◀ Room */
+function lxToCover(){   /* 📡 lk-6b: leave the finished game, keep the room — back to the cover, its line and ▶ Start */
+  clearTimeout(LX.autoT); lxThink(0); LX.cfg = null; const o = document.querySelector('.lx-over'); if(o) o.remove();
+  if(G && G.lx){ if(window.Cheer) Cheer.unmount(); clearTimeout(botTimer); clearInterval(tickHandle); danceStop(); hideResult(); G = null; }
+  $('scr-play').classList.remove('lx-flip', 'lx-tv'); ['me', 'op'].forEach(k => $('pl-' + k).classList.remove('lx-you'));
+  renderLevels(); showScreen('menu'); openCover();
+}
 function lxEnded(msg){
   if(G){ G.over = true; clearTimeout(LX.autoT); lxThink(0); }
   hideResult(); const o0 = document.querySelector('.lx-over'); if(o0) o0.remove();   // the message sits on top, alone
@@ -1785,4 +1798,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (11w-1+11x-4+r32+back-1+modes-3+p1b+cs-3a+lk-3c+lk-5a+lk-5b+lk-5f+lk-5g+b3w2+st-1+24s-b+24u-b) END OF Checkers.html -->
+<!-- (11w-1+11x-4+r32+back-1+modes-3+p1b+cs-3a+lk-3c+lk-5a+lk-5b+lk-5f+lk-5g+b3w2+st-1+24s-b+24u-b+lk-6b) END OF Checkers.html -->
