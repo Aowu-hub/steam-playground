@@ -657,6 +657,7 @@ function safeSeen_(players) {
 //   added = 'yyyy-mm-dd' when the mode came out → a 🆕 Dashboard card for 7 days.
 const MODES_ = [
   { game: 'tdstories', id: 'draprincess', icon: '🐉', name: 'Dra-Princess Diary', pitch: 'A dragon + princess vs every suitor!', route: 'tdstories', added: '2026-11-14', tried: { board: 'td-draprincess' } },
+  { game: 'tdstories', id: 'farmer', icon: '👨‍🌾', name: 'Farmer Delusion', pitch: 'Plant a maze so long the bank gives up', route: 'tdstories', added: '2026-11-17', tried: { board: 'td-farmer' } },   // 👨‍🌾 fd-1b
   { game: 'artifactory', id: 'whittle', icon: '🔪', name: 'Artifactory Whittling', pitch: 'Carve a spoon — always away from you', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'whittle']] } },
   { game: 'artifactory', id: 'print', icon: '🖨️', name: 'Artifactory 3D printing', pitch: 'Draw a shape and print it layer by layer', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'print']] } },
   { game: 'artifactory', id: 'nature', icon: '🌿', name: 'Artifactory Nature crafts', pitch: 'Weave a hat, press flowers in resin', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'nature']] } },
@@ -1868,7 +1869,7 @@ function recordsFor_(gameId, players) {
 }
 
 // Games shown on the Achievements records board.
-const RECORD_GAMES = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'brawenture', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'beat-piano', 'beat-drums', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'pyraspike', 'pokadif', 'sciencetory', 'pokadif-arcade', 'pokadif-case'];
+const RECORD_GAMES = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'brawenture', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'beat-piano', 'beat-drums', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'td-farmer', 'pyraspike', 'pokadif', 'sciencetory', 'pokadif-arcade', 'pokadif-case'];
 // Per level: the fastest finish and the top score among active players.
 function gameRecords_(gameId, players) {
   const names = {};
@@ -3091,7 +3092,7 @@ function featBadges_(f) {
   return out;
 }
 function titleContext_(name, players) {
-  const cleared = {}, bigGames = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'pyraspike', 'pokadif', 'sciencetory', 'pokadif-arcade', 'pokadif-case'];
+  const cleared = {}, bigGames = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'td-farmer', 'pyraspike', 'pokadif', 'sciencetory', 'pokadif-arcade', 'pokadif-case'];
   let allRound = true;
   bigGames.forEach(g => {
     const p = g === 'maze' ? mazeProgressFor_(name) : levelProgressFor_(name, g);
@@ -4018,7 +4019,7 @@ function giveCreation(from, to, id) {
 /* ---------- Daily treasures: 3 items a day (same for the whole family), each with a goal for today ---------- */
 const MINI_IDS_ = ['color-match', 'count-match', 'code-robot', 'trash-pointer'];
 const DAILY_GOALS = [
-  { id: 'tdstory', icon: '🏰', how: 'Win a TD-Stories chapter today (any level)', r: d => d.rows.some(r => r.game === 'td-draprincess' && r.stars > 0) },
+  { id: 'tdstory', icon: '🏰', how: 'Win a TD-Stories chapter today (any level)', r: d => d.rows.some(r => (r.game === 'td-draprincess' || r.game === 'td-farmer') && r.stars > 0) },   // fd-1b: either book
   { id: 'gssolve', icon: '🔢', how: 'Solve 8 GeoScout puzzles today', r: d => (d.room.gsSolved || 0) >= 8 },
   { id: 'gsstory', icon: '📖', how: 'Play a GeoScout Journey chapter or win a Tower battle today', r: d => (d.room.gsStory || 0) >= 1 },
   { id: 'grwords', icon: '🔤', how: 'Read or build 6 words in GeoRead today', r: d => (d.room.grWords || 0) >= 6 },
@@ -4923,7 +4924,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b) END OF Code.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */

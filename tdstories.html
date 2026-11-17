@@ -189,6 +189,7 @@
 <script src="inc/AvatarWeapons.js"></script>
 <script src="inc/SkillKit.js"></script>
 <script src="inc/IsoKit.js"></script>
+<script src="inc/IsoProps.js"></script>
 <script src="inc/ActionFX.js"></script>
 </head>
 <body ontouchstart="">
@@ -1036,14 +1037,14 @@ const stageOf = tier => tier >= 10 ? 5 : tier >= 7 ? 4 : tier >= 5 ? 3 : tier >=
 
 /* ---------- 🏝️ the island + farm (an IsoKit map — the page bakes the SAME map) ---------- */
 function rimOf(n){ const R = rngOf(n * 13 + 1), ph1 = R() * 6, ph2 = R() * 6, ph3 = R() * 6; return th => 9.4 + 0.8 * Math.sin(3 * th + ph1) + 0.6 * Math.sin(5 * th + ph2) + 0.35 * Math.sin(8 * th + ph3); }
-const HOUSE = [[12, 12], [13, 12], [12, 13], [13, 13]], DOOR = {i: 13, j: 14};   // 🏡 farmhouse 2 × 2 on world (7–9, 7–9), door on its front (+y) side
+const HOUSE = [[12, 12], [13, 12], [12, 13], [13, 13]], DOOR = {i: 13, j: 14}, PILE = {i: 12, j: 14};   // 🏡 farmhouse 2 × 2 on world (7–9, 7–9), door on its front (+y) side · 🎃 fd-1b: the pumpkin pile (= your hearts) left of the door
 function buildIsland(C, rng){
   const rim = rimOf(C.n), solid = new Uint8Array(N * N), fade = new Float32Array(N * N);
   for(let j = 0; j < N; j++) for(let i = 0; i < N; i++){ const x = wx(i), y = wx(j), dc = dist(x, y, CX, CY), out = dc - rim(Math.atan2(y - CY, x - CX)), k = j * N + i;
     fade[k] = out > 1.0 ? 0 : out > 0.7 ? 0.2 : out > 0.1 ? 0.48 : out > -0.7 ? 0.8 : 1; solid[k] = fade[k] === 1 ? 1 : 0; }
   const map = ISO.map({w: N, h: N, theme: 'td-farm', seed: C.n * 7, base: 1.4, cell: (i, j) => { const k = j * N + i; if(!fade[k]) return {t: 'void'};
     return {t: (i * 7 + j * 3) % 5 === 0 ? 'flower' : 'grass', h: 0, fade: fade[k], block: solid[k] ? 0 : 1}; }});
-  HOUSE.forEach(([i, j]) => map.setBlock(i, j, 1));
+  HOUSE.forEach(([i, j]) => map.setBlock(i, j, 1)); map.setBlock(PILE.i, PILE.j, 1);
   return {map, solid, rim};
 }
 function gateCell(isl, ang){ // the farthest solid cell along that angle from the farm = where they walk in
@@ -1412,7 +1413,7 @@ function simulate(o){
   return {won: M.state === 'won', hearts: M.hearts, score: M.score, wave: M.wave + 1, steps: M.stats.steps, plants: M.plants.length, M};
 }
 
-return {N, O, CX, CY, STEP, LEVELS, FOES, PLANTS, KINDS, STAGE_MUL, BOOKS, PACKS, COMBOS, HEROES, GATE_A, HOUSE, DOOR, TIRE, stageOf, plantSpec, growCost, wx,
+return {N, O, CX, CY, STEP, LEVELS, FOES, PLANTS, KINDS, STAGE_MUL, BOOKS, PACKS, COMBOS, HEROES, GATE_A, HOUSE, DOOR, PILE, TIRE, stageOf, plantSpec, growCost, wx,
   newMatch, offer, take, startWave, step, cast, ready, canAim, cdOf, skillOf, live, liveAll, front, takeEvents, flowOf, stepsOf, pathOf, canPlant, previewSteps, bestSpots,
   plant, plantAt, grow, pull, move, moveCost, cellDist, stars, autoBuild, simulate, rngOf, buildable, gateCell};
 })();
@@ -3714,7 +3715,10 @@ function fdBake(tod){
   // 🌳 a ring of trees + hay on the misty edge (not part of the farm grid), far first
   const stand = []; for(let j = 0; j < FD.N; j++) for(let i = 0; i < FD.N; i++){ const k = j * FD.N + i; if(G.isl.solid[k] || M.isVoid(i, j) || M.al[k] < 150) continue; if(R() > 0.35) continue;
     if(G.gates.some(Gt => Math.abs(Gt.i - i) + Math.abs(Gt.j - j) < 3)) continue; stand.push({x: FD.wx(i) + (R() - 0.5) * 0.4, y: FD.wx(j) + (R() - 0.5) * 0.4, ic: ['🌳', '🌳', '🌲', '🌾', '🌻', '🪨'][Math.floor(R() * 6)]}); }
-  stand.sort((a, b) => (a.x + a.y) - (b.x + b.y)).forEach(o => { const big = o.ic === '🌳' || o.ic === '🌲', sz = big ? 1.05 + R() * 0.3 : 0.55; shadow(g, o.x, o.y, sz * 0.4); emo(g, o.ic, IX(o.x, o.y), IY(o.x, o.y, 0) - s * sz * 0.45, s * sz); });
+  const EDGE = {'🌳': ['mango', 'jtree', 'mushtree'], '🌲': ['jtree', 'mango'], '🌾': ['haybale', 'corn'], '🌻': ['sunflower', 'pumpkins', 'flowerpatch'], '🪨': ['rock', 'bush']};   // 🌳 fd-1b: IsoProps
+  stand.sort((a, b) => (a.x + a.y) - (b.x + b.y)).forEach(o => { const big = o.ic === '🌳' || o.ic === '🌲', sz = big ? 1.05 + R() * 0.3 : 0.55, r1 = R(), r2 = R();
+    if(fdHasProps()){ const L = EDGE[o.ic], key = L[Math.floor(r1 * L.length)], it = fdItem('edge', key, 0, 0, {v: Math.floor(r2 * 4)}); if(it && fdProp(g, it, {dx: o.x + FD.O - 0.5, dy: o.y + FD.O - 0.5, scale: big ? 0.8 + r2 * 0.35 : 0.85})) return; }
+    shadow(g, o.x, o.y, sz * 0.4); emo(g, o.ic, IX(o.x, o.y), IY(o.x, o.y, 0) - s * sz * 0.45, s * sz); });
   if(base.tint){ g.fillStyle = base.tint; g.fillRect(0, 0, W, H); }
   if(tod){ g.globalCompositeOperation = 'source-atop'; g.fillStyle = tod === 2 ? 'rgba(30,30,110,.40)' : 'rgba(255,120,60,.15)'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over'; }
   const vg = g.createRadialGradient(W / 2, H * 0.55, Math.min(W, H) * 0.4, W / 2, H * 0.55, Math.max(W, H) * 0.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(40,20,60,.2)'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
@@ -3726,6 +3730,22 @@ function fdPaintBG(g, dt){
   const a = Math.floor(FDP.tod), f = FDP.tod - a; if(!FDP.bgs[a]) FDP.bgs[a] = fdBake(a); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(FDP.bgs[a], 0, 0);
   if(f > 0.001){ if(!FDP.bgs[a + 1]) FDP.bgs[a + 1] = fdBake(a + 1); g.globalAlpha = f; g.drawImage(FDP.bgs[a + 1], 0, 0); g.globalAlpha = 1; }
 }
+/* 🌳 fd-1b: 🌾 IsoProps farm props instead of the stand-ins — 🏡 farmhouse (👨‍🌾 on its porch roof = it.stand) · 🚪 farm gates (the chapter's 🚧 new back gate = state 'new') ·
+   🎃 pumpkin pile by the door = your pumpkins (1–12) · 🌾 hay bales · 🧑‍🌾 scarecrows · 🕳️ mud pits · 🪨 rocks · 🌳 the misty edge ring (mango · tree · mushroom tree ·
+   corn · sunflower · hay · pumpkins · bush). Drawn through Iso.drawPic with a little view that speaks TD-Stories' own projection (IX / IY); without IsoProps
+   the old painters stay (fallback). */
+const FDPR = {it: new Map()};
+const fdHasProps = () => typeof Props !== 'undefined' && !!Props.item && !!Iso.drawPic;
+function fdV(sx, sy){ return {zoom: ISO.zi, dpr: VIEW.dpr || 1, toScreen: (x, y, z) => ({x: IX(x - FD.O, y - FD.O) + (sx || 0), y: IY(x - FD.O, y - FD.O, 0) - (z || 0) * Iso.HZ * ISO.zi + (sy || 0)})}; }
+// one item per key (cached; a new state / look = a new item, pictures come from IsoProps' own cache)
+function fdItem(key, prop, i, j, o){ const k = key + '|' + prop + '|' + i + ',' + j + '|' + JSON.stringify(o || {}); let it = FDPR.it.get(k); if(it) return it;
+  if(FDPR.it.size > 400) FDPR.it.clear(); try{ it = Props.item(prop, i, j, Object.assign({look: 'farm'}, o || {})); }catch(e){ it = null; } FDPR.it.set(k, it); return it; }
+function fdProp(g, it, o){ if(!it || !it.pic) return false; o = o || {}; g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
+  const ok = Iso.drawPic(g, fdV(o.sx, o.sy), it.pic, it.x + (o.dx || 0), it.y + (o.dy || 0), it.z || 0, {alpha: o.alpha, scale: o.scale}); g.restore(); return ok; }
+const fdPileN = () => Math.max(0, Math.min(12, Math.ceil(G.hearts || 0)));
+function fdHouseIt(){ return fdItem('house', 'farmhouse', FD.HOUSE[0][0], FD.HOUSE[0][1], {v: (G.C.n - 1) % 4}); }
+function fdGateIt(Gt){ const a = Gt.ang || 0, along = Math.abs(Math.cos(a)) > Math.abs(Math.sin(a));   // the gate spans ACROSS the walk
+  return fdItem('gate', 'farmgate', Gt.i, Gt.j, {turn: along ? 1 : 0, state: G.C.newGate && G.C.newGate.gate === Gt.name ? 'new' : 'open'}); }
 // a plant / house picture baked once per size (plants sway a little when drawn)
 function fdPic(key, w, h, fx, fy, paint){ const dpr = VIEW.dpr || 1, k2 = key + '@' + Math.round(VIEW.s * 10) + '@' + dpr; let p = FDP.pics.get(k2); if(p) return p;
   if(FDP.pics.size > 120) FDP.pics.clear(); const c = document.createElement('canvas'); c.width = Math.ceil(w * dpr); c.height = Math.ceil(h * dpr); const g = c.getContext('2d'); g.scale(dpr, dpr); paint(g, fx, fy);
@@ -3751,21 +3771,26 @@ function fdPaint(t){
     g.fillStyle = ok ? 'rgba(80,220,120,.45)' : 'rgba(255,80,90,.45)'; g.fillRect(FDP.pick.i - FD.O + 0.05 + sh, FDP.pick.j - FD.O + 0.05, 0.9, 0.9); g.strokeStyle = ok ? '#2BB673' : '#E5484D'; g.lineWidth = 0.06; g.strokeRect(FDP.pick.i - FD.O + 0.05 + sh, FDP.pick.j - FD.O + 0.05, 0.9, 0.9); }
   if(FDP.mode === 'move'){ const mp = G.plants.find(q => q.id === FDP.moveId); if(mp){ g.strokeStyle = 'rgba(58,134,255,' + (0.6 + 0.3 * Math.sin(t * 6)) + ')'; g.lineWidth = 0.08; g.strokeRect(mp.i - FD.O + 0.05, mp.j - FD.O + 0.05, 0.9, 0.9); } }
   screenTf(g); if(sx || sy) g.translate(sx, sy);
+  if(fdHasProps()) G.traps.forEach(T => { if(T.kind !== 'lava') return; const it = fdItem('mud', 'mudpit', 0, 0, {v: T.id % 2}); fdProp(g, it, {sx, sy, dx: T.x + FD.O - 0.5, dy: T.y + FD.O - 0.5, scale: Math.max(0.8, T.r * 1.7), alpha: 0.85 + 0.1 * Math.sin(t * 4)}); });   // 🕳️ fd-1b
   // 👣 footprints along every walk (the preview walk shows in green / red when you hover a spot)
   const fs = Math.max(1.6, s * 0.075);
   paths.forEach((P, n) => Iso.footsteps(g, P, fdTo, {t, size: fs, col: 'rgba(110,70,35,.55)', pulse: true, from: t * 0.6}));
   if(FDP.pick && FDP.pick.pre && FDP.pick.can.ok) FDP.pick.pre.paths.map(toW).forEach(P => Iso.footsteps(g, P, fdTo, {t, size: fs, col: FDP.pick.pre.gain > 0 ? 'rgba(40,170,90,.75)' : 'rgba(255,150,40,.75)', every: 0.5}));
-  G.gates.forEach(Gt => { const x = FD.wx(Gt.i), y = FD.wx(Gt.j); emo(g, '🚧', IX(x, y), IY(x, y, 0.35), s * 0.55); });
+  if(!fdHasProps()) G.gates.forEach(Gt => { const x = FD.wx(Gt.i), y = FD.wx(Gt.j); emo(g, '🚧', IX(x, y), IY(x, y, 0.35), s * 0.55); });
   const dx = FD.wx(FD.DOOR.i), dy = FD.wx(FD.DOOR.j);
   // standing things, far → near (depth = x + y)
   const items = [];
-  (G.rocks || []).forEach(r => items.push({y: r.x + r.y, d: () => { shadow(g, r.x, r.y, 0.42); g.fillStyle = ['#B9B3A8', '#A9A397', '#C4BEB2'][r.v]; g.strokeStyle = '#2A1C14'; g.lineWidth = Math.max(1, s * 0.03); g.beginPath(); g.ellipse(IX(r.x, r.y), IY(r.x, r.y, 0) - s * 0.18, s * 0.42, s * 0.3, 0, 0, 7); g.fill(); g.stroke(); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(IX(r.x, r.y) - s * 0.12, IY(r.x, r.y, 0) - s * 0.3, s * 0.14, s * 0.07, -0.3, 0, 7); g.fill(); }}));
+  const PR = fdHasProps();
+  if(PR){ G.gates.forEach(Gt => { const it = fdGateIt(Gt); items.push({y: FD.wx(Gt.i) + FD.wx(Gt.j) - 0.05, d: () => fdProp(g, it, {sx, sy})}); });   // 🚪 fd-1b
+    const n = fdPileN(); if(n > 0){ const it = fdItem('pile', 'pumpkinpile', FD.PILE.i, FD.PILE.j, {state: n}); items.push({y: FD.wx(FD.PILE.i) + FD.wx(FD.PILE.j), d: () => fdProp(g, it, {sx, sy})}); } }   // 🎃 = your hearts
+  (G.rocks || []).forEach(r => items.push({y: r.x + r.y, d: () => { if(PR && fdProp(g, fdItem('rock', 'rock', r.i, r.j, {v: r.v}), {sx, sy})) return; shadow(g, r.x, r.y, 0.42); g.fillStyle = ['#B9B3A8', '#A9A397', '#C4BEB2'][r.v]; g.strokeStyle = '#2A1C14'; g.lineWidth = Math.max(1, s * 0.03); g.beginPath(); g.ellipse(IX(r.x, r.y), IY(r.x, r.y, 0) - s * 0.18, s * 0.42, s * 0.3, 0, 0, 7); g.fill(); g.stroke(); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(IX(r.x, r.y) - s * 0.12, IY(r.x, r.y, 0) - s * 0.3, s * 0.14, s * 0.07, -0.3, 0, 7); g.fill(); }}));
   G.traps.forEach(T => { if(T.kind === 'lava') return; items.push({y: T.x + T.y - 0.1, d: () => { const ic = T.kind === 'pop' ? '🌶️' : T.kind === 'mine' ? '💩' : T.kind === 'push' ? '🪣' : T.kind === 'root' ? '🧶' : T.kind === 'stun' ? '🕳️' : '🌵'; emo(g, ic, IX(T.x, T.y), IY(T.x, T.y, 0.18), s * 0.5, T.seen ? 0.5 : 1); }}); });
   G.plants.forEach(P => items.push({y: P.x + P.y, d: () => { const pic = plantPic(P), born = Math.min(1, (G.t - P.born) / 0.35), sw = 1 + Math.sin(t * 2 + P.id) * 0.02 + (P.aim > 0.3 ? 0.06 : 0);
     fdDrawPic(g, pic, IX(P.x, P.y), IY(P.x, P.y, 0), born, sw * born, FDP.selP === P.id ? 0.8 : 1); if(FDP.selP === P.id){ g.strokeStyle = '#FFC93C'; g.lineWidth = 2; g.beginPath(); g.ellipse(IX(P.x, P.y), IY(P.x, P.y, 0), s * 0.6, s * 0.3, 0, 0, 7); g.stroke(); } }}));
-  G.blockers.forEach(b => items.push({y: b.x + b.y, d: () => { const ic = {hay: '🌾', wool: '☁️', sheep: '🐑', chicken: '🐔'}[b.k] || '🐑'; shadow(g, b.x, b.y, 0.4); emo(g, ic, IX(b.x, b.y), IY(b.x, b.y, 0.4 + (b.k === 'sheep' || b.k === 'chicken' ? Math.abs(Math.sin(t * 8 + b.id)) * 0.12 : 0)), s * 0.75); bar(g, IX(b.x, b.y), IY(b.x, b.y, 1.1), s * 0.7, b.hp / b.hpMax, '#22A867'); }}));
-  G.helpers.forEach(H => items.push({y: H.x + H.y, d: () => { FP.crow(g, IX(H.x, H.y), IY(H.x, H.y, 0), s / 44, t); }}));
-  items.push({y: FD.CX + FD.CY + 0.5, d: () => { const hp = housePic(); fdDrawPic(g, hp, IX(FD.CX + 1, FD.CY + 1), IY(FD.CX + 1, FD.CY + 1, 0), 1, 1); fdFarmer(g, t); }});
+  G.blockers.forEach(b => items.push({y: b.x + b.y, d: () => { if(PR && b.k === 'hay' && fdProp(g, fdItem('hay', 'haybale', b.i, b.j, {v: b.id % 2}), {sx, sy})){ bar(g, IX(b.x, b.y), IY(b.x, b.y, 1.1), s * 0.7, b.hp / b.hpMax, '#22A867'); return; }   // 🌾 fd-1b
+    const ic = {hay: '🌾', wool: '☁️', sheep: '🐑', chicken: '🐔'}[b.k] || '🐑'; shadow(g, b.x, b.y, 0.4); emo(g, ic, IX(b.x, b.y), IY(b.x, b.y, 0.4 + (b.k === 'sheep' || b.k === 'chicken' ? Math.abs(Math.sin(t * 8 + b.id)) * 0.12 : 0)), s * 0.75); bar(g, IX(b.x, b.y), IY(b.x, b.y, 1.1), s * 0.7, b.hp / b.hpMax, '#22A867'); }}));
+  G.helpers.forEach(H => items.push({y: H.x + H.y, d: () => { if(PR && fdProp(g, fdItem('crow', 'scarecrow', 0, 0, {v: H.id % 3}), {sx, sy, dx: H.x + FD.O - 0.5, dy: H.y + FD.O - 0.5})) return; FP.crow(g, IX(H.x, H.y), IY(H.x, H.y, 0), s / 44, t); }}));   // 🧑‍🌾 fd-1b
+  items.push({y: FD.CX + FD.CY + 0.5, d: () => { if(!(PR && fdProp(g, fdHouseIt(), {sx, sy}))){ const hp = housePic(); fdDrawPic(g, hp, IX(FD.CX + 1, FD.CY + 1), IY(FD.CX + 1, FD.CY + 1, 0), 1, 1); } fdFarmer(g, t, sx, sy); }});
   { const H = G.heroes.goat; items.push({y: H.x + H.y, d: () => fdGoat(g, t)}); }
   G.enemies.forEach(e => items.push({y: e.x + e.y, d: () => fdCollector(g, e, t, s)}));
   items.sort((a, b) => a.y - b.y).forEach(it => it.d());
@@ -3793,7 +3818,8 @@ function fdMorphDraw(g, h, x, feet, k, t, drawFn){
   g.save(); g.translate(x, feet); g.scale(sc, sc); g.translate(-x, -feet); drawFn(half ? m.from : st, half && m.from < 3 ? null : col, half ? 1 - q : 1); g.restore();
   if(!half && !m.burst){ m.burst = 1; const p = h === 'farmer' ? G.heroes.farmer : G.heroes.goat; burst(p.x, p.y, 1.6, ['✨', '⭐', '🎉', COLORS[col || 'A'].dot], 14); }
 }
-function fdFarmer(g, t){ const H = G.heroes.farmer, hk = VIEW.s / 40, x = IX(FD.CX + 1, FD.CY + 1) - 24 * hk, feet = IY(FD.CX + 1, FD.CY + 1, 0) - 57 * hk, k = VIEW.s / 36;   // 👨‍🌾 on the hayloft door
+function fdFarmer(g, t, sx, sy){ const H = G.heroes.farmer, hk = VIEW.s / 40, it = fdHasProps() ? fdHouseIt() : null, st = it && it.stand, p = st ? fdV().toScreen(st.x, st.y, st.z) : null;   // 👨‍🌾 on the porch roof (fd-1b: IsoProps it.stand)
+  const x = p ? p.x : IX(FD.CX + 1, FD.CY + 1) - 24 * hk, feet = p ? p.y : IY(FD.CX + 1, FD.CY + 1, 0) - 57 * hk, k = VIEW.s / (p ? 46 : 36);   // on the porch: collector-sized, so the house still reads as a house
   fdMorphDraw(g, 'farmer', x, feet, k, t, (st, col) => TDFarmer.draw(g, st, col, x, feet, k, t, {dir: H.ax != null && IX(H.ax, H.ay) < x ? -1 : 1, pose: H.atkT && G.t - H.atkT < 0.3 ? {armR: -2.2} : {}})); }
 function fdGoat(g, t){ const H = G.heroes.goat, x = IX(H.x, H.y), feet = IY(H.x, H.y, 0) + (H.mv ? -Math.abs(Math.sin(t * 12)) * VIEW.s * 0.12 : 0), k = VIEW.s / 30;
   shadow(g, H.x, H.y, 0.38); fdMorphDraw(g, 'goat', x, feet, k, t, (st, col) => TDGoat.draw(g, st, col, x, feet, k, t, {dir: H.tx < H.x ? -1 : 1})); }
@@ -4273,4 +4299,4 @@ function tdResultBadge(){
 /* 🏷️ TD LOGO END */</script>
 </body>
 </html>
-<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a+fd-1a2) END OF TDStories.html -->
+<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a+fd-1a2+fd-1b) END OF TDStories.html -->

@@ -2367,7 +2367,7 @@ function startMatch(){
     avs: raw.map(fightAv), winAvs: raw, cam: {cx: 0, w: 9}, shake: 0, hitstop: 0, t: 0, startAt: performance.now(), pads: [null, null], dance: null, hpShow: [1, 1]};
   M.sq.forEach((tm, i) => tm.forEach(p => { p.seatKeys = duo ? [KEYS[i]] : (i === 0 ? [KEYS[0], KEYS[1]] : []); }));
   G.crowd = crowdFor(M); G.faceKey = ['', ''];
-  cheerMount();   /* 📣 cs-2c */
+  cheerMount(); calloutSetup(); /* 💬 24t-e */   /* 📣 cs-2c */
   $('n0').textContent = M.f[0].name; $('n1').textContent = (duo ? '' : '🤖 ') + M.f[1].name;
   ['pips0', 'pips1'].forEach(id => { $(id).innerHTML = '<i></i>'.repeat(M.need); });
   showScreen('play'); layoutPlay(); hud();
@@ -2509,7 +2509,7 @@ function leavePlay(){
   if(!G) return; const was = G.paused; G.paused = true;
   UI.confirm({icon: '◀', title: 'Leave this brawl?', body: 'This brawl won\'t be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(!G) return; G.paused = was; if(ok) backToMenu(); });
 }
-function backToMenu(){ if(window.Cheer) Cheer.unmount(); if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); $('bottom').innerHTML = ''; document.querySelectorAll('#arena .ctl').forEach(e => e.remove()); renderMenu(); showScreen('menu'); }
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); /* 💬 24t-e off */ if(window.UI && UI.callout) UI.callout.setup(null); if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); $('bottom').innerHTML = ''; document.querySelectorAll('#arena .ctl').forEach(e => e.remove()); renderMenu(); showScreen('menu'); }
 
 /* ---------- input ---------- */
 document.addEventListener('keydown', e => {
@@ -2556,34 +2556,34 @@ function handleEvents(list){
       if(e.move === 'upper') G.fx.push({k: 'txt', x: e.x, y: e.y + 0.8, txt: '🚀 UP!', t: 0, life: 0.8});
       if(e.jug) G.fx.push({k: 'txt', x: e.x, y: e.y + 1.2, txt: '🔼 ' + e.jug, t: 0, life: 0.6, small: true});
     }
-    else if(e.k === 'block'){ visOf(G, e.p).blockT = 0; boing(620, 0.06, 'sine', 0.08); G.fx.push({k: 'shield', x: e.x, y: e.y, t: 0, life: 0.3, low: e.low}); if(e.timed) G.fx.push({k: 'txt', x: e.x, y: e.y + 0.8, txt: '🛡️ PARRY!', t: 0, life: 0.9, gold: true}); }
-    else if(e.k === 'counter'){ boing(980, 0.12, 'square', 0.06); G.fx.push({k: 'txt', x: e.x, y: e.y + 0.4, txt: e.n > 1 ? '⚡ COUNTER ×' + e.n + '!' : '⚡ COUNTER!', t: 0, life: 1.1, gold: true}); }
-    else if(e.k === 'combo'){ G.fx.push({k: 'txt', x: e.x, y: e.y, txt: e.n + ' HITS!', t: 0, life: 0.8, gold: true}); if(e.n === 5 || e.n === 8) bigWord('🔥 ' + e.n + ' combo!'); }
-    else if(e.k === 'sky'){ crowdReact('cheer', 1.6); bigWord('🌟 Sky Combo!'); UISound.play('unlock'); }
+    else if(e.k === 'block'){ visOf(G, e.p).blockT = 0; boing(620, 0.06, 'sine', 0.08); G.fx.push({k: 'shield', x: e.x, y: e.y, t: 0, life: 0.3, low: e.low}); if(e.timed) brWord(e.p, 'good', {k: 'txt', x: e.x, y: e.y + 0.8, txt: '🛡️ PARRY!', t: 0, life: 0.9, gold: true}); }
+    else if(e.k === 'counter'){ boing(980, 0.12, 'square', 0.06); brWord(e.p, e.n >= 3 ? 'big' : 'good', {k: 'txt', x: e.x, y: e.y + 0.4, txt: e.n > 1 ? '⚡ COUNTER ×' + e.n + '!' : '⚡ COUNTER!', t: 0, life: 1.1, gold: true}); }
+    else if(e.k === 'combo'){ brWord(e.p, 'good', {k: 'txt', x: e.x, y: e.y, txt: e.n + ' HITS!', t: 0, life: 0.8, gold: true}); if(e.n === 5 || e.n === 8) bigWord('🔥 ' + e.n + ' combo!', e.p, 'big'); }
+    else if(e.k === 'sky'){ crowdReact('cheer', 1.6); bigWord('🌟 Sky Combo!', e.p, 'big'); UISound.play('unlock'); }
     else if(e.k === 'swing'){ if(e.move === 'power' || e.move === 'jpower'){ G.fx.push({k: 'swirl', p: e.p, t: 0, life: 0.5}); UISound.play('whoosh'); } else if(e.move === 'bonk' || e.move === 'jbonk' || e.move === 'upper') boing(260, 0.08, 'sine', 0.05); }
     else if(e.k === 'nopower'){ const p = M.f[e.p]; if(p.human){ UISound.play('error'); G.fx.push({k: 'txt', x: p.x, y: p.y + 2.1, txt: '⚡ not full yet', t: 0, life: 0.7, small: true}); } }
-    else if(e.k === 'powerUse'){ const p = M.f[e.p]; G.fx.push({k: 'txt', x: p.x, y: p.y + 2.2, txt: '🌀 POWER!', t: 0, life: 0.8, gold: true}); }
+    else if(e.k === 'powerUse'){ const p = M.f[e.p]; brWord(e.p, 'good', {k: 'txt', x: p.x, y: p.y + 2.2, txt: '🌀 POWER!', t: 0, life: 0.8, gold: true}); }
     else if(e.k === 'dodge'){ boing(900, 0.1, 'sine', 0.05); }
     else if(e.k === 'jump'){ boing(500, 0.08, 'sine', 0.04); }
     else if(e.k === 'land'){ G.fx.push({k: 'dust', x: e.x, y: 0, t: 0, life: 0.4}); boing(120, 0.15, 'triangle', 0.1); }
     else if(e.k === 'getup'){ visOf(G, e.p).getup = 0; }
-    else if(e.k === 'tag'){ bigWord('🔁 Swap! ' + e.to + '!'); UISound.play('whoosh'); boing(520, 0.12, 'sine', 0.1); G.hpShow[e.p] = 1; G.flash = 0.12; crowdReact('cheer', 1.4); setNames(); }
+    else if(e.k === 'tag'){ bigWord('🔁 Swap! ' + e.to + '!', e.p, 'good'); UISound.play('whoosh'); boing(520, 0.12, 'sine', 0.1); G.hpShow[e.p] = 1; G.flash = 0.12; crowdReact('cheer', 1.4); setNames(); }
     else if(e.k === 'tagin'){ G.fx.push({k: 'txt', x: e.x, y: 2.4, txt: '🔁 ' + e.to + ' jumps in!', t: 0, life: 1.1, gold: true}); G.hpShow[e.p] = 1; setNames(); }
-    else if(e.k === 'out'){ G.fx.push({k: 'txt', x: e.x, y: 2.2, txt: '💫 ' + e.name + ' is out!', t: 0, life: 1.2}); boing(140, 0.3, 'triangle', 0.14); crowdReact('gasp', 1.2); if(FX) G.hitstop = 0.18; }
+    else if(e.k === 'out'){ brWord(e.p, 'good', {k: 'txt', x: e.x, y: 2.2, txt: '💫 ' + e.name + ' is out!', t: 0, life: 1.2}); boing(140, 0.3, 'triangle', 0.14); crowdReact('gasp', 1.2); if(FX) G.hitstop = 0.18; }
     else if(e.k === 'notag'){ const p = M.f[e.p]; if(p.human){ UISound.play('error'); G.fx.push({k: 'txt', x: p.x, y: p.y + 2.1, txt: '🔁 in ' + Math.ceil(e.cd || 0) + ' s', t: 0, life: 0.8, small: true}); } }
     else if(e.k === 'dash' || e.k === 'bdash'){ boing(e.k === 'dash' ? 340 : 700, 0.07, 'sine', 0.05); G.fx.push({k: 'dust', x: e.x, y: 0, t: 0, life: 0.35}); if(e.k === 'dash') G.fx.push({k: 'speed', p: e.p, t: 0, life: 0.34}); }
-    else if(e.k === 'grab'){ UISound.play('whoosh'); G.fx.push({k: 'txt', x: e.x, y: 2.5, txt: '🤼 ' + e.name + '!', t: 0, life: 1.1, gold: true}); }
+    else if(e.k === 'grab'){ UISound.play('whoosh'); brWord(e.p, 'good', {k: 'txt', x: e.x, y: 2.5, txt: '🤼 ' + e.name + '!', t: 0, life: 1.1, gold: true}); }
     else if(e.k === 'slam'){ crowdReact('cheer', 1.4); G.flash = 0.1; boing(90, 0.3, 'square', 0.2); boing(160, 0.18, 'triangle', 0.14); G.fx.push({k: 'shock', x: e.x, y: 0, t: 0, life: 0.6}); G.fx.push({k: 'burst', x: e.x, y: 0.5, t: 0, life: 0.55, word: e.up ? 'WHOOSH!' : 'SLAM!', e1: '💥', big: true});
       if(FX){ G.hitstop = 0.11; if(!reduced()) G.shake = 0.26; } }
-    else if(e.k === 'tech'){ crowdReact('gasp', 1); boing(980, 0.12, 'sine', 0.08); G.fx.push({k: 'txt', x: e.x, y: 2.2, txt: '✨ Wriggled out!', t: 0, life: 1, gold: true}); G.fx.push({k: 'ring', x: e.x, y: 1.1, t: 0, life: 0.4}); }
+    else if(e.k === 'tech'){ crowdReact('gasp', 1); boing(980, 0.12, 'sine', 0.08); brWord(e.p, 'small', {k: 'txt', x: e.x, y: 2.2, txt: '✨ Wriggled out!', t: 0, life: 1, gold: true}); G.fx.push({k: 'ring', x: e.x, y: 1.1, t: 0, life: 0.4}); }
     else if(e.k === 'charge'){ boing(220, 0.35, 'sawtooth', 0.04); }
-    else if(e.k === 'gbreak'){ crowdReact('cheer', 1.2); G.flash = 0.08; bigWord('🔨 Guard break!'); boing(140, 0.25, 'square', 0.18); G.fx.push({k: 'shards', x: e.x, y: e.y, t: 0, life: 0.6}); if(FX){ G.hitstop = 0.1; if(!reduced()) G.shake = 0.22; } }
-    else if(e.k === 'open'){ G.fx.push({k: 'txt', x: e.x, y: e.y + 0.6, txt: '😱 Wide open!', t: 0, life: 0.9, small: true}); }
-    else if(e.k === 'escape'){ const p = M.f[e.p]; G.fx.push({k: 'txt', x: p.x, y: p.y + 2, txt: '✨ Wriggled free!', t: 0, life: 0.8, small: true}); }
-    else if(e.k === 'ko'){ crowdReact('gasp', 0.6); G.slow = FX && !reduced() ? 0.9 : 0; G.flash = 0.18; bigWord(pickOne(['💫 Bonked out!', '💫 BONKED OUT!'])); UISound.play('bump'); if(FX) G.hitstop = 0.25; if(!reduced()) G.shake = 0.3; }
+    else if(e.k === 'gbreak'){ crowdReact('cheer', 1.2); G.flash = 0.08; bigWord('🔨 Guard break!', e.p, 'good'); boing(140, 0.25, 'square', 0.18); G.fx.push({k: 'shards', x: e.x, y: e.y, t: 0, life: 0.6}); if(FX){ G.hitstop = 0.1; if(!reduced()) G.shake = 0.22; } }
+    else if(e.k === 'open'){ brWord(e.p, 'small', {k: 'txt', x: e.x, y: e.y + 0.6, txt: '😱 Wide open!', t: 0, life: 0.9, small: true}); }
+    else if(e.k === 'escape'){ const p = M.f[e.p]; brWord(e.p, 'small', {k: 'txt', x: p.x, y: p.y + 2, txt: '✨ Wriggled free!', t: 0, life: 0.8, small: true}); }
+    else if(e.k === 'ko'){ crowdReact('gasp', 0.6); G.slow = FX && !reduced() ? 0.9 : 0; G.flash = 0.18; bigWord(pickOne(['💫 Bonked out!', '💫 BONKED OUT!']), e.by >= 0 ? e.by : e.p, 'big', true); UISound.play('bump'); if(FX) G.hitstop = 0.25; if(!reduced()) G.shake = 0.3; }
     else if(e.k === 'round'){ banner('Round ' + e.n, 'good'); }
-    else if(e.k === 'fight'){ bigWord(M.round === 1 ? '🥊 Bonk!' : '🥊 Round ' + M.round + '!'); if(FX) say(M.round === 1 ? 'Ready? Bonk!' : 'Round ' + M.round); }
-    else if(e.k === 'perfect'){ G.fx.push({k: 'txt', x: M.f[e.p].x, y: 2.6, txt: '✨ PERFECT!', t: 0, life: 1.2, gold: true}); }
+    else if(e.k === 'fight'){ bigWord(M.round === 1 ? '🥊 Bonk!' : '🥊 Round ' + M.round + '!', null, 'big', true); if(FX) say(M.round === 1 ? 'Ready? Bonk!' : 'Round ' + M.round); }
+    else if(e.k === 'perfect'){ brWord(e.p, 'good', {k: 'txt', x: M.f[e.p].x, y: 2.6, txt: '✨ PERFECT!', t: 0, life: 1.2, gold: true}); }
     else if(e.k === 'roundEnd'){
       const w = e.winner; if(w < 0) banner('⏰ Time! A draw — again!', 'gold');
       else { const human = M.f[w].human; banner((e.timeUp ? '⏰ Time! ' : '🏆 ') + M.f[w].name + ' wins round ' + e.n + '!', human ? 'good' : 'bad'); UISound.play(human ? 'success' : 'bump'); }
@@ -2601,7 +2601,8 @@ function startDance(w){
 function reduced(){ try{ return matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){ return false; } }
 let bannerTimer = 0;
 function banner(text, kind){ const b = $('banner'); b.textContent = text; b.className = 'banner on' + (kind ? ' ' + kind : ''); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('on'), 1800); }
-function bigWord(text){ if(!FX) return; const host = $('bigword-host'); host.innerHTML = ''; const d = document.createElement('div'); d.className = 'big-word'; d.textContent = text; host.appendChild(d); setTimeout(() => d.remove(), 1100); }
+function brWord(i, rank, fx){ if(window.UI && UI.callout && UI.callout.active()){ if(FX) UI.callout(fx.txt, {who: i, rank}); return; } G.fx.push(fx); } /* 💬 24t-e */
+function bigWord(text, who, rank, stopped){ if(!FX) return; /* 💬 24t bigWord */ if(window.UI && UI.callout && UI.callout.active()){ UI.callout(text, {who, rank, stopped}); return; } const host = $('bigword-host'); host.innerHTML = ''; const d = document.createElement('div'); d.className = 'big-word'; d.textContent = text; host.appendChild(d); setTimeout(() => d.remove(), 1100); }
 function stepFx(dt){ if(G.flash > 0) G.flash -= dt; if(G.crowd) G.crowd.t += dt; if(G.crowdR && G.crowdR.t < G.crowdR.d) G.crowdR.t += dt; (G.vis || []).forEach(v => { if(!v) return; if(v.react) v.react.t += dt; if(v.blockT != null) v.blockT += dt; if(v.getup != null) v.getup += dt; }); G.fx.forEach(f => f.t += dt); G.fx = G.fx.filter(f => f.t < f.life); if(G.shake > 0) G.shake -= dt; if(G.dance) G.dance.t += dt; }
 
 /* ---------- HUD ---------- */
@@ -2647,6 +2648,22 @@ function hud(){
 /* ================= DRAWING ================= */
 /* 📣 CHEERSQUAD (cs-2c) START — the crowd behind the ring (CheerSquad.html, 📣 Cheer chat). Replaces drawCrowd in the 🥊 ring. Don't remove: the Cheer chat re-applies it. */
 // sides: 0 = left (you / player 1), 1 = right (🤖 or player 2); fighters in either team are not in the crowd
+/* 💬 24t-e: words during play (UiKit UI.callout) — the floor + both fighters + the fighter HUD stay clear, crowd fans can say it */
+function calloutSetup(){ if(!(window.UI && UI.callout) || !G) return;
+  const sc = () => { const V = G && G.V; if(!V) return null; const c = $('cv').getBoundingClientRect(); return {V, l: c.left, t: c.top, w: c.width, h: c.height}; };
+  const box = i => { const q = sc(), f = G && G.M.f[i]; if(!q || !f) return null; const V = q.V, x = q.l + V.X(f.x), feet = q.t + V.Y(Math.max(0, f.y)), head = q.t + V.Y(Math.max(0, f.y) + 1.85); return {x, feet, head, s: V.s}; };
+  const meI = () => { if(!G) return -1; const F = G.M.f; const i = F.findIndex(p => p.human && p.name === S.player); return i >= 0 ? i : F.findIndex(p => p.human); };
+  UI.callout.setup({
+    get me(){ return meI(); },
+    at: w => { const b = box(typeof w === 'number' && w >= 0 ? w : meI()); return b ? {x: b.x, y: b.head - 6} : null; },
+    side: w => { const i = typeof w === 'number' && w >= 0 ? w : meI(); return i === 0 || i === 1 ? i : null; },
+    crowd: () => $('cv'),
+    poly: () => { const q = sc(); if(!q) return null; const y = q.t + q.V.floorY; return [[q.l, y - 4], [q.l + q.w, y - 4], [q.l + q.w, q.t + q.h], [q.l, q.t + q.h]]; },
+    keep: () => { if(!G) return []; const out = [];
+      [0, 1].forEach(i => { const b = box(i); if(!b) return; const w = Math.max(30, b.s * 0.8); out.push({l: b.x - w, r: b.x + w, t: b.head - 10, b: b.feet + 6}); });
+      const h = $('fhud'); if(h){ const r = h.getBoundingClientRect(); if(r.width) out.push({l: r.left, t: r.top, r: r.right, b: r.bottom}); }
+      return out; }
+  }); }
 function cheerMount(){
   if(!window.Cheer || !G) return; Cheer.unmount(); const M = G.M, duo = G.mode === 'duo' || !!(M.f[1] && M.f[1].human);
   const inRing = new Set(M.sq[0].concat(M.sq[1]).map(f => f.name));
@@ -2739,7 +2756,7 @@ function view(W, H, st){
   return {s, cx: halfW * 2 > 2 * lim ? 0 : cx, floorY, W, H, X: x => W / 2 + (x - (halfW * 2 > 2 * lim ? 0 : cx)) * s, Y: y => floorY - y * s};
 }
 function drawScene(g, W, H, st, still){
-  const V = view(W, H, st), T = THEMES[st.theme], M = st.M, t = st.t || 0;
+  const V = view(W, H, st), T = THEMES[st.theme], M = st.M, t = st.t || 0; if(st === G) G.V = V; /* 💬 24t-e */
   g.save();
   if(st.shake > 0 && !st.preview){ g.translate((Math.random() - 0.5) * 10 * st.shake / 0.3, (Math.random() - 0.5) * 8 * st.shake / 0.3); }
   // sky + far hills + far things (parallax)
@@ -3043,6 +3060,7 @@ function drawFx(g, V, st, f){
 
 /* ================= RESULT + SAVE ================= */
 function finishMatch(){
+  if(window.UI && UI.callout) UI.callout.setup(null); /* 💬 24t-e match end */
   const M = G.M; G.shown = true; G.over = true; const win = M.winner, secs = Math.max(1, Math.round((performance.now() - G.startAt) / 1000));
   const humans = M.f.filter(p => p.human), vsRobot = G.mode === 'robot', myWin = vsRobot ? win === 0 : true;
   const st = M.stats, stars = BB.starsFor(M, 0);
@@ -3096,7 +3114,7 @@ function saveText(res, cleared){
   const h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New high score!' : cleared ? (res.best && res.best.score ? 'Best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Saved') : '✅ Feats saved — win to unlock the next level';
   return featText(res.feats, h);
 }
-function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces();   /* 📣 cs-2c */ }
+function showResult(html){ /* 💬 24t-e result */ if(window.UI && UI.callout) UI.callout.setup(null); $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces();   /* 📣 cs-2c */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pickOne(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
@@ -4010,4 +4028,4 @@ msAfter('choosePlayer', name => {
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.themes', {rows: 2}); }</script>
 </body>
 </html>
-<!-- (11i-I+back-1+r35+modes-3+mg-1+ck-room+p1c+p2+p3a+ck-2b+cs-2c+ls-1b+pz-1+pz-2+b3w5b) END OF BrawlBuddies.html -->
+<!-- (11i-I+back-1+r35+modes-3+mg-1+ck-room+p1c+p2+p3a+ck-2b+cs-2c+ls-1b+pz-1+pz-2+b3w5b+24t-e) END OF BrawlBuddies.html -->
