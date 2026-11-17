@@ -611,6 +611,38 @@
   .wait-strip.lkb-empty .lkb-h{font-size:.95rem;}
   .wait-strip .lkb-room{background:rgba(127,127,127,.12);color:inherit;box-shadow:none;}
   .wait-strip .lkb-go{font:inherit;font-weight:800;}
+
+  /* 🎴 gr-9 FILTERS (Aowu 2026-11-17 "C"): the chip row never scrolls sideways (P2). Under 900 px the 17 kinds sit behind ONE
+     🗂️ "Kinds of game ▾" chip + a sheet; the picked kind shows on that chip ("➗ Math ✕"). 900 px and up: all chips wrap as before. */
+  @media (max-width:899px){
+    html .filters{flex-wrap:wrap;overflow:visible;scroll-snap-type:none;margin-left:0;margin-right:0;padding-left:0;padding-right:0;}
+    html .filters .pill.kind{display:none;}
+    html .filters .pill.gap{margin-right:0;} html .filters .pill.gap::after{display:none;}   /* a wrapped row: no dangling | at a line end */
+  }
+  @media (min-width:900px){ html .filters .pill.kinds{display:none;} }
+  @media (max-width:560px){ html .filters{gap:7px;} html .filters .pill{padding:8px 13px;} }
+  .pill.kinds:not(.active){background:linear-gradient(135deg,#FFE9AE,#FFD27A);color:#5b3b00;}
+  .pill.kinds .dn{font-size:.8em;opacity:.75;}
+  .pill.kinds .x{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin:-4px -8px -4px 2px;border-radius:50%;
+    background:rgba(255,255,255,.22);font-size:.8rem;}
+  .ksheet{position:fixed;inset:0;z-index:960;display:flex;align-items:flex-end;justify-content:center;background:rgba(28,26,40,0);transition:background .2s;}
+  .ksheet.on{background:rgba(28,26,40,.45);}
+  .ksheet .kc{width:min(560px,100%);box-sizing:border-box;background:var(--bg,#FBF6EE);color:var(--ink,#37474F);border-radius:24px 24px 0 0;
+    padding:14px 14px var(--safe-b,18px);box-shadow:0 -8px 30px rgba(0,0,0,.22);transform:translateY(105%);transition:transform .26s cubic-bezier(.2,1.25,.4,1);}
+  .ksheet.on .kc{transform:none;}
+  .ksheet .kh{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-family:Fredoka,Nunito,sans-serif;}
+  .ksheet .kh b{font-size:1.15rem;} .ksheet .kh .th{font-size:.85rem;color:var(--ink-soft,#6b7a80);font-family:Mitr,Nunito,sans-serif;}
+  .ksheet .kx{margin-left:auto;width:40px;height:40px;border:none;border-radius:50%;background:var(--card,#fff);color:inherit;font-size:1.05rem;cursor:pointer;box-shadow:0 2px 0 rgba(0,0,0,.12);}
+  .ksheet .kg{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:8px;}
+  .ksheet .kg .pill{justify-content:flex-start;white-space:nowrap;padding:9px 12px;min-height:40px;}
+  .ksheet .kg .pill .n{margin-left:auto;}
+  .ksheet .kg .pill.all{grid-column:1 / -1;justify-content:center;}
+  .ksheet.tight .kg{gap:6px;} .ksheet.tight .kg .pill{padding:6px 10px;min-height:36px;font-size:.82rem;} .ksheet.tight .kh{margin-bottom:6px;}
+  @media (min-width:600px), (max-height:500px){
+    .ksheet{align-items:center;padding:8px;} .ksheet .kc{width:min(720px,100%);border-radius:24px;padding-bottom:14px;transform:translateY(24px) scale(.96);opacity:0;transition:transform .22s cubic-bezier(.2,1.25,.4,1),opacity .18s;}
+    .ksheet.on .kc{opacity:1;}
+  }
+  @media (prefers-reduced-motion:reduce){ .ksheet .kc{transition:none;} }
 </style>
 <script src="inc/UiKit.js"></script>
 <script src="inc/Themes.js"></script>
@@ -974,7 +1006,7 @@ function renderFilters(){
   items.forEach(([key, icon, label, gap]) => {
     const was = filter; filter = key; const n = allGames.filter(matches).length; filter = was;
     const b = document.createElement('button');
-    b.className = 'pill t-chip' + (filter === key ? ' active' : '') + (gap ? ' gap' : '') + (key === 'multi' || key === 'party' ? ' who' : '');
+    b.className = 'pill t-chip' + (filter === key ? ' active' : '') + (gap ? ' gap' : '') + (key === 'multi' || key === 'party' ? ' who' : '') + (key.indexOf('t:') === 0 ? ' kind' : '');   /* 🎴 gr-9: kinds hide under 900 px */
     b.setAttribute('role', 'tab');
     b.setAttribute('aria-selected', filter === key ? 'true' : 'false');
     b.setAttribute('data-sound', 'pop');
@@ -982,7 +1014,68 @@ function renderFilters(){
     b.onclick = () => { filter = key; renderFilters(); render(); };
     box.appendChild(b);
   });
+  kindsChip(box, items);   /* 🎴 gr-9 */
 }
+
+/* 🎴 gr-9 KINDS (Aowu 2026-11-17 "C · Kinds button"): under 900 px the 17 kinds live in ONE chip + a sheet, so the filter row
+   never scrolls sideways (P2 rule). kindsChip(box, items) is called at the end of renderFilters; openKinds() / closeKinds(). */
+let KIND_ITEMS = [];
+function kindCount(key){ const was = filter; filter = key; const n = allGames.filter(matches).length; filter = was; return n; }
+function kindsChip(box, items){
+  KIND_ITEMS = items.filter(i => i[0].indexOf('t:') === 0);
+  if(!KIND_ITEMS.length) return;
+  const sel = KIND_ITEMS.find(i => i[0] === filter);
+  const b = document.createElement('button');
+  b.id = 'kinds-btn'; b.type = 'button';
+  b.className = 'pill t-chip kinds' + (sel ? ' active' : '');
+  b.setAttribute('aria-haspopup', 'dialog'); b.setAttribute('data-sound', 'pop');
+  b.innerHTML = sel
+    ? '<span>' + sel[1] + '</span><span>' + UI.esc(sel[2]) + '</span><span class="n">' + kindCount(sel[0]) + '</span><span class="x" role="button" aria-label="Show all games" title="Show all games">✕</span>'
+    : '<span>🗂️</span><span>Kinds of game</span><span class="n">' + KIND_ITEMS.length + '</span><span class="dn">▾</span>';
+  b.title = sel ? 'Kind: ' + sel[2] + ' — tap to pick another kind' : 'Pick a kind of game (Math, Words, Sport…)';
+  b.onclick = e => {
+    if(e.target.closest('.x')){ filter = 'all'; renderFilters(); render(); return; }
+    openKinds();
+  };
+  box.appendChild(b);
+}
+function closeKinds(){
+  const sh = document.getElementById('kind-sheet'); if(!sh) return;
+  document.removeEventListener('keydown', kindsKey, true);
+  sh.classList.remove('on'); sh.dataset.closing = '1';
+  setTimeout(() => sh.remove(), matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 220);
+  const kb = document.getElementById('kinds-btn'); if(kb) try { kb.focus({preventScroll: true}); } catch(e){}
+}
+function kindsKey(e){ if(e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); closeKinds(); } }
+function openKinds(){
+  const old = document.getElementById('kind-sheet'); if(old) old.remove();
+  const sh = document.createElement('div');
+  sh.id = 'kind-sheet'; sh.className = 'ksheet';
+  sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-modal', 'true'); sh.setAttribute('aria-label', 'Kinds of game');
+  sh.innerHTML = '<div class="kc"><div class="kh"><b>🗂️ Kinds of game</b><span class="th">ประเภทเกม</span>'
+    + '<button type="button" class="kx" aria-label="Close" data-sound="pop">✕</button></div><div class="kg"></div></div>';
+  const kg = sh.querySelector('.kg');
+  const pick = (key) => { filter = key; closeKinds(); renderFilters(); render(); };
+  const all = document.createElement('button'); all.type = 'button';
+  all.className = 'pill t-chip all' + (filter.indexOf('t:') === 0 ? '' : ' active'); all.setAttribute('data-sound', 'pop');
+  all.innerHTML = '<span>🎮</span><span>Every kind</span>'; all.onclick = () => pick('all'); kg.appendChild(all);
+  KIND_ITEMS.forEach(([key, icon, label]) => {
+    const b = document.createElement('button'); b.type = 'button';
+    b.className = 'pill t-chip' + (filter === key ? ' active' : ''); b.setAttribute('data-sound', 'pop'); b.dataset.k = key;
+    b.setAttribute('aria-pressed', filter === key ? 'true' : 'false');
+    b.innerHTML = '<span>' + icon + '</span><span>' + UI.esc(label) + '</span><span class="n">' + kindCount(key) + '</span>';
+    b.onclick = () => pick(key);
+    kg.appendChild(b);
+  });
+  sh.addEventListener('click', e => { if(e.target === sh || e.target.closest('.kx')) closeKinds(); });
+  document.body.appendChild(sh);
+  const kc = sh.querySelector('.kc');
+  if(kc.scrollHeight > innerHeight - 12) sh.classList.add('tight');   // short screens: smaller chips, never a scrolling sheet
+  document.addEventListener('keydown', kindsKey, true);
+  requestAnimationFrame(() => { sh.classList.add('on'); const f = kg.querySelector('.active') || kg.firstChild; try { f.focus({preventScroll: true}); } catch(e){} });
+}
+addEventListener('resize', () => { const sh = document.getElementById('kind-sheet'); if(sh && !sh.dataset.closing && innerWidth >= 900) closeKinds(); });
+
 
 function render(){
   const shown = allGames.filter(matches);
@@ -1213,7 +1306,7 @@ function gameroomGuide(){
     {icon: '👋', title: 'Welcome to the Gameroom, ' + who + '!', body: 'Every game here grows a different super-power: **maths, words, logic, memory, music** and more. Here is how it works.'},
     {icon: '🎮', title: 'Big adventures', lines: [['🪜', '6 levels each: Basic → Junior → Intermediate → Hard → Extreme → **💀 Hardcore**.'], ['🔓', 'Clear a level to open the next one.'], ['⭐', 'Up to 3 stars per level — faster and cleaner = more stars.'], ['🎯', '"Great for you!" marks games that fit your age.']]},
     {icon: '🎲', title: 'Mini games', lines: [['⚡', 'Quick little games for younger players (colours, counting, sorting, coding).'], ['🪜', 'Pick a stage first — stars open the next stages.']]},
-    {icon: '🔍', title: 'Find a game', lines: [['👥', '**2 players** / **3–4 players** = play together on one screen.'], ['➗', 'Type chips (Math, Words, Colours…) show one kind of game.'], ['❤️', 'Tap the heart to keep a favourite at the top.'], ['❓', 'Tap ❓ on a card to see how to play it.']]},
+    {icon: '🔍', title: 'Find a game', lines: [['👥', '**2 players** / **3–4 players** = play together on one screen.'], ['🗂️', 'Kind chips (Math, Words, Colours…) show one kind of game — on a phone or tablet tap 🗂️ **Kinds of game**.'], ['❤️', 'Tap the heart to keep a favourite at the top.'], ['❓', 'Tap ❓ on a card to see how to play it.']]},
     {icon: '🏆', title: 'Earn cool stuff', lines: [['🏅', 'Badges for clearing levels.'], ['👕', 'New clothes, pets and items for your avatar (see 📖 Collection).'], ['🐾', 'Adventure miles unlock ride-ons.'], ['🏷️', 'Titles to wear on the Dashboard.']]}
   ];
 }
@@ -1428,4 +1521,4 @@ loadGameroom();
 </script>
 </body>
 </html>
-<!-- (11m+11j+11i+11x-1+11y-1+sb-4+pp-4+ebr-3+r34+wd-1+bc-3+r35b+modes-2+gr-1+gs-2+af-1+mg-1+gro-1+sb2-2+p5+p5-2+p5-3+p5-4+p5-5+p5-6+p5-7+p5-8+lk-1b-g+lk-2c+lk-1b-g2+lk-2e+td-1+pd-1+bo-1+pk-1+gr-td1+sc-1+pk-2a+gr-lk3+sc-2a+pk-2b+pk-3a+lk-5a+sc-2b+lk-5f+sc-2d+gr-23+gr-2b+sc-3a+sc-3b+sc-3c+st-1+gr-5+ap-1+sc-3d+gr-6+sc-4a+gr-7+sc-4b+sc-4c) END OF Gameroom.html -->
+<!-- (11m+11j+11i+11x-1+11y-1+sb-4+pp-4+ebr-3+r34+wd-1+bc-3+r35b+modes-2+gr-1+gs-2+af-1+mg-1+gro-1+sb2-2+p5+p5-2+p5-3+p5-4+p5-5+p5-6+p5-7+p5-8+lk-1b-g+lk-2c+lk-1b-g2+lk-2e+td-1+pd-1+bo-1+pk-1+gr-td1+sc-1+pk-2a+gr-lk3+sc-2a+pk-2b+pk-3a+lk-5a+sc-2b+lk-5f+sc-2d+gr-23+gr-2b+sc-3a+sc-3b+sc-3c+st-1+gr-5+ap-1+sc-3d+gr-6+sc-4a+gr-7+sc-4b+sc-4c+gr-9) END OF Gameroom.html -->
