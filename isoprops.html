@@ -98,6 +98,9 @@
   <button id="s-turn" class="sp-btn sp-secondary sp-sm" data-sound="none"><span class="bi">🔄</span> <span class="bl">Turn</span></button>
   <button id="s-var" class="sp-btn sp-secondary sp-sm" data-sound="none"><span class="bi">🎲</span> <span class="bl">Variant</span></button>
   <button id="s-state" class="sp-btn sp-secondary sp-sm hidden" data-sound="none"><span class="bi">🔀</span> <span class="bl">State</span></button>
+  <button id="s-shrink" class="sp-btn sp-secondary sp-sm hidden" data-sound="none"><span class="bi">◀</span> <span class="bl">Shrink</span></button>
+  <button id="s-grow" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">🌱</span> <span class="bl">Grow</span></button>
+  <button id="s-grow2" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">🌱</span> <span class="bl">②</span></button>
   <button id="s-move" class="sp-btn sp-secondary sp-sm" data-sound="none"><span class="bi">✋</span> <span class="bl">Move</span></button>
   <button id="s-del" class="sp-btn sp-danger sp-sm" data-sound="none"><span class="bi">🗑️</span> <span class="bl">Remove</span></button>
   <button id="s-x" class="sp-btn sp-ghost sp-sm" data-sound="none" aria-label="Done"><span class="bi">✖</span></button>
@@ -148,12 +151,12 @@ function label(el, txt){ const m = String(txt).match(/^(\S+)\s([\s\S]*)$/); if(!
 function renderTabs(){ $('tabs').innerHTML = ''; SET_KEYS.forEach(k => { const st = Props.SETS[k], b = document.createElement('button'); b.className = 'tab' + (k === S.set ? ' on' : ''); b.dataset.set = k; b.setAttribute('data-sound', 'none');
   label(b, (st.icon || '📦') + ' ' + st.name); b.onclick = () => { S.set = k; renderTabs(); renderCards(); sound('tap'); }; $('tabs').appendChild(b); }); }
 function thumb(cv, key){ const dpr = Math.min(2, window.devicePixelRatio || 1), def = Props.DEFS[key], G = Props.geom(def, 0), W = cv.clientWidth || 64, H = cv.clientHeight || 56;
-  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); const k = Math.min(W / G.w, H / G.h) * 1.12, c = Props.canvas(key, {k, s: dpr, look: S.look, cond: S.cond}), g = cv.getContext('2d');
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); const k = Math.min(W / G.w, H / G.h) * 1.12, c = Props.canvas(key, {k, s: dpr, look: S.look, cond: S.cond, state: def.grow ? '5a' : undefined}), g = cv.getContext('2d');
   g.clearRect(0, 0, cv.width, cv.height); g.drawImage(c, (cv.width - c.width) / 2, cv.height - c.height + 2 * dpr); }
 function renderCards(){ const box = $('cards'); box.innerHTML = '';
   Props.list({set: S.set}).forEach(m => { const b = document.createElement('button'); b.className = 'pcard' + (S.hold && S.hold.key === m.key ? ' on' : ''); b.dataset.key = m.key; b.setAttribute('data-sound', 'none');
     b.title = m.name + ' · ' + m.foot.join('×') + ' · ' + m.h + ' px';
-    const cv = document.createElement('canvas'), sp = document.createElement('span'); sp.textContent = m.name; b.appendChild(cv); b.appendChild(sp); box.appendChild(b); thumb(cv, m.key);
+    const cv = document.createElement('canvas'), sp = document.createElement('span'); sp.textContent = m.grow ? m.grow.line : m.name;   /* ip-3c: 'Mushroom', not 'Mushroom (growing)' cut short */ b.appendChild(cv); b.appendChild(sp); box.appendChild(b); thumb(cv, m.key);
     b.addEventListener('pointerdown', e => cardDown(e, m.key)); });
   if(UI.pageRow) UI.pageRow(box, {rows: 1, swipe: false, edge: !wide()}); }   /* ip-3b: 9 set tabs → one card row a page on a phone held sideways too */
 const wide = () => matchMedia('(max-height:520px) and (orientation:landscape)').matches;
@@ -172,7 +175,7 @@ function cardDown(e, key){ e.preventDefault(); const sx = e.clientX, sy = e.clie
 function ghostAt(cx, cy){ const r = $('iso').getBoundingClientRect(), h = S.hold; if(!h){ S.ghost = null; return; } const def = Props.DEFS[h.key], T = Props.turner(def.foot[0], def.foot[1], h.turn);
   const g = Iso.place(S.V, cx - r.left, cy - r.top, {w: T.W, d: T.D}); if(!g){ S.ghost = null; return; }
   g.ok = Props.fits(S.M, h.key, g.i, g.j, {turn: h.turn}); g.it = Props.item(h.key, g.i, g.j, {v: h.v, turn: h.turn, look: S.look, cond: S.cond, state: h.state, text: h.text}); g.it.alpha = 0.62; S.ghost = g; }
-function placeHeld(){ const g = S.ghost, h = S.hold; if(!g || !h) return null; const it = add(h.key, g.i, g.j, {v: h.v, turn: h.turn, state: h.state, text: h.text}); if(it){ sound('success'); pop(it); } return it; }
+function placeHeld(){ const g = S.ghost, h = S.hold; if(!g || !h) return null; const it = add(h.key, g.i, g.j, {v: h.v, turn: h.turn, state: h.state, text: h.text}); if(it){ sound('success'); pop(it); if(it.grow) tip('🌱 a ' + it.grow.names[it.state].toLowerCase() + ' — tap it, then 🌱 Grow'); } return it; }
 function add(key, i, j, o){ const it = Props.place(S.M, key, i, j, Object.assign({look: S.look, cond: S.cond}, o || {})); if(!it){ S.missed.push(key + '@' + i + ',' + j); return null; }
   S.props.push(it); S.items.push(it); S.placed++; info(); return it; }
 function del(it){ Props.remove(S.M, it); [S.props, S.items].forEach(a => { const k = a.indexOf(it); if(k >= 0) a.splice(k, 1); }); if(S.sel === it) select(null); info(); }
@@ -183,6 +186,7 @@ function select(it){ S.sel = it; showBar(); }
 function showBar(){ const it = S.sel, h = S.hold, bar = $('selbar'); if(!it && !h){ bar.classList.add('hidden'); return; }
   const key = it ? it.prop : h.key, def = Props.DEFS[key]; $('sel-name').textContent = (h ? '✋ ' : '') + def.name + ' · ' + def.foot.join('×');
   const stNow = it ? it.state : h.state != null ? h.state : def.states ? Props.stateOf(key) : null; $('s-state').classList.toggle('hidden', !def.states); if(def.states) $('sel-name').textContent += ' · ' + stNow;
+  growBar(def, stNow);
   $('s-move').classList.toggle('hidden', !it); $('s-del').classList.toggle('hidden', !it); $('s-var').classList.toggle('hidden', def.variants < 2); bar.classList.remove('hidden'); placeUi(); }
 // re-place a prop with new settings (turn / variant); it stays put when the new shape doesn't fit
 function reshape(it, o){ const keep = {v: it.v, turn: it.turn, state: it.state, text: it.text}; Props.remove(S.M, it); const n = Props.place(S.M, it.prop, it.x, it.y, Object.assign({look: S.look, cond: S.cond}, keep, o));
@@ -194,6 +198,21 @@ $('s-move').onclick = () => { const it = S.sel; if(!it) return; const o = {v: it
 // 🔀 ip-3b a prop with states (gate open · closed · new, bridge down · lifted, hay bale whole · flat, pumpkin pile 1–12): flip it in place — the map follows (Props.setState)
 $('s-state').onclick = () => { const key = S.hold ? S.hold.key : S.sel && S.sel.prop, d = Props.DEFS[key]; if(!d || !d.states) return; const cur = S.hold ? (S.hold.state != null ? S.hold.state : Props.stateOf(key)) : S.sel.state, nx = d.states[(d.states.indexOf(cur) + 1) % d.states.length];
   if(S.hold){ S.hold.state = nx; } else { Props.setState(S.sel, nx, S.M); pop(S.sel); } showBar(); sound('tap'); tip('🔀 ' + d.name + ' · ' + nx); };
+// 🌱 ip-3c growing props: ◀ Shrink · 🌱 Grow (at the young stage: ① / ② = the two branches, in their SkillKit colours) — Props.grow + the ✨ morph moment
+function growBar(def, st){ const G = def.grow, ids = ['s-shrink', 's-grow', 's-grow2']; if(!G){ ids.forEach(x => $(x).classList.add('hidden')); return; }
+  $('s-state').classList.add('hidden'); const n = parseInt(st, 10), br = String(st).slice(1) || null, young = n === G.branchAt - 1;
+  $('sel-name').textContent = (S.hold && !S.sel ? '✋ ' : '🌱 ') + G.names[st];   /* the stage name says it all (a long prop name + size got cut on phones) */
+  $('s-shrink').classList.toggle('hidden', n <= 1); $('s-grow').classList.toggle('hidden', n >= G.stages); $('s-grow2').classList.toggle('hidden', !young);
+  const g1 = $('s-grow'), g2 = $('s-grow2'); label(g1, young ? '① ' + G.names[G.branchAt + 'a'] : '🌱 Grow'); label(g2, '② ' + G.names[G.branchAt + 'b']); g1.title = young ? '🌱 ① ' + G.names[G.branchAt + 'a'] : '🌱 Grow'; g2.title = '🌱 ② ' + G.names[G.branchAt + 'b'];
+  g1.style.boxShadow = young ? 'inset 0 -4px 0 ' + G.colHex[G.branchAt + 'a'] : ''; g2.style.boxShadow = 'inset 0 -4px 0 ' + G.colHex[G.branchAt + 'b']; g1.dataset.branch = young ? 'a' : (br || ''); }
+function growTo(delta, branch){ const key = S.hold ? S.hold.key : S.sel && S.sel.prop, d = Props.DEFS[key]; if(!d || !d.grow) return; const it = S.sel, cur = it ? it.state : (S.hold.state != null ? S.hold.state : Props.stateOf(key));
+  const n = parseInt(cur, 10) + delta, br = branch || String(cur).slice(1) || 'a', nx = Props.growKey(key, n, br);
+  if(S.hold){ S.hold.state = nx; } else { Props.grow(it, n, br, S.M); it.morphT = S.lastT || 0; } showBar(); sound(delta > 0 ? 'success' : 'tap'); tip((delta > 0 ? '✨ ' : '◀ ') + d.grow.names[nx]); }
+$('s-grow').onclick = () => growTo(1, $('s-grow').dataset.branch || null);
+$('s-grow2').onclick = () => growTo(1, 'b');
+$('s-shrink').onclick = () => growTo(-1);
+// ✨ the morph moment over a plant that just changed stage (🐣 rule: 1.2 s)
+function morphs(g, V, t){ S.props.forEach(it => { if(it.morphT == null) return; if(!Props.morphFx(g, V, it, (t - it.morphT) / 1.2)) it.morphT = null; }); }
 $('s-del').onclick = () => { if(S.sel){ del(S.sel); sound('pop'); } };
 $('s-x').onclick = () => { drop(); select(null); };
 
@@ -222,7 +241,7 @@ function render(alpha, t){ S.lastT = t;
   for(const w of S.walkers){ const it = w.it; it.x = w.px + (w.x - w.px) * alpha; it.y = w.py + (w.y - w.py) * alpha; it.pic = w.frames[w.path ? Math.floor(w.dist * 3.2) % Iso.WALK_N : 0]; it.flip = w.flip; }
   Props.tick(S.props, t);
   if(t - seeT > 0.1){ seeT = t; Props.seeThrough(S.V, S.props, S.walkers.map(w => w.it)); }
-  const st = Iso.frame(S.V, {items: S.items, t, overlay: (g, V) => { burst(g, V, t); ringSel(g, V, t); ghostDraw(g, V, t); }});
+  const st = Iso.frame(S.V, {items: S.items, t, overlay: (g, V) => { burst(g, V, t); morphs(g, V, t); ringSel(g, V, t); ghostDraw(g, V, t); }});
   if(performance.now() - lastInfo > 400){ lastInfo = performance.now(); S.ms = st.ms; info(); }
 }
 function diamond(g, V, x, y, w, d, z){ const p = (a, b) => { const s = V.toScreen(a, b, z || 0); return [s.x - V._sx(), s.y - V._sy()]; }; g.beginPath(); [p(x, y), p(x + w, y), p(x + w, y + d), p(x, y + d)].forEach((q, k) => k ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.closePath(); }
@@ -247,7 +266,7 @@ function setLook(k){ S.look = k; reskin();
 $('t-look').onclick = () => { setLook(LOOK_KEYS[(LOOK_KEYS.indexOf(S.look) + 1) % LOOK_KEYS.length]); sound('tap'); };
 // 🍂 ip-3b rule 14: the condition (what happened here) stacks with the look (where) — every prop + the ground follow it
 const COND_KEYS = Object.keys(Props.CONDS);
-function reskin(){ S.props.forEach(it => { const n = Props.item(it.prop, it.x, it.y, {v: it.v, turn: it.turn, look: S.look, cond: S.cond, z: it.z, state: it.state, text: it.text}); it.pic = n.pic; it.frames = n.frames; it.look = S.look; it.cond = n.cond; }); }
+function reskin(){ S.props.forEach(it => { const n = Props.item(it.asked || it.prop, it.x, it.y, {v: it.v, turn: it.turn, look: S.look, cond: S.cond, z: it.z, state: it.state, text: it.text}); it.pic = n.pic; it.frames = n.frames; it.look = S.look; it.cond = n.cond; it.prop = n.prop; it.asked = n.asked; }); }   /* ip-3c: re-ask the swap */
 function ground(){ if(S.M && S.M.setTheme) S.M.setTheme(Props.ground('meadow', S.cond)); }
 function setCond(c){ S.cond = c && c !== 'fresh' ? c : null; reskin(); ground(); const C = Props.CONDS[S.cond || 'fresh']; label($('t-cond'), (C.icon || '🌿') + ' ' + C.name); renderCards(); info(); }
 $('t-cond').onclick = () => { const cur = S.cond || 'fresh'; setCond(COND_KEYS[(COND_KEYS.indexOf(cur) + 1) % COND_KEYS.length]); sound('tap'); tip(S.cond ? (S.cond === 'ruined' ? '🏚️ ruined — holes, boards, rubble, bare trees' : '🍂 dry — faded, cracked, few leaves') : '🌿 fresh'); };
@@ -298,11 +317,11 @@ async function start(){ renderTabs(); renderCards(); lastWide = wide(); label($(
   await Props.warm(S.props, S.V, {onProgress: f => { $('load-bar').style.width = Math.round(f * 100) + '%'; }});
   $('loading').style.opacity = 0; setTimeout(() => $('loading').classList.add('hidden'), 350); setTimeout(() => { $('tip').style.opacity = 0; }, 5000);
   S.loop = Iso.loop({update: step, render}); S.ready = true; }
-S.add = add; S.del = del; S.holdKey = holdKey; S.drop = drop; S.ghostAt = ghostAt; S.placeHeld = placeHeld; S.select = select; S.setLook = setLook; S.setCond = setCond; S.village = village; S.makeTown = makeTown; S.townMode = townMode; S.reshape = reshape; S.tap = tap; S.pads = pads;
+S.add = add; S.del = del; S.holdKey = holdKey; S.drop = drop; S.ghostAt = ghostAt; S.placeHeld = placeHeld; S.select = select; S.setLook = setLook; S.setCond = setCond; S.growTo = growTo; S.village = village; S.makeTown = makeTown; S.townMode = townMode; S.reshape = reshape; S.tap = tap; S.pads = pads;
 window.PLAB = S;
 start();
 })();
 </script>
 </body>
 </html>
-<!-- (ip-2+ip-3b) END OF IsoPropsLab.html -->
+<!-- (ip-2+ip-3b+ip-3c) END OF IsoPropsLab.html -->

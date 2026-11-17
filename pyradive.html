@@ -1087,6 +1087,7 @@ var PD = (function () {
   }
   function release(M, pid, key) {
     var p = bodyFor(M, byId(M, pid)); if (!p) return;
+    if (key === 'touch') p.hold = null;   /* 🦶 pd-9c release */
     if (key === 'drive' && M.phase === 'serve' && M.ball.held === p.id && p.charge >= 0) serve(M, p, clamp(p.charge / 0.9, 0.15, 1));
   }
   function jump(M, p, forSpike) {
@@ -1384,10 +1385,20 @@ var PD = (function () {
   }
   function hoopStyle(M, p, key) { var hz = M.ball.z - p.z; return key === 'dink' ? 'heel' : key === 'drive' && p.z > 0.3 && hz > 1.4 ? 'bicycle' : hz < 0.8 ? 'foot' : hz < 1.5 ? 'knee' : 'head'; }
   function hoopReach(M, p) { var b = M.ball, hz = b.z - p.z; return hyp(b.x - p.x, b.y - p.y) <= 0.95 * (isPerson(p) ? M.lv.assist.reach : 1.15) && hz >= 0.25 && hz <= 2.5 && b.vz < 1.5; }
+  var STALL_MAX = 1.5, STALL_MIN = 0.35, STALL_PRE = 0.18;   /* 🦶 pd-9c keepy-up sole stall: longest hold · shortest hold that counts as the trick · 🦵 held this long before the ball meets the foot (a quick tap = a normal touch) */
+  function stallUp(M, p) {   // 🦶 pd-9c: let go → the ball pops back up off the sole (= a keepy-up touch + the trick bonus)
+    var D = M.drill, b = M.ball, T = p.team, held = M.stall.t; M.stall = null;
+    p.act = 'dig'; p.actT = 0; p.style = null; p.want = null; p.st.touches++; b.hitT = M.t; M.lastP = p.id; M.lastTeam = T; M.combo++; M.rally++; M.rallyMax = Math.max(M.rallyMax, M.rally);
+    lob(M, b, p.x * 0.9, p.y * 0.9, 1.2, 3.0); M.recv[T] = p.id; M.assignT = M.t; M.shot = null;
+    var bonus = held >= STALL_MIN ? 3 : 0; juggleTouch(M, p, bonus ? 'stall' : 'foot'); if (bonus) D.score += bonus;   /* a short hold = a normal foot touch */
+    ev(M, 'stallUp', { p: p.id, team: T, t: Math.round(held * 100) / 100, pts: bonus, score: D.score });
+  }
   function hoopTouch(M, p, key) {
     if (M.drill) key = 'touch';   // 🤹 Keepy-up: every touch keeps it up (no hoop)
     var b = M.ball, T = p.team, style = hoopStyle(M, p, key), person = isPerson(p);
     if (M.lastP === p.id && M.t - b.hitT < 0.3) return null;
+    if (M.stall) return null;   /* 🦶 pd-9c stall start */
+    if (M.drill && person && p.hold != null && M.t - p.hold >= STALL_PRE && style === 'foot' && p.z === 0) { M.stall = { p: p.id, t0: M.t, t: 0 }; b.vx = b.vy = b.vz = 0; p.act = 'dig'; p.actT = 9; p.want = null; b.hitT = M.t; M.lastP = p.id; M.lastTeam = T; ev(M, 'stall', { p: p.id, team: T }); return 'stall'; }
     var q = clamp(1 - hyp(b.x - p.x, b.y - p.y) / 1.2, 0, 1);
     p.act = key === 'touch' ? (style === 'head' ? 'set' : style === 'foot' ? 'dig' : 'bump') : style === 'heel' ? 'dink' : 'dunk'; p.actT = 0; p.style = style === 'bicycle' ? 'bicycle' : null; p.want = null; p.st.touches++;
     b.hitT = M.t; M.lastP = p.id; M.lastTeam = T; M.n = Math.min(3, M.n + 1); M.combo++; M.rally++; M.rallyMax = Math.max(M.rallyMax, M.rally);
@@ -1418,6 +1429,7 @@ var PD = (function () {
     if (key === 'jump') { if (p.z > 0 || M.phase !== 'rally') return false; p.vz = JUMPV; ev(M, 'jump', { p: p.id }); return true; }
     if (key === 'dive') { if (M.phase !== 'rally' || p.z > 0) return false; p.lunge = 0.3; p.want = { key: 'touch', t: 0.5 }; ev(M, 'diveGo', { p: p.id }); return true; }   // 🤸 a quick lunge to the ball
     if (key !== 'touch' && key !== 'drive' && key !== 'dink') return false;
+    if (key === 'touch' && M.drill && isPerson(p) && p.hold == null) p.hold = M.t;   /* 🦶 pd-9c hold: when 🦵 went down */
     if (M.phase === 'serve') { if (M.ball.held === p.id && M.phaseT > 0.2) { hoopLaunch(M); return true; } return false; }
     if (M.phase !== 'rally') return false;
     p.want = { key: key, t: 0.42 }; return true;
@@ -1444,6 +1456,7 @@ var PD = (function () {
     // people + robots move: the receiver runs under the ball, the others go back to their seat
     var land = M.phase === 'rally' ? predict(M, 1.15).at : null;
     M.players.forEach(function (p) {
+      if (M.stall && M.stall.p === p.id && hyp(p.input.x, p.input.y) <= 0.15) { p.vx = p.vy = 0; p.walkT = 0; return; }   /* 🦶 pd-9c stand */
       var h = hoopHome(M, p), tx = h.x, ty = h.y, sp = 3.4 * Math.max(0.85, lv.spd);
       if (p.team === M.turn && M.phase === 'rally' && M.recv[p.team] === p.id && land) { tx = land.x; ty = land.y; var d0 = hyp(tx, ty); if (d0 > RING + 0.6) { tx *= (RING + 0.6) / d0; ty *= (RING + 0.6) / d0; } if (d0 < RING - 1.4) { var k0 = (RING - 1.4) / Math.max(0.01, d0); tx *= k0; ty *= k0; } }
       var person = isPerson(p), vx = 0, vy = 0;
@@ -1473,6 +1486,10 @@ var PD = (function () {
       if (shoot && p.meter >= PYRA_COST && M.rnd() < 0.4) { p.pyraArm = true; p.spiritArm = p.meter >= SPIRIT_COST && M.level >= 1; if (p.spiritArm && M.level >= 2) armTeam(M, p); }
       hoopTouch(M, p, shoot ? (p.z > 0.3 ? 'drive' : M.rnd() < 0.15 * lv.bot.smart ? 'dink' : 'drive') : 'touch');
     });
+    if (M.stall) { var stp = byId(M, M.stall.p);   /* 🦶 pd-9c on the sole */
+      if (!stp || M.phase !== 'rally') M.stall = null;
+      else { M.stall.t += dt; b.x = stp.x + 0.15 * (stp.dir || 1); b.y = stp.y; b.z = stp.z + 0.55; b.vx = b.vy = b.vz = 0;
+        if (stp.hold == null || M.stall.t >= STALL_MAX) stallUp(M, stp); else return; } }
     // ball flight + the hoop
     var pz = b.z, px = b.x, py = b.y, g = ballG(M);
     b.vz -= g * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
@@ -1507,7 +1524,7 @@ var PD = (function () {
     if (M.phase === 'serve') { var tp = byId(M, M.ball.held); if (tp && isPerson(tp)) return { p: tp.id, key: 'touch', why: 'htoss', reach: true }; return null; }
     if (M.phase !== 'rally' || M.shot) return null;
     var h = byId(M, M.recv[M.turn]); if (!h || !isPerson(h)) return null;
-    if (M.drill) return { p: h.id, key: 'touch', why: 'jkeep', reach: hoopReach(M, h) };   // 🤹 keepy-up: always keep it up
+    if (M.drill) return M.stall ? null : { p: h.id, key: 'touch', why: 'jkeep', reach: hoopReach(M, h) };   /* 🦶 pd-9c: the stall is yours to time */   // 🤹 keepy-up: always keep it up
     var key = M.combo >= 2 ? 'drive' : 'touch';
     return { p: h.id, key: key, why: key === 'drive' ? 'hshoot' : 'hpass', reach: hoopReach(M, h) };
   }
@@ -1850,7 +1867,7 @@ var PD = (function () {
   }
 
   return { DT: DT, ARENA_GRAV: ARENA_GRAV, MODES: MODES, MODE_ORDER: MODE_ORDER, LEVELS: LEVELS, FILL: FILL, PYRA_COST: PYRA_COST, METER_MAX: METER_MAX, ROLE_ICON: ROLE_ICON, ROLE_NAME: ROLE_NAME, STRIKE_NAME: STRIKE_NAME, actName: actName, isStrike: isStrike, ACT_NAME: ACT_NAME,
-    pyraName: pyraName, SPIRITS: SPIRITS, SPIRITS_DUO: SPIRITS_DUO, SPIRITS_TRIO: SPIRITS_TRIO, armTeam: armTeam, SPIRIT_COST: SPIRIT_COST, spiritGo: spiritGo, slotOf: slotOf, newMatch: newMatch, control: control, bodyOf: bodyFor, driverOf: driverOf, ctlHome: ctlHome, hitterFor: hitterFor, hoopPassTo: hoopPassTo, dinkSpot: dinkSpot, CTL_SPORT: CTL_SPORT, step: step, tick: tick, input: input, press: press, release: release, takeEvents: takeEvents, simulate: simulate,
+    STALL_MAX: STALL_MAX, STALL_MIN: STALL_MIN, STALL_PRE: STALL_PRE, stallUp: stallUp, pyraName: pyraName, SPIRITS: SPIRITS, SPIRITS_DUO: SPIRITS_DUO, SPIRITS_TRIO: SPIRITS_TRIO, armTeam: armTeam, SPIRIT_COST: SPIRIT_COST, spiritGo: spiritGo, slotOf: slotOf, newMatch: newMatch, control: control, bodyOf: bodyFor, driverOf: driverOf, ctlHome: ctlHome, hitterFor: hitterFor, hoopPassTo: hoopPassTo, dinkSpot: dinkSpot, CTL_SPORT: CTL_SPORT, step: step, tick: tick, input: input, press: press, release: release, takeEvents: takeEvents, simulate: simulate,
     canReach: canReach, doTouch: doTouch, sparkTouch: sparkTouch, sparkTick: sparkTick, sparkReach: sparkReach, sparkPredict: sparkPredict, SPARK: SPARK, isSpark: isSpark, noHands: noHands, hoopTouch: hoopTouch, hoopTick: hoopTick, hoopReach: hoopReach, HOOP: { Z: HOOP_Z, R: HOOP_R, RING: RING, PTS: HOOP_PTS, NAME: HOOP_NAME, T: HOOP_T, UP: FEED_UP }, serve: serve, feedServe: feedServe, feederOf: feederOf, feedSpot: feedSpot, circleSpot: circleSpot, jumpServe: jumpServe, botServe: botServe, startServe: startServe, predict: predict, assign: assign, nextNOf: nextNOf, fill: fill, isPerson: isPerson, uOf: uOf, sgn: sgn, baseOf: baseOf, guideFor: guideFor,
     BALL_R: BALL_R, DRILL: DRILL, PARTY: PARTY, zoneRect: zoneRect, drillEnd: drillEnd, partyTick: partyTick, SPIRIT: null };   // 🔥🔥 SPIRIT = R2 hook: Spirit Dive supers (full meter) plug in here
 })();
@@ -2297,7 +2314,7 @@ function drawLeaders(el){
 function markModes(){ const k = curMode(), m = modeInfo(k); $('mode-list').querySelectorAll('.ui-mbtn').forEach(b => b.classList.toggle('on', b.dataset.k === k)); $('level-head').textContent = 'Pick a level — ' + m.icon + ' ' + m.name; }
 /* 🎯 pd-4a: level cards + setup lines for the drills and 🌀 Spark Party */
 const DRILL_BLURB = ['The ball waits for you — press the glowing button.', 'A bit faster. Lots of aim help.', 'Normal speed. A little aim help.', 'Fast — aim it yourself.', 'Faster, smaller zones.', 'Fastest. ×3 points.'];
-const DRILL_GOAL = {zone: '🎯 Hit the glowing zone = 3 · any hit on their half = 1', combo: '🔗 Trap → Pop → ⚡ Smash = 5 · 3 touches = 2 · any return = 1', run: '🏃 Every return = 1 · the ball gets faster · a miss costs a ❤️', juggle: '🤹 Every touch = 1 · switch foot / knee / head = +1 · every 10 in a row = +5'};
+const DRILL_GOAL = {zone: '🎯 Hit the glowing zone = 3 · any hit on their half = 1', combo: '🔗 Trap → Pop → ⚡ Smash = 5 · 3 touches = 2 · any return = 1', run: '🏃 Every return = 1 · the ball gets faster · a miss costs a ❤️', juggle: '🤹 Every touch = 1 · switch foot / knee / head = +1 · every 10 in a row = +5 · hold 🦵 on a low ball = 🦶 sole stall +3'};
 function levelGoal(mode, i){ if(mode === 'cups') mode = SET.cup || 'cupfour'; if(CUPS[mode]) return CUPS[mode].n + ' teams · ' + Math.log2(CUPS[mode].n) + ' wins = 🏆 · first to ' + CUP_TARGET[i]; const m = PD.MODES[mode], L = PD.LEVELS[i]; if(m.drill){ const D = PD.DRILL[m.drill]; return [D.time ? '⏱️ ' + D.time[i] + ' s' : '', D.lives ? '❤️ ' + D.lives[i] : '', '⭐ ' + D.stars[i].join(' / ')].filter(Boolean).join(' · '); }
   if(m.party) return 'first to ' + PD.PARTY.target[i] + ' · ' + PD.PARTY.balls[i] + ' extra balls'; return L.sets === 3 ? 'best of 3 sets to ' + L.target : 'first to ' + L.target; }
 function levelBlurb(mode, i){ if(CUPS[mode] || mode === 'cups') return LEVEL_UI[i].blurb.replace(/ (First to|Best of) [^.]*\./, ''); const m = PD.MODES[mode]; return m.drill ? DRILL_BLURB[i] : LEVEL_UI[i].blurb; }
@@ -2472,13 +2489,14 @@ function startMatch(){
   else if(cupOn) banner(CUPS[SET.cupState.k].icon + ' ' + cupRoundName(SET.cupState) + ' · ' + PD.MODES[SET.mode].icon + ' first to ' + M.target, 'gold', 2400);
   else banner(PD.MODES[SET.mode].icon + ' ' + PD.MODES[SET.mode].name + ' · ' + (M.drill ? levelGoal(SET.mode, SET.level).split(' · ⭐')[0] + ' · ' + DRILL_GOAL[M.drill.k].split(' · ')[0] : M.setsTo > 1 ? 'best of 3 sets to ' + M.target : 'first to ' + M.target), 'good', 2400);
   cheerMount(); /* 📣 cs-pd */
+  calloutSetup(); /* 💬 pd-9a */
   startLoop();
 }
 function startLoop(){ stopLoop(); G.last = performance.now(); const f = ts => { RAF = requestAnimationFrame(f); frame(ts); }; RAF = requestAnimationFrame(f); }
 function stopLoop(){ if(RAF) cancelAnimationFrame(RAF); RAF = 0; }
 function setPaused(on){ if(!G || G.over) return; G.paused = !!on; if(window.Cheer) Cheer.pause(G.paused); /* 📣 cs-pd */ if(!on) G.last = performance.now(); }
 function pauseGame(){ setPaused(true); }
-function leavePlay(){ if(window.Cheer) Cheer.unmount(); stopLoop(); if(G) G.over = true; G = null; if(SET.cupState && SET.cup){ SET.mode = SET.cupState.sportBack || SET.mode; } SET.cupState = null; freeSprites(); hideResult(); $('pads').innerHTML = ''; renderMenu(); showScreen('menu'); }
+function leavePlay(){ if(window.Cheer) Cheer.unmount(); /* 💬 pd-9a off */ calloutOff(); stopLoop(); if(G) G.over = true; G = null; if(SET.cupState && SET.cup){ SET.mode = SET.cupState.sportBack || SET.mode; } SET.cupState = null; freeSprites(); hideResult(); $('pads').innerHTML = ''; renderMenu(); showScreen('menu'); }
 function frame(ts){
   if(!G) return;
   let dt = Math.min(0.1, Math.max(0, (ts - G.last) / 1000)); G.last = ts;
@@ -2511,30 +2529,30 @@ function handleEvents(list){
     switch(e.k){
       case 'serve': snd('whoosh'); spark(b.x, b.y, b.z, e.pyra ? '#FF6B1A' : '#FFFFFF', e.kind === 'jump' ? 16 : 10);
         if(M.drill) break;   // 🧑‍🏫 the Coach's feeds need no words
-        if(e.kind === 'kick') floatWord('🦶 Kick serve!', b.x, b.y, b.z, '#FFFFFF');
-        else if(e.kind === 'jump'){ floatWord(PD.isStrike(M) ? '🦵 Power kick!' : '🦘 Jump serve!', b.x, b.y, b.z, '#FFE14A'); if(FX) G.shake = 0.1; } else if(e.kind === 'pinch') floatWord(PD.isStrike(M) ? '🦶 Tip serve' : '🤏 Pinch serve', b.x, b.y, b.z, '#E6D3FF'); break;
+        if(e.kind === 'kick') floatSay('🦶 Kick serve!', p, 'small', b.x, b.y, b.z, '#FFFFFF');
+        else if(e.kind === 'jump'){ floatSay(PD.isStrike(M) ? '🦵 Power kick!' : '🦘 Jump serve!', p, 'good', b.x, b.y, b.z, '#FFE14A'); if(FX) G.shake = 0.1; } else if(e.kind === 'pinch') floatSay(PD.isStrike(M) ? '🦶 Tip serve' : '🤏 Pinch serve', p, 'small', b.x, b.y, b.z, '#E6D3FF'); break;
       case 'serveToss': snd('tap'); break;
       case 'bump': case 'set': case 'dig': case 'dive': case 'dunk': case 'dink': case 'drive':
         if(p) p.style = e.style || null;
         snd(e.k === 'dunk' || e.k === 'drive' ? 'drop' : 'bump'); spark(b.x, b.y, b.z, e.k === 'dunk' ? '#FFB627' : '#FFFFFF', e.k === 'dunk' ? 16 : 8);
-        if(p) floatWord(wordOf(M, e) + (e.over && e.k !== 'dunk' ? ' over!' : ''), p.x - PD.sgn(p.team) * 0.4, p.y, p.z + 2.2, TEAM_COL[e.team]);   // over the player, so the ball flies clear of the word
+        if(p) floatSay(wordOf(M, e) + (e.over && e.k !== 'dunk' ? ' over!' : ''), p, e.k === 'dunk' ? 'good' : 'small', p.x - PD.sgn(p.team) * 0.4, p.y, p.z + 2.2, TEAM_COL[e.team]);   // over the player, so the ball flies clear of the word
         if(e.k === 'dunk' && FX){ G.shake = 0.18; }
-        if(p && p.human && G.locals.length === 1 && (e.k === 'dig' || e.k === 'dive')) bigWord(e.k === 'dive' ? 'DIVE SAVE!' : 'GREAT DIG!');
+        if(p && p.human && G.locals.length === 1 && (e.k === 'dig' || e.k === 'dive')) bigWord(e.k === 'dive' ? 'DIVE SAVE!' : 'GREAT DIG!', '', '', p, 'good');
         break;
-      case 'pyra': snd('unlock'); spark(b.x, b.y, b.z, '#FF6B1A', 26); bigWord(e.name + '!', 'pyra', p ? p.name : ''); break;
-      case 'block': snd('bump'); floatWord(e.stuff ? '🧱 STUFF!' : '🧱 Block', b.x, b.y, b.z + 0.5, TEAM_COL[e.team]); if(e.stuff && FX) G.shake = 0.15; break;
-      case 'net': floatWord('🥅 Net!', b.x, b.y, b.z + 0.4, '#FFFFFF'); snd('bump'); break;
-      case 'tape': floatWord('😮 Tape!', b.x, b.y, b.z + 0.4, '#FFE14A'); break;
+      case 'pyra': snd('unlock'); spark(b.x, b.y, b.z, '#FF6B1A', 26); bigWord(e.name + '!', 'pyra', p ? p.name : '', p, 'big'); break;
+      case 'block': snd('bump'); floatSay(e.stuff ? '🧱 STUFF!' : '🧱 Block', p, e.stuff ? 'good' : 'small', b.x, b.y, b.z + 0.5, TEAM_COL[e.team]); if(e.stuff && FX) G.shake = 0.15; break;
+      case 'net': floatSay('🥅 Net!', {world: [b.x, b.y, b.z + 0.4]}, 'small', b.x, b.y, b.z + 0.4, '#FFFFFF'); snd('bump'); break;
+      case 'tape': floatSay('😮 Tape!', {world: [b.x, b.y, b.z + 0.4]}, 'small', b.x, b.y, b.z + 0.4, '#FFE14A'); break;
       // ⚡ PyraSpark
       case 'bounce': snd('tap'); spark(e.x, e.y, PD.SPARK.Z + 0.05, '#BFE3FF', 4); break;
-      case 'edge': snd('unlock'); bigWord('💥 EDGE!', 'pyra', p ? p.name : ''); spark(e.x, e.y, PD.SPARK.Z + 0.05, '#FFE14A', 22); if(FX) G.shake = 0.1; break;
+      case 'edge': snd('unlock'); bigWord('💥 EDGE!', 'pyra', p ? p.name : '', p, 'good'); spark(e.x, e.y, PD.SPARK.Z + 0.05, '#FFE14A', 22); if(FX) G.shake = 0.1; break;
       case 'serveMiss': banner('🔁 Missed serve — 2nd try!', 'good', 1300); break;
       case 'serveChange': banner('🔄 Serve changes — ' + teamName(e.team) + ' serve', 'good', 1300); break;
       case 'partnerHint': if(p) floatWord('🤝 Partner first!', p.x, p.y, 2.2, '#FFFFFF'); break;
-      case 'out': floatWord('🚫 Out!', b.x, b.y, 0.6, '#FF8080'); break;
-      case 'ace': bigWord('ACE!', '', nameOf(e.p)); break;
-      case 'kill': if(isLocal(e.p)) bigWord('KILL!', '', nameOf(e.p)); break;
-      case 'stuff': bigWord('STUFF BLOCK!', '', nameOf(e.p)); break;
+      case 'out': floatSay('🚫 Out!', {world: [b.x, b.y, 0.6]}, 'small', b.x, b.y, 0.6, '#FF8080'); break;
+      case 'ace': bigWord('ACE!', '', nameOf(e.p), e.p, 'big'); break;
+      case 'kill': if(isLocal(e.p)) bigWord('KILL!', '', nameOf(e.p), e.p, 'big'); break;
+      case 'stuff': bigWord('STUFF BLOCK!', '', nameOf(e.p), e.p, 'big'); break;
       case 'fault': banner('😬 ' + (WHY[e.why] || e.why) + ' → point ' + teamName(1 - e.team), 'bad', 1800); snd('error'); break;
       case 'point': {
         const mine = G.locals.some(q => q.team === e.team) && !(G.who === 'duo');
@@ -2546,40 +2564,42 @@ function handleEvents(list){
       case 'spirit': spiritShow(e); break;
       case 'teamSpirit': banner((e.tier === 'trio' ? '🔥🔥×3 TRIO' : '🔥🔥×2 DUO') + ' Spirit ready — ' + (e.tier === 'trio' ? 'dig → set → spike = a Combo (point ×2), or block!' : 'your next Dunk, Dink or Block!'), 'gold', 2400); snd('unlock'); break;
       case 'spiritCombo': if(p) floatWord('🔥 ' + e.step + (e.step === 1 ? ' · Dig' : ' · Set'), p.x, p.y, 2.5, '#FF7AB6'); break;
-      case 'double': bigWord('×2 POINT!', 'pyra', teamName(e.team)); barScore(); break;
+      case 'double': bigWord('×2 POINT!', 'pyra', teamName(e.team), {team: e.team}, 'big'); barScore(); break;
       case 'pyraArm': if(isLocal(e.p)) { snd(e.on ? 'unlock' : 'tap'); floatWord(e.on ? (e.spirit ? '🔥🔥 Spirit ready!' : '🔥 Flame on!') : 'Flame off', p.x, p.y, 2.4, e.spirit ? '#FF7AB6' : '#FFB627'); } break;
       case 'pyraLow': if(isLocal(e.p)) floatWord('🔥 Fill half the flame first', p.x, p.y, 2.4, '#FFB627'); break;
       case 'setPoint': banner('⚡ Set point ' + teamName(e.team) + '!', 'gold', 1600); break;
       case 'matchPoint': banner('🏆 Match point ' + teamName(e.team) + '!', 'gold', 1600); break;
-      case 'setWon': G.setScores.push(e.score); bigWord('SET ' + teamName(e.team).toUpperCase() + '!', '', e.score.join(' – ')); barScore(); break;
+      case 'setWon': G.setScores.push(e.score); bigWord('SET ' + teamName(e.team).toUpperCase() + '!', '', e.score.join(' – '), {team: e.team}, 'big', true); barScore(); break;
       case 'newSet': banner('🏐 Set ' + e.n + '!', 'good', 1500); barScore(); break;
-      case 'longRally': if(e.n % 5 === 0) floatWord('🔁 Rally ×' + e.n + '!', 0, -G.M.W / 2, G.M.netH + 1.2, '#FFE14A'); break;
+      case 'longRally': if(e.n % 5 === 0) floatSay('🔁 Rally ×' + e.n + '!', {world: [b.x, b.y, b.z]}, 'good', 0, -G.M.W / 2, G.M.netH + 1.2, '#FFE14A'); break;
       case 'control': { const fr = G.M.players[e.from]; if(fr && G.locals.some(l => l.own === e.h)){ G.ctlFx = {x: fr.x, y: fr.y, to: e.to, t0: performance.now()}; if(e.why !== 'home') snd('tap'); } break; }   /* 🎮 pd-8a */
       case 'serveTurn': if(isLocal(e.p) && G.locals.length === 1) banner('🚀 Your turn to serve!', 'good', 1600); break;   /* 🚀 pd-8a */
       case 'rotate': floatWord('🔄 Rotate!', PD.sgn(e.team) * G.M.L * 0.5, 0, 2.6, TEAM_COL[e.team]); break;
       case 'whiff': if(isLocal(e.p)) floatWord('💨', p.x, p.y, 2.2, '#FFFFFF'); break;
       case 'match': finishSoon(); break;
       // ⭕ hoop takraw
-      case 'hpass': snd('bump'); if(p) floatWord('🦵 ' + e.name + (e.combo >= 3 ? ' ×' + e.combo : ''), p.x, p.y, p.z + 2.2, TEAM_COL[e.team]); break;
-      case 'hshot': snd('drop'); if(p) floatWord('⭕ ' + e.name + '!', p.x, p.y, p.z + 2.3, '#FFE14A'); break;
-      case 'hoop': snd('unlock'); spark(0, 0, PD.HOOP.Z, e.spirit ? '#FF4D8D' : '#FFE14A', 30); bigWord('⭕ HOOP! +' + e.pts, e.pyra ? 'pyra' : '', (p ? p.name + ' · ' : '') + e.name); if(FX) G.shake = 0.12; barScore(); break;
-      case 'rim': snd('bump'); floatWord('😮 Rim!', b.x, b.y, b.z + 0.4, '#FFFFFF'); break;
-      case 'drop': floatWord('💨 Dropped', b.x, b.y, 0.8, '#FF8080'); break;
-      case 'miss': floatWord('Missed', b.x, b.y, 0.8, '#FFFFFF'); break;
+      case 'hpass': snd('bump'); if(p) floatSay('🦵 ' + e.name + (e.combo >= 3 ? ' ×' + e.combo : ''), p, e.combo >= 3 ? 'good' : 'small', p.x, p.y, p.z + 2.2, TEAM_COL[e.team]); break;
+      case 'hshot': snd('drop'); if(p) floatSay('⭕ ' + e.name + '!', p, 'small', p.x, p.y, p.z + 2.3, '#FFE14A'); break;
+      case 'hoop': snd('unlock'); spark(0, 0, PD.HOOP.Z, e.spirit ? '#FF4D8D' : '#FFE14A', 30); bigWord('⭕ HOOP! +' + e.pts, e.pyra ? 'pyra' : '', (p ? p.name + ' · ' : '') + e.name, p, 'big'); if(FX) G.shake = 0.12; barScore(); break;
+      case 'rim': snd('bump'); floatSay('😮 Rim!', {world: [b.x, b.y, b.z + 0.4]}, 'small', b.x, b.y, b.z + 0.4, '#FFFFFF'); break;
+      case 'drop': floatSay('💨 Dropped', {world: [b.x, b.y, 0.8]}, 'small', b.x, b.y, 0.8, '#FF8080'); break;
+      case 'miss': floatSay('Missed', {world: [b.x, b.y, 0.8]}, 'small', b.x, b.y, 0.8, '#FFFFFF'); break;
       case 'hoopTurn': if(M.drill){ banner('🤹 Keep it up! ⏱️ ' + e.time + ' s', 'good', 2000); barScore(); break; } banner(teamName(e.team) + (G.locals.some(q => q.team === e.team) ? ' — your turn! ' : '\'s turn · ') + '⏱️ ' + e.time + ' s', 'good', 2200); barScore(); hoopSkipBtn(); break;
       // 🎯 drills + 🌀 Spark Party (pd-4a)
       case 'drillStart': barScore(); break;
       case 'zone': if(FX) spark(e.rect.u0 + (e.rect.u1 - e.rect.u0) / 2, (e.rect.v0 + e.rect.v1) / 2, PD.SPARK.Z + 0.05, '#FFE14A', 8); break;
       case 'drillHit': {
         const col = e.kind === 'zone' || e.kind === 'combo' ? '#FFE14A' : '#FFFFFF', pp = p || G.locals[0];
-        if(isHoop(M)){ if(e.kind === 'switch' || e.streak % 10 === 0) floatWord('+' + e.pts + (e.streak % 10 === 0 ? ' · ' + e.streak + ' in a row!' : ' switch!'), pp.x, pp.y, pp.z + 2.7, '#FFE14A'); if(e.streak % 10 === 0){ snd('unlock'); bigWord(e.streak + ' IN A ROW!', 'pyra', '+5'); } }
+        if(isHoop(M)){ if(e.kind === 'switch' || e.streak % 10 === 0) floatWord('+' + e.pts + (e.streak % 10 === 0 ? ' · ' + e.streak + ' in a row!' : ' switch!'), pp.x, pp.y, pp.z + 2.7, '#FFE14A'); if(e.streak % 10 === 0){ snd('unlock'); bigWord(e.streak + ' IN A ROW!', 'pyra', '+5', pp, 'good'); } }
         else { floatWord('+' + e.pts + (e.kind === 'zone' ? ' 🎯 ZONE!' : e.kind === 'combo' ? ' 🔗 COMBO!' : e.kind === 'three' ? ' · 3 touches' : ''), e.x, e.y, PD.SPARK.Z + 0.9, col); spark(e.x, e.y, PD.SPARK.Z + 0.05, col, e.kind === 'hit' || e.kind === 'return' ? 6 : 20);
           if(e.kind === 'zone' || e.kind === 'combo') snd('success'); else snd('tap');
-          if(e.kind === 'combo') bigWord('🔗 COMBO!', 'pyra', '+5'); else if(e.kind === 'return' && e.streak % 5 === 0) bigWord('🏃 ' + e.streak + ' in a row!', '', 'faster…'); }
+          if(e.kind === 'combo') bigWord('🔗 COMBO!', 'pyra', '+5', pp, 'good'); else if(e.kind === 'return' && e.streak % 5 === 0) bigWord('🏃 ' + e.streak + ' in a row!', '', 'faster…', pp, 'good'); }
         barScore(); break; }
       case 'drillMiss': snd('drop'); banner(pdPick(['💨 Missed — the Coach feeds another one', '😅 So close — next one!', '💪 Again!']), '', 1100); barScore(); break;
       case 'drillLife': snd('error'); banner(e.lives > 0 ? '💔 Missed! ❤️ ' + e.lives + ' left' : '💔 No lives left!', 'bad', 1300); barScore(); break;
       case 'drillCoachMiss': floatWord('🧑‍🏫 Oops!', PD.SPARK.L, 0, 2.3, '#FFFFFF'); barScore(); break;
+      case 'stall': snd('tap'); if(p) floatWord('🦶 Stall…', p.x, p.y, 2.3, '#BFE3FF'); break;   /* 🦶 pd-9c */
+      case 'stallUp': if(e.pts){ snd('unlock'); if(p){ floatWord('🦶 Sole stall! +' + e.pts, p.x, p.y, 2.7, '#FFE14A'); spark(M.ball.x, M.ball.y, M.ball.z, '#FFE14A', 14); } bigWord('🦶 SOLE STALL!', 'pyra', '+' + e.pts, p, 'good'); } else snd('bump'); barScore(); break;
       case 'drillEnd': barScore(); finishSoon(); break;
       case 'partyDrop': snd('pop'); break;
       case 'partyBounce': snd('tap'); break;
@@ -2713,7 +2733,34 @@ function hoopSkipBtn(){
   if(!b){ b = document.createElement('button'); b.id = 'hoop-skip'; b.className = 'sp-btn sp-secondary sp-sm hoop-skip'; b.textContent = '⏭ Skip the robots\' turn'; $('stage').appendChild(b);
     b.onclick = () => { const M2 = G.M, t0 = M2.turn; let n = 0; while(!M2.over && M2.turn === t0 && n++ < 30 * 200){ PD.step(M2, 1 / 30); handleEvents(PD.takeEvents(M2).filter(e => e.k !== 'hoop' && e.k !== 'spirit' && e.k !== 'pyra' || e.k === 'match')); } barScore(); hoopSkipBtn(); }; }
 }
-function bigWord(text, cls, sub){ if(!FX) return; const host = $('bigword-host'); host.innerHTML = ''; const d = document.createElement('div'); d.className = 'big-word ' + (cls || ''); d.innerHTML = UI.esc(text) + (sub ? '<small>' + UI.esc(sub) + '</small>' : ''); host.appendChild(d); setTimeout(() => d.remove(), 1100); }
+/* 💬 pd-9a: words during play (UiKit UI.callout) — the court, the people and the ball stay clear; fans on #court can say it */
+function pdCall(text, who, rank, stopped){ if(!FX || !G || !(window.UI && UI.callout && UI.callout.active())) return false; UI.callout(text, {who: who == null ? undefined : who, rank: rank || undefined, stopped: !!stopped}); return true; }
+function floatSay(text, who, rank, x, y, z, col){ if(pdCall(text, who, rank)) return; floatWord(text, x, y, z, col); }
+function calloutSetup(){ if(!(window.UI && UI.callout) || !G) return;
+  const scr = (x, y, z) => { if(!G || !V) return null; const c = $('court').getBoundingClientRect(), q = P(x, y, z || 0); return {x: c.left + q[0], y: c.top + q[1], s: q[2]}; };
+  const me = () => G && G.locals[0] ? (PD.bodyOf(G.M, G.locals[0]) || G.locals[0]) : null;
+  const pl = w => { if(!G) return null; if(typeof w === 'number') return G.M.players[w] || null; if(w && w.team != null && w.x != null && w.id != null) return w; return null; };
+  const kOf = q => 1.55 * V.k * q.s / 70;   /* the avatar scale the court painter uses */
+  const box = pp => { const f = scr(pp.x, pp.y, 0); if(!f) return null; const k = kOf(f), lift = (typeof airZ === 'function' ? airZ(G.M, pp) : (pp.z || 0)) * 45 * k; return {l: f.x - Math.max(34 * k, 30), r: f.x + Math.max(34 * k, 30), t: f.y - lift - 96 * k - 54, b: f.y + 8 * k}; };   /* + the name tag, 🎮 You and the role icons over the head */
+  const floor = () => { if(!G || !V) return null; const M = G.M, L = M.L, Wh = M.W / 2, Q = [scr(-L, -Wh), scr(L, -Wh), scr(L, Wh), scr(-L, Wh)]; return Q.some(q => !q) ? null : Q; };
+  UI.callout.setup({
+    get me(){ return me(); },
+    at: w => { if(!G) return null; if(w && w.world){ const q = scr(w.world[0], w.world[1], w.world[2]); return q ? {x: q.x, y: q.y - 10} : null; }
+      const pp = pl(w) || me(); if(!pp) return null; const b = box(pp); return b ? {x: (b.l + b.r) / 2, y: b.t + 40} : null; },   /* the tag sits just over the head, under the name */
+    side: w => { if(w && w.team != null) return w.team; const pp = pl(w) || me(); return pp ? pp.team : null; },
+    crowd: () => $('court'),
+    poly: () => { const Q = floor(); return Q ? Q.map(q => [q.x, q.y]) : null; },
+    inside: (x, y) => { const Q = floor(); if(!Q) return false; let ins = false;
+      for(let i = 0, j = 3; i < 4; j = i++){ const a = Q[i], b = Q[j]; if(((a.y > y) !== (b.y > y)) && (x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x)) ins = !ins; } return ins; },
+    keep: () => { if(!G || !V) return []; const out = [];
+      G.M.players.forEach(pp => { const b = box(pp); if(b) out.push(b); });
+      const ba = G.M.ball; if(ba){ const q = scr(ba.x, ba.y, ba.z || 0), g0 = scr(ba.x, ba.y, 0); if(q) out.push({l: q.x - 24, r: q.x + 24, t: q.y - 24, b: Math.max(q.y, g0 ? g0.y : q.y) + 12}); }
+      const c0 = $('court').getBoundingClientRect(); if(G.M.phase === 'rally' || G.M.phase === 'serve') PD_CNTS.forEach(q => { if(q) out.push({l: c0.left + q[0] - q[2] * 3.6, r: c0.left + q[0] + q[2] * 3.6, t: c0.top + q[1] - q[2] - 3, b: c0.top + q[1] + q[2] + 3}); });
+      if(isHoop(G.M)){ const h = scr(0, 0, PD.HOOP.Z); if(h) out.push({l: h.x - 40, r: h.x + 40, t: h.y - 40, b: h.y + 30}); }
+      return out; }
+  }); }
+function calloutOff(){ if(window.UI && UI.callout) UI.callout.setup(null); }
+function bigWord(text, cls, sub, who, rank, stopped){ if(!FX) return; /* 💬 pd-9a bigWord */ if(pdCall(text, who, rank || 'big', stopped)) return; const host = $('bigword-host'); host.innerHTML = ''; const d = document.createElement('div'); d.className = 'big-word ' + (cls || ''); d.innerHTML = UI.esc(text) + (sub ? '<small>' + UI.esc(sub) + '</small>' : ''); host.appendChild(d); setTimeout(() => d.remove(), 1100); }
 function floatWord(text, x, y, z, col){ if(!G) return; const near = G.words.filter(w => w.t < 0.8 && Math.abs(w.x - x) < 1.6).length; G.words.push({text, x, y, z: z + 0.5 + near * 0.55, col, t: 0}); if(G.words.length > 12) G.words.shift(); }   // above the ball, stacked when they bunch up
 function spark(x, y, z, col, n){ if(!G || !FX) return; for(let i = 0; i < n; i++){ const a = Math.random() * Math.PI * 2, s = 1 + Math.random() * 3; G.fx.push({x, y, z, vx: Math.cos(a) * s, vy: Math.sin(a) * s * 0.5, vz: 1 + Math.random() * 3, t: 0, life: 0.4 + Math.random() * 0.3, col}); } if(G.fx.length > 160) G.fx.splice(0, G.fx.length - 160); }
 
@@ -2734,7 +2781,7 @@ document.addEventListener('keydown', e => {
     PD.press(G.M, p.id, a); flashBtn(p.id, a); });
 });
 document.addEventListener('keyup', e => {
-  if(!G) return; keySeat(e.code).forEach(([s, a]) => { G.keysDown.delete(s + ':' + a); const p = seatPlayer(s); if(p && a === 'drive') PD.release(G.M, p.id, 'drive'); });
+  if(!G) return; keySeat(e.code).forEach(([s, a]) => { G.keysDown.delete(s + ':' + a); const p = seatPlayer(s); if(p && (a === 'drive' || a === 'touch')) PD.release(G.M, p.id, a); });   /* 🦶 pd-9c: 🦵 too (keepy-up sole stall) */
 });
 window.addEventListener('blur', () => { if(G) G.keysDown.clear(); });
 function readInput(){
@@ -2764,7 +2811,7 @@ function buildPads(){
         b.classList.remove('flash'); void b.offsetWidth; b.classList.add('down', 'flash'); if(navigator.vibrate) try{ navigator.vibrate(8); }catch(err){}
         if(b.dataset.a === 'dive') readInput();
         PD.press(G.M, p.id, b.dataset.a); });
-      const up = () => { b.classList.remove('down'); if(G && b.dataset.a === 'drive') PD.release(G.M, p.id, 'drive'); };
+      const up = () => { b.classList.remove('down'); if(G && (b.dataset.a === 'drive' || b.dataset.a === 'touch')) PD.release(G.M, p.id, b.dataset.a); };   /* 🦶 pd-9c */
       b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up);
     });
     const T = UI.stickTracker(st, {player: p.name, av: p.av, buttons: pad}), kn = st.querySelector('.knob'), SS = {id: null, v: null};
@@ -3269,7 +3316,8 @@ function beatPose(M, p){
   else if(feetOn(M)){   // 🦶 pd-6c
     const fk = p.act && p.actT < 0.15 ? feetKeyOf(p) : null, hoop = isHoop(M), b = M.ball, held = B.cap != null;
     // 1 · the real touch: contact = the engine's touch moment
-    if(fk){ const tc = Math.round((now - p.actT) * 1000) / 1000; if(B.touch !== tc){ B.touch = tc; bRun(M, p, fk, tc, tc); B.bike = fk === 'pyradive.bicycle'; } }
+    if(hoop && M.stall && M.stall.p === p.id && hasBeat('pyradive.kpass')){ if(B.stall !== M.stall.t0){ B.stall = M.stall.t0; bRun(M, p, 'pyradive.kpass', M.stall.t0 - 0.05, M.stall.t0); B.cap = M.stall.t0 + 0.04; } }   /* 🦶 pd-9c stall pose */
+    else if(fk){ const tc = Math.round((now - p.actT) * 1000) / 1000; if(B.touch !== tc){ B.touch = tc; bRun(M, p, fk, tc, tc); B.bike = fk === 'pyradive.bicycle'; } }
     // 2 · 🧺 the toss — Strike: the tosser lets go when the feed starts · Hoop: the holder throws it up to himself (the launch)
     else if(hoop && M.phase === 'rally' && M.tosser === p.id && M.lastP == null && now - b.hitT < 0.2 && hasBeat('pyradive.toss')){ if(B.touch !== b.hitT){ B.touch = b.hitT; bRun(M, p, 'pyradive.toss', b.hitT, b.hitT); } }
     else if(M.phase === 'serve' && hasBeat('pyradive.toss') && (hoop ? b.held === p.id : M.feeder === p.id && b.held !== p.id)){
@@ -3503,6 +3551,18 @@ function ctlFxDraw(g, M){   // the gold arc: from the old player to the new one 
   g.save(); g.globalAlpha = 1 - k * 0.6; g.strokeStyle = '#FFD23F'; g.lineWidth = 3; g.setLineDash([6, 6]); g.beginPath(); g.moveTo(a[0], a[1]); for(let u = 0.1; u <= k + 1e-6; u += 0.1){ const q = at(Math.min(u, k)); g.lineTo(q[0], q[1]); } g.stroke();
   const q = at(k); g.setLineDash([]); g.fillStyle = '#FFF4C2'; g.shadowColor = '#FFD23F'; g.shadowBlur = 12; g.beginPath(); g.arc(q[0], q[1], 6, 0, 7); g.fill(); g.restore();
 }
+/* 🧺 pd-9c: the ROBOT tosser talks — "Ready?" while it waits for your kick (or just before a robot serve), "Hup!" as it tosses. Drawing only. */
+function tossCallOf(M, p){ if(M.sp.sport !== 'strike' || M.phase !== 'serve' || M.feeder !== p.id || PD.isPerson(p) || M.ball.held === p.id) return null;
+  const sv = M.players.find(q => q.id === M.ball.held); if(!sv) return null;
+  if(sv.feed) return M.t - sv.feed.t0 < 0.5 ? 'Hup!' : null;
+  if(PD.isPerson(sv)) return M.phaseT > 0.7 && (M.phaseT % 3.2) < 2.2 ? 'Ready?' : null;   /* waits for YOUR kick: asks, rests, asks again */
+  return M.phaseT > M.serveWait - 0.75 ? 'Ready?' : null; }
+function tossCall(g, M, p, x, y, kAv){ const w = tossCallOf(M, p); if(!w) return; G.tossSaid = w;
+  const fs = Math.max(11, Math.round(12 * kAv * 1.35)); g.save(); g.font = '900 ' + fs + 'px Nunito, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const tw = g.measureText(w).width, bw = tw + fs * 1.1, bh = fs * 1.7, bx = x - bw / 2, by = y - bh, r = bh / 2;
+  g.fillStyle = '#FFFFFF'; g.strokeStyle = '#16161D'; g.lineWidth = 2.2; g.beginPath(); g.moveTo(bx + r, by); g.arcTo(bx + bw, by, bx + bw, by + bh, r); g.arcTo(bx + bw, by + bh, bx, by + bh, r);
+  g.lineTo(x + fs * 0.35, by + bh); g.lineTo(x, by + bh + fs * 0.55); g.lineTo(x - fs * 0.15, by + bh); g.arcTo(bx, by + bh, bx, by, r); g.arcTo(bx, by, bx + bw, by, r); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = w === 'Hup!' ? '#E5304B' : '#16161D'; g.fillText(w, x, by + bh / 2 + 1); g.restore(); }
 function drawPlayer(g, M, p, t, o){
   const [fx, fy, s] = P(p.x, p.y, 0), kAv = 1.55 * V.k * s / 70, live = o.live, zd = airZ(M, p) /* 🦘 pd-6e drawn height */, lift = zd * 45 * kAv;
   // 🔥 flame aura (half meter = soft glow, armed / full = big flames) — a cached picture, gently pulsing by size only
@@ -3519,6 +3579,7 @@ function drawPlayer(g, M, p, t, o){
   const a = {name: p.name, av: p.av, dir: p.dir, gest};
   const bp = gest || !live ? null : beatPose(M, p), special = feetOn(M) || sparkOn(M) ? !!p.dive /* 🦶 pd-6c · ⚡ pd-6d */ : PD.noHands(M) ? (p.dive || (p.block > 0 && p.z > 0) || (M.phase === 'serve' && (M.ball.held === p.id || M.feeder === p.id)) || (p.act && p.actT < 0.4)) : !!(p.act && p.actT < 0.4 && !beatKeyOf(p) && !(p.act === 'dive' && p.bt && p.bt.key === 'pyradive.dive'));   // 🎬 pd-6a · 🏐 pd-6b: every volleyball move has its beats
   const pose = gest ? null : bp && !special ? Object.assign({}, IDLE_POSE, bp.pose) : Object.assign({}, IDLE_POSE, p.walkT && p.z === 0 && !p.act ? walkPose(p.walkT) : p.z > 0 ? AIR_POSE : null, poseOf(M, p, t) || {});
+  if(pose && live && airOn() && !p.dive && (p.own || p.human)){ const A = airState(p); if(A && A.L.name === 'pyra' && A.H > 0.3){ const sh = airShare(A.u, A.L, (p.bt || {}).noLoad); if(sh > 0.8) pose.float = sh > 0.94 ? 1 : 0.5; } }   /* 🔥 pd-9d float: hair + dress drift up at the top of YOUR 🔥 Pyra jump (people only — robots stay cached: picture budget) */
   // ground shadow (smaller + lighter in the air), then the cached body picture
   const sh = 1 - Math.min(0.55, zd / 1.4); g.fillStyle = 'rgba(0,0,0,' + (0.22 * sh).toFixed(3) + ')'; g.beginPath(); g.ellipse(fx, fy, 15 * kAv * sh, 6 * kAv * sh, 0, 0, 7); g.fill();
   if(kAv >= AV_LIVE && M.players.length <= 4){   // 🧺 pd-5e (Aowu 12:20 "PyraSpark the player is blurry"): BIG players (⚡ Spark, zoomed phones) are painted live at full sharpness — a cached picture that big costs too much memory
@@ -3541,6 +3602,7 @@ function drawPlayer(g, M, p, t, o){
   if(p.own || M.sp.n <= 3){ g.font = '800 ' + Math.max(10, Math.round(11 * kAv * 1.3)) + 'px Nunito, sans-serif'; g.textAlign = 'center'; g.lineWidth = arenaLook(M).light ? 5 : 3; g.strokeStyle = arenaLook(M).light ? 'rgba(20,20,40,0.85)' : 'rgba(0,0,0,0.6)';   // ☁️ light arenas: a darker outline
     const nm = p.own ? p.name : p.name.slice(0, 9); if(!(live && ctlDriven(M, p))){ g.strokeText(nm, fx, top - sz * 0.95); g.fillStyle = p.own ? '#FFE9A8' : '#E6ECFF'; g.fillText(nm, fx, top - sz * 0.95); } }
   if(live) ctlOver(g, M, p, fx, top - sz * 0.95, kAv, top);   /* 🎮 pd-8a: the driven player's name = the 🎮 pill */
+  if(live) tossCall(g, M, p, fx, top - sz * 1.9, kAv);   /* 🧺 pd-9c */
 }
 let BALL_SPR = {};
 function takrawSprite(px){   // 🦶 a woven rattan ball: golden ring weave with round holes
@@ -3601,8 +3663,13 @@ function drawExtra(g, M, e, t){
   if(bm && (typeof BombSkins !== 'undefined')){ BombSkins.draw(g, bm, x, y, r * 2.3, t, 0.2); return; }   // 💣 pd-4c: your Soul Bopper bombs bounce in 🌀 Spark Party
   g.save(); g.translate(x, y); g.rotate((e.x * 4 + e.z * 3) % (Math.PI * 2)); g.drawImage(spr, -spr.width / 2, -spr.height / 2); g.restore();
 }
+/* 🦶 pd-9c: where the sole of the held inside-pass pose is on screen (avatar units: feet = 0,0, facing right — the same steps as drawAvatar) → the ball sits on it */
+function stallBallAt(M){ const st = M.stall; if(!st || !window.Acting) return null; const p = M.players.find(q => q.id === st.p); if(!p) return null;
+  const P0 = Acting.pose('pd.f-pass-hit') || {}, L = (x, y, a, len) => [x - Math.sin(a) * len, y + Math.cos(a) * len], kn = L(5, -20, P0.legR || 0, 9), ft = L(kn[0], kn[1], (P0.legR || 0) + (P0.kneeR || 0), 9);
+  const [fx, fy, s] = P(p.x, p.y, 0), kAv = 1.55 * V.k * s / 70, r = Math.max(6, V.k * 0.25 * s), dir = p.dir || 1;
+  return [fx + ft[0] * kAv * dir, fy - airZ(M, p) * 45 * kAv + (ft[1] + (P0.dy || 0)) * kAv - r * 0.95, s]; }
 function drawBall(g, M, t){
-  const b = M.ball, [x, y, s] = P(b.x, b.y, b.z), r = Math.max(6, V.k * 0.25 * s);
+  const b = M.ball, [x, y, s] = (M.stall && stallBallAt(M)) || P(b.x, b.y, b.z), r = Math.max(6, V.k * 0.25 * s);   /* 🦶 pd-9c */
   if(b.trail && b.trail.length > 2 && M.phase === 'rally'){
     const fast = Math.hypot(b.vx, b.vz) > 7;
     const sc = b.spirit ? (spiritOf(b.spirit) || {}).col : null;
@@ -3622,10 +3689,11 @@ function drawBall(g, M, t){
   else if(b.pyra && M.phase === 'rally') emo(g, '🔥', x, y - r * 1.4, r * 1.6);
 }
 // ①②③ touch counter above each half (lights up with each touch on that side)
+const PD_CNTS = [];   /* 💬 pd-9a: last painted ①②③ spots per team [x, y, r] (court px) */
 function drawCounters(g, M){
   if(M.phase !== 'rally' && M.phase !== 'serve') return;
   [0, 1].forEach(t => { const r = Math.max(7, Math.min(16, V.k * 0.26)), q = V.rot ? P(PD.sgn(t) * M.L * 0.5, M.W / 2 + 0.6, 0) : P(PD.sgn(t) * M.L * 0.5, -M.W / 2 - FEX(), 0), x = V.short ? V.W * (t ? 0.82 : 0.18) : Math.max(r * 4, Math.min(V.W - r * 4, q[0])), y = V.short ? r + 12 : V.rot ? Math.max(r * 2, q[1]) : Math.max(96 + r, q[1] - r * 1.8), /* 📱 pd-5b short sideways: top band */ n = M.side === t && M.phase === 'rally' ? M.n : 0;
-    for(let i = 0; i < 3; i++){ const cx = x + (i - 1) * r * 2.5, on = i < n; g.fillStyle = on ? TEAM_COL[t] : 'rgba(255,255,255,0.18)'; g.beginPath(); g.arc(cx, y, r, 0, 7); g.fill();
+    PD_CNTS[t] = [x, y, r]; /* 💬 pd-9a */ for(let i = 0; i < 3; i++){ const cx = x + (i - 1) * r * 2.5, on = i < n; g.fillStyle = on ? TEAM_COL[t] : 'rgba(255,255,255,0.18)'; g.beginPath(); g.arc(cx, y, r, 0, 7); g.fill();
       g.strokeStyle = on ? '#FFFFFF' : 'rgba(255,255,255,0.4)'; g.lineWidth = 2; g.stroke();
       g.fillStyle = on ? '#FFFFFF' : 'rgba(255,255,255,0.65)'; g.font = '700 ' + Math.round(r * 1.2) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(i + 1, cx, y + 1); g.textBaseline = 'alphabetic'; } });
 }
@@ -3896,7 +3964,7 @@ function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!car
   const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
   const at = card.querySelector('.res-btns'); if(at) { at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); } else { card.appendChild(cap); card.appendChild(c); } }, 900); }
 /* 📣 CHEERSQUAD END */
-function showResult(html){ $('result-card').innerHTML = html; pdResultBadge(); /* 🏷️ pd-7 */ $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-pd */ }
+function showResult(html){ /* 💬 pd-9a result */ calloutOff(); $('result-card').innerHTML = html; pdResultBadge(); /* 🏷️ pd-7 */ $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-pd */ }
 function hideResult(){ $('result').classList.add('hidden'); }
 function confetti(list, count){ for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pdPick(list); e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's'; document.body.appendChild(e); setTimeout(() => e.remove(), 3800); } }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
@@ -3935,6 +4003,45 @@ function boot(){
 }
 boot();
 </script>
+<script>
+/* 🎵 MOOD (24u-b) START — 🔥 PyraDive chat (pd-9b) · UiKit ambient mood (UISound.mood, plan `Ambient Moods — full plan.md` §7). Don't edit by hand:
+   Test Harness/patch_pd9b.py re-applies it (block from patch_24ub_moods.py). Starts with the game's cheerMount() (= play starts, also 🔄 Again), stops with
+   cheerEnd() (result) or when the play screen goes away (◀ / 🎚️ Levels); every 0.4 s it reads the game's own state → tension /
+   hush (🤖 thinking) / pause; the crowd's big moments → lift (max one every 3 s). Test hook: GMOOD (page global). */
+const GMOOD = (function(){
+  const ID = 'pyradive';
+  let h = null, timer = 0, lastLift = 0;
+  const vis = el => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
+  function playing(){ try{ return !!(G && !G.over) && vis(document.getElementById('scr-play')) && !vis(document.getElementById('result')); }catch(e){ return false; } }
+  function skip(){ return false; }
+  function tension(){ const M = G.M; if(!M) return 0; const clk = tl => tl < 10 ? .75 : tl < 20 ? .45 : .2; if(isHoop(M)) return clk(M.timeLeft); if(M.drill) return M.drill.time != null ? clk(M.drill.time) : Math.min(.7, (M.drill.streak || 0) / 15); const T = M.teams; if(!T || T.length < 2) return 0; const a = T[0].score, b = T[1].score, tg = M.target || 15, hi = Math.max(a, b); let t = .55 * Math.min(1, hi / tg); if(Math.abs(a - b) <= 2 && hi >= tg * .5) t += .15; if(hi >= tg - 1){ t = Math.max(t, .8); if([0, 1].some(i => T[i].score >= tg - 1 && T[i].score > T[1 - i].score && T[i].sets + 1 >= M.setsTo)) t = .95; } if((M.rally || 0) >= 8) t += .1; return t; }
+  function hush(){ const M = G.M; return !!(M && !M.over && (M.phase === 'serve' || M.waiting)); }
+  function paused(){ return !!(G.paused || G.held); }
+  function poll(){
+    if(!h || !h.live || !playing()){ stop(); return; }
+    let t = 0; try{ t = Number(tension()) || 0; }catch(e){} h.tension(Math.min(1, Math.max(0, t)));
+    let q = false; try{ q = !!hush(); }catch(e){} h.hush(q);
+    let p = false; try{ p = !!paused(); }catch(e){} h.pause(p, 'game');
+  }
+  function start(){
+    stop();
+    try{ if(skip()) return; }catch(e){}
+    try{ if(window.UISound && UISound.mood) h = UISound.mood(ID); }catch(e){ h = null; }
+    if(h && h.live){ timer = setInterval(poll, 400); setTimeout(poll, 80); } else h = null;
+  }
+  function lift(){ const now = Date.now(); if(!h || !h.live || now - lastLift < 3000) return; lastLift = now; try{ h.lift(); }catch(e){} }
+  function stop(){ clearInterval(timer); timer = 0; const x = h; h = null; if(x){ try{ x.stop(); }catch(e){} } }
+  function wrap(name, before){
+    const f = window[name]; if(typeof f !== 'function' || f.__gmood) return;
+    const w = function(){ try{ before.apply(this, arguments); }catch(e){} return f.apply(this, arguments); }; w.__gmood = 1; window[name] = w;
+  }
+  wrap('cheerMount', start);
+  wrap('cheerEnd', stop);
+  wrap('cheerSay', function(){ if((function(kind){ return kind === 'big'; }).apply(this, arguments)) lift(); });
+  return {id: ID, start: start, stop: stop, lift: lift, poll: poll, now: () => h, playing: playing, tension: tension, hush: hush, paused: paused};
+})();
+/* 🎵 MOOD (24u-b) END */
+</script>
 </body>
 </html>
-<!-- (pd-4c+cs-pd+ck-2d+pd-4e+pd-5a+pd-7+pd-5b+pd-6a+pd-5c+pd-6b+pd-5d+pd-6b2+pd-5e+pd-6c+pd-8a+pd-8b+pd-6d+pd-5f+pd-6e) END OF PyraDive.html -->
+<!-- (pd-4c+cs-pd+ck-2d+pd-4e+pd-5a+pd-7+pd-5b+pd-6a+pd-5c+pd-6b+pd-5d+pd-6b2+pd-5e+pd-6c+pd-8a+pd-8b+pd-6d+pd-5f+pd-6e+pd-9a+pd-9b+pd-9c+pd-9d) END OF PyraDive.html -->
