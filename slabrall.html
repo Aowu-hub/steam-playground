@@ -2815,7 +2815,10 @@ function drawScene(g, V, M, theme, t, opt){
   poly(g, [P(-ext, -wy), P(ext, -wy), P(ext, wy), P(-ext, wy)], T.ground);
   if(!opt.preview) decoAround(g, V, M, T, t);
   // court
-  if(sp.kind === 'puck') drawRink(g, V, M, T); else if(sp.table) drawTable(g, V, M, T); else if(sp.squash) drawRoom(g, V, M, T); else drawCourt(g, V, M, T);
+  // 🏓 b3b6b people beyond the table's far end stand BEHIND it: painted between the hall floor and the table (and left out of the depth list below)
+  const tblFar = sp.table ? Math.min.apply(null, [[-sp.Lh, -sp.Wh], [sp.Lh, -sp.Wh], [-sp.Lh, sp.Wh], [sp.Lh, sp.Wh]].map(c => V.depth(c[0], c[1]))) : -1e9;
+  const behindT = sp.table ? M.players.filter(p => V.depth(p.x, p.y) < tblFar - 1e-6) : [];
+  if(sp.kind === 'puck') drawRink(g, V, M, T); else if(sp.table) drawTable(g, V, M, T, () => behindT.forEach(p => drawPlayer(g, V, M, p, t))); else if(sp.squash) drawRoom(g, V, M, T); else drawCourt(g, V, M, T);
   surfaceLogos(g, V, M, theme, T);   // 🏷️ tb-1
   // element patches
   M.patches.forEach(q => { const E = SB.ELEMENTS[q.el], c = P(q.x, q.y, 0); g.save(); g.globalAlpha = Math.min(0.7, q.t / 2); g.fillStyle = E.col; ell(g, V, q.x, q.y, q.r); g.fill(); g.globalAlpha = 1; drawEmo(g, E.icon, c[0] + Math.sin(t * 3 + q.x) * 4, c[1], V.sc(q.x, q.y, 0) * 0.9); g.restore(); });
@@ -2832,7 +2835,7 @@ function drawScene(g, V, M, theme, t, opt){
     if(b.z > 0.9 && sp.kind !== 'puck'){ const a = P(b.x, b.y, 0), c = P(b.x, b.y, b.z); g.save(); g.strokeStyle = 'rgba(255,255,255,0.45)'; g.lineWidth = 1.5; g.setLineDash([3, 4]); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(c[0], c[1]); g.stroke(); g.restore(); } });
   // depth-sorted things: players, balls, net, orb
   const items = [];
-  M.players.forEach(p => items.push({d: V.depth(p.x, p.y), f: () => drawPlayer(g, V, M, p, t)}));
+  M.players.forEach(p => { if(behindT.indexOf(p) < 0) items.push({d: V.depth(p.x, p.y), f: () => drawPlayer(g, V, M, p, t)}); });   // 🏓 b3b6b (the ones behind the table are already painted)
   M.balls.forEach(b => { if(b.live) items.push({d: V.depth(b.x, b.y) + 0.01, f: () => drawBall(g, V, M, b, t, opt)}); });
   if(G && !opt.preview && typeof sbsDraw === 'function') items.push({d: 1e9, f: () => sbsDraw(g, V, M, t)});   // 🎾 b3b6 ⭕ ring + ⚡ spark
   if(sp.net) items.push({d: V.mode === 'side' && !V.portrait ? -sp.Wh - 0.5 : 0, f: () => drawNet(g, V, M, T)});
@@ -3145,13 +3148,14 @@ function drawNet(g, V, M, T){
   for(let i = 0; i <= 24; i++){ const y = -W + i * 2 * W / 24; line(g, P(0, y, 0), top(y), 'rgba(255,255,255,0.3)', 1); } for(let j = 1; j < 4; j++) line(g, mid(-W, j / 4), mid(W, j / 4), 'rgba(255,255,255,0.3)', 1); g.restore();
   line(g, d, c, '#FFFFFF', 3); [a, b].forEach((p, i) => line(g, p, i ? c : d, T.net, 4));
 }
-function drawTable(g, V, M, T){
+function drawTable(g, V, M, T, behind){   /* 🏓 b3b6b behind() = paint the people beyond the far end here: after the hall floor, before the table */
   const sp = M.sp, L = sp.Lh, W = sp.Wh, P = V.P;
   // tb-1: a real table — the hall floor under it (planks), a soft shadow, 4 legs, a thick edge, then the top (z = 0 = the table top, the floor is z = -0.9)
   const FZ = -0.9, FL = L + 3.6, FW = W + 2.6;
   poly(g, courtPts(V, -FL, -FW, FL, FW, FZ), 'rgba(0,0,0,0.16)', 'rgba(255,255,255,0.25)', 2);
   g.save(); g.strokeStyle = 'rgba(255,255,255,0.08)'; g.lineWidth = 1.5; for(let yy = -FW + 0.9; yy < FW; yy += 0.9) line(g, P(-FL, yy, FZ), P(FL, yy, FZ), 'rgba(255,255,255,0.08)', 1.5); g.restore();
   poly(g, courtPts(V, -L + 0.3, -W + 0.5, L + 0.9, W + 0.9, FZ), 'rgba(0,0,0,0.3)');   // shadow on the floor
+  if(behind) behind();   // 🏓 b3b6b the table goes IN FRONT of them
   [[-L * 0.8, -W * 0.85], [L * 0.8, -W * 0.85], [-L * 0.8, W * 0.85], [L * 0.8, W * 0.85]].forEach(([x, y]) => line(g, P(x, y, FZ), P(x, y, -0.12), '#2B2D42', Math.max(3, V.sc(x, y, 0) * 0.16)));
   const edge = shade(T.table, 0.62);   // the thick edge (all 4 sides — the ones facing you show)
   [[-L, -W, L, -W], [L, -W, L, W], [L, W, -L, W], [-L, W, -L, -W]].forEach(([x0, y0, x1, y1]) => poly(g, [P(x0, y0, 0), P(x1, y1, 0), P(x1, y1, -0.16), P(x0, y0, -0.16)], edge, 'rgba(0,0,0,0.35)', 1));
@@ -3660,4 +3664,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+lk-1b+p1d+lk-1c+cs-1+lk-2e+dv-1+tb-1+lk-5e+lk-5f+ls-1b+pz-1+24t-a+b3w5+st-2b+lk-6c+24u-d1+b3b5+b3b6) END OF SlaBrall.html -->
+<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+lk-1b+p1d+lk-1c+cs-1+lk-2e+dv-1+tb-1+lk-5e+lk-5f+ls-1b+pz-1+24t-a+b3w5+st-2b+lk-6c+24u-d1+b3b5+b3b6+b3b6b) END OF SlaBrall.html -->
