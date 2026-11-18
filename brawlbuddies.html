@@ -2607,6 +2607,7 @@ function handleEvents(list){
     }
     else if(e.k === 'match'){ startDance(e.winner); }
   });
+  if(typeof brbEvents === 'function') brbEvents(list);   /* 🎬 b3b9: hit / block / get-up / jump → contact now */
 }
 function startDance(w){
   const p = G.M.f[w]; G.dance = {p: w, g: EPIC_DANCES.length ? pickOne(EPIC_DANCES) : GESTURES[0], t: 0};
@@ -2808,6 +2809,120 @@ function drawScene(g, W, H, st, still){
   if(st.flash > 0 && !st.preview && !reduced()){ g.fillStyle = 'rgba(255,255,255,' + Math.min(0.45, st.flash * 3).toFixed(2) + ')'; g.fillRect(-20, -20, W + 40, H + 40); }
   g.restore();
 }
+/* 🎬 BRAWL BEATS (b3b9, 🧱 baseline chat, 2026-11-18) START — every fighter action = 3–5 beats on the shared timeline (Acting, 🎭 BLOCK `brawl`).
+   ⭐ Aowu's picks: Brawl's OWN punch shapes (KF), re-timed + a settle + a trailing back arm · the game's own hit-stop (35 / 70 ms on a hit,
+   110 ms on a grapple slam) freezes the ENGINE clock, so the contact pose holds with it. The engines BB / BV are not touched.
+   👊 strikes: the act is mapped onto the move's own times — wind-up = start-up (st), the strike pose = contact = the engine's active start,
+   held through the active frames (ac), follow-through + settle = the recovery (rc) — a pure function of the move's clock (Brawenture heroes
+   pass their own HMOVES times). 💥 hits · 🛡️ blocks · 😵 get-ups play FROM contact (the event tick) on top of whatever the body is doing.
+   🦘 jump: take-off = ready, tuck = anticipation, LANDING = contact (predicted from the jump, re-timed to the real landing tick). 🌀 dodge
+   = the roll on its 0.34 s clock. A new strike blends out of the old one (60 ms). Clock = the engine's own (M.t). Off: window.BRB_ON = false. */
+const BRB_HAS = typeof Acting !== 'undefined' && typeof Acting.play === 'function' && typeof Acting.act === 'function';
+window.BRB_LOG = window.BRB_LOG || [];
+const BRB_EASE = {ready: 'sineInOut', anticipation: 'cubicOut', contact: 'quartOut', follow: 'backOut', settle: 'sineInOut'};
+const BRB_KEYS = ['armR', 'armL', 'legL', 'legR', 'rot', 'rotFull', 'dy', 'sx', 'sy'];
+const BRB_S0 = {armR: 1.15, armL: -1.05, rot: 0, dy: 0, rotFull: 0};
+const BRB_WHO = {name: 'Brawl', av: null}, BRB_RUNS = {};
+function brbOk(){ return BRB_HAS && window.BRB_ON !== false && !!Acting.act('brawl.boop'); }
+function brbNow(st){ if(st && st.M && typeof st.M.t === 'number') return st.M.t; if(typeof AV !== 'undefined' && AV && AV.M) return AV.M.t || 0; return G && G.M ? G.M.t : 0; }
+function brbLog(p, act, at, tick){ window.BRB_LOG.push({p, act, at, tick: tick == null ? at : tick}); if(window.BRB_LOG.length > 300) window.BRB_LOG.shift(); }
+function brbRun(act){ if(!brbOk() || !Acting.act(act)) return null; return BRB_RUNS[act] || (BRB_RUNS[act] = Acting.play(BRB_WHO, act, {t0: 0})); }
+// the glove reach `ext` is Brawl's own field → eased here beat by beat (Acting blends numbers it knows; ext would snap)
+function brbExt(run, f){
+  const B = run.beats, P = i => B[Math.max(0, i)].ext || 0;   /* ext rides on the beat (not a pose field) */
+  const i = f.i, a = i > 0 ? P(i - 1) : P(0), b = P(i), e = Acting.ease(B[i].ease || BRB_EASE[B[i].name] || 'quadInOut'); return a + (b - a) * e(f.q);
+}
+// an Acting frame → Brawl's pose (Brawl space: legL flipped back; the page flips it again for its 'follow' feet)
+function brbPose(run, f, base){
+  const P = Object.assign({}, base), q = f.pose;
+  BRB_KEYS.forEach(k => { if(q[k] != null) P[k] = k === 'legL' ? -q[k] : q[k]; else if(k === 'rotFull') P[k] = 0; });
+  P.ext = brbExt(run, f); if(f.face) P.face = f.face; return P;
+}
+// 👊 a strike: st / ac / rc of the move → the act's beats (contact EXACTLY at st)
+function brbStrikeEl(run, m, tt){
+  const ci = run.beats.findIndex(b => b.contact), c0 = run.contactMs, c1 = run.start[ci] + run.D[ci].ms, T = run.total;
+  const st = Math.max(1e-3, m.st), ac = Math.max(1e-3, m.ac), rc = Math.max(1e-3, m.rc);
+  if(tt <= st) return c0 * Math.max(0, tt) / st;
+  if(tt <= st + ac) return c0 + (c1 - c0) * (tt - st) / ac;
+  return c1 + (T - c1) * Math.min(1, (tt - st - ac) / rc);
+}
+function brbStrike(k, m, tt, base){
+  if(!m || !(m.st < 50)) return null; const run = brbRun('brawl.' + k); if(!run) return null;
+  return brbPose(run, run.at(brbStrikeEl(run, m, tt) / 1000), base);
+}
+// event acts (hit / block / get-up / jump) live per fighter in its vis, on the engine clock
+function brbStart(vis, slot, act, now, contactAt, who, from){
+  if(!brbOk() || !Acting.act(act)) return null;
+  const run = Acting.play(BRB_WHO, act, {t0: now, contactAt, from, onContact: r => brbLog(who, act, r.contactT, brbNow(G && G.M ? G : null))});
+  vis[slot] = {act, run}; if(contactAt <= now + 1e-9) run.at(Math.max(now, run.contactT) + 1e-6); return vis[slot];
+}
+function brbFrame(vis, slot, now){
+  const A = vis[slot]; if(!A) return null; const f = A.run.at(Math.max(now, A.run.t0));
+  if(f.done){ vis[slot] = null; return null; } return f;
+}
+// on top of the body: rot / arms / lift add, squash multiplies (the act is written round the stance)
+function brbDelta(P, q){
+  ['armR', 'armL', 'rot', 'dy', 'rotFull'].forEach(k => { P[k] = (P[k] || 0) + ((q[k] != null ? q[k] : BRB_S0[k]) - BRB_S0[k]); });
+  ['sx', 'sy'].forEach(k => { P[k] = (P[k] == null ? 1 : P[k]) * (q[k] != null ? q[k] : 1); });
+}
+const BRB_BIG = ['bonk', 'jbonk', 'power', 'jpower', 'upper', 'lowbonk', 'dbonk', 'fly', 'gbreak'];
+function brbHitAct(e){ return e.lvl === 'low' ? 'brawl.hitLow' : (BRB_BIG.indexOf(e.move) >= 0 || e.down || e.big) ? 'brawl.hitBig' : 'brawl.hit'; }
+// Brawl: the engine's events (handleEvents) → contact NOW; strikes are logged at their exact active start
+function brbEvents(list){
+  if(!brbOk() || !G || !G.M) return; const M = G.M, now = M.t;
+  list.forEach(e => {
+    if(e.k === 'hit' && e.to != null){ const v = visOf(G, e.to); brbStart(v, 'brbH', brbHitAct(e), now, now, e.to); if(v.react) v.react.brb = 1; }
+    else if(e.k === 'block' && e.p != null) brbStart(visOf(G, e.p), 'brbB', 'brawl.block', now, now, e.p);
+    else if(e.k === 'getup' && e.p != null) brbStart(visOf(G, e.p), 'brbG', 'brawl.getup', now, now, e.p);
+    else if(e.k === 'jump' && e.p != null){ const p = M.f[e.p]; if(p) brbJump(visOf(G, e.p), p, now, BB.GRAV, e.p); }
+  });
+  M.f.forEach((p, i) => { const v = visOf(G, i), m = p.act && BB.MOVES[p.act.k];
+    if(m && m.st < 50 && p.act.t >= m.st && v.brbS !== p.act.id){ v.brbS = p.act.id; brbLog(i, 'brawl.' + p.act.k, now - (p.act.t - m.st), now); }
+    brbLanded(v, p, now, i); });
+}
+// 🦘 jump: contact = the landing (predicted from the jump + one tick, then re-timed to the real landing tick)
+function brbJump(vis, p, now, grav, who){
+  const vy = p.vy || 0, y = Math.max(0, p.y || 0); if(vy <= 0.5) return;
+  const tl = (vy + Math.sqrt(vy * vy + 2 * grav * y)) / grav; brbStart(vis, 'brbJ', 'brawl.jump', now, now + tl + 1 / 120, who); vis.brbJAir = true;
+}
+function brbLanded(vis, p, now, who){
+  const A = vis.brbJ; if(!A) return;
+  if(p.launched || p.ko || p.held || p.grab){ vis.brbJ = null; return; }
+  if(BB.onGround(p) && vis.brbJAir){ vis.brbJAir = false; if(!A.run.fired) brbStart(vis, 'brbJ', 'brawl.jump', now, now, who, A.run.last || undefined); }
+}
+// drawing hooks (poseRaw) — Brawl + Brawenture (Brawenture has no event hook: its acts start on the first frame that shows them)
+function brbAir(st, p, P, air, m, vis){
+  vis.brbJA = vis.brbJL = false; if(!brbOk() || (st && st.preview)) return;
+  const now = brbNow(st), adv = !(st && st.M && typeof st.M.t === 'number');
+  if(adv){ if(air && !vis.brbWasAir && p.vy > 2 && !p.launched) brbJump(vis, p, now, 22, p.i); brbLanded(vis, p, now, p.i); }
+  vis.brbWasAir = air;
+  const f = brbFrame(vis, 'brbJ', now); if(!f || m || p.dash || p.launched) return;
+  if(air && !f.contact){ const run = vis.brbJ.run, Q = brbPose(run, f, P); Object.assign(P, Q); delete P.ext; vis.brbJA = true; }
+  else if(!air && f.contact){ brbDelta(P, f.pose); vis.brbJL = true; }
+}
+function brbReact(st, p, P, a, vis){
+  if(!brbOk() || (st && st.preview)) return false; const now = brbNow(st), R0 = vis.react;
+  if(R0 && !R0.brb){ R0.brb = 1; brbStart(vis, 'brbH', R0.kind === 'low' ? 'brawl.hitLow' : R0.kind === 'big' ? 'brawl.hitBig' : 'brawl.hit', now, now, p.i); }
+  const f = brbFrame(vis, 'brbH', now); if(!f) return !!(R0 && R0.brb);
+  brbDelta(P, f.pose); a.eyes = 'closed'; a.mouth = 'open'; return true;
+}
+function brbBlock(st, p, P, vis){ if(!brbOk() || (st && st.preview)) return false; const f = brbFrame(vis, 'brbB', brbNow(st)); if(!f) return false; brbDelta(P, f.pose); return true; }
+function brbGetup(st, p, P, vis, m){ if(!brbOk() || (st && st.preview) || m) return false; const f = brbFrame(vis, 'brbG', brbNow(st)); if(!f) return false; brbDelta(P, f.pose); return true; }
+// 🌀 dodge roll on its own 0.34 s clock (contact = the press)
+function brbDodge(p, P){
+  const run = brbRun('brawl.dodge'); if(!run || !p.dodge) return false;
+  const c0 = run.contactMs, el = c0 + (run.total - c0) * Math.min(1, p.dodge.t / 0.34), Q = brbPose(run, run.at(el / 1000), P);
+  Q.rotFull = (Q.rotFull || 0) * (p.dodge.dir || 1); delete Q.ext; Object.assign(P, Q); return true;
+}
+// a new strike blends out of the one before (60 ms of the engine clock) — never a jump in the picture
+function brbBlend(st, p, P, vis){
+  if(!brbOk() || (st && st.preview)) return P; const now = brbNow(st), key = p.act ? p.act.k + '@' + (p.act.id != null ? p.act.id : p.act.m ? Math.round((now - (p.act.t || 0)) * 100) : '') : '';
+  if(key !== vis.brbKey){ if(key && vis.brbKey && vis.brbLast) { vis.brbFrom = vis.brbLast; vis.brbFromT = now; } else vis.brbFrom = null; vis.brbKey = key; }
+  let Q = P; if(vis.brbFrom && now - vis.brbFromT < 0.06){ const u = Math.max(0, (now - vis.brbFromT) / 0.06), e = 1 - Math.pow(1 - u, 3), A = vis.brbFrom; Q = Object.assign({}, P);
+    BRB_KEYS.concat(['ext']).forEach(k => { const x = A[k] != null ? A[k] : (k === 'sx' || k === 'sy' ? 1 : 0), y = P[k] != null ? P[k] : (k === 'sx' || k === 'sy' ? 1 : 0); Q[k] = x + (y - x) * e; }); }
+  vis.brbLast = key ? Object.assign({}, Q) : null; return Q;
+}
+/* 🎬 BRAWL BEATS END */
 /* ---------- 🎬 move animation (round A): wind-up → strike → follow-through → recover ---------- */
 const eo = x => 1 - Math.pow(1 - x, 3);                       // ease out
 const eob = x => { const c = 1.9; x -= 1; return 1 + (c + 1) * x * x * x + c * x * x; };   // ease out with a little overshoot (snap)
@@ -2834,6 +2949,7 @@ const KF = {
   cbonk:   {w: {armR: 3.1, armL: -1.5, rot: 0.16, legL: 0.65, legR: -0.55}, s: {armR: 0.8, ext: 0.85, rot: 0.48, legL: 0.75, legR: -0.65, sy: 0.92}}
 };
 function strikePose(k, m, t, base){
+  const BRB = typeof brbStrike === 'function' ? brbStrike(k, m, t, base) : null; if(BRB) return BRB;   /* 🎬 b3b9 */
   const kf = KF[k]; if(!kf) return base;
   const W = Object.assign({}, base, kf.w), S = Object.assign({}, base, kf.s);
   if(t < m.st) return lerpPose(base, W, eo(cl01(t / m.st)));
@@ -2872,6 +2988,7 @@ function poseRaw(st, p, t){
     if(p.grab.done){ const r = cl01((p.grab.t - p.grab.imp) / Math.max(0.1, p.grab.dur - p.grab.imp)); me = lerpPose(me, P, eio(cl01((r - 0.35) / 0.65))); }
     a.mouth = 'open'; return {P: me, a}; }
   if(p.launched){ P.rotFull = -(t * 9 % (Math.PI * 2)); Object.assign(P, {armR: 2.6, armL: -2.4, legL: 0.6, legR: -0.5, dy: 0}); a.eyes = 'closed'; a.mouth = 'open'; return {P, a}; }
+  if(p.dodge && typeof brbDodge === 'function' && brbDodge(p, P)) return {P, a};   /* 🎬 b3b9 */
   if(p.dodge){ const u = Math.min(1, p.dodge.t / 0.34); P.rotFull = p.dodge.dir * eio(u) * Math.PI * 2; Object.assign(P, {sy: 0.8, armR: 2.2, armL: -2.2, legL: 1.1, legR: -1.1}); return {P, a}; }
   const duck = BB.ducking(p), air = !BB.onGround(p);
   if(duck) Object.assign(P, {sy: 0.74, legL: 0.95, legR: -0.95, armR: 1.35, armL: -1.2, dy: 0});
@@ -2880,9 +2997,11 @@ function poseRaw(st, p, t){
     if(p.dash.dir > 0){ const c = Math.sin(t * 34); Object.assign(P, {rot: 0.3, legL: 0.9 * c, legR: -0.9 * c, armR: 0.6 - 0.9 * c, armL: -0.6 + 0.9 * c, sy: 0.98, dy: Math.abs(c) * -2}); }
     else Object.assign(P, {rot: -0.28, legL: 0.6, legR: 0.1, armR: 0.3, armL: 0.4, sy: 1.02});
   }
-  const guard = BB.guardOf(p), m = p.act ? BB.MOVES[p.act.k] : null;
+  const guard = BB.guardOf(p), m = p.act ? (p.act.m || BB.MOVES[p.act.k] || null) : null;   /* 🎬 b3b9: p.act.m = a hero's own times */
   if(guard && !m){ const o = M.f[1 - p.i], near = !o || Math.abs(o.x - p.x) < 3.2; if(near){ Object.assign(P, guard === 'low' ? {armR: 1.75, armL: -1.65, rot: 0.06} : {armR: 2.55, armL: -2.35, rot: -0.1}); } }
+  if(typeof brbAir === 'function') vis.brbJA = vis.brbJL = false;   /* 🎬 b3b9 */
   if(air && !m && !p.dash){ const up = p.vy > 2; Object.assign(P, {legL: up ? 0.75 : 0.45, legR: up ? -0.15 : -0.5, armR: up ? 2.2 : 1.6, armL: up ? -2.0 : -1.5, dy: 0}); }
+  if(typeof brbAir === 'function') brbAir(st, p, P, air, m, vis);   /* 🎬 b3b9: 🦘 take-off → tuck → LAND = contact */
   if(m){
     const k = p.act.k, tt = p.act.t;
     if(k === 'charge'){   // 🔨 wind back and shake while charging
@@ -2900,20 +3019,24 @@ function poseRaw(st, p, t){
   else if((p.stun > 0 || p.bstun > 0 && !guard) && !m) { Object.assign(P, {armR: 0.6, armL: 0.4}); a.eyes = 'closed'; a.mouth = 'open'; }
   // 💥 hit reactions: head snaps back (high), bend over (low), big knock
   const R0 = vis.react;
-  if(R0 && R0.t < 0.4){ const amt = Math.pow(1 - R0.t / 0.4, 2), wob = Math.cos(R0.t * 26);
+  if(typeof brbReact === 'function' && brbReact(st, p, P, a, vis)){ /* 🎬 b3b9 */ }
+  else if(R0 && R0.t < 0.4){ const amt = Math.pow(1 - R0.t / 0.4, 2), wob = Math.cos(R0.t * 26);
     if(R0.kind === 'low'){ P.rot += 0.38 * amt; P.sy *= 1 - 0.1 * amt; }
     else if(R0.kind === 'big'){ P.rot -= 0.62 * amt * (0.6 + 0.4 * wob); P.armR += 1.2 * amt; P.armL -= 1.2 * amt; }
     else { P.rot -= 0.42 * amt * (0.6 + 0.4 * wob); P.armR -= 0.5 * amt; }
     a.eyes = 'closed'; a.mouth = 'open'; }
-  if(vis.blockT != null && vis.blockT < 0.16){ const amt = 1 - vis.blockT / 0.16; P.rot -= 0.14 * amt; P.sx *= 1 - 0.05 * amt; }
+  if(typeof brbBlock === 'function' && brbBlock(st, p, P, vis)){ /* 🎬 b3b9 */ }
+  else if(vis.blockT != null && vis.blockT < 0.16){ const amt = 1 - vis.blockT / 0.16; P.rot -= 0.14 * amt; P.sx *= 1 - 0.05 * amt; }
   // squash & stretch: take-off stretch, landing squash, getting up
-  if(air && p.vy > 3 && !p.launched){ P.sy *= 1.08; P.sx *= 0.94; }
-  if(p.land > 0 && !m){ const q = p.land / 0.25; P.sy *= 1 - 0.16 * q; P.sx *= 1 + 0.12 * q; }
-  if(vis.getup != null && vis.getup < 0.35 && !m){ const q = 1 - vis.getup / 0.35; P.sy *= 1 - 0.3 * q; P.rot -= 0.5 * q; P.armR = 0.8; P.armL = -0.6; }
+  if(air && p.vy > 3 && !p.launched && !vis.brbJA){ P.sy *= 1.08; P.sx *= 0.94; }
+  if(p.land > 0 && !m && !vis.brbJL){ const q = p.land / 0.25; P.sy *= 1 - 0.16 * q; P.sx *= 1 + 0.12 * q; }
+  if(typeof brbGetup === 'function' && brbGetup(st, p, P, vis, m)){ /* 🎬 b3b9 */ }
+  else if(vis.getup != null && vis.getup < 0.35 && !m){ const q = 1 - vis.getup / 0.35; P.sy *= 1 - 0.3 * q; P.rot -= 0.5 * q; P.armR = 0.8; P.armL = -0.6; }
   if(p.cheer > 0 && !m && M.state !== 'fight'){ a.gest = {g: gestOf('cheer'), t: 2 - p.cheer}; return {P: null, a}; }
   if(p.sad > 0 && !m && M.state !== 'fight'){ a.gest = {g: gestOf('shrug'), t: 2 - p.sad}; return {P: null, a}; }
   if(Math.abs(p.vx) > 0.3 && BB.onGround(p) && !duck && !m && !p.dash){ a.walkT = p.walkT + 0.01; const w = Math.sin(p.walkT * 11); P.legL = 0.45 * w; P.legR = -0.45 * w; P.dy -= Math.abs(Math.cos(p.walkT * 11)) * 2; }
   if(a.mouth) P.mouth = a.mouth;
+  if(typeof brbBlend === 'function') P = brbBlend(st, p, P, vis);   /* 🎬 b3b9: a new strike blends out of the old one */
   return {P, a};
 }
 // 🐢 emoji lag rule: '🚀 UP!' → 🚀 from the emo() sprite cache + 'UP!' as text (font / align / colours set by the caller)
@@ -3961,7 +4084,7 @@ function advFighter(g, V, p, t){
   // pose object: the fighter painter reads Brawl moves; map our moves onto them (baddie wind-ups slowed down → time scaled)
   let act = null;
   if(p.act){ const hm = BV.HMOVES[p.act.k];
-    if(p.hero && hm) act = {k: hm.anim, t: p.act.t};
+    if(p.hero && hm) act = typeof brbOk === 'function' && brbOk() ? {k: p.act.k === 'toss' ? 'toss' : hm.anim, t: p.act.t, m: hm} : {k: hm.anim, t: p.act.t};   /* 🎬 b3b9 */
     else if(p.foe){ const T = BV.foeTimes(p, p.act.k), base = BB.MOVES[p.act.k === 'lob' ? 'boop' : p.act.k === 'pound' ? 'jbonk' : p.act.k === 'charge' ? 'dbonk' : p.act.k] || BB.MOVES.boop, sc = base.st / Math.max(0.01, T.st);
       act = {k: p.act.k === 'lob' ? 'boop' : p.act.k === 'pound' ? 'jbonk' : p.act.k === 'charge' ? (p.act.t < T.st ? 'charge' : 'dbonk') : p.act.k, t: p.act.k === 'charge' && p.act.t < T.st ? p.act.t * 0.5 : p.act.t < T.st ? p.act.t * sc : base.st + (p.act.t - T.st)}; } }
   const q = {i: p.i, name: p.name, x: p.x, y: p.y, vy: p.vy, vx: Math.hypot(p.vx || 0, p.vz || 0) * (p.face || 1), face: p.face, act, stun: p.stun, bstun: 0, down: p.down, ko: p.ko || (p.dead && !p.launched), launched: p.launched, dodge: null, dash: p.foe ? (p.act && p.act.k === 'charge' && act && act.k === 'dbonk' ? {dir: 1} : null) : (p.dash && !p.act ? {dir: 1, t: p.dash.t} : null),
@@ -4100,4 +4223,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (11i-I+back-1+r35+modes-3+mg-1+ck-room+p1c+p2+p3a+ck-2b+cs-2c+ls-1b+pz-1+pz-2+b3w5b+24t-e+24u-d1+24z+24z-b) END OF BrawlBuddies.html -->
+<!-- (11i-I+back-1+r35+modes-3+mg-1+ck-room+p1c+p2+p3a+ck-2b+cs-2c+ls-1b+pz-1+pz-2+b3w5b+24t-e+24u-d1+24z+24z-b+b3b9) END OF BrawlBuddies.html -->
