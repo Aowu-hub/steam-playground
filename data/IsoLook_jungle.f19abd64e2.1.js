@@ -200,5 +200,5 @@ function heap(g, c, k, n, col, r, seed, o){ const R = rnd(seed); o = o || {}; fo
 const PLAZA = {jungle: {well: 'well_thai', stall: 'stall_thai', qboard: 'qboard_thai', lantern: 'lantern_thai'}};
 Object.keys(PLAZA).forEach(lk => { const L = LOOKS[lk]; if(!L) return; const sw = {}; Object.keys(PLAZA[lk]).forEach(a => { if(DEFS[PLAZA[lk][a]]) sw[a] = PLAZA[lk][a]; }); L.swap = Object.assign({}, L.swap || {}, sw); });
 })();
-K.loaded('jungle', 'ar-1');
+K.loaded('jungle', 'ip-4b');
 })(window.Props && window.Props._K);

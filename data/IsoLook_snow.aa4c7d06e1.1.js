@@ -287,5 +287,5 @@ function heap(g, c, k, n, col, r, seed, o){ const R = rnd(seed); o = o || {}; fo
 const PLAZA = {snow: {well: 'well_log', stall: 'stall_chalet', qboard: 'qboard_rune', lantern: 'aurorapost'}};
 Object.keys(PLAZA).forEach(lk => { const L = LOOKS[lk]; if(!L) return; const sw = {}; Object.keys(PLAZA[lk]).forEach(a => { if(DEFS[PLAZA[lk][a]]) sw[a] = PLAZA[lk][a]; }); L.swap = Object.assign({}, L.swap || {}, sw); });
 })();
-K.loaded('snow', 'ar-1');
+K.loaded('snow', 'ip-4b');
 })(window.Props && window.Props._K);

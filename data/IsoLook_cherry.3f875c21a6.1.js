@@ -314,5 +314,5 @@ function heap(g, c, k, n, col, r, seed, o){ const R = rnd(seed); o = o || {}; fo
 const PLAZA = {cherry: {well: 'well_ido', stall: 'stall_yatai', qboard: 'qboard_ema', lantern: 'stonelantern'}};
 Object.keys(PLAZA).forEach(lk => { const L = LOOKS[lk]; if(!L) return; const sw = {}; Object.keys(PLAZA[lk]).forEach(a => { if(DEFS[PLAZA[lk][a]]) sw[a] = PLAZA[lk][a]; }); L.swap = Object.assign({}, L.swap || {}, sw); });
 })();
-K.loaded('cherry', 'ar-1');
+K.loaded('cherry', 'ip-4b');
 })(window.Props && window.Props._K);

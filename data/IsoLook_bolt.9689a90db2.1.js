@@ -21,7 +21,7 @@ const HULL = '#EEF1F6', HULL2 = '#DDE3EE', METAL = '#9AA2B4', DARKM = '#4A5266',
 function zap(g, x, y, r, col){ g.fillStyle = col; g.beginPath(); g.moveTo(x + r * 0.25, y - r); g.lineTo(x - r * 0.55, y + r * 0.12); g.lineTo(x - r * 0.02, y + r * 0.12); g.lineTo(x - r * 0.3, y + r); g.lineTo(x + r * 0.58, y - r * 0.18); g.lineTo(x + r * 0.06, y - r * 0.18); g.closePath(); g.fill(); }
 addSide('bolt', {name: 'Bolt Works', icon: '🤖', look: 'bolt', accent: YEL, emblem: zap, base: 'moon'});
 addLook('bolt', {name: 'Bolt Works', walls: [HULL, HULL2, '#E6E9F0'], roofs: [METAL, DARKM, YEL], trim: DARKM, accent: YEL, stilts: false, team: null, side: 'bolt', ground: 'moon',
-  res: {coin: '#C9D3E2', coinDk: '#6A7488', rock: '#8E8A9E', brick: '#8A94A8', brickDk: '#4A5266', leaf: '#6FC36A', bark: '#6A6070'}}, 'moon');
+  res: {coin: '#C9D3E2', coinDk: '#6A7488', rock: '#8E8A9E', brick: '#8A94A8', brickDk: '#4A5266', leaf: '#6FC36A', bark: '#6A6070', gem: '#39E6FF', gemDk: '#1A6FB0', gemHi: '#E0FBFF'}}, 'moon');
 /* ---------- 🖌️ bolt painters ---------- */
 const seams = (n, h) => (g, Q, k) => { g.strokeStyle = 'rgba(58,66,86,0.24)'; g.lineWidth = 0.9 * k; for(let i = 1; i < n; i++) line(g, Q(i / n, 0), Q(i / n, h)); g.fillStyle = 'rgba(58,66,86,0.4)';
   for(let i = 0; i <= n; i++) [3, h - 3].forEach(z => { const q = Q(Math.min(0.97, Math.max(0.03, i / n)), z); g.beginPath(); g.arc(q[0], q[1], 0.75 * k, 0, TAU); g.fill(); }); };
@@ -241,6 +241,54 @@ addFloor('bolt', {name: 'Metal plates + pipes', top: '#AEB4C2', top2: '#A2A9B8',
     const m = q(0.5, 0.32 + r2 * 0.3); g.fillStyle = YEL; g.fillRect(m[0] - 2 * s, m[1] - 3 * s, 4 * s, 5 * s); }
   else if(r > 0.86){ const pts = [q(0.08, 0.84), q(0.92, 0.84), q(0.92, 0.94), q(0.08, 0.94)]; polyP(g, pts); g.fillStyle = YEL; g.fill(); g.save(); g.clip(); g.fillStyle = BLK; for(let u = 0; u < 1; u += 0.16){ polyP(g, [q(u, 0.84), q(u + 0.07, 0.84), q(u + 0.1, 0.94), q(u + 0.03, 0.94)]); g.fill(); } g.restore(); }
   else if(r2 > 0.8){ boltHead(g, ...q(0.62, 0.4), 2.6 * s); } }});
+/* ---------- 🧱 AR-4 (pictures 2026-11-18): 🤖 Bolt Works wall = riveted steel panels on a hazard-stripe base, team light strip · posts = pylons with a team beacon
+   gate = two hazard pylons + a steel beam, a blast door that rolls UP to open ---------- */
+(function(){ const {wallProp, gateProp, longFaces, WP, tallWallProp, tallGateProp} = K.AR;
+  const skin = {name: 'Steel wall', gateName: 'Blast gate', h: 48, gateH: 100,
+    seg(B, L, r, c, v){ const [x, y, w, d, ax] = r, len = ax === 'x' ? w : d, b0 = B.box(x, y, 0, w, d, 6, BLK);
+      ['front', 'right', 'left', 'back'].forEach(s => B.decal(b0, s, ...F(b0, s), 0, 6, YEL, {paint: hazard(0, 6)}));
+      const pb = B.box(x, y, 6, w, d, 21, METAL); ['front', 'right', 'left', 'back'].forEach(s => { const lf = longFaces(ax).indexOf(s) >= 0; B.decal(pb, s, ...F(pb, s), 0, 21, METAL, {paint: seams(lf ? Math.max(1, Math.round(len * 4)) : 1, 21)}); });
+      trim(B, L, pb, 9, 3, longFaces(ax)); B.box(x, y, 27, w, d, 3, DARKM); },
+    post(B, L, kind, c){ const P = WP, H = 34, b = B.box(0.5 - P, 0.5 - P, 0, 2 * P, 2 * P, H, DARKM);
+      ['front', 'right', 'left', 'back'].forEach(s => { B.decal(b, s, ...F(b, s), 0, 6, YEL, {paint: hazard(0, 6)}); B.decal(b, s, ...F(b, s), 6, H - 6, DARKM, {paint: seams(2, H - 6)}); });
+      trim(B, L, b, 22, 3); B.box(0.5 - P - 0.03, 0.5 - P - 0.03, H, 2 * P + 0.06, 2 * P + 0.06, 3, METAL);
+      const on = lightOf(c); B.drum(0.5, 0.5, H + 3, 0.085, 5, c && c.broken ? '#5A5560' : teamOf(L), {rings: 1}); if(on) halo(B, 0.5, 0.5, H + 6, 11, teamOf(L), 0.5 * on); },
+    gate(B, L, open, c, v){ const t = 0.22, H = 56, oz = 44, on = lightOf(c);
+      [[0, 0.26], [0.74, 0.26]].forEach(([x0, w]) => { const b = B.box(x0, 0.5 - t, 0, w, 2 * t, H, DARKM);
+        ['front', 'right', 'left', 'back'].forEach(s => { B.decal(b, s, ...F(b, s), 0, 9, YEL, {paint: hazard(0, 9)}); B.decal(b, s, ...F(b, s), 9, H - 9, DARKM, {paint: seams(2, H - 9)}); });
+        trim(B, L, b, 44, 3); B.box(x0 - 0.02, 0.5 - t - 0.02, H, w + 0.04, 2 * t + 0.04, 3, METAL); });
+      const li = B.box(0.26, 0.5 - 0.13, oz, 0.48, 0.26, 10, METAL); ['front', 'back'].forEach(s => B.decal(li, s, ...F(li, s), 0, 10, YEL, {paint: hazard(2, 6)}));
+      B.drum(0.5, 0.5, oz + 10, 0.07, 4, c && c.broken ? '#5A5560' : teamOf(L), {rings: 1}); if(on) halo(B, 0.5, 0.5, oz + 13, 12, teamOf(L), 0.55 * on);
+      if(c && c.broken){ B.box(0.28, 0.5 - 0.05, 0, 0.44, 0.1, 14, D.sh(STEEL, -0.3)); }
+      else { const dz = open ? oz - 6 : 0, dh = open ? 6 : oz, db = B.box(0.26, 0.5 - 0.05, dz, 0.48, 0.1, dh, STEEL);
+        ['front', 'back'].forEach(s => { B.decal(db, s, ...F(db, s), 0, dh, STEEL, {paint: seams(3, dh)}); if(!open){ B.decal(db, s, ...F(db, s), 0, 7, YEL, {paint: hazard(0, 7)}); } });
+        if(!open) trim(B, L, db, 24, 3, ['front', 'back']); }
+      if(!(c && c.broken)) [[0.13], [0.87]].forEach(([x]) => pennant(B, L, x, 0.5, H + 3, 20, {w: 11, hh: 7, emblem: zap, pole: DARKM})); } };
+  wallProp('bolt', 'bolt', skin); gateProp('bolt', 'bolt', skin);
+  // 🏯 tall: the steel wall on a bulkhead rampart (hazard foot + panel seams + a walkway rail) · towers = square pylons with a team band, a turret drum + team beacon · gatehouse = a blast door under a steel bridge
+  const tall = {name: 'Bulkhead wall', gateName: 'Blast gatehouse', base: 30, h: 108, gateH: 112,
+    rampart(B, L, r, c, hb){ const [x, y, w, d, ax] = r, e = 0.07, len = ax === 'x' ? w : d, bx = ax === 'x' ? [x, y - e, w, d + 2 * e] : [x - e, y, w + 2 * e, d];
+      const b0 = B.box(bx[0], bx[1], 0, bx[2], bx[3], 8, BLK); ['front', 'right', 'left', 'back'].forEach(s => B.decal(b0, s, ...F(b0, s), 0, 8, YEL, {paint: hazard(0, 8)}));
+      const b = B.box(bx[0], bx[1], 8, bx[2], bx[3], hb - 10, DARKM); ['front', 'right', 'left', 'back'].forEach(s => { const lf = longFaces(ax).indexOf(s) >= 0; B.decal(b, s, ...F(b, s), 0, hb - 10, DARKM, {paint: seams(lf ? Math.max(1, Math.round(len * 3)) : 1, hb - 10)}); });
+      B.box(bx[0], bx[1], hb - 2, bx[2], bx[3], 2, METAL); },
+    tower(B, L, c, cx, cy, hb, kind, hw){ const br = c && c.broken, on = lightOf(c), H = hb + 34, HH = br ? H - 14 : H, b = B.box(cx - hw, cy - hw, 0, 2 * hw, 2 * hw, HH, DARKM);
+      ['front', 'right', 'left', 'back'].forEach(s => { B.decal(b, s, ...F(b, s), 0, 9, YEL, {paint: hazard(0, 9)}); B.decal(b, s, ...F(b, s), 9, HH - 9, DARKM, {paint: seams(2, HH - 9)}); });
+      ['front', 'right'].forEach(s => B.decal(b, s, (s === 'front' ? cx : cy) - 0.05, 0.1, hb + 6, 5, CYAN, {k: 'win'}));
+      trim(B, L, b, HH - 14, 3); if(br) return;
+      B.box(cx - hw - 0.03, cy - hw - 0.03, H, 2 * hw + 0.06, 2 * hw + 0.06, 3, METAL);
+      B.drum(cx, cy, H + 3, hw * 0.75, 9, METAL, {rings: 2}); B.drum(cx, cy, H + 12, hw * 0.45, 5, teamOf(L), {rings: 1});
+      if(on) halo(B, cx, cy, H + 15, kind === 'gate' ? 11 : 14, teamOf(L), 0.55 * on); },
+    gatehouse(B, L, open, c, hb){ const br = c && c.broken, on = lightOf(c), oz = 44, H = hb + 32, t = 0.16;
+      if(br) B.box(0.28, 0.5 - 0.05, 0, 0.44, 0.1, 14, D.sh(STEEL, -0.3));
+      else { const dz = open ? oz - 6 : 0, dh = open ? 6 : oz, db = B.box(0.26, 0.5 - 0.05, dz, 0.48, 0.1, dh, STEEL);
+        ['front', 'back'].forEach(s => { B.decal(db, s, ...F(db, s), 0, dh, STEEL, {paint: seams(3, dh)}); if(!open) B.decal(db, s, ...F(db, s), 0, 7, YEL, {paint: hazard(0, 7)}); });
+        if(!open) trim(B, L, db, 24, 3, ['front', 'back']); }
+      const b = B.box(0.26, 0.5 - t, oz, 0.48, 2 * t, br ? 6 : H - oz, METAL); ['front', 'back'].forEach(s => B.decal(b, s, ...F(b, s), 0, br ? 6 : H - oz, YEL, {paint: hazard(0, 5)}));
+      if(br) return; trim(B, L, b, H - oz - 8, 3, ['front', 'back']);
+      B.drum(0.5, 0.5, H, 0.08, 5, teamOf(L), {rings: 1}); if(on) halo(B, 0.5, 0.5, H + 3, 13, teamOf(L), 0.55 * on);
+      pennant(B, L, 0.5, 0.5 + t * 0.5, H, 18, {w: 11, hh: 7, emblem: zap, pole: DARKM}); } };
+  tallWallProp('bolt', 'bolt', skin, tall); tallGateProp('bolt', 'bolt', skin, tall);
 })();
-K.loaded('bolt', 'ar-1');
+})();
+K.loaded('bolt', 'ip-4b');
 })(window.Props && window.Props._K);

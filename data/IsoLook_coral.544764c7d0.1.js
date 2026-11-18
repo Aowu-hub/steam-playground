@@ -174,5 +174,5 @@ Object.assign(LOOKS.coral, {swap: {palm: 'kelp', jtree: 'coraltree', mango: 'cor
     inn: 'inn_pearl', smithy: 'smithy_vent', well: 'well_clam', stall: 'stall_reef', qboard: 'qboard_drift', lantern: 'lantern_jelly'},
   roles: {home: ['coralhouse', 'shellhouse', 'coralhouse'], tall: ['coraltree', 'kelp', 'coraltree', 'kelp'], small: ['anemone', 'rock', 'anemone', 'rock']}});
 })();
-K.loaded('coral', 'ar-1');
+K.loaded('coral', 'ip-4b');
 })(window.Props && window.Props._K);

@@ -161,5 +161,5 @@ Object.assign(LOOKS.lava, {swap: {palm: 'embertree', jtree: 'embertree', mango: 
     inn: 'inn_ember', smithy: 'smithy_lava', well: 'well_geyser', stall: 'stall_ember', qboard: 'qboard_ember', lantern: 'lantern_magma'},
   roles: {home: ['basalthouse', 'emberdome', 'basalthouse'], tall: ['embertree', 'embertree', 'obsidian', 'embertree'], small: ['firebloom', 'obsidian', 'rock', 'firebloom', 'rock']}});
 })();
-K.loaded('lava', 'ar-1');
+K.loaded('lava', 'ip-4b');
 })(window.Props && window.Props._K);

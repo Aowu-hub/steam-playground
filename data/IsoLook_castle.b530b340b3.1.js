@@ -165,5 +165,5 @@ Object.assign(LOOKS.castle, {swap: {palm: 'oak', jtree: 'oak', mango: 'oak', bam
     inn: 'inn_tavern', smithy: 'smithy_armory', well: 'fountain_royal', stall: 'stall_fair', qboard: 'qboard_herald', lantern: 'lantern_torch'},
   roles: {home: ['tudor', 'towerhouse', 'tudor'], tall: ['oak', 'oak', 'topiary', 'oak'], small: ['rosebush', 'topiary', 'rock', 'rosebush']}});
 })();
-K.loaded('castle', 'ar-1');
+K.loaded('castle', 'ip-4b');
 })(window.Props && window.Props._K);

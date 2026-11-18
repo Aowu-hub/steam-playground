@@ -171,5 +171,5 @@ Object.assign(LOOKS.moon, {swap: {palm: 'crystaltree', jtree: 'crystaltree', man
   roles: {home: ['moondome', 'moonpod', 'moondome'], tall: ['crystaltree', 'crystaltree', 'moongarden'], small: ['moonrock', 'moonrock', 'moongarden', 'moonrock']}});
 /*@@CASTLE@@*/
 })();
-K.loaded('moon', 'ar-1');
+K.loaded('moon', 'ip-4b');
 })(window.Props && window.Props._K);

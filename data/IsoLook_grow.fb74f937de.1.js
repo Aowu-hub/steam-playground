@@ -279,5 +279,5 @@ Object.keys(LINES).forEach(key => { const Ln = LINES[key];
   def.aims = STAGES.reduce((o, s) => (o[s] = [0.5, 0.5, Math.round(Ln.h[s] * 0.8)], o), {});
   def.conds = {'*': (g, x, y, k, t, v, c, L) => wilt(g, x, y, k, c, tg => Ln.paint(tg, String((L && L.state) || '1'), 0))}; });
 })();
-K.loaded('grow', 'ar-1');
+K.loaded('grow', 'ip-4b');
 })(window.Props && window.Props._K);

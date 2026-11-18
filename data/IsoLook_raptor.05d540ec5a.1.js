@@ -14,14 +14,14 @@ const {HTW, LOOKS, DEFS, MAT, PD, add, lit, sideOf, sh, rnd, addLook, addSet, or
 (function(){
 'use strict';
 const {vis, F, line, polyP, ph, lightOf, dome, frustum, halo} = T;
-const {pennant, banner, trim, building, addSide, addFloor, tileBase, hash, teamOf} = K.AR;
+const {pennant, banner, trim, building, addSide, addFloor, tileBase, hash, teamOf, patOf, inkOf} = K.AR;
 const D = PD, M = MAT, TAU = Math.PI * 2, S2 = Math.SQRT2;
 const BAS = '#7A7484', BAS2 = '#615B6C', BONE = '#F4EAD2', BONED = '#CDBE98', FERN = '#4CB13A', FERN2 = '#2E8B3A', AMB = '#FF9A2E', MUD = '#C08A56', EGG = '#F8EFD9', SPOT = '#3FB8A8', BARK = '#8A5A34', MOSS = '#7FB24A';
 // 🦶 the side's emblem: a three-toe dino footprint
 function claw(g, x, y, r, col){ g.fillStyle = col; g.beginPath(); D.ell(g, x, y + r * 0.35, r * 0.48, r * 0.42); g.fill(); [[-0.62, -0.42, -0.5], [0, -0.72, 0], [0.62, -0.42, 0.5]].forEach(([dx, dy, a]) => { g.beginPath(); D.ell(g, x + dx * r, y + dy * r, r * 0.2, r * 0.36, a); g.fill(); }); }
 addSide('raptor', {name: 'Raptor Ridge', icon: '🦖', look: 'raptor', accent: AMB, emblem: claw, base: 'jungle'});
 addLook('raptor', {name: 'Raptor Ridge', walls: ['#C08A56', '#B9A27A', '#D6A26C'], roofs: [FERN, '#E3BE6A', FERN2], trim: '#5A3418', accent: AMB, stilts: false, team: null, side: 'raptor',
-  res: {coin: '#FF9A2E', coinDk: '#B8561A', rock: '#8C8496', brick: '#5DBB46', brickDk: '#2E8B3A', leaf: '#3FA53A', bark: '#8A5A34'}}, 'jungle');
+  res: {coin: '#FF9A2E', coinDk: '#B8561A', rock: '#8C8496', brick: '#5DBB46', brickDk: '#2E8B3A', leaf: '#3FA53A', bark: '#8A5A34', gem: '#3FD6C2', gemDk: '#1C8A7E', gemHi: '#D8FFF8'}}, 'jungle');
 /* ---------- 🖌️ raptor painters ---------- */
 // 🪨 volcanic rock blocks on a face (decal paint): rows of rounded stones, h = face height px
 const rocks = (h, col, seed) => (g, Q, k) => { const R = rnd(seed || 7); for(let z = 0, row = 0; z < h - 1; z += 9, row++){ let u = row % 2 ? -0.08 : 0; const zh = Math.min(9, h - z);
@@ -270,6 +270,65 @@ addFloor('raptor', {name: 'Mossy stones + bones', top: '#A9AE7E', top2: '#9DA472
   if(r < 0.35){ const p = q(0.68, 0.3 + r2 * 0.3); frond(g, p[0], p[1], s * 0.7, 10, -0.6, FERN2, null); frond(g, p[0], p[1], s * 0.7, 9, 0.5, FERN, null); }
   if(r > 0.88){ const p = q(0.5, 0.55); nest(g, p[0], p[1], s, 8, null); egg(g, p[0], p[1] - 3 * s, 3.4 * s, null); }
   if(r2 < 0.2){ g.fillStyle = '#B8B2C2'; g.beginPath(); D.ell(g, ...q(0.2, 0.75), 2.6 * s, 1.6 * s); g.fill(); } }});
+/* ---------- 🧱 AR-4 (pictures 2026-11-18): 🦖 Raptor Ridge wall = a log palisade on mossy rock, team rope lashing · posts = thick logs with crossed tusks
+   gate = two rock pillars under a giant tusk arch, log doors ---------- */
+(function(){ const {wallProp, gateProp, gateDoors, longFaces, WT, WP, tallWallProp, tallGateProp} = K.AR;
+  const TIP = '#D9B07A', ROPE = '#C8A060';
+  const logs = h => (g, Q, k) => { for(let u = 0, i = 0; u < 1; u += 0.2, i++){ polyP(g, [Q(u + 0.01, 0), Q(u + 0.19, 0), Q(u + 0.19, h), Q(u + 0.01, h)]); g.fillStyle = D.sh(BARK, (i % 2 ? -0.08 : 0.06)); g.fill();
+      g.strokeStyle = 'rgba(42,28,20,0.35)'; g.lineWidth = 0.9 * k; g.stroke(); g.strokeStyle = 'rgba(255,230,190,0.25)'; line(g, Q(u + 0.06, 2), Q(u + 0.06, h - 2)); }
+    g.strokeStyle = ROPE; g.lineWidth = 2 * k; [h * 0.25, h * 0.72].forEach(z => line(g, Q(0.02, z), Q(0.98, z))); };
+  // 🪢 the team rope lashing along a run (front side), drawn after the logs
+  function lashing(B, L, x0, y0, x1, y1, ax, z, c){ B.custom((x0 + x1) / 2, (y0 + y1) / 2, (g, P, k) => { const col = teamOf(L), br = c && c.broken, U = 36, len = Math.hypot(x1 - x0, y1 - y0) * U, hh = 5,
+      off = 0.075, M2 = (s, v) => { const f = s / len; return P(x0 + (x1 - x0) * f + (ax === 'y' ? off : 0), y0 + (y1 - y0) * f + (ax === 'x' ? off : 0), z + hh - v); };
+    g.save(); polyP(g, [M2(0, 0), M2(len, 0), M2(len, hh), M2(0, hh)]); g.fillStyle = br ? D.sh(col, -0.45) : col; g.fill(); g.clip(); if(!br) K.AR.patPaint(g, M2, len, hh, patOf(L), inkOf(col), k); g.restore();
+    g.strokeStyle = D.sh(col, -0.5); g.lineWidth = 1 * k; line(g, M2(0, 0.3), M2(len, 0.3)); line(g, M2(0, hh - 0.3), M2(len, hh - 0.3)); }, {layer: 5, zb: z, top: z + 5}); }
+  const skin = {name: 'Log palisade', gateName: 'Tusk gate', h: 50, gateH: 100,
+    seg(B, L, r, c, v){ const [x, y, w, d, ax] = r, t = 0.15, bx = ax === 'x' ? [x, 0.5 - t, w, 2 * t] : [0.5 - t, y, 2 * t, d], b = B.box(bx[0], bx[1], 0, bx[2], bx[3], 8, BAS);
+      ['front', 'right', 'left', 'back'].forEach(s => B.decal(b, s, ...F(b, s), 0, 8, BAS, {paint: rocks(8, BAS, 5 + Math.round((x + y) * 10))}));
+      const len = ax === 'x' ? w : d, n = Math.max(1, Math.round(len / 0.13)), st = len / n;
+      for(let i = 0; i < n; i++){ const p = (ax === 'x' ? x : y) + (i + 0.5) * st, cx = ax === 'x' ? p : 0.5, cy = ax === 'x' ? 0.5 : p, j = ((Math.round(p * 100) * 7) % 5), hh = (c && c.broken && i % 3 === 1) ? 10 : 25 + j;
+        B.drum(cx, cy, 8, 0.066, hh, BARK); if(!(c && c.broken && i % 3 === 1)) B.cone(cx, cy, 8 + hh, 0.066, 7, c ? '#B99A70' : TIP); }
+      const a0 = ax === 'x' ? [x, 0.5] : [0.5, y], a1 = ax === 'x' ? [x + w, 0.5] : [0.5, y + d]; lashing(B, L, a0[0], a0[1], a1[0], a1[1], ax, 21, c); },
+    post(B, L, kind, c){ B.drum(0.5, 0.5, 0, 0.2, 7, BAS2); B.drum(0.5, 0.5, 7, 0.15, 27, D.sh(BARK, -0.06), {rings: 2});
+      B.custom(0.5, 0.5, (g, P, k) => { const col = teamOf(L), br = c && c.broken, q = P(0.5, 0.5, 23), rx = 0.155 * HTW * k * S2, ry = rx / 2;
+        g.fillStyle = br ? D.sh(col, -0.45) : col; g.beginPath(); g.ellipse(q[0], q[1], rx, ry, 0, 0, Math.PI); g.lineTo(q[0] - rx, q[1] - 5 * k); g.ellipse(q[0], q[1] - 5 * k, rx, ry, 0, Math.PI, 0, true); g.closePath(); g.fill();
+        g.strokeStyle = D.sh(col, -0.5); g.lineWidth = 1 * k; g.stroke(); }, {layer: 5, zb: 23, top: 28});
+      if(!(c && c.broken)) B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 34); tusk(g, q[0] - 3 * k, q[1], k, 13, 0.8, 2.6); tusk(g, q[0] + 3 * k, q[1], k, 13, -0.8, 2.6); }, {layer: 6, zb: 34, top: 47}); },
+    gate(B, L, open, c, v){ const t = 0.22, H = 40;
+      [[0, 0.26], [0.74, 0.26]].forEach(([x0, w]) => { const b = B.box(x0, 0.5 - t, 0, w, 2 * t, H, BAS); ['front', 'right', 'left', 'back'].forEach(s => B.decal(b, s, ...F(b, s), 0, H, BAS, {paint: rocks(H, BAS, 61 + x0 * 10)}));
+        B.box(x0 + 0.02, 0.5 - t + 0.02, H, w - 0.04, 2 * t - 0.04, 3, MOSS); });
+      if(!(c && c.broken)) B.custom(0.5, 0.5, (g, P, k) => { const a = P(0.13, 0.5, H + 3), b2 = P(0.87, 0.5, H + 3), m = P(0.5, 0.5, H + 34);   // 🦴 the giant tusk arch
+        [[a, 1], [b2, -1]].forEach(([p, s]) => { g.fillStyle = BONE; g.beginPath(); g.moveTo(p[0] - 5 * k, p[1]); g.quadraticCurveTo(p[0] - 4 * k * s + s * 2 * k, m[1] + 6 * k, m[0] + s * 3 * k, m[1]); g.quadraticCurveTo(p[0] + s * 7 * k, m[1] + 14 * k, p[0] + 5 * k, p[1]); g.closePath(); g.fill();
+          g.fillStyle = 'rgba(160,140,100,0.35)'; g.beginPath(); g.moveTo(p[0] + s * 1 * k, p[1]); g.quadraticCurveTo(p[0] + s * 6 * k, m[1] + 12 * k, m[0] + s * 3 * k, m[1]); g.quadraticCurveTo(p[0] + s * 8 * k, m[1] + 15 * k, p[0] + s * 5 * k, p[1]); g.closePath(); g.fill(); });
+        const col = teamOf(L); g.fillStyle = col; g.beginPath(); D.ell(g, m[0], m[1] + 3 * k, 6 * k, 4.4 * k); g.fill(); g.strokeStyle = D.sh(col, -0.5); g.lineWidth = 1 * k; g.stroke();
+        claw(g, m[0], m[1] + 3.4 * k, 3.2 * k, inkOf(col)); }, {layer: 6, zb: H, top: H + 38});
+      gateDoors(B, open, c, 34, BARK, ROPE, {paint: logs(34)});
+      if(!(c && c.broken)) [[0.13], [0.87]].forEach(([x]) => pennant(B, L, x, 0.5 - 0.12, H + 3, 20, {w: 11, hh: 7, emblem: claw})); } };
+  wallProp('raptor', 'raptor', skin); gateProp('raptor', 'raptor', skin);
+  // 🏯 tall: the palisade on a mossy rock rampart · towers = a rock pillar carrying a log watchtower (platform + rope band + thatch roof + claw pennant) · gatehouse = a log bridge with crossed tusks
+  const THATCH = '#CFA75C';
+  const tall = {name: 'Rampart palisade', gateName: 'Tusk gatehouse', base: 30, h: 112, gateH: 116,
+    rampart(B, L, r, c, hb){ const [x, y, w, d, ax] = r, e = 0.08, b = ax === 'x' ? B.box(x, y - e, 0, w, d + 2 * e, hb - 3, BAS) : B.box(x - e, y, 0, w + 2 * e, d, hb - 3, BAS);
+      ['front', 'right', 'left', 'back'].forEach(s => B.decal(b, s, ...F(b, s), 0, hb - 3, BAS, {paint: rocks(hb - 3, BAS, 23 + Math.round((x + y) * 10))}));
+      if(ax === 'x') B.box(x, y - e, hb - 3, w, d + 2 * e, 3, c ? '#8FA060' : MOSS); else B.box(x - e, y, hb - 3, w + 2 * e, d, 3, c ? '#8FA060' : MOSS); },
+    tower(B, L, c, cx, cy, hb, kind, hw){ const br = c && c.broken, b = B.box(cx - hw, cy - hw, 0, 2 * hw, 2 * hw, hb, BAS2);
+      ['front', 'right', 'left', 'back'].forEach(s => B.decal(b, s, ...F(b, s), 0, hb, BAS2, {paint: rocks(hb, BAS2, 37 + Math.round(cx * 10))}));
+      const lh = 22, lg = hw * 0.72, z1 = hb + lh;
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy], i) => { if(br && i === 1) return; B.drum(cx + sx * lg, cy + sy * lg, hb, Math.max(0.035, hw * 0.17), br && i === 3 ? 10 : lh + 18, D.sh(BARK, -0.05)); });
+      if(br) return;
+      const pf = B.box(cx - hw - 0.02, cy - hw - 0.02, z1, 2 * hw + 0.04, 2 * hw + 0.04, 6, BARK); ['front', 'right', 'left', 'back'].forEach(s => B.decal(pf, s, ...F(pf, s), 0, 6, BARK, {paint: logs(6)}));
+      trim(B, L, pf, 2, 2, ['front', 'right']);
+      B.cone(cx, cy, z1 + 18, hw * 1.45, kind === 'gate' ? 18 : 24, THATCH);
+      pennant(B, L, cx, cy, z1 + 18 + (kind === 'gate' ? 16 : 22), kind === 'gate' ? 14 : 18, {w: 11, hh: 7, emblem: claw}); },
+    gatehouse(B, L, open, c, hb){ const br = c && c.broken, z0 = 40, t = 0.17;
+      gateDoors(B, open, c, 34, BARK, ROPE, {paint: logs(34)});
+      const b = B.box(0.26, 0.5 - t, z0, 0.48, 2 * t, br ? 5 : 10, BARK); ['front', 'back'].forEach(s => B.decal(b, s, ...F(b, s), 0, br ? 5 : 10, BARK, {paint: logs(br ? 5 : 10)}));
+      if(br) return; trim(B, L, b, 4, 2, ['front', 'back']);
+      for(let i = 0; i < 5; i++){ const x = 0.3 + i * 0.1; B.drum(x, 0.5, z0 + 10, 0.045, 16 + (i % 2) * 4, BARK); B.cone(x, 0.5, z0 + 26 + (i % 2) * 4, 0.045, 6, TIP); }
+      B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5 - t, z0 + 5); tusk(g, q[0] - 5 * k, q[1] + 2 * k, k, 16, 0.9, 3); tusk(g, q[0] + 5 * k, q[1] + 2 * k, k, 16, -0.9, 3);
+        const col = teamOf(L); g.fillStyle = col; g.beginPath(); D.ell(g, q[0], q[1] - 4 * k, 5.5 * k, 4 * k); g.fill(); g.strokeStyle = D.sh(col, -0.5); g.lineWidth = 1 * k; g.stroke(); claw(g, q[0], q[1] - 3.6 * k, 3 * k, inkOf(col)); }, {layer: 7, zb: z0, top: z0 + 22}); } };
+  tallWallProp('raptor', 'raptor', skin, tall); tallGateProp('raptor', 'raptor', skin, tall);
 })();
-K.loaded('raptor', 'ar-1');
+})();
+K.loaded('raptor', 'ip-4b');
 })(window.Props && window.Props._K);

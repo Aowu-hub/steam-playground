@@ -309,5 +309,5 @@ const PLAZA = {desert: {well: 'well_mosaic', qboard: 'qboard_scroll', lantern: '
 };
 Object.keys(PLAZA).forEach(lk => { const L = LOOKS[lk]; if(!L) return; const sw = {}; Object.keys(PLAZA[lk]).forEach(a => { if(DEFS[PLAZA[lk][a]]) sw[a] = PLAZA[lk][a]; }); L.swap = Object.assign({}, L.swap || {}, sw); });
 })();
-K.loaded('desert', 'ar-1');
+K.loaded('desert', 'ip-4b');
 })(window.Props && window.Props._K);
