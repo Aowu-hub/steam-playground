@@ -78,7 +78,7 @@ L.add('lab', {staff: {name: 'Oak Staff', kind: 'weapon', slot: 'hand', staff: tr
   q.fillStyle = '#2A1C14'; q.beginPath(); q.arc(24, -50, 21, 0, 7); q.fill(); const gr = q.createRadialGradient(18, -56, 2, 24, -50, 18); gr.addColorStop(0, '#FFFFFF'); gr.addColorStop(1, c); q.fillStyle = gr; q.beginPath(); q.arc(24, -50, 17, 0, 7); q.fill(); }}}, {by: 'LootLab'});
 const SRCS = Object.keys(L.SRC), POOL = ['demo.blade', 'demo.helm', 'demo.amulet'];
 const SETS = {boss: {id: 'jungle-gold', tier: 4, pieces: POOL}, eboss: {id: 'jungle-rainbow', tier: 5, pieces: POOL}, awaken: {id: 'temple-sky', tier: 6, pieces: POOL}, hidden: {id: 'jungle-gold', tier: 4, pieces: POOL}};
-const S = {view: 'tiers', src: 'mini', basic: false, dayN: 0, W: 0, H: 0, dpr: 1, last: null, stats: null, busy: false, sheet: null, drawn: [], frameMs: 0, rolls: 0};
+const S = {hp: 100, view: 'tiers', src: 'mini', basic: false, dayN: 0, W: 0, H: 0, dpr: 1, last: null, stats: null, busy: false, sheet: null, drawn: [], frameMs: 0, rolls: 0};
 // a demo bag: 30 things, some materials, 2 in the 📬 mailbox, 2 to buy back
 function demoBag(){ const r = L.rng('lab-bag'), B = L.bag({slots: 40, c: 250});
   for(let i = 0; i < 30; i++){ const tier = [0, 0, 0, 1, 1, 1, 2, 2, 3, 4, 5, 6][Math.floor(r() * 12)]; B.add({base: POOL[i % 3], tier, lv: 1 + Math.floor(r() * 9), seed: Math.floor(r() * 1e9), sock: L.SOCK[tier], runes: []}); }
@@ -100,9 +100,9 @@ function dock(){ const D = $('dock'); D.innerHTML = '';
     const row2 = document.createElement('div'); row2.className = 'chips'; D.appendChild(row2);
     chipRow(row2, [['go', '▶', 'Roll', 'go'], ['basic', '🌱', S.basic ? 'Basic on' : 'Basic off'], ['stats', '📊', '10 000 rolls'], ['day', '⏭', 'Next day']], S.basic ? 'basic' : null, k => {
       if(k === 'go') doRoll(); else if(k === 'basic'){ S.basic = !S.basic; dock(); } else if(k === 'stats') stats(); else { S.dayN++; note(); } }); }
-  else if(S.view === 'fight'){ const bar = L.quickBar(D, BAG, {onUse: r => { toastEff(r); note(); }}); S.bar = bar;
+  else if(S.view === 'fight'){ const bar = L.quickBar(D, BAG, {onUse: r => { const h = r.eff.find(e => e.k === 'heal'); if(h) S.hp = Math.min(100, S.hp + h.v); toastEff(r); note(); }, onChange: () => note()}); S.bar = bar;
     const row = document.createElement('div'); row.className = 'chips'; row.id = 'hits'; D.appendChild(row);
-    chipRow(row, [['blade', '🔥', 'Blade hit'], ['staff', '⚡', 'Staff spell'], ['turn', '⏭', 'Next turn']], null, k => { if(k === 'turn'){ bar.newTurn(); S.hits = null; return; } fight(k); }); }
+    chipRow(row, [['blade', '🔥', 'Blade hit'], ['staff', '⚡', 'Staff spell'], ['ouch', '💥', 'Ouch −30'], ['turn', '⏭', 'Next turn']], null, k => { if(k === 'turn'){ bar.newTurn(); S.hits = null; bar.check(S.hp / 100); note(); return; } if(k === 'ouch'){ S.hp = Math.max(1, S.hp - 30); bar.check(S.hp / 100); note(); return; } fight(k); }); }
   else if(S.view === 'bag' || S.view === 'book'){ chipRow(D, [['open', S.view === 'bag' ? '🎒' : '📖', S.view === 'bag' ? 'Open bag' : 'Open book'], ['reset', '🔄', 'New demo bag']], null, k => { if(k === 'reset'){ BAG = demoBag(); } openSheet(); }); } }
 function openSheet(){ if(S.sheet){ S.sheet.close(); S.sheet = null; }
   if(S.view === 'bag') S.sheet = L.bagSheet(document.body, BAG, {onUse: r => toastEff(r), onEquip: it => UI.toast ? UI.toast('⭐ ' + L.get(it.base).name + ' equipped') : 0, onClose: () => { S.sheet = null; }, onChange: note});
@@ -114,14 +114,14 @@ function toastEff(r){ const t = (L.useDef(r.id) || {}).name + ': ' + r.eff.map(e
 const FOES = ['leaf', 'water', 'fire', 'rock', 'bolt', 'wind', 'star', 'dark'];
 function fight(k){ const fb = BAG.g.find(i => i.base === 'demo.blade' && i.el), st = BAG.g.find(i => i.base === 'lab.staff'), base = 100;
   S.hits = {k, list: FOES.map(e => { const m = k === 'staff' ? L.spellMult(st, 'bolt', e) : L.hitMult(fb, e); return {e, n: Math.round(base * m.x), m}; })}; }
-function vFight(){ const W = S.W, H = S.H, h = S.hits; txt(h ? (h.k === 'staff' ? '⚡ Bolt spell · staff ⚡ Lv 3 (+30 %)' : '🔥 Blade · 🔥 Lv 2 (+10 %)') + ' — base 100' : '⚔️ tap 🔥 Blade hit or ⚡ Staff spell · the quick bar is below', W / 2, 26, Math.max(12, Math.min(16, W / 30)));
+function vFight(){ const W = S.W, H = S.H, h = S.hits; txt(h ? (h.k === 'staff' ? '⚡ Bolt spell · staff ⚡ Lv 3 (+30 %)' : '🔥 Blade · 🔥 Lv 2 (+10 %)') + ' — base 100' : '⚔️ tap 🔥 Blade hit or ⚡ Staff spell', W / 2, W > H ? H - 12 : 26, Math.max(12, Math.min(16, W / 30)));   // sideways: the line sits at the bottom (the note pill is top right)
   if(!h) return; const n = h.list.length, cols = W > H ? 8 : 4, rows = Math.ceil(n / cols), cw = W / cols, ch = Math.min(110, (H - 46) / rows);
   h.list.forEach((x, i) => { const cx = cw * (i % cols) + cw / 2, cy = 46 + ch * Math.floor(i / cols) + ch / 2, E = L.ELS[x.e], r = Math.min(cw, ch) * 0.3;
     g.fillStyle = E.c; g.globalAlpha = 0.25; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill(); g.globalAlpha = 1; txt(E.icon, cx, cy + r * 0.35, r * 0.9); rec(cx - r, cy - r, r * 2, r * 2);
     txt(x.n + (x.m.arrow ? ' ' + x.m.arrow : ''), cx, cy - r - 4, Math.max(13, r * 0.6), x.m.k === 'strong' ? '#E09A00' : x.m.k === 'normal' ? '#24324A' : '#8A93A8'); txt(E.name, cx, cy + r + 14, 12, '#566A84'); }); }
 function note(){ const n = $('note'); if(S.view === 'tiers') n.textContent = '🎁 7 tiers · the item keeps its look — frame, glow, gem shape tell the tier';
   else if(S.view === 'roll') n.textContent = L.SRC[S.src].icon + ' ' + L.SRC[S.src].name + ' · 🍀 ' + BAG.luck().toFixed(1) + ' / ' + L.LUCK_STEPS + ' · ☁️ ' + BAG.shards() + ' · 📅 ' + day();
-  else if(S.view === 'fight') n.textContent = '⚔️ quick bar: ' + BAG.qb.map((id, i) => (i + 1) + ' ' + (id ? (L.useDef(id) || {}).icon + ' ×' + (BAG.u[id] || 0) : '—')).join(' · ') + (S.lastUse ? ' · last: ' + S.lastUse : '');
+  else if(S.view === 'fight') n.textContent = '❤️ ' + S.hp + ' · 🤖 auto-heal ' + (BAG.qa ? 'on (under 30 %)' : 'off') + ' · ⚔️ ' + BAG.qb.map((id, i) => (i + 1) + ' ' + (id ? (L.useDef(id) || {}).icon + ' ×' + (BAG.u[id] || 0) : '—')).join(' · ') + (S.lastUse ? ' · last: ' + S.lastUse : '');
   else n.textContent = '🎒 ' + BAG.count() + ' / ' + BAG.slots + ' · 📬 ' + BAG.mail.length + ' · save ' + BAG.size() + ' chars'; }
 async function doRoll(){ if(S.busy) return; S.busy = true; S.rolls++;
   const res = L.roll(S.src, {seed: 'lab:' + S.rolls + ':' + Date.now(), luck: 20, lv: 5, state: BAG.st, pool: POOL, boss: S.src === 'monster' || S.src === 'elite' ? null : 'lab-' + S.src, day: day(), set: SETS[S.src], relic: 'demo.amulet'});
@@ -162,4 +162,4 @@ setView('tiers'); requestAnimationFrame(frame);
 </script>
 </body>
 </html>
-<!-- (av-r0d3+av-r0e4+av-r0g) END OF LootLab.html -->
+<!-- (av-r0d3+av-r0e4+av-r0g+av-r0g2) END OF LootLab.html -->
