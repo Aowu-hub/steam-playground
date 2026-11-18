@@ -15,9 +15,9 @@
             40 slots (+10 per upgrade, max 120) · full → 📬 mail (never lost) · no ground drop · 🔵+ ask "are you sure?" · 🔒 locked = can't sell / recycle · ☀️ = never sold (♻️ → shards) · 🔁 last 10 sold
    ─ UI ─ show(box, item, {kind: 'chest'|'cloud'|'wheel'|'beam', src, chest, basic, skip, auto}) → Promise<'equip'|'bag'> (≤ 2 s, tap skips — not the very first time)
           reveal(box, res, o) = the right shows for a whole roll · showFor(src, item) · bagSheet(box, bag, {onEquip, onChange, matName, matIcon}) · book(box, bag, {list, title})
-   ─ 🍙 Use (av-r0g) ─ USES (10 island foods `food.*` + 4 potions `potion.*`) · addUse(pack, {id: {name, icon, island, eff: [{k, v, turns|fights}], cook: {mat: n}, paint(g)}}) · effRow(e) → [icon, words, value]
+   ─ 🍙 Use (av-r0g) ─ USES (10 island foods `food.*` + 5 potions `potion.*` incl. 🌟 Aura — Aura = the skill bar, plan §20h) · addUse(pack, {id: {name, icon, island, eff: [{k, v, turns|fights}], cook: {mat: n}, paint(g)}}) · effRow(e) → [icon, words, value]
             bag: use(id, n) (×99 cap, returns {n, over}) · eat(id) → {ok, eff, left} (the GAME applies the effects) · quick(slot, id) · quickUse(slot) · B.u / B.qb saved
-            quickBar(el, bag, {onUse(res), onChange}) → {newTurn(), render()} = 3 gold slots, one use per turn · bagSheet tabs 🎒 Gear · 🍙 Use · 🧱 Craft · 📬 Mail · 🔁 Buy back (+ o.onUse = 🍽️ Use button)
+            quickBar(el, bag, {onUse(res), onChange}) → {newTurn(), check(hp 0..1), render()} = 3 gold slots + ONE 🤖 auto-heal switch (B.qa; HP < 30 % → the first ❤️ heal on the bar, counts as the turn's use), one use per turn · bagSheet tabs 🎒 Gear · 🍙 Use · 🧱 Craft · 📬 Mail · 🔁 Buy back (+ o.onUse = 🍽️ Use button)
             roll: elites / bosses sometimes drop a potion (USE_DROP, own random → res.uses)
    ─ 🔥 Elements (av-r0g, Aowu 2026-11-18) ─ ELS (8 = the monsters' elements) · roll(src, {el}) drops that element's CORE (`core.<el>`, CORE_DROP, own random) · forge(item, el, lv?) (Lv 1–5, FORGE_COST cores; swap = half back)
             elMult(atkEl, defEl, lv) → {k: strong|normal|weak|same|plain, x, arrow} — strong ×1.5 · normal ×1 · weak ×0.7 · same ×0.75 · plain ×0.9 · ✨↔🌑 ×1.5 · +5 % a forged level
@@ -297,7 +297,7 @@ LD = {feather, bigWing, sunBurst, skyBack, sunCrest, cloudBank, RAR, RB, rainbow
 'use strict';
 const P = (typeof LD !== 'undefined' && LD) ? LD : window.LootDraft, D = window.AVD || (typeof AVD !== 'undefined' ? AVD : null);
 if(!P || !D) return;
-const TAU = Math.PI * 2, RAR = P.RAR, VERSION = 'av-r0g';
+const TAU = Math.PI * 2, RAR = P.RAR, VERSION = 'av-r0g2';
 /* ---------------- rng ---------------- */
 function hash(s){ s = String(s); let h = 2166136261 >>> 0; for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
 function rng(seed){ let a = (typeof seed === 'number' ? seed >>> 0 : hash(seed)) || 1; return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -351,13 +351,13 @@ function forge(it, el, lv){ if(!ELS[el]) return {ok: false, why: 'element'}; con
 /* 🍙 consumables (av-r0g, Aowu 2026-11-17 23:45 + 2026-11-18: "consumable, potion / craft / food" · "food based on island, different food different effect")
    Loot.addUse(pack, {id: {name, icon, island, eff: [{k, v, turns | fights | drops}], cook: {mat: n}, paint(g)}}) · stacks ×99 in the 🎒 bag (B.u) · 3-slot ⚔️ quick bar (B.qb)
    eff k: heal · hot (heal each turn) · power · shield · luck · speed · dodge · fire · cost · all · clear · drops — the GAME applies them; LootKit stores, shows and hands them out */
-const USE_MAX = 99, QB_N = 3, USES = {}, POTIONS = [];
+const USE_MAX = 99, QB_N = 3, AUTO_UNDER = 0.3, USES = {}, POTIONS = [];   // 🤖 auto-heal when HP < 30 %
 const ISLES = {jungle: '🌴 Jungle', beach: '🏖️ Beach', cove: '🥥 Coconut cove', farm: '🌾 Farm', desert: '🏜️ Desert', snow: '❄️ Snow', lava: '🌋 Lava', coral: '🌊 Coral', moon: '🚀 Moon', kingdom: '🏰 Kingdom'};
 const EFF = {heal: ['❤️', 'Heal'], hot: ['❤️', 'Heal each turn'], power: ['⚔️', 'Power'], shield: ['🛡️', 'Shield'], luck: ['🍀', 'Luck'], speed: ['💨', 'Speed'], dodge: ['🌀', 'Dodge'],
-  fire: ['🔥', 'Fire damage'], cost: ['✨', 'Skill cost'], all: ['⭐', 'Everything'], clear: ['✨', 'Clears burn · dizzy'], drops: ['🍀', 'Lucky drops']};
+  fire: ['🔥', 'Fire damage'], cost: ['🌟', 'Aura cost'], all: ['⭐', 'Everything'], clear: ['✨', 'Clears burn · dizzy'], drops: ['🍀', 'Lucky drops'], aura: ['🌟', 'Aura']};   // 🌟 Aura = the skill bar (Aowu 13:37 "aura ok")
 // one row per effect: [icon, words, value]
 function effRow(e){ const E = EFF[e.k] || ['•', e.k], when = e.turns ? (e.k === 'hot' ? ' × ' + e.turns : ' · ' + e.turns + ' turns') : e.fights ? (e.fights === 1 ? ' · next fight' : ' · ' + e.fights + ' fights') : '';
-  const v = e.k === 'clear' ? '✓' : e.k === 'drops' ? 'next ' + e.v : e.k === 'cost' ? '−' + e.v : e.k === 'luck' || e.k === 'speed' ? '+' + e.v : e.k === 'shield' ? e.v + ' % HP' : e.k === 'heal' || e.k === 'hot' ? e.v + ' %' : '+' + e.v + ' %';
+  const v = e.k === 'clear' ? '✓' : e.k === 'drops' ? 'next ' + e.v : e.k === 'cost' ? '−' + e.v : e.k === 'luck' || e.k === 'speed' || e.k === 'aura' ? '+' + e.v : e.k === 'shield' ? e.v + ' % HP' : e.k === 'heal' || e.k === 'hot' ? e.v + ' %' : '+' + e.v + ' %';
   return [E[0], E[1] + when, v]; }
 function addUse(pack, defs){ const ids = []; Object.keys(defs || {}).forEach(k => { const id = pack ? pack + '.' + k : k; USES[id] = Object.assign({id, name: k, icon: '🍙', eff: []}, defs[k]); ids.push(id); }); return ids; }
 const useDef = id => USES[id] || null, useName = id => (USES[id] || {}).name || id;
@@ -372,7 +372,8 @@ function add(pack, defs, meta){ const ids = []; Object.keys(defs || {}).forEach(
 function get(id){ return ITEMS[id] || null; }
 function list(o){ o = o || {}; return Object.keys(ITEMS).filter(id => (!o.kind || ITEMS[id].kind === o.kind) && (!o.pack || ITEMS[id].pack === o.pack) && (o.demo || o.pack === 'demo' || ITEMS[id].pack !== 'demo')); }
 function mkItem(base, tier, lv, r, extra){ return Object.assign({base, tier, lv: lv || 1, seed: Math.floor(r() * 1e9), sock: SOCK[tier], runes: []}, extra || {}); }
-function power(it){ return Math.round((10 + (it.lv || 1) * 4) * TMUL[it.tier]); }
+const STAR_MAX = 5, STAR_POW = 0.08;   // ⬆️ ★1 → ★5 at the 🔨 Blacksmith (CraftKit, av-r0i): each ★ = +8 % gear power, saved as x.k
+function power(it){ return Math.round((10 + (it.lv || 1) * 4) * TMUL[it.tier] * (1 + STAR_POW * (Math.min(STAR_MAX, it.star || 1) - 1))); }
 function price(it){ return Math.round(5 * (it.tier + 1) * (it.tier + 1) * (1 + (it.lv || 1) / 10)); }
 function bonus(it){ const r = rng(it.seed + 7), n = NBONUS[it.tier], left = STATS.slice(), out = [];
   for(let i = 0; i < n && left.length; i++){ const s = left.splice(Math.floor(r() * left.length), 1)[0], v = Math.max(1, Math.round((1 + (it.lv || 1) * 0.6) * (1 + it.tier * 0.5) * (0.7 + r() * 0.6) * (s[0] === 'hp' ? 8 : 1)));
@@ -425,10 +426,10 @@ function party(src, ctxs){ return (ctxs || []).map(c => roll(src, c)); }
 function showFor(src, it){ if(it && it.tier >= 5) return 'cloud'; const S = SRC[src]; return S ? S.show : 'beam'; }
 /* ---------------- bag ---------------- */
 const MAX_SLOTS = 120, BUY_KEEP = 10;
-function pack(it){ const x = {}; if(it.runes && it.runes.length) x.r = it.runes; if(it.set) x.s = it.set; if(it.relic) x.x = 1; if(it.el) x.e = [it.el, it.elv || 1]; return [it.base, it.tier, it.lv, it.seed, it.lock ? 1 : 0].concat(Object.keys(x).length ? [x] : []); }
-function unpack(a){ const x = a[5] || {}; const it = {base: a[0], tier: a[1] | 0, lv: a[2] | 0 || 1, seed: a[3] | 0, sock: SOCK[a[1] | 0], runes: x.r || []}; if(a[4]) it.lock = true; if(x.s) it.set = x.s; if(x.x) it.relic = true; if(x.e){ it.el = x.e[0]; it.elv = x.e[1] | 0 || 1; } return it; }
+function pack(it){ const x = {}; if(it.runes && it.runes.length) x.r = it.runes; if(it.star > 1) x.k = it.star; if(it.set) x.s = it.set; if(it.relic) x.x = 1; if(it.el) x.e = [it.el, it.elv || 1]; return [it.base, it.tier, it.lv, it.seed, it.lock ? 1 : 0].concat(Object.keys(x).length ? [x] : []); }
+function unpack(a){ const x = a[5] || {}; const it = {base: a[0], tier: a[1] | 0, lv: a[2] | 0 || 1, seed: a[3] | 0, sock: SOCK[a[1] | 0], runes: x.r || []}; if(a[4]) it.lock = true; if(x.s) it.set = x.s; if(x.x) it.relic = true; if(x.e){ it.el = x.e[0]; it.elv = x.e[1] | 0 || 1; } if(x.k) it.star = Math.min(STAR_MAX, x.k | 0); return it; }
 function bag(save, o){ o = o || {}; save = save || {};
-  const B = {g: (save.g || []).map(unpack), slots: Math.min(MAX_SLOTS, save.slots || o.slots || 40), m: Object.assign({}, save.m), q: Object.assign({}, save.q), u: Object.assign({}, save.u), qb: (save.qb || []).concat([null, null, null]).slice(0, QB_N),
+  const B = {g: (save.g || []).map(unpack), slots: Math.min(MAX_SLOTS, save.slots || o.slots || 40), m: Object.assign({}, save.m), q: Object.assign({}, save.q), u: Object.assign({}, save.u), qb: (save.qb || []).concat([null, null, null]).slice(0, QB_N), qa: !!save.qa,
     mail: (save.mail || []).map(unpack), buy: (save.buy || []).map(unpack), c: save.c | 0, st: Object.assign(freshState(), save.st || {}), s: Object.assign({}, save.s), news: 0};
   const seen = it => { if(B.s[it.base] == null || B.s[it.base] < it.tier) B.s[it.base] = it.tier; };
   const askFor = it => it.tier >= 2;
@@ -441,6 +442,8 @@ function bag(save, o){ o = o || {}; save = save || {};
     eat(id){ if(!(B.u[id] > 0)) return {ok: false, why: 'none'}; B.use(id, -1); const d = useDef(id); return {ok: true, id, eff: d ? d.eff.slice() : [], left: B.u[id] || 0}; },   // use one → its effects for the game to apply
     quick(slot, id){ if(slot < 0 || slot >= QB_N) return false; if(id != null && !useDef(id)) return false; B.qb = B.qb.map(x => x === id ? null : x); B.qb[slot] = id == null ? null : id; return true; },
     quickUse(slot){ const id = B.qb[slot]; if(!id) return {ok: false, why: 'empty'}; return Object.assign({slot}, B.eat(id)); },
+    autoSlot(){ for(let i = 0; i < QB_N; i++){ const id = B.qb[i], d = id && useDef(id); if(d && (B.u[id] || 0) > 0 && d.eff.some(e => e.k === 'heal' || e.k === 'hot')) return i; } return -1; },   // 🤖 the first ❤️ heal thing on the bar
+    autoHeal(hp, o){ o = o || {}; if(!B.qa || !(hp < (o.under || AUTO_UNDER))) return {ok: false, why: B.qa ? 'hp' : 'off'}; const k = B.autoSlot(); if(k < 0) return {ok: false, why: 'none'}; return Object.assign({auto: true}, B.quickUse(k)); },
     quest(id, n){ B.q[id] = Math.max(0, (B.q[id] || 0) + (n == null ? 1 : n)); if(!B.q[id]) delete B.q[id]; return B.q[id] || 0; },
     lock(i, on){ const it = B.g[i]; if(!it) return false; it.lock = on == null ? !it.lock : !!on; if(!it.lock) delete it.lock; return !!it.lock; },
     sell(i, a){ a = a || {}; const it = B.g[i]; if(!it) return {ok: false, why: 'none'};
@@ -463,7 +466,7 @@ function bag(save, o){ o = o || {}; save = save || {};
     buyPiece(set, piece, cost){ cost = cost || 10; const miss = missing(B.st, set); if(miss.indexOf(piece) < 0) return {ok: false, why: 'have'}; if(B.st.shards < cost) return {ok: false, why: 'shards'};
       B.st.shards -= cost; (B.st.sets[set.id] = B.st.sets[set.id] || []).push(piece); const it = mkItem(piece, set.tier == null ? 6 : set.tier, o.lv || 1, rng(hash(piece) + B.st.shards), {set: set.id}); return {ok: true, where: B.add(it), item: it}; },
     shards(){ return B.st.shards; }, luck(){ return B.st.luck; },
-    toJSON(){ return {v: 1, g: B.g.map(pack), slots: B.slots, m: B.m, q: B.q, u: B.u, qb: B.qb, mail: B.mail.map(pack), buy: B.buy.map(pack), c: B.c, st: B.st, s: B.s}; },
+    toJSON(){ return {v: 1, g: B.g.map(pack), slots: B.slots, m: B.m, q: B.q, u: B.u, qb: B.qb, qa: B.qa ? 1 : 0, mail: B.mail.map(pack), buy: B.buy.map(pack), c: B.c, st: B.st, s: B.s}; },
     size(){ return JSON.stringify(B.toJSON()).length; }});
   return B; }
 /* ---------------- look ---------------- */
@@ -545,6 +548,12 @@ function css(){ if(document.getElementById('lk-css')) return; if(!document.docum
   '.lk-cell.use{position:relative;} .lk-cell.use canvas{position:absolute;inset:0;width:100%;height:100%;} .lk-cell.use .n{position:absolute;right:3px;bottom:2px;font:800 11px Fredoka,sans-serif;background:#2B2D42;color:#fff;border-radius:8px;padding:0 5px;}',
   '.lk-cell.use .qb{position:absolute;left:3px;top:2px;font:800 10px Fredoka,sans-serif;background:#8A5A00;color:#FFF3B0;border-radius:8px;padding:0 4px;}',
   '.lk-stat.el b{color:#C8361A;} .lk-a-qb.on{background:linear-gradient(#FFF3B0,#FFD54A);}',
+  '.lk-qrow{display:flex;flex-wrap:nowrap;align-items:center;gap:7px;padding:4px 8px 4px 10px;border-radius:999px;background:#F2F8FF;} .lk-ql{font:800 12px/1.1 Fredoka,sans-serif;color:#2B3A55;max-width:72px;}',
+  '.lk-qm{position:relative;width:40px;height:40px;flex:none;border-radius:50%;border:0;padding:0;background:#fff;box-shadow:0 0 0 2px #C9D3E6,0 3px 0 #9AA8C0;cursor:pointer;font:800 18px Fredoka,sans-serif;color:#8A93A8;}',
+  '.lk-qm canvas{width:34px;height:34px;margin:3px;} .lk-qm i{position:absolute;left:-3px;top:-4px;font:800 10px/1 Fredoka,sans-serif;font-style:normal;background:#2B2D42;color:#fff;border-radius:7px;padding:2px 4px;}',
+  '.lk-qm.on{box-shadow:0 0 0 3px #FFD54A,0 0 0 5px #8A5A00,0 0 12px 3px rgba(255,200,40,.75);} .lk-qm.on i{background:#8A5A00;color:#FFF3B0;} .lk-qm.empty{background:rgba(255,255,255,.6);}',
+  '.lk-qa{position:relative;width:44px;height:44px;border-radius:50%;border:0;padding:0;background:#E4ECF5;box-shadow:0 0 0 2px #9AA8C0;cursor:pointer;font:22px/1 sans-serif;filter:grayscale(.7);} .lk-qa i{position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font:800 10px/1 Fredoka,sans-serif;font-style:normal;background:#566A84;color:#fff;border-radius:7px;padding:2px 5px;}',
+  '.lk-qa.on{background:#E8FFE8;filter:none;box-shadow:0 0 0 3px #4CC870,0 0 10px 2px rgba(76,200,112,.6);} .lk-qa.on i{background:#2E9E46;} .lk-qs.auto{animation:lkAuto .6s ease-out;} @keyframes lkAuto{0%{transform:scale(1.25);box-shadow:0 0 0 6px #4CC870;}100%{transform:none;}}',
   '.lk-qbar{display:flex;gap:10px;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;background:rgba(43,45,66,.82);box-shadow:0 0 0 2px #FFD54A,0 0 0 4px #8A5A00;}',
   '.lk-qs{position:relative;width:58px;height:58px;border-radius:50%;border:0;padding:0;background:#fff;box-shadow:0 0 0 3px #FFD54A,0 0 0 5px #8A5A00,0 4px 0 #8A5A00;cursor:pointer;font:800 22px Fredoka,sans-serif;color:#8A93A8;}',
   '.lk-qs canvas{width:56px;height:56px;margin:1px;} .lk-qs i{position:absolute;right:-4px;bottom:-4px;font:800 11px/1 Fredoka,sans-serif;font-style:normal;background:#8A5A00;color:#FFF3B0;border-radius:9px;padding:3px 5px;}',
@@ -599,7 +608,7 @@ const ease = {out: x => 1 - Math.pow(1 - x, 3), back: x => { const c = 1.7; retu
 const cl = (x, a, b) => Math.max(a, Math.min(b, x)), seg = (ms, a, b) => cl((ms - a) / (b - a), 0, 1);
 function seenKind(k, set){ try { const key = 'sp_loot_seen_' + k; if(set){ localStorage.setItem(key, '1'); return true; } return localStorage.getItem(key) === '1'; } catch(e){ return true; } }
 function nameOf(it){ const d = get(it.base); return d ? d.name : it.base; }
-function tierLine(it){ return RAR[it.tier].name + ' · Lv ' + (it.lv || 1) + (it.set ? ' · set' : '') + (it.relic ? ' · relic' : ''); }
+function tierLine(it){ return RAR[it.tier].name + ' · Lv ' + (it.lv || 1) + (it.star > 1 ? ' · ★' + it.star : '') + (it.set ? ' · set' : '') + (it.relic ? ' · relic' : ''); }
 /* ---------------- shows ---------------- */
 const LOG = [];
 function show(box, it, o){ o = o || {}; const kind = o.kind || showFor(o.src, it), basic = !!o.basic;
@@ -721,8 +730,13 @@ function bagSheet(box, B, o){ o = o || {}; const ov = overlay(box, 'lk-bag', o.t
       '<div class="lk-stats">' + d.eff.map(e => { const r = effRow(e); return row(r[0], r[1], r[2]); }).join('') + (d.cook ? row('🍳', 'Cook', Object.keys(d.cook).map(k => matIcon(k) + '×' + d.cook[k]).join(' ')) : '') + '</div>'; C.appendChild(info);
     const acts = document.createElement('div'); acts.className = 'acts'; const btn = (cls, txt, fn, dis) => { const b = document.createElement('button'); b.className = 'lk-b ' + cls; b.textContent = txt; b.disabled = !!dis; b.onclick = fn; acts.appendChild(b); return b; };
     if(o.onUse) btn('main lk-a-use', '🍽️ Use', () => { const r = B.eat(it.use); if(r.ok){ o.onUse(r); if(!B.u[it.use]) S.sel = -1; changed(); } });
-    for(let k = 0; k < QB_N; k++){ const on = B.qb[k] === it.use; btn('lk-a-qb' + (on ? ' on' : ''), '⚔️ ' + (k + 1) + (on ? ' ✓' : ''), () => { B.quick(k, on ? null : it.use); changed(); }); }
-    C.appendChild(acts); iconize(acts);
+    // ⚔️ battle quick bar: 3 round slots that look like the real bar — each shows what is in it; tap = put THIS here (it glows gold), tap its own slot again = take it out
+    const qr = document.createElement('div'); qr.className = 'lk-qrow'; qr.innerHTML = '<span class="lk-ql">⚔️ Battle quick bar</span>'; const qd = Math.min(2, window.devicePixelRatio || 1);
+    for(let k = 0; k < QB_N; k++){ const id = B.qb[k], on = id === it.use, b = document.createElement('button'); b.className = 'lk-qm' + (on ? ' on' : '') + (id ? '' : ' empty'); b.dataset.s = k;
+      b.setAttribute('aria-label', 'Quick slot ' + (k + 1) + ': ' + (id ? useName(id) : 'empty') + (on ? ' (this one)' : ''));
+      if(id){ const c = document.createElement('canvas'), Q = 34; c.width = c.height = Math.round(Q * qd); b.appendChild(c); const q2 = c.getContext('2d'); q2.scale(qd, qd); usePic(q2, id, 3, 3, Q - 6, Q - 6); } else b.textContent = '+';
+      b.insertAdjacentHTML('beforeend', '<i>' + (k + 1) + '</i>'); b.onclick = () => { B.quick(k, on ? null : it.use); changed(); }; qr.appendChild(b); }
+    acts.appendChild(qr); C.appendChild(acts); iconize(acts);
     for(let k = 0; k < 8 && C.scrollHeight > C.clientHeight + 1; k++){ if(cs > 48){ cs = Math.round(cs * 0.82); draw(); } else { C.classList.add('tight'); break; } } }
   function note(msg){ if(window.UI && UI.toast) UI.toast(msg); else ask(msg, null); }
   function ask(msg, yes, yesTxt){ const A = document.createElement('div'); A.className = 'lk-ask'; A.innerHTML = '<div><div class="m"></div><div class="row"></div></div>'; A.querySelector('.m').textContent = msg;
@@ -807,7 +821,8 @@ POTIONS.push(...addUse('potion', {
   heal: {name: 'Heal potion', icon: '❤️', eff: [{k: 'heal', v: 50}], paint: potionP('#FF5A6E')},
   power: {name: 'Power-up', icon: '⚡', eff: [{k: 'power', v: 25, fights: 1}], paint: potionP('#FFC21A')},
   shield: {name: 'Shield potion', icon: '🛡️', eff: [{k: 'shield', v: 30}], paint: potionP('#5AA8FF')},
-  lucky: {name: 'Lucky potion', icon: '🍀', eff: [{k: 'drops', v: 3}], paint: potionP('#4CC870')}}));
+  lucky: {name: 'Lucky potion', icon: '🍀', eff: [{k: 'drops', v: 3}], paint: potionP('#4CC870')},
+  aura: {name: 'Aura potion', icon: '🌟', eff: [{k: 'aura', v: 3}], paint: potionP('#B58CFF')}}));   // 🌟 +3 Aura dots (av-r0g2)
 function usePic(g, id, x, y, w, h){ const d = useDef(id); if(!d) return; if(d.paint) D.fit(g, 'use:' + id, q => d.paint(q), x, y, w, h); else { g.font = Math.floor(Math.min(w, h) * 0.7) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(d.icon, x + w / 2, y + h / 2); } }
 /* ⚔️ quick bar — 3 round gold slots for battle: tap = use one (once per turn); Loot.quickBar(el, B, {onUse(res), onChange}) → {render, newTurn, el} */
 function quickBar(el, B, o){ o = o || {}; css(); const box = document.createElement('div'); box.className = 'lk-qbar'; el.appendChild(box); let used = false;
@@ -816,8 +831,12 @@ function quickBar(el, B, o){ o = o || {}; css(); const box = document.createElem
       b.setAttribute('aria-label', id ? useName(id) + ' ×' + n : 'Empty quick slot'); b.disabled = !id || !n || used;
       if(id){ const c = document.createElement('canvas'), S = 56; c.width = c.height = Math.round(S * dpr); b.appendChild(c); const q = c.getContext('2d'); q.scale(dpr, dpr); usePic(q, id, 6, 6, S - 12, S - 12); b.insertAdjacentHTML('beforeend', '<i>×' + n + '</i>'); } else b.textContent = '+';
       b.onclick = () => { if(used) return; const r = B.quickUse(i); if(!r.ok) return; used = true; b.classList.add('pop'); render(); if(o.onUse) o.onUse(r); if(o.onChange) o.onChange(B); };
-      box.appendChild(b); } }
-  render(); return {el: box, render, newTurn(){ used = false; render(); }, used: () => used}; }
+      box.appendChild(b); }
+    const a = document.createElement('button'); a.className = 'lk-qa' + (B.qa ? ' on' : ''); a.innerHTML = '🤖<i>' + (B.qa ? 'on' : 'off') + '</i>'; a.setAttribute('aria-label', 'Auto-heal ' + (B.qa ? 'on' : 'off') + ': drink a heal when HP is under 30 %');
+    a.onclick = () => { B.qa = !B.qa; render(); if(o.onChange) o.onChange(B); }; box.appendChild(a); }
+  // 🤖 the game calls check(hp 0..1) each turn: auto-heal on + HP < 30 % + nothing used yet → the first ❤️ heal on the bar is used (it IS this turn's use)
+  function check(hp){ if(used) return null; const r = B.autoHeal(hp, o); if(!r.ok) return null; used = true; render(); const s = box.querySelector('[data-s="' + r.slot + '"]'); if(s) s.classList.add('auto'); if(o.onUse) o.onUse(r); if(o.onChange) o.onChange(B); return r; }
+  render(); return {el: box, render, check, newTurn(){ used = false; render(); }, used: () => used}; }
 /* ---------------- demo items (lab + tests; games add their own with Loot.add) ---------------- */
 add('demo', {blade: {name: 'Steel Blade', kind: 'weapon', slot: 'hand', paint: P.weapon}, helm: {name: 'Plume Helm', kind: 'wear', slot: 'head', paint: P.helm}, amulet: {name: 'Sun Amulet', kind: 'acc', slot: 'neck', paint: P.amulet}}, {by: 'LootKit', date: '2026-11-17'});
 const API = {VERSION, RAR, RB: P.RB, SRC, SOCK, STATS, LUCK_STEPS, MAX_SLOTS, ITEMS, BLOCKS,
@@ -825,7 +844,7 @@ const API = {VERSION, RAR, RB: P.RB, SRC, SOCK, STATS, LUCK_STEPS, MAX_SLOTS, IT
   add, get, list, power, price, bonus, recycleOf, rng, hash, today, range, roll, choose, party, showFor, freshState, missing, bag, pack, unpack,
   show, reveal, bagSheet, book, LOG, MATS, MAT_DROP, MAT_POOL, addMat, matName, matIcon,
   USES, USE_MAX, QB_N, ISLES, EFF, addUse, useDef, useName, effRow, usePic, quickBar, USE_DROP, POTIONS, food: FOODP,
-  ELS, BEATS, EL_MULT, EL_LV, SPELL_LV, CORE_DROP, FORGE_COST, elVs, elMult, hitMult, spellMult, forge, react: () => (css(), REACT), sparkle, THEMES, theme: (n, el) => (css(), theme(n, el)), iconize, demo: {paint: {blade: P.weapon, helm: P.helm, amulet: P.amulet}}};
+  STAR_MAX, STAR_POW, ELS, BEATS, EL_MULT, EL_LV, SPELL_LV, CORE_DROP, FORGE_COST, AUTO_UNDER, elVs, elMult, hitMult, spellMult, forge, react: () => (css(), REACT), sparkle, THEMES, theme: (n, el) => (css(), theme(n, el)), iconize, demo: {paint: {blade: P.weapon, helm: P.helm, amulet: P.amulet}}};
 if(typeof LD !== 'undefined' && LD) window.Loot = API; else window.LootKitDraft = API;
 })();
 })();
