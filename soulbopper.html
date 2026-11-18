@@ -1878,6 +1878,70 @@ function hud(){
   M.P.forEach(p => { if(!G.chipEls[p.i]){ const d = document.createElement('div'); d.className = 'pchip'; d.style.setProperty('--pc', BOT_COL); d.innerHTML = CHIP_HTML; G.avFor(p.i); drawPreviewCanvas(d.querySelector('canvas'), G.winAvs[p.i], {name: p.name, t: 1}); G.chipEls[p.i] = d; placeChips(); } });
 }
 
+/* 🎬 SOUL BOPPER BEATS (b3b7, 🧱 baseline chat, 2026-11-18) START — every action = 3–5 beats on the shared timeline (Acting.play).
+   The ENGINE owns contact: its event = the contact tick (sbpEvent). Taps (💣 plant · 👟 kick · 🤾 toss · 🏏 bat · 💨 dash · 🪤 trap) play FROM
+   contact. Real wind-ups where the game holds or the page sees it coming (sbpAhead, once a frame): 🏋️ the 0.22 s hold before a lift ·
+   ✨ a power-up ≤ 0.25 s ahead · 😱 a pop on your cell in ≤ 0.25 s (duck + cover; contact = the pop) — held until it happens, let go if not.
+   💫 caught = at once; the game's own 90 ms freeze (G.freeze) is the hit-stop. 🏆 the round winner jumps, then the old dance.
+   Clock = G.bt (engine steps). Acts: 🎭 BLOCK `soulbopper` (AvatarActs). Per-player act state lives outside the engine (WeakMap). */
+const SBP_HAS = typeof Acting !== 'undefined' && typeof Acting.play === 'function', SBP_LEAD = 0.25;
+window.SBP_LOG = window.SBP_LOG || [];
+const SBP_M = new WeakMap();
+function sbpH(p){ let H = SBP_M.get(p); if(!H){ H = {act: null}; SBP_M.set(p, H); } return H; }
+function sbpClock(){ return G ? (G.bt || 0) : 0; }
+function sbpStart(p, act, contactAt, o){
+  o = o || {}; if(!SBP_HAS || !G || !G.M || !p || !Acting.act(act)) return null;
+  const now = sbpClock(), H = sbpH(p), cur = H.act, from = cur && cur.run.last && !cur.run.done ? cur.run.last : undefined;
+  const run = Acting.play({name: p.name, av: G.avFor ? G.avFor(p.i) : null}, act, {t0: now, contactAt, from, onContact: r => {
+    window.SBP_LOG.push({p: p.i, act, t: sbpClock(), at: r.contactT}); if(window.SBP_LOG.length > 300) window.SBP_LOG.shift(); }});
+  H.act = {act, run, wait: !!o.wait, hold: o.hold || null, key: o.key || null};
+  run.at(contactAt != null && contactAt <= now + 1e-6 ? Math.max(now, run.contactT) + 1e-6 : now); return H.act;
+}
+// the engine's events (right after the step that made them) → contact now
+function sbpEvent(e){
+  const M = G && G.M; if(!SBP_HAS || !M) return; const P = e.i != null ? M.P[e.i] : null, now = sbpClock();
+  const K = {plant: 'soulbopper.plant', kick: 'soulbopper.kick', toss: 'soulbopper.toss', edgethrow: 'soulbopper.toss', hit: 'soulbopper.bat',
+    dash: 'soulbopper.dash', carry: 'soulbopper.lift', pick: 'soulbopper.grab', caught: 'soulbopper.caught', comeback: 'soulbopper.cheer', respawn: 'soulbopper.cheer'}[e.k];
+  if(K && P) sbpStart(P, K, now);
+  else if(e.k === 'lock' && M.P[e.ghost]) sbpStart(M.P[e.ghost], 'soulbopper.trap', now);
+  else if(e.k === 'swap' && M.P[e.ghost]) sbpStart(M.P[e.ghost], 'soulbopper.swap', now);
+  else if(e.k === 'pop') M.P.forEach(q => { const A = sbpH(q).act; if(A && A.key && A.key[0] === 'b' && !A.run.fired) sbpStart(q, 'soulbopper.brace', now); });   // 😱 the bang = contact
+  else if(e.k === 'roundend' && M.P[e.winner]) sbpStart(M.P[e.winner], 'soulbopper.win', now + 0.22);
+}
+function sbpSpeed(M, p){ let v = 2.7 + 0.42 * (p.spd || 0); if(!p.human) v *= p.botSpeed || M.L.botSpeed || 1; if(p.slow > 0) v *= 0.5; return v; }   // = the engine's speedOf (read only)
+// look ahead (once a frame): 🏋️ a lift being held · 😱 a pop coming to your cell · ✨ a power-up you are walking into
+function sbpAhead(){
+  const M = G && G.M; if(!SBP_HAS || !M || M.state !== 'play' || G.over) return; const now = sbpClock();
+  if(G._dT !== M.totalT){ G._D = BOP.dangerMap(M); G._dT = M.totalT; } const D = G._D;
+  M.P.forEach(p => {
+    if(!p.alive || p.ghost || p.edge || p.lock > 0) return; const H = sbpH(p), A = H.act; if(A && !A.run.fired) return;   // a wind-up already waiting
+    const cx = Math.round(p.x), cy = Math.round(p.y);
+    if(p.toss && p.holdT > 0 && !BOP.carriedBy(M, p)){ const b = BOP.bombAt(M, cx, cy);   // 🏋️ the hold IS the anticipation
+      if(b && b.owner === p.i && !b.slide && !b.fly){ sbpStart(p, 'soulbopper.lift', now + Math.max(0.03, 0.22 - p.holdT), {wait: true, hold: 'lift', key: 'lift'}); return; } }
+    const d = D[cy * M.W + cx];
+    if(d > 0.02 && d <= SBP_LEAD && !p.shield){ const key = 'br' + Math.round((now + d) * 20); if(H.braceKey !== key){ H.braceKey = key; sbpStart(p, 'soulbopper.brace', now + d, {wait: true, key}); return; } }
+    if(p.moving){ const it = BOP.itemAt(M, cx, cy) || BOP.itemAt(M, cx + (p.dx || 0), cy + (p.dy || 0));
+      if(it && !it.exit){ const rem = Math.abs(it.x - p.x) + Math.abs(it.y - p.y) - 0.45, tc = rem / sbpSpeed(M, p), key = 'g' + it.x + ',' + it.y;
+        if(tc > 0.02 && tc <= SBP_LEAD && H.grabKey !== key){ H.grabKey = key; sbpStart(p, 'soulbopper.grab', now + tc, {wait: true, key}); } } }
+  });
+}
+// the frame to draw now (null = the game's own pose / gesture); a waiting wind-up holds just before contact, then lets go
+function sbpFrame(p){
+  const H = p && SBP_M.get(p), A = H && H.act; if(!A || !G) return null; const now = sbpClock() + Math.min(Math.max(0, G.acc || 0), BOP.DT);
+  if(A.wait && !A.run.fired && now >= A.run.contactT - 0.02){
+    const keep = A.hold === 'lift' ? p.holdT > 0 && !!p.hold : now <= A.run.contactT + 0.3;
+    if(!keep){ H.act = null; return null; } return A.run.last; }
+  const f = A.run.at(now); if(f.done){ H.act = null; return null; } return f;
+}
+// draw the player with the beat frame when one is playing (🏏 your BatStick for the whole swing); else the old way
+function sbpDraw(g, p, A, x, feet, k, t, pose){
+  const F = p.lock > 0 ? null : sbpFrame(p);
+  if(F){ const who = Object.assign({}, A, {gest: null, stance: ''}), H = SBP_M.get(p);
+    if(H && H.act && H.act.act === 'soulbopper.bat'){ const bd = batFor(p.name); if(bd && typeof BatStick !== 'undefined') who.av = BatStick.hold(A.av, bd); }
+    try { Acting.draw(g, who, x, feet, k, F, {t, keep: true, ride: 'keep'}); return; } catch(e){ /* fall back to the old drawing */ } }
+  drawAvatar(g, A, x, feet, k, {t, pose: pose || undefined});
+}
+/* 🎬 SOUL BOPPER BEATS END */
 /* ================= LOOP ================= */
 function frame(now){
   if(!G) return; G.raf = requestAnimationFrame(frame);
@@ -1890,8 +1954,9 @@ function frame(now){
     const mult = (G.watch ? 3 : 1) * SPEED;
     if(G.freeze > 0){ G.freeze -= dt; dt = 0; }   // 💥 hit-stop: a split-second freeze when someone is caught
     G.acc += dt * mult; let n = 0;
-    while(G.acc >= BOP.DT && n < 30){ BOP.step(G.M, BOP.DT); G.acc -= BOP.DT; n++; handleEvents(BOP.takeEvents(G.M)); }
+    while(G.acc >= BOP.DT && n < 30){ BOP.step(G.M, BOP.DT); G.bt = (G.bt || 0) + BOP.DT; /* 🎬 b3b7 clock */ G.acc -= BOP.DT; n++; handleEvents(BOP.takeEvents(G.M)); }
     G.t += dt; stepFx(dt * mult);
+    if(typeof sbpAhead === 'function') sbpAhead();   /* 🎬 b3b7: wind-ups that can be seen coming */
     if(G.M.done && !G.shown && G.M.state === 'end' && G.M.endT < 0.6) finishMatch();
   }
   if(window.Cheer) Cheer.pause(!!(G && G.paused));   /* 📣 cs-2b (not on hold / game over: the crowd keeps cheering) */
@@ -1966,6 +2031,7 @@ function popSound(big){ boing(big ? 140 : 190, 0.28, 'sawtooth', 0.14, 50); boin
 /* ================= EVENTS → fx ================= */
 function handleEvents(list){
   const M = G.M, T = THEMES[G.theme];
+  if(typeof sbpEvent === 'function') list.forEach(sbpEvent);   /* 🎬 b3b7: contact = the engine's event */
   polishEvents(list);
   GameComic._feed(list);   // 💥📣 sb-9a: room for comics + crowd
   list.forEach(e => {
@@ -2218,11 +2284,11 @@ function drawPlayer(g, st, p, CS, t){
     // paint into a small canvas, colour it, then stamp it (soot / soaked / zapped / zombie green / ghost)
     const w = Math.ceil(CS * 2.2), h = Math.ceil(CS * 2.6), s = DPR; TINT = TINT || document.createElement('canvas'); if(TINT.width < w * s || TINT.height < h * s){ TINT.width = w * s; TINT.height = h * s; }
     const tg = TINT.getContext('2d'); tg.setTransform(1, 0, 0, 1, 0, 0); tg.clearRect(0, 0, TINT.width, TINT.height); tg.setTransform(s, 0, 0, s, 0, 0);
-    drawAvatar(tg, A, w / 2, h - CS * 0.25, k, {t, pose: pose || undefined});
+    sbpDraw(tg, p, A, w / 2, h - CS * 0.25, k, t, pose);   /* 🎬 b3b7 */
     tg.globalCompositeOperation = 'source-atop'; tg.fillStyle = tint; tg.fillRect(0, 0, w, h); tg.globalCompositeOperation = 'source-over';
     g.globalAlpha = alpha; const wob = theme.caught === 'green' && caught ? Math.sin(t * 12) * CS * 0.06 : 0;
     g.drawImage(TINT, 0, 0, w * s, h * s, x - w / 2 + wob, feet - (h - CS * 0.25), w, h); g.globalAlpha = 1;
-  } else { g.globalAlpha = alpha; drawAvatar(g, A, x, feet, k, {t, pose: pose || undefined}); g.globalAlpha = 1; }
+  } else { g.globalAlpha = alpha; sbpDraw(g, p, A, x, feet, k, t, pose); /* 🎬 b3b7 */ g.globalAlpha = 1; }
   // overlays
   const head = feet - CS * 1.05 - (A.jumpH || 0) * k;
   if(caught){ for(let i = 0; i < 3; i++){ const an = t * 5 + i * 2.1; emo(g, i % 2 ? '⭐' : (theme.caught === 'soak' ? '💧' : theme.caught === 'zap' ? '⚡' : '💫'), x + Math.cos(an) * CS * 0.32, head + Math.sin(an) * CS * 0.08, CS * 0.26); } }
@@ -2696,4 +2762,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (sb-8+r33+back-1+modes-3+mg-1+p1c+sb-9a+sb-9a2+p2+p3a+p3c+ck-2a+cs-2b+sb-9+pz-1+b3w5+24t-d+24u-d1) END OF SoulBopper.html -->
+<!-- (sb-8+r33+back-1+modes-3+mg-1+p1c+sb-9a+sb-9a2+p2+p3a+p3c+ck-2a+cs-2b+sb-9+pz-1+b3w5+24t-d+24u-d1+b3b7) END OF SoulBopper.html -->
