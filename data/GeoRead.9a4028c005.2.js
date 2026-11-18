@@ -640,11 +640,18 @@ const Voice = (function(){
     return new Promise(res => {
       if(my !== token){ res(); return; }
       log.push(text); if(log.length > 300) log.splice(0, 100);
+      // 🎧 vp-3: a recorded natural-voice clip when the voice pack has this text (sounds · words · story lines); else / on a failed clip = the device voice
+      const VP = window.UI && UI.voicePack;
+      if(VP && SPEED && text && UISound.get().enabled && VP.has(text)){ busy++; let d2 = false; const f2 = () => { if(d2) return; d2 = true; busy = Math.max(0, busy - 1); res(); };
+        VP.play(text, {rate: rate(r || 1)}).then(ok => { if(ok === false && !d2){ d2 = true; busy = Math.max(0, busy - 1); speakDevice(); } else f2(); }, f2); return; }
+      speakDevice();
+      function speakDevice(){
       const ok = window.speechSynthesis && UISound.get().enabled && text;
       if(!ok || !SPEED){ setTimeout(res, SPEED ? 260 : 0); return; }
       let done = false; const fin = () => { if(done) return; done = true; busy = Math.max(0, busy - 1); res(); };
       try{ const u = new SpeechSynthesisUtterance(text); u.rate = rate(r || 1); u.pitch = 1.08; u.onend = fin; u.onerror = fin; busy++; speechSynthesis.speak(u); setTimeout(fin, 500 + String(text).length * 140 / rate(r || 1)); }
       catch(e){ fin(); }
+      }
     });
   }
   // items = [{t, rate, gap}] spoken in order; a new say() cancels the old one
@@ -654,10 +661,11 @@ const Voice = (function(){
     p = p.then(() => { if(my === token) try{ bubbleLater(); }catch(e){} });   // 💬 gr-7: the avatar's speech bubble shows what is said
     return p;
   }
-  function cancel(){ token++; busy = 0; try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} }
+  function cancel(){ token++; busy = 0; try{ if(window.UI && UI.voicePack) UI.voicePack.stop(); }catch(e){} try{ if(window.speechSynthesis) speechSynthesis.cancel(); }catch(e){} }   // 🎧 vp-3
   return {say, cancel, log, speaking: () => busy > 0};
 })();
 window.GR_SAY_LOG = Voice.log;
+try{ if(window.UI && UI.voicePack) UI.voicePack.load(); }catch(e){}   // 🎧 vp-3: fetch the pack's list early
 function saySound(g){ return Voice.say([{t: GR.SAY[g] || g, rate: 0.75, show: g}]); }
 function sayWord(w){ return Voice.say([{t: w, rate: 0.9}]); }
 // 🔉 a little "pop" per letter tap in the house's own sound (tiny synth)
@@ -743,7 +751,7 @@ function levelInfo(i){
 function renderLevels(){
   $('level-list').classList.remove('road'); if(SET.mode === 'journey'){ renderRoad(); markPicks(); return; }
   const box = $('level-list'); box.innerHTML = ''; const p = progressOf(S.player), rec = AGE_START[S.age], u = unlockedOf(S.player);
-  $('level-head').textContent = '🎚️ 3. Pick a level — ' + MODES[SET.mode].icon + ' ' + MODES[SET.mode].name;
+  $('level-head').textContent = '🎚️ 4. Pick a level — ' + MODES[SET.mode].icon + ' ' + MODES[SET.mode].name;
   GR.LEVELS.forEach((L, i) => {
     const U = LEVEL_UI[i], open = canPlay(i), done = u > i, b = document.createElement('button');
     b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (U.hardcore ? ' hardcore' : ''); b.setAttribute('data-sound', open ? 'pop' : 'none'); b.dataset.lv = i;

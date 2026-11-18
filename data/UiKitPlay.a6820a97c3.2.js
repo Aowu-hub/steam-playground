@@ -190,7 +190,74 @@
   UI.seePads = {scan: scan, isPhone: isPhone, marked: () => marked.slice()};
 })();
 /* ================= 🫥 SEE-THROUGH PADS (an-3) END ================= */
-/* ================= 🗣️ VOICE PICKER + GUIDE (an-4, ✨ polish chat 2026-11-18) =================
+/* ================= 🎧 VOICE PACK (vp-3, ✨ polish chat 2026-11-18) =================
+   Recorded natural-voice clips (Google Neural2, made once by steam-source tools/voices + workflow voices.yml) on the site:
+   aowu-hub.github.io/steam-voices/<us|gb|au>/<id>.mp3 + manifest.json (own repo aowu-hub/steam-voices) (spoken text key → clip id).
+   UI.voicePack.load() → Promise(ready) · .ready() · .has(text) · .play(text, {rate}) → Promise(true = played | false = use the device voice)
+   · .stop() · .accent() ('us'|'gb'|'au' from the 🗣️ accent pick, Auto = the device's language, else gb) · .off(bool) · .log
+   A phrase it has no clip for = its words one by one (every word must have a clip), else false → the page speaks with speechSynthesis as before.
+   Used only while the player's 🎙️ voice pick is ⭐ Best (a picked device voice / 📱 Phone voice wins). ONE shared <audio> (iPhone unlocks it on the first tap). */
+(function(){
+  window.UI = window.UI || {};
+  const BASES = ['https://aowu-hub.github.io/steam-voices/', 'https://cdn.jsdelivr.net/gh/Aowu-hub/steam-voices@main/'];   // own site (vp-3b: kept off steam-playground's 50 MB budget)
+  const ACC = {'en-US': 'us', 'en-GB': 'gb', 'en-AU': 'au'};
+  const norm = t => String(t || '').toLowerCase().replace(/[’]/g, "'").replace(/[^a-z' ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  let mf = null, base = '', loading = null, el = null, token = 0, OFF = false, unlocked = false;
+  const log = [];
+  function accent(){
+    let a = ''; try{ a = (window.UISound && UISound.music && UISound.music.get().acc) || ''; }catch(e){}
+    if(ACC[a]) return ACC[a];
+    const n = String(navigator.language || '').toLowerCase(); return /-us\b/.test(n) ? 'us' : /-au\b/.test(n) ? 'au' : 'gb';
+  }
+  function load(){
+    if(mf) return Promise.resolve(true); if(loading) return loading;
+    if(window.UI_VOICEPACK === false) return Promise.resolve(false);
+    if(navigator.webdriver && !window.UI_VOICEPACK_BASES) return Promise.resolve(false);   // test browsers: only when a test gives its own bases
+    const bases = window.UI_VOICEPACK_BASES || BASES;
+    loading = (async () => { for(const b of bases){ try{ const r = await fetch(b + 'manifest.json', {cache: 'no-cache'}); if(!r.ok) continue; const j = await r.json(); if(j && j.accents){ mf = j; base = b; return true; } }catch(e){} } return false; })();
+    return loading;
+  }
+  function picked(){ try{ return typeof spPicked === 'function' ? spPicked() : ''; }catch(e){ return ''; } }
+  function usable(){ return !!(mf && !OFF && !picked() && mf.accents[accent()]); }
+  function urls(text){
+    if(!usable()) return null; const A = mf.accents[accent()], key = norm(text); if(!key) return null;
+    if(A.files[key]) return [A.files[key]];
+    const ws = key.split(' '); if(ws.every(w => A.files[w])) return ws.map(w => A.files[w]);
+    return null;
+  }
+  function audio(){ if(!el){ el = new Audio(); el.preload = 'auto'; try{ el.setAttribute('playsinline', ''); }catch(e){} } return el; }
+  // iPhone: an <audio> may only start after a tap — wake our one element inside the first tap (silent), later plays are allowed
+  function unlock(){ if(unlocked) return; unlocked = true; try{ if(navigator.audioSession) navigator.audioSession.type = 'playback'; }catch(e){}
+    try{ const a = audio(), SIL = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='; if(a.src && !/^data:/.test(a.src)) return;   // a clip already started inside this tap = unlocked
+      a.muted = true; a.src = SIL; const p = a.play(), back = () => { try{ if(a.src === SIL){ a.pause(); a.muted = false; } }catch(e){} }; if(p && p.then) p.then(back, back); else setTimeout(back, 60); }catch(e){}   // never pauses a real clip
+    ['touchend', 'click', 'keydown'].forEach(t => document.removeEventListener(t, unlock, true)); }
+  ['touchend', 'click', 'keydown'].forEach(t => document.addEventListener(t, unlock, true));
+  function clip(id, rate, my){
+    return new Promise(res => {
+      if(my !== token){ res(false); return; }
+      const a = audio(); let done = false; const fin = ok => { if(done) return; done = true; a.onended = a.onerror = null; clearTimeout(tm); res(ok); };
+      const tm = setTimeout(() => fin(false), 8000);
+      a.onended = () => fin(true); a.onerror = () => fin(false);
+      try{ a.src = base + accent() + '/' + id + '.mp3'; a.muted = false; a.playbackRate = Math.max(0.7, Math.min(1.2, (rate || 0.9) / 0.9)); try{ a.preservesPitch = true; a.webkitPreservesPitch = true; }catch(e){}
+        const p = a.play(); if(p && p.catch) p.catch(() => fin(false)); }catch(e){ fin(false); }
+    });
+  }
+  async function play(text, o){
+    const list = urls(text); if(!list) return null;   // null = not ours → the page speaks as before
+    const my = ++token; log.push(text); if(log.length > 300) log.splice(0, 100);
+    for(let i = 0; i < list.length; i++){ const ok = await clip(list[i], (o || {}).rate, my); if(!ok) return my === token && i === 0 ? false : true; if(i < list.length - 1) await new Promise(r => setTimeout(r, 90)); }
+    return true;
+  }
+  function stop(){ token++; try{ if(el){ el.pause(); } }catch(e){} }
+  UI.voicePack = {load, ready: () => usable(), hasAccent: a => !!(mf && mf.accents[ACC[a] || a]), loaded: () => !!mf, has: t => !!urls(t), play: (t, o) => play(t, o), stop, accent, log,
+    off(v){ OFF = !!v; }, voice: () => (mf && mf.accents[accent()] || {}).voice || '', _reset(){ mf = null; loading = null; base = ''; }};
+})();
+/* ================= 🎧 VOICE PACK (vp-3) END ================= */
+/* ================= 🗣️ VOICE PICKER + GUIDE (an-4, ✨ polish chat 2026-11-18 · an-6 voice list) =================
+   an-6 (Aowu 20:51 "I got Kate / Serena · Ava / Joelle · Karen / Matilda Enhanced but it chose something else"): under the accent, a 🎙️ Voice row
+   lists THIS device's voices for that country (⭐ Best = auto · each voice with ✨ Enhanced / 💎 Premium; joke voices like Albert hidden);
+   tap = that player's voice on this device (SPVoice.choose, localStorage sp_voice_pick:<Name> per accent — voices live on the device)
+   + a short sample. iPhone names have no "(Enhanced)" — the label comes from the voice id. No Enhanced voice listed → tip: close Safari fully.
    Aowu 20:14: "please add accent picker and a guide to how to download in the app for each mobile type" (iPhone voice list photos).
    UI.voicePicker(box) = 🗣️ Reading voice: Auto · 🇺🇸 US · 🇬🇧 UK · 🇦🇺 Australia (per player, saved with the music record {acc},
    follows the player to every device) + "🔊 Using: <voice>" + ▶ Try + "📥 How to get a better voice" → UI.voiceGuide() = steps for
@@ -217,6 +284,11 @@
       + '.ui-vp-now .w{flex:1 1 180px;min-width:0;}'
       + '.ui-vp button.sm{min-height:40px;padding:0 12px;border-radius:12px;border:0;background:#EDE7FF;color:#4A3AA8;font-weight:800;cursor:pointer;}'
       + '.ui-vp .warn{color:#B4441E;font-weight:800;font-size:.88rem;}'
+      + '.ui-vp-vh{font-weight:800;font-size:.85rem;opacity:.75;margin-top:2px;}'
+      + '.ui-vp-vs button{min-height:40px;font-size:.88rem;border-width:2px;}'
+      + '.ui-vp-vs button .q{font-size:.72rem;font-weight:800;padding:1px 6px;border-radius:999px;background:rgba(124,92,255,.14);}'
+      + '.ui-vp-vs button.on .q{background:rgba(255,255,255,.25);}'
+      + '.ui-vp .tipv{background:#FFF6DD;color:#6A4A00;border-radius:12px;padding:6px 10px;font-size:.84rem;font-weight:700;}'
       + '.ui-vg{position:fixed;inset:0;z-index:9990;background:rgba(20,16,40,.55);display:flex;align-items:center;justify-content:center;padding:12px;}'
       + '.ui-vg-in{background:#fff;color:#2B2440;border-radius:20px;max-width:620px;width:100%;max-height:calc(100% - 24px);overflow:auto;padding:14px 16px 16px;font-family:Nunito,sans-serif;box-shadow:0 18px 50px rgba(0,0,0,.35);}'
       + '.ui-vg-in h3{margin:0 0 4px;font-family:Fredoka,sans-serif;font-size:1.25rem;display:flex;align-items:center;gap:8px;}'
@@ -231,10 +303,13 @@
     document.head.appendChild(st); }
   // 📥 what to download, by device (Aowu's iPhone list 2026-11-18: Kate (Enhanced) already on his phone)
   const GUIDE = {
-    iphone: {name: '📱 iPhone / iPad', steps: ['Open <span class="path">Settings</span>', 'Tap <span class="path">Accessibility</span> → <span class="path">Read &amp; Speak</span> (older iOS: <span class="path">Spoken Content</span>)',
-        'Tap <span class="path">Voices</span> → <span class="path">English</span>', 'Find the country (United States · United Kingdom · Australia) and tap ☁️ next to the voice below', 'Wait for the download (Wi-Fi), then close the game and open it again'],
-      rec: [['🇺🇸 US', 'Ava (Enhanced) · 241 MB', 'Samantha (Enhanced) · 152 MB'], ['🇬🇧 UK', 'Kate (Enhanced) · 56 MB', 'Serena (Enhanced) · 131 MB'], ['🇦🇺 Australia', 'Karen (Enhanced) · 157 MB', 'Matilda (Enhanced) · 94 MB']],
-      tip: 'Pick an <b>(Enhanced)</b> voice: clear and natural. <b>(Premium)</b> voices sound best in Apple apps but a web page may not be allowed to use them — if a Premium voice never shows here, use the Enhanced one.'},
+    iphone: {name: '📱 iPhone / iPad', steps: ['iPhone and iPad let a web page use <b>only the voices that come built in</b>. Voices you download in <span class="path">Settings → Accessibility → Read &amp; Speak → Voices</span> (Enhanced or basic) never reach Safari or the home-screen app — that is an Apple limit, not the game',
+        'Here in the game: pick the country (🇺🇸 · 🇬🇧 · 🇦🇺), then a voice under 🎙️ Voice — tap ▶ Try to hear it',
+        '🎛️ <b>Classic</b> voices (Flo · Sandy · Shelley · Grandma · Eddy · Reed …) are built in too — older sound, but women’s voices for every country',
+        '📱 <b>Phone voice</b> lets the iPhone read with its own voice for that country — try it, on some iPhones it sounds nicer',
+        'For the natural Enhanced voices: play on a computer — Microsoft Edge (Windows) or Chrome bring natural online voices'],
+      rec: [['🇺🇸 US', 'Samantha', '🎛️ Flo · Shelley'], ['🇬🇧 UK', 'Daniel', '🎛️ Flo · Sandy'], ['🇦🇺 Australia', 'Karen', '🎛️ Shelley · Sandy']],
+      tip: 'Apple has an open bug report for this (WebKit 290497). If Apple fixes it, your downloaded Enhanced voices (Kate, Ava, Matilda …) will show up here by themselves — the game already picks them first.'},
     android: {name: '🤖 Android', steps: ['Open <span class="path">Settings</span> and search <span class="path">Text-to-speech</span>', 'Preferred engine: <span class="path">Speech Services by Google</span> → tap ⚙️',
         'Tap <span class="path">Install voice data</span> → <span class="path">English (United States)</span> / <span class="path">English (United Kingdom)</span> / <span class="path">English (Australia)</span>', 'Pick a voice (play ▶ to listen) and tap ⬇️ to download', 'Close the game and open it again'],
       rec: [['🇺🇸 US', 'a woman’s voice you like (Voice I or III)', '—'], ['🇬🇧 UK', 'a woman’s voice (Voice I or III)', '—'], ['🇦🇺 Australia', 'a woman’s voice (Voice I or III)', '—']],
@@ -245,7 +320,7 @@
       tip: 'Chrome on a PC also has online voices: <b>Google US English</b> and <b>Google UK English Female</b>.'},
     mac: {name: '🖥️ Mac', steps: ['<span class="path">System Settings → Accessibility → Spoken Content</span>', '<span class="path">System voice → Manage Voices…</span> → <span class="path">English</span>', 'Tick the voice below for each country and wait for the download', 'Close the game and open it again'],
       rec: [['🇺🇸 US', 'Ava (Enhanced)', 'Samantha (Enhanced)'], ['🇬🇧 UK', 'Kate (Enhanced)', 'Serena (Enhanced)'], ['🇦🇺 Australia', 'Karen (Enhanced)', 'Matilda (Enhanced)']],
-      tip: 'Enhanced voices work in Safari and Chrome.'}
+      tip: 'Safari on a Mac shows only the built-in voices too (Apple limit). <b>Chrome</b> or <b>Edge</b> on the Mac add natural online voices.'}
   };
   function guide(which){
     css(); const old = document.querySelector('.ui-vg'); if(old) old.remove();
@@ -270,23 +345,44 @@
   UI.voiceGuide = guide;
   function picker(box){
     if(!box) return null; css();
-    box.innerHTML = '<div class="ui-vp"><div class="ui-vp-h">🗣️ Reading voice</div><div class="ui-vp-row"></div><div class="ui-vp-now"><span class="w"></span><button type="button" class="sm try" data-sound="tap">▶ Try</button></div>'
+    box.innerHTML = '<div class="ui-vp"><div class="ui-vp-h">🗣️ Reading voice</div><div class="ui-vp-row ui-vp-acc"></div><div class="ui-vp-vh" hidden>🎙️ Voice</div><div class="ui-vp-row ui-vp-vs" hidden></div><div class="tipv" hidden></div><div class="ui-vp-now"><span class="w"></span><button type="button" class="sm try" data-sound="tap">▶ Try</button></div>'
       + '<div class="warn" hidden></div><div><button type="button" class="sm how" data-sound="tap">📥 How to get a better voice</button></div></div>';
-    const row = box.querySelector('.ui-vp-row'), now = box.querySelector('.w'), warn = box.querySelector('.warn');
+    const row = box.querySelector('.ui-vp-acc'), now = box.querySelector('.w'), warn = box.querySelector('.warn'), vh = box.querySelector('.ui-vp-vh'), vs = box.querySelector('.ui-vp-vs'), tipv = box.querySelector('.tipv');
+    const SV = () => (typeof SPVoice !== 'undefined' ? SPVoice : null);
+    const QL = {premium: '💎 Premium', enhanced: '✨ Enhanced', natural: '✨ Natural', retro: '🎛️ Classic'}, QR = {premium: 0, enhanced: 1, natural: 2, basic: 3, retro: 4, fun: 9};
+    const apple = () => device() === 'iphone' || (device() === 'mac' && /Safari/.test(navigator.userAgent) && !/Chrome|Chromium|Edg\//.test(navigator.userAgent));   // 🎙️ an-7: Safari = built-in voices only
+    const DEV = () => (SV() && SV().DEVICE) || '__device__';
+    const packOn = () => !!(UI.voicePack && UI.voicePack.loaded() && UI.voicePack.hasAccent(accentNow() || ({us: 'en-US', gb: 'en-GB', au: 'en-AU'})[UI.voicePack.accent()]));   // 🎧 vp-3
+    function listFor(a){   // 🎙️ an-6: this device's voices for the accent, best first, joke voices out, one chip per label
+      const sv = SV(); if(!a || !sv || !sv.kind) return [];
+      const seen = {}; return voicesFor(a).filter(v => sv.kind(v) !== 'fun').map(v => ({v: v, id: v.voiceURI || v.name, k: sv.kind(v), l: sv.label(v), f: sv.female(v)}))
+        .sort((x, y) => (QR[x.k] - QR[y.k]) || ((y.f ? 1 : 0) - (x.f ? 1 : 0)) || x.l.localeCompare(y.l)).filter(x => seen[x.l] ? false : (seen[x.l] = 1));
+    }
     function paint(){
       const a = accentNow();
-      row.innerHTML = ACC.map(([k, n, f]) => { const ok = !k || voicesFor(k).length; return '<button type="button" data-a="' + k + '" class="' + (k === a ? 'on' : '') + '" data-sound="tap">' + f + ' ' + n + (k ? '<span class="ok">' + (ok ? ' ✓' : ' 📥') + '</span>' : '') + '</button>'; }).join('');
+      row.innerHTML = ACC.map(([k, n, f]) => { const ok = !k || voicesFor(k).length || (UI.voicePack && UI.voicePack.hasAccent(k)); return '<button type="button" data-a="' + k + '" class="' + (k === a ? 'on' : '') + '" data-sound="tap">' + f + ' ' + n + (k ? '<span class="ok">' + (ok ? ' ✓' : ' 📥') + '</span>' : '') + '</button>'; }).join('');
       row.querySelectorAll('button').forEach(b => b.onclick = () => { try{ UISound.music.set({acc: b.dataset.a}); }catch(e){} try{ if(typeof SPVoice !== 'undefined') SPVoice.refresh(); }catch(e){} paint(); trySay(); });
       let v = null; try{ if(typeof SPVoice !== 'undefined'){ SPVoice.refresh(); v = SPVoice.current(); } }catch(e){}
+      // 🎙️ an-6: the voice row
+      const L = listFor(a), sv = SV(), pk = sv && sv.picked ? sv.picked() : '';
+      vh.hidden = vs.hidden = !L.length && !packOn();   // 🎧 vp-3: ⭐ Best · 🎧 shows even with no device voice
+      vs.innerHTML = L.length ? '<button type="button" data-v="" class="' + (pk ? '' : 'on') + '" data-sound="tap">⭐ Best' + (packOn() ? ' · 🎧' : '') + '</button>' + (apple() ? '<button type="button" data-v="' + DEV() + '" class="' + (pk === DEV() ? 'on' : '') + '" data-sound="tap">📱 Phone voice</button>' : '') + L.map(x => '<button type="button" data-v="' + String(x.id).replace(/"/g, '&quot;') + '" class="' + (pk === x.id ? 'on' : '') + '" data-sound="tap">' + x.l.replace(/ \((Enhanced|Premium)\)/, '').replace(/ \(English \([^)]*\)\)/, '').replace(/</g, '&lt;') + (QL[x.k] ? ' <span class="q">' + QL[x.k] + '</span>' : '') + '</button>').join('') : '';
+      vs.querySelectorAll('button').forEach(b => b.onclick = () => { try{ SV().choose(b.dataset.v); }catch(e){} paint(); trySay(); });
+      const good = L.some(x => x.k === 'premium' || x.k === 'enhanced' || x.k === 'natural'); tipv.hidden = !(L.length && !good) || (packOn() && !pk);   // 🎙️ an-7: honest Apple note · 🎧 vp-3: not needed while the natural voice reads
+      if(!tipv.hidden) tipv.textContent = apple() ? '📱 iPhone / iPad (and Safari on a Mac) let a web page use only the voices that come built in — voices you download in Settings never reach it (Apple limit, not the game). Pick one above, or try 📱 Phone voice.'
+        : '💡 Only basic voices show here. Downloaded a better one? Close the browser / app fully (swipe it away) and open it again.';
       const flag = v ? (ACC.find(x => x[0] && norm(v.lang).indexOf(x[0].toLowerCase()) === 0) || ['', '', '🌐'])[2] : '';
-      now.textContent = v ? '🔊 Using: ' + v.name + ' ' + flag : '🔊 Using: the device’s own voice';
-      const miss = a && !voicesFor(a).length; warn.hidden = !miss;
+      now.textContent = packOn() && !pk ? '🔊 Using: 🎧 natural voice ' + ((ACC.find(x => x[0] && x[0] === ({us: 'en-US', gb: 'en-GB', au: 'en-AU'})[UI.voicePack.accent()]) || ['', '', '🌐'])[2]) : pk === DEV() ? '🔊 Using: 📱 this phone’s own voice ' + ((ACC.find(x => x[0] && x[0] === a) || ['', '', '🌐'])[2]) : v ? '🔊 Using: ' + (SV() && SV().label ? SV().label(v) : v.name) + ' ' + flag : '🔊 Using: the device’s own voice';   // 🎙️ an-6: + (Enhanced) from the voice id
+      if(pk && sv && sv.bad && sv.bad() === pk){ warn.hidden = false; warn.textContent = '⚠️ That voice didn’t start on this device — tap ▶ Try to give it another go, or pick another.'; return; }
+      const miss = a && !voicesFor(a).length && !packOn(); warn.hidden = !miss;   // 🎧 vp-3
       if(miss) warn.textContent = '📥 No ' + (ACC.find(x => x[0] === a) || [])[2] + ' voice on this device yet — tap "How to get a better voice". Until then the closest voice reads.';
     }
-    function trySay(){ try{ if(!window.speechSynthesis) return; speechSynthesis.cancel(); speechSynthesis.speak(new SpeechSynthesisUtterance('Hello! Let us read: cat, ship, frog.')); }catch(e){} }
-    box.querySelector('.try').onclick = trySay;
+    function trySay(){ try{ if(packOn() && !(SV() && SV().picked && SV().picked())){ UI.voicePack.stop(); UI.voicePack.play('cat ship frog', {rate: 0.9}); return; } }catch(e){}   // 🎧 vp-3: the natural voice
+      try{ if(!window.speechSynthesis) return; speechSynthesis.cancel(); speechSynthesis.speak(new SpeechSynthesisUtterance('Hello! Let us read: cat, ship, frog.')); }catch(e){} }
+    box.querySelector('.try').onclick = () => { try{ const sv = SV(); if(sv && sv.bad && sv.bad() && sv.bad() === (sv.picked && sv.picked())) sv.forget(); }catch(e){} paint(); trySay(); };   // 🎙️ an-6: Try gives a stuck voice another go
     box.querySelector('.how').onclick = () => guide();
     paint();
+    try{ if(UI.voicePack) UI.voicePack.load().then(() => { if(box.isConnected) paint(); }); }catch(e){}   // 🎧 vp-3
     try{ speechSynthesis.addEventListener('voiceschanged', paint); }catch(e){}
     try{ UISound.music.watch(() => { if(box.isConnected) paint(); }); }catch(e){}
     return {paint: paint};
