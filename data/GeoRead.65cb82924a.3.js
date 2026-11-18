@@ -4,13 +4,13 @@
    cheerEnd() (result) or when the play screen goes away (◀ / 🎚️ Levels); every 0.4 s it reads the game's own state → tension /
    hush (🤖 thinking) / pause; the crowd's big moments → lift (max one every 3 s). Test hook: GMOOD (page global). */
 const GMOOD = (function(){
-  const ID = 'wisdeck';
+  const ID = 'georead';
   let h = null, timer = 0, lastLift = 0;
   const vis = el => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
-  function playing(){ try{ const q = vis(document.getElementById('v-quiz')) && !vis(document.getElementById('q-res')), t = vis(document.getElementById('v-table')) && !vis(document.getElementById('t-res')); return vis(document.getElementById('scr-play')) && (q || t); }catch(e){ return false; } }
+  function playing(){ try{ return !!(G && !G.over) && vis(document.getElementById('scr-play')) && !vis(document.getElementById('result')); }catch(e){ return false; } }
   function skip(){ return false; }
-  function tension(){ if(vis(document.getElementById('v-quiz')) && Q) return .8 * Q.i / Math.max(1, Q.qs.length); return .35; }
-  function hush(){ return hushArg;   /* 🤖 the table robot thinks (the game's own cheerHush) */ }
+  function tension(){ return .7 * Math.max(0, G.i) / Math.max(1, G.game.rounds.length); }
+  function hush(){ return !!(window.speechSynthesis && speechSynthesis.speaking);   /* 🗣️ the voice reads: music steps back */ }
   function paused(){ return false; }
   function poll(){
     if(!h || !h.live || !playing()){ stop(); return; }
@@ -30,13 +30,9 @@ const GMOOD = (function(){
     const f = window[name]; if(typeof f !== 'function' || f.__gmood) return;
     const w = function(){ try{ before.apply(this, arguments); }catch(e){} return f.apply(this, arguments); }; w.__gmood = 1; window[name] = w;
   }
-  let hushArg = false;
-  wrap('cheerHush', function(on){ hushArg = !!on; });
   wrap('cheerMount', start);
-  wrap('cheerQuizEnd', stop);
-  wrap('cheerTableEnd', stop);
-  wrap('cheerSay', function(){ if((function(kind){ return kind === 'goal' && !!Q && Q.streak >= 3; }).apply(this, arguments)) lift(); });
-  wrap('cheerRound', function(){ if((function(w){ return w === 0; }).apply(this, arguments)) lift(); });
+  wrap('cheerEnd', stop);
+  wrap('cheerSay', function(){ if((function(kind){ return kind === 'big'; }).apply(this, arguments)) lift(); });
   return {id: ID, start: start, stop: stop, lift: lift, poll: poll, now: () => h, playing: playing, tension: tension, hush: hush, paused: paused};
 })();
 /* 🎵 MOOD (24u-b) END */

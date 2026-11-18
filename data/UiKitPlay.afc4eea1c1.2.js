@@ -137,3 +137,160 @@
   UI.callout = C;
 })();
 /* ================= 💬 CALLOUTS (24t) END ================= */
+/* ================= 🫥 SEE-THROUGH PADS (an-3, ✨ polish chat 2026-11-18) =================
+   Aowu 19:13 (BlasOff + Brawl iPhone photos): "button + joystick transparent as same as Brawl and apply to all game with full screen
+   like this". On a phone, every stick / button ring that sits ON the play picture (a canvas under its middle) is see-through
+   (62 %) and goes solid (95 %) while a thumb is on it — the 🥊 Brawl 24z look, for every game, with no game edit.
+   Pads beside the play area (side columns) stay solid; a pad whose parent is already see-through (Brawl's own .ctl) is left alone.
+   Off: window.UI_SEEPADS = false. Test hooks: UI.seePads.scan() → the groups marked · UI.seePads.isPhone(). */
+(function(){
+  window.UI = window.UI || {};
+  const GROUP = '.pz-fan, .pz-petals, .pads .stick, .tpad, .joy:not(.hidden), .pz-stick, .pad, .actpad, .btnpad, .shotpad';
+  const css = () => { if(document.getElementById('ui-seepads')) return; const st = document.createElement('style'); st.id = 'ui-seepads';
+    st.textContent = '.pz-see{opacity:.62 !important;transition:opacity .15s;}.pz-see.pz-touch{opacity:.95 !important;}'; document.head.appendChild(st); };
+  function isPhone(){ if(window.UI_GBPHONE != null) return !!window.UI_GBPHONE;
+    let touch = false; try{ touch = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0; }catch(e){}
+    return touch && Math.min(innerWidth, innerHeight) < 600; }
+  const vis = e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
+  function groups(){
+    const out = new Set();
+    document.querySelectorAll(GROUP).forEach(e => { if(vis(e) && !e.parentElement.closest(GROUP)) out.add(e); });
+    document.querySelectorAll('.pz-btn').forEach(b => { if(!vis(b) || b.closest(GROUP)) return; const p = b.parentElement; if(p && p !== document.body) out.add(p); });
+    return [...out];
+  }
+  function dimmed(e){ for(let a = e.parentElement; a && a !== document.body; a = a.parentElement){ if(+getComputedStyle(a).opacity < .99) return true; } return false; }
+  function overPicture(e){
+    const b = e.getBoundingClientRect(); if(b.width < 20 || b.height < 20) return false;
+    const pts = [[.5, .5], [.3, .3], [.7, .7]];
+    return pts.some(([u, v]) => { const x = b.left + b.width * u, y = b.top + b.height * v; if(x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) return false;
+      const st = document.elementsFromPoint(x, y).filter(t => !e.contains(t) && !t.closest('.pz-see') && t !== e); const c = st.slice(0, 4).find(t => t.tagName === 'CANVAS');
+      return !!(c && c.getBoundingClientRect().width > innerWidth * .4); });
+  }
+  let marked = [];
+  function scan(){
+    if(window.UI_SEEPADS === false){ marked.forEach(e => e.classList.remove('pz-see', 'pz-touch')); marked = []; return []; }
+    const phone = isPhone(), now = [];
+    if(phone){ css(); groups().forEach(g => { if(!dimmed(g) && overPicture(g)) now.push(g); }); }
+    marked.forEach(e => { if(now.indexOf(e) < 0) e.classList.remove('pz-see', 'pz-touch'); });
+    now.forEach(e => e.classList.add('pz-see'));
+    marked = now; return now;
+  }
+  // 👆 solid while a thumb is on it (also a stick that follows the thumb out of its box: anything within 70 px of the press)
+  const held = new Map();
+  function near(g, x, y){ const b = g.getBoundingClientRect(), m = 70; return x > b.left - m && x < b.right + m && y > b.top - m && y < b.bottom + m; }
+  addEventListener('pointerdown', ev => { if(!marked.length) return; const hit = marked.filter(g => g.contains(ev.target) || near(g, ev.clientX, ev.clientY));
+    const g = hit.find(q => q.contains(ev.target)) || hit[0]; if(!g) return; g.classList.add('pz-touch'); held.set(ev.pointerId, g); }, true);
+  const up = ev => { const g = held.get(ev.pointerId); if(!g) return; held.delete(ev.pointerId); if(![...held.values()].includes(g)) g.classList.remove('pz-touch'); };
+  ['pointerup', 'pointercancel'].forEach(t => addEventListener(t, up, true));
+  let timer = 0;
+  function tick(){ try{ scan(); }catch(e){} }
+  function start(){ if(timer) return; timer = setInterval(() => { if(!document.hidden && (marked.length || document.querySelector('.pz-btn, ' + GROUP))) tick(); }, 600); }
+  addEventListener('resize', () => setTimeout(tick, 120)); addEventListener('orientationchange', () => setTimeout(tick, 300));
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+  UI.seePads = {scan: scan, isPhone: isPhone, marked: () => marked.slice()};
+})();
+/* ================= 🫥 SEE-THROUGH PADS (an-3) END ================= */
+/* ================= 🗣️ VOICE PICKER + GUIDE (an-4, ✨ polish chat 2026-11-18) =================
+   Aowu 20:14: "please add accent picker and a guide to how to download in the app for each mobile type" (iPhone voice list photos).
+   UI.voicePicker(box) = 🗣️ Reading voice: Auto · 🇺🇸 US · 🇬🇧 UK · 🇦🇺 Australia (per player, saved with the music record {acc},
+   follows the player to every device) + "🔊 Using: <voice>" + ▶ Try + "📥 How to get a better voice" → UI.voiceGuide() = steps for
+   iPhone / iPad · Android · Windows · Mac (this device first) with the voice to download for each accent.
+   UiKit core SPVoice reads the accent (UISound.music.get().acc) and prefers that country's voice, then Enhanced / Premium / Natural ones.
+   UI.voiceAccent() → '' | 'en-US' | 'en-GB' | 'en-AU' (for speech recognition: rec.lang = UI.voiceAccent() || 'en-US'). */
+(function(){
+  window.UI = window.UI || {};
+  const ACC = [['', 'Auto', '🌐'], ['en-US', 'US', '🇺🇸'], ['en-GB', 'UK', '🇬🇧'], ['en-AU', 'Australia', '🇦🇺']];
+  const norm = l => String(l || '').replace('_', '-').toLowerCase();
+  const voicesFor = a => { try{ return (speechSynthesis.getVoices() || []).filter(v => norm(v.lang).indexOf(a.toLowerCase()) === 0); }catch(e){ return []; } };
+  const accentNow = () => { try{ return (UISound.music.get() || {}).acc || ''; }catch(e){ return ''; } };
+  UI.voiceAccent = accentNow;
+  function device(){ const u = navigator.userAgent || ''; if(/iPhone|iPod/.test(u)) return 'iphone'; if(/iPad/.test(u) || (/Macintosh/.test(u) && navigator.maxTouchPoints > 1)) return 'iphone';
+    if(/Android/.test(u)) return 'android'; if(/Windows/.test(u)) return 'windows'; if(/Macintosh|Mac OS/.test(u)) return 'mac'; return 'android'; }
+  function css(){ if(document.getElementById('ui-vp-css')) return; const st = document.createElement('style'); st.id = 'ui-vp-css';
+    st.textContent = '.ui-vp{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:16px;background:var(--card,#fff);color:var(--ink,#2B2440);box-shadow:0 2px 0 rgba(0,0,0,.12);max-width:560px;margin:8px auto;font-family:Nunito,sans-serif;}'
+      + '.ui-vp-h{font-family:Fredoka,sans-serif;font-weight:700;font-size:1.05rem;}'
+      + '.ui-vp-row{display:flex;flex-wrap:wrap;gap:6px;}'
+      + '.ui-vp-row button{min-height:44px;padding:0 12px;border-radius:999px;border:2px solid rgba(124,92,255,.35);background:#F4F1FA;color:#2B2440;font-weight:800;font-size:.95rem;cursor:pointer;display:flex;align-items:center;gap:5px;}'
+      + '.ui-vp-row button.on{background:linear-gradient(135deg,#7C5CFF,#FF5DA2);color:#fff;border-color:transparent;}'
+      + '.ui-vp-row button .ok{font-size:.75rem;opacity:.85;}'
+      + '.ui-vp-now{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700;font-size:.92rem;}'
+      + '.ui-vp-now .w{flex:1 1 180px;min-width:0;}'
+      + '.ui-vp button.sm{min-height:40px;padding:0 12px;border-radius:12px;border:0;background:#EDE7FF;color:#4A3AA8;font-weight:800;cursor:pointer;}'
+      + '.ui-vp .warn{color:#B4441E;font-weight:800;font-size:.88rem;}'
+      + '.ui-vg{position:fixed;inset:0;z-index:9990;background:rgba(20,16,40,.55);display:flex;align-items:center;justify-content:center;padding:12px;}'
+      + '.ui-vg-in{background:#fff;color:#2B2440;border-radius:20px;max-width:620px;width:100%;max-height:calc(100% - 24px);overflow:auto;padding:14px 16px 16px;font-family:Nunito,sans-serif;box-shadow:0 18px 50px rgba(0,0,0,.35);}'
+      + '.ui-vg-in h3{margin:0 0 4px;font-family:Fredoka,sans-serif;font-size:1.25rem;display:flex;align-items:center;gap:8px;}'
+      + '.ui-vg-in h3 button{margin-left:auto;min-width:44px;min-height:44px;border:0;border-radius:50%;background:#F4F1FA;font-size:1.1rem;cursor:pointer;}'
+      + '.ui-vg-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}'
+      + '.ui-vg-tabs button{min-height:40px;padding:0 12px;border-radius:999px;border:0;background:#F4F1FA;font-weight:800;cursor:pointer;color:#2B2440;}'
+      + '.ui-vg-tabs button.on{background:#2B2440;color:#fff;}'
+      + '.ui-vg ol{margin:6px 0 10px;padding-left:1.4em;line-height:1.45;} .ui-vg li{margin:3px 0;}'
+      + '.ui-vg .path{display:inline-block;background:#F4F1FA;border-radius:8px;padding:1px 6px;font-weight:800;}'
+      + '.ui-vg table{border-collapse:collapse;width:100%;font-size:.92rem;margin:4px 0 8px;} .ui-vg td,.ui-vg th{border-bottom:1px solid #EEE;padding:6px 4px;text-align:left;vertical-align:top;}'
+      + '.ui-vg .tip{background:#FFF6DD;border-radius:12px;padding:8px 10px;font-size:.88rem;margin-top:6px;}';
+    document.head.appendChild(st); }
+  // 📥 what to download, by device (Aowu's iPhone list 2026-11-18: Kate (Enhanced) already on his phone)
+  const GUIDE = {
+    iphone: {name: '📱 iPhone / iPad', steps: ['Open <span class="path">Settings</span>', 'Tap <span class="path">Accessibility</span> → <span class="path">Read &amp; Speak</span> (older iOS: <span class="path">Spoken Content</span>)',
+        'Tap <span class="path">Voices</span> → <span class="path">English</span>', 'Find the country (United States · United Kingdom · Australia) and tap ☁️ next to the voice below', 'Wait for the download (Wi-Fi), then close the game and open it again'],
+      rec: [['🇺🇸 US', 'Ava (Enhanced) · 241 MB', 'Samantha (Enhanced) · 152 MB'], ['🇬🇧 UK', 'Kate (Enhanced) · 56 MB', 'Serena (Enhanced) · 131 MB'], ['🇦🇺 Australia', 'Karen (Enhanced) · 157 MB', 'Matilda (Enhanced) · 94 MB']],
+      tip: 'Pick an <b>(Enhanced)</b> voice: clear and natural. <b>(Premium)</b> voices sound best in Apple apps but a web page may not be allowed to use them — if a Premium voice never shows here, use the Enhanced one.'},
+    android: {name: '🤖 Android', steps: ['Open <span class="path">Settings</span> and search <span class="path">Text-to-speech</span>', 'Preferred engine: <span class="path">Speech Services by Google</span> → tap ⚙️',
+        'Tap <span class="path">Install voice data</span> → <span class="path">English (United States)</span> / <span class="path">English (United Kingdom)</span> / <span class="path">English (Australia)</span>', 'Pick a voice (play ▶ to listen) and tap ⬇️ to download', 'Close the game and open it again'],
+      rec: [['🇺🇸 US', 'a woman’s voice you like (Voice I or III)', '—'], ['🇬🇧 UK', 'a woman’s voice (Voice I or III)', '—'], ['🇦🇺 Australia', 'a woman’s voice (Voice I or III)', '—']],
+      tip: 'Samsung: <span class="path">Settings → General management → Text-to-speech</span> → choose <b>Speech Services by Google</b> first.'},
+    windows: {name: '💻 Windows PC', steps: ['Easiest: open the game in <b>Microsoft Edge</b> — it brings natural online voices with no download', 'Or: <span class="path">Settings → Time &amp; language → Speech → Manage voices → Add voices</span>',
+        'Add <span class="path">English (United Kingdom)</span> / <span class="path">English (Australia)</span> / <span class="path">English (United States)</span>', 'Close the game and open it again'],
+      rec: [['🇺🇸 US', 'Edge: Aria / Jenny (Natural)', 'Windows: Zira'], ['🇬🇧 UK', 'Edge: Sonia / Libby (Natural)', 'Windows: Hazel'], ['🇦🇺 Australia', 'Edge: Natasha (Natural)', 'Windows: Catherine']],
+      tip: 'Chrome on a PC also has online voices: <b>Google US English</b> and <b>Google UK English Female</b>.'},
+    mac: {name: '🖥️ Mac', steps: ['<span class="path">System Settings → Accessibility → Spoken Content</span>', '<span class="path">System voice → Manage Voices…</span> → <span class="path">English</span>', 'Tick the voice below for each country and wait for the download', 'Close the game and open it again'],
+      rec: [['🇺🇸 US', 'Ava (Enhanced)', 'Samantha (Enhanced)'], ['🇬🇧 UK', 'Kate (Enhanced)', 'Serena (Enhanced)'], ['🇦🇺 Australia', 'Karen (Enhanced)', 'Matilda (Enhanced)']],
+      tip: 'Enhanced voices work in Safari and Chrome.'}
+  };
+  function guide(which){
+    css(); const old = document.querySelector('.ui-vg'); if(old) old.remove();
+    const el = document.createElement('div'); el.className = 'ui-vg'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'How to get a better voice');
+    const order = [device()].concat(['iphone', 'android', 'windows', 'mac'].filter(k => k !== device()));
+    let cur = which || order[0];
+    function paint(){
+      const G = GUIDE[cur];
+      el.innerHTML = '<div class="ui-vg-in"><h3>📥 Get a better reading voice<button type="button" data-sound="tap" aria-label="Close">✕</button></h3>'
+        + '<div style="font-size:.9rem">Voices live on the device — download one once, every game uses it.</div>'
+        + '<div class="ui-vg-tabs">' + order.map(k => '<button type="button" data-k="' + k + '" class="' + (k === cur ? 'on' : '') + '">' + GUIDE[k].name + (k === device() ? ' · this one' : '') + '</button>').join('') + '</div>'
+        + '<ol>' + G.steps.map(s => '<li>' + s + '</li>').join('') + '</ol>'
+        + '<table><tr><th>Accent</th><th>⭐ Best</th><th>Lighter</th></tr>' + G.rec.map(r => '<tr><td><b>' + r[0] + '</b></td><td>' + r[1] + '</td><td>' + r[2] + '</td></tr>').join('') + '</table>'
+        + '<div class="tip">💡 ' + G.tip + '</div></div><span class="ui-modal on" style="display:none!important"></span>';
+      el.querySelector('h3 button').onclick = close;
+      el.querySelectorAll('.ui-vg-tabs button').forEach(b => b.onclick = () => { cur = b.dataset.k; paint(); });
+    }
+    function close(){ el.remove(); }
+    el.addEventListener('click', e => { if(e.target === el) close(); });
+    paint(); document.body.appendChild(el); return {el: el, close: close};
+  }
+  UI.voiceGuide = guide;
+  function picker(box){
+    if(!box) return null; css();
+    box.innerHTML = '<div class="ui-vp"><div class="ui-vp-h">🗣️ Reading voice</div><div class="ui-vp-row"></div><div class="ui-vp-now"><span class="w"></span><button type="button" class="sm try" data-sound="tap">▶ Try</button></div>'
+      + '<div class="warn" hidden></div><div><button type="button" class="sm how" data-sound="tap">📥 How to get a better voice</button></div></div>';
+    const row = box.querySelector('.ui-vp-row'), now = box.querySelector('.w'), warn = box.querySelector('.warn');
+    function paint(){
+      const a = accentNow();
+      row.innerHTML = ACC.map(([k, n, f]) => { const ok = !k || voicesFor(k).length; return '<button type="button" data-a="' + k + '" class="' + (k === a ? 'on' : '') + '" data-sound="tap">' + f + ' ' + n + (k ? '<span class="ok">' + (ok ? ' ✓' : ' 📥') + '</span>' : '') + '</button>'; }).join('');
+      row.querySelectorAll('button').forEach(b => b.onclick = () => { try{ UISound.music.set({acc: b.dataset.a}); }catch(e){} try{ if(typeof SPVoice !== 'undefined') SPVoice.refresh(); }catch(e){} paint(); trySay(); });
+      let v = null; try{ if(typeof SPVoice !== 'undefined'){ SPVoice.refresh(); v = SPVoice.current(); } }catch(e){}
+      const flag = v ? (ACC.find(x => x[0] && norm(v.lang).indexOf(x[0].toLowerCase()) === 0) || ['', '', '🌐'])[2] : '';
+      now.textContent = v ? '🔊 Using: ' + v.name + ' ' + flag : '🔊 Using: the device’s own voice';
+      const miss = a && !voicesFor(a).length; warn.hidden = !miss;
+      if(miss) warn.textContent = '📥 No ' + (ACC.find(x => x[0] === a) || [])[2] + ' voice on this device yet — tap "How to get a better voice". Until then the closest voice reads.';
+    }
+    function trySay(){ try{ if(!window.speechSynthesis) return; speechSynthesis.cancel(); speechSynthesis.speak(new SpeechSynthesisUtterance('Hello! Let us read: cat, ship, frog.')); }catch(e){} }
+    box.querySelector('.try').onclick = trySay;
+    box.querySelector('.how').onclick = () => guide();
+    paint();
+    try{ speechSynthesis.addEventListener('voiceschanged', paint); }catch(e){}
+    try{ UISound.music.watch(() => { if(box.isConnected) paint(); }); }catch(e){}
+    return {paint: paint};
+  }
+  UI.voicePicker = picker;
+})();
+/* ================= 🗣️ VOICE PICKER + GUIDE (an-4) END ================= */
