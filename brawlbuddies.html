@@ -327,6 +327,7 @@
   #scr-play.side.ovl .ctl{position:absolute;bottom:0;z-index:6;opacity:.62;transition:opacity .15s;}
   #scr-play.side.ovl .ctl.pz-l{left:0;} #scr-play.side.ovl .ctl.pz-r{right:0;}
   #scr-play.side.ovl .ctl.on{opacity:.95;}
+  #scr-advplay.ovl .actl{opacity:.62;transition:opacity .15s;} #scr-advplay.ovl .actl.on{opacity:.95;}   /* 🗺️ 24z-b css: Brawenture sideways phone */
   /* 📱 phones held upright: the 🌸 ring's invisible box poked 15 px past the right edge (page slid sideways); its buttons end inside — clip the empty box */
   #scr-play.port .ctl-wrap{overflow-x:clip;}
 </style>
@@ -3284,6 +3285,7 @@ function layoutAdv(){
   const sp = $('scr-advplay'), arena = $('adv-arena'), W = window.innerWidth, H = window.innerHeight;
   arena.querySelectorAll('.actl').forEach(e => e.remove()); $('adv-bottom').innerHTML = '';
   const touch = isTouch(), humans = AV.M.heroes.filter(h => h.human); sp.classList.toggle('port', touch && H > W * 1.05);
+  sp.classList.toggle('ovl', touch && !(H > W * 1.05) && H < 560); AV.ovl = sp.classList.contains('ovl');   /* 🗺️ 24z-b ovl: phone held sideways = see-through controls + closer camera (advViewW) */
   AV.touch = touch;
   if(!touch){ $('adv-bottom').innerHTML = advLegend(); }
   else if(H > W * 1.05){ const w = document.createElement('div'); w.className = 'ctl-wrap adv-wrap';   // tall screen: pads under the picture
@@ -3291,9 +3293,14 @@ function layoutAdv(){
     $('adv-bottom').appendChild(w); if(humans.length === 1) pzFitStick(w, ADV.macro ? 4 : 3); }
   else if(humans.length > 1){ arena.appendChild(advCtl(0, 'l', true)); arena.appendChild(advCtl(1, 'r', true)); }
   else { arena.appendChild(advCtl(0, 'l', false, 'pad')); arena.appendChild(advCtl(0, 'r', false, 'btn')); }
-  pzArcAll($('scr-advplay'));
+  pzArcAll($('scr-advplay')); advOvlOn();
   requestAnimationFrame(advResize); advResize();
   if(AV.M && !AV.M.t) AV.M.view = advViewW();
+}
+function advOvlOn(){   /* 🗺️ 24z-b */
+  document.querySelectorAll('#adv-arena .actl').forEach(e => { const on = new Set(), set = () => e.classList.toggle('on', on.size > 0);
+    e.addEventListener('pointerdown', ev => { on.add(ev.pointerId); set(); }, true);
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(k => e.addEventListener(k, ev => { on.delete(ev.pointerId); set(); }, true)); });
 }
 function advLegend(){
   const set = (K, who) => '<span><b>' + who + '</b> ' + kk(K.left) + kk(K.right) + kk(K.jump) + kk(K.duck) + ' walk · ' + kk(K.boop) + '👊 ' + kk(K.bonk) + '💥 ' + kk(K.power) + '🌀 ' + kk(K.dodge) + '⤴️</span>';
@@ -3613,9 +3620,10 @@ function advHud(){
 
 /* ---------- drawing (2.5D: x along the street, z into the screen, y up) ---------- */
 // how many metres of street fit across: 11 on a wide screen, closer up on a tall phone / tablet so the heroes stay big
-function advViewW(){ const st = $('adv-stage'), w = (st && st.clientWidth) || innerWidth, h = (st && st.clientHeight) || innerHeight * 0.7; return Math.max(6.5, Math.min(BV.VIEW, 11 * (w / Math.max(1, h)) / 1.35)); }
+const ADV_OVL_VIEW = 8.5, ADV_OVL_HEAD = 1.8;   /* 🗺️ 24z-b: on a phone held sideways: metres across (bigger fighters) · metres of sky kept over the back row (fighter + name tag) */
+function advViewW(){ const st = $('adv-stage'), w = (st && st.clientWidth) || innerWidth, h = (st && st.clientHeight) || innerHeight * 0.7, sp = $('scr-advplay'); const v = Math.max(6.5, Math.min(BV.VIEW, 11 * (w / Math.max(1, h)) / 1.35)); return sp && sp.classList.contains('ovl') ? Math.min(v, ADV_OVL_VIEW) : v; }
 function advView(W, H){
-  const s = W / AV.M.view, bandH = Math.max(H * 0.26, Math.min(H * 0.5, s * BV.ZD * (H > W ? 1 : 0.7))), yB = H - Math.max(6, H * 0.035), yT = yB - bandH, cam = AV.M.cam;
+  const s = W / AV.M.view, yB = H - Math.max(6, H * 0.035), bandH = Math.min(Math.max(H * 0.26, Math.min(H * 0.5, s * BV.ZD * (H > W ? 1 : 0.7))), AV.ovl ? Math.max(H * 0.26, yB - s * ADV_OVL_HEAD) : 1e9), yT = yB - bandH, cam = AV.M.cam;   /* 🗺️ 24z-b: AV.ovl keeps ADV_OVL_HEAD of sky */
   return {W, H, s, yT, yB, bandH, cam, gy: z => yT + z / BV.ZD * bandH, ks: z => 0.88 + 0.12 * z / BV.ZD, sx: x => (x - cam) * s + W / 2};
 }
 const ADV_SCENES = {
@@ -4092,4 +4100,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (11i-I+back-1+r35+modes-3+mg-1+ck-room+p1c+p2+p3a+ck-2b+cs-2c+ls-1b+pz-1+pz-2+b3w5b+24t-e+24u-d1+24z) END OF BrawlBuddies.html -->
+<!-- (11i-I+back-1+r35+modes-3+mg-1+ck-room+p1c+p2+p3a+ck-2b+cs-2c+ls-1b+pz-1+pz-2+b3w5b+24t-e+24u-d1+24z+24z-b) END OF BrawlBuddies.html -->
