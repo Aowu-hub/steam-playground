@@ -196,6 +196,9 @@
   @keyframes pw-glow{50%{transform:scale(1.07);box-shadow:inset 0 0 0 4px #FFF,0 0 22px #FFC845,0 6px 0 rgba(0,0,0,0.3);}}
   .sbtn.down,.sbtn:active{transform:translateY(5px) scale(.95);box-shadow:inset 0 0 0 4px var(--rim),inset 0 -2px 0 rgba(0,0,0,0.28),0 1px 0 rgba(0,0,0,0.3);}
   .sbtn.armed{box-shadow:inset 0 0 0 4px var(--rim),0 0 0 4px var(--rim),0 0 18px var(--rim),0 6px 0 rgba(0,0,0,0.3);}
+  .sbtn.srv .nm{white-space:normal;max-width:86%;text-align:center;font-size:max(9px,calc(var(--sz) * 0.125));line-height:1.02;}   /* 🎾 b3b6 serve names while you serve */
+  .sbtn.srv{--rim2:#FFE38A;} .sbtn.tossnow{animation:sbs-now .32s ease-in-out infinite alternate;box-shadow:inset 0 0 0 4px #FFC845,0 0 0 4px #FFC845,0 0 22px #FFC845,0 6px 0 rgba(0,0,0,0.3);}
+  @keyframes sbs-now{from{scale:1;}to{scale:1.07;}}
   .sbtn.flash::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:3px solid var(--rim);animation:sb-flash .45s ease-out forwards;pointer-events:none;}
   @keyframes sb-flash{from{transform:scale(.85);opacity:1;}to{transform:scale(1.35);opacity:0;}}
   /* where: 1 person = stick bottom-left, shots bottom-right · 2 people side by side (landscape) = a column each side · phone upright 2 people = a band top + bottom */
@@ -220,6 +223,7 @@
   .power-tag{position:absolute;z-index:12;pointer-events:none;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.78rem;background:rgba(10,30,24,0.78);border-radius:12px;padding:4px 9px;color:#fff;white-space:nowrap;}
   .power-tag.l{left:calc(8px + env(safe-area-inset-left));top:6px;} .power-tag.r{right:calc(8px + env(safe-area-inset-right));top:6px;}
   .power-tag.gold{background:linear-gradient(135deg,#FF9F1C,#FF4D8D);}
+  .serve-hint.gold{background:rgba(120,72,0,0.88);color:#FFE38A;}   /* 🎾 b3b6 */
   .serve-hint{position:absolute;left:50%;top:10px;   /* sb2-1: top of the court — the stick + shot buttons own the bottom */transform:translateX(-50%);z-index:11;pointer-events:none;background:rgba(10,30,24,0.78);border-radius:14px;padding:6px 12px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.85rem;white-space:nowrap;animation:bob 1.2s ease-in-out infinite;}
   @keyframes bob{50%{transform:translate(-50%,-5px);}}
   /* result */
@@ -496,6 +500,24 @@ var SB = (function () {
     slice:  { depth: 0.36, speed: 0.82, top: -0.85, label: '🔪 Slice' }
   };
 
+  // 🎾 b3b6 serves: one real-sport toss per sport (z0 = the hand, apex = top of the toss, cz = contact height, T = tap → contact in s)
+  var TOSS = {
+    slaball: { kind: 'toss',      apex: 2.6,  cz: 2.35, T: 0.667, fx0: 0.5, fx1: 0.78 },   // 🎾 toss up, 🏆 trophy pose, hit overhead
+    slapong: { kind: 'ptoss',     apex: 0.95, cz: 0.6,  T: 0.5,   fx0: 0.5, fx1: 0.5 },    // 🏓 palm toss, hit on the way down
+    slabam:  { kind: 'feather',   apex: 0,    cz: 0.6,  T: 0.35,  fx0: 0.5, fx1: 0.55 },   // 🏸 let go of the feathers, hit below the waist
+    slapoof: { kind: 'dropserve', bounce: 0.82, cz: 0.55, fx0: 0.5, fx1: 0.6 },            // 🥒 drop, one bounce, underhand on the way up
+    slawall: { kind: 'wtoss',     apex: 1.4,  cz: 1.0,  T: 0.55,  fx0: 0.5, fx1: 0.62 }    // 🧱 short side toss
+  };
+  var PERFECT_WIN = 0.16;   // ⚡ a 2nd tap in the last 0.16 s before contact (the ⭕ glow) = a perfect serve (Junior and up)
+  // serve variants by the shot you tap (human servers; robots serve 'normal'): f = where in the allowed depth, v = speed
+  var SERVE_SHOT = {
+    normal: { f0: 0.45, f1: 0.9,  v: 1 },
+    smash:  { f0: 0.72, f1: 1.0,  v: 1.18 },               // 💥 power serve: fast + deep
+    lob:    { f0: 0.75, f1: 1.0,  v: 0.72, high: true },   // 🌈 high serve: slow, high, deep
+    drop:   { f0: 0.0,  f1: 0.22, v: 0.72, short: true },  // 🪶 short serve: just past the line
+    slice:  { f0: 0.4,  f1: 0.8,  v: 1,    spin: true }    // 🔪 spin serve: curves out
+  };
+
   // ---------- powers (14) ----------
   var POWERS = {
     big:      { tier: 0, icon: '🏓', name: 'Big Paddle',   gentle: true, about: 'Your paddle is much bigger for 10 s' },
@@ -624,7 +646,7 @@ var SB = (function () {
   function setupServe(M) {
     var sp = M.sp, s = M.score.serveSide;
     M.balls = []; M.rally = 0; M.orb = null; M.state = 'serve'; M.stateT = 0;
-    M.players.forEach(function (p) { p.swing = 0; });
+    M.players.forEach(function (p) { p.swing = 0; p.tossing = false; });   // 🎾 b3b6
     resetPositions(M);
     var server = serverOf(M);
     var b = mkBall(M, server.x + fwdOf(M, server) * 0.5, server.y, sp.table ? 0.55 : 1.0);
@@ -648,27 +670,75 @@ var SB = (function () {
     M.balls.push(b);
   }
 
-  // serve: called when the server presses a shot (or the robot decides)
-  function doServe(M, shot) {
+  // 🎾 b3b6: the serve starts with a TOSS (one per sport, TOSS table). The ball stays b.held (every "held" check keeps working) and follows
+  // the toss curve; at b.toss.at (a whole number of ticks away, known at once) doServe hits it from the real toss height.
+  function tossOf(M) { return TOSS[M.sp.id] || null; }
+  function startToss(M, shot) {
+    if (M.state !== 'serve') return false;
+    var b = M.balls[0]; if (!b || b.held == null || b.toss) return false;
+    var p = M.players[b.held], T = tossOf(M);
+    if (!T) return doServe(M, shot);
+    var z0 = b.z, g, vz, dur;
+    if (T.kind === 'dropserve') {   // 🥒 drop → one bounce → contact on the way up
+      g = G; var t1 = Math.sqrt(2 * z0 / g), v1 = T.bounce * g * t1, disc = v1 * v1 - 2 * g * T.cz;
+      vz = 0; dur = t1 + (disc > 0 ? (v1 - Math.sqrt(disc)) / g : v1 / g);
+    } else {
+      var ap = Math.max(T.apex, z0), up = Math.sqrt(2 * (ap - z0)), dn = Math.sqrt(2 * Math.max(0, ap - T.cz));
+      dur = Math.max(1, Math.round(T.T / DT)) * DT;   // a whole number of ticks, so contact lands exactly on cz
+      g = Math.pow((up + dn) / dur, 2); vz = up * Math.sqrt(g);
+    }
+    var n = Math.max(1, Math.round(dur / DT - (T.kind === 'dropserve' ? -0.5 + 1e-6 : 0)));
+    b.toss = { t0: M.t, z0: z0, vz: vz, g: g, at: M.t + n * DT, n: n, shot: shot || 'normal', kind: T.kind, perfect: false, fx0: T.fx0, fx1: T.fx1, dur: n * DT,
+      bounce: T.bounce || 0, win: PERFECT_WIN, canPerfect: !!(p.human && M.level >= 1) };
+    if (p.robot && M.lv.timing) b.toss.perfect = M.rnd() < 0.25 + 0.15 * (M.level - 3);   // 🤖 pro robots sometimes hit ⚡ perfect
+    p.tossing = true; p.queued = null;
+    M.events.push({ k: 'toss', p: p.i, side: p.side, at: b.toss.at, kind: T.kind, shot: b.toss.shot, win: PERFECT_WIN, canPerfect: b.toss.canPerfect });
+    return true;
+  }
+  // where the tossed ball is now (the ball stays held until contact)
+  function tossBall(M, b, p) {
+    var o = b.toss, tt = Math.min(M.t - o.t0, o.dur), z;
+    if (o.kind === 'dropserve') {
+      var t1 = Math.sqrt(2 * o.z0 / o.g);
+      if (tt <= t1) z = o.z0 - 0.5 * o.g * tt * tt;
+      else { var u = tt - t1, v1 = o.bounce * o.g * t1; z = v1 * u - 0.5 * o.g * u * u; if (!o.bounced) { o.bounced = true; M.events.push({ k: 'tossbounce', p: p.i }); } }
+    } else z = o.z0 + o.vz * tt - 0.5 * o.g * tt * tt;
+    var f = o.dur > 0 ? tt / o.dur : 1;
+    b.x = p.x + fwdOf(M, p) * (o.fx0 + (o.fx1 - o.fx0) * f); b.y = p.y; b.z = Math.max(0.03, z);
+  }
+  // a 2nd tap during the toss: inside the ⭕ window = ⚡ perfect (Junior and up). Never a fault.
+  function tossTap(M, p) {
+    var b = M.balls[0], o = b && b.toss; if (!o || o.tapped) return;
+    o.tapped = true;
+    var ok = o.canPerfect && M.t >= o.at - o.win - 1e-9;
+    if (ok) o.perfect = true;
+    M.events.push({ k: 'tosstap', p: p.i, ok: ok, early: o.canPerfect && !ok });
+  }
+
+  // serve: called at the toss's contact (or straight away for a sport without a toss); o = {x, z, perfect} from the toss
+  function doServe(M, shot, o) {
     if (M.state !== 'serve') return false;
     var b = M.balls[0]; if (!b || b.held == null) return false;
-    var p = M.players[b.held], sp = M.sp, d = dirOf(p.side);
-    b.held = null; b.owner = p.side; b.by = p.i; b.serve = true; b.b = [0, 0]; b.hits = 0;
-    b.x = p.x + d * 0.4; b.y = p.y; b.z = sp.table ? 0.45 : (sp.serve === 'under' ? 0.6 : 1.9);
+    o = o || {};
+    var p = M.players[b.held], sp = M.sp, d = dirOf(p.side), SV = SERVE_SHOT[shot] || SERVE_SHOT.normal;
+    if (!p.human) SV = SERVE_SHOT.normal;
+    b.held = null; b.owner = p.side; b.by = p.i; b.serve = true; b.b = [0, 0]; b.hits = 0; b.toss = null; p.tossing = false;
+    b.x = o.x != null ? o.x : p.x + d * 0.4; b.y = p.y; b.z = o.z != null ? o.z : (sp.table ? 0.45 : (sp.serve === 'under' ? 0.6 : 1.9));
     var r = M.rnd, lw = courtW(M, 1 - p.side);
     var ty = clamp((-p.y * 0.6) + (r() - 0.5) * lw * 0.9, -lw * 0.75, lw * 0.75);
-    var V = sp.V * M.lv.vMul * (p.robot ? 1 : 0.95);
+    var V = sp.V * M.lv.vMul * (p.robot ? 1 : 0.95) * (o.perfect ? 1.12 : 1) * SV.v;
     if (sp.squash) {
       // 🧱 serve at the FRONT wall, to the other player's half; it comes back to them
       var fy = -sgn(p.y || 0.01) * sp.Wh * (0.15 + r() * 0.3), fz = 2.1 + r() * 0.7;
-      b.x = p.x + 0.4; b.z = 1.0; b.fb = 0;
+      b.x = o.x != null ? o.x : p.x + 0.4; b.z = o.z != null ? o.z : 1.0; b.fb = 0;
+      if (SV.high) fy *= 0.6, fz = 3.2 + (fz - 2.1) * 0.8; else if (SV === SERVE_SHOT.smash) fz = 1.7 + (fz - 2.1) * 0.6;   // 🎾 b3b6 high / power serve
       var sdx = sp.Lh - b.x, sdy = fy - b.y, sdd = Math.sqrt(sdx * sdx + sdy * sdy), sT = sdd / (V * 0.75);
-      b.vx = sdx / sT; b.vy = sdy / sT; b.vz = (fz - b.z + 0.5 * G * sT * sT) / sT; b.top = 0; b.side = 0;
+      b.vx = sdx / sT; b.vy = sdy / sT; b.vz = (fz - b.z + 0.5 * G * sT * sT) / sT; b.top = 0; b.side = SV.spin ? -sgn(fy) * 0.5 : 0;
     } else if (sp.pongServe) {
       // first bounce on own side, then over the net: search a speed that works
       var z0 = b.z, best = null;
-      for (var vx = V * 0.55; vx <= V * 1.2 && !best; vx += V * 0.05) {
-        for (var f2 = 0.75; f2 >= 0.35 && !best; f2 -= 0.05) {
+      for (var vx = V * (o.perfect ? 0.72 : 0.55); vx <= V * 1.2 && !best; vx += V * 0.05) {   // ⚡ b3b6 a perfect serve starts faster
+        for (var f2 = SV.short ? 0.45 : SV.f0 > 0.6 ? 0.85 : 0.75; f2 >= (SV.short ? 0.25 : 0.35) && !best; f2 -= 0.05) {   // 🎾 b3b6 short / deep
           var x2 = d * sp.Lh * f2;
           var vi;  // impact speed at the first bounce
           // try first-bounce spots on own side
@@ -680,21 +750,25 @@ var SB = (function () {
             if (Math.abs((vz0 - G * T1) + vi) > 0.6) continue;
             var tn = Math.abs(x1) / vx, zn = vzUp * tn - 0.5 * G * tn * tn;
             if (zn < sp.net + 0.12) continue;
-            best = { vx: vx, vz0: vz0, T1: T1, x1: x1 }; break;
+            best = { vx: vx, vz0: vz0, T1: T1, x1: x1, T2: T2 }; break;
           }
         }
       }
       if (!best) { var T1b = 0.5; best = { vx: V * 0.8, vz0: (0 - z0 + 0.5 * G * T1b * T1b) / T1b, T1: T1b }; }
       b.vx = d * best.vx; b.vy = (ty * 0.5 - b.y) / (best.T1 * 3); b.vz = best.vz0;
-      b.pongServeBounce = true; b.top = 0; b.side = 0;
+      b.pongServeBounce = true; b.top = 0; b.side = SV.spin ? -sgn(ty || 0.01) * 0.5 : 0;
+      if (SV.spin) { var Tt = best.T1 + (best.T2 || best.T1); b.vy = (ty * 0.5 - b.y - 0.5 * b.side * SIDE_ACC * Tt * Tt) / Tt; }   // 🔪 the curve is aimed in
     } else {
       var minX = sp.twoBounce ? sp.kitchen + 0.8 : 1.2;
       var maxX = sp.serveLock ? courtL(M, 1 - p.side) * 0.62 : courtL(M, 1 - p.side) * 0.8;
-      var tx = d * (minX + (maxX - minX) * (0.45 + r() * 0.45));
-      aimBall(M, b, tx, ty, V * (sp.serve === 'under' ? 0.85 : 1.05), sp.serve === 'under' ? 0.1 : 0.35, 0);
+      if (sp.drag) { minX = (sp.shortLine || 1.98) + 0.25; maxX = courtL(M, 1 - p.side) * 0.92; }   // 🏸 b3b6 short line → back line
+      var tx = d * (minX + (maxX - minX) * Math.min(1, SV.f0 + r() * (SV.f1 - SV.f0) + (o.perfect ? 0.1 : 0)));   // ⚡ perfect = a bit deeper
+      b.shotKind = sp.drag ? (SV.high ? 'lob' : SV.short ? 'drop' : shot === 'slice' || o.perfect ? 'slice' : null) : null;   // 🏸 short / high serve (⚡ perfect = flatter)
+      aimBall(M, b, tx, ty, V * (sp.serve === 'under' ? 0.85 : 1.05), (sp.serve === 'under' ? 0.1 : 0.35) + (o.perfect ? 0.25 : 0), SV.spin && !sp.drag ? -sgn(ty || 0.01) * 0.9 : 0);
     }
     b.t0 = M.t; p.swing = 1; p.swingShot = shot || 'normal'; M.state = 'play'; M.stateT = 0;
-    M.events.push({ k: 'serve', side: p.side, p: p.i });
+    if (o.perfect) { M.stats[p.side].perfect++; M.fx.push({ k: 'spark', x: b.x, y: b.y, z: b.z, t: 0, life: 0.5 }); }
+    M.events.push({ k: 'serve', side: p.side, p: p.i, shot: shot || 'normal', perfect: !!o.perfect, toss: !!o.toss });
     M.lastServeSide = p.side; M.receiverTouched = false;
     return true;
   }
@@ -1084,12 +1158,15 @@ var SB = (function () {
       robots(M, dt);
       movePlayers(M, dt, false);
       var b = M.balls[0], p = b && M.players[b.held];
-      if (p) {
+      if (p && b.toss) {   // 🎾 b3b6 the toss is in the air: follow its curve, hit at the contact tick
+        tossBall(M, b, p);
+        if (M.t >= b.toss.at - 1e-9) { var o3 = b.toss; doServe(M, o3.shot, { x: b.x, z: b.z, perfect: o3.perfect, toss: true }); }
+      } else if (p) {
         // ball stays at the server's hand
         b.x = p.x + fwdOf(M, p) * 0.5; b.y = p.y; b.z = M.sp.table ? 0.55 : 1.0 + Math.sin(M.t * 5) * 0.12;
-        if ((p.robot || p.auto) && M.stateT > 0.9 + M.rnd() * 0.2) doServe(M, 'normal');
-        if (p.human && p.queued && M.t - p.queuedT < 0.6) { doServe(M, p.queued); p.queued = null; }
-        if (p.human && M.stateT > (M.autoServe || 99)) doServe(M, 'normal');
+        if ((p.robot || p.auto) && M.stateT > 0.9 + M.rnd() * 0.2) startToss(M, 'normal');
+        else if (p.human && p.queued && M.t - p.queuedT < 0.6) { startToss(M, p.queued); p.queued = null; }
+        else if (p.human && M.stateT > (M.autoServe || 99)) startToss(M, 'normal');
       }
       return;
     }
@@ -1115,7 +1192,7 @@ var SB = (function () {
         ix = p.input.x; iy = p.input.y;                       // world directions (the page turns screen keys into world)
         if (p.mirror > 0) iy = -iy;
       }
-      if (p.stun > 0 || p.stand > 0) { ix = 0; iy = 0; }   // 🦘🤸 stand still after a jump / getting up after a dive
+      if (p.stun > 0 || p.stand > 0 || p.tossing) { ix = 0; iy = 0; }   // 🎾 b3b6 + the server stands still while the toss is up   // 🦘🤸 stand still after a jump / getting up after a dive
       var len = Math.sqrt(ix * ix + iy * iy); if (len > 1) { ix /= len; iy /= len; }
       var tvx = ix * sp, tvy = iy * sp;
       var pt = patchAt(M, p.x, p.y);
@@ -1590,8 +1667,11 @@ var SB = (function () {
   // human: press a shot (queued for the next contact or serves)
   function pressShot(M, pi, shot) {
     var p = M.players[pi]; if (!p) return;
+    if (M.state === 'serve' && M.balls[0] && M.balls[0].held === pi) {   // 🎾 b3b6 1st tap = toss · 2nd tap = ⚡ timing
+      if (M.balls[0].toss) tossTap(M, p); else startToss(M, shot || 'normal');
+      p.queued = null; return;
+    }
     p.queued = shot || 'normal'; p.queuedT = M.t;
-    if (M.state === 'serve' && M.balls[0] && M.balls[0].held === pi) { doServe(M, p.queued); p.queued = null; }
   }
 
   function takeEvents(M) { var e = M.events; M.events = []; return e; }
@@ -1607,7 +1687,7 @@ var SB = (function () {
     SPORTS: SPORTS, SPORT_ORDER: SPORT_ORDER, LEVELS: LEVELS, SHOTS: SHOTS, POWERS: POWERS, POWER_KEYS: POWER_KEYS, ELEMENTS: ELEMENTS, ORB_AT: ORB_AT,
     newMatch: newMatch, step: step, DT: DT, pressShot: pressShot, usePower: usePower, takeEvents: takeEvents, pointText: pointText,
     simulate: simulate, courtW: courtW, courtL: courtL, goalHalf: goalHalf, limits: limits, dirOf: dirOf, paddlePos: paddlePos,
-    reachOf: reachOf, doServe: doServe, patchAt: patchAt, mkRng: mkRng, homeOf: homeOf, G: G,
+    reachOf: reachOf, doServe: doServe, startToss: startToss, TOSS: TOSS, SERVE_SHOT: SERVE_SHOT, PERFECT_WIN: PERFECT_WIN, patchAt: patchAt, mkRng: mkRng, homeOf: homeOf, G: G,
     humanAim: humanAim, aimPreview: aimPreview, jumpFail: jumpFail, JUMP_AIR: JUMP_AIR, DIVE_T: DIVE_T, landingOf: landingOf, fwdOf: fwdOf, flyShuttle: flyShuttle, squashDir: squashDir
   };
 })();
@@ -2333,7 +2413,8 @@ function sbbServeAct(){ const sp = G.M.sp; return sp.kind === 'puck' ? 'slabrall
 function sbbEvent(e){
   const M = G && G.M; if(!SBB_HAS || !M) return; const p = e.p != null ? M.players[e.p] : null;
   if(e.k === 'hit' && p) sbbStart(p, sbbShotAct(p, e.shot, e.jump), M.t);
-  else if(e.k === 'serve' && p) sbbStart(p, sbbServeAct(), M.t);
+  else if(e.k === 'toss' && p && SBS_ACT[e.kind]) sbbStart(p, SBS_ACT[e.kind], e.at, {key: 'toss'});   // 🎾 b3b6 the toss: contact = e.at, known now
+  else if(e.k === 'serve' && p){ const A = sbbH(p).act; if(e.toss && A && A.key === 'toss' && Math.abs(A.run.contactT - M.t) < 0.05) A.run.at(Math.max(M.t, A.run.contactT) + 1e-6); else sbbStart(p, sbbServeAct(), M.t); }   // the toss act's contact lands in this tick
   else if(e.k === 'legendmiss' && p) sbbStart(p, 'slabrall.whiff', M.t);
   else if(e.k === 'jump' && p && !e.ok && e.kind === 'h'){ const A = sbbH(p).act; if(!(A && A.run.t0 === M.t)) sbbStart(p, 'slabrall.dive', M.t); }   // a dive that missed
   else if(e.k === 'point') M.players.forEach(q => sbbStart(q, q.side === e.side ? 'slabrall.yes' : 'slabrall.aww', M.t));
@@ -2369,6 +2450,51 @@ function sbbFrame(p){
 // forehand / backhand: is the nearest real ball on this player's facing side on screen?
 function sbbSide(V, M, p, fx, dir){ const b = M.balls.find(q => q.live && q.real); if(!b) return; const q = V.P(b.x, b.y, b.z || 0); sbbH(p).back = (q[0] - fx) * dir < -4; }
 /* 🎬 SLABRALL BEATS END */
+/* 🎾 SLABRALL SERVES (b3b6, 🧱 baseline chat, 2026-11-18) START — one real-sport serve per sport (engine TOSS table): 1st tap = toss (the shot you tap
+   picks the serve: the buttons show serve names while you serve, then change back), the ball goes up for real, the engine hits it at the sweet spot.
+   From 🎚️ Junior a 2nd tap while the ⭕ glow is on = ⚡ perfect serve (+12 %). Never a fault. Acts: 🎭 BLOCK slabrall (toss · ptoss · feather · dropserve · wtoss). */
+const SBS_ACT = {toss: 'slabrall.toss', ptoss: 'slabrall.ptoss', feather: 'slabrall.feather', dropserve: 'slabrall.dropserve', wtoss: 'slabrall.wtoss'};
+const SBS_NAMES = {
+  slaball: {smash: ['💥', 'Power serve'], lob: ['🌈', 'High serve'], drop: ['🪶', 'Short serve'], slice: ['🔪', 'Slice serve']},
+  slapong: {smash: ['💥', 'Fast serve'], lob: ['🌈', 'Long serve'], drop: ['🪶', 'Short serve'], slice: ['🌀', 'Spin serve']},
+  slabam:  {smash: ['💨', 'Flick serve'], lob: ['🌈', 'High serve'], drop: ['🪶', 'Short serve'], slice: ['➡️', 'Drive serve']},
+  slapoof: {smash: ['💥', 'Power serve'], lob: ['🌈', 'Lob serve'], drop: ['🪶', 'Soft serve'], slice: ['🌀', 'Spin serve']},
+  slawall: {smash: ['💥', 'Power serve'], lob: ['🌈', 'Lob serve'], drop: ['🪶', 'Soft serve'], slice: ['🌀', 'Spin serve']}
+};
+const SBS_VERB = {slaball: '🎾 Tap a serve to toss', slapong: '🏓 Tap a serve to toss', slabam: '🏸 Tap a serve to drop & hit', slapoof: '🥒 Tap a serve to drop', slawall: '🧱 Tap a serve to toss'};
+window.SBS_LOG = window.SBS_LOG || [];
+// the toss now: {p, at, win, can} from the 'toss' event (host + 📡 guests), gone at the serve / a point
+function sbsEvent(e){ if(!G) return; if(e.k === 'toss'){ G.sbs = {p: e.p, at: e.at, win: e.win, can: e.canPerfect}; window.SBS_LOG.push({k: 'toss', p: e.p, at: e.at, kind: e.kind, shot: e.shot}); }
+  else if(e.k === 'serve' || e.k === 'point'){ if(e.k === 'serve') window.SBS_LOG.push({k: 'serve', p: e.p, t: G.M.t, perfect: e.perfect, shot: e.shot}); G.sbs = null; }
+  else if(e.k === 'tosstap') window.SBS_LOG.push({k: 'tosstap', p: e.p, ok: e.ok}); }
+function sbsWindow(M){ const T = G && G.sbs; return !!(T && T.can && M.t >= T.at - T.win - 1e-9 && M.t < T.at + 1e-9); }
+// shot buttons: serve names while this pad's player serves, back to the shot names in play; ⭕ glow in the perfect window
+function sbsPads(M){
+  const b0 = M.balls[0], serving = M.state === 'serve' && b0 && b0.held != null ? b0.held : -1, names = SBS_NAMES[M.sp.id], now = sbsWindow(M);
+  const pads = $('pads'), first = pads.querySelector('.shotpad'), sig = serving + '|' + now + '|' + (G.sbs ? G.sbs.p : -1) + '|' + M.sp.id;   // only touch the DOM when something changed
+  if(!first || first.__sbs === sig) return; first.__sbs = sig;   // (a rebuilt pad = a new element → done again)
+  pads.querySelectorAll('.shotpad').forEach(d => { const pi = Number(d.dataset.p), on = !!names && serving === pi;
+    const key = on ? 'srv' : 'shot'; if(d.dataset.sbs !== key){ d.dataset.sbs = key;
+      d.querySelectorAll('.sbtn[data-a]').forEach(x => { const a = x.dataset.a; if(a === 'power') return; const ic = x.querySelector('.ic'), nm = x.querySelector('.nm');
+        const L = on ? names[a] : [SHOT_ICON[a], SHOT_NAME[a]]; if(!L) return; ic.textContent = L[0]; nm.textContent = L[1]; x.title = L[1]; x.classList.toggle('srv', on); }); }
+    d.querySelectorAll('.sbtn[data-a]').forEach(x => { if(x.dataset.a !== 'power') x.classList.toggle('tossnow', on && now && G.sbs && G.sbs.p === pi); }); });
+}
+// the hint line on top of the court
+function sbsHint(M, sh, server){
+  const many = M.players.filter(p => p.human).length > 1, who = many ? server.name + ': ' : '', T = G.sbs && G.sbs.p === server.i ? G.sbs : null;
+  if(!T){ const v = SBS_VERB[M.sp.id]; return v ? v.replace(/^(\S+) /, '$1 ' + who) : '🎾 ' + who + 'tap or press a shot key to serve'; }
+  if(!T.can) return null;                                   // 🌱 Basic: one tap, nothing to time
+  return sbsWindow(M) ? '⭕ ' + who + 'Tap now for ⚡!' : '⭕ ' + who + 'Wait for the glow…';
+}
+// ⭕ a gold ring round the tossed ball in the window · ⚡ spark at a perfect contact
+function sbsDraw(g, V, M, t){
+  M.fx.forEach(f => { if(f.k !== 'spark') return; const w = V.P(f.x, f.y, f.z), a = 1 - f.t / f.life, r = 8 + f.t * 70; g.save(); g.strokeStyle = 'rgba(255,214,90,' + a + ')'; g.lineWidth = 3;
+    for(let i = 0; i < 8; i++){ const an = i * Math.PI / 4 + 0.3; g.beginPath(); g.moveTo(w[0] + Math.cos(an) * r * 0.45, w[1] + Math.sin(an) * r * 0.45); g.lineTo(w[0] + Math.cos(an) * r, w[1] + Math.sin(an) * r); g.stroke(); } g.restore(); });
+  const T = G && G.sbs, b = M.balls[0]; if(!T || !T.can || !b || b.held == null) return; const srv = M.players[T.p]; if(!srv || !srv.human || srv.remote) return;
+  const w = V.P(b.x, b.y, b.z), k = V.sc(b.x, b.y, b.z), on = sbsWindow(M), pu = 0.5 + 0.5 * Math.sin(t * 22);
+  g.save(); g.strokeStyle = on ? 'rgba(255,200,69,' + (0.75 + 0.25 * pu) + ')' : 'rgba(255,255,255,0.35)'; g.lineWidth = on ? 4 : 2; g.beginPath(); g.arc(w[0], w[1], k * (on ? 0.42 + 0.06 * pu : 0.5), 0, 7); g.stroke(); g.restore();
+}
+/* 🎾 SLABRALL SERVES END */
 /* ---------- loop ---------- */
 function frame(now){
   if(!G) return;
@@ -2537,6 +2663,7 @@ const WHY = {floor: 'it touched the floor', net: 'into the net', out: 'out!', ow
 function handleEvents(list){
   const M = G.M;
   if(typeof sbbEvent === 'function') list.forEach(sbbEvent);   /* 🎬 b3b5: contact = the engine's event */
+  if(typeof sbsEvent === 'function') list.forEach(sbsEvent);   /* 🎾 b3b6 the toss */
   list.forEach(e => {
     if(e.k === 'hit'){ UISound.play(e.shot === 'smash' ? 'whoosh' : 'pop'); const p = M.players[e.p]; if(e.perfect && p.human && !FX){ bigWord('PERFECT!'); } if(e.shot === 'smash' && p.human && !FX) floatAt(p, '💥 SMASH', 0.9);   // st-1: with effects on, the Sla… callouts say it
       if(e.rally === 10 || e.rally === 20 || e.rally === 30) banner('🔁 ' + e.rally + '-hit rally!', 'gold');
@@ -2663,8 +2790,10 @@ function hud(){
   $('pads').querySelectorAll('.shotpad').forEach(d => { const p = M.players[Number(d.dataset.p)]; const b = d.querySelector('.pw'); if(b) b.classList.toggle('ready', !!(p && p.power));
     d.querySelectorAll('.sbtn[data-a]').forEach(x => { if(x.dataset.a !== 'power') x.classList.toggle('armed', !!(p && p.queued === x.dataset.a && M.t - p.queuedT < 0.6)); }); });
   const sh = $('serve-hint'), b0 = M.balls[0], server = b0 && b0.held != null ? M.players[b0.held] : null;
-  if(M.state === 'serve' && server && server.human && !server.remote && !G.paused){ const txt = '🎾 ' + (M.players.filter(p => p.human).length > 1 ? server.name + ': ' : '') + 'tap or press a shot key to serve'; if(sh.textContent !== txt) sh.textContent = txt; sh.classList.remove('hidden'); }
+  const stx = M.state === 'serve' && server && server.human && !server.remote && !G.paused ? sbsHint(M, sh, server) : null;   // 🎾 b3b6 toss → ⭕ glow
+  if(stx){ if(sh.textContent !== stx) sh.textContent = stx; sh.classList.remove('hidden'); sh.classList.toggle('gold', stx.indexOf('⭕') === 0); }
   else sh.classList.add('hidden');
+  sbsPads(M);
 }
 
 /* ---------- drawing ---------- */
@@ -2705,6 +2834,7 @@ function drawScene(g, V, M, theme, t, opt){
   const items = [];
   M.players.forEach(p => items.push({d: V.depth(p.x, p.y), f: () => drawPlayer(g, V, M, p, t)}));
   M.balls.forEach(b => { if(b.live) items.push({d: V.depth(b.x, b.y) + 0.01, f: () => drawBall(g, V, M, b, t, opt)}); });
+  if(G && !opt.preview && typeof sbsDraw === 'function') items.push({d: 1e9, f: () => sbsDraw(g, V, M, t)});   // 🎾 b3b6 ⭕ ring + ⚡ spark
   if(sp.net) items.push({d: V.mode === 'side' && !V.portrait ? -sp.Wh - 0.5 : 0, f: () => drawNet(g, V, M, T)});
   if(M.orb) items.push({d: V.depth(M.orb.x, M.orb.y), f: () => drawOrb(g, V, M.orb, t)});
   items.sort((a, b) => a.d - b.d).forEach(it => it.f());
@@ -3530,4 +3660,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+lk-1b+p1d+lk-1c+cs-1+lk-2e+dv-1+tb-1+lk-5e+lk-5f+ls-1b+pz-1+24t-a+b3w5+st-2b+lk-6c+24u-d1+b3b5) END OF SlaBrall.html -->
+<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+lk-1b+p1d+lk-1c+cs-1+lk-2e+dv-1+tb-1+lk-5e+lk-5f+ls-1b+pz-1+24t-a+b3w5+st-2b+lk-6c+24u-d1+b3b5+b3b6) END OF SlaBrall.html -->
