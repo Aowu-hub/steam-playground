@@ -956,7 +956,7 @@ const LEVELS = [
   {name: 'Hardcore', emoji: '💀', will: 3.9, spd: 1.14, hearts: 5, seeds: 8, cards: 3, glow: 0, mult: 3, bot: 1, hardcore: true, brk: 10, blurb: '5 pumpkins, no hints, ×3 points'},
 ];
 /* ---------- ⚖️ win-rate tuning (wr-1, Aowu 2026-11-18) — collector Will × this, per chapter × level; made by Test Harness/rounds/wr-1/tune.js so the auto-player wins 🌱 90–100 · 🐣 70–90 · 🌳 60–80 · 🔥 30–50 · ⚡ 10–20 · 💀 5–15 % ---------- */
-const WR = {1: [1, 5.02, 1.96, 1.14, 0.86, 0.59], 2: [1, 3.37, 1.52, 0.78, 0.57, 0.37], 3: [1, 3.2, 1.52, 0.8, 0.59, 0.38]};
+const WR = {1: [1, 5.02, 1.96, 1.14, 0.86, 0.59], 2: [1, 3.37, 1.52, 0.78, 0.57, 0.37], 3: [1, 3.2, 1.52, 0.8, 0.59, 0.38], 4: [1, 3.28, 1.6, 0.88, 0.65, 0.4]};
 const wrOf = (C, lv) => ((WR[C.n] || [])[lv]) || 1;
 const TIRE = 0.005;   // 😩 every tile walked drains 0.75 % of a collector's Will — a long maze helps even with no attacks
 
@@ -968,6 +968,8 @@ const FOES = {
   boss1: {name: 'Mr. Clipboard', icon: '📋', will: 430, spd: 0.5, seeds: 20, pts: 400, take: 5, boss: true, size: 1.6, spot: 99, clip: true, skill: '🔍 Spots EVERY trap + calls more collectors'},
   boss2: {name: 'Mr. Umbrella', icon: '☂️', will: 620, spd: 0.48, seeds: 26, pts: 550, take: 6, boss: true, size: 1.7, umbrella: true, brolly: true, skill: '☔ Umbrella Spin shields his friends + calls Umbrella Men'},
   tr: {name: 'Treats Lady', icon: '🦴', will: 38, spd: 0.95, seeds: 2, pts: 18, take: 1, treats: true, skill: '🦴 Throws a treat — the closest animal stops to eat it'},   // ✦ fd-2a
+  bk: {name: 'Bike Clerk', icon: '🚲', will: 34, spd: 0.95, seeds: 2, pts: 18, take: 1, bike: true, skill: '🚲 Zooms on dry paths — crawls in mud and on wet canal banks'},   // ✦ fd-2b
+  boss4: {name: 'Speedy Bike Bill', icon: '🚴', will: 700, spd: 0.5, seeds: 30, pts: 650, take: 6, boss: true, size: 1.7, bike: true, bell: true, skill: '🔔 Rings his bell — the sheep in front jump aside · fast on dry ground, stuck in mud'},   // ✦ fd-2b
   boss3: {name: 'Mrs. Treats', icon: '👜', will: 760, spd: 0.46, seeds: 30, pts: 650, take: 6, boss: true, size: 1.7, treats: true, bag: true, skill: '👜 Empties her treat bag — every animal near her eats · at half Will she calls 2 Treats Ladies'},   // ✦ fd-2a
 };
 
@@ -991,10 +993,15 @@ const PLANTS = {
         {name: "Jack-o'-Lantern", icon: '🏮', col: 'E', atk: 'fear', dmg: 4, rate: 6, range: 2.2, back: 3, does: 'scary face — they run back 3 tiles'}]},
 };
 const KINDS = ['mush', 'corn', 'sun', 'pepper', 'pump'];
+/* ---------- 🌊 build tools (✦ fd-2b, ch 4+): canals = water walls · bridges go on a canal (tap = lift / lower) · plants beside water grow cheaper ---------- */
+const TOOLS = {canal: {name: 'Canal', icon: '🌊', cost: 2, ch: 4, does: 'dig water — a wall nobody walks through, nothing grows on it · plants beside water cost less'},
+  bridge: {name: 'Bridge', icon: '🌉', cost: 3, ch: 4, does: 'goes on a canal · tap it to lift (blocked) or lower (they cross) — even mid-wave'}};
+const TOOL_KEYS = ['canal', 'bridge'], WATER_OFF = 0.75, BRIDGE_REST = 4, LEVER_REST = 2;
+const kindOf = k => PLANTS[k] || TOOLS[k] || null;
 const STAGE_MUL = [0, 1, 1.35, 1.75, 2.3, 3.0];
 function plantSpec(P){ const K = PLANTS[P.kind], b = P.br >= 0 && P.st >= 4 ? K.b[P.br] : null, base = Object.assign({}, K, b || {});
   base.dmg = (base.dmg || 0) * STAGE_MUL[P.st]; base.range = (base.range || 1) + 0.18 * (P.st - 1); base.col = b ? b.col : null; base.name = b ? b.name : K.name; base.icon = b ? b.icon : K.icon; return base; }
-function growCost(P){ return P.st >= 5 ? 0 : PLANTS[P.kind].grow[P.st - 1]; }
+function growCost(P, M){ if(P.st >= 5) return 0; const c = PLANTS[P.kind].grow[P.st - 1]; return M && nearWater(M, P.i, P.j) ? Math.max(1, Math.round(c * WATER_OFF)) : c; }   // 💧 fd-2b: beside water = cheaper
 
 /* ---------- 📖 the book: chapters (10 waves each, wave 10 = boss) ---------- */
 // group = [type, count, gate (−1 = take turns), gap seconds, start second] · gates = angles round the island (0 = screen right-down, world +x)
@@ -1036,14 +1043,25 @@ const BOOKS = {farmer: {id: 'farmer', board: 'td-farmer', title: 'Farmer Delusio
     [['c', 18, -1, 0.6, 0], ['tr', 7, -1, 1.5, 2], ['k', 6, -1, 1.6, 5]],
     [['boss3', 1, 2, 0, 0], ['tr', 6, -1, 1.8, 3], ['c', 10, -1, 1, 6]],
   ]},
-  {n: 4, title: 'The Great Pond', boss: 'boss1', gates: [], soon: true},
+  {n: 4, title: 'The Great Pond', boss: 'boss4', gates: ['left', 'right'], newGate: {after: 5, gate: 'boat', who: 'Speedy Bike Bill', boat: true}, scene: 'farm', rocks: 5,   // ✦ fd-2b: 🌊 canals + 🌉 bridges + 🌽 corn switch · 🚲 bikes hate mud
+    pond: {x: CX + 0.6, y: CY - 5.3, rx: 2.7, ry: 2.2}, hedge: {i: 8, open: 17, shut: 10, lever: [9, 14]}, mud: 4, waves: [
+    [['c', 6, -1, 1.5, 0], ['bk', 1, 0, 0, 4]],
+    [['bk', 3, -1, 2.4, 0], ['c', 6, -1, 1.2, 1]],
+    [['k', 4, -1, 2, 0], ['bk', 3, -1, 2.4, 2]],
+    [['c', 12, -1, 0.85, 0], ['bk', 4, -1, 2, 3]],
+    [['bk', 5, -1, 1.7, 0], ['tr', 3, -1, 2.4, 2], ['u', 3, -1, 2.2, 4]],
+    [['c', 14, -1, 0.75, 0], ['bk', 5, -1, 1.8, 3]],
+    [['k', 8, -1, 1.3, 0], ['bk', 6, -1, 1.8, 2]],
+    [['bk', 8, -1, 1.2, 0], ['c', 12, -1, 0.75, 2], ['u', 3, -1, 2.5, 5]],
+    [['c', 18, -1, 0.6, 0], ['bk', 7, -1, 1.4, 2], ['tr', 5, -1, 1.8, 5]],
+    [['boss4', 1, 1, 0, 0], ['bk', 6, -1, 1.6, 3], ['c', 10, -1, 1, 6]],
+  ]},
   {n: 5, title: 'The Lawyer', boss: 'boss1', gates: [], soon: true}, {n: 6, title: 'The Lender Himself', boss: 'boss1', gates: [], soon: true},
 ]}};
 BOOKS.farmer.chapters.forEach(C => { if(C.soon) C.waves = []; });
 
 /* ---------- 🧬 hero packs (SkillKit engines, our names — plan §16c) ---------- */
-const PACKS = {
-  farmer: SK.pack('td-farmer:farmer', [
+const FARMER_ITEMS = [
     {key: 'a_shot', name: 'Tomato Toss', icon: '🍅', look: 'fire', desc: 'A big ripe tomato — splat! {dmg} Will.'}, {key: 'a_whip', name: 'Pumpkin Roll', icon: '🎃', look: 'honey', desc: 'Rolls a pumpkin down the path: {dmg} Will and a push back.'},
     {key: 'a_cone', name: 'Pepper Puff', icon: '🌶️', look: 'fire', desc: 'Hot pepper puff: {dmg} Will + a burn.'}, {key: 'pa_power', name: 'Strong Arm', icon: '💪'}, {key: 'pa_rate', name: 'Quick Hands', icon: '⏩'},
     {key: 'b_gold', name: 'Seed Bag', icon: '🌰', look: 'gold', desc: '+{gold} seeds… well, a handful of 🌰 and +{heal} 🎃.'}, {key: 'b_haste', name: 'Watering Can', icon: '🚿', look: 'water', desc: 'Your plants work faster for {dur}s.'},
@@ -1057,7 +1075,14 @@ const PACKS = {
     {key: 'u_meteor', name: 'Tomato Rain', icon: '🍅', look: 'fire'}, {key: 'u_army', name: 'Chicken Parade', icon: '🐔', look: 'sun'}, {key: 'u_field', name: 'The Great Corn Maze', icon: '🌽', look: 'nature'},
     {key: 'u_fort', name: 'Barn Fortress', icon: '🏡', look: 'holy'}, {key: 'u_charm', name: 'Sunny Day', icon: '🌞', look: 'sun'},
     {key: 'x_burst', name: 'Pepper Stampede', icon: '🌶️'}, {key: 'x_guard', name: 'Hay Fort', icon: '🏰'}, {key: 'x_wall', name: 'Mud Splash Party', icon: '🐷'},
-  ]),
+];
+// 🌊 ✦ fd-2b: from ch 4 (the pond) the Farmer's rain barrel floods, and two new cards come in — ch 1–3 keep their old pack (same cards, same balance)
+const POND_ITEMS = FARMER_ITEMS.map(it => it.key === 'c_splash' ? {key: 'c_flood', name: 'Rain Barrel Flood', icon: '🪣', look: 'water', desc: 'Tip the rain barrel — a wave rolls {len} tiles down their walk: {push} steps back, wet and slow for {dur}s.'} : it);
+POND_ITEMS.splice(POND_ITEMS.findIndex(it => it.key === 'b_sign') + 1, 0, {key: 'b_canal', name: 'Dig a Ditch', icon: '🌊', look: 'water', desc: 'The Farmer digs {n} ditch cells across their walk — they must go round for {dur}s.'});
+POND_ITEMS.splice(POND_ITEMS.findIndex(it => it.key === 'c_flood') + 1, 0, {key: 'c_switch', name: 'Corn Switch', icon: '🌽', look: 'nature', desc: 'Every corn gate and bridge on the farm flips for {dur}s — the walk swaps lanes (no switches: a corn wall pops up on their walk).'});
+const PACKS = {
+  farmer: SK.pack('td-farmer:farmer', FARMER_ITEMS),
+  farmerPond: SK.pack('td-farmer:farmer', POND_ITEMS),
   goat: SK.pack('td-farmer:goat', [
     {key: 'a_whip', name: 'Head Butt', icon: '🐐', look: 'rock', desc: 'BONK! {dmg} Will and a push back.'}, {key: 'a_bounce', name: 'Chicken Stampede', icon: '🐔', look: 'sun', desc: '{cnt} chickens peck for {dmg} Will each.'},
     {key: 'a_meteor', name: 'Egg Drop', icon: '🥚', look: 'sun', desc: 'Eggs from the sky: {dmg} Will round the spot.'}, {key: 'pa_power', name: 'Hard Horns', icon: '🦴'}, {key: 'pa_crit', name: 'Lucky Bell', icon: '🔔'},
@@ -1089,14 +1114,16 @@ const stageOf = tier => tier >= 10 ? 5 : tier >= 7 ? 4 : tier >= 5 ? 3 : tier >=
 /* ---------- 🏝️ the island + farm (an IsoKit map — the page bakes the SAME map) ---------- */
 function rimOf(n){ const R = rngOf(n * 13 + 1), ph1 = R() * 6, ph2 = R() * 6, ph3 = R() * 6; return th => 9.4 + 0.8 * Math.sin(3 * th + ph1) + 0.6 * Math.sin(5 * th + ph2) + 0.35 * Math.sin(8 * th + ph3); }
 const HOUSE = [[12, 12], [13, 12], [12, 13], [13, 13]], DOOR = {i: 13, j: 14}, PILE = {i: 12, j: 14};   // 🏡 farmhouse 2 × 2 on world (7–9, 7–9), door on its front (+y) side · 🎃 fd-1b: the pumpkin pile (= your hearts) left of the door
+const inPond = (C, i, j) => !!C.pond && Math.hypot((wx(i) - C.pond.x) / C.pond.rx, (wx(j) - C.pond.y) / C.pond.ry) < 1;   // 🌊 fd-2b
 function buildIsland(C, rng){
-  const rim = rimOf(C.n), solid = new Uint8Array(N * N), fade = new Float32Array(N * N);
+  const rim = rimOf(C.n), solid = new Uint8Array(N * N), fade = new Float32Array(N * N), pond = new Uint8Array(N * N);
   for(let j = 0; j < N; j++) for(let i = 0; i < N; i++){ const x = wx(i), y = wx(j), dc = dist(x, y, CX, CY), out = dc - rim(Math.atan2(y - CY, x - CX)), k = j * N + i;
-    fade[k] = out > 1.0 ? 0 : out > 0.7 ? 0.2 : out > 0.1 ? 0.48 : out > -0.7 ? 0.8 : 1; solid[k] = fade[k] === 1 ? 1 : 0; }
+    fade[k] = out > 1.0 ? 0 : out > 0.7 ? 0.2 : out > 0.1 ? 0.48 : out > -0.7 ? 0.8 : 1; solid[k] = fade[k] === 1 ? 1 : 0; if(solid[k] && inPond(C, i, j)){ pond[k] = 1; solid[k] = 0; } }
   const map = ISO.map({w: N, h: N, theme: 'td-farm', seed: C.n * 7, base: 1.4, cell: (i, j) => { const k = j * N + i; if(!fade[k]) return {t: 'void'};
+    if(pond[k]) return {t: 'water', h: 0, fade: fade[k], block: 1};
     return {t: (i * 7 + j * 3) % 5 === 0 ? 'flower' : 'grass', h: 0, fade: fade[k], block: solid[k] ? 0 : 1}; }});
   HOUSE.forEach(([i, j]) => map.setBlock(i, j, 1)); map.setBlock(PILE.i, PILE.j, 1);
-  return {map, solid, rim};
+  return {map, solid, rim, pond};
 }
 function gateCell(isl, ang){ // the farthest solid cell along that angle from the farm = where they walk in
   let best = null; for(let r = 3; r < 13; r += 0.25){ const x = CX + Math.cos(ang) * r, y = CY + Math.sin(ang) * r, i = Math.floor(x + O), j = Math.floor(y + O);
@@ -1113,12 +1140,16 @@ function newMatch(o){
     shieldHp: 0, shieldT: 0, armorT: 0, armorV: 0, domeT: 0, reflectN: 0, hasteT: 0, hasteV: 0, rain: false, freeMoveT: 0, routeDone: false,
     cd: {farmer: {}, goat: {}}, readyT: {farmer: {}, goat: {}}, jam: {farmer: {}, goat: {}}, auto: {farmer: !!o.auto, goat: !!o.auto}, enCd: {}, mods: {},
     heroes: {farmer: {x: CX - 0.2, y: CY - 0.2, z: 1.6, atk: 0.6}, goat: {x: CX + 1.2, y: CY + 1.7, atk: 0.9, tx: CX + 1.2, ty: CY + 1.7}},
-    stats: {quits: 0, waves: 0, perfect: 0, evolves: 0, ultimates: 0, combos: 0, casts: 0, plants: 0, grows: 0, steps: 0, lost: 0}, lostThisWave: 0, instant: !!o.instant};
+    stats: {quits: 0, waves: 0, perfect: 0, evolves: 0, ultimates: 0, combos: 0, casts: 0, plants: 0, grows: 0, steps: 0, lost: 0}, lostThisWave: 0, instant: !!o.instant,
+    water: new Uint8Array(N * N), noBuild: new Uint8Array(N * N), canals: [], ditches: [], bridges: [], sw: [], hedge: [], mud: new Set(), unflip: []};   // 🌊 ✦ fd-2b
+  isl.pond.forEach((v, k) => { if(v) M.water[k] = 1; });
   C.gates.forEach(g => addGate(M, g));
+  if(C.hedge) buildHedge(M, C.hedge);
   placeRocks(M, C.rocks || 0);
+  if(C.mud) placeMud(M, C.mud);
   M.baseSteps = Math.max.apply(null, M.gates.map(g => flowOf(M).at(g.i, g.j)));
   M.trees = {
-    farmer: SK.tree({pack: PACKS.farmer, hero: 'farmer', forms: HEROES.farmer.forms, cards: L.cards, glow: L.glow > 0, rng, combos: COMBOS}),
+    farmer: SK.tree({pack: C.pond ? PACKS.farmerPond : PACKS.farmer, hero: 'farmer', forms: HEROES.farmer.forms, cards: L.cards, glow: L.glow > 0, rng, combos: COMBOS}),
     goat: SK.tree({pack: PACKS.goat, hero: 'goat', forms: HEROES.goat.forms, cards: L.cards, glow: L.glow > 0, rng, combos: COMBOS}),
     foes: SK.tree({pack: PACKS.foes, hero: 'foes', forms: ['Collectors', 'Office Team', 'The Whole Bank'], cards: 3, rng, bot: true}),
   };
@@ -1142,17 +1173,19 @@ function flowOf(M){ if(!M.flow || M.flow.ver !== M.map.ver) M.flow = ISO.flow(M.
 function stepsOf(M){ const F = flowOf(M); return M.gates.map(g => F.at(g.i, g.j)); }
 function pathOf(M, g){ return flowOf(M).path(g.i, g.j); }
 const isGate = (M, i, j) => M.gates.some(g => g.i === i && g.j === j);
-function buildable(M, i, j, quiet){ if(i < 0 || j < 0 || i >= N || j >= N) return false; const k = j * N + i; if(!M.isl.solid[k] || M.map.block[k]) return false;
+function buildable(M, i, j, quiet){ if(i < 0 || j < 0 || i >= N || j >= N) return false; const k = j * N + i; if(!M.isl.solid[k] || M.map.block[k] || M.water[k] || M.noBuild[k]) return false;
   if(i === M.door.i && j === M.door.j) return false; if(isGate(M, i, j)) return false; if(Math.abs(i - M.door.i) + Math.abs(j - M.door.j) < 1) return false; return true; }
 function occupied(M, i, j){ return M.enemies.some(e => !e.gone && ((e.ci === i && e.cj === j) || (e.ti === i && e.tj === j))); }
 // can a plant go here? → {ok, why}  (why: 'no' · 'seal' · 'busy' · 'seeds' · 'locked')
+function costOf(M, kind, i, j){ const K = kindOf(kind); if(!K) return 0; return PLANTS[kind] && i != null && nearWater(M, i, j) ? Math.max(1, Math.round(K.cost * WATER_OFF)) : K.cost; }   // 💧 fd-2b
 function canPlant(M, i, j, kind){
-  if(kind && PLANTS[kind].ch > M.C.n) return {ok: false, why: 'locked'};
+  if(kind === 'bridge') return canBridge(M, i, j);
+  if(kind && kindOf(kind).ch > M.C.n) return {ok: false, why: 'locked'};
   if(!buildable(M, i, j)) return {ok: false, why: 'no'};
   if(occupied(M, i, j)) return {ok: false, why: 'busy'};
   const starts = M.gates.concat(M.enemies.filter(e => !e.gone && !e.entering).map(e => ({i: e.ti, j: e.tj})));
   if(ISO.wouldSeal(M.map, {i, j}, starts, M.door)) return {ok: false, why: 'seal'};
-  if(kind && M.seeds < PLANTS[kind].cost) return {ok: false, why: 'seeds'};
+  if(kind && M.seeds < costOf(M, kind, i, j)) return {ok: false, why: 'seeds'};
   return {ok: true};
 }
 // what planting there would do to the walk: the longest gate walk before → after (for "+N steps")
@@ -1171,14 +1204,69 @@ function bestSpots(M, n){
   out.sort((a, b) => b.score - a.score || a.i - b.i || a.j - b.j); return out.slice(0, n || 3);
 }
 function plant(M, i, j, kind){
+  if(kind === 'canal') return dig(M, i, j); if(kind === 'bridge') return buildBridge(M, i, j);   // 🌊 ✦ fd-2b
   const c = canPlant(M, i, j, kind); if(!c.ok){ ev(M, 'noPlant', {i, j, why: c.why, kind}); return null; }
-  const K = PLANTS[kind]; M.seeds -= K.cost; M.map.setBlock(i, j, 1); M.flow = null;
-  const P = {id: M.idN++, kind, st: 1, br: -1, i, j, x: wx(i), y: wx(j), cd: 0.6 + M.rng() * 0.6, spent: K.cost, born: M.t, aim: 0};
+  const K = PLANTS[kind], cost = costOf(M, kind, i, j); M.seeds -= cost; M.map.setBlock(i, j, 1); M.flow = null;
+  const P = {id: M.idN++, kind, st: 1, br: -1, i, j, x: wx(i), y: wx(j), cd: 0.6 + M.rng() * 0.6, spent: cost, born: M.t, aim: 0, wet: cost < K.cost};
   M.plants.push(P); M.stats.plants++; ev(M, 'plant', {id: P.id, kind, i, j, x: P.x, y: P.y}); retarget(M); return P;
 }
+/* ---------- 🌊 ✦ fd-2b the pond chapter: 🌽 corn hedge + 2 corn gates + lever · 🟫 mud · 🌊 canals · 🌉 lift bridges · ⛵ the boat gate ---------- */
+const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const isWater = (M, i, j) => i >= 0 && j >= 0 && i < N && j < N && M.water[j * N + i] > 0;
+function nearWater(M, i, j){ return !!M.water && N4.some(([a, b]) => isWater(M, i + a, j + b) && !bridgeAt(M, i + a, j + b)); }
+function startsOf(M){ return M.gates.concat(live(M).map(e => ({i: e.ci, j: e.cj}))); }
+const sealsIf = (M, i, j) => ISO.wouldSeal(M.map, {i, j}, startsOf(M), M.door);
+function buildHedge(M, H){   // a corn hedge down one column, edge to edge, with 2 corn gates (one open) + a lever beside them
+  for(let j = 0; j < N; j++){ const k = j * N + H.i; if(!M.isl.solid[k]) continue; M.noBuild[k] = 1; if(j === H.open || j === H.shut) continue; M.map.setBlock(H.i, j, 1); M.hedge.push({i: H.i, j}); }
+  M.map.setBlock(H.i, H.shut, 1); const L = {i: H.lever[0], j: H.lever[1]}; M.map.setBlock(L.i, L.j, 1); M.noBuild[L.j * N + L.i] = 1;
+  M.sw.push({id: M.idN++, cells: [{i: H.i, j: H.open}, {i: H.i, j: H.shut}], open: 0, lever: L, rest: 0, x: wx(L.i), y: wx(L.j)}); M.flow = null; }
+function placeMud(M, n){   // 🟫 mud on the walks (bikes crawl here) — cells 3–5 steps in from each gate
+  const F = flowOf(M); M.gates.forEach(g => { const P = F.path(g.i, g.j) || []; [3, 5].forEach(q => { const p = P[q]; if(p && M.mud.size < n) M.mud.add(Math.floor(p.x) + ',' + Math.floor(p.y)); }); }); }
+const muddy = (M, i, j) => M.mud.has(i + ',' + j);
+function canalAt(M, i, j){ return M.canals.find(c => c.i === i && c.j === j) || null; }
+function bridgeAt(M, i, j){ return M.bridges.find(B => B.i === i && B.j === j) || null; }
+function switchAt(M, i, j){ return M.sw.find(S => (S.lever.i === i && S.lever.j === j) || S.cells.some(c => c.i === i && c.j === j)) || null; }
+function dig(M, i, j){
+  const c = canPlant(M, i, j, 'canal'); if(!c.ok){ ev(M, 'noPlant', {i, j, why: c.why, kind: 'canal'}); return null; }
+  const k = j * N + i; M.seeds -= TOOLS.canal.cost; M.map.setBlock(i, j, 1); M.water[k] = 2; const C2 = {id: M.idN++, i, j, x: wx(i), y: wx(j), born: M.t}; M.canals.push(C2); M.flow = null;
+  M.stats.canals = (M.stats.canals || 0) + 1; ev(M, 'dig', {id: C2.id, i, j, x: C2.x, y: C2.y}); retarget(M); return C2; }
+function fill(M, i, j){ const C2 = canalAt(M, i, j); if(!C2) return 0; const B = bridgeAt(M, i, j); let back = 1; if(B){ M.bridges = M.bridges.filter(q => q !== B); back += 1; }
+  M.canals = M.canals.filter(q => q !== C2); M.water[j * N + i] = 0; M.map.setBlock(i, j, 0); M.flow = null; M.seeds += back; ev(M, 'fill', {i, j, x: C2.x, y: C2.y, back}); retarget(M); return back; }
+function canBridge(M, i, j){ if(TOOLS.bridge.ch > M.C.n) return {ok: false, why: 'locked'}; if(!canalAt(M, i, j)) return {ok: false, why: 'nocanal'}; if(bridgeAt(M, i, j)) return {ok: false, why: 'no'};
+  if(M.seeds < TOOLS.bridge.cost) return {ok: false, why: 'seeds'}; return {ok: true}; }
+function buildBridge(M, i, j){ const c = canBridge(M, i, j); if(!c.ok){ ev(M, 'noPlant', {i, j, why: c.why, kind: 'bridge'}); return null; }
+  const along = isWater(M, i - 1, j) || isWater(M, i + 1, j);   // the canal runs along x → the planks span across it (walk along y)
+  const B = {id: M.idN++, i, j, x: wx(i), y: wx(j), up: 0, rest: 0, along, born: M.t}; M.seeds -= TOOLS.bridge.cost; M.bridges.push(B); M.map.setBlock(i, j, 0); M.flow = null;
+  M.stats.bridges = (M.stats.bridges || 0) + 1; ev(M, 'bridge', {id: B.id, i, j, x: B.x, y: B.y}); return B; }
+// 🌉 tap = lift (blocked — never seals, nobody on it) / lower (they cross) · 4 s rest after a tap (a skill flip skips the rest)
+function toggleBridge(M, id, o){ o = o || {}; const B = M.bridges.find(q => q.id === id); if(!B) return {ok: false, why: 'no'};
+  if(!o.skill && B.rest > 0) return {ok: false, why: 'rest', left: B.rest};
+  if(!B.up){ if(occupied(M, B.i, B.j)) return {ok: false, why: 'busy'}; if(sealsIf(M, B.i, B.j)) return {ok: false, why: 'seal'}; M.map.setBlock(B.i, B.j, 1); B.up = 1; }
+  else { M.map.setBlock(B.i, B.j, 0); B.up = 0; }
+  if(!o.skill) B.rest = BRIDGE_REST; B.t0 = M.t; M.flow = null; retarget(M); M.stats.lifts = (M.stats.lifts || 0) + 1; ev(M, 'lift', {id: B.id, up: B.up, x: B.x, y: B.y, skill: !!o.skill}); return {ok: true, up: B.up}; }
+// 🌽 the lever: the open corn gate shuts, the other opens → the walk swaps lanes (refused when the shut one would seal the farm or someone stands in it)
+function flip(M, id, o){ o = o || {}; const S = M.sw.find(q => q.id === id); if(!S) return {ok: false, why: 'no'};
+  if(!o.skill && S.rest > 0) return {ok: false, why: 'rest', left: S.rest};
+  const shut = S.cells[S.open], open = S.cells[1 - S.open]; if(occupied(M, shut.i, shut.j)) return {ok: false, why: 'busy'};
+  M.map.setBlock(open.i, open.j, 0); if(sealsIf(M, shut.i, shut.j)){ M.map.setBlock(open.i, open.j, 1); return {ok: false, why: 'seal'}; }
+  M.map.setBlock(shut.i, shut.j, 1); S.open = 1 - S.open; if(!o.skill) S.rest = LEVER_REST; S.t0 = M.t; M.flow = null; retarget(M); M.stats.flips = (M.stats.flips || 0) + 1;
+  ev(M, 'switch', {id: S.id, open: S.open, x: S.x, y: S.y, skill: !!o.skill}); return {ok: true}; }
+// ⛵ the boat gate: they row across and land on the FAR bank of the pond (the shore cell farthest from the farm that still reaches it)
+function addBoatGate(M){ const P = M.C.pond, F = flowOf(M); let best = null, bs = -1e9;
+  for(let j = 0; j < N; j++) for(let i = 0; i < N; i++){ const k = j * N + i; if(!M.isl.solid[k] || M.map.block[k] || M.water[k] || M.noBuild[k] || M.isl.pond[k]) continue;
+    if(!N4.some(([a, b]) => { const q = (j + b) * N + i + a; return q >= 0 && q < N * N && M.isl.pond[q]; }) || F.at(i, j) <= 0 || isGate(M, i, j)) continue;
+    const d = dist(wx(i), wx(j), CX, CY) - Math.abs(wx(i) - P.x) * 0.05; if(d > bs){ bs = d; best = {i, j}; } }
+  if(!best) return null; const ang = Math.atan2(P.y - wx(best.j), P.x - wx(best.i)), G = {name: 'boat', boat: true, i: best.i, j: best.j, ang, ox: wx(best.i) + Math.cos(ang) * 1.5, oy: wx(best.j) + Math.sin(ang) * 1.5};
+  M.gates.push(G); M.flow = null; return G; }
+function inMud(M, e){ return muddy(M, e.ci, e.cj) || e.wetT > 0 || nearWater(M, e.ci, e.cj) || M.traps.some(T => T.kind === 'lava' && dist(T.x, T.y, e.x, e.y) <= T.r); }
+// 🔁 timers that run in the break too: bridge / lever rests, skill flips that go back, ditches that dry up
+function pondTimers(M, dt){
+  M.bridges.forEach(B => { if(B.rest > 0) B.rest = Math.max(0, B.rest - dt); }); M.sw.forEach(S => { if(S.rest > 0) S.rest = Math.max(0, S.rest - dt); });
+  M.unflip = M.unflip.filter(u => { u.t -= dt; if(u.t > 0) return true; const r = u.k === 'sw' ? flip(M, u.id, {skill: true}) : toggleBridge(M, u.id, {skill: true}); if(r.ok) return false; u.t = 0.3; return true; });
+  M.ditches = M.ditches.filter(D => { D.t -= dt; if(D.t > 0) return true; M.water[D.j * N + D.i] = 0; M.map.setBlock(D.i, D.j, 0); M.flow = null; ev(M, 'dry', {x: D.x, y: D.y}); return false; }); }
 function plantAt(M, i, j){ return M.plants.find(P => P.i === i && P.j === j) || null; }
 function grow(M, id, br){
-  const P = M.plants.find(q => q.id === id); if(!P || P.st >= 5) return false; const cost = growCost(P);
+  const P = M.plants.find(q => q.id === id); if(!P || P.st >= 5) return false; const cost = growCost(P, M);
   if(M.seeds < cost){ ev(M, 'noPlant', {i: P.i, j: P.j, why: 'seeds', kind: P.kind}); return false; }
   if(P.st === 3){ if(br !== 0 && br !== 1) return false; P.br = br; }
   M.seeds -= cost; P.spent += cost; P.st++; M.stats.grows++; ev(M, 'grow', {id: P.id, kind: P.kind, st: P.st, br: P.br, x: P.x, y: P.y}); return true;
@@ -1208,7 +1296,7 @@ function take(M, card){
 }
 function enterBreak(M){ M.state = 'break'; M.wt = 0;
   const NG = M.C.newGate; if(NG && !M.routeDone && M.wave + 1 === NG.after && !(M.lvl === 0 && M.C.n === 1)){ M.routeDone = true; const before = stepsOf(M);
-    const g = addGate(M, NG.gate); if(g){ const s = flowOf(M).at(g.i, g.j); M.freeMoveT = 20; ev(M, 'newRoute', {gate: g.name, who: NG.who, old: Math.max.apply(null, before), now: s, i: g.i, j: g.j}); } } }
+    const g = NG.boat ? addBoatGate(M) : addGate(M, NG.gate); if(g){ const s = flowOf(M).at(g.i, g.j); M.freeMoveT = 20; ev(M, 'newRoute', {gate: g.name, who: NG.who, old: Math.max.apply(null, before), now: s, i: g.i, j: g.j, boat: !!NG.boat}); } } }
 function startWave(M){
   if(M.state !== 'break') return false;
   M.wave++; M.state = 'wave'; M.wt = 0; M.lostThisWave = 0; M.spawnQ = []; M.freeMoveT = 0;
@@ -1261,7 +1349,7 @@ const ANIMAL_TRAP = {lava: 'pig', push: 'duck', mine: 'cow'};
 function animals(M){ return [].concat(M.blockers.filter(b => b.k === 'sheep' || b.k === 'chicken'), M.traps.filter(T => T.hero === 'goat' && ANIMAL_TRAP[T.kind]), M.helpers.filter(H => H.k === 'dog')); }
 function feed(M, a, dur, from){ if(!a) return; a.eatT = Math.max(a.eatT || 0, dur); if(a.wall) unwall(M, a); ev(M, 'treat', {x: a.x, y: a.y, who: a.k || ANIMAL_TRAP[a.kind], x0: from && from.x, y0: from && from.y}); fx(M, 'treat', {x0: from ? from.x : a.x, y0: from ? from.y : a.y, x: a.x, y: a.y, dur: 0.5}); }
 // a sheep becomes a LIVE WALL when the cell may close (never seals the farm, never on someone, never on a gate / the door)
-function canWall(M, i, j){ const k = j * N + i; if(i < 0 || j < 0 || i >= N || j >= N || !M.isl.solid[k] || M.map.block[k]) return false; if(i === M.door.i && j === M.door.j) return false;
+function canWall(M, i, j){ const k = j * N + i; if(i < 0 || j < 0 || i >= N || j >= N || !M.isl.solid[k] || M.map.block[k] || M.water[k] || M.noBuild[k]) return false; if(i === M.door.i && j === M.door.j) return false;
   if(M.gates.some(g => g.i === i && g.j === j) || occupied(M, i, j) || M.plants.some(P => P.i === i && P.j === j)) return false;
   const starts = M.gates.concat(live(M).map(e => ({i: e.ci, j: e.cj}))); return !ISO.wouldSeal(M.map, {i, j}, starts, M.door); }
 function wall(M, b){ if(!canWall(M, b.i, b.j)) return false; M.map.setBlock(b.i, b.j, 1); b.wall = b.wantWall = 1; retarget(M); return true; }
@@ -1303,6 +1391,7 @@ function rollLine(M, tgt, len){ const F = flowOf(M), out = []; let c = {i: tgt.t
 function skillOf(M, h, key){ return {lv: M.trees[h].skills[key] || 1, n: SK.num(key, M.trees[h].skills[key] || 1), E: SK.get(key)}; }
 function cdOf(M, h, key){ const s = skillOf(M, h, key), m = M.mods[h]; return Math.max(1.5, (s.E.cd || 8) * (1 - Math.min(0.5, (m.cdMul || 0) + (m.rateMul || 0) * 0.5))); }
 const ALWAYS = new Set(['gold', 'haste', 'shield', 'heal', 'reflect', 'dome']);
+const byWay = M => live(M).sort((a, b) => cellDist(M, a) - cellDist(M, b));
 function canAim(M, h, key){ const E = SK.get(key); if(!E) return false; if(ALWAYS.has(E.shape)) return true; return live(M).length > 0; }
 function ready(M, h, key){ return M.state === 'wave' && !M.paused && (M.cd[h][key] || 0) <= 0; }
 function cast(M, h, key){
@@ -1342,6 +1431,22 @@ function cast(M, h, key){
       fx(M, 'dazzle', {x: at.x, y: at.y, r: n.r || 1.8, dur: 0.7}); break;
     case 'reset': { const list = live(M).sort((a, b) => cellDist(M, a) - cellDist(M, b)).slice(0, Math.max(1, n.cnt || 1));   // 📄 ✦ fd-2a: back to the start (a boss loses part of the way)
       list.forEach(e => { fx(M, 'chew', {x: e.x, y: e.y, dur: 0.8}); if(e.boss){ const F = flowOf(M), G = M.gates[e.gate] || M.gates[0], come = Math.max(0, F.at(G.i, G.j) - Math.max(0, F.at(e.ci, e.cj))); e.backN = Math.max(e.backN, Math.round(come * (n.boss || 0.25))); }   /* 🐞 wr-1: the way it has come, not every step */ else { sendBack(M, e); e.signN = 0; e.wanderT = 0; } ev(M, 'reset', {x: e.x, y: e.y, boss: e.boss}); }); break; }
+    case 'carve': { if(!tgt) break; const want = Math.max(1, Math.round(n.n || 3)), dur = T(n.dur || 20); let made = 0;   // 🌊 ✦ fd-2b: ditch cells across their walk (each one never seals)
+      for(let q = 2; q <= 14 && made < want; q++){ const c = ahead(q); if(c.i === M.door.i && c.j === M.door.j) break; const k = c.j * N + c.i;
+        if(!M.isl.solid[k] || M.map.block[k] || M.water[k] || M.noBuild[k] || isGate(M, c.i, c.j) || occupied(M, c.i, c.j) || sealsIf(M, c.i, c.j)) continue;
+        M.map.setBlock(c.i, c.j, 1); M.water[k] = 3; M.ditches.push({i: c.i, j: c.j, x: wx(c.i), y: wx(c.j), t: dur, born: M.t}); M.flow = null; made++; retarget(M); }
+      fx(M, 'ditch', {x: at.x, y: at.y, dur: 0.7}); ev(M, 'ditch', {n: made, x: at.x, y: at.y}); break; }
+    case 'wave': { const L0 = byWay(M); if(!L0.length) break; const len = Math.max(2, Math.round(n.len || 5)), d0 = cellDist(M, L0[0]), F = flowOf(M);   // 🪣 ✦ fd-2b: a wave rolls back down the walk
+      L0.filter(e => cellDist(M, e) <= d0 + len).forEach(e => { if(e.S.umbrella || e.umbT > 0){ ev(M, 'umbrella', {x: e.x, y: e.y}); return; }
+        e.backN = Math.max(e.backN, e.boss ? 1 : Math.round(n.push || 3)); slow(e, n.slow || 0.4, T(n.dur || 4)); e.wetT = Math.max(e.wetT || 0, T(n.dur || 4)); });
+      const pts = []; let c = {i: L0[0].ci, j: L0[0].cj}; pts.push([wx(c.i), wx(c.j)]); for(let q = 0; q < len; q++){ const a = F.away(c.i, c.j); if(!a) break; c = a; pts.push([wx(c.i), wx(c.j)]); }
+      fx(M, 'flood', {pts, dur: 0.9}); break; }
+    case 'toggle': { const dur = T(n.dur || 8); let flipped = 0;   // 🌽 ✦ fd-2b: every corn gate + bridge flips for a while, then flips back
+      M.sw.forEach(S => { if(flip(M, S.id, {skill: true}).ok){ flipped++; M.unflip.push({k: 'sw', id: S.id, t: dur}); } });
+      M.bridges.forEach(B => { if(toggleBridge(M, B.id, {skill: true}).ok){ flipped++; M.unflip.push({k: 'br', id: B.id, t: dur}); } });
+      if(!flipped && tgt) for(let q = 2; q <= 8; q++){ const c = ahead(q); if(c.i === M.door.i && c.j === M.door.j) break; if(!canWall(M, c.i, c.j)) continue;   // no switches: a corn wall pops up on the walk
+        const b = {id: M.idN++, k: 'corn', i: c.i, j: c.j, x: wx(c.i), y: wx(c.j), hp: 999, hpMax: 999, dmg: 0, t: dur}; M.blockers.push(b); if(wall(M, b)){ flipped++; break; } }
+      fx(M, 'switch', {x: at.x, y: at.y, dur: 0.7}); ev(M, 'switched', {n: flipped}); break; }
     case 'gold': { const add = Math.max(2, Math.round((n.gold || 30) / 12)); M.seeds += add; if(n.heal) M.hearts = Math.min(M.heartsMax + 5, M.hearts + n.heal); fx(M, 'seedrain', {x: CX, y: CY, dur: 0.9}); ev(M, 'seeds', {n: add, heal: n.heal || 0}); break; }
     case 'haste': M.hasteT = T(n.dur); M.hasteV = n.v; fx(M, 'haste', {x: CX, y: CY, dur: 0.8}); break;
     case 'decoy': M.zones.push({k: 'stop', x: at.x, y: at.y, r: n.r || 1.3, t: T(n.dur)}); fx(M, 'skillboom', {x: at.x, y: at.y, r: n.r || 1.3, dur: 0.5}); break;
@@ -1359,7 +1464,7 @@ function cast(M, h, key){
     default: M._src = null; return false;
   }
   M._src = null; M.cd[h][key] = cdOf(M, h, key); M.stats.casts++; M.lastUsed = M.t;
-  ev(M, 'cast', {hero: h, key, name: PACKS[h].get(key).name, icon: PACKS[h].get(key).icon, col: E.col, x: at.x, y: at.y}); return true;
+  const PK = M.trees[h].pack.get(key) || PACKS[h].get(key) || SK.get(key); ev(M, 'cast', {hero: h, key, name: PK.name, icon: PK.icon, col: E.col, x: at.x, y: at.y}); return true;
 }
 
 /* ---------- 🚶 one game step ---------- */
@@ -1370,6 +1475,7 @@ function walk(M, e, dt){
   if(e.stunT > 0 || e.sleepT > 0 || e.stopT > 0) return;
   let v = e.spd * (e.slowT > 0 ? 1 - e.slowF : 1) * (e.blindT > 0 ? 0.6 : 1) * (e.rushT > 0 ? 1.5 : 1) * (M.rain && e.S.umbrella ? 1.1 : 1);
   if(e.blindT > 0) v *= 0.85;
+  if(e.S.bike){ e.mud = inMud(M, e); v *= e.mud ? (e.boss ? 0.3 : 0.45) : 1.7; }   // 🚲 ✦ fd-2b
   const blk = M.blockers.find(b => b.i === e.ti && b.j === e.tj && b.hp > 0 && !b.wall && !(b.eatT > 0));
   if(blk && e.prog > 0.45){ blk.hp -= dt * (e.boss ? 18 : 6); e.prog = 0.45; return; }
   e.prog += v * dt;
@@ -1411,6 +1517,7 @@ function step(M, dt){
 function tick(M, dt){
   M.t += dt; M.wt += dt;
   M.fx = M.fx.filter(f => (f.t += dt) < f.dur);
+  pondTimers(M, dt);   // 🌊 fd-2b
   if(M.state === 'break'){ M.freeMoveT = Math.max(0, M.freeMoveT - dt); if(M.breakLen > 0 && M.wt >= M.breakLen + (M.freeMoveT > 0 ? 10 : 0)) startWave(M); return; }
   if(M.state !== 'wave') return;
   ['hasteT', 'shieldT', 'armorT', 'domeT'].forEach(k => { if(M[k] > 0) M[k] = Math.max(0, M[k] - dt); });
@@ -1426,12 +1533,14 @@ function tick(M, dt){
   { const H = M.heroes.goat, f = front(M); if(f && dist(f.x, f.y, CX, CY) < 7){ H.tx = clamp(f.x, CX - 4, CX + 4); H.ty = clamp(f.y, CY - 4, CY + 4); } else { H.tx = CX + 1.2; H.ty = CY + 1.7; }
     const d = dist(H.x, H.y, H.tx, H.ty); if(d > 0.6){ H.x += (H.tx - H.x) / d * Math.min(d, 2.2 * dt); H.y += (H.ty - H.y) / d * Math.min(d, 2.2 * dt); H.mv = 1; } else H.mv = 0; }
   // collectors' own skills (bosses) + bot-tree actives
-  M.enemies.forEach(e => { if(e.gone) return; ['slowT', 'sleepT', 'stunT', 'blindT', 'stopT', 'umbT', 'rushT', 'hit', 'wanderT'].forEach(k => { if(e[k] > 0) e[k] = Math.max(0, e[k] - dt); });
+  M.enemies.forEach(e => { if(e.gone) return; ['slowT', 'sleepT', 'stunT', 'blindT', 'stopT', 'umbT', 'rushT', 'hit', 'wanderT', 'wetT'].forEach(k => { if(e[k] > 0) e[k] = Math.max(0, e[k] - dt); });
     if(e.burnT > 0){ e.burnT -= dt; hit(M, e, e.burnD * dt, 'burn'); if(e.burnT <= 0) e.burnD = 0; }
     if(e.S.treats && !e.boss && !e.entering && !(e.stunT > 0 || e.sleepT > 0)){ e.trT = (e.trT == null ? 2 + M.rng() * 2 : e.trT) - dt;   // 🦴 ✦ fd-2a: a treat for the closest animal
       if(e.trT <= 0){ const a = animals(M).filter(a => !(a.eatT > 0) && dist(a.x, a.y, e.x, e.y) <= 3).sort((p, q) => dist(p.x, p.y, e.x, e.y) - dist(q.x, q.y, e.x, e.y))[0]; if(a){ feed(M, a, 3, e); e.trT = 5; e.throwT = M.t; } else e.trT = 1; } }
     if(e.S.bag && !e.half && e.will < e.willMax / 2){ e.half = 1; for(let q = 0; q < 2; q++) M.spawnQ.push({type: 'tr', at: M.wt + q * 0.8, gate: q % M.gates.length}); ev(M, 'foeSkill', {skill: 'call', x: e.x, y: e.y}); }
     if(e.boss){ e.skT -= dt; if(e.skT <= 0){ e.skT = 7 + M.rng() * 2;
+      if(e.S.bell){ e.skT = 6; const near = M.blockers.filter(b => (b.k === 'sheep' || b.k === 'chicken') && dist(b.x, b.y, e.x, e.y) <= 2.6);   // 🔔 ✦ fd-2b: the sheep in front jump aside
+        near.forEach(b => { unwall(M, b); b.eatT = Math.max(b.eatT || 0, 2.2); b.jumpT = M.t; }); fx(M, 'bell', {x: e.x, y: e.y, r: 2.6, dur: 0.8}); ev(M, 'foeSkill', {skill: 'bell', x: e.x, y: e.y, n: near.length}); }
       if(e.S.bag){ e.skT = 9; const near = animals(M).filter(a => dist(a.x, a.y, e.x, e.y) <= 3.5); near.forEach(a => feed(M, a, 4, e)); fx(M, 'bag', {x: e.x, y: e.y, r: 3.5, dur: 0.9}); ev(M, 'foeSkill', {skill: 'bag', x: e.x, y: e.y, n: near.length}); }
       if(e.S.clip){ for(let q = 0; q < 2; q++) M.spawnQ.push({type: 'c', at: M.wt + q * 0.6, gate: q % M.gates.length}); ev(M, 'foeSkill', {skill: 'clip', x: e.x, y: e.y}); }
       if(e.S.brolly){ M.enemies.forEach(o => { if(!o.gone && dist(o.x, o.y, e.x, e.y) < 2.4) o.umbT = 4; }); for(let q = 0; q < 2; q++) M.spawnQ.push({type: 'u', at: M.wt + q * 0.9, gate: q % M.gates.length}); ev(M, 'foeSkill', {skill: 'brolly', x: e.x, y: e.y}); } } }
@@ -1472,6 +1581,7 @@ function waveDone(M){
   const regen = Math.round((M.mods.farmer.regen || 0) + (M.mods.goat.regen || 0)); if(regen) M.hearts = Math.min(M.heartsMax + 5, M.hearts + regen);
   M.seeds += bonus; const pts = (perfect ? 80 : 40) * M.L.mult; M.score += pts;
   M.traps = M.traps.filter(T => T.kind !== 'lava'); M.zones = []; M.blockers.forEach(b => unwall(M, b)); M.blockers = []; M.helpers = []; M.rain = false;
+  M.unflip.forEach(u => { u.t = 0; }); pondTimers(M, 0); M.ditches.forEach(D => { D.t = 0; }); pondTimers(M, 0); M.unflip = [];   // 🌊 fd-2b
   ev(M, 'waveDone', {n: M.wave + 1, perfect, bonus, pts, regen});
   if(M.wave >= M.C.waves.length - 1){ M.score += M.hearts * 30 * M.L.mult; M.state = 'won'; ev(M, 'won', {}); return; }
   { const T = M.trees.foes; if(M.L.bot && M.rng() < M.L.bot + 0.0001 && T.tier < 10){ const o = T.offer(), c = o && o.cards.length ? T.botPick(o) : null; if(c){ T.take(c); refreshMods(M); ev(M, 'foesUp', {key: c.key, name: c.name, icon: c.icon, tier: T.tier}); } } }
@@ -1483,7 +1593,7 @@ function stars(M){ const f = M.hearts / Math.max(1, M.heartsMax); return M.state
 function autoBuild(M, o){
   o = o || {}; const keep = o.keep || 0; let n = 0, guard = 40; const kind = KINDS.filter(k => PLANTS[k].ch <= M.C.n).sort((a, b) => PLANTS[a].cost - PLANTS[b].cost)[o.kindIx || 0] || 'mush';
   while(guard-- > 0 && M.seeds - PLANTS[kind].cost >= keep){ const S = bestSpots(M, o.top || 1).filter(x => x.score > 0), s = S[o.rng ? Math.floor(o.rng() * S.length) : 0]; if(!s) break; if(plant(M, s.i, s.j, kind)) n++; else break; }   // wr-1: o.top + o.rng = a kid picks one of the good spots
-  if(o.grow !== false){ const L = M.plants.slice().sort((a, b) => a.st - b.st || a.id - b.id); for(const P of L){ if(P.st >= 5) continue; const c = growCost(P); if(M.seeds - c < keep) continue; if(nearPath(M, P)) grow(M, P.id, P.st === 3 ? (P.id % 2) : undefined); } }
+  if(o.grow !== false){ const L = M.plants.slice().sort((a, b) => a.st - b.st || a.id - b.id); for(const P of L){ if(P.st >= 5) continue; const c = growCost(P, M); if(M.seeds - c < keep) continue; if(nearPath(M, P)) grow(M, P.id, P.st === 3 ? (P.id % 2) : undefined); } }
   return n;
 }
 function nearPath(M, P){ const F = flowOf(M); return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => F.at(P.i + a, P.j + b) > 0); }
@@ -1508,7 +1618,8 @@ function kidCast(M, kid, dt){ Object.keys(M.readyT).forEach(h => { if(!M.trees[h
 
 return {N, O, CX, CY, STEP, LEVELS, WR, wrOf, FOES, PLANTS, KINDS, STAGE_MUL, BOOKS, PACKS, COMBOS, HEROES, GATE_A, HOUSE, DOOR, PILE, TIRE, stageOf, plantSpec, growCost, wx,
   newMatch, offer, take, startWave, step, cast, ready, canAim, cdOf, skillOf, live, liveAll, front, takeEvents, flowOf, stepsOf, pathOf, canPlant, previewSteps, bestSpots,
-  plant, plantAt, grow, pull, move, moveCost, cellDist, stars, autoBuild, simulate, rngOf, buildable, gateCell, animals, canWall, ANIMAL_TRAP};
+  plant, plantAt, grow, pull, move, moveCost, cellDist, stars, autoBuild, simulate, rngOf, buildable, gateCell, animals, canWall, ANIMAL_TRAP,
+  TOOLS, TOOL_KEYS, WATER_OFF, kindOf, costOf, isWater, nearWater, dig, fill, canBridge, buildBridge, toggleBridge, flip, canalAt, bridgeAt, switchAt, muddy, inMud, inPond};   // 🌊 fd-2b
 })();
 // FD ENGINE END
 </script>
@@ -3660,11 +3771,16 @@ DIARY.farmer = {
       outro: 'Dear Diary,\nMrs. Treats emptied her whole bag — and Rex ate it, then ate the bag. 👜🐕\nShe ran out of biscuits, then out of breath, then out of the farm.\nThe sheep are still chewing. 🐑',
       lessons: [['🐑', 'Sheep stick together', 'Sheep feel safe in a group, called a flock. If one sheep walks off, the others usually follow — that\'s why one good sheepdog can move hundreds of them!'],
                 ['🌶️', 'Why peppers are hot', 'Hot peppers make a stuff called capsaicin. Birds can\'t taste it, so they eat the peppers and spread the seeds — but animals with teeth stay away!']]},
+  4: {intro: 'Dear Diary,\nThe bank bought BIKES. 🚲 Ding-ding! The clerks zoom down my maze twice as fast.\nBut bikes HATE mud — and the pond is right there. 🌊\nToday I dig canals, build lift bridges and pull the corn lever. 🌽 Chewy wants to be the bridge-keeper.',   // ✦ fd-2b
+      outro: 'Dear Diary,\nSpeedy Bike Bill rang his bell all the way into the mud. 🔔🟫 Then the bridge went UP. 🌉\nHe pedalled round the pond three times, sat down on the bank and said "I\'ll take the bus."\nChewy kept his bell. 🐐',
+      lessons: [['🌊', 'What canals do', 'People dig canals to bring water to fields and to let boats travel where there was no river. Some canals are hundreds of years old!'],
+                ['🟫', 'Why bikes stick in mud', 'Wet mud is soft and sticky — a thin bike wheel sinks in and has to push the mud away, so it slows right down. Wide tractor tyres sink much less.']]},
 };
 const FDP = {sel: 'mush', pick: null, mode: 'plant', moveId: 0, hint: [], ghosts: [], pics: new Map(), bgs: [null, null, null], bgKey: '', tod: 0, morph: {farmer: null, goat: null}, seen: {farmer: 1, goat: 1}, toldSeal: 0, used: 0, card: 0, rain: []};
 const isFarm = () => !!(G && G.fd);
-const FD_HK = {mush: 'A', corn: 'S', sun: 'D', pepper: 'F', pump: 'G'};
-const FD_COLOR = {mush: '#E5484D', corn: '#F2B92A', sun: '#FFB020', pepper: '#E8341C', pump: '#FF8A1F'};
+const FD_HK = {mush: 'A', corn: 'S', sun: 'D', pepper: 'F', pump: 'G', canal: 'H', bridge: 'J'};   // 🌊 fd-2b: + canal / bridge
+const FD_COLOR = {mush: '#E5484D', corn: '#F2B92A', sun: '#FFB020', pepper: '#E8341C', pump: '#FF8A1F', canal: '#3A86FF', bridge: '#8E5A2C'};
+const fdK2 = k => FD.kindOf(k) || FD.PLANTS.mush;   // 🌊 fd-2b: a plant or a build tool
 (function(){ const st = document.createElement('style'); st.id = 'fd-css'; st.textContent = [
   '.fd-build{display:flex;align-items:center;gap:var(--bgap,7px);flex-wrap:wrap;justify-content:center;background:rgba(255,255,255,.55);border-radius:16px;padding:4px 8px;box-shadow:0 2px 0 rgba(0,0,0,.08)}',
   '.fd-plant{position:relative;width:var(--skk-bs,46px);height:var(--skk-bs,46px);border-radius:14px;border:2.5px solid #fff;background:linear-gradient(180deg,#FFF8E6,#F3DDB0);box-shadow:0 3px 0 #C9A46A,0 0 0 2px var(--pc,#8BC34A);font-size:calc(var(--skk-bs,46px)*.5);line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:transform .12s}',
@@ -3672,6 +3788,7 @@ const FD_COLOR = {mush: '#E5484D', corn: '#F2B92A', sun: '#FFB020', pepper: '#E8
   '.fd-plant.on{transform:translateY(-3px) scale(1.06);box-shadow:0 3px 0 #C9A46A,0 0 0 3px #FFC93C,0 0 14px #FFC93C;background:linear-gradient(180deg,#FFFDF2,#FFE7A6)}',
   '.fd-plant.poor{filter:grayscale(.6) brightness(.95)} .fd-plant.poor .pr{background:#B23B3B}',
   '.fd-plant.lock{filter:grayscale(1);opacity:.55} .fd-plant.lock .pr{background:#777}',
+  '.fd-plant.tool{background:linear-gradient(180deg,#EAF6FF,#BFE3FF);box-shadow:0 3px 0 #6FA8D6,0 0 0 2px var(--pc,#3A86FF)} .fd-plant.tool.on{background:linear-gradient(180deg,#F4FBFF,#CFEBFF)}',   /* 🌊 fd-2b */
   '.fd-seeds{font:800 clamp(.9rem,1.6vmin + .5rem,1.25rem) Fredoka,Nunito,sans-serif;color:#5C3B1E;white-space:nowrap;padding:0 4px}',
   '.fd-steps{position:absolute;left:8px;bottom:8px;z-index:6;background:rgba(255,255,255,.9);border-radius:12px;padding:3px 9px;font:800 clamp(.72rem,1.2vmin + .45rem,1rem) Fredoka,Nunito,sans-serif;color:#5C3B1E;box-shadow:0 2px 0 rgba(0,0,0,.12);pointer-events:none;max-width:70%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
   '.fd-steps b{color:#22A867}',
@@ -3698,7 +3815,7 @@ function fdStart(ch, lvl, opt){
   FT = []; PARTS = []; guideUsed = 0; pickOpen = false; speedOn = false; G.speed = 1; Object.assign(FDP, {sel: 'mush', pick: null, mode: 'plant', moveId: 0, hint: [], ghosts: [], bgKey: '', used: 0, toldSeal: 0, morph: {farmer: null, goat: null}, seen: {farmer: 1, goat: 1}});
   const L = LEVELS[lvl]; BAR.level(L.emoji + ' ' + L.name + ' · Ch ' + ch, L.hardcore ? 'hc' : ''); BAR.hide('lives'); BAR.hide('foes');
   paintAuto(); $('speed-btn').textContent = '⏩'; $('goal').style.opacity = 1;
-  $('goal').textContent = opt.bonus ? '🎃 Second try: +' + opt.bonus + ' pumpkins — make the walk LONG!' : '🍄 Plant a maze — make the collectors walk so far they give up!';
+  $('goal').textContent = opt.bonus ? '🎃 Second try: +' + opt.bonus + ' pumpkins — make the walk LONG!' : G.C.pond ? '🌊 Dig canals, lift 🌉 bridges, pull the 🌽 lever — bikes hate mud!' : '🍄 Plant a maze — make the collectors walk so far they give up!';   // 🌊 fd-2b
   if(!$('fd-steps')){ const d = document.createElement('div'); d.className = 'fd-steps'; d.id = 'fd-steps'; $('stage').appendChild(d); }
   $('fd-steps').classList.remove('hidden');
   FDZ.z = 1; FDZ.ox = FDZ.oy = 0; FDR.spin = null; fdSetRot(fdRotSaved() * Math.PI / 2); FDP.lmode = fdMode(); $('scr-play').classList.add('fd'); $('scr-play').classList.toggle('fd-land', fdMode() === 'land');
@@ -3712,11 +3829,11 @@ function fdLeave(){ FDR.spin = null; fdSetRot(0); ISO.rq = 0; fdCloseCard(); fdC
 function fdRenderPanel(){
   if(!isFarm()) return; const P = $('panel'); P.innerHTML = ''; BTN = []; { const o = $('fd-build'); if(o) o.remove(); }
   const bb = document.createElement('div'); bb.className = 'fd-build'; bb.id = 'fd-build';
-  bb.innerHTML = '<span class="fd-seeds" id="fd-seeds" title="Seeds to plant with">🌰 ' + G.seeds + '</span>' + FD.KINDS.map(k => { const K = FD.PLANTS[k], lock = K.ch > G.C.n;
-    return '<button type="button" class="fd-plant' + (lock ? ' lock' : '') + (FDP.sel === k ? ' on' : '') + '" data-kind="' + k + '" data-hk="' + FD_HK[k] + '" data-sound="tap" style="--pc:' + FD_COLOR[k] + '" title="' + UI.esc(K.name + ' — ' + K.does + (lock ? ' (opens in chapter ' + K.ch + ')' : '')) + '">' + K.icon + '<span class="pr">' + (lock ? '🔒' : K.cost + '🌰') + '</span></button>'; }).join('');
+  bb.innerHTML = '<span class="fd-seeds" id="fd-seeds" title="Seeds to plant with">🌰 ' + G.seeds + '</span>' + FD.KINDS.concat(G.C.pond ? FD.TOOL_KEYS : []).map(k => { const K = fdK2(k), lock = K.ch > G.C.n;   // 🌊 fd-2b: + 🌊 canal · 🌉 bridge in the pond chapters
+    return '<button type="button" class="fd-plant' + (FD.TOOLS[k] ? ' tool' : '') + (lock ? ' lock' : '') + (FDP.sel === k ? ' on' : '') + '" data-kind="' + k + '" data-hk="' + FD_HK[k] + '" data-sound="tap" style="--pc:' + FD_COLOR[k] + '" title="' + UI.esc(K.name + ' — ' + K.does + (lock ? ' (opens in chapter ' + K.ch + ')' : '')) + '">' + K.icon + '<span class="pr">' + (lock ? '🔒' : K.cost + '🌰') + '</span></button>'; }).join('');
   P.appendChild(bb);
   bb.querySelectorAll('.fd-plant').forEach(el => { el.onclick = () => fdSelect(el.dataset.kind); });
-  if(fdMode() === 'land') fdPlaceBuild('land');   // sideways phone: the plant column sits left of the map (the hero rows fold to 3 × 2 by CSS)
+  fdBuildSize(); if(fdMode() === 'land') fdPlaceBuild('land');   // sideways phone: the plant column sits left of the map (the hero rows fold to 3 × 2 by CSS)
   ['farmer', 'goat'].forEach((h, hi) => {
     const T = G.trees[h], H = FD.HEROES[h], box = document.createElement('div'); box.className = 'hero'; box.dataset.h = h;
     const btns = T.buttons(), act = btns.filter(b => !b.ult && !b.combo), ult = btns.find(b => b.ult), keys = hi === 0 ? ['1', '2', '3', '4', '5', '6'] : ['Q', 'W', 'E', 'R', 'T', 'Y'];
@@ -3736,9 +3853,9 @@ function fdFace(cv, h){ if(!cv) return; try{ const g = cv.getContext('2d'); g.cl
   if(h === 'farmer') TDFarmer.draw(g, st, col, 32, 74, 0.82, 0.3, {}); else TDGoat.draw(g, st, col, 32, 56, 0.9, 0.3, {});
   cv.parentNode.classList.add('pic'); }catch(e){} }
 function fdSelect(k){
-  if(!isFarm()) return; const K = FD.PLANTS[k]; if(K.ch > G.C.n){ UISound.play('error'); UI.toast('🔒 ' + K.icon + ' ' + K.name + ' opens in chapter ' + K.ch); return; }
+  if(!isFarm()) return; const K = fdK2(k); if(K.ch > G.C.n){ UISound.play('error'); UI.toast('🔒 ' + K.icon + ' ' + K.name + ' opens in chapter ' + K.ch); return; }
   FDP.sel = k; FDP.mode = 'plant'; FDP.moveId = 0; FDP.pick = null; document.querySelectorAll('#fd-build .fd-plant').forEach(el => el.classList.toggle('on', el.dataset.kind === k));
-  banner(K.icon + ' ' + K.name + ' · ' + K.cost + ' 🌰 — ' + K.does);
+  banner(K.icon + ' ' + K.name + ' · ' + K.cost + ' 🌰 — ' + K.does + (k === 'bridge' ? ' · tap a 🌊 canal' : ''));
 }
 function fdTapSkill(h, key, el){
   if(!G || G.state !== 'wave' || G.paused){ UISound.play('bump'); return; }
@@ -3751,7 +3868,7 @@ function fdPanelTick(){
   BTN.forEach(B => { const cd = FD.cdOf(G, B.h, B.key) || 1, left = Math.max(0, G.cd[B.h][B.key] || 0), rd = left <= 0 && G.state === 'wave';
     const f = Math.min(1, left / cd).toFixed(3); if(B.el.style.getPropertyValue('--cd') !== f) B.el.style.setProperty('--cd', f); if(B.el.classList.contains('ready') !== rd) B.el.classList.toggle('ready', rd); });
   const sd = $('fd-seeds'); if(sd){ const t = '🌰 ' + G.seeds; if(sd.textContent !== t) sd.textContent = t; }
-  document.querySelectorAll('#fd-build .fd-plant').forEach(el => { const K = FD.PLANTS[el.dataset.kind], poor = K.ch <= G.C.n && G.seeds < K.cost; if(el.classList.contains('poor') !== poor) el.classList.toggle('poor', poor); });
+  document.querySelectorAll('#fd-build .fd-plant').forEach(el => { const K = fdK2(el.dataset.kind), poor = K.ch <= G.C.n && G.seeds < K.cost; if(el.classList.contains('poor') !== poor) el.classList.toggle('poor', poor); });
 }
 function fdHud(force){
   if(!isFarm()) return; BAR.count('pump', '🎃', Math.max(0, G.hearts), 'Pumpkins left — lose them all and the bank takes the farm', G.hearts <= Math.max(2, G.heartsMax * 0.25));
@@ -3810,28 +3927,31 @@ function fdTap(e){
   const r = $('cv').getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, c = fdCellAt(px, py);
   let P = FD.plantAt(G, c.i, c.j); if(FDP.mode !== 'move'){ const H = fdPlantHit(px, py); if(H && (!P || fdDep(H.x, H.y) > fdDep(P.x, P.y))){ fdOpenCard(H); return; } }   // 👆 fd-1d: the top of a tall plant IN FRONT wins (it is what you see there)
   if(P && FDP.mode !== 'move'){ fdOpenCard(P); return; }
+  if(FDP.mode !== 'move' && fdPondTap(c)) return;   // 🌊 fd-2b
   if(FDP.mode === 'move'){ const mp = G.plants.find(q => q.id === FDP.moveId); if(!mp){ FDP.mode = 'plant'; return; }
     if(P && P.id === mp.id){ FDP.mode = 'plant'; FDP.moveId = 0; banner('🚚 Move cancelled'); return; }
     if(FD.move(G, mp.id, c.i, c.j)){ UISound.play('pop'); FDP.mode = 'plant'; FDP.moveId = 0; FDP.pick = null; fdHints(); } return; }
   fdCloseCard();
   if(FDP.pick && FDP.pick.i === c.i && FDP.pick.j === c.j){ const P2 = FD.plant(G, c.i, c.j, FDP.sel); FDP.pick = null; if(P2){ UISound.play('pop'); FDP.used++; fdHints(); } return; }
+  if(FDP.sel === 'bridge'){ FDP.pick = null; banner('🌉 Bridges go on a canal — dig one first with 🌊', 'bad'); UISound.play('bump'); return; }   // 🌊 fd-2b
   const can = FD.canPlant(G, c.i, c.j, FDP.sel); if(!FD.buildable(G, c.i, c.j)){ FDP.pick = null; return; }
   FDP.pick = {i: c.i, j: c.j, can, pre: can.ok || can.why === 'seeds' ? FD.previewSteps(G, c.i, c.j) : null, t: performance.now()};
   UISound.play('tap');
   if(!can.ok) fdWhy(can.why, c);
-  else banner(FD.PLANTS[FDP.sel].icon + ' Tap again to plant · ' + FD.PLANTS[FDP.sel].cost + ' 🌰' + (FDP.pick.pre.gain > 0 ? ' · +' + FDP.pick.pre.gain + ' steps!' : ''));
+  else { const K = fdK2(FDP.sel), cost = FD.costOf(G, FDP.sel, c.i, c.j); banner(K.icon + ' Tap again to ' + (FDP.sel === 'canal' ? 'dig' : 'plant') + ' · ' + cost + ' 🌰' + (cost < K.cost ? ' 💧' : '') + (FDP.pick.pre.gain > 0 ? ' · +' + FDP.pick.pre.gain + ' steps!' : '')); }
 }
-function fdWhy(why, c){ const K = FD.PLANTS[FDP.sel];
+function fdWhy(why, c){ const K = fdK2(FDP.sel);
   if(why === 'seal'){ banner('🚫 They need a way in! Leave a path open', 'bad'); UISound.play('error'); FDP.shake = {i: c.i, j: c.j, t: performance.now()}; }
   else if(why === 'seeds') banner('🌰 Not enough seeds — ' + K.icon + ' costs ' + K.cost + '. Collectors who give up drop seeds!', 'bad');
   else if(why === 'busy') banner('🚶 Someone is walking there — wait a moment');
-  else if(why === 'locked') banner('🔒 ' + K.name + ' opens in chapter ' + K.ch); }
+  else if(why === 'locked') banner('🔒 ' + K.name + ' opens in chapter ' + K.ch);
+  else if(why === 'nocanal') banner('🌉 Bridges go on a canal — dig one first with 🌊', 'bad'); }
 function fdOpenCard(P){
   fdCloseCard(); FDP.pick = null; const sp = FD.plantSpec(P), K = FD.PLANTS[P.kind], box = document.createElement('div'); box.className = 'fd-card'; box.id = 'fd-card';
-  const cost = FD.growCost(P), mv = FD.moveCost(G), next = P.st === 3 ? null : P.st < 5 ? (P.st >= 4 ? K.b[P.br].name : K.name) : null;
+  const cost = FD.growCost(P, G), wet = FD.nearWater(G, P.i, P.j), mv = FD.moveCost(G), next = P.st === 3 ? null : P.st < 5 ? (P.st >= 4 ? K.b[P.br].name : K.name) : null;
   let grow = '';
-  if(P.st === 3) grow = K.b.map((b, i) => '<button class="sp-btn sp-primary" data-g="' + i + '" style="background:' + COLORS[b.col].hex + '">' + ['①', '②'][i] + ' ' + b.icon + ' ' + UI.esc(b.name) + ' · ' + cost + '🌰<br><small>' + UI.esc(b.does) + '</small></button>').join('');
-  else if(P.st < 5) grow = '<button class="sp-btn sp-primary" data-g="x">🌱 Grow → stage ' + (P.st + 1) + (P.st + 1 === 5 ? ' ⭐' : '') + ' · ' + cost + '🌰<br><small>' + UI.esc(next) + ' gets bigger + stronger</small></button>';
+  if(P.st === 3) grow = K.b.map((b, i) => '<button class="sp-btn sp-primary" data-g="' + i + '" style="background:' + COLORS[b.col].hex + '">' + ['①', '②'][i] + ' ' + b.icon + ' ' + UI.esc(b.name) + ' · ' + cost + '🌰' + (wet ? ' 💧' : '') + '<br><small>' + UI.esc(b.does) + '</small></button>').join('');
+  else if(P.st < 5) grow = '<button class="sp-btn sp-primary" data-g="x">🌱 Grow → stage ' + (P.st + 1) + (P.st + 1 === 5 ? ' ⭐' : '') + ' · ' + cost + '🌰' + (wet ? ' 💧' : '') + '<br><small>' + UI.esc(next) + ' gets bigger + stronger</small></button>';
   else grow = '<div style="text-align:center;font-weight:800;color:#22A867">⭐ Fully grown!</div>';
   box.innerHTML = '<button class="x" data-sound="tap" aria-label="Close">✖</button><div class="hd"><span class="ic">' + sp.icon + '</span><div>' + UI.esc(sp.name) + ' · stage ' + P.st + '<small>' + UI.esc(sp.does) + '</small></div></div>' +
     '<div class="st">' + [1, 2, 3, 4, 5].map(n => '<i class="' + (n <= P.st ? 'on' : '') + '"></i>').join('') + '</div><div class="row">' + grow + '</div>' +
@@ -3844,6 +3964,21 @@ function fdOpenCard(P){
   box.querySelector('[data-a="pull"]').onclick = () => { FD.pull(G, P.id); UISound.play('pop'); fdCloseCard(); fdHints(); };
   box.querySelector('[data-a="move"]').onclick = () => { if(G.seeds < FD.moveCost(G)){ UISound.play('error'); banner('🌰 Moving costs 1 seed', 'bad'); return; } FDP.mode = 'move'; FDP.moveId = P.id; fdCloseCard(); banner('🚚 Tap an empty spot to move the ' + sp.name + ' (it keeps its stage)'); };
 }
+/* 🌊 ✦ fd-2b the pond chapter's taps: a bridge lifts / lowers at once (timing is the fun), the lever swaps the corn gates, a canal opens its card */
+function fdPondTap(c){ if(!G.C.pond) return false;
+  const B = FD.bridgeAt(G, c.i, c.j); if(B){ fdCloseCard(); FDP.pick = null; const r = FD.toggleBridge(G, B.id); fdPondSay(r, B.up ? '🌉 Bridge UP — they must go round!' : '🌉 Bridge down — they can cross'); return true; }
+  const S = FD.switchAt(G, c.i, c.j); if(S){ fdCloseCard(); FDP.pick = null; const r = FD.flip(G, S.id); fdPondSay(r, '🌽 Corn gates swapped — the walk changes lanes!'); return true; }
+  const C = FD.canalAt(G, c.i, c.j); if(C){ FDP.pick = null; if(FDP.sel === 'bridge'){ if(FD.buildBridge(G, c.i, c.j)){ UISound.play('pop'); fdCloseCard(); } return true; } fdOpenCanal(C); return true; }
+  return false; }
+function fdPondSay(r, okTxt){ if(r.ok){ UISound.play('whoosh'); banner(okTxt); fdHints(); return; } UISound.play('bump');
+  banner(r.why === 'rest' ? '⏳ Wait ' + Math.ceil(r.left) + ' s — it needs a little rest' : r.why === 'busy' ? '🚶 Someone is on it — wait a moment' : r.why === 'seal' ? '🚫 They need a way in! That would close the last way' : '🤔 Not now', r.why === 'seal' ? 'bad' : ''); }
+function fdOpenCanal(C){ fdCloseCard(); const B = FD.bridgeAt(G, C.i, C.j), box = document.createElement('div'); box.className = 'fd-card'; box.id = 'fd-card';
+  box.innerHTML = '<button class="x" data-sound="tap" aria-label="Close">✖</button><div class="hd"><span class="ic">🌊</span><div>Canal<small>A water wall — nobody walks through it. Plants beside water cost less 💧</small></div></div>' +
+    '<div class="row">' + (B ? '' : '<button class="sp-btn sp-primary" data-a="bridge">🌉 Build a lift bridge · ' + FD.TOOLS.bridge.cost + '🌰<br><small>tap it later: up = blocked · down = they cross</small></button>') +
+    '<button class="sp-btn sp-secondary" data-a="fill">♻️ Fill it back · +' + (B ? 2 : 1) + '🌰</button></div>';
+  $('arena').appendChild(box); box.querySelector('.x').onclick = () => fdCloseCard();
+  const bb = box.querySelector('[data-a="bridge"]'); if(bb) bb.onclick = () => { if(FD.buildBridge(G, C.i, C.j)){ UISound.play('unlock'); fdCloseCard(); } else UISound.play('error'); };
+  box.querySelector('[data-a="fill"]').onclick = () => { FD.fill(G, C.i, C.j); UISound.play('pop'); fdCloseCard(); fdHints(); }; }
 function fdCloseCard(){ const c = $('fd-card'); if(c) c.remove(); FDP.card = 0; FDP.selP = 0; }
 function fdStory(html, btn){ fdCloseStory(); const d = document.createElement('div'); d.className = 'fd-story'; d.id = 'fd-story'; d.innerHTML = '<div class="pg">' + html + '<div style="margin-top:10px"><button class="sp-btn sp-primary sp-lg" data-sound="pop">' + (btn || 'OK ▶') + '</button></div></div>';
   $('arena').appendChild(d); if(G) G.paused = true; d.querySelector('button').onclick = () => { fdCloseStory(); if(G) G.paused = false; last = 0; }; }
@@ -3880,11 +4015,12 @@ function fdEvents(list){
     if(e.k === 'umbrella' && Math.random() < 0.3) floatText(e.x, e.y - 1.1, '☂️ boing!', '#3A86FF', 0.8);
     if(e.k === 'trap') burst(e.x, e.y, 0.4, ['💥', '🟤'], 3);
     if(e.k === 'boom'){ SHAKE = Math.max(SHAKE, e.big ? 0.4 : 0.15); burst(e.x, e.y, 0.4, ['💥', '✨'], e.big ? 12 : 5); }
+    if(e.k === 'wave' && G.C.pond && G.lvl <= 1 && !G.toldBike && G.C.waves[e.n - 1].some(q => FD.FOES[q[0]].bike)){ G.toldBike = 1; setTimeout(() => banner('🚲 Bikes zoom on dry paths — but crawl in 🟫 mud and beside 🌊 water!'), 1800); }   // 🌊 fd-2b
     if(e.k === 'wave'){ banner(e.boss ? '👑 Here comes ' + FD.FOES[G.C.boss].name + '!' : (e.rain ? '🌧️ Rain! Plants work faster · ' : '🌊 ') + 'Wave ' + e.n + '!', e.boss ? 'bad' : ''); if(G.lvl > 0 && e.n > 1) $('goal').style.opacity = 0; fdCloseCard(); }
     if(e.k === 'waveDone'){ floatText(FD.CX, FD.CY - 2.4, (e.perfect ? '✨ Perfect wave! ' : '✅ Wave done ') + '+' + e.bonus + '🌰', '#22A867', 1.6); if(G.state === 'pick') setTimeout(nextPick, FX ? 900 : 0); else fdAfterPicks(); }
     if(e.k === 'foesUp') floatText(FD.CX, 1.6, '📋 The bank sent ' + e.icon + ' ' + e.name + '!', '#7B4FE0', 2.2);
     if(e.k === 'foeCast') floatText(FD.CX, 1.4, e.icon + ' ' + e.name + '!', '#7B4FE0', 1.4);
-    if(e.k === 'foeSkill'){ floatText(e.x, e.y - 1.2, {clip: '📋 More paperwork!', brolly: '☔ Umbrella Spin!', bag: '👜 Treat Bag! Snack time!', call: '🦴 Ladies, help me!'}[e.skill] || '!', '#E5487F', 1.3); if(e.skill === 'bag'){ SHAKE = Math.max(SHAKE, 0.15); burst(e.x, e.y, 1.2, ['🦴', '🍪', '✨'], 10); } }
+    if(e.k === 'foeSkill'){ floatText(e.x, e.y - 1.2, {clip: '📋 More paperwork!', brolly: '☔ Umbrella Spin!', bag: '👜 Treat Bag! Snack time!', call: '🦴 Ladies, help me!', bell: '🔔 Ring ring! Out of my way!'}[e.skill] || '!', '#E5487F', 1.3); if(e.skill === 'bag'){ SHAKE = Math.max(SHAKE, 0.15); burst(e.x, e.y, 1.2, ['🦴', '🍪', '✨'], 10); } if(e.skill === 'bell' && e.n) burst(e.x, e.y, 1, ['🔔', '🐑'], 6); }
     // ✦ fd-2a: 🐑 animals + 🦴 treats + the new skills
     if(e.k === 'treat'){ if(Math.random() < 0.5) floatText(e.x, e.y - 0.9, {sheep: '🐑 yum!', chicken: '🐔 peck peck', dog: '🐕 woof! yum', pig: '🐷 oink!', duck: '🦆 quack!', cow: '🐮 moo!'}[e.who] || '😋 yum!', '#C2410C', 0.9); if(G.lvl <= 1 && !G.toldTreat){ G.toldTreat = 1; banner('🦴 Treats Lady! Your animals stop to eat — then get back to work', ''); } }
     if(e.k === 'sheepWall'){ burst(e.x, e.y, 0.4, ['🐑', '✨'], 4); if(!G.toldWall){ G.toldWall = 1; floatText(e.x, e.y - 1, '🐑 Baa! Walk round us!', '#22A867', 1.3); } }
@@ -3896,7 +4032,16 @@ function fdEvents(list){
     if(e.k === 'heal') floatText(FD.CX, FD.CY - 2, '+' + e.n + ' 🎃', '#22A867', 1.2);
     if(e.k === 'boss') UISound.play('nav');
     if(e.k === 'lastStand') banner('🍀 Three pumpkins left in the cellar!', 'gold');
-    if(e.k === 'newRoute'){ fdHints(); fdStory('<div class="big">🚧</div><h3>' + UI.esc(e.who) + ' found a back gate!</h3><p>Old way <b>' + e.old + '</b> steps · new way <b style="color:#E5484D">' + e.now + '</b> steps 😱</p><p>🚚 Moving plants is <b>FREE</b> for a little while — they keep their stage.' + (G.lvl <= 1 ? '<br>👻 Ghost plants show good spots.' : '') + '</p>', '🚚 Fix my maze ▶'); }
+    if(e.k === 'newRoute'){ fdHints(); fdStory('<div class="big">' + (e.boat ? '⛵' : '🚧') + '</div><h3>' + (e.boat ? 'A boat crosses the pond!' : UI.esc(e.who) + ' found a back gate!') + '</h3><p>Old way <b>' + e.old + '</b> steps · new way <b style="color:#E5484D">' + e.now + '</b> steps 😱</p><p>🚚 Moving plants is <b>FREE</b> for a little while — they keep their stage.' + (G.lvl <= 1 ? '<br>👻 Ghost plants show good spots.' : '') + '</p>', '🚚 Fix my maze ▶'); }
+    // 🌊 ✦ fd-2b: canals · bridges · the corn switch · ditches · the flood · Bill's bell
+    if(e.k === 'dig'){ burst(e.x, e.y, 0.2, ['💧', '🌊'], 5); if(!G.toldDig){ G.toldDig = 1; floatText(e.x, e.y - 0.8, '🌊 Splash! A water wall', '#3A86FF', 1.2); } }
+    if(e.k === 'fill'){ burst(e.x, e.y, 0.2, ['🟫', '✨'], 4); floatText(e.x, e.y - 0.6, '♻️ +' + e.back + '🌰', '#8A6A48', 1); }
+    if(e.k === 'bridge'){ burst(e.x, e.y, 0.3, ['🌉', '✨'], 4); floatText(e.x, e.y - 0.9, '🌉 Tap me: up / down', '#8E5A2C', 1.3); }
+    if(e.k === 'lift'){ burst(e.x, e.y, 0.5, e.up ? ['⬆️', '💨'] : ['⬇️', '💧'], 3); if(e.skill) floatText(e.x, e.y - 1, e.up ? '🌉 Up!' : '🌉 Down!', '#8E5A2C', 0.9); }
+    if(e.k === 'switch'){ burst(e.x, e.y, 0.6, ['🌽', '✨'], 5); if(e.skill) floatText(e.x, e.y - 1.1, '🌽 Switcheroo!', '#22A867', 1); }
+    if(e.k === 'switched' && !e.n) floatText(FD.CX, FD.CY - 2.2, '🌽 Nothing to switch…', '#8A6A48', 1);
+    if(e.k === 'ditch'){ floatText(e.x, e.y - 1, '🌊 ' + (e.n ? 'Ditch! Go round!' : 'No room to dig…'), '#3A86FF', 1.1); }
+    if(e.k === 'dry') burst(e.x, e.y, 0.2, ['💨'], 2);
     if(e.k === 'won'){ banner('🏆 Chapter ' + G.C.n + ' done!', 'gold'); UISound.play('success'); if(FX) confetti(['🎃', '🍄', '🌽', '⭐', '🐐'], 40); }
     if(e.k === 'lost'){ banner('🎃 Oh no — the last pumpkin!', 'bad'); UISound.play('error'); }
   });
@@ -3911,7 +4056,7 @@ function fdSky(tod){ FDP.sky = FDP.sky || {}; const key = FDP.bgKey.replace(/:r\
   const base = scenePal(), P = Object.assign({}, base, tod && !base.night ? TOD_SKY[tod] : {}), R = FD.rngOf(G.C.n * 97 + 3), M = G.map;
   g.setTransform(d, 0, 0, d, 0, 0); drawSky(g, P, W, H, R);
   // 🌳 a ring of trees + hay on the misty edge (not part of the farm grid) — the same seed = the same ring
-  const stand = []; for(let j = 0; j < FD.N; j++) for(let i = 0; i < FD.N; i++){ const k = j * FD.N + i; if(G.isl.solid[k] || M.isVoid(i, j) || M.al[k] < 150) continue; if(R() > 0.35) continue;
+  const stand = []; for(let j = 0; j < FD.N; j++) for(let i = 0; i < FD.N; i++){ const k = j * FD.N + i; if(G.isl.solid[k] || M.isVoid(i, j) || M.al[k] < 150 || (G.isl.pond && G.isl.pond[k])) continue;   /* 🌊 fd-2b: not on the pond */ if(R() > 0.35) continue;
     if(G.gates.some(Gt => Math.abs(Gt.i - i) + Math.abs(Gt.j - j) < 3)) continue; stand.push({x: FD.wx(i) + (R() - 0.5) * 0.4, y: FD.wx(j) + (R() - 0.5) * 0.4, ic: ['🌳', '🌳', '🌲', '🌾', '🌻', '🪨'][Math.floor(R() * 6)]}); }
   stand.forEach(o => { o.big = o.ic === '🌳' || o.ic === '🌲'; o.sz = o.big ? 1.05 + R() * 0.3 : 0.55; o.r1 = R(); o.r2 = R(); });
   FDP.sky[tod] = {key, c, stand, base}; return FDP.sky[tod]; }
@@ -4044,6 +4189,7 @@ function fdPaint(t){
   const F = FD.flowOf(G), toW = P => (P || []).map(q => ({x: q.x - FD.O, y: q.y - FD.O})), paths = G.gates.map(Gt => toW(F.path(Gt.i, Gt.j)));
   groundTf(g, sx, sy); g.fillStyle = 'rgba(190,140,80,.42)'; const seen = new Set();
   paths.forEach(P => P.forEach(p => { const k = Math.floor(p.x) + ',' + Math.floor(p.y); if(seen.has(k)) return; seen.add(k); g.fillRect(Math.floor(p.x) + 0.04, Math.floor(p.y) + 0.04, 0.92, 0.92); }));
+  if(G.C.pond) fdPondGround(g, t);   // 🌊 fd-2b
   G.plants.forEach(P => { g.fillStyle = 'rgba(110,72,40,.55)'; g.fillRect(P.i - FD.O + 0.06, P.j - FD.O + 0.06, 0.88, 0.88); g.fillStyle = 'rgba(80,50,25,.35)'; g.fillRect(P.i - FD.O + 0.06, P.j - FD.O + 0.7, 0.88, 0.24); });
   G.zones.forEach(Z => { g.fillStyle = Z.k === 'storm' ? 'rgba(255,140,60,.22)' : 'rgba(58,134,255,.18)'; g.beginPath(); g.arc(Z.x, Z.y, Z.r, 0, 7); g.fill(); });
   G.traps.forEach(T => { if(T.kind === 'lava'){ g.fillStyle = 'rgba(120,80,40,' + (0.45 + 0.1 * Math.sin(t * 4)) + ')'; g.beginPath(); g.ellipse(T.x, T.y, T.r, T.r * 0.9, 0, 0, 7); g.fill(); } });
@@ -4057,19 +4203,19 @@ function fdPaint(t){
   const fs = Math.max(1.6, s * 0.075);
   paths.forEach((P, n) => Iso.footsteps(g, P, fdTo, {t, size: fs, col: 'rgba(110,70,35,.55)', pulse: true, from: t * 0.6}));
   if(FDP.pick && FDP.pick.pre && FDP.pick.can.ok) FDP.pick.pre.paths.map(toW).forEach(P => Iso.footsteps(g, P, fdTo, {t, size: fs, col: FDP.pick.pre.gain > 0 ? 'rgba(40,170,90,.75)' : 'rgba(255,150,40,.75)', every: 0.5}));
-  if(!fdHasProps()) G.gates.forEach(Gt => { const x = FD.wx(Gt.i), y = FD.wx(Gt.j); emo(g, '🚧', IX(x, y), IY(x, y, 0.35), s * 0.55); });
+  if(!fdHasProps()) G.gates.forEach(Gt => { if(Gt.boat) return; const x = FD.wx(Gt.i), y = FD.wx(Gt.j); emo(g, '🚧', IX(x, y), IY(x, y, 0.35), s * 0.55); });
   const dx = FD.wx(FD.DOOR.i), dy = FD.wx(FD.DOOR.j);
   // standing things, far → near (depth = x + y)
   const items = [];
   const PR = fdHasProps();
-  if(PR){ G.gates.forEach(Gt => { const it = fdGateIt(Gt); items.push({y: fdDep(FD.wx(Gt.i), FD.wx(Gt.j)) - 0.05, d: () => fdProp(g, it, {sx, sy})}); });   // 🚪 fd-1b
+  if(PR){ G.gates.forEach(Gt => { if(Gt.boat) return; const it = fdGateIt(Gt); items.push({y: fdDep(FD.wx(Gt.i), FD.wx(Gt.j)) - 0.05, d: () => fdProp(g, it, {sx, sy})}); });   // 🚪 fd-1b
     const n = fdPileN(); if(n > 0){ const it = fdItem('pile', 'pumpkinpile', FD.PILE.i, FD.PILE.j, {state: n}); items.push({y: fdDep(FD.wx(FD.PILE.i), FD.wx(FD.PILE.j)), d: () => fdProp(g, it, {sx, sy})}); } }   // 🎃 = your hearts
   (G.rocks || []).forEach(r => items.push({y: fdDep(r.x, r.y), d: () => { if(PR && fdProp(g, fdItem('rock', 'rock', r.i, r.j, {v: r.v}), {sx, sy})) return; shadow(g, r.x, r.y, 0.42); g.fillStyle = ['#B9B3A8', '#A9A397', '#C4BEB2'][r.v]; g.strokeStyle = '#2A1C14'; g.lineWidth = Math.max(1, s * 0.03); g.beginPath(); g.ellipse(IX(r.x, r.y), IY(r.x, r.y, 0) - s * 0.18, s * 0.42, s * 0.3, 0, 0, 7); g.fill(); g.stroke(); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(IX(r.x, r.y) - s * 0.12, IY(r.x, r.y, 0) - s * 0.3, s * 0.14, s * 0.07, -0.3, 0, 7); g.fill(); }}));
   G.traps.forEach(T => { if(T.kind === 'lava') return; items.push({y: fdDep(T.x, T.y) - 0.1, d: () => { const ic = T.kind === 'pop' ? '🌶️' : T.kind === 'mine' ? '💩' : T.kind === 'push' ? '🪣' : T.kind === 'root' ? '🧶' : T.kind === 'stun' ? '🕳️' : '🌵'; emo(g, ic, IX(T.x, T.y), IY(T.x, T.y, 0.18), s * 0.5, T.seen ? 0.5 : 1); }}); });
   G.plants.forEach(P => items.push({y: fdDep(P.x, P.y), d: () => { const born = Math.min(1, (G.t - P.born) / 0.35), sw = 1 + Math.sin(t * 2 + P.id) * 0.02 + (P.aim > 0.3 ? 0.06 : 0);
     if(PR && fdPlantNow(g, P, born, sw, sx, sy)){} else { const pic = plantPic(P); fdDrawPic(g, pic, IX(P.x, P.y), IY(P.x, P.y, 0), born, sw * born, FDP.selP === P.id ? 0.8 : 1); } if(FDP.selP === P.id){ g.strokeStyle = '#FFC93C'; g.lineWidth = 2; g.beginPath(); g.ellipse(IX(P.x, P.y), IY(P.x, P.y, 0), s * 0.6, s * 0.3, 0, 0, 7); g.stroke(); } }}));
   G.blockers.forEach(b => items.push({y: fdDep(b.x, b.y), d: () => { if(PR && b.k === 'hay' && fdProp(g, fdItem('hay', 'haybale', b.i, b.j, {v: b.id % 2}), {sx, sy})){ bar(g, IX(b.x, b.y), IY(b.x, b.y, 1.1), s * 0.7, b.hp / b.hpMax, '#22A867'); return; }   // 🌾 fd-1b
-    if(typeof FA2 !== 'undefined' && (b.k === 'sheep' || b.k === 'chicken')){ fdAnimal(g, b.k, b.x, b.y, t, b.eatT > 0 ? 'eat' : b.wall ? 'block' : 'stand', b.id % 2 ? 1 : -1, b); if(!b.wall) bar(g, IX(b.x, b.y), IY(b.x, b.y, 1.1), s * 0.7, b.hp / b.hpMax, '#22A867'); return; }   // ✦ fd-2a
+    if(typeof FA2 !== 'undefined' && (b.k === 'sheep' || b.k === 'chicken')){ const hop = b.jumpT != null && G.t - b.jumpT < 0.6 ? Math.sin((G.t - b.jumpT) / 0.6 * Math.PI) * 0.55 : 0; fdAnimal(g, b.k, b.x + hop * 0.5, b.y - hop * 0.5, t, b.eatT > 0 ? 'eat' : b.wall ? 'block' : 'stand', b.id % 2 ? 1 : -1, b); if(!b.wall) bar(g, IX(b.x, b.y), IY(b.x, b.y, 1.1), s * 0.7, b.hp / b.hpMax, '#22A867'); return; }   // ✦ fd-2a
     const ic = {hay: '🌾', wool: '☁️', sheep: '🐑', chicken: '🐔'}[b.k] || '🐑'; shadow(g, b.x, b.y, 0.4); emo(g, ic, IX(b.x, b.y), IY(b.x, b.y, 0.4 + (b.k === 'sheep' || b.k === 'chicken' ? Math.abs(Math.sin(t * 8 + b.id)) * 0.12 : 0)), s * 0.75); bar(g, IX(b.x, b.y), IY(b.x, b.y, 1.1), s * 0.7, b.hp / b.hpMax, '#22A867'); }}));
   G.traps.forEach(T => { const a = FD.ANIMAL_TRAP[T.kind]; if(T.hero !== 'goat' || !a || typeof FA2 === 'undefined') return; const ox = a === 'pig' ? 0.25 : 0.42, x = T.x + ox, y = T.y - ox * 0.4;   // ✦ fd-2a: Chewy's traps come with their animal
     items.push({y: fdDep(x, y), d: () => fdAnimal(g, a, x, y, t, T.eatT > 0 ? 'eat' : a === 'pig' ? 'mud' : a === 'duck' ? 'splash' : 'stand', -1, T, 0.8)}); });
@@ -4077,6 +4223,7 @@ function fdPaint(t){
   G.helpers.forEach(H => { if(H.k === 'dog') items.push({y: fdDep(H.x, H.y), d: () => fdAnimal(g, 'dog', H.x, H.y, t, H.eatT > 0 ? 'eat' : H.mv ? 'run' : 'stand', H.face || 1, H)}); });   // 🐕 ✦ fd-2a
   G.helpers.forEach(H => H.k === 'dog' || items.push({y: fdDep(H.x, H.y), d: () => { if(PR && fdProp(g, fdItem('crow', 'scarecrow', 0, 0, {v: H.id % 3}), {sx, sy, dx: H.x + FD.O - 0.5, dy: H.y + FD.O - 0.5})) return; FP.crow(g, IX(H.x, H.y), IY(H.x, H.y, 0), s / 44, t); }}));   // 🧑‍🌾 fd-1b
   items.push({y: fdDep(FD.CX, FD.CY) + 0.5, d: () => { if(!(PR && fdProp(g, fdHouseIt(), {sx, sy}))){ const hp = housePic(); fdDrawPic(g, hp, IX(FD.CX + 1, FD.CY + 1), IY(FD.CX + 1, FD.CY + 1, 0), 1, 1); } fdFarmer(g, t, sx, sy); }});
+  if(G.C.pond) fdPondItems(items, g, t, sx, sy, PR);   // 🌊 fd-2b
   { const H = G.heroes.goat; items.push({y: fdDep(H.x, H.y), d: () => fdGoat(g, t)}); }
   G.enemies.forEach(e => items.push({y: fdDep(e.x, e.y), d: () => fdCollector(g, e, t, s)}));
   items.sort((a, b) => a.y - b.y).forEach(it => it.d());
@@ -4084,9 +4231,9 @@ function fdPaint(t){
   paintLights(g, t);
   G.fx.forEach(f => fdFx(g, f, s, t));
   PARTS = PARTS.filter(p => (p.t += 1 / 60) < p.dur); PARTS.forEach(p => { const k = p.t / p.dur; emo(g, p.ic, IX(p.x, p.y) + p.vx * k * s, IY(p.x, p.y, p.z) + (p.vy * k + 2.2 * k * k) * s, s * p.sz * (1 - k * 0.4), 1 - k); });
-  if(FDP.pick && FDP.pick.pre && FDP.pick.can.ok){ const x = FD.wx(FDP.pick.i), y = FD.wx(FDP.pick.j), K = FD.PLANTS[FDP.sel]; emo(g, K.icon, IX(x, y), IY(x, y, 0.5), s * 0.7, 0.55);
+  if(FDP.pick && FDP.pick.pre && FDP.pick.can.ok){ const x = FD.wx(FDP.pick.i), y = FD.wx(FDP.pick.j), K = fdK2(FDP.sel); emo(g, K.icon, IX(x, y), IY(x, y, 0.5), s * 0.7, 0.55);
     g.font = '800 ' + Math.max(11, Math.round(s * 0.42)) + 'px Fredoka, Nunito, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = s * 0.12; g.strokeStyle = 'rgba(255,255,255,.95)';
-    drawTxt(g, (FDP.pick.pre.gain > 0 ? '+' + FDP.pick.pre.gain + ' 👣 · ' : '') + K.cost + '🌰', IX(x, y), IY(x, y, 1.5), Math.max(11, s * 0.42), FDP.pick.pre.gain > 0 ? '#1F9B5A' : '#8A6A48'); }
+    drawTxt(g, (FDP.pick.pre.gain > 0 ? '+' + FDP.pick.pre.gain + ' 👣 · ' : '') + FD.costOf(G, FDP.sel, FDP.pick.i, FDP.pick.j) + '🌰', IX(x, y), IY(x, y, 1.5), Math.max(11, s * 0.42), FDP.pick.pre.gain > 0 ? '#1F9B5A' : '#8A6A48'); }
   g.textAlign = 'center'; g.textBaseline = 'middle';
   FT.forEach(f => { const p = f.t / f.dur, a = p < 0.75 ? 1 : 1 - (p - 0.75) / 0.25, fsz = Math.max(11, s * 0.5), pop = p < 0.12 ? 0.6 + p / 0.12 * 0.4 : 1;
     g.font = '800 ' + Math.round(fsz * pop) + 'px Fredoka, Nunito, sans-serif'; g.globalAlpha = a; const x = Math.max(fsz * 2, Math.min(VIEW.px - fsz * 2, IX(f.x, f.y))), y = Math.max(fsz, IY(f.x, f.y, 1.4) - p * s * 0.9);
@@ -4109,15 +4256,15 @@ function fdFarmer(g, t, sx, sy){ const H = G.heroes.farmer, hk = VIEW.s / 40, it
   fdMorphDraw(g, 'farmer', x, feet, k, t, (st, col) => TDFarmer.draw(g, st, col, x, feet, k, t, {dir: H.ax != null && IX(H.ax, H.ay) < x ? -1 : 1, pose: H.atkT && G.t - H.atkT < 0.3 ? {armR: -2.2} : {}})); }
 function fdGoat(g, t){ const H = G.heroes.goat, x = IX(H.x, H.y), feet = IY(H.x, H.y, 0) + (H.mv ? -Math.abs(Math.sin(t * 12)) * VIEW.s * 0.12 : 0), k = VIEW.s / 30;
   shadow(g, H.x, H.y, 0.38); fdMorphDraw(g, 'goat', x, feet, k, t, (st, col) => TDGoat.draw(g, st, col, x, feet, k, t, {dir: ISO.rq ? (fdFaceL(H, x) ? -1 : 1) : H.tx < H.x ? -1 : 1})); }
-const FD_COL_KEY = {c: 'co', k: 'ck', u: 'um', boss1: 'co', boss2: 'um', tr: 'tr', boss3: 'mt'};   // ✦ fd-2a: 🦴 Treats Lady + 👜 Mrs. Treats
+const FD_COL_KEY = {c: 'co', k: 'ck', u: 'um', boss1: 'co', boss2: 'um', tr: 'tr', boss3: 'mt', bk: 'bk', boss4: 'sb'};   // ✦ fd-2b: 🚲 Bike Clerk + 🚴 Speedy Bike Bill   // ✦ fd-2a: 🦴 Treats Lady + 👜 Mrs. Treats
 function fdCollector(g, e, t, s){
   const key = FD_COL_KEY[e.type] || 'co', sz = e.S.size || 1, set = charSet('fc:' + key + (e.boss ? 'B' : ''), {name: e.S.name, av: FCOL.av(key)}, Math.round(s * 1.35 * sz), Math.round(s * 1.75 * sz));
   const quitA = e.gone ? Math.max(0, 1 - (G.t - (e.quitT || G.t)) / 1.4) : 1; if(quitA <= 0) return;
   const x = IX(e.x, e.y), y = IY(e.x, e.y, 0) - (e.gone ? (G.t - e.quitT) * s * 0.6 : 0), flip = ISO.rq ? fdFaceL(e, x) : (e.face || 1) < 0, moving = !e.gone && !(e.stunT > 0 || e.sleepT > 0 || e.stopT > 0);
   shadow(g, e.x, e.y, 0.3 * sz, 0.18 * quitA);
-  const fr = moving ? set.walk[Math.floor((e.steps + e.prog) * 4) % WALK_N] : set.still;
-  drawPic(g, fr, x, y, set.w, set.h, flip, e.gone ? Math.sin(G.t * 20) * 0.2 : e.hit > 0 ? Math.sin(t * 50) * 0.05 : 0, quitA, set);
-  if(e.boss) emo(g, {um: '☂️', mt: '👜'}[key] || '📋', x + s * 0.45 * (flip ? -1 : 1), y - set.h * 0.55, s * 0.55, quitA);
+  const fr = moving ? set.walk[Math.floor((e.steps + e.prog) * 4) % WALK_N] : set.still, bike = e.S.bike ? fdBike(g, e, x, y, s * sz, flip, t, quitA, moving) : 0;   // 🚲 fd-2b: on the saddle
+  drawPic(g, bike ? set.still : fr, x, y - bike, set.w, set.h, flip, e.gone ? Math.sin(G.t * 20) * 0.2 : e.hit > 0 ? Math.sin(t * 50) * 0.05 : 0, quitA, set);
+  if(e.boss) emo(g, {um: '☂️', mt: '👜', sb: '🔔'}[key] || '📋', x + s * 0.45 * (flip ? -1 : 1), y - set.h * 0.55, s * 0.55, quitA);
   if(e.throwT && G.t - e.throwT < 0.4 && !e.gone) emo(g, '🦴', x + s * 0.4 * (flip ? -1 : 1), y - set.h * (0.6 + (G.t - e.throwT)), s * 0.3, quitA);
   if(e.gone) return;
   const top = y - set.h * 0.92, v = Math.max(0, e.will / e.willMax);
@@ -4126,6 +4273,34 @@ function fdCollector(g, e, t, s){
   if(e.backN > 0) emo(g, '↩️', x - s * 0.3, top - s * 0.3, s * 0.3); if(e.umbT > 0 && !e.S.umbrella) emo(g, '☂️', x, top - s * 0.4, s * 0.32); if(e.shield > 0) emo(g, '📄', x + s * 0.35, top, s * 0.28);
 }
 // 🐑 ✦ fd-2a: one animal on the island (FA2 painters, farm_fd2.js) — eating shows the 🦴 treat at its feet + 😋
+/* 🌊 ✦ fd-2b the pond chapter's own pictures */
+// a bike under a collector (two wheels + a frame in the tie colour) — returns how high the rider sits · 💨 lines when fast · 🟫 splashes in mud
+function fdBike(g, e, x, y, s, flip, t, a, moving){ const k = s / 40, d = flip ? -1 : 1, col = (FCOL.T[FD_COL_KEY[e.type]] || {}).tie || '#FF9F1C', spin = moving ? t * (e.mud ? 4 : 14) : 0, wob = e.mud && moving ? Math.sin(t * 9) * 1.2 * k : 0;
+  g.save(); g.globalAlpha = a; g.translate(x, y + wob); g.lineCap = 'round'; g.lineJoin = 'round';
+  [-11, 11].forEach(dx => { g.strokeStyle = '#2A1C14'; g.lineWidth = 2.6 * k; g.beginPath(); g.arc(dx * k, -6.5 * k, 6.2 * k, 0, 7); g.stroke(); g.strokeStyle = '#9AA6B2'; g.lineWidth = 0.8 * k; for(let q = 0; q < 3; q++){ const an = spin + q * 2.09; g.beginPath(); g.moveTo(dx * k, -6.5 * k); g.lineTo(dx * k + Math.cos(an) * 5.6 * k, -6.5 * k + Math.sin(an) * 5.6 * k); g.stroke(); } });
+  g.strokeStyle = '#2A1C14'; g.lineWidth = 3.4 * k; const F = () => { g.beginPath(); g.moveTo(-11 * k, -6.5 * k); g.lineTo(-1 * k, -15 * k); g.lineTo(11 * k, -6.5 * k); g.moveTo(-1 * k, -15 * k); g.lineTo(d * 7 * k, -18 * k); g.lineTo(d * 11 * k, -6.5 * k); g.stroke(); }; F(); g.strokeStyle = col; g.lineWidth = 1.8 * k; F();
+  if(moving && !e.mud) { g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 1.4 * k; for(let q = 0; q < 3; q++){ g.beginPath(); g.moveTo(-d * (18 + q * 3) * k, -(5 + q * 6) * k); g.lineTo(-d * (30 + q * 3) * k, -(5 + q * 6) * k); g.stroke(); } }
+  if(e.mud){ g.fillStyle = 'rgba(110,80,50,.8)'; for(let q = 0; q < 4; q++){ const ph = (t * 2 + q * 0.25) % 1; g.beginPath(); g.arc((q % 2 ? -11 : 11) * k - d * ph * 6 * k, -ph * 9 * k, (1.6 - ph) * 1.4 * k, 0, 7); g.fill(); } }
+  g.restore(); return 9 * k; }
+function fdPondGround(g, t){ const O = FD.O;   // in world units (groundTf): dug canals + temporary ditches + mud patches + the wet look of the banks
+  G.mud.forEach(key => { const [i, j] = key.split(',').map(Number); g.fillStyle = 'rgba(122,88,52,.78)'; g.fillRect(i - O + 0.05, j - O + 0.05, 0.9, 0.9); g.fillStyle = 'rgba(92,64,36,.7)';
+    [[0.3, 0.35, 0.16], [0.68, 0.3, 0.12], [0.55, 0.7, 0.18], [0.22, 0.75, 0.1]].forEach(([u, v, r]) => { g.beginPath(); g.ellipse(i - O + u, j - O + v, r, r * 0.8, 0, 0, 7); g.fill(); }); });
+  const water = (i, j, a) => { g.globalAlpha = a; g.fillStyle = '#8E6A44'; g.fillRect(i - O, j - O, 1, 1); g.fillStyle = '#4BB2DE'; g.fillRect(i - O + 0.1, j - O + 0.1, 0.8, 0.8); g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(i - O + 0.1, j - O + 0.1, 0.8, 0.18);
+    g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 0.05; const ph = (t * 0.6 + i * 0.37 + j * 0.21) % 1; g.beginPath(); g.moveTo(i - O + 0.25 + ph * 0.3, j - O + 0.55); g.quadraticCurveTo(i - O + 0.4 + ph * 0.3, j - O + 0.45, i - O + 0.55 + ph * 0.3, j - O + 0.55); g.stroke(); g.globalAlpha = 1; };
+  G.canals.forEach(C => water(C.i, C.j, Math.min(1, (G.t - C.born) / 0.35 + 0.2)));
+  G.ditches.forEach(D => water(D.i, D.j, Math.min(1, D.t / 1.2, (G.t - D.born) / 0.3 + 0.2) * 0.9)); }
+function fdPondItems(items, g, t, sx, sy, PR){ const s = VIEW.s;
+  G.hedge.forEach(h => { const x = FD.wx(h.i), y = FD.wx(h.j); items.push({y: fdDep(x, y), d: () => { if(PR && fdProp(g, fdItem('hedge', 'growcorn', h.i, h.j, {stage: 4, branch: 'b'}), {sx, sy, scale: 0.92})) return; emo(g, '🌽', IX(x, y), IY(x, y, 0.5), s * 0.8); }}); });
+  G.sw.forEach(S => { S.cells.forEach((c, n) => { const open = n === S.open, x = FD.wx(c.i), y = FD.wx(c.j); items.push({y: fdDep(x, y) - 0.04, d: () => { if(PR && fdProp(g, fdItem('cgate', 'farmgate', c.i, c.j, {state: open ? 'open' : 'closed', turn: 1}), {sx, sy})) return; emo(g, open ? '🚪' : '🌽', IX(x, y), IY(x, y, 0.4), s * 0.7); }}); });
+    const L = S.lever, x = FD.wx(L.i), y = FD.wx(L.j); items.push({y: fdDep(x, y), d: () => { const X = IX(x, y), F = IY(x, y, 0), k = s / 26, ready = !(S.rest > 0) && G.state !== 'pick';
+      if(ready && G.lvl <= 1){ g.fillStyle = 'rgba(255,215,60,' + (0.25 + 0.2 * Math.sin(t * 5)) + ')'; g.beginPath(); g.ellipse(X, F, s * 0.62, s * 0.31, 0, 0, 7); g.fill(); }
+      const sw = S.t0 != null && G.t - S.t0 < 0.3 ? (G.t - S.t0) / 0.3 : 1; try{ FA2.lever(g, X, F, k, S.open === 1 ? sw > 0.5 : sw <= 0.5); }catch(e){ emo(g, '🕹️', X, F - s * 0.4, s * 0.6); }
+      if(S.rest > 0) emo(g, '⏳', X + s * 0.45, F - s * 0.9, s * 0.3); }}); });
+  G.bridges.forEach(B => items.push({y: fdDep(B.x, B.y) - 0.02, d: () => { const lift = B.t0 != null && G.t - B.t0 < 0.25 ? 1 + 0.08 * Math.sin((G.t - B.t0) / 0.25 * Math.PI) : 1;
+    if(!(PR && fdProp(g, fdItem('bridge', 'plankbridge', B.i, B.j, {state: B.up ? 'lifted' : 'down', turn: B.along ? 0 : 1}), {sx, sy, scale: lift}))) emo(g, B.up ? '🚧' : '🌉', IX(B.x, B.y), IY(B.x, B.y, 0.3), s * 0.7);
+    if(B.rest > 0) emo(g, '⏳', IX(B.x, B.y) + s * 0.4, IY(B.x, B.y, 1.3), s * 0.28); }}));
+  G.blockers.forEach(b => { if(b.k !== 'corn') return; items.push({y: fdDep(b.x, b.y), d: () => { if(PR && fdProp(g, fdItem('hedge', 'growcorn', b.i, b.j, {stage: 4, branch: 'b'}), {sx, sy, scale: 0.85})) return; emo(g, '🌽', IX(b.x, b.y), IY(b.x, b.y, 0.5), s * 0.8); }}); });
+  G.gates.forEach(Gt => { if(!Gt.boat) return; items.push({y: fdDep(Gt.ox, Gt.oy), d: () => { const X = IX(Gt.ox, Gt.oy), F = IY(Gt.ox, Gt.oy, 0) + Math.sin(t * 2) * s * 0.04; try{ FA2.boat(g, X, F, s / 30, t); }catch(e){ emo(g, '⛵', X, F - s * 0.5, s * 0.9); } }}); }); }
 function fdAnimal(g, kind, x, y, t, act, dir, who, sc){ const s = VIEW.s, k = s / 38 * (sc || 1), X = IX(x, y), F = IY(x, y, 0), d = ISO.rq && who && who.k === 'dog' ? (fdFaceL(who, X) ? -1 : 1) : dir;
   try{ FA2.draw(g, kind, X, F, k, t + (who && who.id || 0) * 0.37, {dir: d, act}); }catch(e){ emo(g, {sheep: '🐑', chicken: '🐔', dog: '🐕', pig: '🐷', duck: '🦆', cow: '🐮'}[kind] || '🐑', X, F - s * 0.4, s * 0.7); }
   if(act === 'eat'){ FA2.treat(g, X + d * 9 * k, F - 2 * k, k * 0.8); emo(g, '😋', X, F - s * 1.05 - Math.abs(Math.sin(t * 5)) * s * 0.08, s * 0.32); }
@@ -4150,6 +4325,11 @@ function fdFx(g, f, s, t){
   if(f.k === 'bag' || f.k === 'dazzle'){ const R = f.r * s * Math.SQRT2 * (0.3 + p * 0.7); g.strokeStyle = f.k === 'bag' ? 'rgba(199,138,203,' + a + ')' : 'rgba(255,236,120,' + a + ')'; g.lineWidth = s * 0.12; g.beginPath(); g.ellipse(IX(f.x, f.y), IY(f.x, f.y, 0), R, R * 0.5, 0, 0, 7); g.stroke();
     for(let i = 0; i < 6; i++){ const an = i * 1.05 + p * 2; emo(g, f.k === 'bag' ? '🦴' : '✨', IX(f.x, f.y) + Math.cos(an) * R, IY(f.x, f.y, 0.4) + Math.sin(an) * R * 0.5, s * 0.3, a); } return; }
   if(f.k === 'sign'){ emo(g, '❓', IX(f.x, f.y), IY(f.x, f.y, 1.4 + p * 0.6), s * 0.45, a); return; }
+  if(f.k === 'flood'){ const P = f.pts || [], n = P.length - 1; if(n < 1) return; const u = p * n, i0 = Math.min(n - 1, Math.floor(u)), r = u - i0, A = P[i0], B = P[i0 + 1], x = A[0] + (B[0] - A[0]) * r, y = A[1] + (B[1] - A[1]) * r;   // ✦ fd-2b
+    for(let q = 0; q <= i0; q++){ g.fillStyle = 'rgba(75,178,222,' + (0.35 * a) + ')'; g.beginPath(); g.ellipse(IX(P[q][0], P[q][1]), IY(P[q][0], P[q][1], 0), s * 0.6, s * 0.3, 0, 0, 7); g.fill(); }
+    emo(g, '🌊', IX(x, y), IY(x, y, 0.35), s * 0.9, 1); return; }
+  if(f.k === 'ditch' || f.k === 'switch' || f.k === 'bell'){ const R = (f.r || 1.4) * s * Math.SQRT2 * (0.3 + p * 0.7), ic = {ditch: '💧', switch: '🌽', bell: '🔔'}[f.k]; g.strokeStyle = 'rgba(' + {ditch: '58,134,255', switch: '34,168,103', bell: '255,201,60'}[f.k] + ',' + a + ')'; g.lineWidth = s * 0.1; g.beginPath(); g.ellipse(IX(f.x, f.y), IY(f.x, f.y, 0), R, R * 0.5, 0, 0, 7); g.stroke();
+    for(let i = 0; i < 5; i++){ const an = i * 1.26 + p * 2; emo(g, ic, IX(f.x, f.y) + Math.cos(an) * R, IY(f.x, f.y, 0.4) + Math.sin(an) * R * 0.5, s * 0.3, a); } return; }
   if(f.k === 'chew'){ for(let i = 0; i < 5; i++){ const an = i * 1.3 + f.x; emo(g, '📄', IX(f.x, f.y) + Math.cos(an) * s * p, IY(f.x, f.y, 0.8 + p * 1.2) + Math.sin(an) * s * 0.3 * p, s * 0.32, a); } return; }
 }
 
@@ -4201,7 +4381,7 @@ function fdScene(c, o){
   if(o.won) emo(g, '📄', cx + 80 * u, top - 10 * u, 16 * u);
 }
 function fdCover(c, row){ const r = row || {}, f = (r.last || {}).farmer || {}, gt = (r.last || {}).goat || {}; fdScene(c, {kind: 'cover', fS: FD.stageOf(Number(f.t) || 1), fC: f.m || null, gS: FD.stageOf(Number(gt.t) || 1), gC: gt.m || null, collector: 'co'}); }
-function fdDiaryPic(cv, ch, when){ fdScene(cv, {kind: 'diary', ch, fS: when === 'intro' ? (ch === 1 ? 1 : 2) : ch === 1 ? 2 : 3, gS: when === 'intro' ? (ch === 1 ? 1 : 2) : 2, collector: when === 'intro' ? (ch === 2 ? 'um' : 'co') : null, won: when === 'outro' ? true : undefined, rain: ch === 2}); }
+function fdDiaryPic(cv, ch, when){ fdScene(cv, {kind: 'diary', ch, fS: when === 'intro' ? (ch === 1 ? 1 : 2) : ch === 1 ? 2 : 3, gS: when === 'intro' ? (ch === 1 ? 1 : 2) : 2, collector: when === 'intro' ? ({2: 'um', 3: 'tr', 4: 'bk'}[ch] || 'co') : null, won: when === 'outro' ? true : undefined, rain: ch === 2}); }
 /* ================= 📱 fd-1a2 phone layouts + 🤏 pinch zoom (Aowu 17:49 · 17:57: both books — 🐉 Dragon Princess too) =================
    sideways phone: ONE bar row (◀ folds Gameroom · Levels · 🏠 into its ▾ menu, score + ⏸ on the same row) · 🌱 plants in a column on the LEFT ·
    map in the middle, filling it · skills on the RIGHT: 👨‍🌾 hero 3 × 2 on top, 🐐 pet 3 × 2 below (Aowu 17:57) ·
@@ -4221,6 +4401,8 @@ function fdMode(){ const w = innerWidth, h = innerHeight; if(h < 520 && w > h) r
   '#fd-left{display:none}#fd-left:empty{display:none !important}#scr-play.tl-land #fd-left{display:flex;flex-direction:column;justify-content:center;flex:0 0 auto}',
   '#scr-play.tl-land #fd-left .fd-build{flex-direction:column;flex-wrap:nowrap;padding:6px 4px;gap:var(--bgap,6px)}',
   '#scr-play.tl-land #fd-left .fd-seeds{font-size:.95rem;padding:0}',
+  '#fd-build .fd-seeds{min-width:3.3em;text-align:center}',
+  '#scr-play.tl-land #fd-left .fd-build.two{display:grid;grid-template-columns:repeat(2,var(--skk-bs,46px));justify-items:center;align-items:center} #scr-play.tl-land #fd-left .fd-build.two .fd-seeds{grid-column:1 / -1;text-align:center}',   /* 🌊 fd-2b */
   '#scr-play.tl-land #panel{width:auto !important;flex:0 0 auto;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px}',
   /* Aowu 17:57: right side = 3 × 2 for the hero on top, 3 × 2 for the pet below */
   '#scr-play.tl-land .hero{width:auto;padding:4px 6px 6px;margin:0}',
@@ -4264,8 +4446,14 @@ function fdLayout(){
   fdZoomApply(); if(pickOpen) placeHandOnGlow();
   return true;
 }
+// 🌊 fd-2b: 7 build buttons (5 plants + 🌊 + 🌉) — sideways phone: a 2-column plant column · otherwise ONE row of smaller buttons
+function fdBuildSize(mode){ const bb = $('fd-build'); if(!bb) return; const n = bb.querySelectorAll('.fd-plant').length; mode = mode || fdMode();
+  bb.classList.toggle('two', n > 5 && mode === 'land'); if(n <= 5 || mode === 'land'){ bb.style.removeProperty('--skk-bs'); return; }
+  const pw = ((bb.parentNode || {}).clientWidth || 360) - 18, sd = bb.querySelector('.fd-seeds'), sw = Math.max(58, sd ? sd.getBoundingClientRect().width + 6 : 58);   // the 🌰 count may grow to 3 digits
+  let gap = 7, bs = Math.floor((pw - sw - n * gap) / n); if(bs < 40){ gap = 4; bs = Math.floor((pw - sw - n * gap) / n); }
+  bb.style.setProperty('--bgap', gap + 'px'); bb.style.setProperty('--skk-bs', Math.max(36, Math.min(52, bs)) + 'px'); }
 function fdPlaceBuild(mode){ const A = $('arena'); let L = $('fd-left'); if(!L){ L = document.createElement('div'); L.id = 'fd-left'; A.insertBefore(L, A.firstChild); }
-  const bb = $('fd-build'); if(!bb) return; if(mode === 'land'){ if(bb.parentNode !== L) L.appendChild(bb); } else if(bb.parentNode !== $('panel')) $('panel').insertBefore(bb, $('panel').firstChild); }
+  const bb = $('fd-build'); if(!bb) return; if(mode === 'land'){ if(bb.parentNode !== L) L.appendChild(bb); } else if(bb.parentNode !== $('panel')) $('panel').insertBefore(bb, $('panel').firstChild); fdBuildSize(mode); }
 // 🤏 zoom: VIEW.s = base × z, the island's centre offset (ox, oy) keeps the pinched spot under the fingers
 function fdZoomApply(){
   if(VIEW.base == null || VIEW.baseKey !== VIEW.px + 'x' + VIEW.ph){ VIEW.base = VIEW.s; VIEW.baseKey = VIEW.px + 'x' + VIEW.ph; }
@@ -4848,4 +5036,4 @@ function tdResultBadge(){
 /* 🏷️ TD LOGO END */</script>
 </body>
 </html>
-<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a+fd-1a2+fd-1b+fd-1c+fd-1d+fd-1e+fd-2a+wr-1) END OF TDStories.html -->
+<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a+fd-1a2+fd-1b+fd-1c+fd-1d+fd-1e+fd-2a+wr-1+fd-2b) END OF TDStories.html -->
