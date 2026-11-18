@@ -193,16 +193,34 @@ function ghostAt(cx, cy){ const r = $('iso').getBoundingClientRect(), h = S.hold
   const g = Iso.place(S.V, cx - r.left, cy - r.top, {w: T.W, d: T.D}); if(!g){ S.ghost = null; return; }
   g.ok = Props.fits(S.M, h.key, g.i, g.j, {turn: h.turn}); g.it = Props.item(h.key, g.i, g.j, {v: h.v, turn: h.turn, look: S.look, cond: S.cond, state: h.state, text: h.text}); g.it.alpha = 0.62; S.ghost = g; }
 function placeHeld(){ const g = S.ghost, h = S.hold; if(!g || !h) return null; const it = add(h.key, g.i, g.j, {v: h.v, turn: h.turn, state: h.state, text: h.text}); if(it){ sound('success'); pop(it); if(it.grow) tip('🌱 a ' + it.grow.names[it.state].toLowerCase() + ' — tap it, then 🌱 Grow'); } return it; }
-function add(key, i, j, o){ const it = Props.place(S.M, key, i, j, Object.assign({look: S.look, cond: S.cond}, o || {})); if(!it){ S.missed.push(key + '@' + i + ',' + j); return null; }
+function add(key, i, j, o){ const it = arPlace(key, i, j, Object.assign({look: S.look, cond: S.cond}, o || {})); if(!it){ S.missed.push(key + '@' + i + ',' + j); return null; }
   S.props.push(it); S.items.push(it); S.placed++; info(); return it; }
-function del(it){ Props.remove(S.M, it); [S.props, S.items].forEach(a => { const k = a.indexOf(it); if(k >= 0) a.splice(k, 1); }); if(S.sel === it) select(null); info(); }
+function del(it){ if(arWall(it.prop)) Props.AR.wallOff(S.M, it); else Props.remove(S.M, it); [S.props, S.items].forEach(a => { const k = a.indexOf(it); if(k >= 0) a.splice(k, 1); }); if(S.sel === it) select(null); info(); }
 function pop(it){ it.popT = S.lastT || 0; }
 
+/* ---------- 🧱 ar-4 AvataRealm walls: a piece JOINS its neighbours (Props.AR.wall / gate) · drag on the map = a wall line · ⭐ shrine capture steps ---------- */
+const arWall = key => { const d = Props.DEFS[key]; return !!(d && d.wall && Props.AR); };
+function arPlace(key, i, j, o){ const d = Props.DEFS[key]; if(!arWall(key)) return Props.place(S.M, key, i, j, o);
+  const op = Object.assign({}, o, {tall: !!d.tall}); if(d.gate){ if(!(o.turn | 0)) delete op.turn; return Props.AR.gate(S.M, d.side, i, j, op); }
+  delete op.state; return Props.AR.wall(S.M, d.side, i, j, op); }
+const AR_CAP = [[{team: null, by: null, cap: null}, '⚪ neutral'], [{by: 'red', cap: 30}, '🔴 capturing 30 %'], [{by: 'red', cap: 70}, '🔴 capturing 70 %'], [{team: 'red', by: null, cap: null}, '🔴 owns it'],
+  [{by: 'blue', cap: 50}, '🔵 taking it 50 %'], [{team: 'blue', by: null, cap: null}, '🔵 owns it']];
+function arCapStep(it){ const pal = it.pal || {}, k = AR_CAP.findIndex(([q]) => ['team', 'by', 'cap'].every(f => (q[f] == null ? null : q[f]) === (pal[f] == null ? null : pal[f]))), nx = AR_CAP[(k + 1) % AR_CAP.length];
+  Props.AR.set(it, nx[0], S.M); pop(it); return nx[1]; }
+// ✋ holding a wall card: press on the map and drag → every cell you pass gets a piece (the map doesn't pan while you draw)
+(function(){ let line = null; const cellAt = e => { const r = $('iso').getBoundingClientRect(), g = S.V && Iso.place(S.V, e.clientX - r.left, e.clientY - r.top, {w: 1, d: 1}); return g ? [g.i, g.j] : null; };
+  const lay = e => { const c = cellAt(e); if(!c) return; const k = c[0] + ',' + c[1]; if(line.done[k]) return; line.done[k] = 1;
+    if(Props.fits(S.M, line.key, c[0], c[1], {turn: 0}) && add(line.key, c[0], c[1], {v: S.hold.v})){ line.n++; sound('tap'); } };
+  addEventListener('pointerdown', e => { if(e.target !== $('iso') || !S.hold || !arWall(S.hold.key) || Props.DEFS[S.hold.key].gate) return; e.stopPropagation(); e.preventDefault();
+    line = {key: S.hold.key, id: e.pointerId, done: {}, n: 0}; lay(e); }, true);
+  addEventListener('pointermove', e => { if(line && e.pointerId === line.id){ e.stopPropagation(); lay(e); } }, true);
+  const end = e => { if(!line || e.pointerId !== line.id) return; e.stopPropagation(); const n = line.n; line = null; if(n) tip('🧱 ' + n + ' wall piece' + (n > 1 ? 's' : '') + ' — they join by themselves'); else { sound('error'); tip('❌ no free cell there'); } };
+  addEventListener('pointerup', end, true); addEventListener('pointercancel', end, true); window.__arLine = () => line; })();
 /* ---------- 🎯 picking a placed prop + the selection bar ---------- */
 function select(it){ S.sel = it; showBar(); }
 function showBar(){ const it = S.sel, h = S.hold, bar = $('selbar'); if(!it && !h){ bar.classList.add('hidden'); return; }
   const key = it ? it.prop : h.key, def = Props.DEFS[key]; $('sel-name').textContent = (h ? '✋ ' : '') + def.name + ' · ' + def.foot.join('×');
-  const stNow = it ? it.state : h.state != null ? h.state : def.states ? Props.stateOf(key) : null; $('s-state').classList.toggle('hidden', !def.states); if(def.states) $('sel-name').textContent += ' · ' + stNow;
+  const stNow = it ? it.state : h.state != null ? h.state : def.states ? Props.stateOf(key) : null; const plainWall = def.wall && !def.gate, shrine = key === 'realm_shrine' && !!it; $('s-state').classList.toggle('hidden', !(def.states && !plainWall) && !shrine); if(def.states && !plainWall) $('sel-name').textContent += ' · ' + stNow;   /* 🧱 ar-4: a wall's state = its joins (made by the helper) · ⭐ shrine = capture steps */
   growBar(def, stNow);
   $('s-move').classList.toggle('hidden', !it); $('s-del').classList.toggle('hidden', !it); $('s-var').classList.toggle('hidden', def.variants < 2); bar.classList.remove('hidden'); placeUi(); }
 // re-place a prop with new settings (turn / variant); it stays put when the new shape doesn't fit
@@ -213,7 +231,7 @@ $('s-turn').onclick = () => { if(S.hold){ S.hold.turn = (S.hold.turn + 1) % 4; s
 $('s-var').onclick = () => { const d = Props.DEFS[S.hold ? S.hold.key : S.sel && S.sel.prop]; if(!d) return; if(S.hold){ S.hold.v = (S.hold.v + 1) % d.variants; sound('tap'); return; } reshape(S.sel, {v: (S.sel.v + 1) % d.variants}); };
 $('s-move').onclick = () => { const it = S.sel; if(!it) return; const o = {v: it.v, turn: it.turn, state: it.state, text: it.text}; del(it); holdKey(it.prop, o); tip('👆 tap where it should go'); sound('tap'); };
 // 🔀 ip-3b a prop with states (gate open · closed · new, bridge down · lifted, hay bale whole · flat, pumpkin pile 1–12): flip it in place — the map follows (Props.setState)
-$('s-state').onclick = () => { const key = S.hold ? S.hold.key : S.sel && S.sel.prop, d = Props.DEFS[key]; if(!d || !d.states) return; const cur = S.hold ? (S.hold.state != null ? S.hold.state : Props.stateOf(key)) : S.sel.state, nx = d.states[(d.states.indexOf(cur) + 1) % d.states.length];
+$('s-state').onclick = () => { const key = S.hold ? S.hold.key : S.sel && S.sel.prop, d = Props.DEFS[key]; if(!S.hold && S.sel && key === 'realm_shrine'){ tip('⭐ ' + arCapStep(S.sel)); sound('tap'); return; } if(!d || !d.states) return; const cur = S.hold ? (S.hold.state != null ? S.hold.state : Props.stateOf(key)) : S.sel.state, nx = d.states[(d.states.indexOf(cur) + 1) % d.states.length];
   if(S.hold){ S.hold.state = nx; } else { Props.setState(S.sel, nx, S.M); pop(S.sel); } showBar(); sound('tap'); tip('🔀 ' + d.name + ' · ' + nx); };
 // 🌱 ip-3c growing props: ◀ Shrink · 🌱 Grow (at the young stage: ① / ② = the two branches, in their SkillKit colours) — Props.grow + the ✨ morph moment
 function growBar(def, st){ const G = def.grow, ids = ['s-shrink', 's-grow', 's-grow2']; if(!G){ ids.forEach(x => $(x).classList.add('hidden')); return; }
@@ -343,4 +361,4 @@ start();
 </script>
 </body>
 </html>
-<!-- (ip-2+ip-3b+ip-3c+ip-4a+ar-1) END OF IsoPropsLab.html -->
+<!-- (ip-2+ip-3b+ip-3c+ip-4a+ar-1+ar-4) END OF IsoPropsLab.html -->
