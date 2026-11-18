@@ -311,6 +311,7 @@
   <div class="section-head" id="level-head">🎚️ Pick a level</div>
   <div class="levels" id="level-list"></div>
   <div class="section-head" id="opt-head">⚙️ 4. Options</div>
+  <div id="voice-pick"></div>   <!-- 🗣️ an-4: reading-voice accent + how to get a better voice -->
   <div class="cs-chiprow"><button class="btn soft sp-btn sp-secondary" id="cheer-chip" data-sound="tap" title="A cheering crowd beside the play">📣 Cheer squad: Calm 🙂</button><button class="btn soft sp-btn sp-secondary" id="cheer-lang" data-sound="tap" title="Words on the crowd's signs">🪧 Signs: Mix EN + ไทย</button></div>   <!-- 📣 cs-4b -->
   <div hidden>  <details class="rules" id="how"><summary>📖 How to play</summary><ul id="how-list"></ul></details>
   <div class="ui-leaders" id="leaders"></div></div>   <!-- 🧱 b3w3: 📖 how-to + 🏆 leaders live on the cover -->
@@ -1050,7 +1051,7 @@ function choosePlayer(name){
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
 function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">' + (unlockedOf(S.player) > i ? '🏅 Done' : 'Not done yet') + '</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span><span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
-function renderMenu(){ logoInto('logo2'); renderWays(); renderOpts(); renderTrack(); renderLevels(); renderHow(); /* 🧱 b3w3: 🏆 leaders live on the cover */ }
+function renderMenu(){ try{ if(UI.voicePicker && !$('voice-pick').__vp) $('voice-pick').__vp = UI.voicePicker($('voice-pick')); else if($('voice-pick').__vp) $('voice-pick').__vp.paint(); }catch(e){}   /* 🗣️ an-4 */ logoInto('logo2'); renderWays(); renderOpts(); renderTrack(); renderLevels(); renderHow(); /* 🧱 b3w3: 🏆 leaders live on the cover */ }
 function renderWays(){
   const box = $('way-list');
   UI.modeGroups(box, MODE_GROUPS, mgList().map(m => Object.assign({}, m, {on: SET.mode === m.k})), {   // 🗂️ mg-1
@@ -1564,7 +1565,7 @@ function sayItButton(R, word){
   $('saybtn').onclick = () => {
     const b = $('saybtn'); if(!b || b.disabled) return; b.disabled = true; b.textContent = '🎤 Listening…'; Voice.cancel();
     let rec; try{ rec = new (SR())(); }catch(e){ b.remove(); return; }
-    rec.lang = 'en-US'; rec.maxAlternatives = 5; rec.interimResults = false; let got = false;
+    rec.lang = (UI.voiceAccent && UI.voiceAccent()) || 'en-US';   /* 🗣️ an-4 */ rec.maxAlternatives = 5; rec.interimResults = false; let got = false;
     rec.onresult = ev => { got = true; const alts = []; for(const res of ev.results) for(const a of res) alts.push(String(a.transcript || '').toLowerCase());
       const ok = alts.some(t => t.split(/[^a-z']+/).indexOf(word.toLowerCase()) >= 0);
       if(ok && !R.saidIt){ R.saidIt = true; G.score += 25; G.st.said++; $('h-score').textContent = '🏆 ' + G.score.toLocaleString(); floatText('🎤 +25'); gesture('cheer'); pop('ok'); b.textContent = '🎤 Yes! +25'; }
@@ -1640,7 +1641,7 @@ function finaleRound(R){
   $('acts').innerHTML = (mic ? '<button class="big-btn mic pulse" id="readmic" data-sound="none">🎤 I\'m reading!</button>' : '') + '<button class="big-btn" id="readybtn" data-sound="none">✅ I read it!</button>';
   $('readybtn').onclick = () => finaleCheck(R, 0);
   if(mic) $('readmic').onclick = () => { const b = $('readmic'); b.disabled = true; b.textContent = '🎤 Listening…'; let rec; try{ rec = new (SR())(); }catch(e){ finaleCheck(R, 0); return; }
-    rec.lang = 'en-US'; rec.continuous = true; rec.interimResults = false; const heard = [];
+    rec.lang = (UI.voiceAccent && UI.voiceAccent()) || 'en-US';   /* 🗣️ an-4 */ rec.continuous = true; rec.interimResults = false; const heard = [];
     rec.onresult = ev => { for(const res of ev.results) heard.push(String(res[0].transcript || '').toLowerCase()); };
     rec.onerror = ev => { if(ev && (ev.error === 'not-allowed' || ev.error === 'service-not-allowed')){ SR_OFF = true; UI.toast('🎤 The microphone is not allowed here — tap ✅ when you\'ve read it'); b.remove(); } };
     rec.onend = () => { const words = GR.storyWords(S0).map(w => w.toLowerCase()), got = new Set(heard.join(' ').split(/[^a-z']+/)); const n = words.filter(w => got.has(w)).length; if(heard.length) finaleCheck(R, n / Math.max(1, words.length)); };
@@ -2075,4 +2076,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (gr-7+mg-1+p1d+p3a+cs-4b+b3w3+24u-c) END OF GeoRead.html -->
+<!-- (gr-7+mg-1+p1d+p3a+cs-4b+b3w3+24u-c+an-4) END OF GeoRead.html -->

@@ -481,7 +481,7 @@ function saveSettings(obj) {
 // ⭐ Favourite games per player (Gameroom): Settings `Fav_<Name>` = JSON list of GameIDs, in the order they were starred.
 // 🎵 24u-a ambient moods: music on / off + volume PER PLAYER (Settings `Music_<Name>` = {on, v, at}); newest tap wins, so a late
 // answer or an offline replay never overwrites a newer choice. UiKit reads it back in UISound.applySettings (every game boot sends settings).
-function saveMusic(name, on, v, at, fx) {   // 🔊 an-2: + fx = 🔊 Effects level
+function saveMusic(name, on, v, at, fx, acc) {   // 🗣️ an-4: + acc = reading-voice accent   // 🔊 an-2: + fx = 🔊 Effects level
   name = String(name || '').slice(0, 40);
   if (!name) return { ok: false };
   const vol = Math.max(0, Math.min(1, Number(v)));
@@ -489,6 +489,7 @@ function saveMusic(name, on, v, at, fx) {   // 🔊 an-2: + fx = 🔊 Effects le
   let old = null; try { old = JSON.parse(getSettings()['Music_' + name] || 'null'); } catch (e) {}
   if (old && Number(old.at) > rec.at) return { ok: true, kept: 'newer' };
   const f = Number(fx); if (fx != null && fx !== '' && !isNaN(f)) rec.fx = Math.round(Math.max(0, Math.min(1, f)) * 100) / 100; else if (old && old.fx != null) rec.fx = old.fx;   // 🔊 an-2
+  if (acc != null) rec.acc = /^en-(US|GB|AU)$/.test(String(acc)) ? String(acc) : ''; else if (old && old.acc != null) rec.acc = old.acc;   // 🗣️ an-4
   saveSetting('Music_' + name, JSON.stringify(rec));
   return { ok: true };
 }
@@ -3300,7 +3301,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d+gl-r24+av-r0e3+ip-4a+bo-10b+ar-r0b+b3b4+s1+s2a+s2b+s2c+ar-7+ip-4b+av-r0i+s3+mo-3+ip-4c+b4a+an-2) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d+gl-r24+av-r0e3+ip-4a+bo-10b+ar-r0b+b3b4+s1+s2a+s2b+s2c+ar-7+ip-4b+av-r0i+s3+mo-3+ip-4c+b4a+an-2+an-4) END OF Code.gs
 
 ;
 /* ===== GameData.gs ===== */
