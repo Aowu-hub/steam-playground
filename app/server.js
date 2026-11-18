@@ -260,6 +260,7 @@ function doGet(e) {
     avatarealm: 'AvataRealm',   // 🏰⚔️ AvataRealm (ar-r0b: hidden 🧪 speed test ?page=avatarealm&proto=1 — no Games-tab row until R1) — keep on its own line
     creatures: 'CreatureLab',   // 🐾 CreatureKit lab (av-r0c, hidden — not in the Gameroom): every creature, size ladder, battle zoom, map frames, pets — keep on its own line
     loot: 'LootLab',   // 🎁 LootKit lab (av-r0d3, hidden — not in the Gameroom): rarities, rolls + shows, bag, sticker book — keep on its own line
+    craft: 'CraftLab',   // 🔨 CraftKit lab (av-r0i, hidden — not in the Gameroom): 🛒 shop · ⚒️ blacksmith · 🍳 cook · 🧱 materials — keep on its own line
     story: 'StoryLab',   // 📜 StoryKit lab (av-r0e3, hidden — not in the Gameroom): islet with quest markers + pins, talk scenes, quest board, Chronicle, cards — keep on its own line
     fxgallery: 'FxGallery',   // 🎬 ActionFX gallery (fx-1a, hidden — not in the Gameroom): every action move + its own effect — keep on its own line
     moodlab: 'MoodLab',   // 🎵 Mood Lab (24u-a, hidden — not in the Gameroom): listen to every game's ambient mood — keep on its own line
@@ -3293,7 +3294,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d+gl-r24+av-r0e3+ip-4a+bo-10b+ar-r0b+b3b4+s1+s2a+s2b+s2c+ar-7+ip-4b) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d+gl-r24+av-r0e3+ip-4a+bo-10b+ar-r0b+b3b4+s1+s2a+s2b+s2c+ar-7+ip-4b+av-r0i) END OF Code.gs
 
 ;
 /* ===== GameData.gs ===== */
