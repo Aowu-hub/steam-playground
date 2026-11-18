@@ -3594,6 +3594,10 @@ const MAZE_LEVEL_NAMES = ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 
 // Same model as the maze: Progress row (GameID, SeriesID 'main'),
 // UnlockedLevel = levels cleared (0-5), Tokens = one badge per level.
 const LEVEL_GAMES = {
+  'avatarealm': {   // 🏰⚔️ AvataRealm (ar-r1c) — Theme column = "🦖 Jungle · <S|M|L> · 🦖 vs 🤖"
+    badges: ['Realm Basic', 'Realm Junior', 'Realm Intermediate', 'Realm Hard', 'Realm Extreme', 'Realm Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
   // 🏰 TD-Stories (td-1): one Archive board per BOOK — the Theme column says the chapter ("📖 Ch 1 · The Lonely Tower")
   'td-draprincess': {
     badges: ['Diary Basic', 'Diary Junior', 'Diary Intermediate', 'Diary Hard', 'Diary Extreme', 'Diary Hardcore'],
@@ -3802,6 +3806,14 @@ const LEVEL_GAMES = {
 
 /* ============ 📏 FEAT_DEFS (from Code.gs) ============ */
 const FEAT_DEFS = {
+  'avatarealm': {   // 🏰⚔️ AvataRealm (ar-r1c)
+    games: { name: 'AvataRealm battles played', icon: '🎮', kind: 'sum', hidden: true },
+    wins: { name: 'Realm battles won', icon: '🏆', kind: 'sum', tiers: [3, 25, 100] },
+    units: { name: 'Minivatars trained', icon: '👥', kind: 'sum', tiers: [50, 500, 3000] },
+    buildings: { name: 'Town buildings built', icon: '🏘️', kind: 'sum', tiers: [20, 200, 1000] },
+    counterHits: { name: 'Counter-wheel hits', icon: '⚡', kind: 'sum', tiers: [50, 500, 3000] },
+    squads: { name: 'Squads formed', icon: '🚩', kind: 'sum', tiers: [10, 100, 500] },
+  },
   'td-farmer': {   // 👨‍🌾 TD-Stories · Farmer Delusion (fd-1)
     games: { name: 'Farmer Delusion chapters played', icon: '🎮', kind: 'sum', hidden: true },
     quits: { name: 'Collectors who gave up', icon: '😭', kind: 'sum', tiers: [50, 500, 3000] },
@@ -4507,6 +4519,9 @@ const FEAT_DEFS = {
 /* ============ 📏 TITLE_DEFS (from Code.gs) ============ */
 // Titles a player can show under their name. f = that player's feats {game: {stat: value}}, x = extra context.
 const TITLE_DEFS = [
+  { id: 'ar_builder', name: 'Town Builder', icon: '🏰', hint: 'Build 100 town buildings in ⚔️ AvataRealm', rule: f => featVal_(f, 'avatarealm', 'buildings') >= 100 },   // 🏰⚔️ ar-r1c
+  { id: 'ar_warden', name: 'Realm Warden', icon: '⚔️', hint: 'Land 300 counter-wheel hits in ⚔️ AvataRealm', rule: f => featVal_(f, 'avatarealm', 'counterHits') >= 300 },
+  { id: 'ar_ruler', name: 'Realm Ruler', icon: '👑', hint: 'Win 25 ⚔️ AvataRealm battles', rule: f => featVal_(f, 'avatarealm', 'wins') >= 25 },
   { id: 'td_swatter', name: 'Suitor Swatter', icon: '💫', hint: 'Bonk 500 suitors away in 🐉👑 Dra-Princess Diary', rule: f => featVal_(f, 'td-draprincess', 'bonks') >= 500 },
   { id: 'td_tamer', name: 'Dragon Tamer', icon: '🐉', hint: 'Evolve your TD-Stories heroes 10 times', rule: f => featVal_(f, 'td-draprincess', 'evolves') >= 10 },
   { id: 'td_heart', name: 'Dragon Heart', icon: '❤️‍🔥', hint: 'Unlock an ULTIMATE in TD-Stories', rule: f => featVal_(f, 'td-draprincess', 'ultimates') >= 1 },
@@ -5010,7 +5025,7 @@ const DAILY_GOALS = [
   { id: 'poseparty', icon: '📷', how: 'Pass a Pose Party level today', r: d => d.rows.some(r => r.game === 'pose-party' && r.stars > 0) },
 ];
 
-// (s1) END OF GameData.gs
+// (s1+ar-r1c) END OF GameData.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
