@@ -658,197 +658,9 @@ function safeSeen_(players) {
 }
 
 /* ============ ✨ MODE SPOTLIGHT (plan modes-1) ============ */
-// One row per way to play INSIDE a game, so the Dashboard (🎯 Try a mode), the Gameroom (mode chips + ✨ strip) and the
-// game itself (✨ Also try) can point at modes a player hasn't played yet.
-//   game  = the Gameroom card / Games-tab GameID the mode belongs to · id = mode id (?page=<route>&mode=<id> opens it after the player pick)
-//   tried = how we know a player has played it: {board: GameID} Scores rows (+ theme: text the Theme column contains / themeStart: text it starts with)
-//           · {feat: [[game, stat], …]} any of these feats > 0 · {setting: 'Prefix_'} Settings '<Prefix><Name>'
-//           (+ always the ModesTried_<Name> ledger, written by the game the first time the mode starts — markModeTried).
-//   added = 'yyyy-mm-dd' when the mode came out → a 🆕 Dashboard card for 7 days.
-const MODES_ = [
-  { game: 'tdstories', id: 'draprincess', icon: '🐉', name: 'Dra-Princess Diary', pitch: 'A dragon + princess vs every suitor!', route: 'tdstories', added: '2026-11-14', tried: { board: 'td-draprincess' } },
-  { game: 'tdstories', id: 'farmer', icon: '👨‍🌾', name: 'Farmer Delusion', pitch: 'Plant a maze so long the bank gives up', route: 'tdstories', added: '2026-11-17', tried: { board: 'td-farmer' } },   // 👨‍🌾 fd-1b
-  { game: 'artifactory', id: 'whittle', icon: '🔪', name: 'Artifactory Whittling', pitch: 'Carve a spoon — always away from you', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'whittle']] } },
-  { game: 'artifactory', id: 'print', icon: '🖨️', name: 'Artifactory 3D printing', pitch: 'Draw a shape and print it layer by layer', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'print']] } },
-  { game: 'artifactory', id: 'nature', icon: '🌿', name: 'Artifactory Nature crafts', pitch: 'Weave a hat, press flowers in resin', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'nature']] } },
-  { game: 'artifactory', id: 'lab', icon: '🧪', name: 'Artifactory Material lab', pitch: 'Make bronze, glass and dyes yourself', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'lab']] } },
-  { game: 'artifactory', id: 'planer', icon: '🪚', name: 'Artifactory Planer', pitch: 'Plane a rough plank flat and smooth', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'planer']] } },
-  { game: 'artifactory', id: 'weld', icon: '🔥', name: 'Artifactory Welding', pitch: 'Follow the seam with a steady hand', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'weld']] } },
-  { game: 'artifactory', id: 'forge', icon: '⚒️', name: 'Artifactory Forge', pitch: 'Heat it orange, hammer it into shape', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'forge']] } },
-  { game: 'artifactory', id: 'pottery', icon: '🏺', name: 'Artifactory Pottery', pitch: 'Shape spinning clay, fire it in the kiln', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'pottery']] } },
-  { game: 'artifactory', id: 'sew', icon: '🧵', name: 'Artifactory Loom', pitch: 'Weave a pattern for a cape or scarf', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'sew']] } },
-  { game: 'artifactory', id: 'light', icon: '🔌', name: 'Artifactory Light-up', pitch: 'Close the circuit — make it glow!', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'light']] } },
-  { game: 'artifactory', id: 'lathe', icon: '🌀', name: 'Artifactory Lathe', pitch: 'Carve a cup, yo-yo or trophy as it spins', route: 'artifactory', added: '2026-11-08', tried: { feat: [['artifactory', 'lathe']] } },
-  { game: 'artifactory', id: 'stone', icon: '💎', name: 'Artifactory Gems', pitch: 'Polish a stone, cut a sparkling gem', route: 'artifactory', added: '2026-11-08', tried: { feat: [['artifactory', 'stone']] } },
-  { game: 'artifactory', id: 'finish', icon: '🎨', name: 'Artifactory Finish', pitch: 'Paint, varnish and engrave your name', route: 'artifactory', added: '2026-11-08', tried: { feat: [['artifactory', 'finish']] } },
-  { game: 'geoscout', id: 'journey', icon: '📖', name: 'GeoScout Journey', pitch: 'Story chapters with number friends', route: 'geoscout', added: '2026-11-09', tried: { feat: [['geoscout', 'journeys']] } },
-  { game: 'geoscout', id: 'scale', icon: '⚖️', name: 'GeoScout Scale', pitch: 'More, less or the same? Weigh yourself!', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '⚖️ Scale' } },
-  { game: 'geoscout', id: 'shape', icon: '🔷', name: 'GeoScout Shape builder', pitch: 'Build squares, rectangles and steps', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🔷 Shape builder', feat: [['geoscout', 'shapes']] } },
-  { game: 'geoscout', id: 'tens', icon: '🔟', name: 'GeoScout Tens tower', pitch: 'Ten ones snap into a ten-tower!', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🔟 Tens tower', feat: [['geoscout', 'tens']] } },
-  { game: 'geoscout', id: 'next', icon: '🧩', name: 'GeoScout What comes next', pitch: 'Find the pattern!', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🧩 What comes next', feat: [['geoscout', 'patterns']] } },
-  { game: 'geoscout', id: 'frac', icon: '🍕', name: 'GeoScout Fractions', pitch: 'Which pizza slice is bigger?', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🍕 Fractions', feat: [['geoscout', 'fractions']] } },
-  { game: 'geoscout', id: 'wobble', icon: '🏗️', name: 'GeoScout Wobble tower', pitch: 'Stack to the EXACT height', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🏗️ Wobble tower', feat: [['geoscout', 'wobble']] } },
-  { game: 'geoscout', id: 'battle', icon: '⚔️', name: 'GeoScout Tower battle', pitch: '2 players — higher or lower wins!', route: 'geoscout', added: '2026-11-08', tried: { feat: [['geoscout', 'battles']] } },
-  { game: 'geoscout', id: 'count', icon: '🧱', name: 'GeoScout Count', pitch: 'Snap and split blocks to make the number', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🧱 Count' } },
-  { game: 'wisdeck', id: 'quiz', icon: '🧠', name: 'WisQuiz', pitch: 'Pick a category, win cards!', route: 'wisdeck', tried: { board: 'wisdeck' } },
-  { game: 'wisdeck', id: 'buzz', icon: '🔔', name: 'WisBuzz', pitch: '2–4 players — buzz in first!', route: 'wisdeck', tried: { feat: [['wisdeck', 'buzzWins'], ['wisdeck', 'buzzRight']] } },
-  { game: 'wisdeck', id: 'daily', icon: '📅', name: 'WisDaily', pitch: '5 questions, once a day', route: 'wisdeck', tried: { feat: [['wisdeck', 'daily']] } },
-  { game: 'wisdeck', id: 'count', icon: '🔢', name: 'WisCount', pitch: 'Card battle — best 3 of 5', route: 'wisdeck', tried: { board: 'wiscount', feat: [['wiscount', 'games']] } },
-  { game: 'wisdeck', id: 'jack', icon: '🂡', name: 'WisJack', pitch: 'Get as close to 20 as you can', route: 'wisdeck', tried: { board: 'wisjack', feat: [['wisjack', 'games']] } },
-  { game: 'wisdeck', id: 'learn', icon: '📚', name: 'WisLearn', pitch: 'Flip and read the cards', route: 'wisdeck', tried: null },
-  { game: 'snakeast', id: 'feast', icon: '🍎', name: 'Snakeast', pitch: 'Eat, grow, reach the length!', route: 'snakize', tried: { board: 'snakeast', feat: [['snakeast', 'games']] } },
-  { game: 'snakeast', id: 'endless', icon: '♾️', name: 'Snakeast Endless', pitch: 'Grow forever — beat your best!', route: 'snakize', tried: { feat: [['snakeast', 'endless']] } },
-  { game: 'snakeast', id: 'gate', icon: '🧭', name: 'Snakigate', pitch: 'Steer anywhere — be the longest!', route: 'snakize', tried: { board: 'snakigate', feat: [['snakigate', 'games']] } },
-  { game: 'snakeast', id: 'castle', icon: '🏰', name: 'Snakastle', pitch: 'Loop back home to grab land!', route: 'snakize', tried: { board: 'snakastle', feat: [['snakastle', 'games']] } },
-  { game: 'snakeast', id: 'tale', icon: '📜', name: 'Snaketale', pitch: 'Story quests from your family', route: 'snakize', tried: { setting: 'Snaketale_', feat: [['snaketale', 'stages']] } },
-  { game: 'brawl-buddies', id: 'battle', icon: '🥊', name: 'Brawl Battle', pitch: 'Bonk your buddy, cartoon style!', route: 'brawlbuddies', tried: { board: 'brawl-buddies', feat: [['brawl-buddies', 'matches']] } },
-  { game: 'brawl-buddies', id: 'brawenture', icon: '🗺️', name: 'Brawenture', pitch: 'Bonk baddies, rescue the family!', route: 'brawlbuddies', tried: { board: 'brawenture', feat: [['brawenture', 'runs']] }, added: '2026-11-08' },
-  { game: 'soul-bopper', id: 'battle', icon: '⚔️', name: 'Battle', pitch: 'Last one standing wins!', route: 'soulbopper', tried: { feat: [['soul-bopper', 'bestWin']] } },
-  { game: 'soul-bopper', id: 'classic', icon: '💩', name: 'Classic Avatar', pitch: 'Poo bombs — even when you\'re out!', route: 'soulbopper', tried: { feat: [['soul-bopper', 'pooGames']] } },
-  { game: 'soul-bopper', id: 'hold', icon: '🏳️', name: 'Hold the land', pitch: 'Stand in the glowing zone!', route: 'soulbopper', tried: { feat: [['soul-bopper', 'holdSecs'], ['soul-bopper', 'holdWins']] } },
-  { game: 'soul-bopper', id: 'stage', icon: '🗺️', name: 'Stage', pitch: '7 worlds, stages and bosses!', route: 'soulbopper', tried: { board: 'soul-bopper', feat: [['soul-bopper', 'stages']] } },
-  { game: 'polyplot', id: 'classic', icon: '⬜', name: 'Classic', pitch: 'Close a shape, make it yours!', route: 'polyplot', tried: { board: 'polyplot', theme: '· Classic ·' } },
-  { game: 'polyplot', id: 'hunt', icon: '🏹', name: 'Hunt', pitch: 'Catch creatures, grab coins!', route: 'polyplot', tried: { feat: [['polyplot', 'huntGames']] } },
-  { game: 'polyplot', id: 'fort', icon: '🏰', name: 'Fortiplot', pitch: 'Build towers, knock theirs down!', route: 'polyplot', tried: { board: 'polyplot', theme: '· Fortiplot ·', feat: [['polyplot', 'fortWins']] } },
-  { game: 'polyplot', id: 'coop', icon: '🛡️', name: 'Co-op waves', pitch: 'Team up against monster waves!', route: 'polyplot', tried: { feat: [['polyplot', 'bestWave']] } },
-  { game: 'alignext', id: 'drop', icon: '🔴', name: 'Drop', pitch: 'Drop discs, make a line!', route: 'alignext', tried: { board: 'alignext', feat: [['alignext', 'games']] } },
-  { game: 'alignext', id: 'omni', icon: '❌', name: 'Omnifile Classic', pitch: 'Put your piece anywhere!', route: 'alignext', tried: { board: 'omnifile', feat: [['omnifile', 'games']] } },
-  { game: 'alignext', id: 'stack', icon: '♟️', name: 'Omnifile Stack', pitch: 'Big pieces cover small ones!', route: 'alignext', tried: { board: 'omnifile', theme: '· stack', feat: [['omnifile', 'stackWins'], ['omnifile', 'covers']] } },
-  { game: 'beat-corner', id: 'corner', icon: '🎵', name: 'Corners', pitch: 'Hit the beats in 4 corners!', route: 'beatcorner', tried: { board: 'beat-corner' } },
-  { game: 'beat-corner', id: 'piano', icon: '🎹', name: 'Piano', pitch: 'Play the falling notes!', route: 'beatcorner', tried: { board: 'beat-piano' }, added: '2026-11-08' },
-  { game: 'beat-corner', id: 'drums', icon: '🥁', name: 'Drums', pitch: 'Bang a drum kit that grows!', route: 'beatcorner', tried: { board: 'beat-drums' }, added: '2026-11-08' },
-  { game: 'beat-corner', id: 'band', icon: '🎸', name: 'Band', pitch: 'Play a song with a friend!', route: 'beatcorner', tried: { feat: [['beat-piano', 'bandSongs'], ['beat-drums', 'bandSongs']] }, added: '2026-11-08' },
-  { game: 'beat-corner', id: 'maker', icon: '🎼', name: 'Song Maker', pitch: 'Make your own song!', route: 'beatcorner', tried: { feat: [['beat-piano', 'songsMade']] }, added: '2026-11-08' },
-  { game: 'eyes-brain', id: 'classic', icon: '🔢', name: 'Classic', pitch: 'Remember the digits!', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '🔢 Classic' } },
-  { game: 'eyes-brain', id: 'backwards', icon: '🔁', name: 'Backwards', pitch: 'See 123, type 321!', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '🔁 Backwards', feat: [['eyes-brain', 'backPerfects']] } },
-  { game: 'eyes-brain', id: 'challenge', icon: '🏔️', name: 'Challenge', pitch: 'One more digit each time!', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '🏔️ Challenge', feat: [['eyes-brain', 'challenge']] } },
-  { game: 'eyes-brain', id: 'letters', icon: '🔤', name: 'Numbers + letters', pitch: 'Remember numbers AND letters', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '🔤 Numbers + letters' } },
-  { game: 'eyes-brain', id: 'colour', icon: '🎨', name: 'Colour digits', pitch: 'Every digit has a colour', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '🎨 Colour digits' } },
-  { game: 'eyes-brain', id: 'listen', icon: '👂', name: 'Listen', pitch: 'Hear it, then type it back', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '👂 Listen', feat: [['eyes-brain', 'listenPerfects']] } },
-  { game: 'eyes-brain', id: 'chain', icon: '➕', name: 'Chain', pitch: 'Take turns adding a digit', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '➕ Chain', feat: [['eyes-brain', 'chainWins']] } },
-  { game: 'eyes-brain', id: 'word', icon: '📝', name: 'Word mode', pitch: 'Remember short words', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '📝 Word mode' } },
-  { game: 'eyes-brain', id: 'shapes', icon: '🧩', name: 'Shapes', pitch: 'Remember shape patterns', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '🧩 Shapes' } },
-  { game: 'eyes-brain', id: 'daily', icon: '🎯', name: 'Today\'s family number', pitch: 'One try at today\'s number!', route: 'eyesbrain', tried: { feat: [['eyes-brain', 'daily']] } },
-  { game: 'georead', id: 'phonics', icon: '🔊', name: 'Phonics', pitch: 'Tap the sounds, bump the word!', route: 'georead', tried: { board: 'georead', themeStart: '🔊 Phonics', feat: [['georead', 'blends']] }, added: '2026-11-08' },
-  { game: 'georead', id: 'build', icon: '🧱', name: 'Word builder', pitch: 'See the picture, build the word', route: 'georead', tried: { board: 'georead', themeStart: '🧱 Word builder', feat: [['georead', 'built']] }, added: '2026-11-08' },
-  { game: 'georead', id: 'rhyme', icon: '🔁', name: 'Rhyme time', pitch: 'cat · hat · bat — swap a box!', route: 'georead', tried: { board: 'georead', themeStart: '🔁 Rhyme time', feat: [['georead', 'rhymes']] }, added: '2026-11-08' },
-  { game: 'georead', id: 'sight', icon: '👀', name: 'Sight words', pitch: 'Tap the word you hear, quick!', route: 'georead', tried: { board: 'georead', themeStart: '👀 Sight words', feat: [['georead', 'sight']] }, added: '2026-11-08' },
-  { game: 'georead', id: 'trace', icon: '✏️', name: 'Trace', pitch: 'Draw Aa–Zz with your finger', route: 'georead', tried: { board: 'georead', themeStart: '✏️ Trace', feat: [['georead', 'traced']] }, added: '2026-11-08' },
-  { game: 'georead', id: 'case', icon: '🅰️', name: 'Big and small', pitch: 'Match A with a!', route: 'georead', tried: { board: 'georead', themeStart: '🅰️ Big and small', feat: [['georead', 'cases']] }, added: '2026-11-08' },
-  { game: 'georead', id: 'story', icon: '📖', name: 'Story read', pitch: 'Words light up as they are read', route: 'georead', tried: { board: 'georead', themeStart: '📖 Story read', feat: [['georead', 'stories']] }, added: '2026-11-08' },
-  { game: 'georead', id: 'types', icon: '🗂️', name: 'Word types', pitch: 'Naming, doing, describing words', route: 'georead', tried: { board: 'georead', themeStart: '🗂️ Word types', feat: [['georead', 'sorted']] }, added: '2026-11-08' },
-  { game: 'georead', id: 'journey', icon: '🗺️', name: 'Letter Journey', pitch: 'Walk the Alphabet Road!', route: 'georead', tried: { setting: 'GeoJourney_', feat: [['georead', 'chapters']] }, added: '2026-11-08' },
-  { game: 'pyraspike', id: 'beach', icon: '🏖️', name: 'PyraSpike Beach 2v2', pitch: 'Beach volleyball — bump, set, DUNK!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🏖️ Beach 2v2', feat: [['pyraspike', 'm_beach']] } },
-  { game: 'pyraspike', id: 'small', icon: '🏫', name: 'PyraSpike Small 3v3', pitch: 'Drive, Dink, Dunk — 3 a side!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🏫 Small 3v3', feat: [['pyraspike', 'm_small']] } },
-  { game: 'pyraspike', id: 'full', icon: '🏟️', name: 'PyraSpike Full 6v6', pitch: 'The big arena — 6 a side!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🏟️ Full 6v6', feat: [['pyraspike', 'm_full']] } },
-  { game: 'pyraspike', id: 'strikesolo', icon: '🦶', name: 'PyraStrike 1v1', pitch: 'Sepak takraw — feet only, 3 touches!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🦶 Strike 1v1', feat: [['pyraspike', 'm_strikesolo']] } },
-  { game: 'pyraspike', id: 'strikeduo', icon: '🦵', name: 'PyraStrike Duo 2v2', pitch: 'Trap, head it, ROLL STRIKE!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🦵 Strike Duo 2v2', feat: [['pyraspike', 'm_strikeduo']] } },
-  { game: 'pyraspike', id: 'strikeregu', icon: '🧶', name: 'PyraStrike Regu 3v3', pitch: 'Team takraw — bicycle kicks!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🧶 Strike Regu 3v3', feat: [['pyraspike', 'm_strikeregu']] } },
-  { game: 'pyraspike', id: 'hoop', icon: '⭕', name: 'Hoop Takraw', pitch: 'Kick it through the hanging hoop!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '⭕ Hoop Takraw', feat: [['pyraspike', 'm_hoop']] } },
-  { game: 'pyraspike', id: 'sparksolo', icon: '⚡', name: 'PyraSpark 1v1', pitch: 'Net-table: one bounce, no hands, EDGE!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '⚡ Spark 1v1', feat: [['pyraspike', 'm_sparksolo']] } },
-  { game: 'pyraspike', id: 'sparkduo', icon: '🌩️', name: 'PyraSpark Duo 2v2', pitch: 'Pass to your partner, then send it back!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🌩️ Spark Duo 2v2', feat: [['pyraspike', 'm_sparkduo']] } },
-  { game: 'pyraspike', id: 'zonehits', icon: '🎯', name: 'PyraDive Zone Hits', pitch: 'Training: hit the glowing zone!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🎯 Zone Hits', feat: [['pyraspike', 'm_zonehits']] } },
-  { game: 'pyraspike', id: 'combo', icon: '🔗', name: 'PyraDive Body Combo', pitch: 'Training: trap, pop, SMASH!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🔗 Body Combo', feat: [['pyraspike', 'm_combo']] } },
-  { game: 'pyraspike', id: 'rallyrun', icon: '🏃', name: 'PyraDive Rally Run', pitch: 'Training: the ball gets faster!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🏃 Rally Run', feat: [['pyraspike', 'm_rallyrun']] } },
-  { game: 'pyraspike', id: 'juggle', icon: '🤹', name: 'PyraDive Juggle', pitch: 'Training: keep it up — foot, knee, head!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🤹 Juggle', feat: [['pyraspike', 'm_juggle']] } },
-  { game: 'pyraspike', id: 'party', icon: '🌀', name: 'Spark Party', pitch: 'A bouncy ball + extra balls at once!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🌀 Spark Party', feat: [['pyraspike', 'm_party']] } },
-  { game: 'pyraspike', id: 'cups', icon: '🏆', name: 'PyraDive Cups', pitch: 'Knock-out cups: 4 · 8 · 👑 Family Cup!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🏆 Cup of 4', feat: [['pyraspike', 'm_cupfour'], ['pyraspike', 'm_cupeight'], ['pyraspike', 'm_familycup']] } },
-  { game: 'pokadif', id: 'spot', icon: '🖼️', name: 'Find the Difference', pitch: 'Two pictures — poke every change!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '🖼️ Spot' } },
-  { game: 'pokadif', id: 'detective', icon: '🕵️', name: 'Detective Adventure', pitch: 'Solve a case: find · read · crack!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif-case' } },
-  { game: 'pokadif', id: 'arcade', icon: '⏱️', name: 'Photo Hunt Arcade', pitch: 'Speed run to the 🏁 — beat your time!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif-arcade' } },
-  { game: 'pokadif', id: 'blink', icon: '👁️', name: 'Blink', pitch: 'One picture blinks — what changed?', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '👁️ Blink' } },
-  { game: 'pokadif', id: 'odd', icon: '🎯', name: 'Odd One Out', pitch: 'Poke the one that doesn\'t belong!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '🎯 Odd One Out' } },
-  { game: 'sciencetory', id: 'mechanic', icon: '⚙️', name: 'Sciencetory Mechanic', pitch: 'Test your crafted things!', route: 'sciencetory', added: '2026-11-14', tried: { board: 'sciencetory', themeStart: '⚙️ Mechanic' } },
-  { game: 'sciencetory', id: 'chem', icon: '⚗️', name: 'Sciencetory Chemistry', pitch: 'Hunt elements, build molecules!', route: 'sciencetory', added: '2026-11-14', tried: { board: 'sciencetory', themeStart: '⚗️ Chemistry' } },   // ⚗️ sc-2a
-  { game: 'sciencetory', id: 'quantum', icon: '⚛️', name: 'Sciencetory Quantum', pitch: 'Build atoms from tiny parts!', route: 'sciencetory', added: '2026-11-14', tried: { board: 'sciencetory', themeStart: '⚛️ Quantum' } },   // ⚛️ sc-2b
-  { game: 'sciencetory', id: 'particle', icon: '🔬', name: 'Sciencetory Particle', pitch: 'Build protons, smash particles!', route: 'sciencetory', added: '2026-11-14', tried: { board: 'sciencetory', themeStart: '🔬 Particle' } },   // 🔬 sc-2d
-  { game: 'sciencetory', id: 'thermo', icon: '🔥', name: 'Sciencetory Thermo', pitch: 'Melt, mix + keep cocoa warm!', route: 'sciencetory', added: '2026-11-16', tried: { board: 'sciencetory', themeStart: '🔥 Thermo' } },   // 🔥 sc-3a
-  { game: 'sciencetory', id: 'electro', icon: '⚡', name: 'Sciencetory Electro', pitch: 'Light bulbs, magnets + electromagnets!', route: 'sciencetory', added: '2026-11-16', tried: { board: 'sciencetory', themeStart: '⚡ Electro' } },   // ⚡ sc-3b
-  { game: 'sciencetory', id: 'optics', icon: '🌈', name: 'Sciencetory Optics', pitch: 'Rainbows, mirror mazes + magnifiers!', route: 'sciencetory', added: '2026-11-16', tried: { board: 'sciencetory', themeStart: '🌈 Optics' } },   // 🌈 sc-3c
-  { game: 'sciencetory', id: 'acoustics', icon: '🔊', name: 'Sciencetory Acoustics', pitch: 'Sound waves, echoes + thunder counting!', route: 'sciencetory', added: '2026-11-17', tried: { board: 'sciencetory', themeStart: '🔊 Acoustics' } },   // 🔊 sc-3d
-  { game: 'sciencetory', id: 'geo', icon: '🌍', name: 'Sciencetory Geo', pitch: 'Scratch rocks, read a compass, shake!', route: 'sciencetory', added: '2026-11-17', tried: { board: 'sciencetory', themeStart: '🌍 Geo' } },   // 🌍 sc-4a
-  { game: 'sciencetory', id: 'bio', icon: '🧬', name: 'Sciencetory Bio', pitch: 'Bones, heartbeats + hollow tubes!', route: 'sciencetory', added: '2026-11-17', tried: { board: 'sciencetory', themeStart: '🧬 Bio' } },   // 🧬 sc-4b
-  { game: 'sciencetory', id: 'cosmic', icon: '🌌', name: 'Sciencetory Cosmic', pitch: 'Moon weight, stars, sundials, planets!', route: 'sciencetory', added: '2026-11-17', tried: { board: 'sciencetory', themeStart: '🌌 Cosmic' } },   // 🌌 sc-4c
-  { game: 'sla-brall', id: 'slashot', icon: '🏒', name: 'SlaShot', pitch: 'Table hockey — score goals!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaShot ·', feat: [['sla-brall', 'win_slashot']] } },
-  { game: 'sla-brall', id: 'slapoof', icon: '🥒', name: 'SlaPoof', pitch: 'Pickleball — mind the kitchen!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaPoof ·', feat: [['sla-brall', 'win_slapoof']] } },
-  { game: 'sla-brall', id: 'slaball', icon: '🎾', name: 'SlaBall', pitch: 'Tennis: 15, 30, 40, game!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaBall ·', feat: [['sla-brall', 'win_slaball']] } },
-  { game: 'sla-brall', id: 'slapong', icon: '🏓', name: 'SlaPong', pitch: 'Ping-pong on a table!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaPong ·', feat: [['sla-brall', 'win_slapong']] } },
-  { game: 'sla-brall', id: 'slabam', icon: '🏸', name: 'SlaBam', pitch: 'Badminton — fast hit, slow drop!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaBam ·', feat: [['sla-brall', 'win_slabam']] }, added: '2026-11-10' },
-  { game: 'sla-brall', id: 'slawall', icon: '🧱', name: 'SlaWall', pitch: 'Squash room — bounce off ANY wall!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaWall ·', feat: [['sla-brall', 'win_slawall']] } },
-  { game: 'sla-brall', id: 'cup', icon: '🏆', name: 'Tournament', pitch: 'Win the trophy in a cup!', route: 'slabrall', tried: { feat: [['sla-brall', 'cupMatches'], ['sla-brall', 'cups']] } },
-  { game: 'sla-brall', id: 'lhost', icon: '📡', name: 'Host a game', pitch: 'Friends join on their own device!', route: 'slabrall', added: '2026-11-13' },   // 📡 lk-1c
-  { game: 'sla-brall', id: 'ljoin', icon: '🔗', name: 'Join friends', pitch: 'Play on your own device!', route: 'slabrall', added: '2026-11-13' },   // 📡 p3a (lk-1b asked)
-  { game: 'blasoff', id: 'fours', icon: '⚽', name: 'Soccer 4v4', pitch: 'Small pitch, close camera!', route: 'blasoff', tried: { board: 'blasoff', themeStart: '4v4 ·', feat: [['blasoff', 'win_4v4']] }, added: '2026-11-14' },   // ⚽ bo-1
-  { game: 'blasoff', id: 'sevens', icon: '🏟️', name: 'Soccer 7v7', pitch: 'Bigger pitch, more passing!', route: 'blasoff', tried: { board: 'blasoff', themeStart: '7v7 ·', feat: [['blasoff', 'win_7v7']] }, added: '2026-11-14' },   // ⚽ bo-1
-  { game: 'blasoff', id: 'elevens', icon: '🌍', name: 'Soccer 11v11', pitch: 'Full pitch, 11 a side!', route: 'blasoff', tried: { board: 'blasoff', themeStart: '11v11 ·', feat: [['blasoff', 'win_11v11']] }, added: '2026-11-14' },   // 🌍 bo-2a
-  { game: 'blasoff', id: 'party', icon: '🎉', name: 'Party ball', pitch: 'A wild bomb ball, confetti goals!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Party ball ·', feat: [['blasoff', 'win_party']] }, added: '2026-11-14' },   // 🎉 bo-3c
-  { game: 'blasoff', id: 'futsal', icon: '🥅', name: 'Futsal 5v5', pitch: 'Fast court soccer, heavy ball!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Futsal 5v5 ·', feat: [['blasoff', 'win_5v5']] }, added: '2026-11-14' },   // 🏟️ bo-2b
-  { game: 'blasoff', id: 'street', icon: '🏙️', name: 'Street 1v1', pitch: 'Nutmeg = a point, first to 5!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Street 1v1 ·', feat: [['blasoff', 'win_1v1']] }, added: '2026-11-14' },   // 🏙️ bo-2b
-  { game: 'blasoff', id: 'skills', icon: '🎯', name: 'Skill challenges', pitch: '7 drills, three stars each!', route: 'blasoff', tried: { feat: [['blasoff', 'skills']] }, added: '2026-11-14' },   // 🎯 bo-3a
-  { game: 'blasoff', id: 'shootout', icon: '🥅', name: 'Penalty shootout', pitch: 'Kick on the target, dive in goal!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Penalty shootout ·', feat: [['blasoff', 'win_pens']] }, added: '2026-11-14' },
-  { game: 'blasoff', id: 'battle', icon: '🎤', name: 'Tricks Battle', pitch: 'Tricks on the beat, 3 judges!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Tricks Battle ·', feat: [['blasoff', 'win_battle']] }, added: '2026-11-14' },   // 🎤 bo-3b
-  { game: 'blasoff', id: 'cup', icon: '🏆', name: 'Knockout Cup', pitch: '8 teams, win or go home!', route: 'blasoff', tried: { feat: [['blasoff', 'cupPlays']] }, added: '2026-11-16' },   // 🏆 r4a / r4c
-  { game: 'blasoff', id: 'league', icon: '📊', name: 'League', pitch: 'Play everyone, top the table!', route: 'blasoff', tried: { feat: [['blasoff', 'leaguePlays']] }, added: '2026-11-16' },
-  { game: 'blasoff', id: 'family', icon: '👑', name: 'Family cup', pitch: 'Captain your own family team!', route: 'blasoff', tried: { feat: [['blasoff', 'familyPlays']] }, added: '2026-11-16' },
-  { game: 'blasoff', id: 'tale', icon: '📜', name: 'Kick Tale', pitch: 'From the jungle to the cloud final!', route: 'blasoff', tried: { feat: [['blasoff', 'taleSteps']] }, added: '2026-11-16' },   // 📜 r4b / r4c
-  { game: 'turbo', id: 'ghost', icon: '👻', name: 'Ghost race', pitch: 'Race the family\'s best rides!', route: 'turbo', tried: null },
-  { game: 'turbo', id: 'duo', icon: '👥', name: '2-player race', pitch: 'Race a friend, split screen!', route: 'turbo', tried: null },
-  { game: 'word-board', id: 'together', icon: '👨‍👩‍👧', name: 'Lettercraft Play together', pitch: 'Word battle with your family!', route: 'wordboard', tried: { feat: [['word-board', 'togetherGames']] } },
-  { game: 'number-board', id: 'together', icon: '👨‍👩‍👧', name: 'Algebros Play together', pitch: 'Number battle with your family!', route: 'numberboard', tried: { feat: [['number-board', 'togetherGames']] } },
-  { game: 'math-quest', id: 'minute', icon: '⏱️', name: 'Minute Challenge', pitch: '60 seconds — how many sums?', route: 'mathquest', tried: { feat: [['math-quest', 'sprintRounds'], ['math-quest', 'sprintBest']] } },
-  { game: 'math-quest', id: 'worden', icon: '🔤', name: 'Math Quest Word Sums', pitch: 'The sum is written in words!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':worden', feat: [['math-quest', 'wordRight']] } },   // ➗ mq-w1
-  { game: 'math-quest', id: 'wordth', icon: '🐘', name: 'Math Quest เลขคำไทย', pitch: 'Sums in Thai words — อ่านเป็นคำ!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':wordth', feat: [['math-quest', 'thaiRight']] } },   // ➗ mq-w1
-  { game: 'math-quest', id: 'storyen', icon: '📖', name: 'Math Quest Story Problems', pitch: 'Real-life maths stories — 1 to 3 steps!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':storyen' } },   // ➗ mq-w2
-  { game: 'math-quest', id: 'storyth', icon: '📜', name: 'Math Quest โจทย์ปัญหา', pitch: 'Story sums in Thai — โจทย์ปัญหา!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':storyth' } },   // ➗ mq-w2
-  { game: 'math-quest', id: 'tricken', icon: '🤔', name: 'Math Quest Trick Questions', pitch: 'The quick answer is a trap!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':tricken' } },   // ➗ mq-w3
-  { game: 'math-quest', id: 'trickth', icon: '🙃', name: 'Math Quest คำถามหลอก', pitch: 'Thai trick questions — คิดสองรอบ!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':trickth' } },   // ➗ mq-w3
-  { game: 'math-quest', id: 'testen', icon: '📝', name: 'Math Quest Test Practice', pitch: 'School-style maths tests, grade 1–12!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':testen' } },   // ➗ mq-t1
-  { game: 'math-quest', id: 'testth', icon: '📝', name: 'Math Quest ข้อสอบ', pitch: 'Thai school tests — ข้อสอบ ป.1–ม.6!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':testth' } },   // ➗ mq-t1
-  { game: 'math-quest', id: 'sign', icon: '❓', name: 'Math Quest Missing sign', pitch: 'Which sign makes the sum true?', route: 'mathquest', added: '2026-11-16', tried: { board: 'math-quest', theme: ':sign' } },   // ➗ mq-w4
-  { game: 'math-quest', id: 'fix', icon: '🔍', name: 'Math Quest Find the mistake', pitch: 'Be a maths detective — spot it, fix it!', route: 'mathquest', added: '2026-11-16', tried: { board: 'math-quest', theme: ':fix' } },   // ➗ mq-w4
-  { game: 'math-quest', id: 'clock', icon: '🕐', name: 'Math Quest Clock maths', pitch: 'Read the clock, add the minutes!', route: 'mathquest', added: '2026-11-16', tried: { board: 'math-quest', theme: ':clock' } },   // ➗ mq-w4
-  { game: 'math-quest', id: 'listenen', icon: '🎧', name: 'Math Quest Listen', pitch: 'Hear the sum — no numbers on screen!', route: 'mathquest', added: '2026-11-16', tried: { board: 'math-quest', theme: ':listenen' } },   // ➗ mq-w5
-  { game: 'math-quest', id: 'listenth', icon: '👂', name: 'Math Quest ฟังโจทย์', pitch: 'Thai sums you hear — ฟังแล้วตอบ!', route: 'mathquest', added: '2026-11-16', tried: { board: 'math-quest', theme: ':listenth' } },   // ➗ mq-w5
-  { game: 'double-up', id: 'challenge', icon: '🏔️', name: 'Double Up Challenge', pitch: 'Tiny 3×3 board — reach 1024!', route: 'doubleup', tried: { feat: [['double-up', 'chTile']] } },
-  { game: 'memory', id: 'friends', icon: '👥', name: 'Memories with friends', pitch: 'Take turns — most pairs wins!', route: 'memory', tried: { feat: [['memory', 'wins']] } },
-  { game: 'memory', id: 'time', icon: '⏱️', name: 'Memories Time attack', pitch: 'Beat the clock — find every pair fast!', route: 'memory', added: '2026-11-15', tried: { board: 'memory', theme: 'Time attack' } },
-  { game: 'memory', id: 'steam', icon: '🔗', name: 'Memories STEAM pairs', pitch: 'Match cards that belong together!', route: 'memory', added: '2026-11-16', tried: { board: 'memory', theme: 'STEAM pairs' } },
-  { game: 'chess', id: 'duo', icon: '👫', name: 'Chess for 2', pitch: 'Play chess with a friend!', route: 'chess', tried: null },
-  { game: 'checkers', id: 'duo', icon: '👫', name: 'Checkers for 2', pitch: 'Play checkers with a friend!', route: 'checkers', tried: null },
-  { game: 'pose-party', id: 'classic', icon: '🎯', name: 'Classic', pitch: 'Copy each pose — 3, 2, 1, snap!', route: 'poseparty', tried: { board: 'pose-party' } },
-  { game: 'pose-party', id: 'speed', icon: '⏱️', name: 'Speed 60 s', pitch: 'Match fast poses in 60 seconds', route: 'poseparty', tried: { feat: [['pose-party', 'speedBest']] } },
-  { game: 'pose-party', id: 'copy', icon: '🪞', name: 'Copy Me', pitch: 'Copy your buddy\'s pose fast!', route: 'poseparty', tried: { feat: [['pose-party', 'copyBest']] } },
-  { game: 'pose-party', id: 'group', icon: '🧑‍🤝‍🧑', name: 'Group poses', pitch: 'Make one big shape together!', route: 'poseparty', tried: { feat: [['pose-party', 'groupBest']] } },
-  { game: 'pose-party', id: 'dance', icon: '💃', name: 'Dance chain', pitch: 'Pose on the beat!', route: 'poseparty', tried: { feat: [['pose-party', 'danceBest']] } },
-  { game: 'pose-party', id: 'statue', icon: '🗿', name: 'Statue Hold', pitch: 'Freeze like a stone statue!', route: 'poseparty', tried: { feat: [['pose-party', 'statueBest']] } },
-  { game: 'pose-party', id: 'freeze', icon: '🧊', name: 'Freeze Dance', pitch: 'Dance, then FREEZE!', route: 'poseparty', tried: { feat: [['pose-party', 'freezeBest'], ['pose-party', 'freezeSecs']] } },
-  { game: 'pose-party', id: 'mirror', icon: '🪞', name: 'Mirror Twins', pitch: 'Copy your twin like a mirror!', route: 'poseparty', tried: { feat: [['pose-party', 'mirrorBest']] } },
-  { game: 'pose-party', id: 'letters', icon: '🔤', name: 'Body Letters', pitch: 'Spell your name with your body!', route: 'poseparty', tried: { feat: [['pose-party', 'lettersMade']] } },
-  { game: 'pose-party', id: 'yoga', icon: '🧘', name: 'Yoga & Stretch', pitch: 'Slow stretches — hold them still', route: 'poseparty', tried: null },
-];
+// 📏 s1: MODES_ → GameData.gs (moved word for word with its comment).
 const MODES_NEW_DAYS_ = 7;
-// 🗂️ mg-1 Mode groups — the same boxes (and order) as each game's start page. A mode not listed here has no group (2-mode games stay flat).
-const MODE_GROUPS_ = {
-  'memory': [{k: 'match', icon: '🃏', en: 'Match', th: 'จับคู่', modes: ['friends', 'steam']}, {k: 'race', icon: '⏱️', en: 'Race', th: 'แข่งเวลา', modes: ['time']}],   // 🗂️ mm-5
-  'math-quest': [{k: 'numbers', icon: '🔢', en: 'Numbers', th: 'ตัวเลข', modes: ['classic', 'minute', 'sign', 'fix', 'clock']}, {k: 'english', icon: '🔤', en: 'English', th: 'ภาษาอังกฤษ', modes: ['worden', 'storyen', 'tricken', 'testen', 'listenen']}, {k: 'thai', icon: '🐘', en: 'Thai', th: 'ภาษาไทย', modes: ['wordth', 'storyth', 'trickth', 'testth', 'listenth']}],   // ➗ mq-t1 📝   // ➗ mq-w1
-  'sciencetory': [{k: 'matter', icon: '⚗️', en: 'Matter', th: 'สสาร', modes: ['chem', 'quantum', 'particle']}, {k: 'forces', icon: '⚙️', en: 'Forces & Energy', th: 'แรงและพลังงาน', modes: ['mechanic', 'thermo', 'electro']}, {k: 'waves', icon: '🌈', en: 'Waves & Space', th: 'คลื่นและอวกาศ', modes: ['optics', 'acoustics', 'cosmic']}, {k: 'earth', icon: '🌍', en: 'Earth & Life', th: 'โลกและชีวิต', modes: ['geo', 'bio']}],   // 🔬 sc-2b (same boxes as the page)
-  'pokadif': [{k: 'spot', icon: '🖼️', en: 'Spot', th: 'จับผิดภาพ', modes: ['spot', 'blink']}, {k: 'odd', icon: '🎯', en: 'Odd One Out', th: 'หาตัวที่ต่าง', modes: ['odd']}, {k: 'endless', icon: '⏱️', en: 'Arcade', th: 'อาร์เคด', modes: ['arcade']}, {k: 'stories', icon: '📖', en: 'Stories', th: 'นักสืบผจญภัย', modes: ['detective']}],   // 🔍 pk-2a + pk-2b + pk-3a
-  'geoscout': [{k: 'numbers', icon: '🧮', en: 'Number play', th: 'เล่นกับตัวเลข', modes: ['scale', 'count', 'tens', 'next']}, {k: 'shapes', icon: '🔷', en: 'Shapes + parts', th: 'รูปทรง · เศษส่วน', modes: ['shape', 'frac', 'wobble']}, {k: 'friends', icon: '⚔️', en: 'With friends', th: 'เล่นกับเพื่อน', modes: ['battle']}, {k: 'story', icon: '📖', en: 'Story', th: 'เนื้อเรื่อง', modes: ['journey']}],   // 🗂️ p3a (F5)
-  'artifactory': [{k: 'hall', icon: '⚙️', en: 'Machine Hall', th: 'โรงเครื่องจักร', modes: ['lathe', 'planer', 'weld', 'forge', 'pottery', 'sew', 'light', 'finish']}, {k: 'hand', icon: '🪵', en: 'HandCraft Room', th: 'ห้องงานฝีมือ', modes: ['whittle', 'stone', 'print', 'lab', 'nature']}],   // 🗂️ p3a: the page's own areas
-  'wisdeck': [{k: 'quiz', icon: '🧠', en: 'Quiz games', th: 'เกมตอบคำถาม', modes: ['quiz', 'buzz', 'daily']}, {k: 'num', icon: '🔢', en: 'Number games', th: 'เกมตัวเลข', modes: ['count', 'jack']}, {k: 'learn', icon: '📚', en: 'Learn + store', th: 'อ่าน · เรียน · เก็บการ์ด', modes: ['learn']}],
-  'snakeast': [{k: 'arcade', icon: '🐍', en: 'Arcade', th: 'อาร์เคด', modes: ['feast', 'endless', 'gate']}, {k: 'land', icon: '🏰', en: 'Land battle', th: 'ยึดพื้นที่', modes: ['castle']}, {k: 'story', icon: '📜', en: 'Story', th: 'เนื้อเรื่อง', modes: ['tale']}],
-  'soul-bopper': [{k: 'battle', icon: '⚔️', en: 'Battle', th: 'ต่อสู้', modes: ['battle', 'hold']}, {k: 'party', icon: '💩', en: 'Party', th: 'ปาร์ตี้', modes: ['classic']}, {k: 'story', icon: '🗺️', en: 'Story', th: 'ผจญภัย', modes: ['stage']}],
-  'polyplot': [{k: 'boxes', icon: '⬜', en: 'Boxes', th: 'ปิดกล่อง', modes: ['classic', 'hunt']}, {k: 'fort', icon: '🏰', en: 'Fortiplot', th: 'สร้างป้อม', modes: ['fort', 'coop']}],
-  'alignext': [{k: 'drop', icon: '🔴', en: 'Drop', th: 'หยอดเหรียญ', modes: ['drop']}, {k: 'omni', icon: '❌⭕', en: 'Omnifile', th: 'วางได้ทุกช่อง', modes: ['omni', 'stack']}],
-  'beat-corner': [{k: 'songs', icon: '🎤', en: 'Songs', th: 'เพลง', modes: ['corner']}, {k: 'inst', icon: '🎹', en: 'Instruments', th: 'เครื่องดนตรี', modes: ['piano', 'drums']}, {k: 'together', icon: '🎸', en: 'Together', th: 'เล่นด้วยกัน', modes: ['band']}, {k: 'make', icon: '✏️', en: 'Make', th: 'แต่งเพลง', modes: ['maker']}],
-  'eyes-brain': [{k: 'remember', icon: '🔢', en: 'Ways to remember', th: 'วิธีจำ', modes: ['classic', 'backwards', 'colour', 'letters', 'listen', 'word', 'shapes']}, {k: 'challenge', icon: '🏔️', en: 'Challenge', th: 'ท้าทาย', modes: ['challenge', 'daily']}, {k: 'party', icon: '👥', en: 'Party', th: 'เล่นกันหลายคน', modes: ['chain']}],
-  'pyraspike': [{k: 'spike', icon: '🏐', en: 'PyraSpike', th: 'วอลเลย์บอล', modes: ['beach', 'small', 'full']}, {k: 'strike', icon: '🦶', en: 'PyraStrike', th: 'ตะกร้อ', modes: ['strikesolo', 'strikeduo', 'strikeregu', 'hoop']}, {k: 'spark', icon: '⚡', en: 'PyraSpark', th: 'บอลข้ามโต๊ะ', modes: ['sparksolo', 'sparkduo', 'party']}, {k: 'train', icon: '🎯', en: 'Training + Cups', th: 'ฝึกซ้อม + ถ้วย', modes: ['zonehits', 'combo', 'rallyrun', 'juggle', 'cups']}],   // 🔥 pd-3a
-  'sla-brall': [{k: 'sports', icon: '🏓', en: 'Sports', th: 'กีฬา', modes: ['slashot', 'slapoof', 'slaball', 'slapong', 'slabam', 'slawall']}, {k: 'cup', icon: '🏆', en: 'Cup', th: 'ทัวร์นาเมนต์', modes: ['cup']}, {k: 'link', icon: '📡', en: 'Own devices', th: 'เล่นหลายเครื่อง', modes: ['lhost', 'ljoin']}],   // 📡 p3a: lk-1b's 🔗 Join friends
-  'blasoff': [{k: 'match', icon: '⚽', en: 'Matches', th: 'แข่งฟุตบอล', modes: ['fours', 'sevens', 'elevens', 'party']}, {k: 'small', icon: '🏙️', en: 'Futsal + Street', th: 'ฟุตซอล · สตรีท', modes: ['futsal', 'street']}, {k: 'skill', icon: '🕺', en: 'Tricks + skills', th: 'ลีลา · ทักษะ', modes: ['battle', 'skills', 'shootout']}, {k: 'cup', icon: '🏆', en: 'Cups + story', th: 'ถ้วย · เนื้อเรื่อง', modes: ['cup', 'league', 'family', 'tale']}],   // ⚽ bo-1 · 🌍 bo-2a · 🏙️ bo-2b · 🏆 r4c
-  'brawl-buddies': [{k: 'battle', icon: '🥊', en: 'Battle', th: 'ต่อสู้', modes: ['battle']}, {k: 'adv', icon: '🗺️', en: 'Brawenture', th: 'ผจญภัย', modes: ['brawenture']}],
-  'georead': [{k: 'sounds', icon: '🔊', en: 'Sounds', th: 'เสียง', modes: ['phonics', 'rhyme', 'say']}, {k: 'words', icon: '🧱', en: 'Words', th: 'คำ', modes: ['build', 'sight', 'case', 'trace']}, {k: 'reading', icon: '📖', en: 'Reading', th: 'อ่าน', modes: ['story', 'types']}, {k: 'journey', icon: '🗺️', en: 'Journey', th: 'ผจญภัย', modes: ['journey']}],
-  'pose-party': [{k: 'pose', icon: '🎯', en: 'Pose', th: 'ท่าโพส', modes: ['classic', 'speed', 'copy']}, {k: 'move', icon: '💃', en: 'Move', th: 'ขยับตัว', modes: ['dance', 'statue', 'freeze']}, {k: 'together', icon: '🧑‍🤝‍🧑', en: 'Together', th: 'เล่นด้วยกัน', modes: ['group', 'mirror', 'letters']}, {k: 'calm', icon: '🧘', en: 'Calm', th: 'ยืดเหยียด', modes: ['yoga']}]
-};
+// 📏 s1: MODE_GROUPS_ → GameData.gs (moved word for word with its comment).
 // {k, icon, en, th, n (box order), i (place in the box)} or null
 function modeGroupOf_(m) {
   const gs = MODE_GROUPS_[m.game] || [];
@@ -1115,84 +927,7 @@ function getAdminData() {
 }
 
 /* ============ BUILT-IN GAMES (registered automatically) ============ */
-// Games that ship with the app add their own Games-tab row the first time
-// the Gameroom opens — no script to run by hand. Safe to call every time:
-// a row is only added when its GameID is missing. Edit a row in the sheet
-// freely afterwards (name, icon, Status); it is never overwritten.
-const BUILT_IN_GAMES = [
-  { GameID: 'tdstories', GameName: 'TD-Stories', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Strategy + Reading (planning, choosing, story books, castle + dragon facts)',
-    Status: 'Live', PageRoute: 'tdstories', Icon: '🏰', Description: 'Tower-defence story books: 🐉👑 Dra-Princess Diary — a princess and her dragon keep every knight, prince and king away from the tower. Before each wave your heroes level up: pick ONE skill card (5 colours 🔴🔵🟤🟢🟣, Lv 1–3), evolve at tier 5, ULTIMATE at tier 10. Diary pages + 💡 lesson cards between chapters. More books coming!' },
-  { GameID: 'artifactory', GameName: 'Artifactory', SkillLevel: 'build · design · every age', STEAMFocus: 'Engineering + Design (how real machines work, materials, symmetry)',
-    Status: 'Live', PageRoute: 'artifactory', Icon: '🏭', Description: 'The maker app: turn cups and trophies on the 🌀 lathe, polish and cut 💎 gems, paint and engrave on the 🎨 finish bench, make things for your room — then wear what you made in the 🪞 fitting mirror. Materials from your bag and the family shelf, ⭐ blueprint challenges, a real-life lesson at every machine' },
-  { GameID: 'georead', GameName: 'GeoRead', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Reading + Phonics (letter sounds, blending, spelling)',
-    Status: 'Live', PageRoute: 'georead', Icon: '🔤', Description: 'Phonics with letter boxes: your avatar carries letter boxes — tap one to hear its SOUND, bump them together to blend ("c… a… t… cat!"). 🔊 Phonics and 🧱 Word builder, 6 levels from s a t p to magic e and 2-syllable words, 6 house themes and letter-box looks to pick' },
-  { GameID: 'geoscout', GameName: 'GeoScout', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Math (counting, + − × ÷, comparing, balance, shapes)',
-    Status: 'Live', PageRoute: 'geoscout', Icon: '🔢', Description: 'Numbers you can touch: number blocks with faces — snap them to add, split to take away, copy to multiply, share to divide. ⚖️ Scale (> < = and balance, even weigh your avatar) and 🧱 Count (make the number), 6 house themes as blocks' },
-  { GameID: 'wisdeck', GameName: 'WisDeck', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Science + World + History facts (flags, maps, animals, space, chemistry, inventions) in English + Thai',
-    Status: 'Live', PageRoute: 'wisdeck', Icon: '🃏', Description: 'Learn-by-quiz card game: 1,840 real cards on 5 shelves (🌍 World · ⏳ Time · 🦁 Zoo · 🔬 Science · 🛠️ Human-made). 📚 Learn, 🧠 Quiz to win cards, then play 🔢 WisCount and 🂡 WisJack with your deck' },
-  { GameID: 'eyes-brain', GameName: 'Eyes Brain Riot', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Memory + Numbers (chunking, working memory, patterns)',
-    Status: 'Live', PageRoute: 'eyesbrain', Icon: '👀', Description: 'Number memory: tap 👀 Reveal, the number shows in little chunks for a few seconds, then type it back. 🔢 Classic, 🔁 Backwards, 🏔️ Challenge, pictures, letters, colours, 👂 Listen, ➕ Chain for 2–4 players, 🔥 combos and a 🧠 riot meter' },
-  { GameID: 'polyplot', GameName: 'Polyplot', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Geometry + Strategy (polygons, tessellations, counting chains)',
-    Status: 'Live', PageRoute: 'polyplot', Icon: '⬛', Description: 'Dots & boxes grown up: draw lines on square, triangle, hexagon, octagon and mixed dot maps — close a shape to own it. ⬜ Classic, 🏹 Hunt (run, coins, creatures, events, cards), 🏰 Fortiplot (build towers) and 🛡️ co-op waves, 1–4 players + robots' },
-  { GameID: 'trash-pointer', GameName: 'Trash Pointer', SkillLevel: 'beginner', STEAMFocus: 'Environmental Science / Sorting',
-    Status: 'Live', PageRoute: 'minigames', Icon: '🗑️', Description: 'Drag trash into the correct color-coded bin and help keep the park clean' },
-  { GameID: 'maze', GameName: 'Maze Explorer', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Problem Solving / Spatial',
-    Status: 'Live', PageRoute: 'maze', Icon: '🧭', Description: 'A brand-new maze every time, from Basic to Extreme' },
-  { GameID: 'robot-adventure', GameName: 'Code the Robot', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Coding / Sequencing',
-    Status: 'Live', PageRoute: 'robot', Icon: '🤖', Description: 'Write code to guide the robot past traffic, traps and storms' },
-  { GameID: 'checkers', GameName: 'Checkers', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Strategy / Logic',
-    Status: 'Live', PageRoute: 'checkers', Icon: '🔴', Description: 'Beat the bot from Basic to Extreme, or play a friend — classic, fantasy or futuristic boards' },
-  { GameID: 'chess', GameName: 'Chess', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Strategy / Logic',
-    Status: 'Live', PageRoute: 'chess', Icon: '♞', Description: 'Mini chess to the real thing: checkmate the bot or play a friend' },
-  { GameID: 'pinball', GameName: 'Pinball', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Physics / Reflexes',
-    Status: 'Live', PageRoute: 'pinball', Icon: '🎯', Description: '7 tables, a new layout every game: bonus scenes, Lucky Lights, multiball and the Break-out jackpot' },
-  { GameID: 'hopper', GameName: 'Dodgy Hopper', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Timing / Reflexes',
-    Status: 'Live', PageRoute: 'hopper', Icon: '🐸', Description: 'Hop your avatar across roads, rivers and rails in 6 wild worlds' },
-  { GameID: 'turbo', GameName: 'Turbo Trail', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Timing / Reflexes',
-    Status: 'Live', PageRoute: 'turbo', Icon: '🏎️', Description: 'Race to the finish before the clock runs out — jumps, drifts, rivals and wild worlds' },
-  { GameID: 'memory', GameName: 'Memories Match', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Memory / Focus',
-    Status: 'Live', PageRoute: 'memory', Icon: '🃏', Description: 'Flip the cards and find the pairs — pick a map (4×4 to 10×10) and a level (peeks, look-alikes, swaps, 💀 scramble), on your own or with up to 4 players' },
-  { GameID: 'math-quest', GameName: 'Math Quest', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Math / Numbers',
-    Status: 'Live', PageRoute: 'mathquest', Icon: '🧮', Description: 'Add, take away, times and share in 5 worlds — pictures for little ones, big numbers for big kids' },
-  { GameID: 'double-up', GameName: 'Double Up', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Math / Strategy',
-    Status: 'Live', PageRoute: 'doubleup', Icon: '🔀', Description: 'Slide the tiles — two the same join and grow up (2, 4, 8 … 4096): eggs to whales, rocks to galaxies' },
-  { GameID: 'block-drop', GameName: 'Block Drop', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Spatial / Planning',
-    Status: 'Live', PageRoute: 'blockdrop', Icon: '🧱', Description: 'Turn and drop the falling blocks to fill whole rows — faces, dinos, space cargo, gems and jigsaw pieces' },
-  { GameID: 'pop-blocks', GameName: 'Pop Blocks', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Strategy / Patterns',
-    Status: 'Live', PageRoute: 'popblocks', Icon: '🫧', Description: 'Tap groups of the same blocks to pop them — rockets, bombs, rainbows, missions and chicks to rescue' },
-  { GameID: 'number-grid', GameName: 'Digitinct', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Logic / Numbers',
-    Status: 'Live', PageRoute: 'numbergrid', Icon: '🔢', Description: 'Fill the grid so every row, column and box has each picture once — 4×4 up to the 17-clue Hardcore' },
-  { GameID: 'number-board', GameName: 'Algebros', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Math / Words',
-    Status: 'Live', PageRoute: 'numberboard', Icon: '➗', Description: 'Build number sentences like a crossword (3 + 4 = 7) — beat the robot or play together with 2–4 players' },
-  { GameID: 'word-board', GameName: 'Lettercraft', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Words / Spelling',
-    Status: 'Live', PageRoute: 'wordboard', Icon: '🔤', Description: 'Make words like a crossword with letter tiles — beat the robot or play together with 2–4 players' },
-  { GameID: 'sweet-swap', GameName: 'Sweet Swap', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Strategy / Patterns',
-    Status: 'Live', PageRoute: 'sweetswap', Icon: '🍬', Description: 'Swap two pictures to make rows of 3 — bouncers, crosses, bombs, rainbows and power cells, blockers to break, 7 picture sets' },
-  { GameID: 'beat-corner', GameName: 'BeatCorner', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Music / Rhythm',
-    Status: 'Live', PageRoute: 'beatcorner', Icon: '🎵', Description: 'Hit the beats when they reach the corner buttons — 6 levels × 10 songs, holds, slides, pop-up buttons and spinning spirals; plus 🎹 Piano, 🥁 Drums and 🎸 Band' },
-  { GameID: 'pyraspike', GameName: 'PyraDive', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Sport / Physics (arcs, timing, teamwork)',
-    Status: 'Live', PageRoute: 'pyradive', Icon: '🔥', Description: 'Volleyball with your avatar — Drive · Dink · Dunk: 3 touches a side (bump, set, DUNK), a 🔥 Pyra meter that turns your next move into a Pyra… move, roles 🚀 Drive · 🪶 Dink · 💥 Dunk. 🏐 PyraSpike Beach 2v2 · Small 3v3 · Full 6v6, 6 levels, 1–2 players.' },
-  { GameID: 'pokadif', GameName: 'Pokadif', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Science / Observation (attention, comparing, counting)',
-    Status: 'Live', PageRoute: 'pokadif', Icon: '🔍', Description: 'Be a little detective: two pictures look the same, but a few things changed — poke every difference. Every picture is made on the spot (never the same twice) in the 6 house scenes; 🎨 colour · ➖➕ missing / extra · 📏 size · 🔺 shape · 🔄 turn / flip · 🔢 count, 6 levels, 🔍 magnifier hints.' },
-  { GameID: 'sciencetory', GameName: 'Sciencetory', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Science / Engineering (materials, forces, predicting)',
-    Status: 'Live', PageRoute: 'sciencetory', Icon: '🔬', Description: 'Test the things YOU made in Artifactory like a real lab: press, pull, twist, bend, drop, spin, float … — guess first, then watch the gauge. A test can break a thing (fix it with 🔧 repair, broken is never lost). ⚙️ Mechanic now; ⚗️ Chemistry, 🌈 Optics, 🌌 Cosmic and more coming.' },
-  { GameID: 'sla-brall', GameName: 'SlaBrall', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Sport / Physics (spin, bounce, angles)',
-    Status: 'Live', PageRoute: 'slabrall', Icon: '🏓', Description: '6 racket sports in one: SlaShot table hockey, SlaPoof pickleball, SlaBall tennis, SlaPong ping-pong, SlaBam badminton, SlaWall squash — beat the robot, play 2 players or 2 vs 2, spin shots and 14 power-ups' },
-  { GameID: 'blasoff', GameName: 'BlasOff', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Sport / Physics (passing angles, power, teamwork)',
-    Status: 'Live', PageRoute: 'blasoff', Icon: '⚽', Description: 'Soccer with your avatar — 4v4 · 7v7 · 11v11, 🥅 futsal and a 🏙️ street cage 1v1: pass, shoot, tricks, nutmegs and volleys, shout to your robot keeper, 6 levels with real rules from offside to yellow cards' },
-  { GameID: 'pose-party', GameName: 'Pose Party', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Movement / Body awareness (angles, balance)',
-    Status: 'Live', PageRoute: 'poseparty', Icon: '📷', Description: 'Copy the poses with your whole body — the camera checks how close you are! Classic levels, 60-second Speed and Copy Me' },
-  { GameID: 'brawl-buddies', GameName: 'Brawl Buddies', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Reflex / Timing (high, low, combos)',
-    Status: 'Live', PageRoute: 'brawlbuddies', Icon: '🥊', Description: 'Cartoon bonk battle with your avatar — boop, bonk, block, uppercut and juggle up to 5 bounces. Beat Robo-Buddy on 6 levels or play 2 players on one keyboard' },
-  { GameID: 'alignext', GameName: 'Alignext', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Logic / Strategy (lines, blocking, planning ahead)',
-    Status: 'Live', PageRoute: 'alignext', Icon: '🔴', Description: 'Line them up! 🔴 Drop discs into the stand or ❌⭕ Omnifile pieces anywhere on the board — beat Robo on 6 levels, 2 players or 3–4 in Drop, best of 3' },
-  { GameID: 'snakeast', GameName: 'Snakize', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Planning / Spatial thinking (paths, loops, area)',
-    Status: 'Live', PageRoute: 'snakize', Icon: '🐍', Description: 'Ride your snake! 🍎 Snakeast grid snake, 🧭 Snakigate free-steering arena with family snakes, 🏰 Snakastle land grab and 📜 Snaketale story quests — 6 levels, 2 players on one keyboard' },
-  { GameID: 'soul-bopper', GameName: 'Soul Bopper', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Strategy / Planning (pop shapes, chain reactions, escape routes)',
-    Status: 'Live', PageRoute: 'soulbopper', Icon: '👻', Description: 'Bomber maze with your avatar — plant, pop in a + shape, grab power-ups and come back as a ghost. ⚔️ Battle, 💩 Classic Avatar, 🏳️ Hold the land and 🗺️ Stage, 1–4 players + bots' },
-  { GameID: 'workshop', GameName: 'Furniture Workshop', SkillLevel: 'build · decorate · vote', STEAMFocus: 'Design / Making',
-    Status: 'Live', PageRoute: 'workshop', Icon: '🔨', Description: 'Build your own beds, chairs, lamps and more — use them in My Room, give them, and win the Design Show' },
-];
+// 📏 s1: BUILT_IN_GAMES → GameData.gs (moved word for word with its comment).
 // Built-in games that got a new name: an old sheet row still showing the OLD name is renamed once (a name Aowu typed himself is left alone).
 const RENAMED_GAMES_ = { 'memory': ['Memory Match', 'Memories Match'], 'number-board': ['Number Puzzle Board', 'Algebros'], 'word-board': ['Word Puzzle Board', 'Lettercraft'], 'number-grid': ['Number Grid', 'Digitinct'] };
 function ensureBuiltInGames_() {
@@ -1224,7 +959,7 @@ function ensureBuiltInGames_() {
 // Progress row: GameID 'maze', SeriesID 'main', UnlockedLevel = number of
 // levels cleared (0-5), Tokens = one badge per level cleared.
 const MAZE_LEVEL_BADGES = ['Maze Basic', 'Maze Junior', 'Maze Intermediate', 'Maze Hard', 'Maze Extreme', 'Maze Hardcore'];
-const MAZE_LEVEL_NAMES = ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'];
+// 📏 s1: MAZE_LEVEL_NAMES → GameData.gs (moved word for word).
 // Every main game has 6 levels: Basic → Extreme + 💀 Hardcore (opens after Extreme; 1 life, no helpers, ×3 points).
 const LEVEL_COUNT = 6, HARDCORE = 5;
 
@@ -1268,214 +1003,7 @@ function saveMazeResult(name, levelIndex, extra) {
 }
 
 /* ============ LEVEL-BASED GAMES (shared: Stacking, Code the Robot, ...) ============ */
-// Same model as the maze: Progress row (GameID, SeriesID 'main'),
-// UnlockedLevel = levels cleared (0-5), Tokens = one badge per level.
-const LEVEL_GAMES = {
-  // 🏰 TD-Stories (td-1): one Archive board per BOOK — the Theme column says the chapter ("📖 Ch 1 · The Lonely Tower")
-  'td-draprincess': {
-    badges: ['Diary Basic', 'Diary Junior', 'Diary Intermediate', 'Diary Hard', 'Diary Extreme', 'Diary Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'td-farmer': {   // 👨‍🌾 TD-Stories book 2 · Farmer Delusion (fd-1) — Theme column = "📖 Ch N · title"
-    badges: ['Farm Basic', 'Farm Junior', 'Farm Intermediate', 'Farm Hard', 'Farm Extreme', 'Farm Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  // 🏭 Artifactory: ⭐ blueprint challenges — one Archive board, the Theme column says the station ("🌀 Lathe · Cup"); the detail card shows the best per station
-  'artifactory': {
-    badges: ['Maker Basic', 'Maker Junior', 'Maker Intermediate', 'Maker Hard', 'Maker Extreme', 'Maker Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  // 🔤 GeoRead (plan GeoRead): one Archive board for every way to play (the Theme column says the mode: "🔊 Phonics · 🦖 Jungle Gate")
-  'georead': {
-    badges: ['Reader Basic', 'Reader Junior', 'Reader Intermediate', 'Reader Hard', 'Reader Extreme', 'Reader Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  // 🔢 GeoScout: one Archive board for every way to play (the Theme column says the way: "⚖️ Scale · 🦖 Dino Quarry"); the detail card shows the best per way
-  'geoscout': {
-    badges: ['Scout Basic', 'Scout Junior', 'Scout Intermediate', 'Scout Hard', 'Scout Extreme', 'Scout Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  // 🃏 WisDeck (plan 11z): three Archive boards on one page — 🧠 quiz (Theme column = the category), 🔢 WisCount and 🂡 WisJack (vs the robot)
-  'wisdeck': {
-    badges: ['Card Basic', 'Card Junior', 'Card Intermediate', 'Card Hard', 'Card Extreme', 'Card Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'wiscount': {
-    badges: ['Count Basic', 'Count Junior', 'Count Intermediate', 'Count Hard', 'Count Extreme', 'Count Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'wisjack': {
-    badges: ['Jack Basic', 'Jack Junior', 'Jack Intermediate', 'Jack Hard', 'Jack Extreme', 'Jack Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  // 👀🧠 Eyes Brain Riot (plan 11k): one Archive board for every way to play (the Theme column says the way: "🔢 Classic · 🦖 Dino Den")
-  'eyes-brain': {
-    badges: ['Brain Basic', 'Brain Junior', 'Brain Intermediate', 'Brain Hard', 'Brain Extreme', 'Brain Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  // ⬛ Polyplot (plan 11l): one Archive board for every mode (Classic / Hunt / Fortiplot / co-op)
-  'polyplot': {
-    badges: ['Plot Basic', 'Plot Junior', 'Plot Intermediate', 'Plot Hard', 'Plot Extreme', 'Plot Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'soul-bopper': {
-    badges: ['Bopper Basic', 'Bopper Junior', 'Bopper Intermediate', 'Bopper Hard', 'Bopper Extreme', 'Bopper Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  // 🔴 Alignext (plan 11x): one game page, two Archive boards — 'alignext' = 🔴 Drop, 'omnifile' = ❌⭕ Omnifile
-  'alignext': {
-    badges: ['Line Basic', 'Line Junior', 'Line Intermediate', 'Line Hard', 'Line Extreme', 'Line Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  // 🗺️ Brawenture (plan 11i-2): the adventure mode inside Brawl Buddies — one Archive board, level = tale (Theme column = difficulty)
-  'brawenture': {
-    badges: ['Playground Hero', 'Candy Hero', 'Castle Hero', 'Zombie Hero', 'Town Hero', 'Sea Hero'],
-    levelNames: ['Playground Rumble', 'Candy Factory Defense', 'Castle Climb', 'Zombie Crawl', 'Monster Outbreak', 'Undersea Rescue'],
-  },
-  'omnifile': {
-    badges: ['Omni Basic', 'Omni Junior', 'Omni Intermediate', 'Omni Hard', 'Omni Extreme', 'Omni Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  // 🐍 Snakize (plan 11y): one game page, three Archive boards — 'snakeast' = 🍎 grid snake, 'snakigate' = 🧭 arena, 'snakastle' = 🏰 land grab (📜 Snaketale = story progress only)
-  'snakeast': {
-    badges: ['Feast Basic', 'Feast Junior', 'Feast Intermediate', 'Feast Hard', 'Feast Extreme', 'Feast Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'snakigate': {
-    badges: ['Slither Basic', 'Slither Junior', 'Slither Intermediate', 'Slither Hard', 'Slither Extreme', 'Slither Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'snakastle': {
-    badges: ['Castle Basic', 'Castle Junior', 'Castle Intermediate', 'Castle Hard', 'Castle Extreme', 'Castle Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'brawl-buddies': {
-    badges: ['Bonk Basic', 'Bonk Junior', 'Bonk Intermediate', 'Bonk Hard', 'Bonk Extreme', 'Bonk Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'number-grid': {
-    badges: ['Grid Basic', 'Grid Junior', 'Grid Intermediate', 'Grid Hard', 'Grid Extreme', 'Grid Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'pop-blocks': {
-    badges: ['Pop Basic', 'Pop Junior', 'Pop Intermediate', 'Pop Hard', 'Pop Extreme', 'Pop Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'block-drop': {
-    badges: ['Drop Basic', 'Drop Junior', 'Drop Intermediate', 'Drop Hard', 'Drop Extreme', 'Drop Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'pose-party': {
-    badges: ['Pose Basic', 'Pose Junior', 'Pose Intermediate', 'Pose Hard', 'Pose Extreme', 'Pose Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  // 🔥 PyraDive (pd-1): one page, one board per sport — 'pyraspike' 🏐 (R1) · 'pyrastrike' 🦶 (R2) · 'pyraspark' ⚡ (R3); Theme = '<mode> · <arena>'
-  'pyraspike': {
-    badges: ['Spike Basic', 'Spike Junior', 'Spike Intermediate', 'Spike Hard', 'Spike Extreme', 'Spike Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'blasoff': {   // ⚽ bo-1
-    badges: ['Kick Basic', 'Kick Junior', 'Kick Intermediate', 'Kick Hard', 'Kick Extreme', 'Kick Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  // 🔍 Pokadif (pk-1): one board — 🖼️ Find the Difference cases (3 pictures); Theme = '🖼️ Spot · <scene>'. R2 adds ⏱️ Arcade on its own board.
-  'pokadif': {
-    badges: ['Rookie Eye', 'Sharp Spotter', 'Clue Finder', 'Keen Inspector', 'Super Sleuth', 'Master Detective'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  // 🔬 Sciencetory (sc-1): one board — Theme = '<section> · <test>' ('⚙️ Mechanic · Press')
-  'sciencetory': {
-    badges: ['Lab Basic', 'Lab Junior', 'Lab Intermediate', 'Lab Hard', 'Lab Extreme', 'Lab Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  // ⏱️ Pokadif Photo Hunt Arcade (pk-2b): pictures in a row against the clock; cleared = ✅ checkpoint 1 (5 pictures); Theme = '⏱️ Arcade · <scene>'
-  'pokadif-arcade': {
-    badges: ['Quick Eye', 'Fast Finder', 'Speed Sleuth', 'Turbo Spotter', 'Lightning Detective', 'Arcade Legend'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  // 📖 Pokadif Detective Adventure (pk-3a): one case = 3 chapters; Theme = '📖 <case icon> <case name>'
-  'pokadif-case': {
-    badges: ['Case Rookie', 'Clue Collector', 'Trail Tracker', 'Code Cracker', 'Super Sleuth', 'Legend Detective'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'sla-brall': {
-    badges: ['Rally Basic', 'Rally Junior', 'Rally Intermediate', 'Rally Hard', 'Rally Extreme', 'Rally Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'beat-corner': {
-    badges: ['Beat Basic', 'Beat Junior', 'Beat Intermediate', 'Beat Hard', 'Beat Extreme', 'Beat Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  // 🎹 🥁 BeatCorner Piano + Drums (plan 11-bc): two more ways to play inside BeatCorner, each its own Archive board (6 songs a level, pass 3)
-  'beat-piano': {
-    badges: ['Piano Basic', 'Piano Junior', 'Piano Intermediate', 'Piano Hard', 'Piano Extreme', 'Piano Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'beat-drums': {
-    badges: ['Drums Basic', 'Drums Junior', 'Drums Intermediate', 'Drums Hard', 'Drums Extreme', 'Drums Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'sweet-swap': {
-    badges: ['Sweet Basic', 'Sweet Junior', 'Sweet Intermediate', 'Sweet Hard', 'Sweet Extreme', 'Sweet Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'word-board': {
-    badges: ['Words Basic', 'Words Junior', 'Words Intermediate', 'Words Hard', 'Words Extreme', 'Words Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'number-board': {
-    badges: ['Board Basic', 'Board Junior', 'Board Intermediate', 'Board Hard', 'Board Extreme', 'Board Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'double-up': {
-    badges: ['Double Basic', 'Double Junior', 'Double Intermediate', 'Double Hard', 'Double Extreme', 'Double Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'math-quest': {
-    badges: ['Math Basic', 'Math Junior', 'Math Intermediate', 'Math Hard', 'Math Extreme', 'Math Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'memory': {
-    badges: ['Memory Basic', 'Memory Junior', 'Memory Intermediate', 'Memory Hard', 'Memory Extreme', 'Memory Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'turbo': {
-    badges: ['Turbo Basic', 'Turbo Junior', 'Turbo Intermediate', 'Turbo Hard', 'Turbo Extreme', 'Turbo Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'hopper': {
-    badges: ['Hopper Basic', 'Hopper Junior', 'Hopper Intermediate', 'Hopper Hard', 'Hopper Extreme', 'Hopper Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'pinball': {
-    badges: ['Pinball Basic', 'Pinball Junior', 'Pinball Intermediate', 'Pinball Hard', 'Pinball Extreme', 'Pinball Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'chess': {
-    badges: ['Chess Basic', 'Chess Junior', 'Chess Intermediate', 'Chess Hard', 'Chess Extreme', 'Chess Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'checkers': {
-    badges: ['Checkers Basic', 'Checkers Junior', 'Checkers Intermediate', 'Checkers Hard', 'Checkers Extreme', 'Checkers Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'robot-adventure': {
-    badges: ['Robot Basic', 'Robot Junior', 'Robot Intermediate', 'Robot Hard', 'Robot Extreme', 'Robot Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-  },
-  'stacking-sim': {
-    badges: ['Stack Basic', 'Stack Junior', 'Stack Intermediate', 'Stack Hard', 'Stack Extreme', 'Stack Hardcore'],
-    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
-    // Before the rework the game had 3 fixed levels in a 'building' series
-    // (badges "Cozy Cottage Badge", "Clock Tower Badge", "Sky Tower Badge").
-    // Each one cleared there counts as one level cleared here.
-    legacyCleared: function (name) {
-      const old = getProgress(name, 'stacking-sim').filter(r => r.SeriesID === 'building')[0];
-      if (!old) return 0;
-      return Math.min(3, String(old.Tokens || '').split(',').map(t => t.trim()).filter(Boolean).length);
-    },
-  },
-};
+// 📏 s1: LEVEL_GAMES → GameData.gs (moved word for word with its comment).
 function levelGame_(gameId) {
   const g = LEVEL_GAMES[gameId];
   if (!g) throw new Error('Unknown game.');
@@ -2152,900 +1680,9 @@ const FEATS_HEADERS = [
   ['Updated', 'updated', 'yyyy-MM-dd HH:mm'],
 ];
 const FEATS_WIDTH = FEATS_HEADERS.length;
-const FEAT_DEFS = {
-  'td-farmer': {   // 👨‍🌾 TD-Stories · Farmer Delusion (fd-1)
-    games: { name: 'Farmer Delusion chapters played', icon: '🎮', kind: 'sum', hidden: true },
-    quits: { name: 'Collectors who gave up', icon: '😭', kind: 'sum', tiers: [50, 500, 3000] },
-    waves: { name: 'Farm waves held', icon: '🌊', kind: 'sum', tiers: [10, 100, 500] },
-    perfect: { name: 'Perfect farm waves (no 🎃 lost)', icon: '✨', kind: 'sum', tiers: [10, 100, 400] },
-    plants: { name: 'Maze plants planted', icon: '🍄', kind: 'sum', tiers: [50, 500, 3000] },
-    grows: { name: 'Plants grown a stage', icon: '🌱', kind: 'sum', tiers: [20, 200, 1000] },
-    steps: { name: 'Longest maze walk', icon: '👣', kind: 'max', unit: 'steps', tiers: [40, 80, 140] },
-    evolves: { name: 'Farm hero evolutions', icon: '⭐', kind: 'sum', tiers: [2, 20, 100] },
-    ultimates: { name: 'Farm ultimates unlocked', icon: '☄️', kind: 'sum', tiers: [1, 10, 50] },
-    combos: { name: 'Farm combo skills found', icon: '🤝', kind: 'sum', tiers: [1, 10, 40] },
-    casts: { name: 'Farm skills used', icon: '🪄', kind: 'sum', hidden: true },
-    chapters: { name: 'Farm chapters done', icon: '📔', kind: 'max', tiers: [1, 2, 6] },
-  },
-  'td-draprincess': {   // 🏰 TD-Stories · 🐉👑 Dra-Princess Diary (td-1)
-    games: { name: 'Dra-Princess chapters played', icon: '🎮', kind: 'sum', hidden: true },
-    bonks: { name: 'Suitors bonked away', icon: '💫', kind: 'sum', tiers: [50, 500, 3000] },
-    waves: { name: 'Waves held back', icon: '🌊', kind: 'sum', tiers: [10, 100, 500] },
-    perfect: { name: 'Perfect waves (no ❤️ lost)', icon: '✨', kind: 'sum', tiers: [10, 100, 400] },
-    evolves: { name: 'Hero evolutions', icon: '⭐', kind: 'sum', tiers: [2, 20, 100] },
-    ultimates: { name: 'Ultimates unlocked', icon: '☄️', kind: 'sum', tiers: [1, 10, 50] },
-    combos: { name: 'Combo skills found', icon: '🤝', kind: 'sum', tiers: [1, 10, 40] },
-    casts: { name: 'Skills used', icon: '🪄', kind: 'sum', hidden: true },
-    chapters: { name: 'Diary chapters done', icon: '📔', kind: 'max', tiers: [1, 2, 6] },
-  },
-  'artifactory': {
-    games: { name: 'Artifactory sessions', icon: '🎮', kind: 'sum', hidden: true },
-    made: { name: 'Things made', icon: '🏭', kind: 'sum', tiers: [5, 25, 100] },
-    lathe: { name: 'Turned on the lathe', icon: '🌀', kind: 'sum', tiers: [3, 20, 80] },
-    finish: { name: 'Finishes (paint, varnish, engrave)', icon: '🎨', kind: 'sum', tiers: [3, 20, 80] },
-    stone: { name: 'Stones polished', icon: '🪨', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    stories: { name: 'Stories written', icon: '📝', kind: 'sum', tiers: [3, 20, 80] },
-    bpPages: { name: 'Blueprint pages stamped', icon: '🏅', kind: 'sum', tiers: [1, 5, 15] },
-    bpDaily: { name: 'Blueprints of the Day', icon: '📅', kind: 'sum', tiers: [3, 20, 80] },
-    bpCopied: { name: 'Family copied your blueprints', icon: '👪', kind: 'sum', tiers: [1, 10, 40] },
-    bpShared: { name: 'Family blueprints shared', icon: '📐', kind: 'sum', tiers: [1, 5, 20] },
-    repairs: { name: 'Things repaired', icon: '🔧', kind: 'sum', tiers: [1, 10, 40] },
-    tests: { name: 'Things tested', icon: '🧲', kind: 'sum', tiers: [3, 20, 80] },
-    breaks: { name: 'Broken in a test', icon: '💥', kind: 'sum', hidden: true },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
-    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
-    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
-    whittle: { name: 'Things whittled', icon: '🔪', kind: 'sum', tiers: [3, 20, 80] },
-    print: { name: '3D prints', icon: '🖨️', kind: 'sum', tiers: [3, 20, 80] },
-    nature: { name: 'Nature crafts', icon: '🌿', kind: 'sum', tiers: [3, 20, 80] },
-    lab: { name: 'Lab batches', icon: '🧪', kind: 'sum', tiers: [3, 20, 80] },
-    recycled: { name: 'Things recycled', icon: '♻️', kind: 'sum', tiers: [1, 10, 40] },
-    team: { name: 'Team projects', icon: '🤝', kind: 'sum', tiers: [1, 10, 40] },
-    planer: { name: 'Planks planed', icon: '🪚', kind: 'sum', tiers: [3, 20, 80] },
-    weld: { name: 'Welds', icon: '🔥', kind: 'sum', tiers: [3, 20, 80] },
-    forge: { name: 'Forged', icon: '⚒️', kind: 'sum', tiers: [3, 20, 80] },
-    pottery: { name: 'Pots fired', icon: '🏺', kind: 'sum', tiers: [3, 20, 80] },
-    sew: { name: 'Woven + sewn', icon: '🧵', kind: 'sum', tiers: [3, 20, 80] },
-    light: { name: 'Circuits lit', icon: '🔌', kind: 'sum', tiers: [3, 20, 80] },
-    glows: { name: 'Things that glow', icon: '💡', kind: 'sum', tiers: [1, 10, 40] },
-    gems: { name: 'Gems cut', icon: '💎', kind: 'sum', tiers: [3, 10, 50] },
-    engraved: { name: 'Names engraved', icon: '✍️', kind: 'sum', tiers: [1, 10, 40] },
-    blueprints: { name: 'Blueprint challenges', icon: '📐', kind: 'sum', tiers: [3, 20, 80] },
-    perfect: { name: 'Perfect blueprints (3 ⭐)', icon: '⭐', kind: 'sum', tiers: [1, 10, 40] },
-    latheStars: { name: 'Perfect lathe blueprints', icon: '🌀', kind: 'sum', hidden: true },
-    stoneStars: { name: 'Perfect gem blueprints', icon: '💎', kind: 'sum', hidden: true },
-    remixes: { name: 'Remixes', icon: '✨', kind: 'sum', tiers: [1, 10, 40] },
-    gifts: { name: 'Materials given', icon: '🎁', kind: 'sum', tiers: [3, 30, 150] },
-    shared: { name: 'Shared on the family shelf', icon: '🧺', kind: 'sum', tiers: [3, 30, 150] },
-    team: { name: 'Team projects', icon: '🤝', kind: 'sum', tiers: [1, 10, 40] },
-    matsMade: { name: 'Materials made in the lab', icon: '🧪', kind: 'sum', tiers: [3, 30, 150] },
-    showStars: { name: 'Best Design Show stars', icon: '🎭', kind: 'max', tiers: [3, 8, 15] },
-    daily: { name: 'Daily deliveries', icon: '📦', kind: 'sum', hidden: true },
-  },
-  'georead': {
-    games: { name: 'GeoRead games', icon: '🎮', kind: 'sum', hidden: true },
-    sounds: { name: 'Letter sounds found', icon: '🔊', kind: 'max', tiers: [10, 25, 45], unit: 'sounds' },
-    blends: { name: 'Words blended', icon: '💥', kind: 'sum', tiers: [10, 100, 500] },
-    built: { name: 'Words built', icon: '🧱', kind: 'sum', tiers: [10, 100, 500] },
-    perfects: { name: 'Perfect rounds', icon: '⭐', kind: 'sum', tiers: [20, 200, 1000] },
-    magic: { name: 'Magic e words', icon: '✨', kind: 'sum', tiers: [5, 30, 100] },
-    found: { name: 'Sounds picked by ear', icon: '👂', kind: 'sum', tiers: [10, 100, 400], hidden: true },
-    chapters: { name: 'Alphabet Road chapters', icon: '🗺️', kind: 'max', tiers: [1, 3, 6], unit: 'chapters' },
-    rhymes: { name: 'Rhymes found', icon: '🔁', kind: 'sum', tiers: [10, 100, 400] },
-    sight: { name: 'Sight words read', icon: '👀', kind: 'sum', tiers: [20, 200, 800] },
-    traced: { name: 'Letters traced', icon: '✏️', kind: 'sum', tiers: [10, 52, 300] },
-    cases: { name: 'Big + small matches', icon: '🅰️', kind: 'sum', tiers: [20, 150, 600] },
-    stories: { name: 'Stories read', icon: '📖', kind: 'sum', tiers: [3, 20, 100] },
-    sorted: { name: 'Word types sorted', icon: '🗂️', kind: 'sum', tiers: [20, 150, 600] },
-    said: { name: 'Words said out loud', icon: '🎤', kind: 'sum', tiers: [5, 50, 200] },
-  },
-  'geoscout': {
-    games: { name: 'GeoScout games', icon: '🎮', kind: 'sum', hidden: true },
-    snaps: { name: 'Blocks snapped (+)', icon: '🧲', kind: 'sum', tiers: [20, 200, 1000] },
-    splits: { name: 'Blocks split (−)', icon: '✂️', kind: 'sum', tiers: [10, 100, 500] },
-    copies: { name: 'Copies made (×)', icon: '✖️', kind: 'sum', tiers: [5, 50, 250] },
-    shares: { name: 'Fair shares (÷)', icon: '➗', kind: 'sum', tiers: [5, 50, 250] },
-    balances: { name: 'Scales balanced', icon: '⚖️', kind: 'sum', tiers: [10, 100, 500] },
-    compares: { name: 'Right > < = answers', icon: '🟰', kind: 'sum', tiers: [10, 100, 500] },
-    avatarWeighs: { name: 'Times you weighed yourself', icon: '🧑', kind: 'sum', tiers: [1, 10, 50] },
-    counts: { name: 'Numbers made', icon: '🎯', kind: 'sum', tiers: [10, 100, 500] },
-    perfect: { name: 'Perfect rounds', icon: '✅', kind: 'sum', tiers: [10, 100, 500] },
-    bestStreak: { name: 'Best perfect streak', icon: '🔥', kind: 'max', tiers: [4, 8, 10] },
-    tens: { name: 'Tens towers built', icon: '🔟', kind: 'sum', tiers: [10, 100, 500] },
-    wobble: { name: 'Exact towers', icon: '🏗️', kind: 'sum', tiers: [10, 100, 500] },
-    fractions: { name: 'Fractions right', icon: '🍕', kind: 'sum', tiers: [10, 100, 500] },
-    battleWins: { name: 'Tower battles won', icon: '⚔️', kind: 'sum', tiers: [1, 10, 50] },
-    journeys: { name: 'Journey chapters', icon: '📖', kind: 'max', tiers: [1, 3, 6] },
-    shapes: { name: 'Shapes built', icon: '🔷', kind: 'sum', tiers: [10, 100, 500] },
-    patterns: { name: 'Patterns solved', icon: '🧩', kind: 'sum', tiers: [10, 100, 500] },
-    battles: { name: 'Tower battles played', icon: '⚔️', kind: 'sum', hidden: true },
-  },
-  'wiscount': {   // 🃏🔢 WisCount (vs robot via saveLevelResult, 👥 2 players via saveFeats)
-    games: { name: 'WisCount matches', icon: '🎮', kind: 'sum', hidden: true },
-    wins: { name: 'WisCount wins', icon: '🔢', kind: 'sum', tiers: [1, 10, 50] },
-    sweeps: { name: 'WisCount 3-0 sweeps', icon: '🧹', kind: 'sum', tiers: [1, 5, 20] },
-  },
-  'wisjack': {   // 🃏🂡 WisJack
-    games: { name: 'WisJack matches', icon: '🎮', kind: 'sum', hidden: true },
-    wins: { name: 'WisJack wins', icon: '🂡', kind: 'sum', tiers: [1, 10, 50] },
-    sweeps: { name: 'WisJack 3-0 sweeps', icon: '🧹', kind: 'sum', tiers: [1, 5, 20] },
-    exact: { name: 'Exactly 20 (or 21)', icon: '🎯', kind: 'sum', tiers: [1, 10, 50] },
-  },
-  'wisdeck': {   // 🃏 WisDeck (plan 11z): quiz feats come with saveLevelResult, deck feats with saveWisDeck
-    games: { name: 'WisDeck quizzes', icon: '🎮', kind: 'sum', hidden: true },
-    right: { name: 'Right answers', icon: '✅', kind: 'sum', tiers: [50, 500, 3000] },
-    bestStreak: { name: 'Best answer streak', icon: '🔥', kind: 'max', tiers: [5, 10, 10] },
-    cards: { name: 'Cards won', icon: '🃏', kind: 'sum', tiers: [50, 500, 3000] },
-    fullCats: { name: 'Full categories', icon: '🎓', kind: 'max', tiers: [1, 5, 15] },
-    cosmic: { name: 'Cosmic cards', icon: '🌌', kind: 'max', tiers: [1, 5, 20] },
-    buzzWins: { name: 'WisBuzz wins', icon: '🔔', kind: 'sum', tiers: [1, 10, 50] },
-    buzzRight: { name: 'WisBuzz right answers', icon: '✅', kind: 'sum', tiers: [10, 100, 500] },
-    daily: { name: 'Daily decks played', icon: '📅', kind: 'sum', tiers: [1, 7, 30] },
-  },
-
-
-
-
-  'eyes-brain': {
-    games: { name: 'Eyes Brain games', icon: '🎮', kind: 'sum', hidden: true },
-    digits: { name: 'Digits remembered', icon: '🔢', kind: 'sum', tiers: [100, 1000, 10000] },
-    perfects: { name: 'Perfect rounds', icon: '✅', kind: 'sum', tiers: [10, 100, 500] },
-    bestCombo: { name: 'Best combo', icon: '🔥', kind: 'max', tiers: [3, 6, 10] },
-    longest: { name: 'Brain level (longest number)', icon: '🏅', kind: 'max', tiers: [6, 10, 14], unit: 'digits' },
-    challenge: { name: 'Longest Challenge', icon: '🏔️', kind: 'max', tiers: [6, 10, 15], unit: 'digits' },
-    backPerfects: { name: 'Backwards perfects', icon: '🔁', kind: 'sum', tiers: [5, 25, 100] },
-    listenPerfects: { name: 'Listen perfects', icon: '👂', kind: 'sum', tiers: [5, 25, 100] },
-    chainWins: { name: 'Chain wins', icon: '➕', kind: 'sum', tiers: [1, 10, 50] },
-    riots: { name: 'Brain riots', icon: '🧠', kind: 'sum', tiers: [1, 10, 50] },
-    daily: { name: 'Daily family numbers', icon: '🎯', kind: 'sum', tiers: [1, 7, 30] },
-  },
-  'polyplot': {
-    games: { name: 'Polyplot games', icon: '🎮', kind: 'sum', hidden: true },
-    wins: { name: 'Plot Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
-    boxes: { name: 'Shape Maker', icon: '⬛', kind: 'sum', tiers: [50, 500, 3000] },
-    bestChain: { name: 'Longest chain', icon: '🔗', kind: 'max', tiers: [3, 6, 10] },
-    chains3: { name: 'Chains of 3+', icon: '⛓️', kind: 'sum', tiers: [3, 30, 150] },
-    catches: { name: 'Creature Catcher', icon: '🪤', kind: 'sum', tiers: [5, 50, 300] },
-    hidden: { name: 'Hidden Finder', icon: '🐾', kind: 'sum', tiers: [1, 10, 50] },
-    legend: { name: 'Legend Tamer', icon: '🐉', kind: 'sum', tiers: [1, 3, 10] },
-    coins: { name: 'Coin Collector', icon: '🪙', kind: 'sum', tiers: [20, 200, 1000] },
-    cards: { name: 'Card Player', icon: '🃏', kind: 'sum', tiers: [3, 30, 150] },
-    events: { name: 'Storm Survivor', icon: '🌪️', kind: 'sum', tiers: [5, 50, 250] },
-    doors: { name: 'Door Maker', icon: '🚪', kind: 'sum', tiers: [1, 10, 50] },
-    built: { name: 'Fort Builder', icon: '🏗️', kind: 'sum', tiers: [5, 50, 250] },
-    monsters: { name: 'Monster Stopper', icon: '👹', kind: 'sum', tiers: [5, 50, 250] },
-    bestWave: { name: 'Waves held', icon: '🛡️', kind: 'max', tiers: [5, 10, 20] },
-    fortWins: { name: 'Fort Winner', icon: '🏰', kind: 'sum', tiers: [1, 10, 50] },
-    huntGames: { name: 'Hunt games', icon: '🏹', kind: 'sum', hidden: true },
-  },
-  'soul-bopper': {
-    wins: { name: 'Bopper Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
-    catches: { name: 'Player Catcher', icon: '💥', kind: 'sum', tiers: [5, 50, 300] },
-    bots: { name: 'Bot Popper', icon: '🤖', kind: 'sum', tiers: [10, 100, 500] },
-    blocks: { name: 'Block Breaker', icon: '🧱', kind: 'sum', tiers: [100, 1000, 5000] },
-    chains: { name: 'Chain Reactor', icon: '🔗', kind: 'sum', tiers: [5, 50, 250] },
-    kicks: { name: 'Bomb Kicker', icon: '👢', kind: 'sum', tiers: [5, 50, 200] },
-    tosses: { name: 'Bomb Tosser', icon: '🤾', kind: 'sum', tiers: [5, 50, 200] },
-    comebacks: { name: 'Comeback Kid', icon: '👻', kind: 'sum', tiers: [1, 10, 50] },
-    multi: { name: 'Multi Catch', icon: '🎯', kind: 'max', tiers: [2, 3, 4] },
-    triple: { name: 'Triple Pop', icon: '💫', kind: 'sum', tiers: [1, 5, 20] },
-    pooWins: { name: 'Poo Commander', icon: '💩', kind: 'sum', tiers: [1, 5, 25] },
-    holdWins: { name: 'Land Holder', icon: '🏳️', kind: 'sum', tiers: [1, 5, 25] },
-    holdSecs: { name: 'Seconds in the zone', icon: '🏳️', kind: 'sum', hidden: true },
-    bestWin: { name: 'Best battle level won', icon: '⚔️', kind: 'max', hidden: true },
-    games: { name: 'Soul Bopper games', icon: '🎮', kind: 'sum', hidden: true },
-    pooGames: { name: 'Classic Avatar games', icon: '💩', kind: 'sum', hidden: true },
-    pickups: { name: 'Power-ups grabbed', icon: '✨', kind: 'sum', hidden: true },
-    stages: { name: 'Stage Explorer', icon: '🗺️', kind: 'sum', tiers: [5, 30, 100] },
-    bosses: { name: 'Boss Breaker', icon: '👑', kind: 'sum', tiers: [1, 3, 7] },
-    w_dino: { name: 'Dino world stages', icon: '🦖', kind: 'max', hidden: true }, w_sea: { name: 'Sea world stages', icon: '🐙', kind: 'max', hidden: true }, w_dance: { name: 'Dance world stages', icon: '🪩', kind: 'max', hidden: true }, w_robot: { name: 'Robot world stages', icon: '🤖', kind: 'max', hidden: true },
-    w_space: { name: 'Space world stages', icon: '🪐', kind: 'max', hidden: true }, w_sky: { name: 'Sky world stages', icon: '☁️', kind: 'max', hidden: true }, w_zombie: { name: 'Zombie world stages', icon: '🧟', kind: 'max', hidden: true },
-    // per world (bomb skin evolution): g_ games, c_ catches, wl_ best level won vs bots (level + 1)
-    g_dino: { name: 'Dino games', icon: '🦖', kind: 'sum', hidden: true }, g_sea: { name: 'Sea games', icon: '🐙', kind: 'sum', hidden: true }, g_dance: { name: 'Dance games', icon: '🪩', kind: 'sum', hidden: true }, g_robot: { name: 'Robot games', icon: '🤖', kind: 'sum', hidden: true }, g_space: { name: 'Space games', icon: '🪐', kind: 'sum', hidden: true }, g_sky: { name: 'Sky games', icon: '☁️', kind: 'sum', hidden: true }, g_zombie: { name: 'Zombie games', icon: '🧟', kind: 'sum', hidden: true },
-    c_dino: { name: 'Dino catches', icon: '🦖', kind: 'sum', hidden: true }, c_sea: { name: 'Sea catches', icon: '🐙', kind: 'sum', hidden: true }, c_dance: { name: 'Dance catches', icon: '🪩', kind: 'sum', hidden: true }, c_robot: { name: 'Robot catches', icon: '🤖', kind: 'sum', hidden: true }, c_space: { name: 'Space catches', icon: '🪐', kind: 'sum', hidden: true }, c_sky: { name: 'Sky catches', icon: '☁️', kind: 'sum', hidden: true }, c_zombie: { name: 'Zombie catches', icon: '🧟', kind: 'sum', hidden: true },
-    wl_dino: { name: 'Dino best win', icon: '🦖', kind: 'max', hidden: true }, wl_sea: { name: 'Sea best win', icon: '🐙', kind: 'max', hidden: true }, wl_dance: { name: 'Dance best win', icon: '🪩', kind: 'max', hidden: true }, wl_robot: { name: 'Robot best win', icon: '🤖', kind: 'max', hidden: true }, wl_space: { name: 'Space best win', icon: '🪐', kind: 'max', hidden: true }, wl_sky: { name: 'Sky best win', icon: '☁️', kind: 'max', hidden: true }, wl_zombie: { name: 'Zombie best win', icon: '🧟', kind: 'max', hidden: true },
-  },
-  'alignext': {   // 🔴 Drop
-    wins: { name: 'Drop Winner', icon: '🔴', kind: 'sum', tiers: [1, 10, 50] },
-    lines: { name: 'Line Maker', icon: '〰️', kind: 'sum', tiers: [5, 50, 250] },
-    perfect: { name: 'Clean Sweep', icon: '✨', kind: 'sum', tiers: [1, 10, 30] },
-    series: { name: 'Best of 3 Champ', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },
-    cards: { name: 'Card Player', icon: '🃏', kind: 'sum', tiers: [5, 25, 100] },
-    flips: { name: 'Stand Flipper', icon: '🪜', kind: 'sum', tiers: [1, 5, 20] },
-    games: { name: 'Drop games', icon: '🎮', kind: 'sum', hidden: true },
-  },
-  'omnifile': {   // ❌⭕ Omnifile
-    wins: { name: 'Omnifile Winner', icon: '❌', kind: 'sum', tiers: [1, 10, 50] },
-    lines: { name: 'Corner Thinker', icon: '〰️', kind: 'sum', tiers: [5, 50, 250] },
-    perfect: { name: 'No Chance Given', icon: '✨', kind: 'sum', tiers: [1, 10, 30] },
-    series: { name: 'Omni Best of 3', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },
-    cards: { name: 'Omni Card Player', icon: '🃏', kind: 'sum', tiers: [5, 25, 100] },
-    covers: { name: 'Stack Coverer', icon: '⬇️', kind: 'sum', tiers: [5, 30, 150] },
-    stackWins: { name: 'Stack Winner', icon: '♟️', kind: 'sum', tiers: [1, 10, 50] },
-    powers: { name: 'Power Mover', icon: '⚡', kind: 'sum', tiers: [3, 25, 100] },
-    games: { name: 'Omnifile games', icon: '🎮', kind: 'sum', hidden: true },
-  },
-  'snakeast': {   // 🍎 Snakeast
-    wins: { name: 'Feast Winner', icon: '🍎', kind: 'sum', tiers: [1, 10, 50] },
-    eaten: { name: 'Snake Snacker', icon: '🍏', kind: 'sum', tiers: [50, 500, 3000] },
-    longest: { name: 'Long Snake', icon: '🐍', kind: 'max', unit: 'long', tiers: [15, 30, 50] },
-    golds: { name: 'Golden Eater', icon: '✨', kind: 'sum', tiers: [5, 50, 250] },
-    goldRow: { name: 'Golden Streak', icon: '🥇', kind: 'max', tiers: [2, 3, 5] },
-    endless: { name: 'Endless Best', icon: '♾️', kind: 'max', tiers: [500, 3000, 15000] },
-    skills: { name: 'Skill Snake', icon: '⚡', kind: 'sum', tiers: [5, 50, 250] },
-    duelWins: { name: 'Snake Duel Champ', icon: '👥', kind: 'sum', tiers: [1, 10, 50] },
-    games: { name: 'Snakeast games', icon: '🎮', kind: 'sum', hidden: true },
-    end0: { name: 'Endless Basic', icon: '♾️', kind: 'max', hidden: true }, end1: { name: 'Endless Junior', icon: '♾️', kind: 'max', hidden: true }, end2: { name: 'Endless Intermediate', icon: '♾️', kind: 'max', hidden: true },
-    end3: { name: 'Endless Hard', icon: '♾️', kind: 'max', hidden: true }, end4: { name: 'Endless Extreme', icon: '♾️', kind: 'max', hidden: true }, end5: { name: 'Endless Hardcore', icon: '♾️', kind: 'max', hidden: true },
-  },
-  'snakigate': {   // 🧭 Snakigate
-    wins: { name: 'Slither Winner', icon: '🧭', kind: 'sum', tiers: [1, 10, 50] },
-    eaten: { name: 'Dot Gobbler', icon: '🟡', kind: 'sum', tiers: [100, 1000, 6000] },
-    longest: { name: 'Mega Snake', icon: '🐉', kind: 'max', unit: 'long', tiers: [40, 100, 200] },
-    popped: { name: 'Snake Popper', icon: '💥', kind: 'sum', tiers: [3, 25, 150] },
-    skills: { name: 'Arena Skills', icon: '⚡', kind: 'sum', tiers: [5, 50, 250] },
-    duelWins: { name: 'Arena Duel Champ', icon: '👥', kind: 'sum', tiers: [1, 10, 50] },
-    games: { name: 'Snakigate games', icon: '🎮', kind: 'sum', hidden: true },
-  },
-  'snakastle': {   // 🏰 Snakastle
-    wins: { name: 'Castle Winner', icon: '🏰', kind: 'sum', tiers: [1, 10, 50] },
-    land: { name: 'Land Claimer', icon: '🗺️', kind: 'max', unit: '%', tiers: [30, 50, 70] },
-    flags: { name: 'Flag Planter', icon: '🚩', kind: 'sum', tiers: [10, 100, 600] },
-    cuts: { name: 'Trail Cutter', icon: '✂️', kind: 'sum', tiers: [1, 10, 50] },
-    eaten: { name: 'Castle Snacker', icon: '🍎', kind: 'sum', tiers: [20, 200, 1500] },
-    longest: { name: 'Castle Snake', icon: '🐍', kind: 'max', unit: 'long', tiers: [10, 25, 50] },
-    skills: { name: 'Castle Skills', icon: '⚡', kind: 'sum', tiers: [5, 50, 250] },
-    duelWins: { name: 'Land Race Champ', icon: '👥', kind: 'sum', tiers: [1, 10, 50] },
-    games: { name: 'Snakastle games', icon: '🎮', kind: 'sum', hidden: true },
-  },
-  // (per-world feats for 🐍 snake skins are added below FEAT_DEFS: g_<world> games · f_<world> food · l_<world> longest · w_<world> best level won + 1)
-  'snaketale': {   // 📜 Snaketale (story — feats only, no board)
-    stages: { name: 'Story Stages', icon: '📜', kind: 'max', tiers: [5, 20, 42] },
-    chapters: { name: 'Tale Chapters', icon: '📖', kind: 'max', tiers: [1, 3, 6] },
-    bosses: { name: 'Boss Beater', icon: '👑', kind: 'max', tiers: [1, 3, 6] },
-    stars: { name: 'Story Stars', icon: '⭐', kind: 'max', tiers: [20, 70, 126] },
-    eaten: { name: 'Story Snacks', icon: '🍎', kind: 'sum', hidden: true },
-  },
-  'brawl-buddies': {
-    wins: { name: 'Brawl Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
-    bonks: { name: 'Bonk Machine', icon: '👊', kind: 'sum', tiers: [50, 500, 3000] },
-    combo: { name: 'Combo Star', icon: '🔥', kind: 'max', tiers: [3, 6, 10] },
-    juggle: { name: 'Sky Juggler', icon: '🌟', kind: 'max', tiers: [2, 4, 5] },
-    uppers: { name: 'Uppercut Rocket', icon: '🚀', kind: 'sum', tiers: [5, 50, 250] },
-    perfects: { name: 'Untouchable', icon: '✨', kind: 'sum', tiers: [1, 10, 50] },
-    powers: { name: 'Power Pusher', icon: '🌀', kind: 'sum', tiers: [5, 50, 200] },
-    duoWins: { name: 'Family Brawl Champ', icon: '👥', kind: 'sum', tiers: [1, 10, 50] },
-    grabs: { name: 'Grapple Champ', icon: '🤼', kind: 'sum', tiers: [1, 25, 150] },
-    breaks: { name: 'Guard Smasher', icon: '🔨', kind: 'sum', tiers: [1, 20, 100] },
-    techs: { name: 'Wriggle Wizard', icon: '🪄', kind: 'sum', tiers: [1, 10, 50] },
-    tags: { name: 'Tag Team', icon: '🔁', kind: 'sum', tiers: [1, 25, 150] },
-    sky: { name: 'Sky Combos', icon: '🌟', kind: 'sum', hidden: true },
-    matches: { name: 'Brawls', icon: '🥊', kind: 'sum', hidden: true },
-  },
-  'brawenture': {   // 🗺️ Brawenture (plan 11i-2)
-    tales: { name: 'Family Rescuer', icon: '🗺️', kind: 'sum', tiers: [1, 6, 20] },
-    puzzles: { name: 'Puzzle Pro', icon: '🧩', kind: 'sum', tiers: [3, 25, 100] },
-    bosses: { name: 'Boss Buster', icon: '😈', kind: 'sum', tiers: [1, 10, 40] },
-    found: { name: 'Treasure Finder', icon: '🧸', kind: 'sum', tiers: [3, 18, 50] },
-    kos: { name: 'Baddie Bonker', icon: '👊', kind: 'sum', tiers: [25, 250, 1500] },
-    coop: { name: 'Team Adventurer', icon: '👥', kind: 'sum', tiers: [1, 10, 30] },
-    hardcore: { name: 'Brave Hero', icon: '💀', kind: 'sum', tiers: [1, 3, 6] },
-    t1: { name: 'Playground Rumble', icon: '🛝', kind: 'max', hidden: true }, t2: { name: 'Candy Factory Defense', icon: '🍭', kind: 'max', hidden: true },
-    t3: { name: 'Castle Climb', icon: '🏰', kind: 'max', hidden: true }, t4: { name: 'Zombie Crawl', icon: '🧟', kind: 'max', hidden: true },
-    t5: { name: 'Monster Outbreak', icon: '👾', kind: 'max', hidden: true }, t6: { name: 'Undersea Rescue', icon: '🧜', kind: 'max', hidden: true },
-    runs: { name: 'Adventures', icon: '🗺️', kind: 'sum', hidden: true },
-  },
-  checkers: {
-    doubles: { name: 'Double Jumper', icon: '🐸', kind: 'sum', tiers: [1, 10, 25] },
-    triples: { name: 'Triple Jumper', icon: '🦘', kind: 'sum', tiers: [1, 5, 15] },
-    megas: { name: 'Mega Jumper', icon: '⚡', kind: 'sum', tiers: [1, 3, 10] },
-    kings: { name: 'King Maker', icon: '👑', kind: 'sum', tiers: [1, 10, 25] },
-    wins: { name: 'Checkers Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 30] },
-    perfect: { name: 'Flawless Win', icon: '💎', kind: 'sum', tiers: [1, 3, 10] },
-  },
-  chess: {
-    castles: { name: 'Castle Builder', icon: '🏰', kind: 'sum', tiers: [1, 10, 25] },
-    promos: { name: 'Pawn Promoter', icon: '✨', kind: 'sum', tiers: [1, 5, 15] },
-    enpassant: { name: 'En Passant', icon: '🥷', kind: 'sum', tiers: [1, 3, 10] },
-    forks: { name: 'Fork Finder', icon: '🍴', kind: 'sum', tiers: [1, 10, 25] },
-    checks: { name: 'Check Caller', icon: '♚', kind: 'sum', tiers: [5, 25, 100] },
-    dchecks: { name: 'Double Check', icon: '⚡', kind: 'sum', tiers: [1, 3, 10] },
-    mates: { name: 'Checkmater', icon: '🏆', kind: 'sum', tiers: [1, 10, 30] },
-    fastMate: { name: 'Quick Checkmate', icon: '⏱️', kind: 'min', tiers: [40, 25, 15], unit: 'moves' },
-  },
-  room: {
-    jumps: { name: 'Jumps', icon: '🦘', kind: 'sum', hidden: true },
-    crawl: { name: 'Belly crawl', icon: '🐛', kind: 'sum', hidden: true },
-    gestures: { name: 'Room moves', icon: '💃', kind: 'sum', hidden: true },
-    placed: { name: 'Room things placed', icon: '🪴', kind: 'max', hidden: true },
-    visits: { name: 'Rooms visited', icon: '🚪', kind: 'sum', hidden: true },
-    gifts: { name: 'Gifts sent', icon: '💝', kind: 'sum', hidden: true },
-    received: { name: 'Gifts received', icon: '🎁', kind: 'sum', hidden: true },
-    cleans: { name: 'Rooms tidied', icon: '🧹', kind: 'sum', hidden: true },
-  },
-  app: {
-    archive: { name: 'Archive visits', icon: '🏆', kind: 'sum', hidden: true },
-    looks: { name: 'Look changes', icon: '🎨', kind: 'sum', hidden: true },
-  },
-  pinball: {
-    topScore: { name: 'High Scorer', icon: '🏆', kind: 'max', tiers: [25000, 75000, 150000] },
-    maxCombo: { name: 'Combo Star', icon: '🔥', kind: 'max', tiers: [10, 20, 35] },
-    jackpots: { name: 'Jackpot', icon: '🎰', kind: 'sum', tiers: [1, 5, 15] },
-    multiballs: { name: 'Multiball', icon: '🎱', kind: 'sum', tiers: [1, 10, 30] },
-    scenes: { name: 'Bonus Explorer', icon: '🎪', kind: 'sum', tiers: [1, 5, 15] },
-    scene_carnival: { name: 'Big Top', icon: '🎪', kind: 'sum', hidden: true },
-    scene_castle: { name: 'Dragon\'s Den', icon: '🐉', kind: 'sum', hidden: true },
-    scene_space: { name: 'Wormhole', icon: '🌀', kind: 'sum', hidden: true },
-    scene_sea: { name: 'Coral Reef', icon: '🪸', kind: 'sum', hidden: true },
-    scene_zombie: { name: 'Graveyard Party', icon: '🪦', kind: 'sum', hidden: true },
-    scene_sport: { name: 'Goal Rush', icon: '🥅', kind: 'sum', hidden: true },
-    scene_monster: { name: 'Catch Zone', icon: '🫧', kind: 'sum', hidden: true },
-    breakouts: { name: 'Break-out', icon: '💥', kind: 'sum', hidden: true },
-    skills: { name: 'Skill Shot', icon: '🎯', kind: 'sum', tiers: [1, 10, 25] },
-    words: { name: 'Word Wizard', icon: '🔤', kind: 'sum', tiers: [1, 10, 25] },
-    boxes: { name: 'Mystery Opener', icon: '🎁', kind: 'sum', tiers: [1, 10, 30] },
-    buddy: { name: 'Buddy Bonus', icon: '🐒', kind: 'sum', tiers: [1, 5, 15] },
-    chain: { name: 'Lucky Streak', icon: '🍀', kind: 'max', tiers: [3, 5, 10] },
-  },
-  hopper: {
-    bestRows: { name: 'Far Hopper', icon: '🐸', kind: 'max', tiers: [30, 75, 150] },
-    coins: { name: 'Coin Hopper', icon: '🪙', kind: 'sum', tiers: [50, 250, 1000] },
-    gems: { name: 'Gem Finder', icon: '💎', kind: 'sum', tiers: [1, 10, 40] },
-    checkpoints: { name: 'Flag Catcher', icon: '🏁', kind: 'sum', tiers: [1, 10, 40] },
-    nearMiss: { name: 'Close Call', icon: '😱', kind: 'sum', tiers: [5, 25, 100] },
-    rows: { name: 'Rows hopped', icon: '🐾', kind: 'sum', hidden: true },
-  },
-  turbo: {
-    topSpeed: { name: 'Speedster', icon: '🚀', kind: 'max', unit: 'km/h', tiers: [120, 160, 200] },
-    overtakes: { name: 'Overtaker', icon: '🏎️', kind: 'sum', tiers: [25, 150, 500] },
-    jumps: { name: 'Jumper', icon: '🦘', kind: 'sum', tiers: [5, 30, 100] },
-    drift: { name: 'Drifter', icon: '🌀', kind: 'sum', unit: 's', tiers: [10, 60, 200] },
-    coins: { name: 'Coin Racer', icon: '🪙', kind: 'sum', tiers: [50, 250, 1000] },
-    wins: { name: 'Race Winner', icon: '🥇', kind: 'sum', tiers: [1, 5, 20] },
-    nearMiss: { name: 'Close Shave', icon: '😱', kind: 'sum', hidden: true },
-    metres: { name: 'Distance driven', icon: '🐾', kind: 'sum', unit: 'm', hidden: true },
-  },
-  workshop: {
-    made: { name: 'Maker', icon: '🔨', kind: 'sum', tiers: [1, 5, 15] },
-    topStars: { name: 'Show Star', icon: '🌟', kind: 'max', tiers: [3, 8, 15] },
-    votes: { name: 'Fair Judge', icon: '🗳️', kind: 'sum', tiers: [3, 15, 40] },
-    given: { name: 'Kind Crafter', icon: '🎁', kind: 'sum', tiers: [1, 5, 15] },
-  },
-  'number-grid': {
-    solved: { name: 'Grids Solved', icon: '🔢', kind: 'sum', tiers: [5, 25, 100] },
-    lines: { name: 'Happy Lines', icon: '🎉', kind: 'sum', tiers: [20, 100, 400] },
-    perfect: { name: 'Perfect Grid', icon: '💯', kind: 'sum', tiers: [1, 5, 20] },
-    cells: { name: 'Squares Filled', icon: '🔲', kind: 'sum', hidden: true },
-    rounds: { name: 'Rounds', icon: '🔢', kind: 'sum', hidden: true },
-  },
-  'pop-blocks': {
-    popped: { name: 'Block Popper', icon: '🫧', kind: 'sum', tiers: [200, 1000, 5000] },
-    bigGroup: { name: 'Big Group', icon: '💥', kind: 'max', tiers: [8, 12, 20] },
-    powers: { name: 'Power Blaster', icon: '🚀', kind: 'sum', tiers: [5, 25, 100] },
-    allClear: { name: 'Clean Sweep', icon: '🧹', kind: 'sum', tiers: [1, 5, 20] },
-    bestCombo: { name: 'Combo', icon: '🔥', kind: 'max', tiers: [2, 4, 8] },
-    rounds: { name: 'Rounds', icon: '🫧', kind: 'sum', hidden: true },
-  },
-  'block-drop': {
-    lines: { name: 'Row Clearer', icon: '🧱', kind: 'sum', tiers: [50, 250, 1000] },
-    quads: { name: 'Block Blast', icon: '💥', kind: 'sum', tiers: [1, 10, 50] },
-    pieces: { name: 'Blocks Dropped', icon: '🔷', kind: 'sum', hidden: true },
-    rounds: { name: 'Rounds', icon: '🧱', kind: 'sum', hidden: true },
-  },
-  'pose-party': {
-    poses: { name: 'Poses Matched', icon: '📷', kind: 'sum', tiers: [20, 150, 600] },
-    perfect: { name: 'Perfect Pose', icon: '💯', kind: 'sum', tiers: [1, 10, 50] },
-    bestPct: { name: 'Best Match', icon: '🎯', kind: 'max', unit: '%', tiers: [80, 90, 98] },
-    speedBest: { name: 'Speed Poser', icon: '⏱️', kind: 'max', tiers: [8, 15, 25] },
-    copyBest: { name: 'Copy Cat', icon: '🪞', kind: 'max', tiers: [5, 8, 10] },
-    danceBest: { name: 'Dance Star', icon: '💃', kind: 'max', tiers: [1500, 4000, 10000] },   // 📷 best Dance chain score (pose chat S2b-4)
-    groupBest: { name: 'Team Poser', icon: '🧑‍🤝‍🧑', kind: 'max', tiers: [4, 8, 10] },   // most group shapes in one game
-    booths: { name: 'Photo Booth Artist', icon: '📸', kind: 'sum', tiers: [1, 10, 30] },   // Photo Booth pictures downloaded
-    statueBest: { name: 'Statue Star', icon: '🗿', kind: 'max', unit: 's', tiers: [20, 45, 90] },   // most seconds held in one Statue Hold game (S4)
-    freezeBest: { name: 'Ice Cube', icon: '🧊', kind: 'max', tiers: [3, 5, 8] },   // perfect freezes in one Freeze Dance
-    freezeSecs: { name: 'Frozen seconds', icon: '❄️', kind: 'sum', hidden: true, tiers: [30, 150, 600] },
-    mirrorBest: { name: 'Mirror Twins', icon: '🪞', kind: 'max', tiers: [3, 6, 10] },   // mirror rounds matched in one game (S5)
-    lettersMade: { name: 'Body Letters', icon: '🔤', kind: 'sum', tiers: [10, 50, 200] },   // letters made with the body (S6)
-    posesBuilt: { name: 'Pose Builder', icon: '🛠️', kind: 'max', tiers: [1, 5, 15] },   // own poses in My poses (S7)
-  },
-  // 🔥 PyraDive feats (pd-1): plan §11 titles per action
-  'pyraspike': {
-    wins: { name: 'Pyra Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
-    aces: { name: 'Ace Driver', icon: '🚀', kind: 'sum', tiers: [5, 30, 100] },
-    kills: { name: 'Spirit Dunker', icon: '💥', kind: 'sum', tiers: [10, 100, 500] },
-    assists: { name: 'Ghost Dinker', icon: '🪶', kind: 'sum', tiers: [10, 100, 500] },
-    digs: { name: 'Floor Guardian', icon: '🛡️', kind: 'sum', tiers: [10, 100, 500] },
-    dives: { name: 'PyraDiver', icon: '🤸', kind: 'sum', tiers: [5, 50, 200] },
-    stuffs: { name: 'Wall Titan', icon: '🧱', kind: 'sum', tiers: [3, 30, 150] },
-    sets: { name: 'Sky Setter', icon: '🙌', kind: 'sum', tiers: [20, 200, 1000] },
-    bumps: { name: 'Perfect Passer', icon: '🤚', kind: 'sum', tiers: [20, 200, 1000] },
-    pyras: { name: 'Flame Starter', icon: '🔥', kind: 'sum', tiers: [5, 50, 250] },
-    rally: { name: 'Rally King / Queen', icon: '🔁', kind: 'max', tiers: [10, 20, 40] },
-    games: { name: 'PyraDive matches', icon: '🏐', kind: 'sum', hidden: true },
-    dinks: { name: 'Dinks', icon: '🪶', kind: 'sum', hidden: true },
-    dunks: { name: 'Dunks', icon: '💥', kind: 'sum', hidden: true },
-    drives: { name: 'Serves', icon: '🚀', kind: 'sum', hidden: true },
-    blocks: { name: 'Blocks', icon: '🧱', kind: 'sum', hidden: true },
-    m_beach: { name: 'Beach 2v2 wins', icon: '🏖️', kind: 'sum', hidden: true },
-    m_small: { name: 'Small 3v3 wins', icon: '🏫', kind: 'sum', hidden: true },
-    m_full: { name: 'Full 6v6 wins', icon: '🏟️', kind: 'sum', hidden: true },
-    traps: { name: 'Sticky Feet', icon: '🦵', kind: 'sum', tiers: [20, 200, 1000] },
-    pops: { name: 'Pop Star', icon: '⬆️', kind: 'sum', tiers: [20, 200, 1000] },
-    edges: { name: 'Edge Lord', icon: '💥', kind: 'sum', tiers: [3, 30, 150] },
-    feeds: { name: 'Toss Buddy', icon: '🤲', kind: 'sum', tiers: [10, 100, 500] },
-    hoops: { name: 'Hoop Master', icon: '⭕', kind: 'sum', tiers: [5, 50, 250] },
-    streak_juggle: { name: 'Juggle Star', icon: '🤹', kind: 'max', tiers: [10, 25, 50] },
-    spirits: { name: 'Spirit Diver', icon: '🔥', kind: 'sum', tiers: [1, 20, 100] },
-    duos: { name: 'Duo Spirit', icon: '🔥🔥', kind: 'sum', tiers: [1, 10, 50] },
-    trios: { name: 'Trio Legend', icon: '🔥🔥🔥', kind: 'sum', tiers: [1, 5, 25] },
-    beasts: { name: 'Beast Keeper', icon: '📖', kind: 'max', tiers: [10, 25, 50] },
-    cups: { name: 'PyraChamp', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },
-    familyCups: { name: 'Captain Flame', icon: '👑', kind: 'sum', tiers: [1, 3, 10] },
-    drill_zone: { name: 'Zone Hits best', icon: '🎯', kind: 'max', hidden: true },
-    drill_combo: { name: 'Body Combo best', icon: '🔗', kind: 'max', hidden: true },
-    drill_run: { name: 'Rally Run best', icon: '🏃', kind: 'max', hidden: true },
-    drill_juggle: { name: 'Juggle best', icon: '🤹', kind: 'max', hidden: true },
-    m_strikesolo: { name: 'Strike 1v1 wins', icon: '🦶', kind: 'sum', hidden: true },
-    m_strikeduo: { name: 'Strike Duo wins', icon: '🦵', kind: 'sum', hidden: true },
-    m_strikeregu: { name: 'Strike Regu wins', icon: '🧶', kind: 'sum', hidden: true },
-    m_hoop: { name: 'Hoop Takraw wins', icon: '⭕', kind: 'sum', hidden: true },
-    m_sparksolo: { name: 'Spark 1v1 wins', icon: '⚡', kind: 'sum', hidden: true },
-    m_sparkduo: { name: 'Spark Duo wins', icon: '🌩️', kind: 'sum', hidden: true },
-    m_zonehits: { name: 'Zone Hits played', icon: '🎯', kind: 'sum', hidden: true },
-    m_combo: { name: 'Body Combo played', icon: '🔗', kind: 'sum', hidden: true },
-    m_rallyrun: { name: 'Rally Run played', icon: '🏃', kind: 'sum', hidden: true },
-    m_juggle: { name: 'Juggle played', icon: '🤹', kind: 'sum', hidden: true },
-    m_party: { name: 'Spark Party wins', icon: '🌀', kind: 'sum', hidden: true },
-    m_cupfour: { name: 'Cup of 4 played', icon: '🏆', kind: 'sum', hidden: true },
-    m_cupeight: { name: 'Cup of 8 played', icon: '🏆', kind: 'sum', hidden: true },
-    m_familycup: { name: 'Family Cup played', icon: '👑', kind: 'sum', hidden: true },
-  },
-  'blasoff': {   // ⚽ bo-1
-    wins: { name: 'Match Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
-    goals: { name: 'Golden Boot', icon: '⚽', kind: 'sum', tiers: [10, 100, 500] },
-    bestGoals: { name: 'Hat-trick Hero', icon: '🎩', kind: 'max', tiers: [2, 3, 5] },
-    assists: { name: 'Playmaker', icon: '🅰️', kind: 'sum', tiers: [5, 50, 200] },
-    tricks: { name: 'Trick Master', icon: '🌀', kind: 'sum', tiers: [10, 100, 500] },
-    volleys: { name: 'Volley Hero', icon: '🎯', kind: 'sum', tiers: [3, 30, 100] },
-    shoutSaves: { name: "Keeper's Voice", icon: '📣', kind: 'sum', tiers: [3, 25, 100] },
-    tackles: { name: 'Ball Winner', icon: '🦶', kind: 'sum', tiers: [10, 100, 500] },
-    cleanSheets: { name: 'Clean Sheet', icon: '🧤', kind: 'sum', tiers: [1, 10, 50] },
-    headers: { name: 'Header Hero', icon: '🤕', kind: 'sum', tiers: [3, 30, 100] },
-    matches: { name: 'Matches', icon: '⚽', kind: 'sum', hidden: true },
-    win_4v4: { name: '4v4 wins', icon: '⚽', kind: 'sum', hidden: true },
-    win_7v7: { name: '7v7 wins', icon: '🏟️', kind: 'sum', hidden: true },
-    win_11v11: { name: '11v11 wins', icon: '🌍', kind: 'sum', hidden: true },   // 🌍 bo-2a
-    win_5v5: { name: 'Futsal wins', icon: '🥅', kind: 'sum', hidden: true },   // 🏟️ bo-2b
-    win_1v1: { name: 'Street wins', icon: '🏙️', kind: 'sum', hidden: true },
-    nutmegs: { name: 'Nutmeg King', icon: '🥜', kind: 'sum', tiers: [3, 25, 100] },
-    perfects: { name: 'Perfect Timing', icon: '⚡', kind: 'sum', tiers: [5, 50, 200] },   // ⚡ bo-2c
-    blasts: { name: 'Star Blaster', icon: '🔥', kind: 'sum', tiers: [1, 10, 50] },
-    skills: { name: 'Skill challenges', icon: '🎯', kind: 'sum', hidden: true },   // 🎯 bo-3a
-    skillStars: { name: 'Skill Star', icon: '⭐', kind: 'sum', tiers: [10, 50, 150] },
-    juggles: { name: 'Keepy-ups', icon: '🦶', kind: 'max', tiers: [10, 25, 50] },
-    win_pens: { name: 'Shootout wins', icon: '🥅', kind: 'sum', hidden: true },
-    win_battle: { name: 'Tricks Battle wins', icon: '🎤', kind: 'sum', tiers: [1, 10, 50] },   // 🎤 bo-3b
-    win_party: { name: 'Party ball wins', icon: '🎉', kind: 'sum', tiers: [1, 10, 50] },   // 🎉 bo-3c
-    cups: { name: 'Cup Winner', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },   // 🏆 r4c (r4a cups)
-    leagues: { name: 'League Champion', icon: '📊', kind: 'sum', tiers: [1, 5, 20] },
-    familyCups: { name: 'Family Captain', icon: '👑', kind: 'sum', tiers: [1, 5, 20] },
-    taleChapters: { name: 'Kick Tale', icon: '📜', kind: 'max', tiers: [1, 3, 6] },   // 📜 r4c (r4b story)
-    taleSteps: { name: 'Kick Tale steps', icon: '📜', kind: 'max', hidden: true },
-    cupPlays: { name: 'Cup matches', icon: '🏆', kind: 'sum', hidden: true },
-    leaguePlays: { name: 'League matches', icon: '📊', kind: 'sum', hidden: true },
-    familyPlays: { name: 'Family cup matches', icon: '👑', kind: 'sum', hidden: true },
-  },
-  // 🔍 Pokadif feats (pk-1)
-  'pokadif': {
-    found: { name: 'Differences found', icon: '🔎', kind: 'sum', tiers: [20, 200, 1000] },
-    cases: { name: 'Cases closed', icon: '📁', kind: 'sum', tiers: [3, 30, 100] },
-    perfect: { name: 'Perfect pictures', icon: '🦅', kind: 'sum', tiers: [5, 50, 200] },
-    quick: { name: 'Fastest picture', icon: '⚡', kind: 'min', tiers: [40, 20, 10], unit: 's' },
-    odd: { name: 'Odd ones found', icon: '🎯', kind: 'sum', tiers: [10, 100, 500] },   // pk-2a
-    blinks: { name: 'Blink finds', icon: '👁️', kind: 'sum', tiers: [10, 100, 500] },
-    games: { name: 'Pokadif cases', icon: '🔍', kind: 'sum', hidden: true },
-    hints: { name: 'Magnifier hints', icon: '🔍', kind: 'sum', hidden: true },
-    oops: { name: 'Oops pokes', icon: '❌', kind: 'sum', hidden: true },
-  },
-  // 🔬 Sciencetory feats (sc-1)
-  'sciencetory': {
-    tests: { name: 'Lab tests', icon: '🔬', kind: 'sum', tiers: [5, 25, 100] },
-    right: { name: 'Good guesses', icon: '🎯', kind: 'sum', tiers: [5, 25, 100] },
-    breaks: { name: 'Crash tests', icon: '💥', kind: 'sum', tiers: [1, 10, 50] },
-    records: { name: 'Family records', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },
-    testKinds: { name: 'Different tests', icon: '⚙️', kind: 'max', tiers: [3, 6, 12] },
-    allKinds: { name: 'Science tests tried', icon: '🧪', kind: 'max', tiers: [6, 12, 17] },   // 🧪 sc-4d (12 strength + 5 science tests on your things)
-    samples: { name: 'Sample tests', icon: '🧪', kind: 'sum', hidden: true },
-    games: { name: 'Sciencetory runs', icon: '🔬', kind: 'sum', hidden: true },
-    elements: { name: 'Element cards', icon: '📇', kind: 'max', tiers: [10, 40, 118] },   // ⚗️ sc-2a (sciChemSave: how many of the 118 you own)
-    compounds: { name: 'Molecules built', icon: '⚛️', kind: 'max', tiers: [5, 20, 50] },
-    chemRounds: { name: 'Chemistry rounds', icon: '⚗️', kind: 'sum', hidden: true },
-    atoms: { name: 'Atoms built', icon: '⚛️', kind: 'max', tiers: [5, 20, 36] },   // ⚛️ sc-2b (sciChemSave kind 'atom': different atoms you built)
-    quantumRounds: { name: 'Quantum rounds', icon: '⚛️', kind: 'sum', hidden: true },
-    particles: { name: 'Particle cards', icon: '🔬', kind: 'max', tiers: [4, 10, 17] },   // 🔬 sc-2d (sciChemSave kinds quark / collide: Standard-Model cards you own)
-    particleRounds: { name: 'Particle rounds', icon: '🔬', kind: 'sum', hidden: true },
-    thermoRounds: { name: 'Thermo rounds', icon: '🔥', kind: 'sum', tiers: [5, 20, 60] },   // 🔥 sc-3a (sciChemSave kinds therm / melt / warm / flow)
-    electroRounds: { name: 'Electro rounds', icon: '⚡', kind: 'sum', tiers: [5, 20, 60] },   // ⚡ sc-3b (sciChemSave kinds circ / cond / mag / emag)
-    opticsRounds: { name: 'Optics rounds', icon: '🌈', kind: 'sum', tiers: [5, 20, 60] },   // 🌈 sc-3c (sciChemSave kinds prism / mixc / mirror / lens)
-    acousticsRounds: { name: 'Acoustics rounds', icon: '🔊', kind: 'sum', tiers: [5, 20, 60] },   // 🔊 sc-3d (sciChemSave kinds wave / xylo / echo / thunder)
-    geoRounds: { name: 'Geo rounds', icon: '🌍', kind: 'sum', tiers: [5, 20, 60] },   // 🌍 sc-4a (sciChemSave kinds scratch / rocks / compass / quake)
-    bioRounds: { name: 'Bio rounds', icon: '🧬', kind: 'sum', tiers: [5, 20, 60] },   // 🧬 sc-4b (sciChemSave kinds skel / sense / heart / tube)
-    cosmicRounds: { name: 'Cosmic rounds', icon: '🌌', kind: 'sum', tiers: [5, 20, 60] },   // 🌌 sc-4c (sciChemSave kinds weigh / stars / sundial / planets)
-    machineRounds: { name: 'Machine rounds', icon: '🏗️', kind: 'sum', tiers: [5, 20, 60] },   // ⚙️ sc-4d2 (sciChemSave kind lift: levers + pulleys)
-  },
-  // ⏱️ Pokadif Arcade feats (pk-2b)
-  'pokadif-arcade': {
-    pictures: { name: 'Most pictures in a run', icon: '📸', kind: 'max', tiers: [5, 10, 15], unit: ' pictures' },
-    finishes: { name: 'Speed runs finished', icon: '🏁', kind: 'sum', tiers: [1, 10, 50] },   // ⏱️ pk-3d
-    checkpoints: { name: 'Arcade checkpoints', icon: '✅', kind: 'sum', tiers: [3, 20, 100] },
-    found: { name: 'Arcade finds', icon: '🔎', kind: 'sum', tiers: [30, 300, 1500] },
-    games: { name: 'Arcade runs', icon: '⏱️', kind: 'sum', hidden: true },
-    hints: { name: 'Arcade hints', icon: '🔍', kind: 'sum', hidden: true },
-    oops: { name: 'Arcade oops', icon: '❌', kind: 'sum', hidden: true },
-  },
-  'pokadif-case': {
-    stories: { name: 'Cases closed', icon: '📁', kind: 'sum', tiers: [1, 10, 30] },   // 📖 pk-3a
-    casebook: { name: 'Case books closed', icon: '📚', kind: 'max', tiers: [1, 2, 3] },   // 📖 pk-3b
-    lessons: { name: 'Lesson cards', icon: '🎓', kind: 'max', tiers: [3, 6, 9] },
-    chapters: { name: 'Chapters', icon: '📖', kind: 'sum', hidden: true },
-    games: { name: 'Cases started', icon: '🕵️', kind: 'sum', hidden: true },
-    perfect: { name: 'Perfect steps', icon: '🦅', kind: 'sum', hidden: true },
-    hints: { name: 'Magnifier hints', icon: '🔍', kind: 'sum', hidden: true },
-    oops: { name: 'Oops', icon: '❌', kind: 'sum', hidden: true },
-  },
-  'sla-brall': {
-    wins: { name: 'Match Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
-    rally: { name: 'Rally Machine', icon: '🔁', kind: 'max', tiers: [10, 25, 50] },
-    smash: { name: 'Smash Captain', icon: '💥', kind: 'sum', tiers: [10, 100, 500] },
-    aces: { name: 'Ace Server', icon: '🎾', kind: 'sum', tiers: [5, 30, 100] },
-    perfect: { name: 'Sweet Spot', icon: '✨', kind: 'sum', tiers: [10, 100, 500] },
-    powers: { name: 'Power Player', icon: '⚡', kind: 'sum', tiers: [5, 50, 200] },
-    legend: { name: 'Golden Shot', icon: '⭐', kind: 'sum', tiers: [1, 10, 50] },
-    goals: { name: 'Goal Getter', icon: '🏒', kind: 'sum', tiers: [10, 100, 500] },
-    matches: { name: 'Matches', icon: '🏓', kind: 'sum', hidden: true },
-    win_slashot: { name: 'SlaShot wins', icon: '🏒', kind: 'sum', hidden: true },
-    win_slapoof: { name: 'SlaPoof wins', icon: '🥒', kind: 'sum', hidden: true },
-    win_slaball: { name: 'SlaBall wins', icon: '🎾', kind: 'sum', hidden: true },
-    win_slapong: { name: 'SlaPong wins', icon: '🏓', kind: 'sum', hidden: true },
-    win_slawall: { name: 'SlaWall wins', icon: '🧱', kind: 'sum', hidden: true },
-    win_slabam: { name: 'SlaBam wins', icon: '🏸', kind: 'sum', hidden: true },
-    cups: { name: 'Tournament Champion', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },   // 🏆 round 2: tournaments won
-    jumpHits: { name: 'Jump Smasher', icon: '🦘', kind: 'sum', tiers: [5, 50, 200] },   // le-1 🦘 jump smashes that went in
-    jumpPerfect: { name: 'Perfect jump smashes', icon: '🦘', kind: 'sum', hidden: true },
-    diveSaves: { name: 'Diving Hero', icon: '🤸', kind: 'sum', tiers: [3, 30, 100] },   // le-1 🤸 dive saves
-    cupMatches: { name: 'Tournament matches', icon: '🎟️', kind: 'sum', hidden: true },
-  },
-  'beat-corner': {
-    notes: { name: 'Beat Hitter', icon: '🎵', kind: 'sum', tiers: [300, 2000, 10000] },
-    perfects: { name: 'Perfect Timing', icon: '💛', kind: 'sum', tiers: [100, 1000, 5000] },
-    bestCombo: { name: 'Combo King', icon: '🔥', kind: 'max', tiers: [25, 100, 250] },
-    songs: { name: 'Song Star', icon: '🎶', kind: 'sum', tiers: [5, 20, 60] },
-    rounds: { name: 'Songs played', icon: '🎵', kind: 'sum', hidden: true },
-  },
-  'beat-piano': {   // 🎹 plan 11-bc
-    songsMade: { name: 'Songs Made', icon: '🎼', kind: 'sum', tiers: [1, 5, 15] },
-    songPlays: { name: 'Family Plays', icon: '🎧', kind: 'sum', tiers: [5, 25, 100] },
-    famPlays: { name: 'Family songs played', icon: '🎼', kind: 'sum', hidden: true },
-    notes: { name: 'Piano Notes', icon: '🎹', kind: 'sum', tiers: [200, 1500, 8000] },
-    chords: { name: 'Chord Player', icon: '🎶', kind: 'sum', tiers: [10, 100, 500] },
-    bigLines: { name: 'Big-line Notes', icon: '✨', kind: 'sum', tiers: [5, 50, 250] },
-    bestCombo: { name: 'Piano Combo', icon: '🔥', kind: 'max', tiers: [20, 60, 150] },
-    songs: { name: 'Piano Songs', icon: '🎼', kind: 'sum', tiers: [3, 15, 40] },
-    bandSongs: { name: 'Band Songs', icon: '🎸', kind: 'sum', tiers: [1, 10, 30] },
-    perfects: { name: 'Piano perfects', icon: '💛', kind: 'sum', hidden: true },
-    rounds: { name: 'Piano songs played', icon: '🎹', kind: 'sum', hidden: true },
-  },
-  'beat-drums': {   // 🥁 plan 11-bc
-    famPlays: { name: 'Family songs played (drums)', icon: '🎼', kind: 'sum', hidden: true },
-    notes: { name: 'Drum Hits', icon: '🥁', kind: 'sum', tiers: [300, 2000, 10000] },
-    fills: { name: 'Drum Fills', icon: '🌀', kind: 'sum', tiers: [5, 50, 250] },
-    bestCombo: { name: 'Drum Combo', icon: '🔥', kind: 'max', tiers: [25, 80, 200] },
-    songs: { name: 'Drum Songs', icon: '🎼', kind: 'sum', tiers: [3, 15, 40] },
-    bandSongs: { name: 'Band Songs', icon: '🎸', kind: 'sum', tiers: [1, 10, 30] },
-    perfects: { name: 'Drum perfects', icon: '💛', kind: 'sum', hidden: true },
-    rounds: { name: 'Drum songs played', icon: '🥁', kind: 'sum', hidden: true },
-  },
-  'sweet-swap': {
-    matches: { name: 'Sweet Matcher', icon: '🍬', kind: 'sum', tiers: [100, 500, 2000] },
-    specials: { name: 'Super Maker', icon: '✨', kind: 'sum', tiers: [5, 25, 100] },
-    bestCombo: { name: 'Chain Champ', icon: '🔗', kind: 'max', tiers: [3, 5, 8] },
-    rounds: { name: 'Rounds', icon: '🍬', kind: 'sum', hidden: true },
-  },
-  'word-board': {
-    words: { name: 'Word Builder', icon: '🔤', kind: 'sum', tiers: [20, 100, 400] },
-    bestMove: { name: 'Big Word', icon: '⚡', kind: 'max', tiers: [25, 50, 90] },
-    bingos: { name: 'All 7 Letters', icon: '🌟', kind: 'sum', tiers: [1, 5, 20] },
-    togetherGames: { name: 'Family Word Games', icon: '👨‍👩‍👧', kind: 'sum', tiers: [1, 10, 30] },
-    quizStars: { name: 'Word Quiz Stars', icon: '🧠', kind: 'sum', tiers: [5, 30, 120] },   // 📖 end-of-game word quiz (11p)
-    wins: { name: 'Robot Beaten', icon: '🤖', kind: 'sum', hidden: true },
-    rounds: { name: 'Rounds', icon: '🔤', kind: 'sum', hidden: true },
-  },
-  'number-board': {
-    equations: { name: 'Sentence Builder', icon: '➗', kind: 'sum', tiers: [20, 100, 400] },
-    bestMove: { name: 'Big Move', icon: '⚡', kind: 'max', tiers: [30, 60, 100] },
-    bingos: { name: 'All 8 Tiles', icon: '🌟', kind: 'sum', tiers: [1, 5, 20] },
-    togetherGames: { name: 'Family Games', icon: '👨‍👩‍👧', kind: 'sum', tiers: [1, 10, 30] },
-    wins: { name: 'Robot Beaten', icon: '🤖', kind: 'sum', hidden: true },
-    rounds: { name: 'Rounds', icon: '➗', kind: 'sum', hidden: true },
-  },
-  'double-up': {
-    merges: { name: 'Tile Joiner', icon: '🔀', kind: 'sum', tiers: [100, 500, 2000] },
-    bestTile: { name: 'Biggest Tile', icon: '🏆', kind: 'max', tiers: [256, 1024, 4096] },
-    rounds: { name: 'Rounds', icon: '🔀', kind: 'sum', hidden: true },
-    chTile: { name: 'Challenge Peak', icon: '🏔️', kind: 'max', tiers: [256, 512, 1024] },   // 🏔️ 3 × 3 Challenge (not a level): best tile + best score
-    chScore: { name: 'Challenge Score', icon: '🏔️', kind: 'max', hidden: true },
-  },
-  'math-quest': {
-    correct: { name: 'Right Answers', icon: '✅', kind: 'sum', tiers: [50, 250, 1000] },
-    bestStreak: { name: 'Number Streak', icon: '🔥', kind: 'max', tiers: [5, 10, 15] },
-    perfect: { name: 'Perfect Round', icon: '💯', kind: 'sum', tiers: [1, 5, 20] },
-    rounds: { name: 'Rounds', icon: '🧮', kind: 'sum', hidden: true },
-    sprintBest: { name: 'Minute Mixer', icon: '⏱️', kind: 'max', tiers: [10, 20, 30] },
-    sprintRounds: { name: 'Minute Challenges', icon: '⏱️', kind: 'sum', hidden: true },
-    wordRight: { name: 'Word Wizard', icon: '🔤', kind: 'sum', tiers: [25, 100, 400] },   // ➗ mq-w1: right answers in 🔤 Word Sums
-    thaiRight: { name: 'Thai Number Reader', icon: '🐘', kind: 'sum', tiers: [25, 100, 400] },   // ➗ mq-w1: right answers in 🐘 เลขคำไทย
-    typedRight: { name: 'Pad Pro', icon: '⌨️', kind: 'sum', tiers: [25, 100, 400] },   // ➗ mq-w1: answers typed on the number pad
-    storyRight: { name: 'Story Solver', icon: '📖', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-w2: right answers in 📖 Story Problems / 📜 โจทย์ปัญหา
-    trickRight: { name: 'Trick Spotter', icon: '🕵️', kind: 'sum', tiers: [10, 25, 100] },   // ➗ mq-w3: tricks spotted in 🤔 Trick Questions / 🙃 คำถามหลอก
-    testRight: { name: 'Test Ace', icon: '📝', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-t1: right answers in 📝 Test Practice / 📝 ข้อสอบ
-    signRight: { name: 'Sign Finder', icon: '❓', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-w4: ❓ Missing sign
-    fixRight: { name: 'Maths Detective', icon: '🔍', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-w4: 🔍 Find the mistake (find + fix)
-    clockRight: { name: 'Time Teller', icon: '🕐', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-w4: 🕐 Clock maths
-    listenRight: { name: 'Sharp Ears', icon: '🎧', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-w5: 🎧 Listen / 👂 ฟังโจทย์
-  },
-  memory: {
-    pairs: { name: 'Pair Finder', icon: '🃏', kind: 'sum', tiers: [50, 250, 1000] },
-    bestStreak: { name: 'Hot Streak', icon: '🔥', kind: 'max', tiers: [4, 8, 16] },
-    perfect: { name: 'Perfect Board', icon: '💯', kind: 'sum', tiers: [1, 5, 20] },
-    wins: { name: 'Family Champ', icon: '👑', kind: 'sum', tiers: [1, 10, 30] },
-  },
-};
+// 📏 s1: FEAT_DEFS → GameData.gs (moved word for word).
 const TIER_NAMES = ['Bronze', 'Silver', 'Gold'], TIER_ICONS = ['🥉', '🥈', '🥇'];
-// Titles a player can show under their name. f = that player's feats {game: {stat: value}}, x = extra context.
-const TITLE_DEFS = [
-  { id: 'td_swatter', name: 'Suitor Swatter', icon: '💫', hint: 'Bonk 500 suitors away in 🐉👑 Dra-Princess Diary', rule: f => featVal_(f, 'td-draprincess', 'bonks') >= 500 },
-  { id: 'td_tamer', name: 'Dragon Tamer', icon: '🐉', hint: 'Evolve your TD-Stories heroes 10 times', rule: f => featVal_(f, 'td-draprincess', 'evolves') >= 10 },
-  { id: 'td_heart', name: 'Dragon Heart', icon: '❤️‍🔥', hint: 'Unlock an ULTIMATE in TD-Stories', rule: f => featVal_(f, 'td-draprincess', 'ultimates') >= 1 },
-  { id: 'af_smith', name: 'Forge Master', icon: '⚒️', hint: 'Forge 20 things at the ⚒️ forge', rule: f => featVal_(f, 'artifactory', 'forge') >= 20 },
-  { id: 'af_potter', name: 'Potter', icon: '🏺', hint: 'Fire 20 pots in the kiln', rule: f => featVal_(f, 'artifactory', 'pottery') >= 20 },
-  { id: 'af_printer', name: '3D Printer Pro', icon: '🖨️', hint: 'Print 20 things on the 🖨️ 3D printer', rule: f => featVal_(f, 'artifactory', 'print') >= 20 },
-  { id: 'af_show', name: 'Show Star', icon: '🎭', hint: 'Get 10 ⭐ for one crafted thing in the 🎭 Design Show', rule: f => featVal_(f, 'artifactory', 'showStars') >= 10 },
-  { id: 'af_master', name: 'Master Maker', icon: '🏭', hint: 'Make 25 things in Artifactory', rule: f => featVal_(f, 'artifactory', 'made') >= 25 },
-  { id: 'af_gem', name: 'Gem Cutter', icon: '💎', hint: 'Cut 10 gems at the 💎 stone station', rule: f => featVal_(f, 'artifactory', 'gems') >= 10 },
-  { id: 'af_lathe', name: 'Lathe Legend', icon: '🌀', hint: 'Get 3 ⭐ on 10 lathe blueprints', rule: f => featVal_(f, 'artifactory', 'latheStars') >= 10 },
-  { id: 'af_fixit', name: 'Fix-it Hero', icon: '🔧', hint: 'Repair 10 broken things in Artifactory', rule: f => featVal_(f, 'artifactory', 'repairs') >= 10 },
-  { id: 'bp_reader', name: 'Blueprint Reader', icon: '📘', hint: 'Stamp 5 pages of the 📘 Blueprint Book (all 12 with ⭐)', rule: f => featVal_(f, 'artifactory', 'bpPages') >= 5 },
-  { id: 'bp_scholar', name: 'Blueprint Scholar', icon: '🎓', hint: 'Stamp 15 pages of the 📘 Blueprint Book', rule: f => featVal_(f, 'artifactory', 'bpPages') >= 15 },
-  { id: 'bp_grand', name: 'Grand Master Maker', icon: '👑', hint: 'Stamp 40 pages of the 📘 Blueprint Book', rule: f => featVal_(f, 'artifactory', 'bpPages') >= 40 },
-  { id: 'bp_daily', name: 'Daily Maker', icon: '📅', hint: 'Get ⭐ on 30 Blueprints of the Day', rule: f => featVal_(f, 'artifactory', 'bpDaily') >= 30 },
-  { id: 'af_remix', name: 'Remix Royalty', icon: '✨', hint: 'Remix 10 things in Artifactory', rule: f => featVal_(f, 'artifactory', 'remixes') >= 10 },
-  { id: 'gr_sound', name: 'Sound Explorer', icon: '🔊', hint: 'Find 30 letter sounds in GeoRead', rule: f => featVal_(f, 'georead', 'sounds') >= 30 },
-  { id: 'gr_wizard', name: 'Word Wizard', icon: '🧙', hint: 'Blend or build 100 words in GeoRead', rule: f => featVal_(f, 'georead', 'blends') + featVal_(f, 'georead', 'built') >= 100 },
-  { id: 'gr_story', name: 'Story Star', icon: '📖', hint: 'Read 10 stories in GeoRead', rule: f => featVal_(f, 'georead', 'stories') >= 10 },
-  { id: 'gr_journey', name: 'Word Kingdom Hero', icon: '👑', hint: 'Finish all 6 chapters of the Alphabet Road in GeoRead', rule: f => featVal_(f, 'georead', 'chapters') >= 6 },
-  { id: 'gs_scout', name: 'Number Scout', icon: '🔢', hint: 'Make 100 numbers in GeoScout 🧱 Count', rule: f => featVal_(f, 'geoscout', 'counts') >= 100 },
-  { id: 'gs_balance', name: 'Balance Master', icon: '⚖️', hint: 'Balance the scale 100 times in GeoScout', rule: f => featVal_(f, 'geoscout', 'balances') >= 100 },
-  { id: 'gs_tower', name: 'Tower Ace', icon: '🏗️', hint: 'Build 50 exact towers in GeoScout 🏗️ Wobble tower', rule: f => featVal_(f, 'geoscout', 'wobble') >= 50 },
-  { id: 'gs_story', name: 'Number Storyteller', icon: '📖', hint: 'Finish all 6 GeoScout 📖 Journey chapters', rule: f => featVal_(f, 'geoscout', 'journeys') >= 6 },
-  { id: 'bc_composer', name: 'Composer', icon: '🎼', hint: 'Make 3 songs in the BeatCorner 🎼 Song Maker', rule: f => featVal_(f, 'beat-piano', 'songsMade') >= 3 },
-  { id: 'bc_keys', name: 'Keyboard Kid', icon: '🎹', hint: 'Pass 5 🎹 Piano songs in BeatCorner', rule: f => featVal_(f, 'beat-piano', 'songs') >= 5 },
-  { id: 'bc_drums', name: 'Drum Hero', icon: '🥁', hint: 'Pass 5 🥁 Drums songs in BeatCorner', rule: f => featVal_(f, 'beat-drums', 'songs') >= 5 },
-  { id: 'bc_band', name: 'Band Leader', icon: '🎸', hint: 'Play 3 🎸 Band songs together in BeatCorner', rule: f => featVal_(f, 'beat-piano', 'bandSongs') + featVal_(f, 'beat-drums', 'bandSongs') >= 3 },
-  { id: 'wd_sage', name: 'Card Sage', icon: '🦉', hint: 'Win 200 cards in 🃏 WisDeck quizzes', rule: f => featVal_(f, 'wisdeck', 'cards') >= 200 },
-  { id: 'wd_count', name: 'Count Master', icon: '🔢', hint: 'Win 10 🔢 WisCount matches', rule: f => featVal_(f, 'wiscount', 'wins') >= 10 },
-  { id: 'wd_twenty', name: 'Twenty Hero', icon: '🎯', hint: 'Hit exactly 20 (or 21) 10 times in 🂡 WisJack', rule: f => featVal_(f, 'wisjack', 'exact') >= 10 },
-  { id: 'wd_cosmic', name: 'Cosmic Collector', icon: '🌌', hint: 'Grow a WisDeck card to 🌌 Cosmic (15 duplicates)', rule: f => featVal_(f, 'wisdeck', 'cosmic') >= 1 },
-  { id: 'ebr_master', name: 'Memory Master', icon: '🧠', hint: 'Remember a 12-digit number perfectly in Eyes Brain Riot', rule: f => featVal_(f, 'eyes-brain', 'longest') >= 12 },
-  { id: 'ebr_combo', name: 'Combo Riot', icon: '🔥', hint: 'Get a combo of 8 perfect rounds in Eyes Brain Riot', rule: f => featVal_(f, 'eyes-brain', 'bestCombo') >= 8 },
-  { id: 'ebr_echo', name: 'Echo Ears', icon: '👂', hint: '25 perfect 👂 Listen rounds in Eyes Brain Riot', rule: f => featVal_(f, 'eyes-brain', 'listenPerfects') >= 25 },
-  { id: 'ebr_back', name: 'Backwards Brain', icon: '🔁', hint: '25 perfect 🔁 Backwards rounds in Eyes Brain Riot', rule: f => featVal_(f, 'eyes-brain', 'backPerfects') >= 25 },
-  { id: 'pp_box', name: 'Box Boss', icon: '⬛', hint: 'Close 300 shapes in Polyplot', rule: f => featVal_(f, 'polyplot', 'boxes') >= 300 },
-  { id: 'pp_chain', name: 'Chain Champion', icon: '🔗', hint: 'Close 8 shapes in one turn in Polyplot', rule: f => featVal_(f, 'polyplot', 'bestChain') >= 8 },
-  { id: 'pp_catch', name: 'Creature Catcher', icon: '🪤', hint: 'Catch 100 creatures in Polyplot 🏹 Hunt', rule: f => featVal_(f, 'polyplot', 'catches') >= 100 },
-  { id: 'pp_master', name: 'Archinota Master', icon: '🌀', hint: 'Beat 💀 Hardcore in Polyplot', rule: (f, x) => (x.cleared['polyplot'] || 0) >= 6 },
-  { id: 'sb_boss', name: 'Bopper Boss', icon: '💣', hint: 'Win 20 Soul Bopper games', rule: f => featVal_(f, 'soul-bopper', 'wins') >= 20 },
-  { id: 'sb_chain', name: 'Chain Reactor', icon: '🔗', hint: 'Set off 50 chain pops in Soul Bopper', rule: f => featVal_(f, 'soul-bopper', 'chains') >= 50 },
-  { id: 'sb_comeback', name: 'Comeback Kid', icon: '👻', hint: 'Come back 10 times in Soul Bopper (👻 soul swap or 💩 edge throw)', rule: f => featVal_(f, 'soul-bopper', 'comebacks') >= 10 },
-  { id: 'sb_poo', name: 'Poo Commander', icon: '💩', hint: 'Win 5 💩 Classic Avatar games in Soul Bopper', rule: f => featVal_(f, 'soul-bopper', 'pooWins') >= 5 },
-  { id: 'ax_line', name: 'Line Master', icon: '〰️', hint: 'Make 50 lines of 3 in Alignext (Drop + Omnifile)', rule: f => featVal_(f, 'alignext', 'lines') + featVal_(f, 'omnifile', 'lines') >= 50 },
-  { id: 'ax_stack', name: 'Stack King', icon: '👑', hint: 'Cover 30 pieces in Alignext Omnifile Stack', rule: f => featVal_(f, 'omnifile', 'covers') >= 30 },
-  { id: 'ax_cards', name: 'Card Shark', icon: '🃏', hint: 'Play 25 skill cards in Alignext', rule: f => featVal_(f, 'alignext', 'cards') + featVal_(f, 'omnifile', 'cards') >= 25 },
-  { id: 'ax_gravity', name: 'Gravity Guru', icon: '🪜', hint: 'Flip the Drop stand upside down 5 times', rule: f => featVal_(f, 'alignext', 'flips') >= 5 },
-  { id: 'ax_legend', name: 'Alignext Legend', icon: '💀', hint: 'Beat 💀 Hardcore in Alignext Drop or Omnifile', rule: (f, x) => (x.cleared['alignext'] || 0) >= 6 || (x.cleared['omnifile'] || 0) >= 6 },
-  { id: 'sn_charmer', name: 'Snake Charmer', icon: '🐍', hint: 'Play 10 Snakize games (any mode)', rule: f => featVal_(f, 'snakeast', 'games') + featVal_(f, 'snakigate', 'games') + featVal_(f, 'snakastle', 'games') >= 10 },
-  { id: 'sn_feast', name: 'Feast Master', icon: '🍎', hint: 'Eat 500 food in Snakeast', rule: f => featVal_(f, 'snakeast', 'eaten') >= 500 },
-  { id: 'sn_slither', name: 'Slither King', icon: '👑', hint: 'Pop 25 snakes in Snakigate', rule: f => featVal_(f, 'snakigate', 'popped') >= 25 },
-  { id: 'sn_land', name: 'Land Lord', icon: '🏰', hint: 'Own 60 % of the map in Snakastle', rule: f => featVal_(f, 'snakastle', 'land') >= 60 },
-  { id: 'sn_tale', name: 'Tale Hero', icon: '📜', hint: 'Finish all 6 Snaketale chapters', rule: f => featVal_(f, 'snaketale', 'chapters') >= 6 },
-  { id: 'sn_legend', name: 'Snakize Legend', icon: '💀', hint: 'Beat 💀 Hardcore in any Snakize mode', rule: (f, x) => (x.cleared['snakeast'] || 0) >= 6 || (x.cleared['snakigate'] || 0) >= 6 || (x.cleared['snakastle'] || 0) >= 6 },
-  { id: 'bb_buddy', name: 'Bonk Buddy', icon: '🥊', hint: 'Win 10 Brawl Buddies fights', rule: f => featVal_(f, 'brawl-buddies', 'wins') >= 10 },
-  { id: 'bb_combo', name: 'Combo Captain', icon: '🔥', hint: 'Land a 10-hit combo in Brawl Buddies', rule: f => featVal_(f, 'brawl-buddies', 'combo') >= 10 },
-  { id: 'bb_sky', name: 'Sky Juggler', icon: '🌟', hint: 'Juggle your buddy 5 bounces in the air in Brawl Buddies', rule: f => featVal_(f, 'brawl-buddies', 'juggle') >= 5 },
-  { id: 'bb_perfect', name: 'Untouchable', icon: '✨', hint: 'Win a Brawl Buddies round without being bonked once', rule: f => featVal_(f, 'brawl-buddies', 'perfects') >= 1 },
-  { id: 'bb_legend', name: 'Brawl Legend', icon: '💀', hint: 'Beat 💀 Hardcore in Brawl Buddies', rule: (f, x) => (x.cleared['brawl-buddies'] || 0) >= 6 },
-  { id: 'bb_grapple', name: 'Grapple Master', icon: '🤼', hint: 'Land 25 grapples in Brawl Buddies', rule: f => featVal_(f, 'brawl-buddies', 'grabs') >= 25 },
-  { id: 'bb_tagteam', name: 'Tag Team Captain', icon: '🔁', hint: 'Tag your buddies in 25 times in Brawl Buddies', rule: f => featVal_(f, 'brawl-buddies', 'tags') >= 25 },
-  { id: 'bv_t1', name: 'Playground Protector', icon: '🛝', hint: 'Finish Brawenture Tale 1 — Playground Rumble', rule: f => featVal_(f, 'brawenture', 't1') >= 1 },
-  { id: 'bv_t2', name: 'Candy Guardian', icon: '🍭', hint: 'Finish Brawenture Tale 2 — Candy Factory Defense', rule: f => featVal_(f, 'brawenture', 't2') >= 1 },
-  { id: 'bv_t3', name: 'Castle Climber', icon: '🏰', hint: 'Finish Brawenture Tale 3 — Castle Climb', rule: f => featVal_(f, 'brawenture', 't3') >= 1 },
-  { id: 'bv_t4', name: 'Zombie Hugger', icon: '🧟', hint: 'Finish Brawenture Tale 4 — Zombie Crawl', rule: f => featVal_(f, 'brawenture', 't4') >= 1 },
-  { id: 'bv_t5', name: 'Town Defender', icon: '👾', hint: 'Finish Brawenture Tale 5 — Monster Outbreak', rule: f => featVal_(f, 'brawenture', 't5') >= 1 },
-  { id: 'bv_t6', name: 'Sea Rescuer', icon: '🧜', hint: 'Finish Brawenture Tale 6 — Undersea Rescue', rule: f => featVal_(f, 'brawenture', 't6') >= 1 },
-  { id: 'bv_hero', name: 'Family Hero', icon: '🦸', hint: 'Finish all 6 Brawenture tales', rule: f => ['t1', 't2', 't3', 't4', 't5', 't6'].every(k => featVal_(f, 'brawenture', k) >= 1) },
-  { id: 'pp_perfect', name: 'Perfect Poser', icon: '💯', hint: 'Get a 95% pose in Pose Party', rule: f => featVal_(f, 'pose-party', 'perfect') >= 1 },
-  { id: 'pp_speed', name: 'Lightning Poser', icon: '⚡', hint: 'Match 15 poses in one Pose Party Speed round', rule: f => featVal_(f, 'pose-party', 'speedBest') >= 15 },
-  { id: 'pp_star', name: 'Pose Superstar', icon: '🌟', hint: 'Match 150 poses in Pose Party', rule: f => featVal_(f, 'pose-party', 'poses') >= 150 },
-  { id: 'sb_rally', name: 'Rally Machine', icon: '🔁', hint: 'Keep a 25-hit rally going in SlaBrall', rule: f => featVal_(f, 'sla-brall', 'rally') >= 25 },
-  { id: 'sb_smash', name: 'Smash Captain', icon: '💥', hint: 'Hit 100 smashes in SlaBrall', rule: f => featVal_(f, 'sla-brall', 'smash') >= 100 },
-  { id: 'sb_allcourt', name: 'All-Court Ace', icon: '🏓', hint: 'Win a match in all 5 SlaBrall sports', rule: f => ['slashot', 'slapoof', 'slaball', 'slapong', 'slawall'].every(k => featVal_(f, 'sla-brall', 'win_' + k) >= 1) },
-  { id: 'sb_allcourt6', name: 'All-Court Legend', icon: '🏸', hint: 'Win a match in all 6 SlaBrall sports (with 🏸 SlaBam + the 🧱 squash room)', rule: f => ['slashot', 'slapoof', 'slaball', 'slapong', 'slabam', 'slawall'].every(k => featVal_(f, 'sla-brall', 'win_' + k) >= 1) },   // le-1 (the 5-sport All-Court Ace stays, nobody loses it)
-  { id: 'sb_skysmash', name: 'Sky Smasher', icon: '🦘', hint: 'Hit 10 PERFECT jump smashes in SlaBrall', rule: f => featVal_(f, 'sla-brall', 'jumpPerfect') >= 10 },
-  { id: 'sb_dive', name: 'Dive Master', icon: '🤸', hint: 'Make 10 dive saves in SlaBrall', rule: f => featVal_(f, 'sla-brall', 'diveSaves') >= 10 },
-  { id: 'sb_golden', name: 'Golden Racket', icon: '⭐', hint: 'Score 5 points with a Legendary Shot', rule: f => featVal_(f, 'sla-brall', 'legend') >= 5 },
-  { id: 'sb_champ', name: 'SlaBrall Champion', icon: '🏆', hint: 'Win a SlaBrall tournament', rule: f => featVal_(f, 'sla-brall', 'cups') >= 1 },
-  { id: 'sb_cups', name: 'Cup Collector', icon: '🥇', hint: 'Win 5 SlaBrall tournaments', rule: f => featVal_(f, 'sla-brall', 'cups') >= 5 },
-  { id: 'sci_rat', name: 'Lab Rat', icon: '🐀', hint: 'Run 10 tests in Sciencetory', rule: f => featVal_(f, 'sciencetory', 'tests') >= 10 },
-  { id: 'sci_pilot', name: 'Test Pilot', icon: '🧑‍✈️', hint: 'Try all 12 ⚙️ Mechanic tests in Sciencetory', rule: f => featVal_(f, 'sciencetory', 'testKinds') >= 12 },
-  { id: 'sci_super', name: 'Super Tester', icon: '🦸', hint: 'Try all 17 tests on your things in Sciencetory (12 strength + 5 science)', rule: f => featVal_(f, 'sciencetory', 'allKinds') >= 17 },   // 🧪 sc-4d
-  { id: 'sci_guess', name: 'Hypothesis Hero', icon: '🎯', hint: 'Guess 20 test results right in Sciencetory', rule: f => featVal_(f, 'sciencetory', 'right') >= 20 },
-  { id: 'sci_elem', name: 'Element Hunter', icon: '📇', hint: 'Collect 40 element cards in ⚗️ Sciencetory Chemistry', rule: f => featVal_(f, 'sciencetory', 'elements') >= 40 },   // ⚗️ sc-2a
-  { id: 'sci_mol', name: 'Molecule Maker', icon: '⚛️', hint: 'Build 20 different molecules in ⚗️ Sciencetory Chemistry', rule: f => featVal_(f, 'sciencetory', 'compounds') >= 20 },
-  { id: 'sci_atom', name: 'Atom Architect', icon: '⚛️', hint: 'Build 20 different atoms in ⚛️ Sciencetory Quantum', rule: f => featVal_(f, 'sciencetory', 'atoms') >= 20 },   // ⚛️ sc-2b
-  { id: 'sci_part', name: 'Particle Pro', icon: '🔬', hint: 'Collect all 17 particle cards in 🔬 Sciencetory Particle', rule: f => featVal_(f, 'sciencetory', 'particles') >= 17 },   // 🔬 sc-2d
-  { id: 'sci_heat', name: 'Heat Hero', icon: '🔥', hint: 'Finish 20 rounds in 🔥 Sciencetory Thermo', rule: f => featVal_(f, 'sciencetory', 'thermoRounds') >= 20 },   // 🔥 sc-3a
-  { id: 'sci_spark', name: 'Spark Scientist', icon: '⚡', hint: 'Finish 20 rounds in ⚡ Sciencetory Electro', rule: f => featVal_(f, 'sciencetory', 'electroRounds') >= 20 },   // ⚡ sc-3b
-  { id: 'sci_light', name: 'Light Bender', icon: '🌈', hint: 'Finish 20 rounds in 🌈 Sciencetory Optics', rule: f => featVal_(f, 'sciencetory', 'opticsRounds') >= 20 },   // 🌈 sc-3c
-  { id: 'sci_sound', name: 'Sound Sleuth', icon: '🔊', hint: 'Finish 20 rounds in 🔊 Sciencetory Acoustics', rule: f => featVal_(f, 'sciencetory', 'acousticsRounds') >= 20 },   // 🔊 sc-3d
-  { id: 'sci_rock', name: 'Rock Hound', icon: '🌍', hint: 'Finish 20 rounds in 🌍 Sciencetory Geo', rule: f => featVal_(f, 'sciencetory', 'geoRounds') >= 20 },   // 🌍 sc-4a
-  { id: 'sci_body', name: 'Body Boffin', icon: '🧬', hint: 'Finish 20 rounds in 🧬 Sciencetory Bio', rule: f => featVal_(f, 'sciencetory', 'bioRounds') >= 20 },   // 🧬 sc-4b
-  { id: 'sci_stars', name: 'Star Gazer', icon: '🌌', hint: 'Finish 20 rounds in 🌌 Sciencetory Cosmic', rule: f => featVal_(f, 'sciencetory', 'cosmicRounds') >= 20 },   // 🌌 sc-4c
-  { id: 'sci_machine', name: 'Machine Master', icon: '🏗️', hint: 'Finish 20 Lift it! rounds (levers + pulleys) in ⚙️ Sciencetory Mechanic', rule: f => featVal_(f, 'sciencetory', 'machineRounds') >= 20 },   // ⚙️ sc-4d2
-  { id: 'pk_eyes', name: 'Sharp Eyes', icon: '👀', hint: 'Find 50 differences in Pokadif', rule: f => featVal_(f, 'pokadif', 'found') >= 50 },
-  { id: 'pk_eagle', name: 'Eagle Eye', icon: '🦅', hint: 'Finish 10 Pokadif pictures with no oops and no hint', rule: f => featVal_(f, 'pokadif', 'perfect') >= 10 },
-  { id: 'pk_case', name: 'Case Closer', icon: '📁', hint: 'Solve 10 Pokadif cases', rule: f => featVal_(f, 'pokadif', 'cases') >= 10 },
-  { id: 'pk_odd', name: 'Odd Spotter', icon: '🎯', hint: 'Find 30 odd ones in Pokadif', rule: f => featVal_(f, 'pokadif', 'odd') >= 30 },
-  { id: 'pk_blink', name: 'Blink Master', icon: '👁️', hint: 'Find 30 changes in Pokadif Blink', rule: f => featVal_(f, 'pokadif', 'blinks') >= 30 },
-  { id: 'pk_arc', name: 'Speed Sleuth', icon: '📸', hint: 'Finish a 15-picture Pokadif speed run (🌋 or 💀)', rule: f => featVal_(f, 'pokadif-arcade', 'pictures') >= 15 },
-  { id: 'pk_cp', name: 'Checkpoint Champ', icon: '✅', hint: 'Reach 20 checkpoints in Pokadif Arcade', rule: f => featVal_(f, 'pokadif-arcade', 'checkpoints') >= 20 },
-  { id: 'pk_sleuth', name: 'Master Sleuth', icon: '🕵️', hint: 'Close all 3 Pokadif case books (🧲 🦖 🐙)', rule: f => featVal_(f, 'pokadif-case', 'casebook') >= 3 },
-  { id: 'pk_story', name: 'Case Cracker', icon: '📁', hint: 'Close a case in Pokadif Detective Adventure', rule: f => featVal_(f, 'pokadif-case', 'stories') >= 1 },
-  { id: 'pk_lesson', name: 'Little Scientist', icon: '🎓', hint: 'Collect 3 lesson cards in Pokadif Detective Adventure', rule: f => featVal_(f, 'pokadif-case', 'lessons') >= 3 },
-  { id: 'pk_quick', name: 'Lightning Lens', icon: '⚡', hint: 'Finish a Pokadif picture in 10 seconds', rule: f => { const q = featVal_(f, 'pokadif', 'quick'); return q > 0 && q <= 10; } },
-  { id: 'bo_boot', name: 'Golden Boot', icon: '⚽', hint: 'Score 50 goals in BlasOff', rule: f => featVal_(f, 'blasoff', 'goals') >= 50 },   // ⚽ bo-1
-  { id: 'bo_tricks', name: 'Trick Master', icon: '🌀', hint: 'Land 50 tricks in BlasOff', rule: f => featVal_(f, 'blasoff', 'tricks') >= 50 },
-  { id: 'bo_volley', name: 'Volley Hero', icon: '🎯', hint: 'Hit 10 volleys in BlasOff (Space, Space, then K or J)', rule: f => featVal_(f, 'blasoff', 'volleys') >= 10 },
-  { id: 'bo_voice', name: "Keeper's Voice", icon: '📣', hint: 'Shout your keeper to 10 saves in BlasOff', rule: f => featVal_(f, 'blasoff', 'shoutSaves') >= 10 },
-  { id: 'bo_nutmeg', name: 'Nutmeg King', icon: '🥜', hint: 'Nutmeg 10 players in BlasOff (L when one stands right in front of you)', rule: f => featVal_(f, 'blasoff', 'nutmegs') >= 10 },   // 🏙️ bo-2b
-  { id: 'bo_captain', name: 'Captain', icon: '👑', hint: 'Win a 👑 Family cup in BlasOff', rule: f => featVal_(f, 'blasoff', 'familyCups') >= 1 },   // 🏆 r4c
-  { id: 'bo_cupking', name: 'Cup King', icon: '🏆', hint: 'Win 3 knockout cups in BlasOff', rule: f => featVal_(f, 'blasoff', 'cups') >= 3 },
-  { id: 'bo_tale', name: 'Kick Tale Hero', icon: '📜', hint: 'Finish all 6 chapters of 📜 Kick Tale in BlasOff', rule: f => featVal_(f, 'blasoff', 'taleChapters') >= 6 },
-  { id: 'pd_ace', name: 'Ace Driver', icon: '🚀', hint: 'Serve 10 aces in PyraDive', rule: f => featVal_(f, 'pyraspike', 'aces') >= 10 },
-  { id: 'pd_dink', name: 'Ghost Dinker', icon: '🪶', hint: 'Set up 20 kills (assists) in PyraDive', rule: f => featVal_(f, 'pyraspike', 'assists') >= 20 },
-  { id: 'pd_dunk', name: 'Spirit Dunker', icon: '💥', hint: 'Score 25 kills in PyraDive', rule: f => featVal_(f, 'pyraspike', 'kills') >= 25 },
-  { id: 'pd_floor', name: 'Floor Guardian', icon: '🛡️', hint: 'Save 50 balls (digs + dives) in PyraDive', rule: f => featVal_(f, 'pyraspike', 'digs') >= 50 },
-  { id: 'pd_wall', name: 'Wall Titan', icon: '🧱', hint: 'Stuff-block 10 dunks in PyraDive', rule: f => featVal_(f, 'pyraspike', 'stuffs') >= 10 },
-  { id: 'pd_flame', name: 'Flame Starter', icon: '🔥', hint: 'Use 10 Pyra… moves in PyraDive', rule: f => featVal_(f, 'pyraspike', 'pyras') >= 10 },
-  { id: 'pd_rally', name: 'Rally King / Queen', icon: '🔁', hint: 'Keep a 20-touch rally going in PyraDive', rule: f => featVal_(f, 'pyraspike', 'rally') >= 20 },
-  { id: 'pd_trap', name: 'Sticky Feet', icon: '🦵', hint: 'Trap 30 balls in PyraStrike / PyraSpark', rule: f => featVal_(f, 'pyraspike', 'traps') >= 30 },
-  { id: 'pd_pop', name: 'Pop Star', icon: '⬆️', hint: 'Pop the ball up 30 times in PyraSpark', rule: f => featVal_(f, 'pyraspike', 'pops') >= 30 },
-  { id: 'pd_edge', name: 'Edge Lord', icon: '💥', hint: 'Hit 10 EDGE balls in PyraSpark', rule: f => featVal_(f, 'pyraspike', 'edges') >= 10 },
-  { id: 'pd_feed', name: 'Toss Buddy', icon: '🤲', hint: 'Feed your teammate 20 serves in PyraStrike', rule: f => featVal_(f, 'pyraspike', 'feeds') >= 20 },
-  { id: 'pd_hoop', name: 'Hoop Master', icon: '⭕', hint: 'Kick 15 balls through the hoop in Hoop Takraw', rule: f => featVal_(f, 'pyraspike', 'hoops') >= 15 },
-  { id: 'pd_juggle', name: 'Juggle Star', icon: '🤹', hint: 'Keep it up 20 times in a row in 🤹 Juggle', rule: f => featVal_(f, 'pyraspike', 'streak_juggle') >= 20 },
-  { id: 'pd_set', name: 'Sky Setter', icon: '🙌', hint: 'Set 50 balls in PyraDive', rule: f => featVal_(f, 'pyraspike', 'sets') >= 50 },
-  { id: 'pd_bump', name: 'Perfect Passer', icon: '🤚', hint: 'Bump 50 balls in PyraSpike', rule: f => featVal_(f, 'pyraspike', 'bumps') >= 50 },
-  { id: 'pd_dive', name: 'PyraDiver', icon: '🤸', hint: 'Make 15 diving saves in PyraDive', rule: f => featVal_(f, 'pyraspike', 'dives') >= 15 },
-  { id: 'pd_spirit', name: 'Spirit Diver', icon: '🔥', hint: 'Call 5 creatures with a Spirit Dive', rule: f => featVal_(f, 'pyraspike', 'spirits') >= 5 },
-  { id: 'pd_duo', name: 'Duo Spirit', icon: '🔥🔥', hint: 'Win 3 Spirit Duo Dives with a teammate', rule: f => featVal_(f, 'pyraspike', 'duos') >= 3 },
-  { id: 'pd_trio', name: 'Trio Legend', icon: '🔥🔥🔥', hint: 'Make 2 Spirit Trio Dives with your team', rule: f => featVal_(f, 'pyraspike', 'trios') >= 2 },
-  { id: 'pd_beast', name: 'Beast Keeper', icon: '📖', hint: 'Find 25 creatures for your Spirit Bestiary', rule: f => featVal_(f, 'pyraspike', 'beasts') >= 25 },
-  { id: 'pd_master', name: 'Spirit Master', icon: '🐉', hint: 'Find all 50 creatures of the Spirit Bestiary', rule: f => featVal_(f, 'pyraspike', 'beasts') >= 50 },
-  { id: 'pd_champ', name: 'PyraChamp', icon: '🏆', hint: 'Win a PyraDive cup', rule: f => featVal_(f, 'pyraspike', 'cups') >= 1 },
-  { id: 'pd_captain', name: 'Captain Flame', icon: '👑', hint: 'Win the 👑 Family Cup in PyraDive', rule: f => featVal_(f, 'pyraspike', 'familyCups') >= 1 },
-  { id: 'newcomer', name: 'Newcomer', icon: '🌱', hint: 'Everyone starts here', rule: () => true },
-  { id: 'pb_jackpot', name: 'Jackpot Hunter', icon: '🎰', hint: 'Hit a Pinball jackpot', rule: f => featVal_(f, 'pinball', 'jackpots') >= 1 },
-  { id: 'pb_royal', name: 'Jackpot Royalty', icon: '💰', hint: 'Hit 5 Pinball jackpots', rule: f => featVal_(f, 'pinball', 'jackpots') >= 5 },
-  { id: 'pb_inferno', name: 'Combo Inferno', icon: '🔥', hint: 'Reach a ×10 combo (35 shots) in Pinball', rule: f => featVal_(f, 'pinball', 'maxCombo') >= 35 },
-  { id: 'pb_multi', name: 'Multiball Maniac', icon: '🎱', hint: 'Start 10 multiballs', rule: f => featVal_(f, 'pinball', 'multiballs') >= 10 },
-  { id: 'pb_realms', name: 'Ringmaster of Realms', icon: '🎪', hint: 'Visit all 3 Pinball bonus scenes', rule: f => featVal_(f, 'pinball', 'scene_carnival') >= 1 && featVal_(f, 'pinball', 'scene_castle') >= 1 && featVal_(f, 'pinball', 'scene_space') >= 1 },
-  { id: 'pb_sharp', name: 'Sharpshooter', icon: '🎯', hint: 'Make 10 Pinball skill shots', rule: f => featVal_(f, 'pinball', 'skills') >= 10 },
-  { id: 'pb_wizard', name: 'Pinball Wizard', icon: '🧙', hint: 'Score 100,000 in one Pinball game', rule: f => featVal_(f, 'pinball', 'topScore') >= 100000 },
-  { id: 'hp_dodge', name: 'Dodge Master', icon: '😱', hint: 'Make 25 close calls in Dodgy Hopper', rule: f => featVal_(f, 'hopper', 'nearMiss') >= 25 },
-  { id: 'hp_far', name: 'Marathon Hopper', icon: '🐸', hint: 'Hop 150 rows in one Dodgy Hopper game', rule: f => featVal_(f, 'hopper', 'bestRows') >= 150 },
-  { id: 'hp_champ', name: 'Hopper Champion', icon: '👑', hint: 'Clear Dodgy Hopper Extreme', rule: (f, x) => x.cleared.hopper >= 5 },
-  { id: 'tt_drift', name: 'Drift King', icon: '🌀', hint: 'Drift for 60 seconds in Turbo Trail', rule: f => featVal_(f, 'turbo', 'drift') >= 60 },
-  { id: 'tt_rocket', name: 'Ramp Rocket', icon: '🦘', hint: 'Jump 30 times in Turbo Trail', rule: f => featVal_(f, 'turbo', 'jumps') >= 30 },
-  { id: 'tt_champ', name: 'Turbo Champion', icon: '🏆', hint: 'Win the Extreme Turbo Trail race', rule: (f, x) => x.cleared.turbo >= 5 },
-  { id: 'mm_elephant', name: 'Elephant Memory', icon: '🐘', hint: 'Finish 5 Memories Match boards with no misses', rule: f => featVal_(f, 'memory', 'perfect') >= 5 },
-  { id: 'mm_streak', name: 'Streak Star', icon: '🔥', hint: 'Match 8 pairs in a row in Memories Match', rule: f => featVal_(f, 'memory', 'bestStreak') >= 8 },
-  { id: 'mm_master', name: 'Memory Master', icon: '🧠', hint: 'Finish Memories Match Extreme', rule: (f, x) => x.cleared.memory >= 5 },
-  { id: 'ws_master', name: 'Master Builder', icon: '🔨', hint: 'Build 10 things in the Furniture Workshop', rule: f => featVal_(f, 'workshop', 'made') >= 10 },
-  { id: 'ws_fav', name: 'Crowd Favourite', icon: '🌟', hint: 'Get 8 stars on one thing in the Design Show', rule: f => featVal_(f, 'workshop', 'topStars') >= 8 },
-  { id: 'ws_judge', name: 'Fair Judge', icon: '🗳️', hint: 'Vote for 15 things in the Design Show', rule: f => featVal_(f, 'workshop', 'votes') >= 15 },
-  { id: 'pb_buddy', name: 'Best Buddies', icon: '🐒', hint: 'Fill your Pinball buddy meter 5 times', rule: f => featVal_(f, 'pinball', 'buddy') >= 5 },
-  { id: 'ck_triple', name: 'Triple Hopper', icon: '🦘', hint: 'Make a triple jump in Checkers', rule: f => featVal_(f, 'checkers', 'triples') >= 1 || featVal_(f, 'checkers', 'megas') >= 1 },
-  { id: 'ck_mega', name: 'Mega Leaper', icon: '⚡', hint: 'Make a MEGA jump (4+) in Checkers', rule: f => featVal_(f, 'checkers', 'megas') >= 1 },
-  { id: 'ck_hop', name: 'Hop Legend', icon: '🐸', hint: 'Make 25 double jumps in Checkers', rule: f => featVal_(f, 'checkers', 'doubles') >= 25 },
-  { id: 'ck_kingmaker', name: 'Kingmaker', icon: '👑', hint: 'Crown 20 Kings in Checkers', rule: f => featVal_(f, 'checkers', 'kings') >= 20 },
-  { id: 'ck_champ', name: 'Checkers Champion', icon: '🏆', hint: 'Beat the Extreme Checkers bot', rule: (f, x) => x.cleared.checkers >= 5 },
-  { id: 'cs_kid', name: 'Checkmate Kid', icon: '♚', hint: 'Checkmate a Chess bot', rule: f => featVal_(f, 'chess', 'mates') >= 1 },
-  { id: 'cs_fork', name: 'Fork Master', icon: '🍴', hint: 'Make 10 forks in Chess', rule: f => featVal_(f, 'chess', 'forks') >= 10 },
-  { id: 'cs_castle', name: 'Castle Keeper', icon: '🏰', hint: 'Castle 10 times in Chess', rule: f => featVal_(f, 'chess', 'castles') >= 10 },
-  { id: 'cs_pawn', name: 'Pawn Whisperer', icon: '✨', hint: 'Promote 5 pawns in Chess', rule: f => featVal_(f, 'chess', 'promos') >= 5 },
-  { id: 'cs_ninja', name: 'En Passant Ninja', icon: '🥷', hint: 'Take a pawn en passant', rule: f => featVal_(f, 'chess', 'enpassant') >= 1 },
-  { id: 'cs_lightning', name: 'Lightning Mate', icon: '⚡', hint: 'Checkmate in under 20 moves', rule: f => featVal_(f, 'chess', 'fastMate') > 0 && featVal_(f, 'chess', 'fastMate') < 20 },
-  { id: 'cs_gm', name: 'Grandmaster in Training', icon: '🧠', hint: 'Beat the Grand Bot (Chess Extreme)', rule: (f, x) => x.cleared.chess >= 5 },
-  { id: 'all_round', name: 'All-Rounder', icon: '🌈', hint: 'Earn a badge in every big game', rule: (f, x) => x.allRound },
-  { id: 'record', name: 'Record Breaker', icon: '🏅', hint: 'Hold a family record in any game', rule: (f, x) => x.record },
-  { id: 'hc_first', name: 'Hardcore Hero', icon: '💀', hint: 'Beat a 💀 Hardcore level in any main game', rule: (f, x) => Object.keys(x.cleared).some(g => x.cleared[g] >= 6) },
-  { id: 'hc_three', name: 'Unbreakable', icon: '🛡️', hint: 'Beat 💀 Hardcore in 3 different games', rule: (f, x) => Object.keys(x.cleared).filter(g => x.cleared[g] >= 6).length >= 3 },
-  { id: 'hc_all', name: 'Legend of the Playground', icon: '🌋', hint: 'Beat 💀 Hardcore in 10 different main games', rule: (f, x) => Object.keys(x.cleared).filter(g => x.cleared[g] >= 6).length >= 10 },
-  { id: 'mq_whiz', name: 'Number Whiz', icon: '🧮', hint: 'Get 250 Math Quest answers right', rule: f => featVal_(f, 'math-quest', 'correct') >= 250 },
-  { id: 'mq_streak', name: 'Streak Master', icon: '🔥', hint: 'Answer 15 Math Quest questions in a row', rule: f => featVal_(f, 'math-quest', 'bestStreak') >= 15 },
-  { id: 'mq_champ', name: 'Math Champion', icon: '🏅', hint: 'Pass Math Quest Extreme', rule: (f, x) => (x.cleared['math-quest'] || 0) >= 5 },
-  { id: 'mq_words', name: 'Word Wizard', icon: '🔤', hint: 'Get 100 Math Quest Word Sums right', rule: f => featVal_(f, 'math-quest', 'wordRight') >= 100 },   // ➗ mq-w1
-  { id: 'mq_thai', name: 'Thai Number Reader', icon: '🐘', hint: 'Get 100 Math Quest เลขคำไทย sums right', rule: f => featVal_(f, 'math-quest', 'thaiRight') >= 100 },   // ➗ mq-w1
-  { id: 'mq_typer', name: 'Pad Pro', icon: '⌨️', hint: 'Type 100 right answers on the Math Quest number pad', rule: f => featVal_(f, 'math-quest', 'typedRight') >= 100 },   // ➗ mq-w1
-  { id: 'mq_story', name: 'Story Solver', icon: '📖', hint: 'Solve 50 Math Quest story problems (📖 English or 📜 ไทย)', rule: f => featVal_(f, 'math-quest', 'storyRight') >= 50 },   // ➗ mq-w2
-  { id: 'mq_trick', name: 'Trick Spotter', icon: '🕵️', hint: 'Spot 25 Math Quest trick questions (🤔 English or 🙃 ไทย)', rule: f => featVal_(f, 'math-quest', 'trickRight') >= 25 },   // ➗ mq-w3
-  { id: 'mq_test', name: 'Test Ace', icon: '📝', hint: 'Get 50 Math Quest test questions right (📝 Test Practice or 📝 ข้อสอบ)', rule: f => featVal_(f, 'math-quest', 'testRight') >= 50 },   // ➗ mq-t1
-  { id: 'mq_detective', name: 'Maths Detective', icon: '🔍', hint: 'Find 25 mistakes in Math Quest 🔍 Find the mistake', rule: f => featVal_(f, 'math-quest', 'fixRight') >= 25 },   // ➗ mq-w4
-  { id: 'mq_ears', name: 'Sharp Ears', icon: '🎧', hint: 'Get 50 Math Quest sums right just by listening (🎧 Listen or 👂 ฟังโจทย์)', rule: f => featVal_(f, 'math-quest', 'listenRight') >= 50 },   // ➗ mq-w5
-];
+// 📏 s1: TITLE_DEFS → GameData.gs (moved word for word with its comment).
 function featVal_(f, g, s) { return Number(((f || {})[g] || {})[s]) || 0; }
 function featsSheet_() {
   let sh = ss_().getSheetByName(FEATS_TAB);
@@ -3239,39 +1876,9 @@ function saveFeats(name, gameId, stats) {
   lock.waitLock(10000);
   try { snakeDaily_(name, gameId, stats); return safeRecordFeats_(name, gameId, stats); } finally { lock.releaseLock(); }
 }
-// 🐍 Snakize skins (plan 11y round 4): per-world evolution from hidden per-world feats, summed over the 3 boards.
-// ⬛ Polyplot 📖 field journal: jc_<theme> = field types caught there (calm, energetic, lazy, enraged + any hidden one = 5 → that theme's 🐾 pet)
-const PP_THEMES_ = ['dino', 'sea', 'dance', 'robot', 'space', 'sky', 'hunter'];
-PP_THEMES_.forEach(t => { FEAT_DEFS['polyplot']['jc_' + t] = { name: 'Journal ' + t, icon: '📖', kind: 'max', hidden: true }; FEAT_DEFS['polyplot']['jt_' + t] = { name: 'Caught in ' + t, icon: '📖', kind: 'max', hidden: true }; });
-const SNAKE_WORLDS_ = ['dino', 'sea', 'dance', 'robot', 'space', 'sky'];
-const SNAKE_GAMES_ = ['snakeast', 'snakigate', 'snakastle'];
-SNAKE_GAMES_.forEach(g => SNAKE_WORLDS_.forEach(w => {
-  FEAT_DEFS[g]['g_' + w] = { name: 'Games in ' + w, icon: '🎮', kind: 'sum', hidden: true };
-  FEAT_DEFS[g]['f_' + w] = { name: 'Food in ' + w, icon: '🍎', kind: 'sum', hidden: true };
-  FEAT_DEFS[g]['l_' + w] = { name: 'Longest in ' + w, icon: '🐍', kind: 'max', hidden: true };
-  FEAT_DEFS[g]['w_' + w] = { name: 'Best win in ' + w, icon: '🏆', kind: 'max', hidden: true };
-}));
+// 📏 s1: PP_THEMES_ · SNAKE_WORLDS_ · SNAKE_GAMES_ + their hidden FEAT_DEFS rows → GameData.gs (moved word for word with its comment).
 function snakeFeat_(f, stat, kind) { const v = SNAKE_GAMES_.map(g => featVal_(f, g, stat)); return kind === 'max' ? Math.max.apply(null, v) : v.reduce((a, b) => a + b, 0); }
-// steps per world: 0 Plain (free) · 1 Pattern (5 games) · 2 Light stripes (300 food) · 3 Armor (win Hard) · 4 Fuel (length 60) · 5 Glow (win Extreme) · 6 Shadow (win Hardcore)
-const SNAKE_STEP_RULES_ = [() => true, (f, w) => snakeFeat_(f, 'g_' + w) >= 5, (f, w) => snakeFeat_(f, 'f_' + w) >= 300, (f, w) => snakeFeat_(f, 'w_' + w, 'max') >= 4, (f, w) => snakeFeat_(f, 'l_' + w, 'max') >= 60, (f, w) => snakeFeat_(f, 'w_' + w, 'max') >= 5, (f, w) => snakeFeat_(f, 'w_' + w, 'max') >= 6];
-const SNAKE_STEP_HOW_ = ['Free', 'Play 5 games in this world', 'Eat 300 food in this world', 'Win a Hard level in this world', 'Grow to 60 long in this world', 'Win an Extreme level in this world', 'Win 💀 Hardcore in this world'];
-const SNAKE_TYPE_RULES_ = [
-  ['garden', 'Free', () => true],
-  ['python', 'Play 10 Snakize games', f => snakeFeat_(f, 'games') >= 10],
-  ['rattle', 'Use 20 skills', f => snakeFeat_(f, 'skills') >= 20],
-  ['cobra', 'Eat 20 golden food in Snakeast', f => featVal_(f, 'snakeast', 'golds') >= 20],
-  ['anaconda', 'Grow to 40 long', f => snakeFeat_(f, 'longest', 'max') >= 40],
-  ['viper', 'Pop 5 snakes in Snakigate', f => featVal_(f, 'snakigate', 'popped') >= 5],
-  ['seasnake', 'Own 40 % land in Snakastle', f => featVal_(f, 'snakastle', 'land') >= 40],
-  ['coral', 'Win 3 family duels', f => snakeFeat_(f, 'duelWins') >= 3],
-  ['boa', 'Win a Hard level in any Snakize mode', f => SNAKE_WORLDS_.some(w => snakeFeat_(f, 'w_' + w, 'max') >= 4)],
-  ['titanoboa', 'Finish Snaketale chapter 1 (🦖)', f => featVal_(f, 'snaketale', 'chapters') >= 1],
-  ['seaserpent', 'Finish Snaketale chapter 2 (🐙)', f => featVal_(f, 'snaketale', 'chapters') >= 2],
-  ['conga', 'Finish Snaketale chapter 3 (🪩)', f => featVal_(f, 'snaketale', 'chapters') >= 3],
-  ['mecha', 'Finish Snaketale chapter 4 (🤖)', f => featVal_(f, 'snaketale', 'chapters') >= 4],
-  ['comet', 'Finish Snaketale chapter 5 (🪐)', f => featVal_(f, 'snaketale', 'chapters') >= 5],
-  ['feather', 'Finish Snaketale chapter 6 (☁️)', f => featVal_(f, 'snaketale', 'chapters') >= 6]
-];
+// 📏 s1: SNAKE_STEP_RULES_ · SNAKE_STEP_HOW_ · SNAKE_TYPE_RULES_ → GameData.gs (moved word for word with its comment).
 function snakeSkinsFor_(f) {
   const worlds = {}; let best = 0;
   SNAKE_WORLDS_.forEach(w => { const steps = SNAKE_STEP_RULES_.map((r, i) => !!r(f, w)); worlds[w] = steps.map((ok, i) => ok ? i : -1).filter(i => i >= 0); best = Math.max(best, worlds[w].length); });
@@ -3318,234 +1925,16 @@ const EQUIP_SLOTS = ['costume', 'hand', 'back', 'pet', 'ride', 'trail', 'neck', 
    A line is a set of looks (steps) for one slot. Every "way" the player completes adds one step
    (up to the number of steps), so getting the same item again evolves it.
    Adding an item later = adding a line (or a step + a way) here. */
-const W_ = {
-  lvl: (g, n, label) => ({ how: 'Pass ' + label + ' ' + MAZE_LEVEL_NAMES[n - 1], r: x => (x.cleared[g] || 0) >= n }),
-  mini: (g, n, label) => ({ how: 'Reach ' + label + ' stage ' + (n + 1), r: x => (x.mini[g] || 0) >= n }),
-  score: (g, n, label) => ({ how: 'Score ' + Number(n).toLocaleString() + ' in ' + label, r: x => (x.best[g] ? x.best[g].score : 0) >= n }),
-  time: (g, s, label) => ({ how: 'Finish ' + label + ' in under ' + Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2), r: x => x.best[g] && x.best[g].time > 0 && x.best[g].time <= s }),
-  feat: (g, s, n, how) => ({ how: how, r: x => featVal_(x.f, g, s) >= n }),
-  total: n => ({ how: 'Pass ' + n + ' levels in any games', r: x => x.levels >= n }),
-  miles: n => ({ how: 'Reach ' + n + ' 🐾 Adventure miles', r: x => (x.miles || 0) >= n }),
-  hardcore: n => ({ how: 'Beat ' + n + ' 💀 Hardcore level' + (n > 1 ? 's' : '') + ' (any games)', r: x => (x.hardcores || 0) >= n }),
-  extreme: n => ({ how: 'Pass ' + n + ' Extreme level' + (n > 1 ? 's' : '') + ' (any games)', r: x => x.extremes >= n }),
-  badges: n => ({ how: 'Earn ' + n + ' badges', r: x => x.badges >= n }),
-  titles: n => ({ how: 'Earn ' + n + ' Title' + (n > 1 ? 's' : ''), r: x => x.titles >= n }),
-  days: n => ({ how: 'Play on ' + n + ' different days', r: x => x.days >= n }),
-};
-const ITEM_LINES = [
-  // 🔢 GeoScout + ➗ Algebros number looks (looks only; NumberSkins.html draws them; picked per player sp_numberskin:<Name>; Journey chapters unlock them too)
-  { id: 'numberskin', name: 'Number looks', icon: '🎨', slot: 'numberskin', game: 'geoscout', soon: 'Used on 🔢 GeoScout number blocks AND ➗ Algebros tiles — pick it on their menus', steps: ['Candy Pops', 'Mini Monsters', 'Pixel Pals', 'Gem Stones', 'Lava Rocks', 'Royal Gold'],
-    ways: [W_.feat('geoscout', 'snaps', 20, 'Snap 20 blocks together in GeoScout'), W_.feat('number-board', 'equations', 20, 'Make 20 number sentences in Algebros'), W_.feat('geoscout', 'balances', 20, 'Balance the scale 20 times in GeoScout'),
-      W_.feat('geoscout', 'counts', 50, 'Make 50 numbers in GeoScout'), W_.feat('number-board', 'equations', 100, 'Make 100 number sentences in Algebros'), W_.feat('geoscout', 'battleWins', 5, 'Win 5 GeoScout Tower battles')] },
-  // 🔤 GeoRead + Lettercraft letter looks (looks only; LetterSkins.html draws them; picked per player sp_letterskin:<Name>)
-  { id: 'letterskin', name: 'Letter looks', icon: '🎨', slot: 'letterskin', game: 'georead', soon: 'Used on 🔤 GeoRead letter boxes AND 🔤 Lettercraft tiles — pick it on their menus', steps: ['Candy', 'Wood blocks', 'Jelly', 'Galaxy', 'Gold', 'Rainbow'],
-    ways: [W_.feat('georead', 'blends', 20, 'Blend 20 words in GeoRead'), W_.feat('word-board', 'words', 20, 'Make 20 words in Lettercraft'), W_.feat('georead', 'built', 20, 'Build 20 words in GeoRead'),
-      W_.feat('georead', 'stories', 5, 'Read 5 GeoRead stories'), W_.feat('word-board', 'words', 100, 'Make 100 words in Lettercraft'), W_.feat('georead', 'sounds', 40, 'Find 40 letter sounds in GeoRead')] },
-  // 🂠 WisDeck card backs (looks only; the best one you own is the back of your face-down cards; painted by drawWisBack in WisDeck + Collection)
-  { id: 'wdback', name: 'Card backs', icon: '🂠', slot: 'wdback', game: 'wisdeck', soon: 'Used in 🃏 WisDeck — the back of your face-down cards', steps: ['Night owl', 'Jungle', 'Deep sea', 'Lava', 'Candy', 'Galaxy', 'Golden', 'Rainbow'],
-    ways: [W_.feat('wisdeck', 'cards', 10, 'Win 10 WisDeck cards'), W_.feat('wisdeck', 'right', 50, '50 right quiz answers'), W_.feat('wisdeck', 'daily', 3, 'Play 3 📅 daily decks'), W_.feat('wiscount', 'wins', 3, 'Win 3 🔢 WisCount matches'),
-      W_.feat('wisjack', 'wins', 3, 'Win 3 🂡 WisJack matches'), W_.feat('wisdeck', 'buzzWins', 2, 'Win 2 🔔 WisBuzz games'), W_.feat('wisdeck', 'fullCats', 1, 'Fill a whole category 🎓'), W_.feat('wisdeck', 'cards', 300, 'Win 300 WisDeck cards')] },
-  // 🎓 WisDeck professor costume: one step per full category in the 📖 deck book (drawn in AvatarKit costumeLook 'professor'; the quiz podium borrows step 2)
-  { id: 'professor', name: 'Professor', icon: '🎓', slot: 'costume', game: 'wisdeck', steps: ['Mortarboard', 'Professor gown', 'Book of facts', 'Golden owl pin', 'Grand professor'],
-    ways: [[1, 'Fill 1 WisDeck category (all its cards)'], [2, 'Fill 2 WisDeck categories'], [3, 'Fill 3 WisDeck categories'], [5, 'Fill 5 WisDeck categories'], [8, 'Fill 8 WisDeck categories']].map(w => W_.feat('wisdeck', 'fullCats', w[0], w[1])) },
-  // 👀🧠 Eyes Brain Riot keypad skins (looks only; picked per device sp_eyesbrain_pad:<Name>; the page + Collection draw them from EBR_PADS)
-  { id: 'ebrpad', name: 'Brain keypads', icon: '🔢', slot: 'ebrpad', game: 'eyes-brain', soon: 'Used in 👀🧠 Eyes Brain Riot — pick your keypad on the level screen', steps: ['Candy', 'Wood blocks', 'Lava stone', 'Ice', 'Neon', 'Jelly', 'Galaxy', 'Gold', 'Rainbow', 'Crystal'],
-    ways: [W_.feat('eyes-brain', 'games', 3, 'Play 3 Eyes Brain Riot games'), W_.feat('eyes-brain', 'digits', 100, 'Remember 100 digits'), W_.feat('eyes-brain', 'perfects', 10, '10 perfect rounds'), W_.feat('eyes-brain', 'bestCombo', 4, 'A 🔥 combo of 4'),
-      W_.feat('eyes-brain', 'riots', 2, '2 🧠 brain riots'), W_.feat('eyes-brain', 'challenge', 8, '🏔️ Challenge: remember 8 digits'), W_.feat('eyes-brain', 'daily', 3, 'Play 3 🎯 daily family numbers'), W_.feat('eyes-brain', 'digits', 1000, 'Remember 1,000 digits'),
-      W_.lvl('eyes-brain', 4, 'Eyes Brain Riot'), W_.feat('eyes-brain', 'longest', 12, '🏅 Brain level 12 (a 12-digit number, perfect)')] },
-  // ⬛ Polyplot line trails (looks only, picked per device sp_polyplot_trail:<Name>, painted by AvatarKit drawPolyTrail) + 🐾 one journal pet per theme (catch its 5 field types)
-  { id: 'polytrail', name: 'Line trails', icon: '🖍️', slot: 'polytrail', game: 'polyplot', soon: 'Used in ⬛ Polyplot — pick your trail in the setup', steps: ['Rainbow chalk', 'Glow paint', 'Lava line', 'Ocean wave', 'Vine rope', 'Star dust', 'Zebra stripes', 'Neon pulse', 'Gold leaf', 'Prism'],
-    ways: [W_.feat('polyplot', 'games', 3, 'Play 3 Polyplot games'), W_.feat('polyplot', 'boxes', 50, 'Close 50 shapes in Polyplot'), W_.feat('polyplot', 'wins', 3, 'Win 3 Polyplot games'), W_.feat('polyplot', 'chains3', 5, 'Close 3+ shapes in one turn 5 times'), W_.feat('polyplot', 'catches', 20, 'Catch 20 creatures in 🏹 Hunt'),
-      W_.feat('polyplot', 'coins', 100, 'Collect 100 coins in Polyplot'), W_.feat('polyplot', 'built', 10, 'Build 10 things in 🏰 Fortiplot'), W_.feat('polyplot', 'bestWave', 10, 'Hold 10 waves in 🛡️ co-op'), W_.feat('polyplot', 'hidden', 3, 'Find 3 hidden creatures'), W_.lvl('polyplot', 5, 'Polyplot')] },
-  { id: 'pppet_dino', name: 'Dino journal pet', icon: '🦕', slot: 'pet', game: 'polyplot', computed: true, steps: ['Leafy Longneck egg', 'Leafy Longneck', 'Leafy Longneck champion'], ways: [W_.feat('polyplot', 'jc_dino', 3, 'Polyplot 📖 🦖 Dino journal: catch 3 field creature types (egg)'), W_.feat('polyplot', 'jc_dino', 5, 'Polyplot 📖 🦖 Dino journal: the 4 field creatures + a hidden one'), W_.feat('polyplot', 'jt_dino', 25, 'Catch 25 creatures in 🦖 Dino (Polyplot)')] },
-  { id: 'pppet_sea', name: 'Aquarium journal pet', icon: '🐢', slot: 'pet', game: 'polyplot', computed: true, steps: ['Shelly Turtle egg', 'Shelly Turtle', 'Shelly Turtle champion'], ways: [W_.feat('polyplot', 'jc_sea', 3, 'Polyplot 📖 🐙 Aquarium journal: catch 3 field creature types (egg)'), W_.feat('polyplot', 'jc_sea', 5, 'Polyplot 📖 🐙 Aquarium journal: the 4 field creatures + a hidden one'), W_.feat('polyplot', 'jt_sea', 25, 'Catch 25 creatures in 🐙 Aquarium (Polyplot)')] },
-  { id: 'pppet_dance', name: 'Dance Hall journal pet', icon: '🦩', slot: 'pet', game: 'polyplot', computed: true, steps: ['Disco Flamingo egg', 'Disco Flamingo', 'Disco Flamingo champion'], ways: [W_.feat('polyplot', 'jc_dance', 3, 'Polyplot 📖 🪩 Dance Hall journal: catch 3 field creature types (egg)'), W_.feat('polyplot', 'jc_dance', 5, 'Polyplot 📖 🪩 Dance Hall journal: the 4 field creatures + a hidden one'), W_.feat('polyplot', 'jt_dance', 25, 'Catch 25 creatures in 🪩 Dance Hall (Polyplot)')] },
-  { id: 'pppet_robot', name: 'Robot Time journal pet', icon: '🐌', slot: 'pet', game: 'polyplot', computed: true, steps: ['Gear Snail egg', 'Gear Snail', 'Gear Snail champion'], ways: [W_.feat('polyplot', 'jc_robot', 3, 'Polyplot 📖 🤖 Robot Time journal: catch 3 field creature types (egg)'), W_.feat('polyplot', 'jc_robot', 5, 'Polyplot 📖 🤖 Robot Time journal: the 4 field creatures + a hidden one'), W_.feat('polyplot', 'jt_robot', 25, 'Catch 25 creatures in 🤖 Robot Time (Polyplot)')] },
-  { id: 'pppet_space', name: 'Space journal pet', icon: '🦄', slot: 'pet', game: 'polyplot', computed: true, steps: ['Star Pony egg', 'Star Pony', 'Star Pony champion'], ways: [W_.feat('polyplot', 'jc_space', 3, 'Polyplot 📖 🪐 Space journal: catch 3 field creature types (egg)'), W_.feat('polyplot', 'jc_space', 5, 'Polyplot 📖 🪐 Space journal: the 4 field creatures + a hidden one'), W_.feat('polyplot', 'jt_space', 25, 'Catch 25 creatures in 🪐 Space (Polyplot)')] },
-  { id: 'pppet_sky', name: 'Sky Temple journal pet', icon: '🕊️', slot: 'pet', game: 'polyplot', computed: true, steps: ['Cloud Dove egg', 'Cloud Dove', 'Cloud Dove champion'], ways: [W_.feat('polyplot', 'jc_sky', 3, 'Polyplot 📖 ☁️ Sky Temple journal: catch 3 field creature types (egg)'), W_.feat('polyplot', 'jc_sky', 5, 'Polyplot 📖 ☁️ Sky Temple journal: the 4 field creatures + a hidden one'), W_.feat('polyplot', 'jt_sky', 25, 'Catch 25 creatures in ☁️ Sky Temple (Polyplot)')] },
-  { id: 'pppet_hunter', name: 'Monster Hunter journal pet', icon: '🦌', slot: 'pet', game: 'polyplot', computed: true, steps: ['Forest Deer egg', 'Forest Deer', 'Forest Deer champion'], ways: [W_.feat('polyplot', 'jc_hunter', 3, 'Polyplot 📖 🏹 Monster Hunter journal: catch 3 field creature types (egg)'), W_.feat('polyplot', 'jc_hunter', 5, 'Polyplot 📖 🏹 Monster Hunter journal: the 4 field creatures + a hidden one'), W_.feat('polyplot', 'jt_hunter', 25, 'Catch 25 creatures in 🏹 Monster Hunter (Polyplot)')] },
-  { id: 'explorer', name: 'Explorer', icon: '🧭', slot: 'costume', game: 'maze', steps: ['Safari hat', 'Explorer backpack', 'Binoculars', 'Torch', 'Jungle explorer outfit'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('maze', n, 'Maze')) },
-  { id: 'builder', name: 'Builder', icon: '⛑️', slot: 'costume', game: 'stacking-sim', steps: ['Hard hat', 'Tool belt', 'Hammer', 'Hi-vis vest', 'Master builder'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('stacking-sim', n, 'Stack It!')) },
-  { id: 'robot', name: 'Robot buddy', icon: '🤖', slot: 'pet', game: 'robot-adventure', steps: ['Tiny bot', 'Rolling bot', 'Drone', 'Robo-dog', 'Mech buddy'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('robot-adventure', n, 'Code the Robot')).concat([1, 2, 3, 4].map(n => W_.mini('code-robot', n, 'mini Code the Robot'))) },
-  { id: 'checkers', name: 'Checkers style', icon: '🔴', slot: 'costume', game: 'checkers', steps: ['Checker hat', 'Checker shirt', 'Checker pants', 'Checkerboard', 'King of the board'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('checkers', n, 'Checkers')) },
-  { id: 'chesspillow', name: 'Chess pillows', icon: '♟️', slot: 'hand', game: 'chess', steps: ['Pawn pillow', 'Knight pillow', 'Bishop pillow', 'Rook pillow', 'Queen pillow', 'King pillow'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('chess', n, 'Chess')).concat([W_.feat('chess', 'mates', 1, 'Checkmate a Chess bot')]) },
-  { id: 'hero', name: 'Super hero', icon: '🦸', slot: 'costume', game: 'pinball', steps: ['Hero mask', 'Hero cape', 'Power gloves & boots', 'Super suit', 'Hover hero', 'Legend aura'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('pinball', n, 'Pinball')).concat([W_.score('pinball', 100000, 'Pinball')]) },
-  { id: 'frog', name: 'Frog', icon: '🐸', slot: 'costume', game: 'hopper', steps: ['Frog cap', 'Frog hood', 'Frog suit', 'Tree frog', 'Frog prince'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('hopper', n, 'Dodgy Hopper')) },
-  { id: 'racer', name: 'Racer', icon: '🏁', slot: 'costume', game: 'turbo', steps: ['Racing cap', 'Racing gloves', 'Racing helmet', 'Racing suit', 'Turbo champion'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('turbo', n, 'Turbo Trail')) },
-  { id: 'cards', name: 'Magic cards', icon: '🃏', slot: 'hand', game: 'memory', steps: ['One card', 'Card pair', 'Card fan', 'Magic deck', 'Golden deck'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('memory', n, 'Memories Match')) },
-  // ⚛️ Sciencetory atom looks (looks only — the element colour always stays; AtomSkins.html draws them; picked per player sp_atomskin:<Name>; Classic is free) · sc-2b
-  { id: 'atomskin', name: 'Atom looks', icon: '⚛️', slot: 'atomskin', game: 'sciencetory', soon: 'Used on every atom in 🔬 Sciencetory ⚗️ Chemistry + ⚛️ Quantum — pick it on their lab screens', steps: ['Bubble', 'Jelly', 'Cartoon', 'Glow', 'Crystal', 'Planet', 'Electron cloud', 'Pixel', 'Galaxy'],
-    ways: [W_.feat('sciencetory', 'elements', 2, 'Collect your first 2 element cards'), W_.feat('sciencetory', 'chemRounds', 1, 'Play a ⚗️ Chemistry round'), W_.feat('sciencetory', 'atoms', 3, 'Build 3 atoms in ⚛️ Quantum'),
-      W_.feat('sciencetory', 'compounds', 5, 'Build 5 molecules'), W_.feat('sciencetory', 'elements', 25, 'Collect 25 element cards'), W_.feat('sciencetory', 'atoms', 10, 'Build 10 different atoms'),
-      W_.feat('sciencetory', 'compounds', 15, 'Build 15 molecules'), W_.feat('sciencetory', 'elements', 50, 'Collect 50 element cards'), W_.feat('sciencetory', 'atoms', 25, 'Build 25 different atoms')] },
-  // 🏓 Table looks (looks only; TableSkins.html draws them; picked per player sp_tableskin:<Name>; Classic is free; every board / stand / sign / frame crafted in 🏭 Artifactory is a table top too) · pd-4c
-  { id: 'tableskin', name: 'Table looks', icon: '🏓', slot: 'tableskin', game: 'pyraspike', soon: 'Used on the ⚡ PyraSpark table in 🔥 PyraDive — pick it on the PyraDive setup screen', steps: ['Wood', 'Chalkboard', 'Candy', 'Marble', 'Ice', 'Lava', 'Neon grid', 'Gold', 'Galaxy', 'Rainbow'],
-    ways: [W_.feat('pyraspike', 'm_sparksolo', 1, 'Win a ⚡ PyraSpark 1v1 game'), W_.feat('pyraspike', 'edges', 3, 'Hit 3 ⚡ EDGE balls'), W_.feat('pyraspike', 'm_party', 1, 'Win a 🌀 Spark Party'), W_.feat('pyraspike', 'traps', 15, 'Trap the ball 15 times'),
-      W_.feat('pyraspike', 'm_zonehits', 1, 'Play 🎯 Zone Hits'), W_.feat('pyraspike', 'pops', 20, 'Pop the ball up 20 times'), W_.feat('pyraspike', 'm_sparkduo', 1, 'Win a ⚡ PyraSpark Duo game'), W_.feat('pyraspike', 'cups', 1, 'Win a 🏆 PyraDive cup'),
-      W_.feat('pyraspike', 'edges', 15, 'Hit 15 ⚡ EDGE balls'), W_.feat('pyraspike', 'familyCups', 1, 'Win the 👑 Family Cup')] },
-  { id: 'ballskin', name: 'Ball skins', icon: '🎱', slot: 'ball', game: 'pinball', soon: 'Used in 🎯 Pinball and 🏓 SlaBrall', steps: ['Colour ball', 'Chrome', 'Marble', '8-ball', 'Planet', 'Smiley', 'Disco', 'Stripes', 'Flames', 'Rainbow comet', 'Orange', 'Watermelon', 'Earth', 'Eyeball', 'Dino egg', 'Pearl', 'Moon', 'Donut', 'Snowball', 'Sun'],
-    ways: [W_.feat('pinball', 'jackpots', 1, 'Hit a Pinball jackpot'), W_.feat('pinball', 'multiballs', 1, 'Start a Pinball multiball'), W_.feat('pinball', 'maxCombo', 10, 'Reach a 10-shot Pinball combo'), W_.feat('pinball', 'skills', 1, 'Make a Pinball skill shot'), W_.feat('pinball', 'scenes', 1, 'Visit a Pinball bonus scene'), W_.feat('pinball', 'boxes', 5, 'Open 5 Mystery Boxes'), W_.feat('pinball', 'chain', 5, 'Light 5 Lucky Lights in a row'), W_.feat('pinball', 'words', 3, 'Spell the top-lane word 3 times'), W_.score('pinball', 40000, 'Pinball'), W_.score('pinball', 150000, 'Pinball'), W_.lvl('sla-brall', 1, 'SlaBrall'), W_.lvl('sla-brall', 2, 'SlaBrall'), W_.lvl('sla-brall', 3, 'SlaBrall'), W_.lvl('sla-brall', 4, 'SlaBrall'), W_.lvl('sla-brall', 5, 'SlaBrall'), W_.feat('sla-brall', 'rally', 15, 'Keep a 15-hit SlaBrall rally'), W_.feat('sla-brall', 'aces', 5, 'Serve 5 aces in SlaBrall'), W_.feat('sla-brall', 'smash', 25, 'Hit 25 SlaBrall smashes'), W_.feat('sla-brall', 'powers', 10, 'Use 10 SlaBrall power-ups'), W_.feat('sla-brall', 'legend', 1, 'Score with a ⭐ Legendary Shot')] },
-  { id: 'shapepillow', name: 'Shape pillows', icon: '🔷', slot: 'hand', game: 'stacking-sim', steps: ['Square pillow', 'Circle pillow', 'Triangle pillow', 'Heart pillow', 'Star pillow', 'Hexagon pillow', 'Crescent pillow', 'Rainbow trapezoid'], ways: [200, 400, 600, 800, 1000, 1200, 1500].map(n => W_.score('stacking-sim', n, 'Stack It!')).concat([W_.time('stacking-sim', 30, 'a Stack It! level')]) },
-  { id: 'posecam', name: 'Pose cameras', icon: '📸', slot: 'hand', game: 'pose-party', steps: ['Instant camera', 'Video camera', 'Spotlight', 'Disco ball', 'Golden camera'],   // 📷 Pose Party (pose chat S2b-4)
-    ways: [W_.feat('pose-party', 'poses', 10, 'Match 10 poses in Pose Party'), W_.lvl('pose-party', 2, 'Pose Party'), W_.feat('pose-party', 'danceBest', 2000, 'Score 2,000 in one 💃 Dance chain'),
-      W_.feat('pose-party', 'booths', 3, 'Make 3 📸 Photo Booth pictures'), W_.lvl('pose-party', 5, 'Pose Party')] },
-  { id: 'mathtools', name: 'Maths tools', icon: '🧮', slot: 'hand', game: 'math-quest', steps: ['Pencil', 'Ruler', 'Abacus', 'Calculator', 'Golden compass'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('math-quest', n, 'Math Quest')) },
-  { id: 'dino', name: 'Dinosaur', icon: '🦖', slot: 'costume', game: 'any', steps: ['Dino egg hat', 'Hatchling hood', 'Baby dino', 'Raptor', 'Triceratops', 'T-rex'], ways: [2, 4, 7, 10, 15, 20].map(W_.total) },
-  { id: 'sword', name: 'Laser sword', icon: '⚔️', slot: 'hand', game: 'checkers', steps: ['Blue laser sword', 'Green blade', 'Curved hilt', 'Purple blade', 'Crossguard hilt', 'Red blade', 'Double-blade staff', 'Gold blade', 'Spin glow', 'Rainbow blade'],
-    parts: { blade: [['Blue', 1], ['Green', 2], ['Purple', 4], ['Red', 6], ['Gold', 8], ['Rainbow', 10]], hilt: [['Classic', 1], ['Curved', 3], ['Crossguard', 5], ['Double staff', 7]] },
-    ways: [1, 2, 3, 4, 5].map(n => W_.lvl('checkers', n, 'Checkers')).concat([1, 2, 3, 4, 5].map(n => W_.lvl('chess', n, 'Chess'))) },
-  { id: 'wings', name: 'Wings', icon: '🦋', slot: 'back', game: 'any', steps: ['Butterfly wings', 'Fairy wings', 'Bird wings', 'Bat wings', 'Dragon wings', 'Rainbow wings'], ways: [3, 6, 10, 15, 20, 30].map(W_.badges) },
-  { id: 'board', name: 'Boards', icon: '🛹', slot: 'ride', game: 'trash-pointer', steps: ['Skateboard', 'Surfboard', 'Hoverboard', 'Rocket board'], ways: [2, 4, 7, 10].map(n => W_.mini('trash-pointer', n, 'Trash Pointer')) },
-  { id: 'wand', name: 'Magic wand', icon: '🪄', slot: 'hand', game: 'color-match', steps: ['Stick wand', 'Star wand', 'Crystal wand', 'Wizard staff', 'Rainbow staff'], ways: [1, 2, 3, 4, 5].map(n => W_.mini('color-match', n, 'Color Match')) },
-  { id: 'petegg', name: 'Pet egg', icon: '🥚', slot: 'pet', game: 'count-match', steps: ['Mystery egg', 'Cracking egg', 'Hatchling', 'Growing pet', 'Pet with a collar', 'Pet with a hat'], ways: [1, 2, 3, 4, 5].map(n => W_.mini('count-match', n, 'Count & Match')).concat([W_.days(5)]) },
-  { id: 'music', name: 'Music', icon: '🎸', slot: 'hand', game: 'room', steps: ['Maracas', 'Guitar', 'Keytar', 'Drum'], ways: [10, 30, 60, 100].map(n => W_.feat('room', 'gestures', n, 'Do ' + n + ' moves in the Family Room')) },
-  { id: 'monster', name: 'Monster', icon: '👾', slot: 'costume', game: 'any', steps: ['Monster horns', 'Furry hood', 'Furry suit', 'Big friendly monster'], ways: [1, 2, 3, 4].map(W_.extreme) },
-  { id: 'snakeskin', name: 'Snake skins', icon: '🐍', slot: 'snakeskin', game: 'snakeast', computed: true, steps: ['Plain', 'Pattern', 'Light stripes', 'Armor', 'Fuel', 'Glow', 'Shadow colour'],   // 🐍 Snakize: each world evolves on its own — this line shows the best world
-    ways: [0, 1, 2, 3, 4, 5, 6].map(k => ({ how: (k ? SNAKE_STEP_HOW_[k] : 'Free') + ' (any world)', r: x => snakeSkinsFor_(x.f).best > k })) },
-  { id: 'snaketype', name: 'Snake types', icon: '🐉', slot: 'snaketype', game: 'snakeast', computed: true, steps: ['Garden snake', 'Python', 'Rattlesnake', 'King cobra', 'Anaconda', 'Viper', 'Sea snake', 'Coral snake', 'Boa', 'Titanoboa', 'Sea serpent', 'Conga dragon', 'Mecha viper', 'Comet serpent', 'Feathered serpent'],
-    ways: SNAKE_TYPE_RULES_.map(t => ({ how: t[1], r: x => !!t[2](x.f) })) },
-  { id: 'taleheroes', name: 'Tale heroes', icon: '📜', slot: 'costume', game: 'snakeast', steps: ['Dino Ranger', 'Deep-Sea Diver', 'Disco Star', 'Robo Pilot', 'Astronaut', 'Sky Knight'],   // 🐍 Snakize 📜 Snaketale: one theme costume per chapter (plan 11y)
-    ways: [1, 2, 3, 4, 5, 6].map(n => W_.feat('snaketale', 'chapters', n, 'Finish Snaketale chapter ' + n + ' (' + ['🦖 Dino Jungle', '🐙 Aquarium', '🪩 Dance Hall', '🤖 Robot Time', '🪐 Space', '☁️ Sky Temple'][n - 1] + ')')) },
-  { id: 'zombie', name: 'Zombie', icon: '🧟', slot: 'costume', game: 'room', steps: ['Bandage', 'Zombie face', 'Torn clothes', 'Shuffling zombie'], ways: [10, 25, 50, 100].map(n => W_.feat('room', 'crawl', n, 'Belly-crawl ' + n + ' tiles in the Family Room')) },
-  { id: 'colours', name: 'Colour schemes', icon: '🎨', slot: 'outfitColor', game: 'any', steps: ['Paint splash', 'Galaxy', 'Lava', 'Candy stripe', 'Neon', 'Camo', 'Gold', 'Rainbow'], ways: [W_.feat('app', 'looks', 1, 'Change your app look')].concat([1, 2, 3, 4, 5, 6, 7].map(W_.titles)) },
-  { id: 'skins', name: 'Fun skins', icon: '✨', slot: 'skin', game: 'any', steps: ['Gold', 'Alien green', 'Ocean blue', 'Fairy lilac', 'Starry'], ways: [2, 4, 7, 10, 14].map(W_.days) },
-  { id: 'medal', name: 'Medals', icon: '🥇', slot: 'neck', game: 'any', steps: ['Bronze medal', 'Silver medal', 'Gold medal'], ways: [10, 25, 50].map(W_.badges) },
-  { id: 'trophy', name: 'Trophy', icon: '🏆', slot: 'hand', game: 'room', steps: ['Bronze trophy', 'Silver trophy', 'Gold trophy'], ways: [1, 5, 15].map(n => W_.feat('app', 'archive', n, 'Open the Achievement Archive ' + n + ' time' + (n > 1 ? 's' : ''))) },
-  { id: 'pogo', name: 'Bouncy', icon: '🦘', slot: 'ride', game: 'room', steps: ['Spring shoes', 'Pogo stick', 'Rocket pogo'], ways: [25, 100, 250].map(n => W_.feat('room', 'jumps', n, 'Jump ' + n + ' times in the Family Room')) },
-  { id: 'fashion', name: 'Fashion', icon: '👗', slot: 'outfit', game: 'any', steps: ['Crop top + high-waist jeans', 'Tee + cargo pants', 'Sweater + plaid skirt', 'Denim jacket + jeans', 'Cardigan + midi skirt', 'Summer co-ord', 'Oversized tee + joggers', 'Shirt dress', 'Jumpsuit', 'Varsity jacket + track pants'],
-    ways: [W_.total(3), W_.days(3), W_.feat('room', 'visits', 3, 'Visit 3 family rooms'), W_.badges(8), W_.total(8), W_.titles(2), W_.feat('room', 'gestures', 40, 'Do 40 moves in the Family Room'), W_.days(8), W_.badges(20), W_.extreme(2)] },
-  { id: 'hairstyles', name: 'Hair styles', icon: '💇', slot: 'hair', game: 'any', steps: ['Braids', 'Ponytail', 'Pigtails', 'Space buns', 'Afro', 'Rainbow hair'],
-    ways: [W_.time('maze', 60, 'a Maze level'), W_.score('stacking-sim', 800, 'Stack It!'), W_.score('robot-adventure', 600, 'Code the Robot'), W_.score('checkers', 600, 'Checkers'), W_.score('chess', 600, 'Chess'), W_.score('pinball', 40000, 'Pinball')] },
-  { id: 'furni', name: 'Room things', icon: '🛋️', slot: 'furni', game: 'room', steps: ['Trophy cabinet', 'Beanbag', 'Arcade machine', 'Aquarium', 'Dino lamp', 'Rocket bed', 'Slide', 'Disco ball'],
-    ways: [W_.total(5), W_.feat('room', 'placed', 5, 'Put 5 things in My Room'), W_.total(10), W_.feat('room', 'gifts', 5, 'Send 5 gifts'), W_.feat('room', 'cleans', 3, 'Tidy 3 family rooms'), W_.feat('room', 'visits', 5, 'Visit 5 family rooms'), W_.total(20), W_.badges(25)] },
-  { id: 'roomstyle', name: 'Room styles', icon: '🖼️', slot: 'roomstyle', game: 'room', steps: ['Star wallpaper', 'Jungle wallpaper', 'Castle stones', 'Galaxy floor', 'Candy floor'],
-    ways: [W_.feat('room', 'visits', 1, 'Visit a family room'), W_.feat('room', 'placed', 10, 'Put 10 things in My Room'), W_.feat('room', 'received', 3, 'Get 3 gifts'), W_.feat('room', 'cleans', 1, 'Tidy a family room'), W_.days(10)] },
-  { id: 'helper', name: 'Helper things', icon: '🧹', slot: 'hand', game: 'room', steps: ['Gift box', 'Paint brush', 'Broom', 'Heart balloon'],
-    ways: [W_.feat('room', 'gifts', 1, 'Send a gift'), W_.feat('room', 'placed', 10, 'Put 10 things in My Room'), W_.feat('room', 'cleans', 1, 'Tidy a family room'), W_.feat('room', 'received', 5, 'Get 5 gifts')] },
-  { id: 'hardcore', name: 'Hardcore trail', icon: '💀', slot: 'trail', game: 'any', steps: ['Skull sparks', 'Fire skulls', 'Thunder skulls', 'Legend storm'], ways: [1, 3, 6, 10].map(W_.hardcore) },
-  // ---- 3c (Aowu's feedback 2026-11-02): 20 more back things, pets, boards and trails (2 lines of 10 each) ----
-  { id: 'gear', name: 'Back gear', icon: '🎒', slot: 'back', game: 'any', steps: ['School backpack', 'Hero shield', 'Kite', 'Turtle shell', 'Guitar on the back', 'Bow and quiver', 'Rocket jetpack', 'Teddy backpack', 'Treasure map', 'Golden jetpack'],
-    ways: [W_.miles(8), W_.total(4), W_.days(4), W_.badges(6), W_.miles(40), W_.total(12), W_.miles(90), W_.badges(18), W_.extreme(3), W_.miles(200)] },
-  { id: 'magicback', name: 'Magic backs', icon: '🌈', slot: 'back', game: 'any', steps: ['Rainbow arc', 'Star halo', 'Angel wing', 'Moon cape', 'Bubble bubble', 'Flower crown back', 'Crystal shards', 'Fire ring', 'Lightning bolts', 'Galaxy swirl'],
-    ways: [W_.titles(1), W_.days(6), W_.miles(25), W_.titles(3), W_.badges(12), W_.miles(70), W_.days(12), W_.titles(5), W_.hardcore(1), W_.miles(260)] },
-  { id: 'cuddlypets', name: 'Cuddly pets', icon: '🐰', slot: 'pet', game: 'any', steps: ['Bunny', 'Hamster', 'Chick', 'Koala', 'Panda cub', 'Puppy', 'Kitten', 'Hedgehog', 'Squirrel', 'Baby unicorn'],
-    ways: [W_.miles(5), W_.days(3), W_.total(6), W_.miles(30), W_.badges(10), W_.days(9), W_.miles(80), W_.total(16), W_.badges(22), W_.miles(180)] },
-  { id: 'wildpets', name: 'Wild pets', icon: '🦊', slot: 'pet', game: 'any', steps: ['Fox', 'Frog', 'Turtle', 'Parrot', 'Penguin', 'Octopus', 'Bee', 'Butterfly', 'Otter', 'Baby dragon'],
-    ways: [W_.extreme(1), W_.miles(20), W_.titles(2), W_.miles(50), W_.extreme(2), W_.days(15), W_.miles(110), W_.titles(4), W_.extreme(5), W_.hardcore(2)] },
-  { id: 'coolboards', name: 'Cool boards', icon: '🛴', slot: 'ride', game: 'any', steps: ['Scooter', 'Roller skates', 'Log raft', 'Leaf glider', 'Donut float', 'Pizza board', 'Fire board', 'Ice board', 'Lightning board', 'Golden board'],
-    ways: [W_.miles(12), W_.total(5), W_.miles(35), W_.days(7), W_.miles(60), W_.badges(15), W_.miles(100), W_.total(20), W_.miles(150), W_.miles(240)] },
-  { id: 'magicfloats', name: 'Magic floats', icon: '☁️', slot: 'ride', game: 'any', steps: ['Cloud', 'Bubble', 'Witch broom', 'Magic carpet', 'Mini UFO', 'Swan float', 'Rainbow road', 'Moon swing', 'Star sled', 'Comet'],
-    ways: [W_.titles(1), W_.miles(45), W_.days(10), W_.titles(3), W_.miles(85), W_.extreme(2), W_.miles(130), W_.titles(6), W_.extreme(4), W_.hardcore(1)] },
-  { id: 'sparkletrails', name: 'Sweet trails', icon: '🍬', slot: 'trail', game: 'any', steps: ['Candy', 'Music notes', 'Flowers', 'Snowflakes', 'Leaves', 'Clovers', 'Cookies', 'Balloons', 'Diamonds', 'Crowns'],
-    ways: [W_.miles(10), W_.days(5), W_.total(8), W_.miles(55), W_.badges(14), W_.days(11), W_.miles(95), W_.total(18), W_.badges(26), W_.miles(220)] },
-  { id: 'wildtrails', name: 'Wild trails', icon: '⚡', slot: 'trail', game: 'any', steps: ['Paw prints', 'Footsteps', 'Fire', 'Lightning', 'Ghosts', 'Bats', 'Planets', 'Fish', 'Dinosaurs', 'Fireworks'],
-    ways: [W_.miles(15), W_.titles(2), W_.miles(65), W_.extreme(1), W_.days(13), W_.titles(4), W_.miles(120), W_.extreme(3), W_.miles(190), W_.hardcore(3)] },
-  { id: 'trails', name: 'Trails', icon: '💫', slot: 'trail', game: 'any', steps: ['Sparkles', 'Bubbles', 'Hearts', 'Stars', 'Comet', 'Rainbow'],
-    ways: [W_.time('maze', 40, 'a Maze level'), W_.score('stacking-sim', 1200, 'Stack It!'), W_.score('robot-adventure', 700, 'Code the Robot'), W_.score('checkers', 700, 'Checkers'), W_.score('chess', 700, 'Chess'), W_.score('pinball', 80000, 'Pinball')] },
-  // 🪶 SlaBam shuttle feathers (sb2-2): own n steps = feathers 0..n-1, painted by BallSkins.feather (the cork = the ball skin). Picked per device: sp_feather:<Name>.
-  { id: 'feather', name: 'Shuttle feathers', icon: '🪶', slot: 'feather', game: 'sla-brall', soon: 'Used in 🏸 SlaBam — your feather flies behind the cork (the cork is your ball skin)', steps: ['Goose white', 'Rainbow', 'Peacock', 'Phoenix', 'Ice crystal', 'Neon', 'Leaf', 'Candy stripe', 'Galaxy', 'Golden'],
-    ways: [W_.feat('sla-brall', 'win_slabam', 1, 'Win a SlaBam match'), W_.feat('sla-brall', 'win_slabam', 3, 'Win 3 SlaBam matches'), W_.feat('sla-brall', 'smash', 15, 'Hit 15 SlaBrall smashes'), W_.feat('sla-brall', 'win_slabam', 6, 'Win 6 SlaBam matches'), W_.feat('sla-brall', 'perfect', 30, 'Hit 30 PERFECT shots in SlaBrall'), W_.feat('sla-brall', 'win_slabam', 10, 'Win 10 SlaBam matches'), W_.feat('sla-brall', 'rally', 25, 'Keep a 25-hit SlaBrall rally'), W_.feat('sla-brall', 'win_slabam', 15, 'Win 15 SlaBam matches'), W_.feat('sla-brall', 'cups', 2, 'Win 2 SlaBrall tournaments'), W_.feat('sla-brall', 'win_slabam', 25, 'Win 25 SlaBam matches')] },
-  // 🕹️ sk-1 Joystick skins (looks only): ONE master list for every joystick + its buttons (UiKit JoySkins), in 3 lines of 8 (house rule ≤ 10 steps): 🍬 Sweet (common) · 🐸 Wild (rare + epic) · 👑 Legend (epic + legend).
-  // Wear one in 🎒 Wardrobe (avatar eq.joy = {id: line, v}). 🎁 pickups (grantJoySkin — Brawl floor capsules etc., 1 per game per day) add a step to the first line that isn't full.
-  { id: 'joyskin', name: 'Sweet joysticks', icon: '🕹️', slot: 'joy', game: 'any', soon: 'Your 🕹️ joystick + buttons in every game with a stick — wear it in 🎒 Wardrobe', steps: ['Bubblegum', 'Mint chip', 'Ocean', 'Lemon', 'Grape', 'Donut', 'Soccer', 'Paw'],
-    ways: [W_.days(1), W_.total(2), W_.miles(10), W_.feat('sla-brall', 'matches', 3, 'Play 3 SlaBrall matches'), W_.days(3), W_.badges(3), W_.total(8), W_.miles(40)] },
-  { id: 'joyskin2', name: 'Wild joysticks', icon: '🐸', slot: 'joy', game: 'any', soon: 'Your 🕹️ joystick + buttons in every game with a stick — wear it in 🎒 Wardrobe', steps: ['Frog', 'Watermelon', 'Cookie', 'Planet', 'Robot eye', 'Star', 'Flower', 'Lava'],
-    ways: [W_.feat('sla-brall', 'wins', 5, 'Win 5 SlaBrall matches'), W_.days(7), W_.titles(1), W_.extreme(1), W_.badges(12), W_.miles(120), W_.feat('sla-brall', 'smash', 50, 'Hit 50 SlaBrall smashes'), W_.hardcore(1)] },
-  { id: 'joyskin3', name: 'Legend joysticks', icon: '👑', slot: 'joy', game: 'any', soon: 'Your 🕹️ joystick + buttons in every game with a stick — wear it in 🎒 Wardrobe', steps: ['Ice', 'Gem', 'Rainbow', 'Galaxy', 'Dragon eye', 'Golden crown', 'Neon pulse', 'Phoenix'],
-    ways: [W_.days(14), W_.miles(200), W_.badges(20), W_.titles(3), W_.extreme(3), W_.feat('sla-brall', 'cups', 1, 'Win a SlaBrall tournament'), W_.hardcore(3), W_.days(30)] },
-  // 🎭 as-2 Signature acts (AvatarActing core-sig): pick ONE in 🎒 Wardrobe → avatar field `sig`; steps = SIG_ACTS_.line in the same order
-  { id: 'sigact', name: 'Signature acts', icon: '🎭', slot: 'sigact', game: 'any', soon: 'Your 🎭 signature move — on the 👋 tiles, in the Family Room and on result cards. Pick it in 🎒 Wardrobe', steps: ['Superstar', 'Power up', 'Heart burst', 'Genius', 'Ninja', 'Rock star', 'Giant hero', 'Flower twirl', 'Moonwalk', 'Robot'],
-    ways: [W_.days(2), W_.total(3), W_.badges(2), W_.miles(15), W_.titles(1), W_.days(5), W_.total(12), W_.miles(40), W_.hardcore(1), W_.days(10)] },
-  // 🏏 bs-1 Batsticks (Batstickskin shapes 11–18 after the 10 rackets): design them in 🏏 My Batstick (shape · sticker · colours · pattern) — used as your SlaBrall racket, your Brawl melee pickup and in your hand.
-  { id: 'batstick', name: 'Batsticks', icon: '🏏', slot: 'hand', game: 'any', soon: 'Your 🏏 Batstick in every game you swing in — design it in 🎒 Wardrobe or SlaBrall', steps: ['Baseball bat', 'Cricket bat', 'Foam bat', 'Lollipop bat', 'Candy cane', 'Glow stick', 'Bamboo stick', 'Dino bone club'],
-    ways: [W_.feat('sla-brall', 'matches', 2, 'Play 2 SlaBrall matches'), W_.days(2), W_.feat('sla-brall', 'smash', 15, 'Hit 15 SlaBrall smashes'), W_.total(5), W_.feat('sla-brall', 'wins', 3, 'Win 3 SlaBrall matches'), W_.badges(6), W_.miles(80), W_.feat('sla-brall', 'perfect', 40, 'Hit 40 PERFECT shots in SlaBrall')] },
-  // ☄️ SlaBrall ball trails (round 2): own n steps = trails 0..n-1, painted by BallSkins.trail. Picked per device: sp_balltrail:<Name>.
-  { id: 'balltrail', name: 'Ball trails', icon: '☄️', slot: 'balltrail', game: 'sla-brall', soon: 'Used in 🏓 SlaBrall — your trail follows the ball after you hit it', steps: ['Sparkles', 'Bubbles', 'Hearts', 'Stars', 'Fire', 'Frost', 'Rainbow', 'Leaves', 'Lightning', 'Galaxy'],
-    ways: [W_.feat('sla-brall', 'matches', 1, 'Play a SlaBrall match'), W_.feat('sla-brall', 'wins', 3, 'Win 3 SlaBrall matches'), W_.feat('sla-brall', 'cupMatches', 1, 'Play a SlaBrall tournament match'), W_.feat('sla-brall', 'perfect', 20, 'Hit 20 PERFECT shots in SlaBrall'), W_.feat('sla-brall', 'smash', 25, 'Hit 25 SlaBrall smashes'), W_.feat('sla-brall', 'aces', 10, 'Serve 10 aces in SlaBrall'), W_.feat('sla-brall', 'cups', 1, 'Win a SlaBrall tournament'), W_.feat('sla-brall', 'powers', 20, 'Use 20 SlaBrall powers'), W_.feat('sla-brall', 'rally', 30, 'Keep a 30-hit SlaBrall rally'), W_.feat('sla-brall', 'cups', 3, 'Win 3 SlaBrall tournaments')] },
-  // 💣 Soul Bopper bomb skins: steps 1–4 = the evolution (Plain is free; each world evolves by its own feats, see bopperInfo_), 5–10 = fun extras (+ golden poo). Picked per device: sp_soulbopper_skin:<Name>. Painted by BombSkins.
-  { id: 'bombskin', name: 'Bomb skins', icon: '💣', slot: 'bombskin', game: 'soul-bopper', soon: 'Used in 👻💣 Soul Bopper — pick your bomb in the setup', steps: ['Pattern bomb', 'Glow bomb', 'Armored bomb', 'Legendary bomb', 'Poo bomb (golden at 100 catches)', 'Watermelon bomb', 'Cake bomb', 'Balloon bomb', 'Teddy bomb', 'Mini volcano'],
-    ways: [W_.feat('soul-bopper', 'games', 5, 'Play 5 Soul Bopper games'), W_.feat('soul-bopper', 'catches', 20, 'Catch 20 players in Soul Bopper'), W_.feat('soul-bopper', 'bestWin', 4, 'Win a Soul Bopper battle on Hard'), W_.feat('soul-bopper', 'bestWin', 5, 'Win a Soul Bopper battle on Extreme'),
-      W_.feat('soul-bopper', 'pooGames', 3, 'Play 3 💩 Classic Avatar games'), W_.feat('soul-bopper', 'blocks', 300, 'Break 300 blocks in Soul Bopper'), W_.feat('soul-bopper', 'wins', 3, 'Win 3 Soul Bopper games'), W_.feat('soul-bopper', 'chains', 20, 'Set off 20 chain pops'), W_.feat('soul-bopper', 'comebacks', 5, 'Come back 5 times in Soul Bopper'), W_.feat('soul-bopper', 'triple', 1, 'Catch 3 with one pop')] },
-  // 🔴 Alignext discs (held in the hand): painted by AvatarKit drawHeldItem('linediscs')
-  { id: 'linediscs', name: 'Line discs', icon: '🔴', slot: 'hand', game: 'alignext', steps: ['Red disc', 'Gold disc', 'Disc tower', 'Hatching egg', 'Ringed planet disc', 'Rainbow disc'],
-    ways: [W_.lvl('alignext', 1, 'Alignext Drop'), W_.lvl('omnifile', 1, 'Alignext Omnifile'), W_.feat('alignext', 'lines', 10, 'Make 10 lines of 3 in Alignext Drop'), W_.lvl('alignext', 3, 'Alignext Drop'), W_.lvl('omnifile', 3, 'Alignext Omnifile'), W_.lvl('alignext', 5, 'Alignext Drop')] },
-  { id: 'racket', name: 'Rackets', icon: '🏓', slot: 'hand', game: 'sla-brall', steps: ['Wood paddle', 'Table-tennis bat', 'Tennis racket', 'Hockey stick', 'Frying pan', 'Guitar', 'Magic wand racket', 'Laser racket', 'Baguette', 'Golden racket'],
-    ways: [W_.feat('sla-brall', 'matches', 1, 'Play a SlaBrall match'), W_.feat('sla-brall', 'wins', 1, 'Win a SlaBrall match'), W_.lvl('sla-brall', 1, 'SlaBrall'), W_.lvl('sla-brall', 2, 'SlaBrall'), W_.feat('sla-brall', 'rally', 20, 'Keep a 20-hit SlaBrall rally'), W_.lvl('sla-brall', 3, 'SlaBrall'), W_.feat('sla-brall', 'smash', 50, 'Hit 50 SlaBrall smashes'), W_.lvl('sla-brall', 4, 'SlaBrall'), { how: 'Win a match in all 5 SlaBrall sports', r: x => ['slashot', 'slapoof', 'slaball', 'slapong', 'slawall'].every(k => featVal_(x.f, 'sla-brall', 'win_' + k) >= 1) }, W_.lvl('sla-brall', 5, 'SlaBrall')] },
-  { id: 'brawlgear', name: 'Brawl gear', icon: '🥊', slot: 'hand', game: 'brawl-buddies', steps: ['Red foam gloves', 'Blue foam gloves', 'Sweatband gloves', 'Star gloves', 'Hero headband', 'Flame gloves', 'Lightning gloves', 'Rainbow gloves', 'Diamond gloves', 'Golden champion gloves'],
-    ways: [W_.feat('brawl-buddies', 'matches', 1, 'Play a Brawl Buddies fight'), W_.feat('brawl-buddies', 'wins', 1, 'Win a brawl'), W_.lvl('brawl-buddies', 1, 'Brawl Buddies'), W_.lvl('brawl-buddies', 2, 'Brawl Buddies'), W_.feat('brawl-buddies', 'combo', 10, 'Land a 10-hit combo'), W_.feat('brawl-buddies', 'grabs', 10, 'Land 10 grapples'), W_.lvl('brawl-buddies', 3, 'Brawl Buddies'), W_.feat('brawl-buddies', 'juggle', 5, 'Juggle a buddy 5 bounces in the air'), W_.lvl('brawl-buddies', 4, 'Brawl Buddies'), W_.lvl('brawl-buddies', 5, 'Brawl Buddies')] },
-];
+// 📏 s1: W_ → GameData.gs (moved word for word).
+// 📏 s1: ITEM_LINES → GameData.gs (moved word for word).
 /* ---------- ADVENTURE MILES 🐾 + RIDE-ONS ----------
    Miles are counted from what the player already did (nothing to keep in sync):
      every cleared level: Basic 1 · Junior 2 · Intermediate 3 · Hard 4 · Extreme 5 (Hardcore 8) + 1 per star,
      every mini-game stage opened +1, Turbo +1 per km driven, Hopper +1 per 50 rows hopped, each daily treasure +3,
      + extra miles written to the Miles tab with addMiles_() (for other parts of the app later).
    Ride-ons unlock at rising mile goals; four special ones can also be won in their own game first. */
-const RIDE_ONS = [
-  { id: 'unicorn', name: 'Unicorn', icon: '🦄', miles: 5 },
-  { id: 'corgi', name: 'Corgi', icon: '🐕', miles: 10 },
-  { id: 'duck', name: 'Duck', icon: '🦆', miles: 16 },
-  { id: 'chicken', name: 'Chicken', icon: '🐔', miles: 24, special: { how: 'or pass Dodgy Hopper Junior', r: x => (x.cleared.hopper || 0) >= 2 } },
-  { id: 'donkey', name: 'Donkey', icon: '🫏', miles: 32 },
-  { id: 'cow', name: 'Cow', icon: '🐄', miles: 42 },
-  { id: 'penguin', name: 'Penguin', icon: '🐧', miles: 52 },
-  { id: 'trex', name: 'T-rex', icon: '🦖', miles: 64, special: { how: 'or pass Maze Intermediate (Jungle maze)', r: x => (x.cleared.maze || 0) >= 3 } },
-  { id: 'camel', name: 'Camel', icon: '🐫', miles: 76 },
-  { id: 'horse', name: 'Horse', icon: '🐎', miles: 90 },
-  { id: 'flamingo', name: 'Flamingo', icon: '🦩', miles: 105 },
-  { id: 'shark', name: 'Shark', icon: '🦈', miles: 120, special: { how: 'or pass Turbo Trail Intermediate (speedboat)', r: x => (x.cleared.turbo || 0) >= 3 } },
-  { id: 'panda', name: 'Panda', icon: '🐼', miles: 138 },
-  { id: 'alligator', name: 'Alligator', icon: '🐊', miles: 156 },
-  { id: 'buffalo', name: 'Buffalo', icon: '🐃', miles: 176 },
-  { id: 'lion', name: 'Lion', icon: '🦁', miles: 198 },
-  { id: 'tiger', name: 'Tiger', icon: '🐅', miles: 222 },
-  { id: 'moose', name: 'Moose', icon: '🫎', miles: 248 },
-  { id: 'elephant', name: 'Elephant', icon: '🐘', miles: 276 },
-  { id: 'dragon', name: 'Dragon', icon: '🐉', miles: 310, special: { how: 'or visit the Dragon\'s Den in Pinball (dragon sky)', r: x => featVal_(x.f, 'pinball', 'scene_castle') >= 1 } },
-  // 🌟 Mystical Beasts (plan 11q, 2026-11-06): need BOTH the miles AND their beast quest. about = kid-friendly story shown in the Collection.
-  { id: 'pegasus', name: 'Pegasus', icon: '🪽', miles: 350, beast: true, quest: { how: 'pass Hard in 3 different games', r: x => (x.hards || 0) >= 3 },
-    about: 'A white horse with big feathered wings from old Greek stories. It gallops on the clouds and flies faster than the wind.' },
-  { id: 'griffin', name: 'Griffin', icon: '🦅', miles: 400, beast: true, quest: { how: 'pass Maze Hard', r: x => (x.cleared['maze'] || 0) >= 4 },
-    about: 'Half eagle, half lion! An eagle\'s head and wings with a strong lion\'s body. In old stories griffins guard gold and treasure.' },
-  { id: 'sphinx', name: 'Sphinx', icon: '🗿', miles: 460, beast: true, quest: { how: 'pass Digitinct Hard', r: x => (x.cleared['number-grid'] || 0) >= 4 },
-    about: 'A wise lion from old Egypt wearing a striped royal headdress. It loves riddles — answer right and it lets you pass!' },
-  { id: 'ninetails', name: 'Nine-tailed Fox', icon: '🦊', miles: 520, beast: true, quest: { how: 'pass Memories Match Extreme', r: x => (x.cleared['memory'] || 0) >= 5 },
-    about: 'A magic fox from Chinese, Japanese and Korean stories. It grows a new tail every hundred years, so nine tails means very old and very wise.' },
-  { id: 'qilin', name: 'Qilin', icon: '🦌', miles: 590, beast: true, quest: { how: 'find 7 daily treasures', r: x => (x.dailies || 0) >= 7 },
-    about: 'A gentle Chinese lucky beast with a deer\'s body, dragon scales and one golden horn. It walks so softly the grass doesn\'t bend, and it brings good luck.' },
-  { id: 'thunderbird', name: 'Thunderbird', icon: '⚡', miles: 660, beast: true, quest: { how: 'pass Block Drop Extreme', r: x => (x.cleared['block-drop'] || 0) >= 5 },
-    about: 'A giant bird from Native American stories. When it flaps its wings you hear thunder, and lightning flashes when it blinks.' },
-  { id: 'naga', name: 'Naga', icon: '🐍', miles: 740, beast: true, quest: { how: 'pass Sweet Swap Hard', r: x => (x.cleared['sweet-swap'] || 0) >= 4 },
-    about: 'A great water serpent from Thai stories with a fan of heads like a crown. Nagas guard rivers and temples and bring the rain.' },
-  { id: 'erawan', name: 'Erawan', icon: '🐘', miles: 820, beast: true, quest: { how: 'pass Lettercraft Hard', r: x => (x.cleared['word-board'] || 0) >= 4 },
-    about: 'The white elephant of Thai stories, drawn with three heads. It carries the sky god Indra and can make rain clouds.' },
-  { id: 'manticore', name: 'Manticore', icon: '🦂', miles: 900, beast: true, quest: { how: 'pass Checkers Extreme', r: x => (x.cleared['checkers'] || 0) >= 5 },
-    about: 'A lion with a spiky scorpion tail from old Persian stories. It looks fierce, but ours is a big friendly cat.' },
-  { id: 'cerberus', name: 'Cerberus', icon: '🐕', miles: 990, beast: true, quest: { how: 'pass Chess Hard', r: x => (x.cleared['chess'] || 0) >= 4 },
-    about: 'A giant three-headed dog from Greek stories that guards a secret gate. Three heads means three times the barking — and three times the cuddles!' },
-  { id: 'phoenix', name: 'Phoenix', icon: '🔥', miles: 1080, beast: true, quest: { how: 'beat any 💀 Hardcore level', r: x => (x.hardcores || 0) >= 1 },
-    about: 'A fire bird that glows like the sun. When it gets old it turns to flames and is born again from the ashes, shiny and new.' },
-  { id: 'hydra', name: 'Hydra', icon: '🐲', miles: 1180, beast: true, quest: { how: 'beat 💀 Hardcore in 3 games', r: x => (x.hardcores || 0) >= 3 },
-    about: 'A many-headed water serpent from Greek stories. If one head is cut off, two more grow back!' },
-  { id: 'roc', name: 'Roc', icon: '🦅', miles: 1280, beast: true, quest: { how: 'pass Turbo Trail Extreme', r: x => (x.cleared['turbo'] || 0) >= 5 },
-    about: 'A bird so huge it can lift an elephant! In the Arabian Nights stories sailors thought its egg was a big white dome.' },
-  { id: 'kraken', name: 'Kraken', icon: '🐙', miles: 1390, beast: true, quest: { how: 'pass Pinball Extreme', r: x => (x.cleared['pinball'] || 0) >= 5 },
-    about: 'A giant sea monster from Norway\'s sailor stories, as big as an island. Its long arms can hug a whole ship.' },
-  { id: 'kaiju', name: 'Titan Kaiju', icon: '🦖', miles: 1500, beast: true, quest: { how: 'make a 2048 tile in Double Up', r: x => featVal_(x.f, 'double-up', 'bestTile') >= 2048 },
-    about: 'Our own giant monster lizard as tall as a city. Kaiju means \"strange beast\" in Japanese. It stomps, roars and its back spikes glow blue.' },
-  { id: 'leviathan', name: 'Leviathan', icon: '🐋', miles: 1620, beast: true, quest: { how: 'beat 💀 Hardcore in 5 games', r: x => (x.hardcores || 0) >= 5 },
-    about: 'A giant sea serpent from very old stories — the biggest creature in the ocean. When it swims, the whole sea swirls.' },
-  { id: 'whitetiger', name: 'White Tiger', icon: '🐯', miles: 1750, beast: true, quest: { how: 'beat 💀 Hardcore in 6 games', r: x => (x.hardcores || 0) >= 6 },
-    about: 'One of the Four Guardians in the Chinese stars (Bai Hu). It guards the West and autumn and stands for being brave.' },
-  { id: 'vermilion', name: 'Vermilion Bird', icon: '🐦', miles: 1880, beast: true, quest: { how: 'beat 💀 Hardcore in 7 games', r: x => (x.hardcores || 0) >= 7 },
-    about: 'Zhu Que, the red fire bird of the Four Guardians. It guards the South and summer — its feathers glow but never burn you.' },
-  { id: 'tortoise', name: 'Black Tortoise', icon: '🐢', miles: 2020, beast: true, quest: { how: 'beat 💀 Hardcore in 8 games', r: x => (x.hardcores || 0) >= 8 },
-    about: 'Xuan Wu, a tortoise with a snake friend wrapped around it. It guards the North and winter and stands for long life and patience.' },
-  { id: 'azure', name: 'Azure Dragon', icon: '🐉', miles: 2200, beast: true, quest: { how: 'own the other 3 Guardians + beat 💀 Hardcore in 10 games', r: x => (x.hardcores || 0) >= 10 },
-    about: 'Qing Long, the blue-green dragon who leads the Four Guardians. It guards the East and spring and brings the rain so plants can grow.' },
-];
-ITEM_LINES.push({ id: 'rideon', name: 'Ride-ons', icon: '🐾', slot: 'ride', game: 'any', rides: true, steps: RIDE_ONS.map(r => r.name),
-  ways: RIDE_ONS.map(r => r.beast ? { how: r.icon + ' ' + r.name + ': ' + r.miles + ' Adventure miles + ' + r.quest.how, r: x => x.miles >= r.miles && !!r.quest.r(x) }
-    : ({ how: r.icon + ' ' + r.name + ': ' + r.miles + ' Adventure miles' + (r.special ? ' — ' + r.special.how : ''), r: x => x.miles >= r.miles || (!!r.special && !!r.special.r(x)) })) });
+// 📏 s1: RIDE_ONS → GameData.gs (moved word for word).
+// 📏 s1: ITEM_LINES.push({ id: 'rideon' }) → GameData.gs (moved word for word).
 function milesFor_(name, x) {
   const from = { levels: 0, mini: 0, turbo: 0, hopper: 0, snake: 0, daily: 0, extra: 0 };
   scoreRows_().forEach(r => { if (r.name !== name || !(r.stars > 0) || !(r.level >= 0)) return; from.levels += (r.level >= 5 ? 8 : r.level + 1) + Math.min(3, r.stars); });
@@ -4042,51 +2431,7 @@ function giveCreation(from, to, id) {
 
 /* ---------- Daily treasures: 3 items a day (same for the whole family), each with a goal for today ---------- */
 const MINI_IDS_ = ['color-match', 'count-match', 'code-robot', 'trash-pointer'];
-const DAILY_GOALS = [
-  { id: 'tdstory', icon: '🏰', how: 'Win a TD-Stories chapter today (any level)', r: d => d.rows.some(r => (r.game === 'td-draprincess' || r.game === 'td-farmer') && r.stars > 0) },   // fd-1b: either book
-  { id: 'gssolve', icon: '🔢', how: 'Solve 8 GeoScout puzzles today', r: d => (d.room.gsSolved || 0) >= 8 },
-  { id: 'gsstory', icon: '📖', how: 'Play a GeoScout Journey chapter or win a Tower battle today', r: d => (d.room.gsStory || 0) >= 1 },
-  { id: 'grwords', icon: '🔤', how: 'Read or build 6 words in GeoRead today', r: d => (d.room.grWords || 0) >= 6 },
-  { id: 'grstory', icon: '📖', how: 'Read a GeoRead story or an Alphabet Road chapter today', r: d => (d.room.grStory || 0) >= 1 },
-  { id: 'wdcards', icon: '🃏', how: 'Win 5 WisDeck cards today', r: d => (d.room.wdCards || 0) >= 5 },
-  { id: 'wddaily', icon: '📅', how: 'Play today\'s WisDeck daily deck', r: d => !!d.room.wdDaily },
-  { id: 'ebrrow', icon: '👀', how: '3 perfect rounds in a row in Eyes Brain Riot today', r: d => (d.room.ebrRow || 0) >= 3 },
-  { id: 'ebrlen', icon: '🏔️', how: 'Remember 10 digits in an Eyes Brain Riot 🏔️ Challenge today', r: d => (d.room.ebrLen || 0) >= 10 },
-  { id: 'ppcatch', icon: '🪤', how: 'Catch 3 creatures in Polyplot today', r: d => (d.room.ppCatch || 0) >= 3 },
-  { id: 'ppchain', icon: '🔗', how: 'Close 5 shapes in one turn in Polyplot today', r: d => (d.room.ppChain || 0) >= 5 },
-  { id: 'sbblocks', icon: '💣', how: 'Break 100 blocks in Soul Bopper today', r: d => (d.room.sbBlocks || 0) >= 100 },
-  { id: 'sbmulti', icon: '🎯', how: 'Catch 2 with one pop in Soul Bopper today', r: d => (d.room.sbMulti || 0) >= 1 },
-  { id: 'sbhits', icon: '🏏', how: 'Hit 5 bombs with 🤾🏏 in Soul Bopper today', r: d => (d.room.sbHits || 0) >= 5 },
-  { id: 'anylevel', icon: '🎮', how: 'Finish any level today', r: d => d.rows.length > 0 },
-  { id: 'hard', icon: '⚡', how: 'Play a Hard or Extreme level today', r: d => d.rows.some(r => MINI_IDS_.indexOf(r.game) === -1 && r.level >= 3) },
-  { id: 'maze', icon: '🧭', how: 'Finish a Maze today', r: d => d.rows.some(r => r.game === 'maze') },
-  { id: 'pinball', icon: '🎯', how: 'Score 30,000 in one Pinball game today', r: d => d.rows.some(r => r.game === 'pinball' && r.score >= 30000) },
-  { id: 'hopper', icon: '🐸', how: 'Score 800 in one Dodgy Hopper game today', r: d => d.rows.some(r => r.game === 'hopper' && r.score >= 800) },
-  { id: 'turbo', icon: '🏎️', how: 'Finish a Turbo Trail race today', r: d => d.rows.some(r => r.game === 'turbo' && r.stars > 0) },
-  { id: 'math', icon: '🧮', how: 'Pass a Math Quest level today', r: d => d.rows.some(r => r.game === 'math-quest' && r.stars > 0) },
-  { id: 'memory', icon: '🃏', how: 'Finish a Memories Match board today', r: d => d.rows.some(r => r.game === 'memory' && r.stars > 0) },
-  { id: 'build', icon: '🔨', how: 'Build something in the Furniture Workshop today', r: d => (d.room.built || 0) >= 1 },
-  { id: 'board', icon: '♟️', how: 'Beat the bot in Checkers or Chess today', r: d => d.rows.some(r => r.game === 'checkers' || r.game === 'chess') },
-  { id: 'brawl', icon: '🥊', how: 'Win 2 brawls in Brawl Buddies today', r: d => d.rows.filter(r => r.game === 'brawl-buddies' && r.stars > 0).length >= 2 },
-  { id: 'sci', icon: '🔬', how: 'Run a science test in Sciencetory today', r: d => d.rows.some(r => r.game === 'sciencetory') },
-  { id: 'poke', icon: '🔍', how: 'Solve a Pokadif case today', r: d => d.rows.some(r => r.game === 'pokadif' && r.stars > 0) },
-  { id: 'pyra', icon: '🔥', how: 'Win a PyraDive volleyball match today', r: d => d.rows.some(r => r.game === 'pyraspike' && r.stars > 0) },
-  { id: 'brawenture', icon: '🗺️', how: 'Finish a Brawenture tale today (any difficulty)', r: d => d.rows.some(r => r.game === 'brawenture' && r.stars > 0) },
-  { id: 'three', icon: '🌈', how: 'Play 3 different games today', r: d => Object.keys(d.rows.reduce((m, r) => { m[r.game] = 1; return m; }, {})).length >= 3 },
-  { id: 'stack', icon: '🏗️', how: 'Finish a Stack It! level today', r: d => d.rows.some(r => r.game === 'stacking-sim') },
-  { id: 'robot', icon: '🤖', how: 'Finish a Code the Robot level today', r: d => d.rows.some(r => r.game === 'robot-adventure') },
-  { id: 'mini', icon: '🎨', how: 'Clear a mini game stage today', r: d => d.rows.some(r => MINI_IDS_.indexOf(r.game) !== -1) },
-  { id: 'stars', icon: '⭐', how: 'Get 3 stars on any level today', r: d => d.rows.some(r => r.stars >= 3) },
-  { id: 'jumps', icon: '🦘', how: 'Jump 20 times in the Family Room today', r: d => (d.room.jumps || 0) >= 20 },
-  { id: 'moves', icon: '💃', how: 'Do 10 moves in the Family Room today', r: d => (d.room.gestures || 0) >= 10 },
-  { id: 'slabrall', icon: '🏓', how: 'Win a SlaBrall match on Junior or harder today', r: d => d.rows.some(r => r.game === 'sla-brall' && r.level >= 1 && r.stars > 0) },
-  { id: 'blasoff', icon: '⚽', how: 'Win a BlasOff match today', r: d => d.rows.some(r => r.game === 'blasoff' && r.stars > 0) },   // ⚽ bo-1
-  { id: 'snakefood', icon: '🐍', how: 'Eat 50 food in Snakize today', r: d => (d.room.snakeFood || 0) >= 50 },
-  { id: 'snakeland', icon: '🏰', how: 'Claim 40 % land in one Snakastle game today', r: d => (d.room.snakeLand || 0) >= 40 },
-  { id: 'snakepop', icon: '💥', how: 'Pop 2 snakes in Snakigate today', r: d => (d.room.snakePop || 0) >= 2 },
-  { id: 'alignext', icon: '🔴', how: 'Win an Alignext game (Drop or Omnifile) today', r: d => d.rows.some(r => (r.game === 'alignext' || r.game === 'omnifile') && r.stars > 0) },
-  { id: 'poseparty', icon: '📷', how: 'Pass a Pose Party level today', r: d => d.rows.some(r => r.game === 'pose-party' && r.stars > 0) },
-];
+// 📏 s1: DAILY_GOALS → GameData.gs (moved word for word).
 function today_() { return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd'); }
 // Picks the same 3 lines + 3 goals for everyone on a given date (any new line added to ITEM_LINES joins the rotation).
 function dailyPicks_(date) {
@@ -4948,7 +3293,1720 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d+gl-r24+av-r0e3+ip-4a+bo-10b+ar-r0b+b3b4) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d+gl-r24+av-r0e3+ip-4a+bo-10b+ar-r0b+b3b4+s1) END OF Code.gs
+
+;
+/* ===== GameData.gs ===== */
+// GameData.gs — STEAM Playground DATA tables (📏 File Split S1, 2026-11-18: moved WORD FOR WORD out of Code.gs,
+// which had grown to 445 KB; house rule ≈ 300 KB a file). Apps Script runs every .gs file in ONE shared global
+// scope, so Code.gs (and every other .gs file) uses these tables exactly as before.
+//
+// ✏️ NEW ROWS GO HERE: MODES_ · MODE_GROUPS_ · BUILT_IN_GAMES · LEVEL_GAMES · FEAT_DEFS · TITLE_DEFS · ITEM_LINES ·
+//    RIDE_ONS · DAILY_GOALS (+ MAZE_LEVEL_NAMES · PP_THEMES_ · SNAKE_WORLDS_ · SNAKE_GAMES_ · SNAKE_STEP_RULES_ ·
+//    SNAKE_STEP_HOW_ · SNAKE_TYPE_RULES_ · W_ — what the tables need while loading).
+//    A patch script finds a table's file with Test Harness/gamedata_file.py → table_file(app_dir, 'FEAT_DEFS').
+// 🔒 RULE: nothing in this file may NEED Code.gs while the file loads — Code.gs names only INSIDE functions
+//    (featVal_, getProgress, snakeSkinsFor_, MINI_IDS_ …), so the order Apps Script runs the files in never
+//    matters. tools/check.mjs refuses a top-level name declared in two .gs files ("already declared" = dead app).
+
+/* ============ 📏 MODES_ (from Code.gs) ============ */
+// One row per way to play INSIDE a game, so the Dashboard (🎯 Try a mode), the Gameroom (mode chips + ✨ strip) and the
+// game itself (✨ Also try) can point at modes a player hasn't played yet.
+//   game  = the Gameroom card / Games-tab GameID the mode belongs to · id = mode id (?page=<route>&mode=<id> opens it after the player pick)
+//   tried = how we know a player has played it: {board: GameID} Scores rows (+ theme: text the Theme column contains / themeStart: text it starts with)
+//           · {feat: [[game, stat], …]} any of these feats > 0 · {setting: 'Prefix_'} Settings '<Prefix><Name>'
+//           (+ always the ModesTried_<Name> ledger, written by the game the first time the mode starts — markModeTried).
+//   added = 'yyyy-mm-dd' when the mode came out → a 🆕 Dashboard card for 7 days.
+const MODES_ = [
+  { game: 'tdstories', id: 'draprincess', icon: '🐉', name: 'Dra-Princess Diary', pitch: 'A dragon + princess vs every suitor!', route: 'tdstories', added: '2026-11-14', tried: { board: 'td-draprincess' } },
+  { game: 'tdstories', id: 'farmer', icon: '👨‍🌾', name: 'Farmer Delusion', pitch: 'Plant a maze so long the bank gives up', route: 'tdstories', added: '2026-11-17', tried: { board: 'td-farmer' } },   // 👨‍🌾 fd-1b
+  { game: 'artifactory', id: 'whittle', icon: '🔪', name: 'Artifactory Whittling', pitch: 'Carve a spoon — always away from you', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'whittle']] } },
+  { game: 'artifactory', id: 'print', icon: '🖨️', name: 'Artifactory 3D printing', pitch: 'Draw a shape and print it layer by layer', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'print']] } },
+  { game: 'artifactory', id: 'nature', icon: '🌿', name: 'Artifactory Nature crafts', pitch: 'Weave a hat, press flowers in resin', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'nature']] } },
+  { game: 'artifactory', id: 'lab', icon: '🧪', name: 'Artifactory Material lab', pitch: 'Make bronze, glass and dyes yourself', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'lab']] } },
+  { game: 'artifactory', id: 'planer', icon: '🪚', name: 'Artifactory Planer', pitch: 'Plane a rough plank flat and smooth', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'planer']] } },
+  { game: 'artifactory', id: 'weld', icon: '🔥', name: 'Artifactory Welding', pitch: 'Follow the seam with a steady hand', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'weld']] } },
+  { game: 'artifactory', id: 'forge', icon: '⚒️', name: 'Artifactory Forge', pitch: 'Heat it orange, hammer it into shape', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'forge']] } },
+  { game: 'artifactory', id: 'pottery', icon: '🏺', name: 'Artifactory Pottery', pitch: 'Shape spinning clay, fire it in the kiln', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'pottery']] } },
+  { game: 'artifactory', id: 'sew', icon: '🧵', name: 'Artifactory Loom', pitch: 'Weave a pattern for a cape or scarf', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'sew']] } },
+  { game: 'artifactory', id: 'light', icon: '🔌', name: 'Artifactory Light-up', pitch: 'Close the circuit — make it glow!', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'light']] } },
+  { game: 'artifactory', id: 'lathe', icon: '🌀', name: 'Artifactory Lathe', pitch: 'Carve a cup, yo-yo or trophy as it spins', route: 'artifactory', added: '2026-11-08', tried: { feat: [['artifactory', 'lathe']] } },
+  { game: 'artifactory', id: 'stone', icon: '💎', name: 'Artifactory Gems', pitch: 'Polish a stone, cut a sparkling gem', route: 'artifactory', added: '2026-11-08', tried: { feat: [['artifactory', 'stone']] } },
+  { game: 'artifactory', id: 'finish', icon: '🎨', name: 'Artifactory Finish', pitch: 'Paint, varnish and engrave your name', route: 'artifactory', added: '2026-11-08', tried: { feat: [['artifactory', 'finish']] } },
+  { game: 'geoscout', id: 'journey', icon: '📖', name: 'GeoScout Journey', pitch: 'Story chapters with number friends', route: 'geoscout', added: '2026-11-09', tried: { feat: [['geoscout', 'journeys']] } },
+  { game: 'geoscout', id: 'scale', icon: '⚖️', name: 'GeoScout Scale', pitch: 'More, less or the same? Weigh yourself!', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '⚖️ Scale' } },
+  { game: 'geoscout', id: 'shape', icon: '🔷', name: 'GeoScout Shape builder', pitch: 'Build squares, rectangles and steps', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🔷 Shape builder', feat: [['geoscout', 'shapes']] } },
+  { game: 'geoscout', id: 'tens', icon: '🔟', name: 'GeoScout Tens tower', pitch: 'Ten ones snap into a ten-tower!', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🔟 Tens tower', feat: [['geoscout', 'tens']] } },
+  { game: 'geoscout', id: 'next', icon: '🧩', name: 'GeoScout What comes next', pitch: 'Find the pattern!', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🧩 What comes next', feat: [['geoscout', 'patterns']] } },
+  { game: 'geoscout', id: 'frac', icon: '🍕', name: 'GeoScout Fractions', pitch: 'Which pizza slice is bigger?', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🍕 Fractions', feat: [['geoscout', 'fractions']] } },
+  { game: 'geoscout', id: 'wobble', icon: '🏗️', name: 'GeoScout Wobble tower', pitch: 'Stack to the EXACT height', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🏗️ Wobble tower', feat: [['geoscout', 'wobble']] } },
+  { game: 'geoscout', id: 'battle', icon: '⚔️', name: 'GeoScout Tower battle', pitch: '2 players — higher or lower wins!', route: 'geoscout', added: '2026-11-08', tried: { feat: [['geoscout', 'battles']] } },
+  { game: 'geoscout', id: 'count', icon: '🧱', name: 'GeoScout Count', pitch: 'Snap and split blocks to make the number', route: 'geoscout', added: '2026-11-08', tried: { board: 'geoscout', themeStart: '🧱 Count' } },
+  { game: 'wisdeck', id: 'quiz', icon: '🧠', name: 'WisQuiz', pitch: 'Pick a category, win cards!', route: 'wisdeck', tried: { board: 'wisdeck' } },
+  { game: 'wisdeck', id: 'buzz', icon: '🔔', name: 'WisBuzz', pitch: '2–4 players — buzz in first!', route: 'wisdeck', tried: { feat: [['wisdeck', 'buzzWins'], ['wisdeck', 'buzzRight']] } },
+  { game: 'wisdeck', id: 'daily', icon: '📅', name: 'WisDaily', pitch: '5 questions, once a day', route: 'wisdeck', tried: { feat: [['wisdeck', 'daily']] } },
+  { game: 'wisdeck', id: 'count', icon: '🔢', name: 'WisCount', pitch: 'Card battle — best 3 of 5', route: 'wisdeck', tried: { board: 'wiscount', feat: [['wiscount', 'games']] } },
+  { game: 'wisdeck', id: 'jack', icon: '🂡', name: 'WisJack', pitch: 'Get as close to 20 as you can', route: 'wisdeck', tried: { board: 'wisjack', feat: [['wisjack', 'games']] } },
+  { game: 'wisdeck', id: 'learn', icon: '📚', name: 'WisLearn', pitch: 'Flip and read the cards', route: 'wisdeck', tried: null },
+  { game: 'snakeast', id: 'feast', icon: '🍎', name: 'Snakeast', pitch: 'Eat, grow, reach the length!', route: 'snakize', tried: { board: 'snakeast', feat: [['snakeast', 'games']] } },
+  { game: 'snakeast', id: 'endless', icon: '♾️', name: 'Snakeast Endless', pitch: 'Grow forever — beat your best!', route: 'snakize', tried: { feat: [['snakeast', 'endless']] } },
+  { game: 'snakeast', id: 'gate', icon: '🧭', name: 'Snakigate', pitch: 'Steer anywhere — be the longest!', route: 'snakize', tried: { board: 'snakigate', feat: [['snakigate', 'games']] } },
+  { game: 'snakeast', id: 'castle', icon: '🏰', name: 'Snakastle', pitch: 'Loop back home to grab land!', route: 'snakize', tried: { board: 'snakastle', feat: [['snakastle', 'games']] } },
+  { game: 'snakeast', id: 'tale', icon: '📜', name: 'Snaketale', pitch: 'Story quests from your family', route: 'snakize', tried: { setting: 'Snaketale_', feat: [['snaketale', 'stages']] } },
+  { game: 'brawl-buddies', id: 'battle', icon: '🥊', name: 'Brawl Battle', pitch: 'Bonk your buddy, cartoon style!', route: 'brawlbuddies', tried: { board: 'brawl-buddies', feat: [['brawl-buddies', 'matches']] } },
+  { game: 'brawl-buddies', id: 'brawenture', icon: '🗺️', name: 'Brawenture', pitch: 'Bonk baddies, rescue the family!', route: 'brawlbuddies', tried: { board: 'brawenture', feat: [['brawenture', 'runs']] }, added: '2026-11-08' },
+  { game: 'soul-bopper', id: 'battle', icon: '⚔️', name: 'Battle', pitch: 'Last one standing wins!', route: 'soulbopper', tried: { feat: [['soul-bopper', 'bestWin']] } },
+  { game: 'soul-bopper', id: 'classic', icon: '💩', name: 'Classic Avatar', pitch: 'Poo bombs — even when you\'re out!', route: 'soulbopper', tried: { feat: [['soul-bopper', 'pooGames']] } },
+  { game: 'soul-bopper', id: 'hold', icon: '🏳️', name: 'Hold the land', pitch: 'Stand in the glowing zone!', route: 'soulbopper', tried: { feat: [['soul-bopper', 'holdSecs'], ['soul-bopper', 'holdWins']] } },
+  { game: 'soul-bopper', id: 'stage', icon: '🗺️', name: 'Stage', pitch: '7 worlds, stages and bosses!', route: 'soulbopper', tried: { board: 'soul-bopper', feat: [['soul-bopper', 'stages']] } },
+  { game: 'polyplot', id: 'classic', icon: '⬜', name: 'Classic', pitch: 'Close a shape, make it yours!', route: 'polyplot', tried: { board: 'polyplot', theme: '· Classic ·' } },
+  { game: 'polyplot', id: 'hunt', icon: '🏹', name: 'Hunt', pitch: 'Catch creatures, grab coins!', route: 'polyplot', tried: { feat: [['polyplot', 'huntGames']] } },
+  { game: 'polyplot', id: 'fort', icon: '🏰', name: 'Fortiplot', pitch: 'Build towers, knock theirs down!', route: 'polyplot', tried: { board: 'polyplot', theme: '· Fortiplot ·', feat: [['polyplot', 'fortWins']] } },
+  { game: 'polyplot', id: 'coop', icon: '🛡️', name: 'Co-op waves', pitch: 'Team up against monster waves!', route: 'polyplot', tried: { feat: [['polyplot', 'bestWave']] } },
+  { game: 'alignext', id: 'drop', icon: '🔴', name: 'Drop', pitch: 'Drop discs, make a line!', route: 'alignext', tried: { board: 'alignext', feat: [['alignext', 'games']] } },
+  { game: 'alignext', id: 'omni', icon: '❌', name: 'Omnifile Classic', pitch: 'Put your piece anywhere!', route: 'alignext', tried: { board: 'omnifile', feat: [['omnifile', 'games']] } },
+  { game: 'alignext', id: 'stack', icon: '♟️', name: 'Omnifile Stack', pitch: 'Big pieces cover small ones!', route: 'alignext', tried: { board: 'omnifile', theme: '· stack', feat: [['omnifile', 'stackWins'], ['omnifile', 'covers']] } },
+  { game: 'beat-corner', id: 'corner', icon: '🎵', name: 'Corners', pitch: 'Hit the beats in 4 corners!', route: 'beatcorner', tried: { board: 'beat-corner' } },
+  { game: 'beat-corner', id: 'piano', icon: '🎹', name: 'Piano', pitch: 'Play the falling notes!', route: 'beatcorner', tried: { board: 'beat-piano' }, added: '2026-11-08' },
+  { game: 'beat-corner', id: 'drums', icon: '🥁', name: 'Drums', pitch: 'Bang a drum kit that grows!', route: 'beatcorner', tried: { board: 'beat-drums' }, added: '2026-11-08' },
+  { game: 'beat-corner', id: 'band', icon: '🎸', name: 'Band', pitch: 'Play a song with a friend!', route: 'beatcorner', tried: { feat: [['beat-piano', 'bandSongs'], ['beat-drums', 'bandSongs']] }, added: '2026-11-08' },
+  { game: 'beat-corner', id: 'maker', icon: '🎼', name: 'Song Maker', pitch: 'Make your own song!', route: 'beatcorner', tried: { feat: [['beat-piano', 'songsMade']] }, added: '2026-11-08' },
+  { game: 'eyes-brain', id: 'classic', icon: '🔢', name: 'Classic', pitch: 'Remember the digits!', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '🔢 Classic' } },
+  { game: 'eyes-brain', id: 'backwards', icon: '🔁', name: 'Backwards', pitch: 'See 123, type 321!', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '🔁 Backwards', feat: [['eyes-brain', 'backPerfects']] } },
+  { game: 'eyes-brain', id: 'challenge', icon: '🏔️', name: 'Challenge', pitch: 'One more digit each time!', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '🏔️ Challenge', feat: [['eyes-brain', 'challenge']] } },
+  { game: 'eyes-brain', id: 'letters', icon: '🔤', name: 'Numbers + letters', pitch: 'Remember numbers AND letters', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '🔤 Numbers + letters' } },
+  { game: 'eyes-brain', id: 'colour', icon: '🎨', name: 'Colour digits', pitch: 'Every digit has a colour', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '🎨 Colour digits' } },
+  { game: 'eyes-brain', id: 'listen', icon: '👂', name: 'Listen', pitch: 'Hear it, then type it back', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '👂 Listen', feat: [['eyes-brain', 'listenPerfects']] } },
+  { game: 'eyes-brain', id: 'chain', icon: '➕', name: 'Chain', pitch: 'Take turns adding a digit', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '➕ Chain', feat: [['eyes-brain', 'chainWins']] } },
+  { game: 'eyes-brain', id: 'word', icon: '📝', name: 'Word mode', pitch: 'Remember short words', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '📝 Word mode' } },
+  { game: 'eyes-brain', id: 'shapes', icon: '🧩', name: 'Shapes', pitch: 'Remember shape patterns', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '🧩 Shapes' } },
+  { game: 'eyes-brain', id: 'daily', icon: '🎯', name: 'Today\'s family number', pitch: 'One try at today\'s number!', route: 'eyesbrain', tried: { feat: [['eyes-brain', 'daily']] } },
+  { game: 'georead', id: 'phonics', icon: '🔊', name: 'Phonics', pitch: 'Tap the sounds, bump the word!', route: 'georead', tried: { board: 'georead', themeStart: '🔊 Phonics', feat: [['georead', 'blends']] }, added: '2026-11-08' },
+  { game: 'georead', id: 'build', icon: '🧱', name: 'Word builder', pitch: 'See the picture, build the word', route: 'georead', tried: { board: 'georead', themeStart: '🧱 Word builder', feat: [['georead', 'built']] }, added: '2026-11-08' },
+  { game: 'georead', id: 'rhyme', icon: '🔁', name: 'Rhyme time', pitch: 'cat · hat · bat — swap a box!', route: 'georead', tried: { board: 'georead', themeStart: '🔁 Rhyme time', feat: [['georead', 'rhymes']] }, added: '2026-11-08' },
+  { game: 'georead', id: 'sight', icon: '👀', name: 'Sight words', pitch: 'Tap the word you hear, quick!', route: 'georead', tried: { board: 'georead', themeStart: '👀 Sight words', feat: [['georead', 'sight']] }, added: '2026-11-08' },
+  { game: 'georead', id: 'trace', icon: '✏️', name: 'Trace', pitch: 'Draw Aa–Zz with your finger', route: 'georead', tried: { board: 'georead', themeStart: '✏️ Trace', feat: [['georead', 'traced']] }, added: '2026-11-08' },
+  { game: 'georead', id: 'case', icon: '🅰️', name: 'Big and small', pitch: 'Match A with a!', route: 'georead', tried: { board: 'georead', themeStart: '🅰️ Big and small', feat: [['georead', 'cases']] }, added: '2026-11-08' },
+  { game: 'georead', id: 'story', icon: '📖', name: 'Story read', pitch: 'Words light up as they are read', route: 'georead', tried: { board: 'georead', themeStart: '📖 Story read', feat: [['georead', 'stories']] }, added: '2026-11-08' },
+  { game: 'georead', id: 'types', icon: '🗂️', name: 'Word types', pitch: 'Naming, doing, describing words', route: 'georead', tried: { board: 'georead', themeStart: '🗂️ Word types', feat: [['georead', 'sorted']] }, added: '2026-11-08' },
+  { game: 'georead', id: 'journey', icon: '🗺️', name: 'Letter Journey', pitch: 'Walk the Alphabet Road!', route: 'georead', tried: { setting: 'GeoJourney_', feat: [['georead', 'chapters']] }, added: '2026-11-08' },
+  { game: 'pyraspike', id: 'beach', icon: '🏖️', name: 'PyraSpike Beach 2v2', pitch: 'Beach volleyball — bump, set, DUNK!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🏖️ Beach 2v2', feat: [['pyraspike', 'm_beach']] } },
+  { game: 'pyraspike', id: 'small', icon: '🏫', name: 'PyraSpike Small 3v3', pitch: 'Drive, Dink, Dunk — 3 a side!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🏫 Small 3v3', feat: [['pyraspike', 'm_small']] } },
+  { game: 'pyraspike', id: 'full', icon: '🏟️', name: 'PyraSpike Full 6v6', pitch: 'The big arena — 6 a side!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🏟️ Full 6v6', feat: [['pyraspike', 'm_full']] } },
+  { game: 'pyraspike', id: 'strikesolo', icon: '🦶', name: 'PyraStrike 1v1', pitch: 'Sepak takraw — feet only, 3 touches!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🦶 Strike 1v1', feat: [['pyraspike', 'm_strikesolo']] } },
+  { game: 'pyraspike', id: 'strikeduo', icon: '🦵', name: 'PyraStrike Duo 2v2', pitch: 'Trap, head it, ROLL STRIKE!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🦵 Strike Duo 2v2', feat: [['pyraspike', 'm_strikeduo']] } },
+  { game: 'pyraspike', id: 'strikeregu', icon: '🧶', name: 'PyraStrike Regu 3v3', pitch: 'Team takraw — bicycle kicks!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🧶 Strike Regu 3v3', feat: [['pyraspike', 'm_strikeregu']] } },
+  { game: 'pyraspike', id: 'hoop', icon: '⭕', name: 'Hoop Takraw', pitch: 'Kick it through the hanging hoop!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '⭕ Hoop Takraw', feat: [['pyraspike', 'm_hoop']] } },
+  { game: 'pyraspike', id: 'sparksolo', icon: '⚡', name: 'PyraSpark 1v1', pitch: 'Net-table: one bounce, no hands, EDGE!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '⚡ Spark 1v1', feat: [['pyraspike', 'm_sparksolo']] } },
+  { game: 'pyraspike', id: 'sparkduo', icon: '🌩️', name: 'PyraSpark Duo 2v2', pitch: 'Pass to your partner, then send it back!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🌩️ Spark Duo 2v2', feat: [['pyraspike', 'm_sparkduo']] } },
+  { game: 'pyraspike', id: 'zonehits', icon: '🎯', name: 'PyraDive Zone Hits', pitch: 'Training: hit the glowing zone!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🎯 Zone Hits', feat: [['pyraspike', 'm_zonehits']] } },
+  { game: 'pyraspike', id: 'combo', icon: '🔗', name: 'PyraDive Body Combo', pitch: 'Training: trap, pop, SMASH!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🔗 Body Combo', feat: [['pyraspike', 'm_combo']] } },
+  { game: 'pyraspike', id: 'rallyrun', icon: '🏃', name: 'PyraDive Rally Run', pitch: 'Training: the ball gets faster!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🏃 Rally Run', feat: [['pyraspike', 'm_rallyrun']] } },
+  { game: 'pyraspike', id: 'juggle', icon: '🤹', name: 'PyraDive Juggle', pitch: 'Training: keep it up — foot, knee, head!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🤹 Juggle', feat: [['pyraspike', 'm_juggle']] } },
+  { game: 'pyraspike', id: 'party', icon: '🌀', name: 'Spark Party', pitch: 'A bouncy ball + extra balls at once!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🌀 Spark Party', feat: [['pyraspike', 'm_party']] } },
+  { game: 'pyraspike', id: 'cups', icon: '🏆', name: 'PyraDive Cups', pitch: 'Knock-out cups: 4 · 8 · 👑 Family Cup!', route: 'pyradive', added: '2026-11-14', tried: { board: 'pyraspike', themeStart: '🏆 Cup of 4', feat: [['pyraspike', 'm_cupfour'], ['pyraspike', 'm_cupeight'], ['pyraspike', 'm_familycup']] } },
+  { game: 'pokadif', id: 'spot', icon: '🖼️', name: 'Find the Difference', pitch: 'Two pictures — poke every change!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '🖼️ Spot' } },
+  { game: 'pokadif', id: 'detective', icon: '🕵️', name: 'Detective Adventure', pitch: 'Solve a case: find · read · crack!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif-case' } },
+  { game: 'pokadif', id: 'arcade', icon: '⏱️', name: 'Photo Hunt Arcade', pitch: 'Speed run to the 🏁 — beat your time!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif-arcade' } },
+  { game: 'pokadif', id: 'blink', icon: '👁️', name: 'Blink', pitch: 'One picture blinks — what changed?', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '👁️ Blink' } },
+  { game: 'pokadif', id: 'odd', icon: '🎯', name: 'Odd One Out', pitch: 'Poke the one that doesn\'t belong!', route: 'pokadif', added: '2026-11-14', tried: { board: 'pokadif', themeStart: '🎯 Odd One Out' } },
+  { game: 'sciencetory', id: 'mechanic', icon: '⚙️', name: 'Sciencetory Mechanic', pitch: 'Test your crafted things!', route: 'sciencetory', added: '2026-11-14', tried: { board: 'sciencetory', themeStart: '⚙️ Mechanic' } },
+  { game: 'sciencetory', id: 'chem', icon: '⚗️', name: 'Sciencetory Chemistry', pitch: 'Hunt elements, build molecules!', route: 'sciencetory', added: '2026-11-14', tried: { board: 'sciencetory', themeStart: '⚗️ Chemistry' } },   // ⚗️ sc-2a
+  { game: 'sciencetory', id: 'quantum', icon: '⚛️', name: 'Sciencetory Quantum', pitch: 'Build atoms from tiny parts!', route: 'sciencetory', added: '2026-11-14', tried: { board: 'sciencetory', themeStart: '⚛️ Quantum' } },   // ⚛️ sc-2b
+  { game: 'sciencetory', id: 'particle', icon: '🔬', name: 'Sciencetory Particle', pitch: 'Build protons, smash particles!', route: 'sciencetory', added: '2026-11-14', tried: { board: 'sciencetory', themeStart: '🔬 Particle' } },   // 🔬 sc-2d
+  { game: 'sciencetory', id: 'thermo', icon: '🔥', name: 'Sciencetory Thermo', pitch: 'Melt, mix + keep cocoa warm!', route: 'sciencetory', added: '2026-11-16', tried: { board: 'sciencetory', themeStart: '🔥 Thermo' } },   // 🔥 sc-3a
+  { game: 'sciencetory', id: 'electro', icon: '⚡', name: 'Sciencetory Electro', pitch: 'Light bulbs, magnets + electromagnets!', route: 'sciencetory', added: '2026-11-16', tried: { board: 'sciencetory', themeStart: '⚡ Electro' } },   // ⚡ sc-3b
+  { game: 'sciencetory', id: 'optics', icon: '🌈', name: 'Sciencetory Optics', pitch: 'Rainbows, mirror mazes + magnifiers!', route: 'sciencetory', added: '2026-11-16', tried: { board: 'sciencetory', themeStart: '🌈 Optics' } },   // 🌈 sc-3c
+  { game: 'sciencetory', id: 'acoustics', icon: '🔊', name: 'Sciencetory Acoustics', pitch: 'Sound waves, echoes + thunder counting!', route: 'sciencetory', added: '2026-11-17', tried: { board: 'sciencetory', themeStart: '🔊 Acoustics' } },   // 🔊 sc-3d
+  { game: 'sciencetory', id: 'geo', icon: '🌍', name: 'Sciencetory Geo', pitch: 'Scratch rocks, read a compass, shake!', route: 'sciencetory', added: '2026-11-17', tried: { board: 'sciencetory', themeStart: '🌍 Geo' } },   // 🌍 sc-4a
+  { game: 'sciencetory', id: 'bio', icon: '🧬', name: 'Sciencetory Bio', pitch: 'Bones, heartbeats + hollow tubes!', route: 'sciencetory', added: '2026-11-17', tried: { board: 'sciencetory', themeStart: '🧬 Bio' } },   // 🧬 sc-4b
+  { game: 'sciencetory', id: 'cosmic', icon: '🌌', name: 'Sciencetory Cosmic', pitch: 'Moon weight, stars, sundials, planets!', route: 'sciencetory', added: '2026-11-17', tried: { board: 'sciencetory', themeStart: '🌌 Cosmic' } },   // 🌌 sc-4c
+  { game: 'sla-brall', id: 'slashot', icon: '🏒', name: 'SlaShot', pitch: 'Table hockey — score goals!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaShot ·', feat: [['sla-brall', 'win_slashot']] } },
+  { game: 'sla-brall', id: 'slapoof', icon: '🥒', name: 'SlaPoof', pitch: 'Pickleball — mind the kitchen!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaPoof ·', feat: [['sla-brall', 'win_slapoof']] } },
+  { game: 'sla-brall', id: 'slaball', icon: '🎾', name: 'SlaBall', pitch: 'Tennis: 15, 30, 40, game!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaBall ·', feat: [['sla-brall', 'win_slaball']] } },
+  { game: 'sla-brall', id: 'slapong', icon: '🏓', name: 'SlaPong', pitch: 'Ping-pong on a table!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaPong ·', feat: [['sla-brall', 'win_slapong']] } },
+  { game: 'sla-brall', id: 'slabam', icon: '🏸', name: 'SlaBam', pitch: 'Badminton — fast hit, slow drop!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaBam ·', feat: [['sla-brall', 'win_slabam']] }, added: '2026-11-10' },
+  { game: 'sla-brall', id: 'slawall', icon: '🧱', name: 'SlaWall', pitch: 'Squash room — bounce off ANY wall!', route: 'slabrall', tried: { board: 'sla-brall', themeStart: 'SlaWall ·', feat: [['sla-brall', 'win_slawall']] } },
+  { game: 'sla-brall', id: 'cup', icon: '🏆', name: 'Tournament', pitch: 'Win the trophy in a cup!', route: 'slabrall', tried: { feat: [['sla-brall', 'cupMatches'], ['sla-brall', 'cups']] } },
+  { game: 'sla-brall', id: 'lhost', icon: '📡', name: 'Host a game', pitch: 'Friends join on their own device!', route: 'slabrall', added: '2026-11-13' },   // 📡 lk-1c
+  { game: 'sla-brall', id: 'ljoin', icon: '🔗', name: 'Join friends', pitch: 'Play on your own device!', route: 'slabrall', added: '2026-11-13' },   // 📡 p3a (lk-1b asked)
+  { game: 'blasoff', id: 'fours', icon: '⚽', name: 'Soccer 4v4', pitch: 'Small pitch, close camera!', route: 'blasoff', tried: { board: 'blasoff', themeStart: '4v4 ·', feat: [['blasoff', 'win_4v4']] }, added: '2026-11-14' },   // ⚽ bo-1
+  { game: 'blasoff', id: 'sevens', icon: '🏟️', name: 'Soccer 7v7', pitch: 'Bigger pitch, more passing!', route: 'blasoff', tried: { board: 'blasoff', themeStart: '7v7 ·', feat: [['blasoff', 'win_7v7']] }, added: '2026-11-14' },   // ⚽ bo-1
+  { game: 'blasoff', id: 'elevens', icon: '🌍', name: 'Soccer 11v11', pitch: 'Full pitch, 11 a side!', route: 'blasoff', tried: { board: 'blasoff', themeStart: '11v11 ·', feat: [['blasoff', 'win_11v11']] }, added: '2026-11-14' },   // 🌍 bo-2a
+  { game: 'blasoff', id: 'party', icon: '🎉', name: 'Party ball', pitch: 'A wild bomb ball, confetti goals!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Party ball ·', feat: [['blasoff', 'win_party']] }, added: '2026-11-14' },   // 🎉 bo-3c
+  { game: 'blasoff', id: 'futsal', icon: '🥅', name: 'Futsal 5v5', pitch: 'Fast court soccer, heavy ball!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Futsal 5v5 ·', feat: [['blasoff', 'win_5v5']] }, added: '2026-11-14' },   // 🏟️ bo-2b
+  { game: 'blasoff', id: 'street', icon: '🏙️', name: 'Street 1v1', pitch: 'Nutmeg = a point, first to 5!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Street 1v1 ·', feat: [['blasoff', 'win_1v1']] }, added: '2026-11-14' },   // 🏙️ bo-2b
+  { game: 'blasoff', id: 'skills', icon: '🎯', name: 'Skill challenges', pitch: '7 drills, three stars each!', route: 'blasoff', tried: { feat: [['blasoff', 'skills']] }, added: '2026-11-14' },   // 🎯 bo-3a
+  { game: 'blasoff', id: 'shootout', icon: '🥅', name: 'Penalty shootout', pitch: 'Kick on the target, dive in goal!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Penalty shootout ·', feat: [['blasoff', 'win_pens']] }, added: '2026-11-14' },
+  { game: 'blasoff', id: 'battle', icon: '🎤', name: 'Tricks Battle', pitch: 'Tricks on the beat, 3 judges!', route: 'blasoff', tried: { board: 'blasoff', themeStart: 'Tricks Battle ·', feat: [['blasoff', 'win_battle']] }, added: '2026-11-14' },   // 🎤 bo-3b
+  { game: 'blasoff', id: 'cup', icon: '🏆', name: 'Knockout Cup', pitch: '8 teams, win or go home!', route: 'blasoff', tried: { feat: [['blasoff', 'cupPlays']] }, added: '2026-11-16' },   // 🏆 r4a / r4c
+  { game: 'blasoff', id: 'league', icon: '📊', name: 'League', pitch: 'Play everyone, top the table!', route: 'blasoff', tried: { feat: [['blasoff', 'leaguePlays']] }, added: '2026-11-16' },
+  { game: 'blasoff', id: 'family', icon: '👑', name: 'Family cup', pitch: 'Captain your own family team!', route: 'blasoff', tried: { feat: [['blasoff', 'familyPlays']] }, added: '2026-11-16' },
+  { game: 'blasoff', id: 'tale', icon: '📜', name: 'Kick Tale', pitch: 'From the jungle to the cloud final!', route: 'blasoff', tried: { feat: [['blasoff', 'taleSteps']] }, added: '2026-11-16' },   // 📜 r4b / r4c
+  { game: 'turbo', id: 'ghost', icon: '👻', name: 'Ghost race', pitch: 'Race the family\'s best rides!', route: 'turbo', tried: null },
+  { game: 'turbo', id: 'duo', icon: '👥', name: '2-player race', pitch: 'Race a friend, split screen!', route: 'turbo', tried: null },
+  { game: 'word-board', id: 'together', icon: '👨‍👩‍👧', name: 'Lettercraft Play together', pitch: 'Word battle with your family!', route: 'wordboard', tried: { feat: [['word-board', 'togetherGames']] } },
+  { game: 'number-board', id: 'together', icon: '👨‍👩‍👧', name: 'Algebros Play together', pitch: 'Number battle with your family!', route: 'numberboard', tried: { feat: [['number-board', 'togetherGames']] } },
+  { game: 'math-quest', id: 'minute', icon: '⏱️', name: 'Minute Challenge', pitch: '60 seconds — how many sums?', route: 'mathquest', tried: { feat: [['math-quest', 'sprintRounds'], ['math-quest', 'sprintBest']] } },
+  { game: 'math-quest', id: 'worden', icon: '🔤', name: 'Math Quest Word Sums', pitch: 'The sum is written in words!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':worden', feat: [['math-quest', 'wordRight']] } },   // ➗ mq-w1
+  { game: 'math-quest', id: 'wordth', icon: '🐘', name: 'Math Quest เลขคำไทย', pitch: 'Sums in Thai words — อ่านเป็นคำ!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':wordth', feat: [['math-quest', 'thaiRight']] } },   // ➗ mq-w1
+  { game: 'math-quest', id: 'storyen', icon: '📖', name: 'Math Quest Story Problems', pitch: 'Real-life maths stories — 1 to 3 steps!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':storyen' } },   // ➗ mq-w2
+  { game: 'math-quest', id: 'storyth', icon: '📜', name: 'Math Quest โจทย์ปัญหา', pitch: 'Story sums in Thai — โจทย์ปัญหา!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':storyth' } },   // ➗ mq-w2
+  { game: 'math-quest', id: 'tricken', icon: '🤔', name: 'Math Quest Trick Questions', pitch: 'The quick answer is a trap!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':tricken' } },   // ➗ mq-w3
+  { game: 'math-quest', id: 'trickth', icon: '🙃', name: 'Math Quest คำถามหลอก', pitch: 'Thai trick questions — คิดสองรอบ!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':trickth' } },   // ➗ mq-w3
+  { game: 'math-quest', id: 'testen', icon: '📝', name: 'Math Quest Test Practice', pitch: 'School-style maths tests, grade 1–12!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':testen' } },   // ➗ mq-t1
+  { game: 'math-quest', id: 'testth', icon: '📝', name: 'Math Quest ข้อสอบ', pitch: 'Thai school tests — ข้อสอบ ป.1–ม.6!', route: 'mathquest', added: '2026-11-15', tried: { board: 'math-quest', theme: ':testth' } },   // ➗ mq-t1
+  { game: 'math-quest', id: 'sign', icon: '❓', name: 'Math Quest Missing sign', pitch: 'Which sign makes the sum true?', route: 'mathquest', added: '2026-11-16', tried: { board: 'math-quest', theme: ':sign' } },   // ➗ mq-w4
+  { game: 'math-quest', id: 'fix', icon: '🔍', name: 'Math Quest Find the mistake', pitch: 'Be a maths detective — spot it, fix it!', route: 'mathquest', added: '2026-11-16', tried: { board: 'math-quest', theme: ':fix' } },   // ➗ mq-w4
+  { game: 'math-quest', id: 'clock', icon: '🕐', name: 'Math Quest Clock maths', pitch: 'Read the clock, add the minutes!', route: 'mathquest', added: '2026-11-16', tried: { board: 'math-quest', theme: ':clock' } },   // ➗ mq-w4
+  { game: 'math-quest', id: 'listenen', icon: '🎧', name: 'Math Quest Listen', pitch: 'Hear the sum — no numbers on screen!', route: 'mathquest', added: '2026-11-16', tried: { board: 'math-quest', theme: ':listenen' } },   // ➗ mq-w5
+  { game: 'math-quest', id: 'listenth', icon: '👂', name: 'Math Quest ฟังโจทย์', pitch: 'Thai sums you hear — ฟังแล้วตอบ!', route: 'mathquest', added: '2026-11-16', tried: { board: 'math-quest', theme: ':listenth' } },   // ➗ mq-w5
+  { game: 'double-up', id: 'challenge', icon: '🏔️', name: 'Double Up Challenge', pitch: 'Tiny 3×3 board — reach 1024!', route: 'doubleup', tried: { feat: [['double-up', 'chTile']] } },
+  { game: 'memory', id: 'friends', icon: '👥', name: 'Memories with friends', pitch: 'Take turns — most pairs wins!', route: 'memory', tried: { feat: [['memory', 'wins']] } },
+  { game: 'memory', id: 'time', icon: '⏱️', name: 'Memories Time attack', pitch: 'Beat the clock — find every pair fast!', route: 'memory', added: '2026-11-15', tried: { board: 'memory', theme: 'Time attack' } },
+  { game: 'memory', id: 'steam', icon: '🔗', name: 'Memories STEAM pairs', pitch: 'Match cards that belong together!', route: 'memory', added: '2026-11-16', tried: { board: 'memory', theme: 'STEAM pairs' } },
+  { game: 'chess', id: 'duo', icon: '👫', name: 'Chess for 2', pitch: 'Play chess with a friend!', route: 'chess', tried: null },
+  { game: 'checkers', id: 'duo', icon: '👫', name: 'Checkers for 2', pitch: 'Play checkers with a friend!', route: 'checkers', tried: null },
+  { game: 'pose-party', id: 'classic', icon: '🎯', name: 'Classic', pitch: 'Copy each pose — 3, 2, 1, snap!', route: 'poseparty', tried: { board: 'pose-party' } },
+  { game: 'pose-party', id: 'speed', icon: '⏱️', name: 'Speed 60 s', pitch: 'Match fast poses in 60 seconds', route: 'poseparty', tried: { feat: [['pose-party', 'speedBest']] } },
+  { game: 'pose-party', id: 'copy', icon: '🪞', name: 'Copy Me', pitch: 'Copy your buddy\'s pose fast!', route: 'poseparty', tried: { feat: [['pose-party', 'copyBest']] } },
+  { game: 'pose-party', id: 'group', icon: '🧑‍🤝‍🧑', name: 'Group poses', pitch: 'Make one big shape together!', route: 'poseparty', tried: { feat: [['pose-party', 'groupBest']] } },
+  { game: 'pose-party', id: 'dance', icon: '💃', name: 'Dance chain', pitch: 'Pose on the beat!', route: 'poseparty', tried: { feat: [['pose-party', 'danceBest']] } },
+  { game: 'pose-party', id: 'statue', icon: '🗿', name: 'Statue Hold', pitch: 'Freeze like a stone statue!', route: 'poseparty', tried: { feat: [['pose-party', 'statueBest']] } },
+  { game: 'pose-party', id: 'freeze', icon: '🧊', name: 'Freeze Dance', pitch: 'Dance, then FREEZE!', route: 'poseparty', tried: { feat: [['pose-party', 'freezeBest'], ['pose-party', 'freezeSecs']] } },
+  { game: 'pose-party', id: 'mirror', icon: '🪞', name: 'Mirror Twins', pitch: 'Copy your twin like a mirror!', route: 'poseparty', tried: { feat: [['pose-party', 'mirrorBest']] } },
+  { game: 'pose-party', id: 'letters', icon: '🔤', name: 'Body Letters', pitch: 'Spell your name with your body!', route: 'poseparty', tried: { feat: [['pose-party', 'lettersMade']] } },
+  { game: 'pose-party', id: 'yoga', icon: '🧘', name: 'Yoga & Stretch', pitch: 'Slow stretches — hold them still', route: 'poseparty', tried: null },
+];
+
+/* ============ 📏 MODE_GROUPS_ (from Code.gs) ============ */
+// 🗂️ mg-1 Mode groups — the same boxes (and order) as each game's start page. A mode not listed here has no group (2-mode games stay flat).
+const MODE_GROUPS_ = {
+  'memory': [{k: 'match', icon: '🃏', en: 'Match', th: 'จับคู่', modes: ['friends', 'steam']}, {k: 'race', icon: '⏱️', en: 'Race', th: 'แข่งเวลา', modes: ['time']}],   // 🗂️ mm-5
+  'math-quest': [{k: 'numbers', icon: '🔢', en: 'Numbers', th: 'ตัวเลข', modes: ['classic', 'minute', 'sign', 'fix', 'clock']}, {k: 'english', icon: '🔤', en: 'English', th: 'ภาษาอังกฤษ', modes: ['worden', 'storyen', 'tricken', 'testen', 'listenen']}, {k: 'thai', icon: '🐘', en: 'Thai', th: 'ภาษาไทย', modes: ['wordth', 'storyth', 'trickth', 'testth', 'listenth']}],   // ➗ mq-t1 📝   // ➗ mq-w1
+  'sciencetory': [{k: 'matter', icon: '⚗️', en: 'Matter', th: 'สสาร', modes: ['chem', 'quantum', 'particle']}, {k: 'forces', icon: '⚙️', en: 'Forces & Energy', th: 'แรงและพลังงาน', modes: ['mechanic', 'thermo', 'electro']}, {k: 'waves', icon: '🌈', en: 'Waves & Space', th: 'คลื่นและอวกาศ', modes: ['optics', 'acoustics', 'cosmic']}, {k: 'earth', icon: '🌍', en: 'Earth & Life', th: 'โลกและชีวิต', modes: ['geo', 'bio']}],   // 🔬 sc-2b (same boxes as the page)
+  'pokadif': [{k: 'spot', icon: '🖼️', en: 'Spot', th: 'จับผิดภาพ', modes: ['spot', 'blink']}, {k: 'odd', icon: '🎯', en: 'Odd One Out', th: 'หาตัวที่ต่าง', modes: ['odd']}, {k: 'endless', icon: '⏱️', en: 'Arcade', th: 'อาร์เคด', modes: ['arcade']}, {k: 'stories', icon: '📖', en: 'Stories', th: 'นักสืบผจญภัย', modes: ['detective']}],   // 🔍 pk-2a + pk-2b + pk-3a
+  'geoscout': [{k: 'numbers', icon: '🧮', en: 'Number play', th: 'เล่นกับตัวเลข', modes: ['scale', 'count', 'tens', 'next']}, {k: 'shapes', icon: '🔷', en: 'Shapes + parts', th: 'รูปทรง · เศษส่วน', modes: ['shape', 'frac', 'wobble']}, {k: 'friends', icon: '⚔️', en: 'With friends', th: 'เล่นกับเพื่อน', modes: ['battle']}, {k: 'story', icon: '📖', en: 'Story', th: 'เนื้อเรื่อง', modes: ['journey']}],   // 🗂️ p3a (F5)
+  'artifactory': [{k: 'hall', icon: '⚙️', en: 'Machine Hall', th: 'โรงเครื่องจักร', modes: ['lathe', 'planer', 'weld', 'forge', 'pottery', 'sew', 'light', 'finish']}, {k: 'hand', icon: '🪵', en: 'HandCraft Room', th: 'ห้องงานฝีมือ', modes: ['whittle', 'stone', 'print', 'lab', 'nature']}],   // 🗂️ p3a: the page's own areas
+  'wisdeck': [{k: 'quiz', icon: '🧠', en: 'Quiz games', th: 'เกมตอบคำถาม', modes: ['quiz', 'buzz', 'daily']}, {k: 'num', icon: '🔢', en: 'Number games', th: 'เกมตัวเลข', modes: ['count', 'jack']}, {k: 'learn', icon: '📚', en: 'Learn + store', th: 'อ่าน · เรียน · เก็บการ์ด', modes: ['learn']}],
+  'snakeast': [{k: 'arcade', icon: '🐍', en: 'Arcade', th: 'อาร์เคด', modes: ['feast', 'endless', 'gate']}, {k: 'land', icon: '🏰', en: 'Land battle', th: 'ยึดพื้นที่', modes: ['castle']}, {k: 'story', icon: '📜', en: 'Story', th: 'เนื้อเรื่อง', modes: ['tale']}],
+  'soul-bopper': [{k: 'battle', icon: '⚔️', en: 'Battle', th: 'ต่อสู้', modes: ['battle', 'hold']}, {k: 'party', icon: '💩', en: 'Party', th: 'ปาร์ตี้', modes: ['classic']}, {k: 'story', icon: '🗺️', en: 'Story', th: 'ผจญภัย', modes: ['stage']}],
+  'polyplot': [{k: 'boxes', icon: '⬜', en: 'Boxes', th: 'ปิดกล่อง', modes: ['classic', 'hunt']}, {k: 'fort', icon: '🏰', en: 'Fortiplot', th: 'สร้างป้อม', modes: ['fort', 'coop']}],
+  'alignext': [{k: 'drop', icon: '🔴', en: 'Drop', th: 'หยอดเหรียญ', modes: ['drop']}, {k: 'omni', icon: '❌⭕', en: 'Omnifile', th: 'วางได้ทุกช่อง', modes: ['omni', 'stack']}],
+  'beat-corner': [{k: 'songs', icon: '🎤', en: 'Songs', th: 'เพลง', modes: ['corner']}, {k: 'inst', icon: '🎹', en: 'Instruments', th: 'เครื่องดนตรี', modes: ['piano', 'drums']}, {k: 'together', icon: '🎸', en: 'Together', th: 'เล่นด้วยกัน', modes: ['band']}, {k: 'make', icon: '✏️', en: 'Make', th: 'แต่งเพลง', modes: ['maker']}],
+  'eyes-brain': [{k: 'remember', icon: '🔢', en: 'Ways to remember', th: 'วิธีจำ', modes: ['classic', 'backwards', 'colour', 'letters', 'listen', 'word', 'shapes']}, {k: 'challenge', icon: '🏔️', en: 'Challenge', th: 'ท้าทาย', modes: ['challenge', 'daily']}, {k: 'party', icon: '👥', en: 'Party', th: 'เล่นกันหลายคน', modes: ['chain']}],
+  'pyraspike': [{k: 'spike', icon: '🏐', en: 'PyraSpike', th: 'วอลเลย์บอล', modes: ['beach', 'small', 'full']}, {k: 'strike', icon: '🦶', en: 'PyraStrike', th: 'ตะกร้อ', modes: ['strikesolo', 'strikeduo', 'strikeregu', 'hoop']}, {k: 'spark', icon: '⚡', en: 'PyraSpark', th: 'บอลข้ามโต๊ะ', modes: ['sparksolo', 'sparkduo', 'party']}, {k: 'train', icon: '🎯', en: 'Training + Cups', th: 'ฝึกซ้อม + ถ้วย', modes: ['zonehits', 'combo', 'rallyrun', 'juggle', 'cups']}],   // 🔥 pd-3a
+  'sla-brall': [{k: 'sports', icon: '🏓', en: 'Sports', th: 'กีฬา', modes: ['slashot', 'slapoof', 'slaball', 'slapong', 'slabam', 'slawall']}, {k: 'cup', icon: '🏆', en: 'Cup', th: 'ทัวร์นาเมนต์', modes: ['cup']}, {k: 'link', icon: '📡', en: 'Own devices', th: 'เล่นหลายเครื่อง', modes: ['lhost', 'ljoin']}],   // 📡 p3a: lk-1b's 🔗 Join friends
+  'blasoff': [{k: 'match', icon: '⚽', en: 'Matches', th: 'แข่งฟุตบอล', modes: ['fours', 'sevens', 'elevens', 'party']}, {k: 'small', icon: '🏙️', en: 'Futsal + Street', th: 'ฟุตซอล · สตรีท', modes: ['futsal', 'street']}, {k: 'skill', icon: '🕺', en: 'Tricks + skills', th: 'ลีลา · ทักษะ', modes: ['battle', 'skills', 'shootout']}, {k: 'cup', icon: '🏆', en: 'Cups + story', th: 'ถ้วย · เนื้อเรื่อง', modes: ['cup', 'league', 'family', 'tale']}],   // ⚽ bo-1 · 🌍 bo-2a · 🏙️ bo-2b · 🏆 r4c
+  'brawl-buddies': [{k: 'battle', icon: '🥊', en: 'Battle', th: 'ต่อสู้', modes: ['battle']}, {k: 'adv', icon: '🗺️', en: 'Brawenture', th: 'ผจญภัย', modes: ['brawenture']}],
+  'georead': [{k: 'sounds', icon: '🔊', en: 'Sounds', th: 'เสียง', modes: ['phonics', 'rhyme', 'say']}, {k: 'words', icon: '🧱', en: 'Words', th: 'คำ', modes: ['build', 'sight', 'case', 'trace']}, {k: 'reading', icon: '📖', en: 'Reading', th: 'อ่าน', modes: ['story', 'types']}, {k: 'journey', icon: '🗺️', en: 'Journey', th: 'ผจญภัย', modes: ['journey']}],
+  'pose-party': [{k: 'pose', icon: '🎯', en: 'Pose', th: 'ท่าโพส', modes: ['classic', 'speed', 'copy']}, {k: 'move', icon: '💃', en: 'Move', th: 'ขยับตัว', modes: ['dance', 'statue', 'freeze']}, {k: 'together', icon: '🧑‍🤝‍🧑', en: 'Together', th: 'เล่นด้วยกัน', modes: ['group', 'mirror', 'letters']}, {k: 'calm', icon: '🧘', en: 'Calm', th: 'ยืดเหยียด', modes: ['yoga']}]
+};
+
+/* ============ 📏 BUILT_IN_GAMES (from Code.gs) ============ */
+// Games that ship with the app add their own Games-tab row the first time
+// the Gameroom opens — no script to run by hand. Safe to call every time:
+// a row is only added when its GameID is missing. Edit a row in the sheet
+// freely afterwards (name, icon, Status); it is never overwritten.
+const BUILT_IN_GAMES = [
+  { GameID: 'tdstories', GameName: 'TD-Stories', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Strategy + Reading (planning, choosing, story books, castle + dragon facts)',
+    Status: 'Live', PageRoute: 'tdstories', Icon: '🏰', Description: 'Tower-defence story books: 🐉👑 Dra-Princess Diary — a princess and her dragon keep every knight, prince and king away from the tower. Before each wave your heroes level up: pick ONE skill card (5 colours 🔴🔵🟤🟢🟣, Lv 1–3), evolve at tier 5, ULTIMATE at tier 10. Diary pages + 💡 lesson cards between chapters. More books coming!' },
+  { GameID: 'artifactory', GameName: 'Artifactory', SkillLevel: 'build · design · every age', STEAMFocus: 'Engineering + Design (how real machines work, materials, symmetry)',
+    Status: 'Live', PageRoute: 'artifactory', Icon: '🏭', Description: 'The maker app: turn cups and trophies on the 🌀 lathe, polish and cut 💎 gems, paint and engrave on the 🎨 finish bench, make things for your room — then wear what you made in the 🪞 fitting mirror. Materials from your bag and the family shelf, ⭐ blueprint challenges, a real-life lesson at every machine' },
+  { GameID: 'georead', GameName: 'GeoRead', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Reading + Phonics (letter sounds, blending, spelling)',
+    Status: 'Live', PageRoute: 'georead', Icon: '🔤', Description: 'Phonics with letter boxes: your avatar carries letter boxes — tap one to hear its SOUND, bump them together to blend ("c… a… t… cat!"). 🔊 Phonics and 🧱 Word builder, 6 levels from s a t p to magic e and 2-syllable words, 6 house themes and letter-box looks to pick' },
+  { GameID: 'geoscout', GameName: 'GeoScout', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Math (counting, + − × ÷, comparing, balance, shapes)',
+    Status: 'Live', PageRoute: 'geoscout', Icon: '🔢', Description: 'Numbers you can touch: number blocks with faces — snap them to add, split to take away, copy to multiply, share to divide. ⚖️ Scale (> < = and balance, even weigh your avatar) and 🧱 Count (make the number), 6 house themes as blocks' },
+  { GameID: 'wisdeck', GameName: 'WisDeck', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Science + World + History facts (flags, maps, animals, space, chemistry, inventions) in English + Thai',
+    Status: 'Live', PageRoute: 'wisdeck', Icon: '🃏', Description: 'Learn-by-quiz card game: 1,840 real cards on 5 shelves (🌍 World · ⏳ Time · 🦁 Zoo · 🔬 Science · 🛠️ Human-made). 📚 Learn, 🧠 Quiz to win cards, then play 🔢 WisCount and 🂡 WisJack with your deck' },
+  { GameID: 'eyes-brain', GameName: 'Eyes Brain Riot', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Memory + Numbers (chunking, working memory, patterns)',
+    Status: 'Live', PageRoute: 'eyesbrain', Icon: '👀', Description: 'Number memory: tap 👀 Reveal, the number shows in little chunks for a few seconds, then type it back. 🔢 Classic, 🔁 Backwards, 🏔️ Challenge, pictures, letters, colours, 👂 Listen, ➕ Chain for 2–4 players, 🔥 combos and a 🧠 riot meter' },
+  { GameID: 'polyplot', GameName: 'Polyplot', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Geometry + Strategy (polygons, tessellations, counting chains)',
+    Status: 'Live', PageRoute: 'polyplot', Icon: '⬛', Description: 'Dots & boxes grown up: draw lines on square, triangle, hexagon, octagon and mixed dot maps — close a shape to own it. ⬜ Classic, 🏹 Hunt (run, coins, creatures, events, cards), 🏰 Fortiplot (build towers) and 🛡️ co-op waves, 1–4 players + robots' },
+  { GameID: 'trash-pointer', GameName: 'Trash Pointer', SkillLevel: 'beginner', STEAMFocus: 'Environmental Science / Sorting',
+    Status: 'Live', PageRoute: 'minigames', Icon: '🗑️', Description: 'Drag trash into the correct color-coded bin and help keep the park clean' },
+  { GameID: 'maze', GameName: 'Maze Explorer', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Problem Solving / Spatial',
+    Status: 'Live', PageRoute: 'maze', Icon: '🧭', Description: 'A brand-new maze every time, from Basic to Extreme' },
+  { GameID: 'robot-adventure', GameName: 'Code the Robot', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Coding / Sequencing',
+    Status: 'Live', PageRoute: 'robot', Icon: '🤖', Description: 'Write code to guide the robot past traffic, traps and storms' },
+  { GameID: 'checkers', GameName: 'Checkers', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Strategy / Logic',
+    Status: 'Live', PageRoute: 'checkers', Icon: '🔴', Description: 'Beat the bot from Basic to Extreme, or play a friend — classic, fantasy or futuristic boards' },
+  { GameID: 'chess', GameName: 'Chess', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Strategy / Logic',
+    Status: 'Live', PageRoute: 'chess', Icon: '♞', Description: 'Mini chess to the real thing: checkmate the bot or play a friend' },
+  { GameID: 'pinball', GameName: 'Pinball', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Physics / Reflexes',
+    Status: 'Live', PageRoute: 'pinball', Icon: '🎯', Description: '7 tables, a new layout every game: bonus scenes, Lucky Lights, multiball and the Break-out jackpot' },
+  { GameID: 'hopper', GameName: 'Dodgy Hopper', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Timing / Reflexes',
+    Status: 'Live', PageRoute: 'hopper', Icon: '🐸', Description: 'Hop your avatar across roads, rivers and rails in 6 wild worlds' },
+  { GameID: 'turbo', GameName: 'Turbo Trail', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Timing / Reflexes',
+    Status: 'Live', PageRoute: 'turbo', Icon: '🏎️', Description: 'Race to the finish before the clock runs out — jumps, drifts, rivals and wild worlds' },
+  { GameID: 'memory', GameName: 'Memories Match', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Memory / Focus',
+    Status: 'Live', PageRoute: 'memory', Icon: '🃏', Description: 'Flip the cards and find the pairs — pick a map (4×4 to 10×10) and a level (peeks, look-alikes, swaps, 💀 scramble), on your own or with up to 4 players' },
+  { GameID: 'math-quest', GameName: 'Math Quest', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Math / Numbers',
+    Status: 'Live', PageRoute: 'mathquest', Icon: '🧮', Description: 'Add, take away, times and share in 5 worlds — pictures for little ones, big numbers for big kids' },
+  { GameID: 'double-up', GameName: 'Double Up', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Math / Strategy',
+    Status: 'Live', PageRoute: 'doubleup', Icon: '🔀', Description: 'Slide the tiles — two the same join and grow up (2, 4, 8 … 4096): eggs to whales, rocks to galaxies' },
+  { GameID: 'block-drop', GameName: 'Block Drop', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Spatial / Planning',
+    Status: 'Live', PageRoute: 'blockdrop', Icon: '🧱', Description: 'Turn and drop the falling blocks to fill whole rows — faces, dinos, space cargo, gems and jigsaw pieces' },
+  { GameID: 'pop-blocks', GameName: 'Pop Blocks', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Strategy / Patterns',
+    Status: 'Live', PageRoute: 'popblocks', Icon: '🫧', Description: 'Tap groups of the same blocks to pop them — rockets, bombs, rainbows, missions and chicks to rescue' },
+  { GameID: 'number-grid', GameName: 'Digitinct', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Logic / Numbers',
+    Status: 'Live', PageRoute: 'numbergrid', Icon: '🔢', Description: 'Fill the grid so every row, column and box has each picture once — 4×4 up to the 17-clue Hardcore' },
+  { GameID: 'number-board', GameName: 'Algebros', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Math / Words',
+    Status: 'Live', PageRoute: 'numberboard', Icon: '➗', Description: 'Build number sentences like a crossword (3 + 4 = 7) — beat the robot or play together with 2–4 players' },
+  { GameID: 'word-board', GameName: 'Lettercraft', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Words / Spelling',
+    Status: 'Live', PageRoute: 'wordboard', Icon: '🔤', Description: 'Make words like a crossword with letter tiles — beat the robot or play together with 2–4 players' },
+  { GameID: 'sweet-swap', GameName: 'Sweet Swap', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Strategy / Patterns',
+    Status: 'Live', PageRoute: 'sweetswap', Icon: '🍬', Description: 'Swap two pictures to make rows of 3 — bouncers, crosses, bombs, rainbows and power cells, blockers to break, 7 picture sets' },
+  { GameID: 'beat-corner', GameName: 'BeatCorner', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Music / Rhythm',
+    Status: 'Live', PageRoute: 'beatcorner', Icon: '🎵', Description: 'Hit the beats when they reach the corner buttons — 6 levels × 10 songs, holds, slides, pop-up buttons and spinning spirals; plus 🎹 Piano, 🥁 Drums and 🎸 Band' },
+  { GameID: 'pyraspike', GameName: 'PyraDive', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Sport / Physics (arcs, timing, teamwork)',
+    Status: 'Live', PageRoute: 'pyradive', Icon: '🔥', Description: 'Volleyball with your avatar — Drive · Dink · Dunk: 3 touches a side (bump, set, DUNK), a 🔥 Pyra meter that turns your next move into a Pyra… move, roles 🚀 Drive · 🪶 Dink · 💥 Dunk. 🏐 PyraSpike Beach 2v2 · Small 3v3 · Full 6v6, 6 levels, 1–2 players.' },
+  { GameID: 'pokadif', GameName: 'Pokadif', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Science / Observation (attention, comparing, counting)',
+    Status: 'Live', PageRoute: 'pokadif', Icon: '🔍', Description: 'Be a little detective: two pictures look the same, but a few things changed — poke every difference. Every picture is made on the spot (never the same twice) in the 6 house scenes; 🎨 colour · ➖➕ missing / extra · 📏 size · 🔺 shape · 🔄 turn / flip · 🔢 count, 6 levels, 🔍 magnifier hints.' },
+  { GameID: 'sciencetory', GameName: 'Sciencetory', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Science / Engineering (materials, forces, predicting)',
+    Status: 'Live', PageRoute: 'sciencetory', Icon: '🔬', Description: 'Test the things YOU made in Artifactory like a real lab: press, pull, twist, bend, drop, spin, float … — guess first, then watch the gauge. A test can break a thing (fix it with 🔧 repair, broken is never lost). ⚙️ Mechanic now; ⚗️ Chemistry, 🌈 Optics, 🌌 Cosmic and more coming.' },
+  { GameID: 'sla-brall', GameName: 'SlaBrall', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Sport / Physics (spin, bounce, angles)',
+    Status: 'Live', PageRoute: 'slabrall', Icon: '🏓', Description: '6 racket sports in one: SlaShot table hockey, SlaPoof pickleball, SlaBall tennis, SlaPong ping-pong, SlaBam badminton, SlaWall squash — beat the robot, play 2 players or 2 vs 2, spin shots and 14 power-ups' },
+  { GameID: 'blasoff', GameName: 'BlasOff', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Sport / Physics (passing angles, power, teamwork)',
+    Status: 'Live', PageRoute: 'blasoff', Icon: '⚽', Description: 'Soccer with your avatar — 4v4 · 7v7 · 11v11, 🥅 futsal and a 🏙️ street cage 1v1: pass, shoot, tricks, nutmegs and volleys, shout to your robot keeper, 6 levels with real rules from offside to yellow cards' },
+  { GameID: 'pose-party', GameName: 'Pose Party', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Movement / Body awareness (angles, balance)',
+    Status: 'Live', PageRoute: 'poseparty', Icon: '📷', Description: 'Copy the poses with your whole body — the camera checks how close you are! Classic levels, 60-second Speed and Copy Me' },
+  { GameID: 'brawl-buddies', GameName: 'Brawl Buddies', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Reflex / Timing (high, low, combos)',
+    Status: 'Live', PageRoute: 'brawlbuddies', Icon: '🥊', Description: 'Cartoon bonk battle with your avatar — boop, bonk, block, uppercut and juggle up to 5 bounces. Beat Robo-Buddy on 6 levels or play 2 players on one keyboard' },
+  { GameID: 'alignext', GameName: 'Alignext', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Logic / Strategy (lines, blocking, planning ahead)',
+    Status: 'Live', PageRoute: 'alignext', Icon: '🔴', Description: 'Line them up! 🔴 Drop discs into the stand or ❌⭕ Omnifile pieces anywhere on the board — beat Robo on 6 levels, 2 players or 3–4 in Drop, best of 3' },
+  { GameID: 'snakeast', GameName: 'Snakize', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Planning / Spatial thinking (paths, loops, area)',
+    Status: 'Live', PageRoute: 'snakize', Icon: '🐍', Description: 'Ride your snake! 🍎 Snakeast grid snake, 🧭 Snakigate free-steering arena with family snakes, 🏰 Snakastle land grab and 📜 Snaketale story quests — 6 levels, 2 players on one keyboard' },
+  { GameID: 'soul-bopper', GameName: 'Soul Bopper', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Strategy / Planning (pop shapes, chain reactions, escape routes)',
+    Status: 'Live', PageRoute: 'soulbopper', Icon: '👻', Description: 'Bomber maze with your avatar — plant, pop in a + shape, grab power-ups and come back as a ghost. ⚔️ Battle, 💩 Classic Avatar, 🏳️ Hold the land and 🗺️ Stage, 1–4 players + bots' },
+  { GameID: 'workshop', GameName: 'Furniture Workshop', SkillLevel: 'build · decorate · vote', STEAMFocus: 'Design / Making',
+    Status: 'Live', PageRoute: 'workshop', Icon: '🔨', Description: 'Build your own beds, chairs, lamps and more — use them in My Room, give them, and win the Design Show' },
+];
+
+/* ============ 📏 MAZE_LEVEL_NAMES (from Code.gs) ============ */
+const MAZE_LEVEL_NAMES = ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'];
+
+/* ============ 📏 LEVEL_GAMES (from Code.gs) ============ */
+// Same model as the maze: Progress row (GameID, SeriesID 'main'),
+// UnlockedLevel = levels cleared (0-5), Tokens = one badge per level.
+const LEVEL_GAMES = {
+  // 🏰 TD-Stories (td-1): one Archive board per BOOK — the Theme column says the chapter ("📖 Ch 1 · The Lonely Tower")
+  'td-draprincess': {
+    badges: ['Diary Basic', 'Diary Junior', 'Diary Intermediate', 'Diary Hard', 'Diary Extreme', 'Diary Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'td-farmer': {   // 👨‍🌾 TD-Stories book 2 · Farmer Delusion (fd-1) — Theme column = "📖 Ch N · title"
+    badges: ['Farm Basic', 'Farm Junior', 'Farm Intermediate', 'Farm Hard', 'Farm Extreme', 'Farm Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  // 🏭 Artifactory: ⭐ blueprint challenges — one Archive board, the Theme column says the station ("🌀 Lathe · Cup"); the detail card shows the best per station
+  'artifactory': {
+    badges: ['Maker Basic', 'Maker Junior', 'Maker Intermediate', 'Maker Hard', 'Maker Extreme', 'Maker Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  // 🔤 GeoRead (plan GeoRead): one Archive board for every way to play (the Theme column says the mode: "🔊 Phonics · 🦖 Jungle Gate")
+  'georead': {
+    badges: ['Reader Basic', 'Reader Junior', 'Reader Intermediate', 'Reader Hard', 'Reader Extreme', 'Reader Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  // 🔢 GeoScout: one Archive board for every way to play (the Theme column says the way: "⚖️ Scale · 🦖 Dino Quarry"); the detail card shows the best per way
+  'geoscout': {
+    badges: ['Scout Basic', 'Scout Junior', 'Scout Intermediate', 'Scout Hard', 'Scout Extreme', 'Scout Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  // 🃏 WisDeck (plan 11z): three Archive boards on one page — 🧠 quiz (Theme column = the category), 🔢 WisCount and 🂡 WisJack (vs the robot)
+  'wisdeck': {
+    badges: ['Card Basic', 'Card Junior', 'Card Intermediate', 'Card Hard', 'Card Extreme', 'Card Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'wiscount': {
+    badges: ['Count Basic', 'Count Junior', 'Count Intermediate', 'Count Hard', 'Count Extreme', 'Count Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'wisjack': {
+    badges: ['Jack Basic', 'Jack Junior', 'Jack Intermediate', 'Jack Hard', 'Jack Extreme', 'Jack Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  // 👀🧠 Eyes Brain Riot (plan 11k): one Archive board for every way to play (the Theme column says the way: "🔢 Classic · 🦖 Dino Den")
+  'eyes-brain': {
+    badges: ['Brain Basic', 'Brain Junior', 'Brain Intermediate', 'Brain Hard', 'Brain Extreme', 'Brain Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  // ⬛ Polyplot (plan 11l): one Archive board for every mode (Classic / Hunt / Fortiplot / co-op)
+  'polyplot': {
+    badges: ['Plot Basic', 'Plot Junior', 'Plot Intermediate', 'Plot Hard', 'Plot Extreme', 'Plot Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'soul-bopper': {
+    badges: ['Bopper Basic', 'Bopper Junior', 'Bopper Intermediate', 'Bopper Hard', 'Bopper Extreme', 'Bopper Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  // 🔴 Alignext (plan 11x): one game page, two Archive boards — 'alignext' = 🔴 Drop, 'omnifile' = ❌⭕ Omnifile
+  'alignext': {
+    badges: ['Line Basic', 'Line Junior', 'Line Intermediate', 'Line Hard', 'Line Extreme', 'Line Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  // 🗺️ Brawenture (plan 11i-2): the adventure mode inside Brawl Buddies — one Archive board, level = tale (Theme column = difficulty)
+  'brawenture': {
+    badges: ['Playground Hero', 'Candy Hero', 'Castle Hero', 'Zombie Hero', 'Town Hero', 'Sea Hero'],
+    levelNames: ['Playground Rumble', 'Candy Factory Defense', 'Castle Climb', 'Zombie Crawl', 'Monster Outbreak', 'Undersea Rescue'],
+  },
+  'omnifile': {
+    badges: ['Omni Basic', 'Omni Junior', 'Omni Intermediate', 'Omni Hard', 'Omni Extreme', 'Omni Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  // 🐍 Snakize (plan 11y): one game page, three Archive boards — 'snakeast' = 🍎 grid snake, 'snakigate' = 🧭 arena, 'snakastle' = 🏰 land grab (📜 Snaketale = story progress only)
+  'snakeast': {
+    badges: ['Feast Basic', 'Feast Junior', 'Feast Intermediate', 'Feast Hard', 'Feast Extreme', 'Feast Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'snakigate': {
+    badges: ['Slither Basic', 'Slither Junior', 'Slither Intermediate', 'Slither Hard', 'Slither Extreme', 'Slither Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'snakastle': {
+    badges: ['Castle Basic', 'Castle Junior', 'Castle Intermediate', 'Castle Hard', 'Castle Extreme', 'Castle Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'brawl-buddies': {
+    badges: ['Bonk Basic', 'Bonk Junior', 'Bonk Intermediate', 'Bonk Hard', 'Bonk Extreme', 'Bonk Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'number-grid': {
+    badges: ['Grid Basic', 'Grid Junior', 'Grid Intermediate', 'Grid Hard', 'Grid Extreme', 'Grid Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'pop-blocks': {
+    badges: ['Pop Basic', 'Pop Junior', 'Pop Intermediate', 'Pop Hard', 'Pop Extreme', 'Pop Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'block-drop': {
+    badges: ['Drop Basic', 'Drop Junior', 'Drop Intermediate', 'Drop Hard', 'Drop Extreme', 'Drop Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'pose-party': {
+    badges: ['Pose Basic', 'Pose Junior', 'Pose Intermediate', 'Pose Hard', 'Pose Extreme', 'Pose Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  // 🔥 PyraDive (pd-1): one page, one board per sport — 'pyraspike' 🏐 (R1) · 'pyrastrike' 🦶 (R2) · 'pyraspark' ⚡ (R3); Theme = '<mode> · <arena>'
+  'pyraspike': {
+    badges: ['Spike Basic', 'Spike Junior', 'Spike Intermediate', 'Spike Hard', 'Spike Extreme', 'Spike Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'blasoff': {   // ⚽ bo-1
+    badges: ['Kick Basic', 'Kick Junior', 'Kick Intermediate', 'Kick Hard', 'Kick Extreme', 'Kick Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  // 🔍 Pokadif (pk-1): one board — 🖼️ Find the Difference cases (3 pictures); Theme = '🖼️ Spot · <scene>'. R2 adds ⏱️ Arcade on its own board.
+  'pokadif': {
+    badges: ['Rookie Eye', 'Sharp Spotter', 'Clue Finder', 'Keen Inspector', 'Super Sleuth', 'Master Detective'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  // 🔬 Sciencetory (sc-1): one board — Theme = '<section> · <test>' ('⚙️ Mechanic · Press')
+  'sciencetory': {
+    badges: ['Lab Basic', 'Lab Junior', 'Lab Intermediate', 'Lab Hard', 'Lab Extreme', 'Lab Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  // ⏱️ Pokadif Photo Hunt Arcade (pk-2b): pictures in a row against the clock; cleared = ✅ checkpoint 1 (5 pictures); Theme = '⏱️ Arcade · <scene>'
+  'pokadif-arcade': {
+    badges: ['Quick Eye', 'Fast Finder', 'Speed Sleuth', 'Turbo Spotter', 'Lightning Detective', 'Arcade Legend'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  // 📖 Pokadif Detective Adventure (pk-3a): one case = 3 chapters; Theme = '📖 <case icon> <case name>'
+  'pokadif-case': {
+    badges: ['Case Rookie', 'Clue Collector', 'Trail Tracker', 'Code Cracker', 'Super Sleuth', 'Legend Detective'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'sla-brall': {
+    badges: ['Rally Basic', 'Rally Junior', 'Rally Intermediate', 'Rally Hard', 'Rally Extreme', 'Rally Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'beat-corner': {
+    badges: ['Beat Basic', 'Beat Junior', 'Beat Intermediate', 'Beat Hard', 'Beat Extreme', 'Beat Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  // 🎹 🥁 BeatCorner Piano + Drums (plan 11-bc): two more ways to play inside BeatCorner, each its own Archive board (6 songs a level, pass 3)
+  'beat-piano': {
+    badges: ['Piano Basic', 'Piano Junior', 'Piano Intermediate', 'Piano Hard', 'Piano Extreme', 'Piano Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'beat-drums': {
+    badges: ['Drums Basic', 'Drums Junior', 'Drums Intermediate', 'Drums Hard', 'Drums Extreme', 'Drums Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'sweet-swap': {
+    badges: ['Sweet Basic', 'Sweet Junior', 'Sweet Intermediate', 'Sweet Hard', 'Sweet Extreme', 'Sweet Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'word-board': {
+    badges: ['Words Basic', 'Words Junior', 'Words Intermediate', 'Words Hard', 'Words Extreme', 'Words Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'number-board': {
+    badges: ['Board Basic', 'Board Junior', 'Board Intermediate', 'Board Hard', 'Board Extreme', 'Board Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'double-up': {
+    badges: ['Double Basic', 'Double Junior', 'Double Intermediate', 'Double Hard', 'Double Extreme', 'Double Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'math-quest': {
+    badges: ['Math Basic', 'Math Junior', 'Math Intermediate', 'Math Hard', 'Math Extreme', 'Math Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'memory': {
+    badges: ['Memory Basic', 'Memory Junior', 'Memory Intermediate', 'Memory Hard', 'Memory Extreme', 'Memory Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'turbo': {
+    badges: ['Turbo Basic', 'Turbo Junior', 'Turbo Intermediate', 'Turbo Hard', 'Turbo Extreme', 'Turbo Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'hopper': {
+    badges: ['Hopper Basic', 'Hopper Junior', 'Hopper Intermediate', 'Hopper Hard', 'Hopper Extreme', 'Hopper Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'pinball': {
+    badges: ['Pinball Basic', 'Pinball Junior', 'Pinball Intermediate', 'Pinball Hard', 'Pinball Extreme', 'Pinball Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'chess': {
+    badges: ['Chess Basic', 'Chess Junior', 'Chess Intermediate', 'Chess Hard', 'Chess Extreme', 'Chess Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'checkers': {
+    badges: ['Checkers Basic', 'Checkers Junior', 'Checkers Intermediate', 'Checkers Hard', 'Checkers Extreme', 'Checkers Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'robot-adventure': {
+    badges: ['Robot Basic', 'Robot Junior', 'Robot Intermediate', 'Robot Hard', 'Robot Extreme', 'Robot Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+  },
+  'stacking-sim': {
+    badges: ['Stack Basic', 'Stack Junior', 'Stack Intermediate', 'Stack Hard', 'Stack Extreme', 'Stack Hardcore'],
+    levelNames: ['Basic', 'Junior', 'Intermediate', 'Hard', 'Extreme', 'Hardcore'],
+    // Before the rework the game had 3 fixed levels in a 'building' series
+    // (badges "Cozy Cottage Badge", "Clock Tower Badge", "Sky Tower Badge").
+    // Each one cleared there counts as one level cleared here.
+    legacyCleared: function (name) {
+      const old = getProgress(name, 'stacking-sim').filter(r => r.SeriesID === 'building')[0];
+      if (!old) return 0;
+      return Math.min(3, String(old.Tokens || '').split(',').map(t => t.trim()).filter(Boolean).length);
+    },
+  },
+};
+
+/* ============ 📏 FEAT_DEFS (from Code.gs) ============ */
+const FEAT_DEFS = {
+  'td-farmer': {   // 👨‍🌾 TD-Stories · Farmer Delusion (fd-1)
+    games: { name: 'Farmer Delusion chapters played', icon: '🎮', kind: 'sum', hidden: true },
+    quits: { name: 'Collectors who gave up', icon: '😭', kind: 'sum', tiers: [50, 500, 3000] },
+    waves: { name: 'Farm waves held', icon: '🌊', kind: 'sum', tiers: [10, 100, 500] },
+    perfect: { name: 'Perfect farm waves (no 🎃 lost)', icon: '✨', kind: 'sum', tiers: [10, 100, 400] },
+    plants: { name: 'Maze plants planted', icon: '🍄', kind: 'sum', tiers: [50, 500, 3000] },
+    grows: { name: 'Plants grown a stage', icon: '🌱', kind: 'sum', tiers: [20, 200, 1000] },
+    steps: { name: 'Longest maze walk', icon: '👣', kind: 'max', unit: 'steps', tiers: [40, 80, 140] },
+    evolves: { name: 'Farm hero evolutions', icon: '⭐', kind: 'sum', tiers: [2, 20, 100] },
+    ultimates: { name: 'Farm ultimates unlocked', icon: '☄️', kind: 'sum', tiers: [1, 10, 50] },
+    combos: { name: 'Farm combo skills found', icon: '🤝', kind: 'sum', tiers: [1, 10, 40] },
+    casts: { name: 'Farm skills used', icon: '🪄', kind: 'sum', hidden: true },
+    chapters: { name: 'Farm chapters done', icon: '📔', kind: 'max', tiers: [1, 2, 6] },
+  },
+  'td-draprincess': {   // 🏰 TD-Stories · 🐉👑 Dra-Princess Diary (td-1)
+    games: { name: 'Dra-Princess chapters played', icon: '🎮', kind: 'sum', hidden: true },
+    bonks: { name: 'Suitors bonked away', icon: '💫', kind: 'sum', tiers: [50, 500, 3000] },
+    waves: { name: 'Waves held back', icon: '🌊', kind: 'sum', tiers: [10, 100, 500] },
+    perfect: { name: 'Perfect waves (no ❤️ lost)', icon: '✨', kind: 'sum', tiers: [10, 100, 400] },
+    evolves: { name: 'Hero evolutions', icon: '⭐', kind: 'sum', tiers: [2, 20, 100] },
+    ultimates: { name: 'Ultimates unlocked', icon: '☄️', kind: 'sum', tiers: [1, 10, 50] },
+    combos: { name: 'Combo skills found', icon: '🤝', kind: 'sum', tiers: [1, 10, 40] },
+    casts: { name: 'Skills used', icon: '🪄', kind: 'sum', hidden: true },
+    chapters: { name: 'Diary chapters done', icon: '📔', kind: 'max', tiers: [1, 2, 6] },
+  },
+  'artifactory': {
+    games: { name: 'Artifactory sessions', icon: '🎮', kind: 'sum', hidden: true },
+    made: { name: 'Things made', icon: '🏭', kind: 'sum', tiers: [5, 25, 100] },
+    lathe: { name: 'Turned on the lathe', icon: '🌀', kind: 'sum', tiers: [3, 20, 80] },
+    finish: { name: 'Finishes (paint, varnish, engrave)', icon: '🎨', kind: 'sum', tiers: [3, 20, 80] },
+    stone: { name: 'Stones polished', icon: '🪨', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    stories: { name: 'Stories written', icon: '📝', kind: 'sum', tiers: [3, 20, 80] },
+    bpPages: { name: 'Blueprint pages stamped', icon: '🏅', kind: 'sum', tiers: [1, 5, 15] },
+    bpDaily: { name: 'Blueprints of the Day', icon: '📅', kind: 'sum', tiers: [3, 20, 80] },
+    bpCopied: { name: 'Family copied your blueprints', icon: '👪', kind: 'sum', tiers: [1, 10, 40] },
+    bpShared: { name: 'Family blueprints shared', icon: '📐', kind: 'sum', tiers: [1, 5, 20] },
+    repairs: { name: 'Things repaired', icon: '🔧', kind: 'sum', tiers: [1, 10, 40] },
+    tests: { name: 'Things tested', icon: '🧲', kind: 'sum', tiers: [3, 20, 80] },
+    breaks: { name: 'Broken in a test', icon: '💥', kind: 'sum', hidden: true },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    drops: { name: 'Game drops collected', icon: '🎁', kind: 'sum', tiers: [10, 100, 500] },
+    remixed: { name: 'Remixed by the family', icon: '🔁', kind: 'sum', tiers: [1, 10, 40] },
+    votes: { name: 'Design Show votes given', icon: '🗳️', kind: 'sum', tiers: [3, 20, 80] },
+    whittle: { name: 'Things whittled', icon: '🔪', kind: 'sum', tiers: [3, 20, 80] },
+    print: { name: '3D prints', icon: '🖨️', kind: 'sum', tiers: [3, 20, 80] },
+    nature: { name: 'Nature crafts', icon: '🌿', kind: 'sum', tiers: [3, 20, 80] },
+    lab: { name: 'Lab batches', icon: '🧪', kind: 'sum', tiers: [3, 20, 80] },
+    recycled: { name: 'Things recycled', icon: '♻️', kind: 'sum', tiers: [1, 10, 40] },
+    team: { name: 'Team projects', icon: '🤝', kind: 'sum', tiers: [1, 10, 40] },
+    planer: { name: 'Planks planed', icon: '🪚', kind: 'sum', tiers: [3, 20, 80] },
+    weld: { name: 'Welds', icon: '🔥', kind: 'sum', tiers: [3, 20, 80] },
+    forge: { name: 'Forged', icon: '⚒️', kind: 'sum', tiers: [3, 20, 80] },
+    pottery: { name: 'Pots fired', icon: '🏺', kind: 'sum', tiers: [3, 20, 80] },
+    sew: { name: 'Woven + sewn', icon: '🧵', kind: 'sum', tiers: [3, 20, 80] },
+    light: { name: 'Circuits lit', icon: '🔌', kind: 'sum', tiers: [3, 20, 80] },
+    glows: { name: 'Things that glow', icon: '💡', kind: 'sum', tiers: [1, 10, 40] },
+    gems: { name: 'Gems cut', icon: '💎', kind: 'sum', tiers: [3, 10, 50] },
+    engraved: { name: 'Names engraved', icon: '✍️', kind: 'sum', tiers: [1, 10, 40] },
+    blueprints: { name: 'Blueprint challenges', icon: '📐', kind: 'sum', tiers: [3, 20, 80] },
+    perfect: { name: 'Perfect blueprints (3 ⭐)', icon: '⭐', kind: 'sum', tiers: [1, 10, 40] },
+    latheStars: { name: 'Perfect lathe blueprints', icon: '🌀', kind: 'sum', hidden: true },
+    stoneStars: { name: 'Perfect gem blueprints', icon: '💎', kind: 'sum', hidden: true },
+    remixes: { name: 'Remixes', icon: '✨', kind: 'sum', tiers: [1, 10, 40] },
+    gifts: { name: 'Materials given', icon: '🎁', kind: 'sum', tiers: [3, 30, 150] },
+    shared: { name: 'Shared on the family shelf', icon: '🧺', kind: 'sum', tiers: [3, 30, 150] },
+    team: { name: 'Team projects', icon: '🤝', kind: 'sum', tiers: [1, 10, 40] },
+    matsMade: { name: 'Materials made in the lab', icon: '🧪', kind: 'sum', tiers: [3, 30, 150] },
+    showStars: { name: 'Best Design Show stars', icon: '🎭', kind: 'max', tiers: [3, 8, 15] },
+    daily: { name: 'Daily deliveries', icon: '📦', kind: 'sum', hidden: true },
+  },
+  'georead': {
+    games: { name: 'GeoRead games', icon: '🎮', kind: 'sum', hidden: true },
+    sounds: { name: 'Letter sounds found', icon: '🔊', kind: 'max', tiers: [10, 25, 45], unit: 'sounds' },
+    blends: { name: 'Words blended', icon: '💥', kind: 'sum', tiers: [10, 100, 500] },
+    built: { name: 'Words built', icon: '🧱', kind: 'sum', tiers: [10, 100, 500] },
+    perfects: { name: 'Perfect rounds', icon: '⭐', kind: 'sum', tiers: [20, 200, 1000] },
+    magic: { name: 'Magic e words', icon: '✨', kind: 'sum', tiers: [5, 30, 100] },
+    found: { name: 'Sounds picked by ear', icon: '👂', kind: 'sum', tiers: [10, 100, 400], hidden: true },
+    chapters: { name: 'Alphabet Road chapters', icon: '🗺️', kind: 'max', tiers: [1, 3, 6], unit: 'chapters' },
+    rhymes: { name: 'Rhymes found', icon: '🔁', kind: 'sum', tiers: [10, 100, 400] },
+    sight: { name: 'Sight words read', icon: '👀', kind: 'sum', tiers: [20, 200, 800] },
+    traced: { name: 'Letters traced', icon: '✏️', kind: 'sum', tiers: [10, 52, 300] },
+    cases: { name: 'Big + small matches', icon: '🅰️', kind: 'sum', tiers: [20, 150, 600] },
+    stories: { name: 'Stories read', icon: '📖', kind: 'sum', tiers: [3, 20, 100] },
+    sorted: { name: 'Word types sorted', icon: '🗂️', kind: 'sum', tiers: [20, 150, 600] },
+    said: { name: 'Words said out loud', icon: '🎤', kind: 'sum', tiers: [5, 50, 200] },
+  },
+  'geoscout': {
+    games: { name: 'GeoScout games', icon: '🎮', kind: 'sum', hidden: true },
+    snaps: { name: 'Blocks snapped (+)', icon: '🧲', kind: 'sum', tiers: [20, 200, 1000] },
+    splits: { name: 'Blocks split (−)', icon: '✂️', kind: 'sum', tiers: [10, 100, 500] },
+    copies: { name: 'Copies made (×)', icon: '✖️', kind: 'sum', tiers: [5, 50, 250] },
+    shares: { name: 'Fair shares (÷)', icon: '➗', kind: 'sum', tiers: [5, 50, 250] },
+    balances: { name: 'Scales balanced', icon: '⚖️', kind: 'sum', tiers: [10, 100, 500] },
+    compares: { name: 'Right > < = answers', icon: '🟰', kind: 'sum', tiers: [10, 100, 500] },
+    avatarWeighs: { name: 'Times you weighed yourself', icon: '🧑', kind: 'sum', tiers: [1, 10, 50] },
+    counts: { name: 'Numbers made', icon: '🎯', kind: 'sum', tiers: [10, 100, 500] },
+    perfect: { name: 'Perfect rounds', icon: '✅', kind: 'sum', tiers: [10, 100, 500] },
+    bestStreak: { name: 'Best perfect streak', icon: '🔥', kind: 'max', tiers: [4, 8, 10] },
+    tens: { name: 'Tens towers built', icon: '🔟', kind: 'sum', tiers: [10, 100, 500] },
+    wobble: { name: 'Exact towers', icon: '🏗️', kind: 'sum', tiers: [10, 100, 500] },
+    fractions: { name: 'Fractions right', icon: '🍕', kind: 'sum', tiers: [10, 100, 500] },
+    battleWins: { name: 'Tower battles won', icon: '⚔️', kind: 'sum', tiers: [1, 10, 50] },
+    journeys: { name: 'Journey chapters', icon: '📖', kind: 'max', tiers: [1, 3, 6] },
+    shapes: { name: 'Shapes built', icon: '🔷', kind: 'sum', tiers: [10, 100, 500] },
+    patterns: { name: 'Patterns solved', icon: '🧩', kind: 'sum', tiers: [10, 100, 500] },
+    battles: { name: 'Tower battles played', icon: '⚔️', kind: 'sum', hidden: true },
+  },
+  'wiscount': {   // 🃏🔢 WisCount (vs robot via saveLevelResult, 👥 2 players via saveFeats)
+    games: { name: 'WisCount matches', icon: '🎮', kind: 'sum', hidden: true },
+    wins: { name: 'WisCount wins', icon: '🔢', kind: 'sum', tiers: [1, 10, 50] },
+    sweeps: { name: 'WisCount 3-0 sweeps', icon: '🧹', kind: 'sum', tiers: [1, 5, 20] },
+  },
+  'wisjack': {   // 🃏🂡 WisJack
+    games: { name: 'WisJack matches', icon: '🎮', kind: 'sum', hidden: true },
+    wins: { name: 'WisJack wins', icon: '🂡', kind: 'sum', tiers: [1, 10, 50] },
+    sweeps: { name: 'WisJack 3-0 sweeps', icon: '🧹', kind: 'sum', tiers: [1, 5, 20] },
+    exact: { name: 'Exactly 20 (or 21)', icon: '🎯', kind: 'sum', tiers: [1, 10, 50] },
+  },
+  'wisdeck': {   // 🃏 WisDeck (plan 11z): quiz feats come with saveLevelResult, deck feats with saveWisDeck
+    games: { name: 'WisDeck quizzes', icon: '🎮', kind: 'sum', hidden: true },
+    right: { name: 'Right answers', icon: '✅', kind: 'sum', tiers: [50, 500, 3000] },
+    bestStreak: { name: 'Best answer streak', icon: '🔥', kind: 'max', tiers: [5, 10, 10] },
+    cards: { name: 'Cards won', icon: '🃏', kind: 'sum', tiers: [50, 500, 3000] },
+    fullCats: { name: 'Full categories', icon: '🎓', kind: 'max', tiers: [1, 5, 15] },
+    cosmic: { name: 'Cosmic cards', icon: '🌌', kind: 'max', tiers: [1, 5, 20] },
+    buzzWins: { name: 'WisBuzz wins', icon: '🔔', kind: 'sum', tiers: [1, 10, 50] },
+    buzzRight: { name: 'WisBuzz right answers', icon: '✅', kind: 'sum', tiers: [10, 100, 500] },
+    daily: { name: 'Daily decks played', icon: '📅', kind: 'sum', tiers: [1, 7, 30] },
+  },
+
+
+
+
+  'eyes-brain': {
+    games: { name: 'Eyes Brain games', icon: '🎮', kind: 'sum', hidden: true },
+    digits: { name: 'Digits remembered', icon: '🔢', kind: 'sum', tiers: [100, 1000, 10000] },
+    perfects: { name: 'Perfect rounds', icon: '✅', kind: 'sum', tiers: [10, 100, 500] },
+    bestCombo: { name: 'Best combo', icon: '🔥', kind: 'max', tiers: [3, 6, 10] },
+    longest: { name: 'Brain level (longest number)', icon: '🏅', kind: 'max', tiers: [6, 10, 14], unit: 'digits' },
+    challenge: { name: 'Longest Challenge', icon: '🏔️', kind: 'max', tiers: [6, 10, 15], unit: 'digits' },
+    backPerfects: { name: 'Backwards perfects', icon: '🔁', kind: 'sum', tiers: [5, 25, 100] },
+    listenPerfects: { name: 'Listen perfects', icon: '👂', kind: 'sum', tiers: [5, 25, 100] },
+    chainWins: { name: 'Chain wins', icon: '➕', kind: 'sum', tiers: [1, 10, 50] },
+    riots: { name: 'Brain riots', icon: '🧠', kind: 'sum', tiers: [1, 10, 50] },
+    daily: { name: 'Daily family numbers', icon: '🎯', kind: 'sum', tiers: [1, 7, 30] },
+  },
+  'polyplot': {
+    games: { name: 'Polyplot games', icon: '🎮', kind: 'sum', hidden: true },
+    wins: { name: 'Plot Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
+    boxes: { name: 'Shape Maker', icon: '⬛', kind: 'sum', tiers: [50, 500, 3000] },
+    bestChain: { name: 'Longest chain', icon: '🔗', kind: 'max', tiers: [3, 6, 10] },
+    chains3: { name: 'Chains of 3+', icon: '⛓️', kind: 'sum', tiers: [3, 30, 150] },
+    catches: { name: 'Creature Catcher', icon: '🪤', kind: 'sum', tiers: [5, 50, 300] },
+    hidden: { name: 'Hidden Finder', icon: '🐾', kind: 'sum', tiers: [1, 10, 50] },
+    legend: { name: 'Legend Tamer', icon: '🐉', kind: 'sum', tiers: [1, 3, 10] },
+    coins: { name: 'Coin Collector', icon: '🪙', kind: 'sum', tiers: [20, 200, 1000] },
+    cards: { name: 'Card Player', icon: '🃏', kind: 'sum', tiers: [3, 30, 150] },
+    events: { name: 'Storm Survivor', icon: '🌪️', kind: 'sum', tiers: [5, 50, 250] },
+    doors: { name: 'Door Maker', icon: '🚪', kind: 'sum', tiers: [1, 10, 50] },
+    built: { name: 'Fort Builder', icon: '🏗️', kind: 'sum', tiers: [5, 50, 250] },
+    monsters: { name: 'Monster Stopper', icon: '👹', kind: 'sum', tiers: [5, 50, 250] },
+    bestWave: { name: 'Waves held', icon: '🛡️', kind: 'max', tiers: [5, 10, 20] },
+    fortWins: { name: 'Fort Winner', icon: '🏰', kind: 'sum', tiers: [1, 10, 50] },
+    huntGames: { name: 'Hunt games', icon: '🏹', kind: 'sum', hidden: true },
+  },
+  'soul-bopper': {
+    wins: { name: 'Bopper Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
+    catches: { name: 'Player Catcher', icon: '💥', kind: 'sum', tiers: [5, 50, 300] },
+    bots: { name: 'Bot Popper', icon: '🤖', kind: 'sum', tiers: [10, 100, 500] },
+    blocks: { name: 'Block Breaker', icon: '🧱', kind: 'sum', tiers: [100, 1000, 5000] },
+    chains: { name: 'Chain Reactor', icon: '🔗', kind: 'sum', tiers: [5, 50, 250] },
+    kicks: { name: 'Bomb Kicker', icon: '👢', kind: 'sum', tiers: [5, 50, 200] },
+    tosses: { name: 'Bomb Tosser', icon: '🤾', kind: 'sum', tiers: [5, 50, 200] },
+    comebacks: { name: 'Comeback Kid', icon: '👻', kind: 'sum', tiers: [1, 10, 50] },
+    multi: { name: 'Multi Catch', icon: '🎯', kind: 'max', tiers: [2, 3, 4] },
+    triple: { name: 'Triple Pop', icon: '💫', kind: 'sum', tiers: [1, 5, 20] },
+    pooWins: { name: 'Poo Commander', icon: '💩', kind: 'sum', tiers: [1, 5, 25] },
+    holdWins: { name: 'Land Holder', icon: '🏳️', kind: 'sum', tiers: [1, 5, 25] },
+    holdSecs: { name: 'Seconds in the zone', icon: '🏳️', kind: 'sum', hidden: true },
+    bestWin: { name: 'Best battle level won', icon: '⚔️', kind: 'max', hidden: true },
+    games: { name: 'Soul Bopper games', icon: '🎮', kind: 'sum', hidden: true },
+    pooGames: { name: 'Classic Avatar games', icon: '💩', kind: 'sum', hidden: true },
+    pickups: { name: 'Power-ups grabbed', icon: '✨', kind: 'sum', hidden: true },
+    stages: { name: 'Stage Explorer', icon: '🗺️', kind: 'sum', tiers: [5, 30, 100] },
+    bosses: { name: 'Boss Breaker', icon: '👑', kind: 'sum', tiers: [1, 3, 7] },
+    w_dino: { name: 'Dino world stages', icon: '🦖', kind: 'max', hidden: true }, w_sea: { name: 'Sea world stages', icon: '🐙', kind: 'max', hidden: true }, w_dance: { name: 'Dance world stages', icon: '🪩', kind: 'max', hidden: true }, w_robot: { name: 'Robot world stages', icon: '🤖', kind: 'max', hidden: true },
+    w_space: { name: 'Space world stages', icon: '🪐', kind: 'max', hidden: true }, w_sky: { name: 'Sky world stages', icon: '☁️', kind: 'max', hidden: true }, w_zombie: { name: 'Zombie world stages', icon: '🧟', kind: 'max', hidden: true },
+    // per world (bomb skin evolution): g_ games, c_ catches, wl_ best level won vs bots (level + 1)
+    g_dino: { name: 'Dino games', icon: '🦖', kind: 'sum', hidden: true }, g_sea: { name: 'Sea games', icon: '🐙', kind: 'sum', hidden: true }, g_dance: { name: 'Dance games', icon: '🪩', kind: 'sum', hidden: true }, g_robot: { name: 'Robot games', icon: '🤖', kind: 'sum', hidden: true }, g_space: { name: 'Space games', icon: '🪐', kind: 'sum', hidden: true }, g_sky: { name: 'Sky games', icon: '☁️', kind: 'sum', hidden: true }, g_zombie: { name: 'Zombie games', icon: '🧟', kind: 'sum', hidden: true },
+    c_dino: { name: 'Dino catches', icon: '🦖', kind: 'sum', hidden: true }, c_sea: { name: 'Sea catches', icon: '🐙', kind: 'sum', hidden: true }, c_dance: { name: 'Dance catches', icon: '🪩', kind: 'sum', hidden: true }, c_robot: { name: 'Robot catches', icon: '🤖', kind: 'sum', hidden: true }, c_space: { name: 'Space catches', icon: '🪐', kind: 'sum', hidden: true }, c_sky: { name: 'Sky catches', icon: '☁️', kind: 'sum', hidden: true }, c_zombie: { name: 'Zombie catches', icon: '🧟', kind: 'sum', hidden: true },
+    wl_dino: { name: 'Dino best win', icon: '🦖', kind: 'max', hidden: true }, wl_sea: { name: 'Sea best win', icon: '🐙', kind: 'max', hidden: true }, wl_dance: { name: 'Dance best win', icon: '🪩', kind: 'max', hidden: true }, wl_robot: { name: 'Robot best win', icon: '🤖', kind: 'max', hidden: true }, wl_space: { name: 'Space best win', icon: '🪐', kind: 'max', hidden: true }, wl_sky: { name: 'Sky best win', icon: '☁️', kind: 'max', hidden: true }, wl_zombie: { name: 'Zombie best win', icon: '🧟', kind: 'max', hidden: true },
+  },
+  'alignext': {   // 🔴 Drop
+    wins: { name: 'Drop Winner', icon: '🔴', kind: 'sum', tiers: [1, 10, 50] },
+    lines: { name: 'Line Maker', icon: '〰️', kind: 'sum', tiers: [5, 50, 250] },
+    perfect: { name: 'Clean Sweep', icon: '✨', kind: 'sum', tiers: [1, 10, 30] },
+    series: { name: 'Best of 3 Champ', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },
+    cards: { name: 'Card Player', icon: '🃏', kind: 'sum', tiers: [5, 25, 100] },
+    flips: { name: 'Stand Flipper', icon: '🪜', kind: 'sum', tiers: [1, 5, 20] },
+    games: { name: 'Drop games', icon: '🎮', kind: 'sum', hidden: true },
+  },
+  'omnifile': {   // ❌⭕ Omnifile
+    wins: { name: 'Omnifile Winner', icon: '❌', kind: 'sum', tiers: [1, 10, 50] },
+    lines: { name: 'Corner Thinker', icon: '〰️', kind: 'sum', tiers: [5, 50, 250] },
+    perfect: { name: 'No Chance Given', icon: '✨', kind: 'sum', tiers: [1, 10, 30] },
+    series: { name: 'Omni Best of 3', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },
+    cards: { name: 'Omni Card Player', icon: '🃏', kind: 'sum', tiers: [5, 25, 100] },
+    covers: { name: 'Stack Coverer', icon: '⬇️', kind: 'sum', tiers: [5, 30, 150] },
+    stackWins: { name: 'Stack Winner', icon: '♟️', kind: 'sum', tiers: [1, 10, 50] },
+    powers: { name: 'Power Mover', icon: '⚡', kind: 'sum', tiers: [3, 25, 100] },
+    games: { name: 'Omnifile games', icon: '🎮', kind: 'sum', hidden: true },
+  },
+  'snakeast': {   // 🍎 Snakeast
+    wins: { name: 'Feast Winner', icon: '🍎', kind: 'sum', tiers: [1, 10, 50] },
+    eaten: { name: 'Snake Snacker', icon: '🍏', kind: 'sum', tiers: [50, 500, 3000] },
+    longest: { name: 'Long Snake', icon: '🐍', kind: 'max', unit: 'long', tiers: [15, 30, 50] },
+    golds: { name: 'Golden Eater', icon: '✨', kind: 'sum', tiers: [5, 50, 250] },
+    goldRow: { name: 'Golden Streak', icon: '🥇', kind: 'max', tiers: [2, 3, 5] },
+    endless: { name: 'Endless Best', icon: '♾️', kind: 'max', tiers: [500, 3000, 15000] },
+    skills: { name: 'Skill Snake', icon: '⚡', kind: 'sum', tiers: [5, 50, 250] },
+    duelWins: { name: 'Snake Duel Champ', icon: '👥', kind: 'sum', tiers: [1, 10, 50] },
+    games: { name: 'Snakeast games', icon: '🎮', kind: 'sum', hidden: true },
+    end0: { name: 'Endless Basic', icon: '♾️', kind: 'max', hidden: true }, end1: { name: 'Endless Junior', icon: '♾️', kind: 'max', hidden: true }, end2: { name: 'Endless Intermediate', icon: '♾️', kind: 'max', hidden: true },
+    end3: { name: 'Endless Hard', icon: '♾️', kind: 'max', hidden: true }, end4: { name: 'Endless Extreme', icon: '♾️', kind: 'max', hidden: true }, end5: { name: 'Endless Hardcore', icon: '♾️', kind: 'max', hidden: true },
+  },
+  'snakigate': {   // 🧭 Snakigate
+    wins: { name: 'Slither Winner', icon: '🧭', kind: 'sum', tiers: [1, 10, 50] },
+    eaten: { name: 'Dot Gobbler', icon: '🟡', kind: 'sum', tiers: [100, 1000, 6000] },
+    longest: { name: 'Mega Snake', icon: '🐉', kind: 'max', unit: 'long', tiers: [40, 100, 200] },
+    popped: { name: 'Snake Popper', icon: '💥', kind: 'sum', tiers: [3, 25, 150] },
+    skills: { name: 'Arena Skills', icon: '⚡', kind: 'sum', tiers: [5, 50, 250] },
+    duelWins: { name: 'Arena Duel Champ', icon: '👥', kind: 'sum', tiers: [1, 10, 50] },
+    games: { name: 'Snakigate games', icon: '🎮', kind: 'sum', hidden: true },
+  },
+  'snakastle': {   // 🏰 Snakastle
+    wins: { name: 'Castle Winner', icon: '🏰', kind: 'sum', tiers: [1, 10, 50] },
+    land: { name: 'Land Claimer', icon: '🗺️', kind: 'max', unit: '%', tiers: [30, 50, 70] },
+    flags: { name: 'Flag Planter', icon: '🚩', kind: 'sum', tiers: [10, 100, 600] },
+    cuts: { name: 'Trail Cutter', icon: '✂️', kind: 'sum', tiers: [1, 10, 50] },
+    eaten: { name: 'Castle Snacker', icon: '🍎', kind: 'sum', tiers: [20, 200, 1500] },
+    longest: { name: 'Castle Snake', icon: '🐍', kind: 'max', unit: 'long', tiers: [10, 25, 50] },
+    skills: { name: 'Castle Skills', icon: '⚡', kind: 'sum', tiers: [5, 50, 250] },
+    duelWins: { name: 'Land Race Champ', icon: '👥', kind: 'sum', tiers: [1, 10, 50] },
+    games: { name: 'Snakastle games', icon: '🎮', kind: 'sum', hidden: true },
+  },
+  // (per-world feats for 🐍 snake skins are added below FEAT_DEFS: g_<world> games · f_<world> food · l_<world> longest · w_<world> best level won + 1)
+  'snaketale': {   // 📜 Snaketale (story — feats only, no board)
+    stages: { name: 'Story Stages', icon: '📜', kind: 'max', tiers: [5, 20, 42] },
+    chapters: { name: 'Tale Chapters', icon: '📖', kind: 'max', tiers: [1, 3, 6] },
+    bosses: { name: 'Boss Beater', icon: '👑', kind: 'max', tiers: [1, 3, 6] },
+    stars: { name: 'Story Stars', icon: '⭐', kind: 'max', tiers: [20, 70, 126] },
+    eaten: { name: 'Story Snacks', icon: '🍎', kind: 'sum', hidden: true },
+  },
+  'brawl-buddies': {
+    wins: { name: 'Brawl Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
+    bonks: { name: 'Bonk Machine', icon: '👊', kind: 'sum', tiers: [50, 500, 3000] },
+    combo: { name: 'Combo Star', icon: '🔥', kind: 'max', tiers: [3, 6, 10] },
+    juggle: { name: 'Sky Juggler', icon: '🌟', kind: 'max', tiers: [2, 4, 5] },
+    uppers: { name: 'Uppercut Rocket', icon: '🚀', kind: 'sum', tiers: [5, 50, 250] },
+    perfects: { name: 'Untouchable', icon: '✨', kind: 'sum', tiers: [1, 10, 50] },
+    powers: { name: 'Power Pusher', icon: '🌀', kind: 'sum', tiers: [5, 50, 200] },
+    duoWins: { name: 'Family Brawl Champ', icon: '👥', kind: 'sum', tiers: [1, 10, 50] },
+    grabs: { name: 'Grapple Champ', icon: '🤼', kind: 'sum', tiers: [1, 25, 150] },
+    breaks: { name: 'Guard Smasher', icon: '🔨', kind: 'sum', tiers: [1, 20, 100] },
+    techs: { name: 'Wriggle Wizard', icon: '🪄', kind: 'sum', tiers: [1, 10, 50] },
+    tags: { name: 'Tag Team', icon: '🔁', kind: 'sum', tiers: [1, 25, 150] },
+    sky: { name: 'Sky Combos', icon: '🌟', kind: 'sum', hidden: true },
+    matches: { name: 'Brawls', icon: '🥊', kind: 'sum', hidden: true },
+  },
+  'brawenture': {   // 🗺️ Brawenture (plan 11i-2)
+    tales: { name: 'Family Rescuer', icon: '🗺️', kind: 'sum', tiers: [1, 6, 20] },
+    puzzles: { name: 'Puzzle Pro', icon: '🧩', kind: 'sum', tiers: [3, 25, 100] },
+    bosses: { name: 'Boss Buster', icon: '😈', kind: 'sum', tiers: [1, 10, 40] },
+    found: { name: 'Treasure Finder', icon: '🧸', kind: 'sum', tiers: [3, 18, 50] },
+    kos: { name: 'Baddie Bonker', icon: '👊', kind: 'sum', tiers: [25, 250, 1500] },
+    coop: { name: 'Team Adventurer', icon: '👥', kind: 'sum', tiers: [1, 10, 30] },
+    hardcore: { name: 'Brave Hero', icon: '💀', kind: 'sum', tiers: [1, 3, 6] },
+    t1: { name: 'Playground Rumble', icon: '🛝', kind: 'max', hidden: true }, t2: { name: 'Candy Factory Defense', icon: '🍭', kind: 'max', hidden: true },
+    t3: { name: 'Castle Climb', icon: '🏰', kind: 'max', hidden: true }, t4: { name: 'Zombie Crawl', icon: '🧟', kind: 'max', hidden: true },
+    t5: { name: 'Monster Outbreak', icon: '👾', kind: 'max', hidden: true }, t6: { name: 'Undersea Rescue', icon: '🧜', kind: 'max', hidden: true },
+    runs: { name: 'Adventures', icon: '🗺️', kind: 'sum', hidden: true },
+  },
+  checkers: {
+    doubles: { name: 'Double Jumper', icon: '🐸', kind: 'sum', tiers: [1, 10, 25] },
+    triples: { name: 'Triple Jumper', icon: '🦘', kind: 'sum', tiers: [1, 5, 15] },
+    megas: { name: 'Mega Jumper', icon: '⚡', kind: 'sum', tiers: [1, 3, 10] },
+    kings: { name: 'King Maker', icon: '👑', kind: 'sum', tiers: [1, 10, 25] },
+    wins: { name: 'Checkers Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 30] },
+    perfect: { name: 'Flawless Win', icon: '💎', kind: 'sum', tiers: [1, 3, 10] },
+  },
+  chess: {
+    castles: { name: 'Castle Builder', icon: '🏰', kind: 'sum', tiers: [1, 10, 25] },
+    promos: { name: 'Pawn Promoter', icon: '✨', kind: 'sum', tiers: [1, 5, 15] },
+    enpassant: { name: 'En Passant', icon: '🥷', kind: 'sum', tiers: [1, 3, 10] },
+    forks: { name: 'Fork Finder', icon: '🍴', kind: 'sum', tiers: [1, 10, 25] },
+    checks: { name: 'Check Caller', icon: '♚', kind: 'sum', tiers: [5, 25, 100] },
+    dchecks: { name: 'Double Check', icon: '⚡', kind: 'sum', tiers: [1, 3, 10] },
+    mates: { name: 'Checkmater', icon: '🏆', kind: 'sum', tiers: [1, 10, 30] },
+    fastMate: { name: 'Quick Checkmate', icon: '⏱️', kind: 'min', tiers: [40, 25, 15], unit: 'moves' },
+  },
+  room: {
+    jumps: { name: 'Jumps', icon: '🦘', kind: 'sum', hidden: true },
+    crawl: { name: 'Belly crawl', icon: '🐛', kind: 'sum', hidden: true },
+    gestures: { name: 'Room moves', icon: '💃', kind: 'sum', hidden: true },
+    placed: { name: 'Room things placed', icon: '🪴', kind: 'max', hidden: true },
+    visits: { name: 'Rooms visited', icon: '🚪', kind: 'sum', hidden: true },
+    gifts: { name: 'Gifts sent', icon: '💝', kind: 'sum', hidden: true },
+    received: { name: 'Gifts received', icon: '🎁', kind: 'sum', hidden: true },
+    cleans: { name: 'Rooms tidied', icon: '🧹', kind: 'sum', hidden: true },
+  },
+  app: {
+    archive: { name: 'Archive visits', icon: '🏆', kind: 'sum', hidden: true },
+    looks: { name: 'Look changes', icon: '🎨', kind: 'sum', hidden: true },
+  },
+  pinball: {
+    topScore: { name: 'High Scorer', icon: '🏆', kind: 'max', tiers: [25000, 75000, 150000] },
+    maxCombo: { name: 'Combo Star', icon: '🔥', kind: 'max', tiers: [10, 20, 35] },
+    jackpots: { name: 'Jackpot', icon: '🎰', kind: 'sum', tiers: [1, 5, 15] },
+    multiballs: { name: 'Multiball', icon: '🎱', kind: 'sum', tiers: [1, 10, 30] },
+    scenes: { name: 'Bonus Explorer', icon: '🎪', kind: 'sum', tiers: [1, 5, 15] },
+    scene_carnival: { name: 'Big Top', icon: '🎪', kind: 'sum', hidden: true },
+    scene_castle: { name: 'Dragon\'s Den', icon: '🐉', kind: 'sum', hidden: true },
+    scene_space: { name: 'Wormhole', icon: '🌀', kind: 'sum', hidden: true },
+    scene_sea: { name: 'Coral Reef', icon: '🪸', kind: 'sum', hidden: true },
+    scene_zombie: { name: 'Graveyard Party', icon: '🪦', kind: 'sum', hidden: true },
+    scene_sport: { name: 'Goal Rush', icon: '🥅', kind: 'sum', hidden: true },
+    scene_monster: { name: 'Catch Zone', icon: '🫧', kind: 'sum', hidden: true },
+    breakouts: { name: 'Break-out', icon: '💥', kind: 'sum', hidden: true },
+    skills: { name: 'Skill Shot', icon: '🎯', kind: 'sum', tiers: [1, 10, 25] },
+    words: { name: 'Word Wizard', icon: '🔤', kind: 'sum', tiers: [1, 10, 25] },
+    boxes: { name: 'Mystery Opener', icon: '🎁', kind: 'sum', tiers: [1, 10, 30] },
+    buddy: { name: 'Buddy Bonus', icon: '🐒', kind: 'sum', tiers: [1, 5, 15] },
+    chain: { name: 'Lucky Streak', icon: '🍀', kind: 'max', tiers: [3, 5, 10] },
+  },
+  hopper: {
+    bestRows: { name: 'Far Hopper', icon: '🐸', kind: 'max', tiers: [30, 75, 150] },
+    coins: { name: 'Coin Hopper', icon: '🪙', kind: 'sum', tiers: [50, 250, 1000] },
+    gems: { name: 'Gem Finder', icon: '💎', kind: 'sum', tiers: [1, 10, 40] },
+    checkpoints: { name: 'Flag Catcher', icon: '🏁', kind: 'sum', tiers: [1, 10, 40] },
+    nearMiss: { name: 'Close Call', icon: '😱', kind: 'sum', tiers: [5, 25, 100] },
+    rows: { name: 'Rows hopped', icon: '🐾', kind: 'sum', hidden: true },
+  },
+  turbo: {
+    topSpeed: { name: 'Speedster', icon: '🚀', kind: 'max', unit: 'km/h', tiers: [120, 160, 200] },
+    overtakes: { name: 'Overtaker', icon: '🏎️', kind: 'sum', tiers: [25, 150, 500] },
+    jumps: { name: 'Jumper', icon: '🦘', kind: 'sum', tiers: [5, 30, 100] },
+    drift: { name: 'Drifter', icon: '🌀', kind: 'sum', unit: 's', tiers: [10, 60, 200] },
+    coins: { name: 'Coin Racer', icon: '🪙', kind: 'sum', tiers: [50, 250, 1000] },
+    wins: { name: 'Race Winner', icon: '🥇', kind: 'sum', tiers: [1, 5, 20] },
+    nearMiss: { name: 'Close Shave', icon: '😱', kind: 'sum', hidden: true },
+    metres: { name: 'Distance driven', icon: '🐾', kind: 'sum', unit: 'm', hidden: true },
+  },
+  workshop: {
+    made: { name: 'Maker', icon: '🔨', kind: 'sum', tiers: [1, 5, 15] },
+    topStars: { name: 'Show Star', icon: '🌟', kind: 'max', tiers: [3, 8, 15] },
+    votes: { name: 'Fair Judge', icon: '🗳️', kind: 'sum', tiers: [3, 15, 40] },
+    given: { name: 'Kind Crafter', icon: '🎁', kind: 'sum', tiers: [1, 5, 15] },
+  },
+  'number-grid': {
+    solved: { name: 'Grids Solved', icon: '🔢', kind: 'sum', tiers: [5, 25, 100] },
+    lines: { name: 'Happy Lines', icon: '🎉', kind: 'sum', tiers: [20, 100, 400] },
+    perfect: { name: 'Perfect Grid', icon: '💯', kind: 'sum', tiers: [1, 5, 20] },
+    cells: { name: 'Squares Filled', icon: '🔲', kind: 'sum', hidden: true },
+    rounds: { name: 'Rounds', icon: '🔢', kind: 'sum', hidden: true },
+  },
+  'pop-blocks': {
+    popped: { name: 'Block Popper', icon: '🫧', kind: 'sum', tiers: [200, 1000, 5000] },
+    bigGroup: { name: 'Big Group', icon: '💥', kind: 'max', tiers: [8, 12, 20] },
+    powers: { name: 'Power Blaster', icon: '🚀', kind: 'sum', tiers: [5, 25, 100] },
+    allClear: { name: 'Clean Sweep', icon: '🧹', kind: 'sum', tiers: [1, 5, 20] },
+    bestCombo: { name: 'Combo', icon: '🔥', kind: 'max', tiers: [2, 4, 8] },
+    rounds: { name: 'Rounds', icon: '🫧', kind: 'sum', hidden: true },
+  },
+  'block-drop': {
+    lines: { name: 'Row Clearer', icon: '🧱', kind: 'sum', tiers: [50, 250, 1000] },
+    quads: { name: 'Block Blast', icon: '💥', kind: 'sum', tiers: [1, 10, 50] },
+    pieces: { name: 'Blocks Dropped', icon: '🔷', kind: 'sum', hidden: true },
+    rounds: { name: 'Rounds', icon: '🧱', kind: 'sum', hidden: true },
+  },
+  'pose-party': {
+    poses: { name: 'Poses Matched', icon: '📷', kind: 'sum', tiers: [20, 150, 600] },
+    perfect: { name: 'Perfect Pose', icon: '💯', kind: 'sum', tiers: [1, 10, 50] },
+    bestPct: { name: 'Best Match', icon: '🎯', kind: 'max', unit: '%', tiers: [80, 90, 98] },
+    speedBest: { name: 'Speed Poser', icon: '⏱️', kind: 'max', tiers: [8, 15, 25] },
+    copyBest: { name: 'Copy Cat', icon: '🪞', kind: 'max', tiers: [5, 8, 10] },
+    danceBest: { name: 'Dance Star', icon: '💃', kind: 'max', tiers: [1500, 4000, 10000] },   // 📷 best Dance chain score (pose chat S2b-4)
+    groupBest: { name: 'Team Poser', icon: '🧑‍🤝‍🧑', kind: 'max', tiers: [4, 8, 10] },   // most group shapes in one game
+    booths: { name: 'Photo Booth Artist', icon: '📸', kind: 'sum', tiers: [1, 10, 30] },   // Photo Booth pictures downloaded
+    statueBest: { name: 'Statue Star', icon: '🗿', kind: 'max', unit: 's', tiers: [20, 45, 90] },   // most seconds held in one Statue Hold game (S4)
+    freezeBest: { name: 'Ice Cube', icon: '🧊', kind: 'max', tiers: [3, 5, 8] },   // perfect freezes in one Freeze Dance
+    freezeSecs: { name: 'Frozen seconds', icon: '❄️', kind: 'sum', hidden: true, tiers: [30, 150, 600] },
+    mirrorBest: { name: 'Mirror Twins', icon: '🪞', kind: 'max', tiers: [3, 6, 10] },   // mirror rounds matched in one game (S5)
+    lettersMade: { name: 'Body Letters', icon: '🔤', kind: 'sum', tiers: [10, 50, 200] },   // letters made with the body (S6)
+    posesBuilt: { name: 'Pose Builder', icon: '🛠️', kind: 'max', tiers: [1, 5, 15] },   // own poses in My poses (S7)
+  },
+  // 🔥 PyraDive feats (pd-1): plan §11 titles per action
+  'pyraspike': {
+    wins: { name: 'Pyra Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
+    aces: { name: 'Ace Driver', icon: '🚀', kind: 'sum', tiers: [5, 30, 100] },
+    kills: { name: 'Spirit Dunker', icon: '💥', kind: 'sum', tiers: [10, 100, 500] },
+    assists: { name: 'Ghost Dinker', icon: '🪶', kind: 'sum', tiers: [10, 100, 500] },
+    digs: { name: 'Floor Guardian', icon: '🛡️', kind: 'sum', tiers: [10, 100, 500] },
+    dives: { name: 'PyraDiver', icon: '🤸', kind: 'sum', tiers: [5, 50, 200] },
+    stuffs: { name: 'Wall Titan', icon: '🧱', kind: 'sum', tiers: [3, 30, 150] },
+    sets: { name: 'Sky Setter', icon: '🙌', kind: 'sum', tiers: [20, 200, 1000] },
+    bumps: { name: 'Perfect Passer', icon: '🤚', kind: 'sum', tiers: [20, 200, 1000] },
+    pyras: { name: 'Flame Starter', icon: '🔥', kind: 'sum', tiers: [5, 50, 250] },
+    rally: { name: 'Rally King / Queen', icon: '🔁', kind: 'max', tiers: [10, 20, 40] },
+    games: { name: 'PyraDive matches', icon: '🏐', kind: 'sum', hidden: true },
+    dinks: { name: 'Dinks', icon: '🪶', kind: 'sum', hidden: true },
+    dunks: { name: 'Dunks', icon: '💥', kind: 'sum', hidden: true },
+    drives: { name: 'Serves', icon: '🚀', kind: 'sum', hidden: true },
+    blocks: { name: 'Blocks', icon: '🧱', kind: 'sum', hidden: true },
+    m_beach: { name: 'Beach 2v2 wins', icon: '🏖️', kind: 'sum', hidden: true },
+    m_small: { name: 'Small 3v3 wins', icon: '🏫', kind: 'sum', hidden: true },
+    m_full: { name: 'Full 6v6 wins', icon: '🏟️', kind: 'sum', hidden: true },
+    traps: { name: 'Sticky Feet', icon: '🦵', kind: 'sum', tiers: [20, 200, 1000] },
+    pops: { name: 'Pop Star', icon: '⬆️', kind: 'sum', tiers: [20, 200, 1000] },
+    edges: { name: 'Edge Lord', icon: '💥', kind: 'sum', tiers: [3, 30, 150] },
+    feeds: { name: 'Toss Buddy', icon: '🤲', kind: 'sum', tiers: [10, 100, 500] },
+    hoops: { name: 'Hoop Master', icon: '⭕', kind: 'sum', tiers: [5, 50, 250] },
+    streak_juggle: { name: 'Juggle Star', icon: '🤹', kind: 'max', tiers: [10, 25, 50] },
+    spirits: { name: 'Spirit Diver', icon: '🔥', kind: 'sum', tiers: [1, 20, 100] },
+    duos: { name: 'Duo Spirit', icon: '🔥🔥', kind: 'sum', tiers: [1, 10, 50] },
+    trios: { name: 'Trio Legend', icon: '🔥🔥🔥', kind: 'sum', tiers: [1, 5, 25] },
+    beasts: { name: 'Beast Keeper', icon: '📖', kind: 'max', tiers: [10, 25, 50] },
+    cups: { name: 'PyraChamp', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },
+    familyCups: { name: 'Captain Flame', icon: '👑', kind: 'sum', tiers: [1, 3, 10] },
+    drill_zone: { name: 'Zone Hits best', icon: '🎯', kind: 'max', hidden: true },
+    drill_combo: { name: 'Body Combo best', icon: '🔗', kind: 'max', hidden: true },
+    drill_run: { name: 'Rally Run best', icon: '🏃', kind: 'max', hidden: true },
+    drill_juggle: { name: 'Juggle best', icon: '🤹', kind: 'max', hidden: true },
+    m_strikesolo: { name: 'Strike 1v1 wins', icon: '🦶', kind: 'sum', hidden: true },
+    m_strikeduo: { name: 'Strike Duo wins', icon: '🦵', kind: 'sum', hidden: true },
+    m_strikeregu: { name: 'Strike Regu wins', icon: '🧶', kind: 'sum', hidden: true },
+    m_hoop: { name: 'Hoop Takraw wins', icon: '⭕', kind: 'sum', hidden: true },
+    m_sparksolo: { name: 'Spark 1v1 wins', icon: '⚡', kind: 'sum', hidden: true },
+    m_sparkduo: { name: 'Spark Duo wins', icon: '🌩️', kind: 'sum', hidden: true },
+    m_zonehits: { name: 'Zone Hits played', icon: '🎯', kind: 'sum', hidden: true },
+    m_combo: { name: 'Body Combo played', icon: '🔗', kind: 'sum', hidden: true },
+    m_rallyrun: { name: 'Rally Run played', icon: '🏃', kind: 'sum', hidden: true },
+    m_juggle: { name: 'Juggle played', icon: '🤹', kind: 'sum', hidden: true },
+    m_party: { name: 'Spark Party wins', icon: '🌀', kind: 'sum', hidden: true },
+    m_cupfour: { name: 'Cup of 4 played', icon: '🏆', kind: 'sum', hidden: true },
+    m_cupeight: { name: 'Cup of 8 played', icon: '🏆', kind: 'sum', hidden: true },
+    m_familycup: { name: 'Family Cup played', icon: '👑', kind: 'sum', hidden: true },
+  },
+  'blasoff': {   // ⚽ bo-1
+    wins: { name: 'Match Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
+    goals: { name: 'Golden Boot', icon: '⚽', kind: 'sum', tiers: [10, 100, 500] },
+    bestGoals: { name: 'Hat-trick Hero', icon: '🎩', kind: 'max', tiers: [2, 3, 5] },
+    assists: { name: 'Playmaker', icon: '🅰️', kind: 'sum', tiers: [5, 50, 200] },
+    tricks: { name: 'Trick Master', icon: '🌀', kind: 'sum', tiers: [10, 100, 500] },
+    volleys: { name: 'Volley Hero', icon: '🎯', kind: 'sum', tiers: [3, 30, 100] },
+    shoutSaves: { name: "Keeper's Voice", icon: '📣', kind: 'sum', tiers: [3, 25, 100] },
+    tackles: { name: 'Ball Winner', icon: '🦶', kind: 'sum', tiers: [10, 100, 500] },
+    cleanSheets: { name: 'Clean Sheet', icon: '🧤', kind: 'sum', tiers: [1, 10, 50] },
+    headers: { name: 'Header Hero', icon: '🤕', kind: 'sum', tiers: [3, 30, 100] },
+    matches: { name: 'Matches', icon: '⚽', kind: 'sum', hidden: true },
+    win_4v4: { name: '4v4 wins', icon: '⚽', kind: 'sum', hidden: true },
+    win_7v7: { name: '7v7 wins', icon: '🏟️', kind: 'sum', hidden: true },
+    win_11v11: { name: '11v11 wins', icon: '🌍', kind: 'sum', hidden: true },   // 🌍 bo-2a
+    win_5v5: { name: 'Futsal wins', icon: '🥅', kind: 'sum', hidden: true },   // 🏟️ bo-2b
+    win_1v1: { name: 'Street wins', icon: '🏙️', kind: 'sum', hidden: true },
+    nutmegs: { name: 'Nutmeg King', icon: '🥜', kind: 'sum', tiers: [3, 25, 100] },
+    perfects: { name: 'Perfect Timing', icon: '⚡', kind: 'sum', tiers: [5, 50, 200] },   // ⚡ bo-2c
+    blasts: { name: 'Star Blaster', icon: '🔥', kind: 'sum', tiers: [1, 10, 50] },
+    skills: { name: 'Skill challenges', icon: '🎯', kind: 'sum', hidden: true },   // 🎯 bo-3a
+    skillStars: { name: 'Skill Star', icon: '⭐', kind: 'sum', tiers: [10, 50, 150] },
+    juggles: { name: 'Keepy-ups', icon: '🦶', kind: 'max', tiers: [10, 25, 50] },
+    win_pens: { name: 'Shootout wins', icon: '🥅', kind: 'sum', hidden: true },
+    win_battle: { name: 'Tricks Battle wins', icon: '🎤', kind: 'sum', tiers: [1, 10, 50] },   // 🎤 bo-3b
+    win_party: { name: 'Party ball wins', icon: '🎉', kind: 'sum', tiers: [1, 10, 50] },   // 🎉 bo-3c
+    cups: { name: 'Cup Winner', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },   // 🏆 r4c (r4a cups)
+    leagues: { name: 'League Champion', icon: '📊', kind: 'sum', tiers: [1, 5, 20] },
+    familyCups: { name: 'Family Captain', icon: '👑', kind: 'sum', tiers: [1, 5, 20] },
+    taleChapters: { name: 'Kick Tale', icon: '📜', kind: 'max', tiers: [1, 3, 6] },   // 📜 r4c (r4b story)
+    taleSteps: { name: 'Kick Tale steps', icon: '📜', kind: 'max', hidden: true },
+    cupPlays: { name: 'Cup matches', icon: '🏆', kind: 'sum', hidden: true },
+    leaguePlays: { name: 'League matches', icon: '📊', kind: 'sum', hidden: true },
+    familyPlays: { name: 'Family cup matches', icon: '👑', kind: 'sum', hidden: true },
+  },
+  // 🔍 Pokadif feats (pk-1)
+  'pokadif': {
+    found: { name: 'Differences found', icon: '🔎', kind: 'sum', tiers: [20, 200, 1000] },
+    cases: { name: 'Cases closed', icon: '📁', kind: 'sum', tiers: [3, 30, 100] },
+    perfect: { name: 'Perfect pictures', icon: '🦅', kind: 'sum', tiers: [5, 50, 200] },
+    quick: { name: 'Fastest picture', icon: '⚡', kind: 'min', tiers: [40, 20, 10], unit: 's' },
+    odd: { name: 'Odd ones found', icon: '🎯', kind: 'sum', tiers: [10, 100, 500] },   // pk-2a
+    blinks: { name: 'Blink finds', icon: '👁️', kind: 'sum', tiers: [10, 100, 500] },
+    games: { name: 'Pokadif cases', icon: '🔍', kind: 'sum', hidden: true },
+    hints: { name: 'Magnifier hints', icon: '🔍', kind: 'sum', hidden: true },
+    oops: { name: 'Oops pokes', icon: '❌', kind: 'sum', hidden: true },
+  },
+  // 🔬 Sciencetory feats (sc-1)
+  'sciencetory': {
+    tests: { name: 'Lab tests', icon: '🔬', kind: 'sum', tiers: [5, 25, 100] },
+    right: { name: 'Good guesses', icon: '🎯', kind: 'sum', tiers: [5, 25, 100] },
+    breaks: { name: 'Crash tests', icon: '💥', kind: 'sum', tiers: [1, 10, 50] },
+    records: { name: 'Family records', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },
+    testKinds: { name: 'Different tests', icon: '⚙️', kind: 'max', tiers: [3, 6, 12] },
+    allKinds: { name: 'Science tests tried', icon: '🧪', kind: 'max', tiers: [6, 12, 17] },   // 🧪 sc-4d (12 strength + 5 science tests on your things)
+    samples: { name: 'Sample tests', icon: '🧪', kind: 'sum', hidden: true },
+    games: { name: 'Sciencetory runs', icon: '🔬', kind: 'sum', hidden: true },
+    elements: { name: 'Element cards', icon: '📇', kind: 'max', tiers: [10, 40, 118] },   // ⚗️ sc-2a (sciChemSave: how many of the 118 you own)
+    compounds: { name: 'Molecules built', icon: '⚛️', kind: 'max', tiers: [5, 20, 50] },
+    chemRounds: { name: 'Chemistry rounds', icon: '⚗️', kind: 'sum', hidden: true },
+    atoms: { name: 'Atoms built', icon: '⚛️', kind: 'max', tiers: [5, 20, 36] },   // ⚛️ sc-2b (sciChemSave kind 'atom': different atoms you built)
+    quantumRounds: { name: 'Quantum rounds', icon: '⚛️', kind: 'sum', hidden: true },
+    particles: { name: 'Particle cards', icon: '🔬', kind: 'max', tiers: [4, 10, 17] },   // 🔬 sc-2d (sciChemSave kinds quark / collide: Standard-Model cards you own)
+    particleRounds: { name: 'Particle rounds', icon: '🔬', kind: 'sum', hidden: true },
+    thermoRounds: { name: 'Thermo rounds', icon: '🔥', kind: 'sum', tiers: [5, 20, 60] },   // 🔥 sc-3a (sciChemSave kinds therm / melt / warm / flow)
+    electroRounds: { name: 'Electro rounds', icon: '⚡', kind: 'sum', tiers: [5, 20, 60] },   // ⚡ sc-3b (sciChemSave kinds circ / cond / mag / emag)
+    opticsRounds: { name: 'Optics rounds', icon: '🌈', kind: 'sum', tiers: [5, 20, 60] },   // 🌈 sc-3c (sciChemSave kinds prism / mixc / mirror / lens)
+    acousticsRounds: { name: 'Acoustics rounds', icon: '🔊', kind: 'sum', tiers: [5, 20, 60] },   // 🔊 sc-3d (sciChemSave kinds wave / xylo / echo / thunder)
+    geoRounds: { name: 'Geo rounds', icon: '🌍', kind: 'sum', tiers: [5, 20, 60] },   // 🌍 sc-4a (sciChemSave kinds scratch / rocks / compass / quake)
+    bioRounds: { name: 'Bio rounds', icon: '🧬', kind: 'sum', tiers: [5, 20, 60] },   // 🧬 sc-4b (sciChemSave kinds skel / sense / heart / tube)
+    cosmicRounds: { name: 'Cosmic rounds', icon: '🌌', kind: 'sum', tiers: [5, 20, 60] },   // 🌌 sc-4c (sciChemSave kinds weigh / stars / sundial / planets)
+    machineRounds: { name: 'Machine rounds', icon: '🏗️', kind: 'sum', tiers: [5, 20, 60] },   // ⚙️ sc-4d2 (sciChemSave kind lift: levers + pulleys)
+  },
+  // ⏱️ Pokadif Arcade feats (pk-2b)
+  'pokadif-arcade': {
+    pictures: { name: 'Most pictures in a run', icon: '📸', kind: 'max', tiers: [5, 10, 15], unit: ' pictures' },
+    finishes: { name: 'Speed runs finished', icon: '🏁', kind: 'sum', tiers: [1, 10, 50] },   // ⏱️ pk-3d
+    checkpoints: { name: 'Arcade checkpoints', icon: '✅', kind: 'sum', tiers: [3, 20, 100] },
+    found: { name: 'Arcade finds', icon: '🔎', kind: 'sum', tiers: [30, 300, 1500] },
+    games: { name: 'Arcade runs', icon: '⏱️', kind: 'sum', hidden: true },
+    hints: { name: 'Arcade hints', icon: '🔍', kind: 'sum', hidden: true },
+    oops: { name: 'Arcade oops', icon: '❌', kind: 'sum', hidden: true },
+  },
+  'pokadif-case': {
+    stories: { name: 'Cases closed', icon: '📁', kind: 'sum', tiers: [1, 10, 30] },   // 📖 pk-3a
+    casebook: { name: 'Case books closed', icon: '📚', kind: 'max', tiers: [1, 2, 3] },   // 📖 pk-3b
+    lessons: { name: 'Lesson cards', icon: '🎓', kind: 'max', tiers: [3, 6, 9] },
+    chapters: { name: 'Chapters', icon: '📖', kind: 'sum', hidden: true },
+    games: { name: 'Cases started', icon: '🕵️', kind: 'sum', hidden: true },
+    perfect: { name: 'Perfect steps', icon: '🦅', kind: 'sum', hidden: true },
+    hints: { name: 'Magnifier hints', icon: '🔍', kind: 'sum', hidden: true },
+    oops: { name: 'Oops', icon: '❌', kind: 'sum', hidden: true },
+  },
+  'sla-brall': {
+    wins: { name: 'Match Winner', icon: '🏆', kind: 'sum', tiers: [1, 10, 50] },
+    rally: { name: 'Rally Machine', icon: '🔁', kind: 'max', tiers: [10, 25, 50] },
+    smash: { name: 'Smash Captain', icon: '💥', kind: 'sum', tiers: [10, 100, 500] },
+    aces: { name: 'Ace Server', icon: '🎾', kind: 'sum', tiers: [5, 30, 100] },
+    perfect: { name: 'Sweet Spot', icon: '✨', kind: 'sum', tiers: [10, 100, 500] },
+    powers: { name: 'Power Player', icon: '⚡', kind: 'sum', tiers: [5, 50, 200] },
+    legend: { name: 'Golden Shot', icon: '⭐', kind: 'sum', tiers: [1, 10, 50] },
+    goals: { name: 'Goal Getter', icon: '🏒', kind: 'sum', tiers: [10, 100, 500] },
+    matches: { name: 'Matches', icon: '🏓', kind: 'sum', hidden: true },
+    win_slashot: { name: 'SlaShot wins', icon: '🏒', kind: 'sum', hidden: true },
+    win_slapoof: { name: 'SlaPoof wins', icon: '🥒', kind: 'sum', hidden: true },
+    win_slaball: { name: 'SlaBall wins', icon: '🎾', kind: 'sum', hidden: true },
+    win_slapong: { name: 'SlaPong wins', icon: '🏓', kind: 'sum', hidden: true },
+    win_slawall: { name: 'SlaWall wins', icon: '🧱', kind: 'sum', hidden: true },
+    win_slabam: { name: 'SlaBam wins', icon: '🏸', kind: 'sum', hidden: true },
+    cups: { name: 'Tournament Champion', icon: '🏆', kind: 'sum', tiers: [1, 5, 20] },   // 🏆 round 2: tournaments won
+    jumpHits: { name: 'Jump Smasher', icon: '🦘', kind: 'sum', tiers: [5, 50, 200] },   // le-1 🦘 jump smashes that went in
+    jumpPerfect: { name: 'Perfect jump smashes', icon: '🦘', kind: 'sum', hidden: true },
+    diveSaves: { name: 'Diving Hero', icon: '🤸', kind: 'sum', tiers: [3, 30, 100] },   // le-1 🤸 dive saves
+    cupMatches: { name: 'Tournament matches', icon: '🎟️', kind: 'sum', hidden: true },
+  },
+  'beat-corner': {
+    notes: { name: 'Beat Hitter', icon: '🎵', kind: 'sum', tiers: [300, 2000, 10000] },
+    perfects: { name: 'Perfect Timing', icon: '💛', kind: 'sum', tiers: [100, 1000, 5000] },
+    bestCombo: { name: 'Combo King', icon: '🔥', kind: 'max', tiers: [25, 100, 250] },
+    songs: { name: 'Song Star', icon: '🎶', kind: 'sum', tiers: [5, 20, 60] },
+    rounds: { name: 'Songs played', icon: '🎵', kind: 'sum', hidden: true },
+  },
+  'beat-piano': {   // 🎹 plan 11-bc
+    songsMade: { name: 'Songs Made', icon: '🎼', kind: 'sum', tiers: [1, 5, 15] },
+    songPlays: { name: 'Family Plays', icon: '🎧', kind: 'sum', tiers: [5, 25, 100] },
+    famPlays: { name: 'Family songs played', icon: '🎼', kind: 'sum', hidden: true },
+    notes: { name: 'Piano Notes', icon: '🎹', kind: 'sum', tiers: [200, 1500, 8000] },
+    chords: { name: 'Chord Player', icon: '🎶', kind: 'sum', tiers: [10, 100, 500] },
+    bigLines: { name: 'Big-line Notes', icon: '✨', kind: 'sum', tiers: [5, 50, 250] },
+    bestCombo: { name: 'Piano Combo', icon: '🔥', kind: 'max', tiers: [20, 60, 150] },
+    songs: { name: 'Piano Songs', icon: '🎼', kind: 'sum', tiers: [3, 15, 40] },
+    bandSongs: { name: 'Band Songs', icon: '🎸', kind: 'sum', tiers: [1, 10, 30] },
+    perfects: { name: 'Piano perfects', icon: '💛', kind: 'sum', hidden: true },
+    rounds: { name: 'Piano songs played', icon: '🎹', kind: 'sum', hidden: true },
+  },
+  'beat-drums': {   // 🥁 plan 11-bc
+    famPlays: { name: 'Family songs played (drums)', icon: '🎼', kind: 'sum', hidden: true },
+    notes: { name: 'Drum Hits', icon: '🥁', kind: 'sum', tiers: [300, 2000, 10000] },
+    fills: { name: 'Drum Fills', icon: '🌀', kind: 'sum', tiers: [5, 50, 250] },
+    bestCombo: { name: 'Drum Combo', icon: '🔥', kind: 'max', tiers: [25, 80, 200] },
+    songs: { name: 'Drum Songs', icon: '🎼', kind: 'sum', tiers: [3, 15, 40] },
+    bandSongs: { name: 'Band Songs', icon: '🎸', kind: 'sum', tiers: [1, 10, 30] },
+    perfects: { name: 'Drum perfects', icon: '💛', kind: 'sum', hidden: true },
+    rounds: { name: 'Drum songs played', icon: '🥁', kind: 'sum', hidden: true },
+  },
+  'sweet-swap': {
+    matches: { name: 'Sweet Matcher', icon: '🍬', kind: 'sum', tiers: [100, 500, 2000] },
+    specials: { name: 'Super Maker', icon: '✨', kind: 'sum', tiers: [5, 25, 100] },
+    bestCombo: { name: 'Chain Champ', icon: '🔗', kind: 'max', tiers: [3, 5, 8] },
+    rounds: { name: 'Rounds', icon: '🍬', kind: 'sum', hidden: true },
+  },
+  'word-board': {
+    words: { name: 'Word Builder', icon: '🔤', kind: 'sum', tiers: [20, 100, 400] },
+    bestMove: { name: 'Big Word', icon: '⚡', kind: 'max', tiers: [25, 50, 90] },
+    bingos: { name: 'All 7 Letters', icon: '🌟', kind: 'sum', tiers: [1, 5, 20] },
+    togetherGames: { name: 'Family Word Games', icon: '👨‍👩‍👧', kind: 'sum', tiers: [1, 10, 30] },
+    quizStars: { name: 'Word Quiz Stars', icon: '🧠', kind: 'sum', tiers: [5, 30, 120] },   // 📖 end-of-game word quiz (11p)
+    wins: { name: 'Robot Beaten', icon: '🤖', kind: 'sum', hidden: true },
+    rounds: { name: 'Rounds', icon: '🔤', kind: 'sum', hidden: true },
+  },
+  'number-board': {
+    equations: { name: 'Sentence Builder', icon: '➗', kind: 'sum', tiers: [20, 100, 400] },
+    bestMove: { name: 'Big Move', icon: '⚡', kind: 'max', tiers: [30, 60, 100] },
+    bingos: { name: 'All 8 Tiles', icon: '🌟', kind: 'sum', tiers: [1, 5, 20] },
+    togetherGames: { name: 'Family Games', icon: '👨‍👩‍👧', kind: 'sum', tiers: [1, 10, 30] },
+    wins: { name: 'Robot Beaten', icon: '🤖', kind: 'sum', hidden: true },
+    rounds: { name: 'Rounds', icon: '➗', kind: 'sum', hidden: true },
+  },
+  'double-up': {
+    merges: { name: 'Tile Joiner', icon: '🔀', kind: 'sum', tiers: [100, 500, 2000] },
+    bestTile: { name: 'Biggest Tile', icon: '🏆', kind: 'max', tiers: [256, 1024, 4096] },
+    rounds: { name: 'Rounds', icon: '🔀', kind: 'sum', hidden: true },
+    chTile: { name: 'Challenge Peak', icon: '🏔️', kind: 'max', tiers: [256, 512, 1024] },   // 🏔️ 3 × 3 Challenge (not a level): best tile + best score
+    chScore: { name: 'Challenge Score', icon: '🏔️', kind: 'max', hidden: true },
+  },
+  'math-quest': {
+    correct: { name: 'Right Answers', icon: '✅', kind: 'sum', tiers: [50, 250, 1000] },
+    bestStreak: { name: 'Number Streak', icon: '🔥', kind: 'max', tiers: [5, 10, 15] },
+    perfect: { name: 'Perfect Round', icon: '💯', kind: 'sum', tiers: [1, 5, 20] },
+    rounds: { name: 'Rounds', icon: '🧮', kind: 'sum', hidden: true },
+    sprintBest: { name: 'Minute Mixer', icon: '⏱️', kind: 'max', tiers: [10, 20, 30] },
+    sprintRounds: { name: 'Minute Challenges', icon: '⏱️', kind: 'sum', hidden: true },
+    wordRight: { name: 'Word Wizard', icon: '🔤', kind: 'sum', tiers: [25, 100, 400] },   // ➗ mq-w1: right answers in 🔤 Word Sums
+    thaiRight: { name: 'Thai Number Reader', icon: '🐘', kind: 'sum', tiers: [25, 100, 400] },   // ➗ mq-w1: right answers in 🐘 เลขคำไทย
+    typedRight: { name: 'Pad Pro', icon: '⌨️', kind: 'sum', tiers: [25, 100, 400] },   // ➗ mq-w1: answers typed on the number pad
+    storyRight: { name: 'Story Solver', icon: '📖', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-w2: right answers in 📖 Story Problems / 📜 โจทย์ปัญหา
+    trickRight: { name: 'Trick Spotter', icon: '🕵️', kind: 'sum', tiers: [10, 25, 100] },   // ➗ mq-w3: tricks spotted in 🤔 Trick Questions / 🙃 คำถามหลอก
+    testRight: { name: 'Test Ace', icon: '📝', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-t1: right answers in 📝 Test Practice / 📝 ข้อสอบ
+    signRight: { name: 'Sign Finder', icon: '❓', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-w4: ❓ Missing sign
+    fixRight: { name: 'Maths Detective', icon: '🔍', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-w4: 🔍 Find the mistake (find + fix)
+    clockRight: { name: 'Time Teller', icon: '🕐', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-w4: 🕐 Clock maths
+    listenRight: { name: 'Sharp Ears', icon: '🎧', kind: 'sum', tiers: [10, 50, 200] },   // ➗ mq-w5: 🎧 Listen / 👂 ฟังโจทย์
+  },
+  memory: {
+    pairs: { name: 'Pair Finder', icon: '🃏', kind: 'sum', tiers: [50, 250, 1000] },
+    bestStreak: { name: 'Hot Streak', icon: '🔥', kind: 'max', tiers: [4, 8, 16] },
+    perfect: { name: 'Perfect Board', icon: '💯', kind: 'sum', tiers: [1, 5, 20] },
+    wins: { name: 'Family Champ', icon: '👑', kind: 'sum', tiers: [1, 10, 30] },
+  },
+};
+
+/* ============ 📏 TITLE_DEFS (from Code.gs) ============ */
+// Titles a player can show under their name. f = that player's feats {game: {stat: value}}, x = extra context.
+const TITLE_DEFS = [
+  { id: 'td_swatter', name: 'Suitor Swatter', icon: '💫', hint: 'Bonk 500 suitors away in 🐉👑 Dra-Princess Diary', rule: f => featVal_(f, 'td-draprincess', 'bonks') >= 500 },
+  { id: 'td_tamer', name: 'Dragon Tamer', icon: '🐉', hint: 'Evolve your TD-Stories heroes 10 times', rule: f => featVal_(f, 'td-draprincess', 'evolves') >= 10 },
+  { id: 'td_heart', name: 'Dragon Heart', icon: '❤️‍🔥', hint: 'Unlock an ULTIMATE in TD-Stories', rule: f => featVal_(f, 'td-draprincess', 'ultimates') >= 1 },
+  { id: 'af_smith', name: 'Forge Master', icon: '⚒️', hint: 'Forge 20 things at the ⚒️ forge', rule: f => featVal_(f, 'artifactory', 'forge') >= 20 },
+  { id: 'af_potter', name: 'Potter', icon: '🏺', hint: 'Fire 20 pots in the kiln', rule: f => featVal_(f, 'artifactory', 'pottery') >= 20 },
+  { id: 'af_printer', name: '3D Printer Pro', icon: '🖨️', hint: 'Print 20 things on the 🖨️ 3D printer', rule: f => featVal_(f, 'artifactory', 'print') >= 20 },
+  { id: 'af_show', name: 'Show Star', icon: '🎭', hint: 'Get 10 ⭐ for one crafted thing in the 🎭 Design Show', rule: f => featVal_(f, 'artifactory', 'showStars') >= 10 },
+  { id: 'af_master', name: 'Master Maker', icon: '🏭', hint: 'Make 25 things in Artifactory', rule: f => featVal_(f, 'artifactory', 'made') >= 25 },
+  { id: 'af_gem', name: 'Gem Cutter', icon: '💎', hint: 'Cut 10 gems at the 💎 stone station', rule: f => featVal_(f, 'artifactory', 'gems') >= 10 },
+  { id: 'af_lathe', name: 'Lathe Legend', icon: '🌀', hint: 'Get 3 ⭐ on 10 lathe blueprints', rule: f => featVal_(f, 'artifactory', 'latheStars') >= 10 },
+  { id: 'af_fixit', name: 'Fix-it Hero', icon: '🔧', hint: 'Repair 10 broken things in Artifactory', rule: f => featVal_(f, 'artifactory', 'repairs') >= 10 },
+  { id: 'bp_reader', name: 'Blueprint Reader', icon: '📘', hint: 'Stamp 5 pages of the 📘 Blueprint Book (all 12 with ⭐)', rule: f => featVal_(f, 'artifactory', 'bpPages') >= 5 },
+  { id: 'bp_scholar', name: 'Blueprint Scholar', icon: '🎓', hint: 'Stamp 15 pages of the 📘 Blueprint Book', rule: f => featVal_(f, 'artifactory', 'bpPages') >= 15 },
+  { id: 'bp_grand', name: 'Grand Master Maker', icon: '👑', hint: 'Stamp 40 pages of the 📘 Blueprint Book', rule: f => featVal_(f, 'artifactory', 'bpPages') >= 40 },
+  { id: 'bp_daily', name: 'Daily Maker', icon: '📅', hint: 'Get ⭐ on 30 Blueprints of the Day', rule: f => featVal_(f, 'artifactory', 'bpDaily') >= 30 },
+  { id: 'af_remix', name: 'Remix Royalty', icon: '✨', hint: 'Remix 10 things in Artifactory', rule: f => featVal_(f, 'artifactory', 'remixes') >= 10 },
+  { id: 'gr_sound', name: 'Sound Explorer', icon: '🔊', hint: 'Find 30 letter sounds in GeoRead', rule: f => featVal_(f, 'georead', 'sounds') >= 30 },
+  { id: 'gr_wizard', name: 'Word Wizard', icon: '🧙', hint: 'Blend or build 100 words in GeoRead', rule: f => featVal_(f, 'georead', 'blends') + featVal_(f, 'georead', 'built') >= 100 },
+  { id: 'gr_story', name: 'Story Star', icon: '📖', hint: 'Read 10 stories in GeoRead', rule: f => featVal_(f, 'georead', 'stories') >= 10 },
+  { id: 'gr_journey', name: 'Word Kingdom Hero', icon: '👑', hint: 'Finish all 6 chapters of the Alphabet Road in GeoRead', rule: f => featVal_(f, 'georead', 'chapters') >= 6 },
+  { id: 'gs_scout', name: 'Number Scout', icon: '🔢', hint: 'Make 100 numbers in GeoScout 🧱 Count', rule: f => featVal_(f, 'geoscout', 'counts') >= 100 },
+  { id: 'gs_balance', name: 'Balance Master', icon: '⚖️', hint: 'Balance the scale 100 times in GeoScout', rule: f => featVal_(f, 'geoscout', 'balances') >= 100 },
+  { id: 'gs_tower', name: 'Tower Ace', icon: '🏗️', hint: 'Build 50 exact towers in GeoScout 🏗️ Wobble tower', rule: f => featVal_(f, 'geoscout', 'wobble') >= 50 },
+  { id: 'gs_story', name: 'Number Storyteller', icon: '📖', hint: 'Finish all 6 GeoScout 📖 Journey chapters', rule: f => featVal_(f, 'geoscout', 'journeys') >= 6 },
+  { id: 'bc_composer', name: 'Composer', icon: '🎼', hint: 'Make 3 songs in the BeatCorner 🎼 Song Maker', rule: f => featVal_(f, 'beat-piano', 'songsMade') >= 3 },
+  { id: 'bc_keys', name: 'Keyboard Kid', icon: '🎹', hint: 'Pass 5 🎹 Piano songs in BeatCorner', rule: f => featVal_(f, 'beat-piano', 'songs') >= 5 },
+  { id: 'bc_drums', name: 'Drum Hero', icon: '🥁', hint: 'Pass 5 🥁 Drums songs in BeatCorner', rule: f => featVal_(f, 'beat-drums', 'songs') >= 5 },
+  { id: 'bc_band', name: 'Band Leader', icon: '🎸', hint: 'Play 3 🎸 Band songs together in BeatCorner', rule: f => featVal_(f, 'beat-piano', 'bandSongs') + featVal_(f, 'beat-drums', 'bandSongs') >= 3 },
+  { id: 'wd_sage', name: 'Card Sage', icon: '🦉', hint: 'Win 200 cards in 🃏 WisDeck quizzes', rule: f => featVal_(f, 'wisdeck', 'cards') >= 200 },
+  { id: 'wd_count', name: 'Count Master', icon: '🔢', hint: 'Win 10 🔢 WisCount matches', rule: f => featVal_(f, 'wiscount', 'wins') >= 10 },
+  { id: 'wd_twenty', name: 'Twenty Hero', icon: '🎯', hint: 'Hit exactly 20 (or 21) 10 times in 🂡 WisJack', rule: f => featVal_(f, 'wisjack', 'exact') >= 10 },
+  { id: 'wd_cosmic', name: 'Cosmic Collector', icon: '🌌', hint: 'Grow a WisDeck card to 🌌 Cosmic (15 duplicates)', rule: f => featVal_(f, 'wisdeck', 'cosmic') >= 1 },
+  { id: 'ebr_master', name: 'Memory Master', icon: '🧠', hint: 'Remember a 12-digit number perfectly in Eyes Brain Riot', rule: f => featVal_(f, 'eyes-brain', 'longest') >= 12 },
+  { id: 'ebr_combo', name: 'Combo Riot', icon: '🔥', hint: 'Get a combo of 8 perfect rounds in Eyes Brain Riot', rule: f => featVal_(f, 'eyes-brain', 'bestCombo') >= 8 },
+  { id: 'ebr_echo', name: 'Echo Ears', icon: '👂', hint: '25 perfect 👂 Listen rounds in Eyes Brain Riot', rule: f => featVal_(f, 'eyes-brain', 'listenPerfects') >= 25 },
+  { id: 'ebr_back', name: 'Backwards Brain', icon: '🔁', hint: '25 perfect 🔁 Backwards rounds in Eyes Brain Riot', rule: f => featVal_(f, 'eyes-brain', 'backPerfects') >= 25 },
+  { id: 'pp_box', name: 'Box Boss', icon: '⬛', hint: 'Close 300 shapes in Polyplot', rule: f => featVal_(f, 'polyplot', 'boxes') >= 300 },
+  { id: 'pp_chain', name: 'Chain Champion', icon: '🔗', hint: 'Close 8 shapes in one turn in Polyplot', rule: f => featVal_(f, 'polyplot', 'bestChain') >= 8 },
+  { id: 'pp_catch', name: 'Creature Catcher', icon: '🪤', hint: 'Catch 100 creatures in Polyplot 🏹 Hunt', rule: f => featVal_(f, 'polyplot', 'catches') >= 100 },
+  { id: 'pp_master', name: 'Archinota Master', icon: '🌀', hint: 'Beat 💀 Hardcore in Polyplot', rule: (f, x) => (x.cleared['polyplot'] || 0) >= 6 },
+  { id: 'sb_boss', name: 'Bopper Boss', icon: '💣', hint: 'Win 20 Soul Bopper games', rule: f => featVal_(f, 'soul-bopper', 'wins') >= 20 },
+  { id: 'sb_chain', name: 'Chain Reactor', icon: '🔗', hint: 'Set off 50 chain pops in Soul Bopper', rule: f => featVal_(f, 'soul-bopper', 'chains') >= 50 },
+  { id: 'sb_comeback', name: 'Comeback Kid', icon: '👻', hint: 'Come back 10 times in Soul Bopper (👻 soul swap or 💩 edge throw)', rule: f => featVal_(f, 'soul-bopper', 'comebacks') >= 10 },
+  { id: 'sb_poo', name: 'Poo Commander', icon: '💩', hint: 'Win 5 💩 Classic Avatar games in Soul Bopper', rule: f => featVal_(f, 'soul-bopper', 'pooWins') >= 5 },
+  { id: 'ax_line', name: 'Line Master', icon: '〰️', hint: 'Make 50 lines of 3 in Alignext (Drop + Omnifile)', rule: f => featVal_(f, 'alignext', 'lines') + featVal_(f, 'omnifile', 'lines') >= 50 },
+  { id: 'ax_stack', name: 'Stack King', icon: '👑', hint: 'Cover 30 pieces in Alignext Omnifile Stack', rule: f => featVal_(f, 'omnifile', 'covers') >= 30 },
+  { id: 'ax_cards', name: 'Card Shark', icon: '🃏', hint: 'Play 25 skill cards in Alignext', rule: f => featVal_(f, 'alignext', 'cards') + featVal_(f, 'omnifile', 'cards') >= 25 },
+  { id: 'ax_gravity', name: 'Gravity Guru', icon: '🪜', hint: 'Flip the Drop stand upside down 5 times', rule: f => featVal_(f, 'alignext', 'flips') >= 5 },
+  { id: 'ax_legend', name: 'Alignext Legend', icon: '💀', hint: 'Beat 💀 Hardcore in Alignext Drop or Omnifile', rule: (f, x) => (x.cleared['alignext'] || 0) >= 6 || (x.cleared['omnifile'] || 0) >= 6 },
+  { id: 'sn_charmer', name: 'Snake Charmer', icon: '🐍', hint: 'Play 10 Snakize games (any mode)', rule: f => featVal_(f, 'snakeast', 'games') + featVal_(f, 'snakigate', 'games') + featVal_(f, 'snakastle', 'games') >= 10 },
+  { id: 'sn_feast', name: 'Feast Master', icon: '🍎', hint: 'Eat 500 food in Snakeast', rule: f => featVal_(f, 'snakeast', 'eaten') >= 500 },
+  { id: 'sn_slither', name: 'Slither King', icon: '👑', hint: 'Pop 25 snakes in Snakigate', rule: f => featVal_(f, 'snakigate', 'popped') >= 25 },
+  { id: 'sn_land', name: 'Land Lord', icon: '🏰', hint: 'Own 60 % of the map in Snakastle', rule: f => featVal_(f, 'snakastle', 'land') >= 60 },
+  { id: 'sn_tale', name: 'Tale Hero', icon: '📜', hint: 'Finish all 6 Snaketale chapters', rule: f => featVal_(f, 'snaketale', 'chapters') >= 6 },
+  { id: 'sn_legend', name: 'Snakize Legend', icon: '💀', hint: 'Beat 💀 Hardcore in any Snakize mode', rule: (f, x) => (x.cleared['snakeast'] || 0) >= 6 || (x.cleared['snakigate'] || 0) >= 6 || (x.cleared['snakastle'] || 0) >= 6 },
+  { id: 'bb_buddy', name: 'Bonk Buddy', icon: '🥊', hint: 'Win 10 Brawl Buddies fights', rule: f => featVal_(f, 'brawl-buddies', 'wins') >= 10 },
+  { id: 'bb_combo', name: 'Combo Captain', icon: '🔥', hint: 'Land a 10-hit combo in Brawl Buddies', rule: f => featVal_(f, 'brawl-buddies', 'combo') >= 10 },
+  { id: 'bb_sky', name: 'Sky Juggler', icon: '🌟', hint: 'Juggle your buddy 5 bounces in the air in Brawl Buddies', rule: f => featVal_(f, 'brawl-buddies', 'juggle') >= 5 },
+  { id: 'bb_perfect', name: 'Untouchable', icon: '✨', hint: 'Win a Brawl Buddies round without being bonked once', rule: f => featVal_(f, 'brawl-buddies', 'perfects') >= 1 },
+  { id: 'bb_legend', name: 'Brawl Legend', icon: '💀', hint: 'Beat 💀 Hardcore in Brawl Buddies', rule: (f, x) => (x.cleared['brawl-buddies'] || 0) >= 6 },
+  { id: 'bb_grapple', name: 'Grapple Master', icon: '🤼', hint: 'Land 25 grapples in Brawl Buddies', rule: f => featVal_(f, 'brawl-buddies', 'grabs') >= 25 },
+  { id: 'bb_tagteam', name: 'Tag Team Captain', icon: '🔁', hint: 'Tag your buddies in 25 times in Brawl Buddies', rule: f => featVal_(f, 'brawl-buddies', 'tags') >= 25 },
+  { id: 'bv_t1', name: 'Playground Protector', icon: '🛝', hint: 'Finish Brawenture Tale 1 — Playground Rumble', rule: f => featVal_(f, 'brawenture', 't1') >= 1 },
+  { id: 'bv_t2', name: 'Candy Guardian', icon: '🍭', hint: 'Finish Brawenture Tale 2 — Candy Factory Defense', rule: f => featVal_(f, 'brawenture', 't2') >= 1 },
+  { id: 'bv_t3', name: 'Castle Climber', icon: '🏰', hint: 'Finish Brawenture Tale 3 — Castle Climb', rule: f => featVal_(f, 'brawenture', 't3') >= 1 },
+  { id: 'bv_t4', name: 'Zombie Hugger', icon: '🧟', hint: 'Finish Brawenture Tale 4 — Zombie Crawl', rule: f => featVal_(f, 'brawenture', 't4') >= 1 },
+  { id: 'bv_t5', name: 'Town Defender', icon: '👾', hint: 'Finish Brawenture Tale 5 — Monster Outbreak', rule: f => featVal_(f, 'brawenture', 't5') >= 1 },
+  { id: 'bv_t6', name: 'Sea Rescuer', icon: '🧜', hint: 'Finish Brawenture Tale 6 — Undersea Rescue', rule: f => featVal_(f, 'brawenture', 't6') >= 1 },
+  { id: 'bv_hero', name: 'Family Hero', icon: '🦸', hint: 'Finish all 6 Brawenture tales', rule: f => ['t1', 't2', 't3', 't4', 't5', 't6'].every(k => featVal_(f, 'brawenture', k) >= 1) },
+  { id: 'pp_perfect', name: 'Perfect Poser', icon: '💯', hint: 'Get a 95% pose in Pose Party', rule: f => featVal_(f, 'pose-party', 'perfect') >= 1 },
+  { id: 'pp_speed', name: 'Lightning Poser', icon: '⚡', hint: 'Match 15 poses in one Pose Party Speed round', rule: f => featVal_(f, 'pose-party', 'speedBest') >= 15 },
+  { id: 'pp_star', name: 'Pose Superstar', icon: '🌟', hint: 'Match 150 poses in Pose Party', rule: f => featVal_(f, 'pose-party', 'poses') >= 150 },
+  { id: 'sb_rally', name: 'Rally Machine', icon: '🔁', hint: 'Keep a 25-hit rally going in SlaBrall', rule: f => featVal_(f, 'sla-brall', 'rally') >= 25 },
+  { id: 'sb_smash', name: 'Smash Captain', icon: '💥', hint: 'Hit 100 smashes in SlaBrall', rule: f => featVal_(f, 'sla-brall', 'smash') >= 100 },
+  { id: 'sb_allcourt', name: 'All-Court Ace', icon: '🏓', hint: 'Win a match in all 5 SlaBrall sports', rule: f => ['slashot', 'slapoof', 'slaball', 'slapong', 'slawall'].every(k => featVal_(f, 'sla-brall', 'win_' + k) >= 1) },
+  { id: 'sb_allcourt6', name: 'All-Court Legend', icon: '🏸', hint: 'Win a match in all 6 SlaBrall sports (with 🏸 SlaBam + the 🧱 squash room)', rule: f => ['slashot', 'slapoof', 'slaball', 'slapong', 'slabam', 'slawall'].every(k => featVal_(f, 'sla-brall', 'win_' + k) >= 1) },   // le-1 (the 5-sport All-Court Ace stays, nobody loses it)
+  { id: 'sb_skysmash', name: 'Sky Smasher', icon: '🦘', hint: 'Hit 10 PERFECT jump smashes in SlaBrall', rule: f => featVal_(f, 'sla-brall', 'jumpPerfect') >= 10 },
+  { id: 'sb_dive', name: 'Dive Master', icon: '🤸', hint: 'Make 10 dive saves in SlaBrall', rule: f => featVal_(f, 'sla-brall', 'diveSaves') >= 10 },
+  { id: 'sb_golden', name: 'Golden Racket', icon: '⭐', hint: 'Score 5 points with a Legendary Shot', rule: f => featVal_(f, 'sla-brall', 'legend') >= 5 },
+  { id: 'sb_champ', name: 'SlaBrall Champion', icon: '🏆', hint: 'Win a SlaBrall tournament', rule: f => featVal_(f, 'sla-brall', 'cups') >= 1 },
+  { id: 'sb_cups', name: 'Cup Collector', icon: '🥇', hint: 'Win 5 SlaBrall tournaments', rule: f => featVal_(f, 'sla-brall', 'cups') >= 5 },
+  { id: 'sci_rat', name: 'Lab Rat', icon: '🐀', hint: 'Run 10 tests in Sciencetory', rule: f => featVal_(f, 'sciencetory', 'tests') >= 10 },
+  { id: 'sci_pilot', name: 'Test Pilot', icon: '🧑‍✈️', hint: 'Try all 12 ⚙️ Mechanic tests in Sciencetory', rule: f => featVal_(f, 'sciencetory', 'testKinds') >= 12 },
+  { id: 'sci_super', name: 'Super Tester', icon: '🦸', hint: 'Try all 17 tests on your things in Sciencetory (12 strength + 5 science)', rule: f => featVal_(f, 'sciencetory', 'allKinds') >= 17 },   // 🧪 sc-4d
+  { id: 'sci_guess', name: 'Hypothesis Hero', icon: '🎯', hint: 'Guess 20 test results right in Sciencetory', rule: f => featVal_(f, 'sciencetory', 'right') >= 20 },
+  { id: 'sci_elem', name: 'Element Hunter', icon: '📇', hint: 'Collect 40 element cards in ⚗️ Sciencetory Chemistry', rule: f => featVal_(f, 'sciencetory', 'elements') >= 40 },   // ⚗️ sc-2a
+  { id: 'sci_mol', name: 'Molecule Maker', icon: '⚛️', hint: 'Build 20 different molecules in ⚗️ Sciencetory Chemistry', rule: f => featVal_(f, 'sciencetory', 'compounds') >= 20 },
+  { id: 'sci_atom', name: 'Atom Architect', icon: '⚛️', hint: 'Build 20 different atoms in ⚛️ Sciencetory Quantum', rule: f => featVal_(f, 'sciencetory', 'atoms') >= 20 },   // ⚛️ sc-2b
+  { id: 'sci_part', name: 'Particle Pro', icon: '🔬', hint: 'Collect all 17 particle cards in 🔬 Sciencetory Particle', rule: f => featVal_(f, 'sciencetory', 'particles') >= 17 },   // 🔬 sc-2d
+  { id: 'sci_heat', name: 'Heat Hero', icon: '🔥', hint: 'Finish 20 rounds in 🔥 Sciencetory Thermo', rule: f => featVal_(f, 'sciencetory', 'thermoRounds') >= 20 },   // 🔥 sc-3a
+  { id: 'sci_spark', name: 'Spark Scientist', icon: '⚡', hint: 'Finish 20 rounds in ⚡ Sciencetory Electro', rule: f => featVal_(f, 'sciencetory', 'electroRounds') >= 20 },   // ⚡ sc-3b
+  { id: 'sci_light', name: 'Light Bender', icon: '🌈', hint: 'Finish 20 rounds in 🌈 Sciencetory Optics', rule: f => featVal_(f, 'sciencetory', 'opticsRounds') >= 20 },   // 🌈 sc-3c
+  { id: 'sci_sound', name: 'Sound Sleuth', icon: '🔊', hint: 'Finish 20 rounds in 🔊 Sciencetory Acoustics', rule: f => featVal_(f, 'sciencetory', 'acousticsRounds') >= 20 },   // 🔊 sc-3d
+  { id: 'sci_rock', name: 'Rock Hound', icon: '🌍', hint: 'Finish 20 rounds in 🌍 Sciencetory Geo', rule: f => featVal_(f, 'sciencetory', 'geoRounds') >= 20 },   // 🌍 sc-4a
+  { id: 'sci_body', name: 'Body Boffin', icon: '🧬', hint: 'Finish 20 rounds in 🧬 Sciencetory Bio', rule: f => featVal_(f, 'sciencetory', 'bioRounds') >= 20 },   // 🧬 sc-4b
+  { id: 'sci_stars', name: 'Star Gazer', icon: '🌌', hint: 'Finish 20 rounds in 🌌 Sciencetory Cosmic', rule: f => featVal_(f, 'sciencetory', 'cosmicRounds') >= 20 },   // 🌌 sc-4c
+  { id: 'sci_machine', name: 'Machine Master', icon: '🏗️', hint: 'Finish 20 Lift it! rounds (levers + pulleys) in ⚙️ Sciencetory Mechanic', rule: f => featVal_(f, 'sciencetory', 'machineRounds') >= 20 },   // ⚙️ sc-4d2
+  { id: 'pk_eyes', name: 'Sharp Eyes', icon: '👀', hint: 'Find 50 differences in Pokadif', rule: f => featVal_(f, 'pokadif', 'found') >= 50 },
+  { id: 'pk_eagle', name: 'Eagle Eye', icon: '🦅', hint: 'Finish 10 Pokadif pictures with no oops and no hint', rule: f => featVal_(f, 'pokadif', 'perfect') >= 10 },
+  { id: 'pk_case', name: 'Case Closer', icon: '📁', hint: 'Solve 10 Pokadif cases', rule: f => featVal_(f, 'pokadif', 'cases') >= 10 },
+  { id: 'pk_odd', name: 'Odd Spotter', icon: '🎯', hint: 'Find 30 odd ones in Pokadif', rule: f => featVal_(f, 'pokadif', 'odd') >= 30 },
+  { id: 'pk_blink', name: 'Blink Master', icon: '👁️', hint: 'Find 30 changes in Pokadif Blink', rule: f => featVal_(f, 'pokadif', 'blinks') >= 30 },
+  { id: 'pk_arc', name: 'Speed Sleuth', icon: '📸', hint: 'Finish a 15-picture Pokadif speed run (🌋 or 💀)', rule: f => featVal_(f, 'pokadif-arcade', 'pictures') >= 15 },
+  { id: 'pk_cp', name: 'Checkpoint Champ', icon: '✅', hint: 'Reach 20 checkpoints in Pokadif Arcade', rule: f => featVal_(f, 'pokadif-arcade', 'checkpoints') >= 20 },
+  { id: 'pk_sleuth', name: 'Master Sleuth', icon: '🕵️', hint: 'Close all 3 Pokadif case books (🧲 🦖 🐙)', rule: f => featVal_(f, 'pokadif-case', 'casebook') >= 3 },
+  { id: 'pk_story', name: 'Case Cracker', icon: '📁', hint: 'Close a case in Pokadif Detective Adventure', rule: f => featVal_(f, 'pokadif-case', 'stories') >= 1 },
+  { id: 'pk_lesson', name: 'Little Scientist', icon: '🎓', hint: 'Collect 3 lesson cards in Pokadif Detective Adventure', rule: f => featVal_(f, 'pokadif-case', 'lessons') >= 3 },
+  { id: 'pk_quick', name: 'Lightning Lens', icon: '⚡', hint: 'Finish a Pokadif picture in 10 seconds', rule: f => { const q = featVal_(f, 'pokadif', 'quick'); return q > 0 && q <= 10; } },
+  { id: 'bo_boot', name: 'Golden Boot', icon: '⚽', hint: 'Score 50 goals in BlasOff', rule: f => featVal_(f, 'blasoff', 'goals') >= 50 },   // ⚽ bo-1
+  { id: 'bo_tricks', name: 'Trick Master', icon: '🌀', hint: 'Land 50 tricks in BlasOff', rule: f => featVal_(f, 'blasoff', 'tricks') >= 50 },
+  { id: 'bo_volley', name: 'Volley Hero', icon: '🎯', hint: 'Hit 10 volleys in BlasOff (Space, Space, then K or J)', rule: f => featVal_(f, 'blasoff', 'volleys') >= 10 },
+  { id: 'bo_voice', name: "Keeper's Voice", icon: '📣', hint: 'Shout your keeper to 10 saves in BlasOff', rule: f => featVal_(f, 'blasoff', 'shoutSaves') >= 10 },
+  { id: 'bo_nutmeg', name: 'Nutmeg King', icon: '🥜', hint: 'Nutmeg 10 players in BlasOff (L when one stands right in front of you)', rule: f => featVal_(f, 'blasoff', 'nutmegs') >= 10 },   // 🏙️ bo-2b
+  { id: 'bo_captain', name: 'Captain', icon: '👑', hint: 'Win a 👑 Family cup in BlasOff', rule: f => featVal_(f, 'blasoff', 'familyCups') >= 1 },   // 🏆 r4c
+  { id: 'bo_cupking', name: 'Cup King', icon: '🏆', hint: 'Win 3 knockout cups in BlasOff', rule: f => featVal_(f, 'blasoff', 'cups') >= 3 },
+  { id: 'bo_tale', name: 'Kick Tale Hero', icon: '📜', hint: 'Finish all 6 chapters of 📜 Kick Tale in BlasOff', rule: f => featVal_(f, 'blasoff', 'taleChapters') >= 6 },
+  { id: 'pd_ace', name: 'Ace Driver', icon: '🚀', hint: 'Serve 10 aces in PyraDive', rule: f => featVal_(f, 'pyraspike', 'aces') >= 10 },
+  { id: 'pd_dink', name: 'Ghost Dinker', icon: '🪶', hint: 'Set up 20 kills (assists) in PyraDive', rule: f => featVal_(f, 'pyraspike', 'assists') >= 20 },
+  { id: 'pd_dunk', name: 'Spirit Dunker', icon: '💥', hint: 'Score 25 kills in PyraDive', rule: f => featVal_(f, 'pyraspike', 'kills') >= 25 },
+  { id: 'pd_floor', name: 'Floor Guardian', icon: '🛡️', hint: 'Save 50 balls (digs + dives) in PyraDive', rule: f => featVal_(f, 'pyraspike', 'digs') >= 50 },
+  { id: 'pd_wall', name: 'Wall Titan', icon: '🧱', hint: 'Stuff-block 10 dunks in PyraDive', rule: f => featVal_(f, 'pyraspike', 'stuffs') >= 10 },
+  { id: 'pd_flame', name: 'Flame Starter', icon: '🔥', hint: 'Use 10 Pyra… moves in PyraDive', rule: f => featVal_(f, 'pyraspike', 'pyras') >= 10 },
+  { id: 'pd_rally', name: 'Rally King / Queen', icon: '🔁', hint: 'Keep a 20-touch rally going in PyraDive', rule: f => featVal_(f, 'pyraspike', 'rally') >= 20 },
+  { id: 'pd_trap', name: 'Sticky Feet', icon: '🦵', hint: 'Trap 30 balls in PyraStrike / PyraSpark', rule: f => featVal_(f, 'pyraspike', 'traps') >= 30 },
+  { id: 'pd_pop', name: 'Pop Star', icon: '⬆️', hint: 'Pop the ball up 30 times in PyraSpark', rule: f => featVal_(f, 'pyraspike', 'pops') >= 30 },
+  { id: 'pd_edge', name: 'Edge Lord', icon: '💥', hint: 'Hit 10 EDGE balls in PyraSpark', rule: f => featVal_(f, 'pyraspike', 'edges') >= 10 },
+  { id: 'pd_feed', name: 'Toss Buddy', icon: '🤲', hint: 'Feed your teammate 20 serves in PyraStrike', rule: f => featVal_(f, 'pyraspike', 'feeds') >= 20 },
+  { id: 'pd_hoop', name: 'Hoop Master', icon: '⭕', hint: 'Kick 15 balls through the hoop in Hoop Takraw', rule: f => featVal_(f, 'pyraspike', 'hoops') >= 15 },
+  { id: 'pd_juggle', name: 'Juggle Star', icon: '🤹', hint: 'Keep it up 20 times in a row in 🤹 Juggle', rule: f => featVal_(f, 'pyraspike', 'streak_juggle') >= 20 },
+  { id: 'pd_set', name: 'Sky Setter', icon: '🙌', hint: 'Set 50 balls in PyraDive', rule: f => featVal_(f, 'pyraspike', 'sets') >= 50 },
+  { id: 'pd_bump', name: 'Perfect Passer', icon: '🤚', hint: 'Bump 50 balls in PyraSpike', rule: f => featVal_(f, 'pyraspike', 'bumps') >= 50 },
+  { id: 'pd_dive', name: 'PyraDiver', icon: '🤸', hint: 'Make 15 diving saves in PyraDive', rule: f => featVal_(f, 'pyraspike', 'dives') >= 15 },
+  { id: 'pd_spirit', name: 'Spirit Diver', icon: '🔥', hint: 'Call 5 creatures with a Spirit Dive', rule: f => featVal_(f, 'pyraspike', 'spirits') >= 5 },
+  { id: 'pd_duo', name: 'Duo Spirit', icon: '🔥🔥', hint: 'Win 3 Spirit Duo Dives with a teammate', rule: f => featVal_(f, 'pyraspike', 'duos') >= 3 },
+  { id: 'pd_trio', name: 'Trio Legend', icon: '🔥🔥🔥', hint: 'Make 2 Spirit Trio Dives with your team', rule: f => featVal_(f, 'pyraspike', 'trios') >= 2 },
+  { id: 'pd_beast', name: 'Beast Keeper', icon: '📖', hint: 'Find 25 creatures for your Spirit Bestiary', rule: f => featVal_(f, 'pyraspike', 'beasts') >= 25 },
+  { id: 'pd_master', name: 'Spirit Master', icon: '🐉', hint: 'Find all 50 creatures of the Spirit Bestiary', rule: f => featVal_(f, 'pyraspike', 'beasts') >= 50 },
+  { id: 'pd_champ', name: 'PyraChamp', icon: '🏆', hint: 'Win a PyraDive cup', rule: f => featVal_(f, 'pyraspike', 'cups') >= 1 },
+  { id: 'pd_captain', name: 'Captain Flame', icon: '👑', hint: 'Win the 👑 Family Cup in PyraDive', rule: f => featVal_(f, 'pyraspike', 'familyCups') >= 1 },
+  { id: 'newcomer', name: 'Newcomer', icon: '🌱', hint: 'Everyone starts here', rule: () => true },
+  { id: 'pb_jackpot', name: 'Jackpot Hunter', icon: '🎰', hint: 'Hit a Pinball jackpot', rule: f => featVal_(f, 'pinball', 'jackpots') >= 1 },
+  { id: 'pb_royal', name: 'Jackpot Royalty', icon: '💰', hint: 'Hit 5 Pinball jackpots', rule: f => featVal_(f, 'pinball', 'jackpots') >= 5 },
+  { id: 'pb_inferno', name: 'Combo Inferno', icon: '🔥', hint: 'Reach a ×10 combo (35 shots) in Pinball', rule: f => featVal_(f, 'pinball', 'maxCombo') >= 35 },
+  { id: 'pb_multi', name: 'Multiball Maniac', icon: '🎱', hint: 'Start 10 multiballs', rule: f => featVal_(f, 'pinball', 'multiballs') >= 10 },
+  { id: 'pb_realms', name: 'Ringmaster of Realms', icon: '🎪', hint: 'Visit all 3 Pinball bonus scenes', rule: f => featVal_(f, 'pinball', 'scene_carnival') >= 1 && featVal_(f, 'pinball', 'scene_castle') >= 1 && featVal_(f, 'pinball', 'scene_space') >= 1 },
+  { id: 'pb_sharp', name: 'Sharpshooter', icon: '🎯', hint: 'Make 10 Pinball skill shots', rule: f => featVal_(f, 'pinball', 'skills') >= 10 },
+  { id: 'pb_wizard', name: 'Pinball Wizard', icon: '🧙', hint: 'Score 100,000 in one Pinball game', rule: f => featVal_(f, 'pinball', 'topScore') >= 100000 },
+  { id: 'hp_dodge', name: 'Dodge Master', icon: '😱', hint: 'Make 25 close calls in Dodgy Hopper', rule: f => featVal_(f, 'hopper', 'nearMiss') >= 25 },
+  { id: 'hp_far', name: 'Marathon Hopper', icon: '🐸', hint: 'Hop 150 rows in one Dodgy Hopper game', rule: f => featVal_(f, 'hopper', 'bestRows') >= 150 },
+  { id: 'hp_champ', name: 'Hopper Champion', icon: '👑', hint: 'Clear Dodgy Hopper Extreme', rule: (f, x) => x.cleared.hopper >= 5 },
+  { id: 'tt_drift', name: 'Drift King', icon: '🌀', hint: 'Drift for 60 seconds in Turbo Trail', rule: f => featVal_(f, 'turbo', 'drift') >= 60 },
+  { id: 'tt_rocket', name: 'Ramp Rocket', icon: '🦘', hint: 'Jump 30 times in Turbo Trail', rule: f => featVal_(f, 'turbo', 'jumps') >= 30 },
+  { id: 'tt_champ', name: 'Turbo Champion', icon: '🏆', hint: 'Win the Extreme Turbo Trail race', rule: (f, x) => x.cleared.turbo >= 5 },
+  { id: 'mm_elephant', name: 'Elephant Memory', icon: '🐘', hint: 'Finish 5 Memories Match boards with no misses', rule: f => featVal_(f, 'memory', 'perfect') >= 5 },
+  { id: 'mm_streak', name: 'Streak Star', icon: '🔥', hint: 'Match 8 pairs in a row in Memories Match', rule: f => featVal_(f, 'memory', 'bestStreak') >= 8 },
+  { id: 'mm_master', name: 'Memory Master', icon: '🧠', hint: 'Finish Memories Match Extreme', rule: (f, x) => x.cleared.memory >= 5 },
+  { id: 'ws_master', name: 'Master Builder', icon: '🔨', hint: 'Build 10 things in the Furniture Workshop', rule: f => featVal_(f, 'workshop', 'made') >= 10 },
+  { id: 'ws_fav', name: 'Crowd Favourite', icon: '🌟', hint: 'Get 8 stars on one thing in the Design Show', rule: f => featVal_(f, 'workshop', 'topStars') >= 8 },
+  { id: 'ws_judge', name: 'Fair Judge', icon: '🗳️', hint: 'Vote for 15 things in the Design Show', rule: f => featVal_(f, 'workshop', 'votes') >= 15 },
+  { id: 'pb_buddy', name: 'Best Buddies', icon: '🐒', hint: 'Fill your Pinball buddy meter 5 times', rule: f => featVal_(f, 'pinball', 'buddy') >= 5 },
+  { id: 'ck_triple', name: 'Triple Hopper', icon: '🦘', hint: 'Make a triple jump in Checkers', rule: f => featVal_(f, 'checkers', 'triples') >= 1 || featVal_(f, 'checkers', 'megas') >= 1 },
+  { id: 'ck_mega', name: 'Mega Leaper', icon: '⚡', hint: 'Make a MEGA jump (4+) in Checkers', rule: f => featVal_(f, 'checkers', 'megas') >= 1 },
+  { id: 'ck_hop', name: 'Hop Legend', icon: '🐸', hint: 'Make 25 double jumps in Checkers', rule: f => featVal_(f, 'checkers', 'doubles') >= 25 },
+  { id: 'ck_kingmaker', name: 'Kingmaker', icon: '👑', hint: 'Crown 20 Kings in Checkers', rule: f => featVal_(f, 'checkers', 'kings') >= 20 },
+  { id: 'ck_champ', name: 'Checkers Champion', icon: '🏆', hint: 'Beat the Extreme Checkers bot', rule: (f, x) => x.cleared.checkers >= 5 },
+  { id: 'cs_kid', name: 'Checkmate Kid', icon: '♚', hint: 'Checkmate a Chess bot', rule: f => featVal_(f, 'chess', 'mates') >= 1 },
+  { id: 'cs_fork', name: 'Fork Master', icon: '🍴', hint: 'Make 10 forks in Chess', rule: f => featVal_(f, 'chess', 'forks') >= 10 },
+  { id: 'cs_castle', name: 'Castle Keeper', icon: '🏰', hint: 'Castle 10 times in Chess', rule: f => featVal_(f, 'chess', 'castles') >= 10 },
+  { id: 'cs_pawn', name: 'Pawn Whisperer', icon: '✨', hint: 'Promote 5 pawns in Chess', rule: f => featVal_(f, 'chess', 'promos') >= 5 },
+  { id: 'cs_ninja', name: 'En Passant Ninja', icon: '🥷', hint: 'Take a pawn en passant', rule: f => featVal_(f, 'chess', 'enpassant') >= 1 },
+  { id: 'cs_lightning', name: 'Lightning Mate', icon: '⚡', hint: 'Checkmate in under 20 moves', rule: f => featVal_(f, 'chess', 'fastMate') > 0 && featVal_(f, 'chess', 'fastMate') < 20 },
+  { id: 'cs_gm', name: 'Grandmaster in Training', icon: '🧠', hint: 'Beat the Grand Bot (Chess Extreme)', rule: (f, x) => x.cleared.chess >= 5 },
+  { id: 'all_round', name: 'All-Rounder', icon: '🌈', hint: 'Earn a badge in every big game', rule: (f, x) => x.allRound },
+  { id: 'record', name: 'Record Breaker', icon: '🏅', hint: 'Hold a family record in any game', rule: (f, x) => x.record },
+  { id: 'hc_first', name: 'Hardcore Hero', icon: '💀', hint: 'Beat a 💀 Hardcore level in any main game', rule: (f, x) => Object.keys(x.cleared).some(g => x.cleared[g] >= 6) },
+  { id: 'hc_three', name: 'Unbreakable', icon: '🛡️', hint: 'Beat 💀 Hardcore in 3 different games', rule: (f, x) => Object.keys(x.cleared).filter(g => x.cleared[g] >= 6).length >= 3 },
+  { id: 'hc_all', name: 'Legend of the Playground', icon: '🌋', hint: 'Beat 💀 Hardcore in 10 different main games', rule: (f, x) => Object.keys(x.cleared).filter(g => x.cleared[g] >= 6).length >= 10 },
+  { id: 'mq_whiz', name: 'Number Whiz', icon: '🧮', hint: 'Get 250 Math Quest answers right', rule: f => featVal_(f, 'math-quest', 'correct') >= 250 },
+  { id: 'mq_streak', name: 'Streak Master', icon: '🔥', hint: 'Answer 15 Math Quest questions in a row', rule: f => featVal_(f, 'math-quest', 'bestStreak') >= 15 },
+  { id: 'mq_champ', name: 'Math Champion', icon: '🏅', hint: 'Pass Math Quest Extreme', rule: (f, x) => (x.cleared['math-quest'] || 0) >= 5 },
+  { id: 'mq_words', name: 'Word Wizard', icon: '🔤', hint: 'Get 100 Math Quest Word Sums right', rule: f => featVal_(f, 'math-quest', 'wordRight') >= 100 },   // ➗ mq-w1
+  { id: 'mq_thai', name: 'Thai Number Reader', icon: '🐘', hint: 'Get 100 Math Quest เลขคำไทย sums right', rule: f => featVal_(f, 'math-quest', 'thaiRight') >= 100 },   // ➗ mq-w1
+  { id: 'mq_typer', name: 'Pad Pro', icon: '⌨️', hint: 'Type 100 right answers on the Math Quest number pad', rule: f => featVal_(f, 'math-quest', 'typedRight') >= 100 },   // ➗ mq-w1
+  { id: 'mq_story', name: 'Story Solver', icon: '📖', hint: 'Solve 50 Math Quest story problems (📖 English or 📜 ไทย)', rule: f => featVal_(f, 'math-quest', 'storyRight') >= 50 },   // ➗ mq-w2
+  { id: 'mq_trick', name: 'Trick Spotter', icon: '🕵️', hint: 'Spot 25 Math Quest trick questions (🤔 English or 🙃 ไทย)', rule: f => featVal_(f, 'math-quest', 'trickRight') >= 25 },   // ➗ mq-w3
+  { id: 'mq_test', name: 'Test Ace', icon: '📝', hint: 'Get 50 Math Quest test questions right (📝 Test Practice or 📝 ข้อสอบ)', rule: f => featVal_(f, 'math-quest', 'testRight') >= 50 },   // ➗ mq-t1
+  { id: 'mq_detective', name: 'Maths Detective', icon: '🔍', hint: 'Find 25 mistakes in Math Quest 🔍 Find the mistake', rule: f => featVal_(f, 'math-quest', 'fixRight') >= 25 },   // ➗ mq-w4
+  { id: 'mq_ears', name: 'Sharp Ears', icon: '🎧', hint: 'Get 50 Math Quest sums right just by listening (🎧 Listen or 👂 ฟังโจทย์)', rule: f => featVal_(f, 'math-quest', 'listenRight') >= 50 },   // ➗ mq-w5
+];
+
+/* ============ 📏 PP_THEMES_ · SNAKE_WORLDS_ · SNAKE_GAMES_ + their hidden FEAT_DEFS rows (from Code.gs) ============ */
+// 🐍 Snakize skins (plan 11y round 4): per-world evolution from hidden per-world feats, summed over the 3 boards.
+// ⬛ Polyplot 📖 field journal: jc_<theme> = field types caught there (calm, energetic, lazy, enraged + any hidden one = 5 → that theme's 🐾 pet)
+const PP_THEMES_ = ['dino', 'sea', 'dance', 'robot', 'space', 'sky', 'hunter'];
+PP_THEMES_.forEach(t => { FEAT_DEFS['polyplot']['jc_' + t] = { name: 'Journal ' + t, icon: '📖', kind: 'max', hidden: true }; FEAT_DEFS['polyplot']['jt_' + t] = { name: 'Caught in ' + t, icon: '📖', kind: 'max', hidden: true }; });
+const SNAKE_WORLDS_ = ['dino', 'sea', 'dance', 'robot', 'space', 'sky'];
+const SNAKE_GAMES_ = ['snakeast', 'snakigate', 'snakastle'];
+SNAKE_GAMES_.forEach(g => SNAKE_WORLDS_.forEach(w => {
+  FEAT_DEFS[g]['g_' + w] = { name: 'Games in ' + w, icon: '🎮', kind: 'sum', hidden: true };
+  FEAT_DEFS[g]['f_' + w] = { name: 'Food in ' + w, icon: '🍎', kind: 'sum', hidden: true };
+  FEAT_DEFS[g]['l_' + w] = { name: 'Longest in ' + w, icon: '🐍', kind: 'max', hidden: true };
+  FEAT_DEFS[g]['w_' + w] = { name: 'Best win in ' + w, icon: '🏆', kind: 'max', hidden: true };
+}));
+
+/* ============ 📏 SNAKE_STEP_RULES_ · SNAKE_STEP_HOW_ · SNAKE_TYPE_RULES_ (from Code.gs) ============ */
+// steps per world: 0 Plain (free) · 1 Pattern (5 games) · 2 Light stripes (300 food) · 3 Armor (win Hard) · 4 Fuel (length 60) · 5 Glow (win Extreme) · 6 Shadow (win Hardcore)
+const SNAKE_STEP_RULES_ = [() => true, (f, w) => snakeFeat_(f, 'g_' + w) >= 5, (f, w) => snakeFeat_(f, 'f_' + w) >= 300, (f, w) => snakeFeat_(f, 'w_' + w, 'max') >= 4, (f, w) => snakeFeat_(f, 'l_' + w, 'max') >= 60, (f, w) => snakeFeat_(f, 'w_' + w, 'max') >= 5, (f, w) => snakeFeat_(f, 'w_' + w, 'max') >= 6];
+const SNAKE_STEP_HOW_ = ['Free', 'Play 5 games in this world', 'Eat 300 food in this world', 'Win a Hard level in this world', 'Grow to 60 long in this world', 'Win an Extreme level in this world', 'Win 💀 Hardcore in this world'];
+const SNAKE_TYPE_RULES_ = [
+  ['garden', 'Free', () => true],
+  ['python', 'Play 10 Snakize games', f => snakeFeat_(f, 'games') >= 10],
+  ['rattle', 'Use 20 skills', f => snakeFeat_(f, 'skills') >= 20],
+  ['cobra', 'Eat 20 golden food in Snakeast', f => featVal_(f, 'snakeast', 'golds') >= 20],
+  ['anaconda', 'Grow to 40 long', f => snakeFeat_(f, 'longest', 'max') >= 40],
+  ['viper', 'Pop 5 snakes in Snakigate', f => featVal_(f, 'snakigate', 'popped') >= 5],
+  ['seasnake', 'Own 40 % land in Snakastle', f => featVal_(f, 'snakastle', 'land') >= 40],
+  ['coral', 'Win 3 family duels', f => snakeFeat_(f, 'duelWins') >= 3],
+  ['boa', 'Win a Hard level in any Snakize mode', f => SNAKE_WORLDS_.some(w => snakeFeat_(f, 'w_' + w, 'max') >= 4)],
+  ['titanoboa', 'Finish Snaketale chapter 1 (🦖)', f => featVal_(f, 'snaketale', 'chapters') >= 1],
+  ['seaserpent', 'Finish Snaketale chapter 2 (🐙)', f => featVal_(f, 'snaketale', 'chapters') >= 2],
+  ['conga', 'Finish Snaketale chapter 3 (🪩)', f => featVal_(f, 'snaketale', 'chapters') >= 3],
+  ['mecha', 'Finish Snaketale chapter 4 (🤖)', f => featVal_(f, 'snaketale', 'chapters') >= 4],
+  ['comet', 'Finish Snaketale chapter 5 (🪐)', f => featVal_(f, 'snaketale', 'chapters') >= 5],
+  ['feather', 'Finish Snaketale chapter 6 (☁️)', f => featVal_(f, 'snaketale', 'chapters') >= 6]
+];
+
+/* ============ 📏 W_ (from Code.gs) ============ */
+const W_ = {
+  lvl: (g, n, label) => ({ how: 'Pass ' + label + ' ' + MAZE_LEVEL_NAMES[n - 1], r: x => (x.cleared[g] || 0) >= n }),
+  mini: (g, n, label) => ({ how: 'Reach ' + label + ' stage ' + (n + 1), r: x => (x.mini[g] || 0) >= n }),
+  score: (g, n, label) => ({ how: 'Score ' + Number(n).toLocaleString() + ' in ' + label, r: x => (x.best[g] ? x.best[g].score : 0) >= n }),
+  time: (g, s, label) => ({ how: 'Finish ' + label + ' in under ' + Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2), r: x => x.best[g] && x.best[g].time > 0 && x.best[g].time <= s }),
+  feat: (g, s, n, how) => ({ how: how, r: x => featVal_(x.f, g, s) >= n }),
+  total: n => ({ how: 'Pass ' + n + ' levels in any games', r: x => x.levels >= n }),
+  miles: n => ({ how: 'Reach ' + n + ' 🐾 Adventure miles', r: x => (x.miles || 0) >= n }),
+  hardcore: n => ({ how: 'Beat ' + n + ' 💀 Hardcore level' + (n > 1 ? 's' : '') + ' (any games)', r: x => (x.hardcores || 0) >= n }),
+  extreme: n => ({ how: 'Pass ' + n + ' Extreme level' + (n > 1 ? 's' : '') + ' (any games)', r: x => x.extremes >= n }),
+  badges: n => ({ how: 'Earn ' + n + ' badges', r: x => x.badges >= n }),
+  titles: n => ({ how: 'Earn ' + n + ' Title' + (n > 1 ? 's' : ''), r: x => x.titles >= n }),
+  days: n => ({ how: 'Play on ' + n + ' different days', r: x => x.days >= n }),
+};
+
+/* ============ 📏 ITEM_LINES (from Code.gs) ============ */
+const ITEM_LINES = [
+  // 🔢 GeoScout + ➗ Algebros number looks (looks only; NumberSkins.html draws them; picked per player sp_numberskin:<Name>; Journey chapters unlock them too)
+  { id: 'numberskin', name: 'Number looks', icon: '🎨', slot: 'numberskin', game: 'geoscout', soon: 'Used on 🔢 GeoScout number blocks AND ➗ Algebros tiles — pick it on their menus', steps: ['Candy Pops', 'Mini Monsters', 'Pixel Pals', 'Gem Stones', 'Lava Rocks', 'Royal Gold'],
+    ways: [W_.feat('geoscout', 'snaps', 20, 'Snap 20 blocks together in GeoScout'), W_.feat('number-board', 'equations', 20, 'Make 20 number sentences in Algebros'), W_.feat('geoscout', 'balances', 20, 'Balance the scale 20 times in GeoScout'),
+      W_.feat('geoscout', 'counts', 50, 'Make 50 numbers in GeoScout'), W_.feat('number-board', 'equations', 100, 'Make 100 number sentences in Algebros'), W_.feat('geoscout', 'battleWins', 5, 'Win 5 GeoScout Tower battles')] },
+  // 🔤 GeoRead + Lettercraft letter looks (looks only; LetterSkins.html draws them; picked per player sp_letterskin:<Name>)
+  { id: 'letterskin', name: 'Letter looks', icon: '🎨', slot: 'letterskin', game: 'georead', soon: 'Used on 🔤 GeoRead letter boxes AND 🔤 Lettercraft tiles — pick it on their menus', steps: ['Candy', 'Wood blocks', 'Jelly', 'Galaxy', 'Gold', 'Rainbow'],
+    ways: [W_.feat('georead', 'blends', 20, 'Blend 20 words in GeoRead'), W_.feat('word-board', 'words', 20, 'Make 20 words in Lettercraft'), W_.feat('georead', 'built', 20, 'Build 20 words in GeoRead'),
+      W_.feat('georead', 'stories', 5, 'Read 5 GeoRead stories'), W_.feat('word-board', 'words', 100, 'Make 100 words in Lettercraft'), W_.feat('georead', 'sounds', 40, 'Find 40 letter sounds in GeoRead')] },
+  // 🂠 WisDeck card backs (looks only; the best one you own is the back of your face-down cards; painted by drawWisBack in WisDeck + Collection)
+  { id: 'wdback', name: 'Card backs', icon: '🂠', slot: 'wdback', game: 'wisdeck', soon: 'Used in 🃏 WisDeck — the back of your face-down cards', steps: ['Night owl', 'Jungle', 'Deep sea', 'Lava', 'Candy', 'Galaxy', 'Golden', 'Rainbow'],
+    ways: [W_.feat('wisdeck', 'cards', 10, 'Win 10 WisDeck cards'), W_.feat('wisdeck', 'right', 50, '50 right quiz answers'), W_.feat('wisdeck', 'daily', 3, 'Play 3 📅 daily decks'), W_.feat('wiscount', 'wins', 3, 'Win 3 🔢 WisCount matches'),
+      W_.feat('wisjack', 'wins', 3, 'Win 3 🂡 WisJack matches'), W_.feat('wisdeck', 'buzzWins', 2, 'Win 2 🔔 WisBuzz games'), W_.feat('wisdeck', 'fullCats', 1, 'Fill a whole category 🎓'), W_.feat('wisdeck', 'cards', 300, 'Win 300 WisDeck cards')] },
+  // 🎓 WisDeck professor costume: one step per full category in the 📖 deck book (drawn in AvatarKit costumeLook 'professor'; the quiz podium borrows step 2)
+  { id: 'professor', name: 'Professor', icon: '🎓', slot: 'costume', game: 'wisdeck', steps: ['Mortarboard', 'Professor gown', 'Book of facts', 'Golden owl pin', 'Grand professor'],
+    ways: [[1, 'Fill 1 WisDeck category (all its cards)'], [2, 'Fill 2 WisDeck categories'], [3, 'Fill 3 WisDeck categories'], [5, 'Fill 5 WisDeck categories'], [8, 'Fill 8 WisDeck categories']].map(w => W_.feat('wisdeck', 'fullCats', w[0], w[1])) },
+  // 👀🧠 Eyes Brain Riot keypad skins (looks only; picked per device sp_eyesbrain_pad:<Name>; the page + Collection draw them from EBR_PADS)
+  { id: 'ebrpad', name: 'Brain keypads', icon: '🔢', slot: 'ebrpad', game: 'eyes-brain', soon: 'Used in 👀🧠 Eyes Brain Riot — pick your keypad on the level screen', steps: ['Candy', 'Wood blocks', 'Lava stone', 'Ice', 'Neon', 'Jelly', 'Galaxy', 'Gold', 'Rainbow', 'Crystal'],
+    ways: [W_.feat('eyes-brain', 'games', 3, 'Play 3 Eyes Brain Riot games'), W_.feat('eyes-brain', 'digits', 100, 'Remember 100 digits'), W_.feat('eyes-brain', 'perfects', 10, '10 perfect rounds'), W_.feat('eyes-brain', 'bestCombo', 4, 'A 🔥 combo of 4'),
+      W_.feat('eyes-brain', 'riots', 2, '2 🧠 brain riots'), W_.feat('eyes-brain', 'challenge', 8, '🏔️ Challenge: remember 8 digits'), W_.feat('eyes-brain', 'daily', 3, 'Play 3 🎯 daily family numbers'), W_.feat('eyes-brain', 'digits', 1000, 'Remember 1,000 digits'),
+      W_.lvl('eyes-brain', 4, 'Eyes Brain Riot'), W_.feat('eyes-brain', 'longest', 12, '🏅 Brain level 12 (a 12-digit number, perfect)')] },
+  // ⬛ Polyplot line trails (looks only, picked per device sp_polyplot_trail:<Name>, painted by AvatarKit drawPolyTrail) + 🐾 one journal pet per theme (catch its 5 field types)
+  { id: 'polytrail', name: 'Line trails', icon: '🖍️', slot: 'polytrail', game: 'polyplot', soon: 'Used in ⬛ Polyplot — pick your trail in the setup', steps: ['Rainbow chalk', 'Glow paint', 'Lava line', 'Ocean wave', 'Vine rope', 'Star dust', 'Zebra stripes', 'Neon pulse', 'Gold leaf', 'Prism'],
+    ways: [W_.feat('polyplot', 'games', 3, 'Play 3 Polyplot games'), W_.feat('polyplot', 'boxes', 50, 'Close 50 shapes in Polyplot'), W_.feat('polyplot', 'wins', 3, 'Win 3 Polyplot games'), W_.feat('polyplot', 'chains3', 5, 'Close 3+ shapes in one turn 5 times'), W_.feat('polyplot', 'catches', 20, 'Catch 20 creatures in 🏹 Hunt'),
+      W_.feat('polyplot', 'coins', 100, 'Collect 100 coins in Polyplot'), W_.feat('polyplot', 'built', 10, 'Build 10 things in 🏰 Fortiplot'), W_.feat('polyplot', 'bestWave', 10, 'Hold 10 waves in 🛡️ co-op'), W_.feat('polyplot', 'hidden', 3, 'Find 3 hidden creatures'), W_.lvl('polyplot', 5, 'Polyplot')] },
+  { id: 'pppet_dino', name: 'Dino journal pet', icon: '🦕', slot: 'pet', game: 'polyplot', computed: true, steps: ['Leafy Longneck egg', 'Leafy Longneck', 'Leafy Longneck champion'], ways: [W_.feat('polyplot', 'jc_dino', 3, 'Polyplot 📖 🦖 Dino journal: catch 3 field creature types (egg)'), W_.feat('polyplot', 'jc_dino', 5, 'Polyplot 📖 🦖 Dino journal: the 4 field creatures + a hidden one'), W_.feat('polyplot', 'jt_dino', 25, 'Catch 25 creatures in 🦖 Dino (Polyplot)')] },
+  { id: 'pppet_sea', name: 'Aquarium journal pet', icon: '🐢', slot: 'pet', game: 'polyplot', computed: true, steps: ['Shelly Turtle egg', 'Shelly Turtle', 'Shelly Turtle champion'], ways: [W_.feat('polyplot', 'jc_sea', 3, 'Polyplot 📖 🐙 Aquarium journal: catch 3 field creature types (egg)'), W_.feat('polyplot', 'jc_sea', 5, 'Polyplot 📖 🐙 Aquarium journal: the 4 field creatures + a hidden one'), W_.feat('polyplot', 'jt_sea', 25, 'Catch 25 creatures in 🐙 Aquarium (Polyplot)')] },
+  { id: 'pppet_dance', name: 'Dance Hall journal pet', icon: '🦩', slot: 'pet', game: 'polyplot', computed: true, steps: ['Disco Flamingo egg', 'Disco Flamingo', 'Disco Flamingo champion'], ways: [W_.feat('polyplot', 'jc_dance', 3, 'Polyplot 📖 🪩 Dance Hall journal: catch 3 field creature types (egg)'), W_.feat('polyplot', 'jc_dance', 5, 'Polyplot 📖 🪩 Dance Hall journal: the 4 field creatures + a hidden one'), W_.feat('polyplot', 'jt_dance', 25, 'Catch 25 creatures in 🪩 Dance Hall (Polyplot)')] },
+  { id: 'pppet_robot', name: 'Robot Time journal pet', icon: '🐌', slot: 'pet', game: 'polyplot', computed: true, steps: ['Gear Snail egg', 'Gear Snail', 'Gear Snail champion'], ways: [W_.feat('polyplot', 'jc_robot', 3, 'Polyplot 📖 🤖 Robot Time journal: catch 3 field creature types (egg)'), W_.feat('polyplot', 'jc_robot', 5, 'Polyplot 📖 🤖 Robot Time journal: the 4 field creatures + a hidden one'), W_.feat('polyplot', 'jt_robot', 25, 'Catch 25 creatures in 🤖 Robot Time (Polyplot)')] },
+  { id: 'pppet_space', name: 'Space journal pet', icon: '🦄', slot: 'pet', game: 'polyplot', computed: true, steps: ['Star Pony egg', 'Star Pony', 'Star Pony champion'], ways: [W_.feat('polyplot', 'jc_space', 3, 'Polyplot 📖 🪐 Space journal: catch 3 field creature types (egg)'), W_.feat('polyplot', 'jc_space', 5, 'Polyplot 📖 🪐 Space journal: the 4 field creatures + a hidden one'), W_.feat('polyplot', 'jt_space', 25, 'Catch 25 creatures in 🪐 Space (Polyplot)')] },
+  { id: 'pppet_sky', name: 'Sky Temple journal pet', icon: '🕊️', slot: 'pet', game: 'polyplot', computed: true, steps: ['Cloud Dove egg', 'Cloud Dove', 'Cloud Dove champion'], ways: [W_.feat('polyplot', 'jc_sky', 3, 'Polyplot 📖 ☁️ Sky Temple journal: catch 3 field creature types (egg)'), W_.feat('polyplot', 'jc_sky', 5, 'Polyplot 📖 ☁️ Sky Temple journal: the 4 field creatures + a hidden one'), W_.feat('polyplot', 'jt_sky', 25, 'Catch 25 creatures in ☁️ Sky Temple (Polyplot)')] },
+  { id: 'pppet_hunter', name: 'Monster Hunter journal pet', icon: '🦌', slot: 'pet', game: 'polyplot', computed: true, steps: ['Forest Deer egg', 'Forest Deer', 'Forest Deer champion'], ways: [W_.feat('polyplot', 'jc_hunter', 3, 'Polyplot 📖 🏹 Monster Hunter journal: catch 3 field creature types (egg)'), W_.feat('polyplot', 'jc_hunter', 5, 'Polyplot 📖 🏹 Monster Hunter journal: the 4 field creatures + a hidden one'), W_.feat('polyplot', 'jt_hunter', 25, 'Catch 25 creatures in 🏹 Monster Hunter (Polyplot)')] },
+  { id: 'explorer', name: 'Explorer', icon: '🧭', slot: 'costume', game: 'maze', steps: ['Safari hat', 'Explorer backpack', 'Binoculars', 'Torch', 'Jungle explorer outfit'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('maze', n, 'Maze')) },
+  { id: 'builder', name: 'Builder', icon: '⛑️', slot: 'costume', game: 'stacking-sim', steps: ['Hard hat', 'Tool belt', 'Hammer', 'Hi-vis vest', 'Master builder'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('stacking-sim', n, 'Stack It!')) },
+  { id: 'robot', name: 'Robot buddy', icon: '🤖', slot: 'pet', game: 'robot-adventure', steps: ['Tiny bot', 'Rolling bot', 'Drone', 'Robo-dog', 'Mech buddy'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('robot-adventure', n, 'Code the Robot')).concat([1, 2, 3, 4].map(n => W_.mini('code-robot', n, 'mini Code the Robot'))) },
+  { id: 'checkers', name: 'Checkers style', icon: '🔴', slot: 'costume', game: 'checkers', steps: ['Checker hat', 'Checker shirt', 'Checker pants', 'Checkerboard', 'King of the board'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('checkers', n, 'Checkers')) },
+  { id: 'chesspillow', name: 'Chess pillows', icon: '♟️', slot: 'hand', game: 'chess', steps: ['Pawn pillow', 'Knight pillow', 'Bishop pillow', 'Rook pillow', 'Queen pillow', 'King pillow'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('chess', n, 'Chess')).concat([W_.feat('chess', 'mates', 1, 'Checkmate a Chess bot')]) },
+  { id: 'hero', name: 'Super hero', icon: '🦸', slot: 'costume', game: 'pinball', steps: ['Hero mask', 'Hero cape', 'Power gloves & boots', 'Super suit', 'Hover hero', 'Legend aura'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('pinball', n, 'Pinball')).concat([W_.score('pinball', 100000, 'Pinball')]) },
+  { id: 'frog', name: 'Frog', icon: '🐸', slot: 'costume', game: 'hopper', steps: ['Frog cap', 'Frog hood', 'Frog suit', 'Tree frog', 'Frog prince'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('hopper', n, 'Dodgy Hopper')) },
+  { id: 'racer', name: 'Racer', icon: '🏁', slot: 'costume', game: 'turbo', steps: ['Racing cap', 'Racing gloves', 'Racing helmet', 'Racing suit', 'Turbo champion'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('turbo', n, 'Turbo Trail')) },
+  { id: 'cards', name: 'Magic cards', icon: '🃏', slot: 'hand', game: 'memory', steps: ['One card', 'Card pair', 'Card fan', 'Magic deck', 'Golden deck'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('memory', n, 'Memories Match')) },
+  // ⚛️ Sciencetory atom looks (looks only — the element colour always stays; AtomSkins.html draws them; picked per player sp_atomskin:<Name>; Classic is free) · sc-2b
+  { id: 'atomskin', name: 'Atom looks', icon: '⚛️', slot: 'atomskin', game: 'sciencetory', soon: 'Used on every atom in 🔬 Sciencetory ⚗️ Chemistry + ⚛️ Quantum — pick it on their lab screens', steps: ['Bubble', 'Jelly', 'Cartoon', 'Glow', 'Crystal', 'Planet', 'Electron cloud', 'Pixel', 'Galaxy'],
+    ways: [W_.feat('sciencetory', 'elements', 2, 'Collect your first 2 element cards'), W_.feat('sciencetory', 'chemRounds', 1, 'Play a ⚗️ Chemistry round'), W_.feat('sciencetory', 'atoms', 3, 'Build 3 atoms in ⚛️ Quantum'),
+      W_.feat('sciencetory', 'compounds', 5, 'Build 5 molecules'), W_.feat('sciencetory', 'elements', 25, 'Collect 25 element cards'), W_.feat('sciencetory', 'atoms', 10, 'Build 10 different atoms'),
+      W_.feat('sciencetory', 'compounds', 15, 'Build 15 molecules'), W_.feat('sciencetory', 'elements', 50, 'Collect 50 element cards'), W_.feat('sciencetory', 'atoms', 25, 'Build 25 different atoms')] },
+  // 🏓 Table looks (looks only; TableSkins.html draws them; picked per player sp_tableskin:<Name>; Classic is free; every board / stand / sign / frame crafted in 🏭 Artifactory is a table top too) · pd-4c
+  { id: 'tableskin', name: 'Table looks', icon: '🏓', slot: 'tableskin', game: 'pyraspike', soon: 'Used on the ⚡ PyraSpark table in 🔥 PyraDive — pick it on the PyraDive setup screen', steps: ['Wood', 'Chalkboard', 'Candy', 'Marble', 'Ice', 'Lava', 'Neon grid', 'Gold', 'Galaxy', 'Rainbow'],
+    ways: [W_.feat('pyraspike', 'm_sparksolo', 1, 'Win a ⚡ PyraSpark 1v1 game'), W_.feat('pyraspike', 'edges', 3, 'Hit 3 ⚡ EDGE balls'), W_.feat('pyraspike', 'm_party', 1, 'Win a 🌀 Spark Party'), W_.feat('pyraspike', 'traps', 15, 'Trap the ball 15 times'),
+      W_.feat('pyraspike', 'm_zonehits', 1, 'Play 🎯 Zone Hits'), W_.feat('pyraspike', 'pops', 20, 'Pop the ball up 20 times'), W_.feat('pyraspike', 'm_sparkduo', 1, 'Win a ⚡ PyraSpark Duo game'), W_.feat('pyraspike', 'cups', 1, 'Win a 🏆 PyraDive cup'),
+      W_.feat('pyraspike', 'edges', 15, 'Hit 15 ⚡ EDGE balls'), W_.feat('pyraspike', 'familyCups', 1, 'Win the 👑 Family Cup')] },
+  { id: 'ballskin', name: 'Ball skins', icon: '🎱', slot: 'ball', game: 'pinball', soon: 'Used in 🎯 Pinball and 🏓 SlaBrall', steps: ['Colour ball', 'Chrome', 'Marble', '8-ball', 'Planet', 'Smiley', 'Disco', 'Stripes', 'Flames', 'Rainbow comet', 'Orange', 'Watermelon', 'Earth', 'Eyeball', 'Dino egg', 'Pearl', 'Moon', 'Donut', 'Snowball', 'Sun'],
+    ways: [W_.feat('pinball', 'jackpots', 1, 'Hit a Pinball jackpot'), W_.feat('pinball', 'multiballs', 1, 'Start a Pinball multiball'), W_.feat('pinball', 'maxCombo', 10, 'Reach a 10-shot Pinball combo'), W_.feat('pinball', 'skills', 1, 'Make a Pinball skill shot'), W_.feat('pinball', 'scenes', 1, 'Visit a Pinball bonus scene'), W_.feat('pinball', 'boxes', 5, 'Open 5 Mystery Boxes'), W_.feat('pinball', 'chain', 5, 'Light 5 Lucky Lights in a row'), W_.feat('pinball', 'words', 3, 'Spell the top-lane word 3 times'), W_.score('pinball', 40000, 'Pinball'), W_.score('pinball', 150000, 'Pinball'), W_.lvl('sla-brall', 1, 'SlaBrall'), W_.lvl('sla-brall', 2, 'SlaBrall'), W_.lvl('sla-brall', 3, 'SlaBrall'), W_.lvl('sla-brall', 4, 'SlaBrall'), W_.lvl('sla-brall', 5, 'SlaBrall'), W_.feat('sla-brall', 'rally', 15, 'Keep a 15-hit SlaBrall rally'), W_.feat('sla-brall', 'aces', 5, 'Serve 5 aces in SlaBrall'), W_.feat('sla-brall', 'smash', 25, 'Hit 25 SlaBrall smashes'), W_.feat('sla-brall', 'powers', 10, 'Use 10 SlaBrall power-ups'), W_.feat('sla-brall', 'legend', 1, 'Score with a ⭐ Legendary Shot')] },
+  { id: 'shapepillow', name: 'Shape pillows', icon: '🔷', slot: 'hand', game: 'stacking-sim', steps: ['Square pillow', 'Circle pillow', 'Triangle pillow', 'Heart pillow', 'Star pillow', 'Hexagon pillow', 'Crescent pillow', 'Rainbow trapezoid'], ways: [200, 400, 600, 800, 1000, 1200, 1500].map(n => W_.score('stacking-sim', n, 'Stack It!')).concat([W_.time('stacking-sim', 30, 'a Stack It! level')]) },
+  { id: 'posecam', name: 'Pose cameras', icon: '📸', slot: 'hand', game: 'pose-party', steps: ['Instant camera', 'Video camera', 'Spotlight', 'Disco ball', 'Golden camera'],   // 📷 Pose Party (pose chat S2b-4)
+    ways: [W_.feat('pose-party', 'poses', 10, 'Match 10 poses in Pose Party'), W_.lvl('pose-party', 2, 'Pose Party'), W_.feat('pose-party', 'danceBest', 2000, 'Score 2,000 in one 💃 Dance chain'),
+      W_.feat('pose-party', 'booths', 3, 'Make 3 📸 Photo Booth pictures'), W_.lvl('pose-party', 5, 'Pose Party')] },
+  { id: 'mathtools', name: 'Maths tools', icon: '🧮', slot: 'hand', game: 'math-quest', steps: ['Pencil', 'Ruler', 'Abacus', 'Calculator', 'Golden compass'], ways: [1, 2, 3, 4, 5].map(n => W_.lvl('math-quest', n, 'Math Quest')) },
+  { id: 'dino', name: 'Dinosaur', icon: '🦖', slot: 'costume', game: 'any', steps: ['Dino egg hat', 'Hatchling hood', 'Baby dino', 'Raptor', 'Triceratops', 'T-rex'], ways: [2, 4, 7, 10, 15, 20].map(W_.total) },
+  { id: 'sword', name: 'Laser sword', icon: '⚔️', slot: 'hand', game: 'checkers', steps: ['Blue laser sword', 'Green blade', 'Curved hilt', 'Purple blade', 'Crossguard hilt', 'Red blade', 'Double-blade staff', 'Gold blade', 'Spin glow', 'Rainbow blade'],
+    parts: { blade: [['Blue', 1], ['Green', 2], ['Purple', 4], ['Red', 6], ['Gold', 8], ['Rainbow', 10]], hilt: [['Classic', 1], ['Curved', 3], ['Crossguard', 5], ['Double staff', 7]] },
+    ways: [1, 2, 3, 4, 5].map(n => W_.lvl('checkers', n, 'Checkers')).concat([1, 2, 3, 4, 5].map(n => W_.lvl('chess', n, 'Chess'))) },
+  { id: 'wings', name: 'Wings', icon: '🦋', slot: 'back', game: 'any', steps: ['Butterfly wings', 'Fairy wings', 'Bird wings', 'Bat wings', 'Dragon wings', 'Rainbow wings'], ways: [3, 6, 10, 15, 20, 30].map(W_.badges) },
+  { id: 'board', name: 'Boards', icon: '🛹', slot: 'ride', game: 'trash-pointer', steps: ['Skateboard', 'Surfboard', 'Hoverboard', 'Rocket board'], ways: [2, 4, 7, 10].map(n => W_.mini('trash-pointer', n, 'Trash Pointer')) },
+  { id: 'wand', name: 'Magic wand', icon: '🪄', slot: 'hand', game: 'color-match', steps: ['Stick wand', 'Star wand', 'Crystal wand', 'Wizard staff', 'Rainbow staff'], ways: [1, 2, 3, 4, 5].map(n => W_.mini('color-match', n, 'Color Match')) },
+  { id: 'petegg', name: 'Pet egg', icon: '🥚', slot: 'pet', game: 'count-match', steps: ['Mystery egg', 'Cracking egg', 'Hatchling', 'Growing pet', 'Pet with a collar', 'Pet with a hat'], ways: [1, 2, 3, 4, 5].map(n => W_.mini('count-match', n, 'Count & Match')).concat([W_.days(5)]) },
+  { id: 'music', name: 'Music', icon: '🎸', slot: 'hand', game: 'room', steps: ['Maracas', 'Guitar', 'Keytar', 'Drum'], ways: [10, 30, 60, 100].map(n => W_.feat('room', 'gestures', n, 'Do ' + n + ' moves in the Family Room')) },
+  { id: 'monster', name: 'Monster', icon: '👾', slot: 'costume', game: 'any', steps: ['Monster horns', 'Furry hood', 'Furry suit', 'Big friendly monster'], ways: [1, 2, 3, 4].map(W_.extreme) },
+  { id: 'snakeskin', name: 'Snake skins', icon: '🐍', slot: 'snakeskin', game: 'snakeast', computed: true, steps: ['Plain', 'Pattern', 'Light stripes', 'Armor', 'Fuel', 'Glow', 'Shadow colour'],   // 🐍 Snakize: each world evolves on its own — this line shows the best world
+    ways: [0, 1, 2, 3, 4, 5, 6].map(k => ({ how: (k ? SNAKE_STEP_HOW_[k] : 'Free') + ' (any world)', r: x => snakeSkinsFor_(x.f).best > k })) },
+  { id: 'snaketype', name: 'Snake types', icon: '🐉', slot: 'snaketype', game: 'snakeast', computed: true, steps: ['Garden snake', 'Python', 'Rattlesnake', 'King cobra', 'Anaconda', 'Viper', 'Sea snake', 'Coral snake', 'Boa', 'Titanoboa', 'Sea serpent', 'Conga dragon', 'Mecha viper', 'Comet serpent', 'Feathered serpent'],
+    ways: SNAKE_TYPE_RULES_.map(t => ({ how: t[1], r: x => !!t[2](x.f) })) },
+  { id: 'taleheroes', name: 'Tale heroes', icon: '📜', slot: 'costume', game: 'snakeast', steps: ['Dino Ranger', 'Deep-Sea Diver', 'Disco Star', 'Robo Pilot', 'Astronaut', 'Sky Knight'],   // 🐍 Snakize 📜 Snaketale: one theme costume per chapter (plan 11y)
+    ways: [1, 2, 3, 4, 5, 6].map(n => W_.feat('snaketale', 'chapters', n, 'Finish Snaketale chapter ' + n + ' (' + ['🦖 Dino Jungle', '🐙 Aquarium', '🪩 Dance Hall', '🤖 Robot Time', '🪐 Space', '☁️ Sky Temple'][n - 1] + ')')) },
+  { id: 'zombie', name: 'Zombie', icon: '🧟', slot: 'costume', game: 'room', steps: ['Bandage', 'Zombie face', 'Torn clothes', 'Shuffling zombie'], ways: [10, 25, 50, 100].map(n => W_.feat('room', 'crawl', n, 'Belly-crawl ' + n + ' tiles in the Family Room')) },
+  { id: 'colours', name: 'Colour schemes', icon: '🎨', slot: 'outfitColor', game: 'any', steps: ['Paint splash', 'Galaxy', 'Lava', 'Candy stripe', 'Neon', 'Camo', 'Gold', 'Rainbow'], ways: [W_.feat('app', 'looks', 1, 'Change your app look')].concat([1, 2, 3, 4, 5, 6, 7].map(W_.titles)) },
+  { id: 'skins', name: 'Fun skins', icon: '✨', slot: 'skin', game: 'any', steps: ['Gold', 'Alien green', 'Ocean blue', 'Fairy lilac', 'Starry'], ways: [2, 4, 7, 10, 14].map(W_.days) },
+  { id: 'medal', name: 'Medals', icon: '🥇', slot: 'neck', game: 'any', steps: ['Bronze medal', 'Silver medal', 'Gold medal'], ways: [10, 25, 50].map(W_.badges) },
+  { id: 'trophy', name: 'Trophy', icon: '🏆', slot: 'hand', game: 'room', steps: ['Bronze trophy', 'Silver trophy', 'Gold trophy'], ways: [1, 5, 15].map(n => W_.feat('app', 'archive', n, 'Open the Achievement Archive ' + n + ' time' + (n > 1 ? 's' : ''))) },
+  { id: 'pogo', name: 'Bouncy', icon: '🦘', slot: 'ride', game: 'room', steps: ['Spring shoes', 'Pogo stick', 'Rocket pogo'], ways: [25, 100, 250].map(n => W_.feat('room', 'jumps', n, 'Jump ' + n + ' times in the Family Room')) },
+  { id: 'fashion', name: 'Fashion', icon: '👗', slot: 'outfit', game: 'any', steps: ['Crop top + high-waist jeans', 'Tee + cargo pants', 'Sweater + plaid skirt', 'Denim jacket + jeans', 'Cardigan + midi skirt', 'Summer co-ord', 'Oversized tee + joggers', 'Shirt dress', 'Jumpsuit', 'Varsity jacket + track pants'],
+    ways: [W_.total(3), W_.days(3), W_.feat('room', 'visits', 3, 'Visit 3 family rooms'), W_.badges(8), W_.total(8), W_.titles(2), W_.feat('room', 'gestures', 40, 'Do 40 moves in the Family Room'), W_.days(8), W_.badges(20), W_.extreme(2)] },
+  { id: 'hairstyles', name: 'Hair styles', icon: '💇', slot: 'hair', game: 'any', steps: ['Braids', 'Ponytail', 'Pigtails', 'Space buns', 'Afro', 'Rainbow hair'],
+    ways: [W_.time('maze', 60, 'a Maze level'), W_.score('stacking-sim', 800, 'Stack It!'), W_.score('robot-adventure', 600, 'Code the Robot'), W_.score('checkers', 600, 'Checkers'), W_.score('chess', 600, 'Chess'), W_.score('pinball', 40000, 'Pinball')] },
+  { id: 'furni', name: 'Room things', icon: '🛋️', slot: 'furni', game: 'room', steps: ['Trophy cabinet', 'Beanbag', 'Arcade machine', 'Aquarium', 'Dino lamp', 'Rocket bed', 'Slide', 'Disco ball'],
+    ways: [W_.total(5), W_.feat('room', 'placed', 5, 'Put 5 things in My Room'), W_.total(10), W_.feat('room', 'gifts', 5, 'Send 5 gifts'), W_.feat('room', 'cleans', 3, 'Tidy 3 family rooms'), W_.feat('room', 'visits', 5, 'Visit 5 family rooms'), W_.total(20), W_.badges(25)] },
+  { id: 'roomstyle', name: 'Room styles', icon: '🖼️', slot: 'roomstyle', game: 'room', steps: ['Star wallpaper', 'Jungle wallpaper', 'Castle stones', 'Galaxy floor', 'Candy floor'],
+    ways: [W_.feat('room', 'visits', 1, 'Visit a family room'), W_.feat('room', 'placed', 10, 'Put 10 things in My Room'), W_.feat('room', 'received', 3, 'Get 3 gifts'), W_.feat('room', 'cleans', 1, 'Tidy a family room'), W_.days(10)] },
+  { id: 'helper', name: 'Helper things', icon: '🧹', slot: 'hand', game: 'room', steps: ['Gift box', 'Paint brush', 'Broom', 'Heart balloon'],
+    ways: [W_.feat('room', 'gifts', 1, 'Send a gift'), W_.feat('room', 'placed', 10, 'Put 10 things in My Room'), W_.feat('room', 'cleans', 1, 'Tidy a family room'), W_.feat('room', 'received', 5, 'Get 5 gifts')] },
+  { id: 'hardcore', name: 'Hardcore trail', icon: '💀', slot: 'trail', game: 'any', steps: ['Skull sparks', 'Fire skulls', 'Thunder skulls', 'Legend storm'], ways: [1, 3, 6, 10].map(W_.hardcore) },
+  // ---- 3c (Aowu's feedback 2026-11-02): 20 more back things, pets, boards and trails (2 lines of 10 each) ----
+  { id: 'gear', name: 'Back gear', icon: '🎒', slot: 'back', game: 'any', steps: ['School backpack', 'Hero shield', 'Kite', 'Turtle shell', 'Guitar on the back', 'Bow and quiver', 'Rocket jetpack', 'Teddy backpack', 'Treasure map', 'Golden jetpack'],
+    ways: [W_.miles(8), W_.total(4), W_.days(4), W_.badges(6), W_.miles(40), W_.total(12), W_.miles(90), W_.badges(18), W_.extreme(3), W_.miles(200)] },
+  { id: 'magicback', name: 'Magic backs', icon: '🌈', slot: 'back', game: 'any', steps: ['Rainbow arc', 'Star halo', 'Angel wing', 'Moon cape', 'Bubble bubble', 'Flower crown back', 'Crystal shards', 'Fire ring', 'Lightning bolts', 'Galaxy swirl'],
+    ways: [W_.titles(1), W_.days(6), W_.miles(25), W_.titles(3), W_.badges(12), W_.miles(70), W_.days(12), W_.titles(5), W_.hardcore(1), W_.miles(260)] },
+  { id: 'cuddlypets', name: 'Cuddly pets', icon: '🐰', slot: 'pet', game: 'any', steps: ['Bunny', 'Hamster', 'Chick', 'Koala', 'Panda cub', 'Puppy', 'Kitten', 'Hedgehog', 'Squirrel', 'Baby unicorn'],
+    ways: [W_.miles(5), W_.days(3), W_.total(6), W_.miles(30), W_.badges(10), W_.days(9), W_.miles(80), W_.total(16), W_.badges(22), W_.miles(180)] },
+  { id: 'wildpets', name: 'Wild pets', icon: '🦊', slot: 'pet', game: 'any', steps: ['Fox', 'Frog', 'Turtle', 'Parrot', 'Penguin', 'Octopus', 'Bee', 'Butterfly', 'Otter', 'Baby dragon'],
+    ways: [W_.extreme(1), W_.miles(20), W_.titles(2), W_.miles(50), W_.extreme(2), W_.days(15), W_.miles(110), W_.titles(4), W_.extreme(5), W_.hardcore(2)] },
+  { id: 'coolboards', name: 'Cool boards', icon: '🛴', slot: 'ride', game: 'any', steps: ['Scooter', 'Roller skates', 'Log raft', 'Leaf glider', 'Donut float', 'Pizza board', 'Fire board', 'Ice board', 'Lightning board', 'Golden board'],
+    ways: [W_.miles(12), W_.total(5), W_.miles(35), W_.days(7), W_.miles(60), W_.badges(15), W_.miles(100), W_.total(20), W_.miles(150), W_.miles(240)] },
+  { id: 'magicfloats', name: 'Magic floats', icon: '☁️', slot: 'ride', game: 'any', steps: ['Cloud', 'Bubble', 'Witch broom', 'Magic carpet', 'Mini UFO', 'Swan float', 'Rainbow road', 'Moon swing', 'Star sled', 'Comet'],
+    ways: [W_.titles(1), W_.miles(45), W_.days(10), W_.titles(3), W_.miles(85), W_.extreme(2), W_.miles(130), W_.titles(6), W_.extreme(4), W_.hardcore(1)] },
+  { id: 'sparkletrails', name: 'Sweet trails', icon: '🍬', slot: 'trail', game: 'any', steps: ['Candy', 'Music notes', 'Flowers', 'Snowflakes', 'Leaves', 'Clovers', 'Cookies', 'Balloons', 'Diamonds', 'Crowns'],
+    ways: [W_.miles(10), W_.days(5), W_.total(8), W_.miles(55), W_.badges(14), W_.days(11), W_.miles(95), W_.total(18), W_.badges(26), W_.miles(220)] },
+  { id: 'wildtrails', name: 'Wild trails', icon: '⚡', slot: 'trail', game: 'any', steps: ['Paw prints', 'Footsteps', 'Fire', 'Lightning', 'Ghosts', 'Bats', 'Planets', 'Fish', 'Dinosaurs', 'Fireworks'],
+    ways: [W_.miles(15), W_.titles(2), W_.miles(65), W_.extreme(1), W_.days(13), W_.titles(4), W_.miles(120), W_.extreme(3), W_.miles(190), W_.hardcore(3)] },
+  { id: 'trails', name: 'Trails', icon: '💫', slot: 'trail', game: 'any', steps: ['Sparkles', 'Bubbles', 'Hearts', 'Stars', 'Comet', 'Rainbow'],
+    ways: [W_.time('maze', 40, 'a Maze level'), W_.score('stacking-sim', 1200, 'Stack It!'), W_.score('robot-adventure', 700, 'Code the Robot'), W_.score('checkers', 700, 'Checkers'), W_.score('chess', 700, 'Chess'), W_.score('pinball', 80000, 'Pinball')] },
+  // 🪶 SlaBam shuttle feathers (sb2-2): own n steps = feathers 0..n-1, painted by BallSkins.feather (the cork = the ball skin). Picked per device: sp_feather:<Name>.
+  { id: 'feather', name: 'Shuttle feathers', icon: '🪶', slot: 'feather', game: 'sla-brall', soon: 'Used in 🏸 SlaBam — your feather flies behind the cork (the cork is your ball skin)', steps: ['Goose white', 'Rainbow', 'Peacock', 'Phoenix', 'Ice crystal', 'Neon', 'Leaf', 'Candy stripe', 'Galaxy', 'Golden'],
+    ways: [W_.feat('sla-brall', 'win_slabam', 1, 'Win a SlaBam match'), W_.feat('sla-brall', 'win_slabam', 3, 'Win 3 SlaBam matches'), W_.feat('sla-brall', 'smash', 15, 'Hit 15 SlaBrall smashes'), W_.feat('sla-brall', 'win_slabam', 6, 'Win 6 SlaBam matches'), W_.feat('sla-brall', 'perfect', 30, 'Hit 30 PERFECT shots in SlaBrall'), W_.feat('sla-brall', 'win_slabam', 10, 'Win 10 SlaBam matches'), W_.feat('sla-brall', 'rally', 25, 'Keep a 25-hit SlaBrall rally'), W_.feat('sla-brall', 'win_slabam', 15, 'Win 15 SlaBam matches'), W_.feat('sla-brall', 'cups', 2, 'Win 2 SlaBrall tournaments'), W_.feat('sla-brall', 'win_slabam', 25, 'Win 25 SlaBam matches')] },
+  // 🕹️ sk-1 Joystick skins (looks only): ONE master list for every joystick + its buttons (UiKit JoySkins), in 3 lines of 8 (house rule ≤ 10 steps): 🍬 Sweet (common) · 🐸 Wild (rare + epic) · 👑 Legend (epic + legend).
+  // Wear one in 🎒 Wardrobe (avatar eq.joy = {id: line, v}). 🎁 pickups (grantJoySkin — Brawl floor capsules etc., 1 per game per day) add a step to the first line that isn't full.
+  { id: 'joyskin', name: 'Sweet joysticks', icon: '🕹️', slot: 'joy', game: 'any', soon: 'Your 🕹️ joystick + buttons in every game with a stick — wear it in 🎒 Wardrobe', steps: ['Bubblegum', 'Mint chip', 'Ocean', 'Lemon', 'Grape', 'Donut', 'Soccer', 'Paw'],
+    ways: [W_.days(1), W_.total(2), W_.miles(10), W_.feat('sla-brall', 'matches', 3, 'Play 3 SlaBrall matches'), W_.days(3), W_.badges(3), W_.total(8), W_.miles(40)] },
+  { id: 'joyskin2', name: 'Wild joysticks', icon: '🐸', slot: 'joy', game: 'any', soon: 'Your 🕹️ joystick + buttons in every game with a stick — wear it in 🎒 Wardrobe', steps: ['Frog', 'Watermelon', 'Cookie', 'Planet', 'Robot eye', 'Star', 'Flower', 'Lava'],
+    ways: [W_.feat('sla-brall', 'wins', 5, 'Win 5 SlaBrall matches'), W_.days(7), W_.titles(1), W_.extreme(1), W_.badges(12), W_.miles(120), W_.feat('sla-brall', 'smash', 50, 'Hit 50 SlaBrall smashes'), W_.hardcore(1)] },
+  { id: 'joyskin3', name: 'Legend joysticks', icon: '👑', slot: 'joy', game: 'any', soon: 'Your 🕹️ joystick + buttons in every game with a stick — wear it in 🎒 Wardrobe', steps: ['Ice', 'Gem', 'Rainbow', 'Galaxy', 'Dragon eye', 'Golden crown', 'Neon pulse', 'Phoenix'],
+    ways: [W_.days(14), W_.miles(200), W_.badges(20), W_.titles(3), W_.extreme(3), W_.feat('sla-brall', 'cups', 1, 'Win a SlaBrall tournament'), W_.hardcore(3), W_.days(30)] },
+  // 🎭 as-2 Signature acts (AvatarActing core-sig): pick ONE in 🎒 Wardrobe → avatar field `sig`; steps = SIG_ACTS_.line in the same order
+  { id: 'sigact', name: 'Signature acts', icon: '🎭', slot: 'sigact', game: 'any', soon: 'Your 🎭 signature move — on the 👋 tiles, in the Family Room and on result cards. Pick it in 🎒 Wardrobe', steps: ['Superstar', 'Power up', 'Heart burst', 'Genius', 'Ninja', 'Rock star', 'Giant hero', 'Flower twirl', 'Moonwalk', 'Robot'],
+    ways: [W_.days(2), W_.total(3), W_.badges(2), W_.miles(15), W_.titles(1), W_.days(5), W_.total(12), W_.miles(40), W_.hardcore(1), W_.days(10)] },
+  // 🏏 bs-1 Batsticks (Batstickskin shapes 11–18 after the 10 rackets): design them in 🏏 My Batstick (shape · sticker · colours · pattern) — used as your SlaBrall racket, your Brawl melee pickup and in your hand.
+  { id: 'batstick', name: 'Batsticks', icon: '🏏', slot: 'hand', game: 'any', soon: 'Your 🏏 Batstick in every game you swing in — design it in 🎒 Wardrobe or SlaBrall', steps: ['Baseball bat', 'Cricket bat', 'Foam bat', 'Lollipop bat', 'Candy cane', 'Glow stick', 'Bamboo stick', 'Dino bone club'],
+    ways: [W_.feat('sla-brall', 'matches', 2, 'Play 2 SlaBrall matches'), W_.days(2), W_.feat('sla-brall', 'smash', 15, 'Hit 15 SlaBrall smashes'), W_.total(5), W_.feat('sla-brall', 'wins', 3, 'Win 3 SlaBrall matches'), W_.badges(6), W_.miles(80), W_.feat('sla-brall', 'perfect', 40, 'Hit 40 PERFECT shots in SlaBrall')] },
+  // ☄️ SlaBrall ball trails (round 2): own n steps = trails 0..n-1, painted by BallSkins.trail. Picked per device: sp_balltrail:<Name>.
+  { id: 'balltrail', name: 'Ball trails', icon: '☄️', slot: 'balltrail', game: 'sla-brall', soon: 'Used in 🏓 SlaBrall — your trail follows the ball after you hit it', steps: ['Sparkles', 'Bubbles', 'Hearts', 'Stars', 'Fire', 'Frost', 'Rainbow', 'Leaves', 'Lightning', 'Galaxy'],
+    ways: [W_.feat('sla-brall', 'matches', 1, 'Play a SlaBrall match'), W_.feat('sla-brall', 'wins', 3, 'Win 3 SlaBrall matches'), W_.feat('sla-brall', 'cupMatches', 1, 'Play a SlaBrall tournament match'), W_.feat('sla-brall', 'perfect', 20, 'Hit 20 PERFECT shots in SlaBrall'), W_.feat('sla-brall', 'smash', 25, 'Hit 25 SlaBrall smashes'), W_.feat('sla-brall', 'aces', 10, 'Serve 10 aces in SlaBrall'), W_.feat('sla-brall', 'cups', 1, 'Win a SlaBrall tournament'), W_.feat('sla-brall', 'powers', 20, 'Use 20 SlaBrall powers'), W_.feat('sla-brall', 'rally', 30, 'Keep a 30-hit SlaBrall rally'), W_.feat('sla-brall', 'cups', 3, 'Win 3 SlaBrall tournaments')] },
+  // 💣 Soul Bopper bomb skins: steps 1–4 = the evolution (Plain is free; each world evolves by its own feats, see bopperInfo_), 5–10 = fun extras (+ golden poo). Picked per device: sp_soulbopper_skin:<Name>. Painted by BombSkins.
+  { id: 'bombskin', name: 'Bomb skins', icon: '💣', slot: 'bombskin', game: 'soul-bopper', soon: 'Used in 👻💣 Soul Bopper — pick your bomb in the setup', steps: ['Pattern bomb', 'Glow bomb', 'Armored bomb', 'Legendary bomb', 'Poo bomb (golden at 100 catches)', 'Watermelon bomb', 'Cake bomb', 'Balloon bomb', 'Teddy bomb', 'Mini volcano'],
+    ways: [W_.feat('soul-bopper', 'games', 5, 'Play 5 Soul Bopper games'), W_.feat('soul-bopper', 'catches', 20, 'Catch 20 players in Soul Bopper'), W_.feat('soul-bopper', 'bestWin', 4, 'Win a Soul Bopper battle on Hard'), W_.feat('soul-bopper', 'bestWin', 5, 'Win a Soul Bopper battle on Extreme'),
+      W_.feat('soul-bopper', 'pooGames', 3, 'Play 3 💩 Classic Avatar games'), W_.feat('soul-bopper', 'blocks', 300, 'Break 300 blocks in Soul Bopper'), W_.feat('soul-bopper', 'wins', 3, 'Win 3 Soul Bopper games'), W_.feat('soul-bopper', 'chains', 20, 'Set off 20 chain pops'), W_.feat('soul-bopper', 'comebacks', 5, 'Come back 5 times in Soul Bopper'), W_.feat('soul-bopper', 'triple', 1, 'Catch 3 with one pop')] },
+  // 🔴 Alignext discs (held in the hand): painted by AvatarKit drawHeldItem('linediscs')
+  { id: 'linediscs', name: 'Line discs', icon: '🔴', slot: 'hand', game: 'alignext', steps: ['Red disc', 'Gold disc', 'Disc tower', 'Hatching egg', 'Ringed planet disc', 'Rainbow disc'],
+    ways: [W_.lvl('alignext', 1, 'Alignext Drop'), W_.lvl('omnifile', 1, 'Alignext Omnifile'), W_.feat('alignext', 'lines', 10, 'Make 10 lines of 3 in Alignext Drop'), W_.lvl('alignext', 3, 'Alignext Drop'), W_.lvl('omnifile', 3, 'Alignext Omnifile'), W_.lvl('alignext', 5, 'Alignext Drop')] },
+  { id: 'racket', name: 'Rackets', icon: '🏓', slot: 'hand', game: 'sla-brall', steps: ['Wood paddle', 'Table-tennis bat', 'Tennis racket', 'Hockey stick', 'Frying pan', 'Guitar', 'Magic wand racket', 'Laser racket', 'Baguette', 'Golden racket'],
+    ways: [W_.feat('sla-brall', 'matches', 1, 'Play a SlaBrall match'), W_.feat('sla-brall', 'wins', 1, 'Win a SlaBrall match'), W_.lvl('sla-brall', 1, 'SlaBrall'), W_.lvl('sla-brall', 2, 'SlaBrall'), W_.feat('sla-brall', 'rally', 20, 'Keep a 20-hit SlaBrall rally'), W_.lvl('sla-brall', 3, 'SlaBrall'), W_.feat('sla-brall', 'smash', 50, 'Hit 50 SlaBrall smashes'), W_.lvl('sla-brall', 4, 'SlaBrall'), { how: 'Win a match in all 5 SlaBrall sports', r: x => ['slashot', 'slapoof', 'slaball', 'slapong', 'slawall'].every(k => featVal_(x.f, 'sla-brall', 'win_' + k) >= 1) }, W_.lvl('sla-brall', 5, 'SlaBrall')] },
+  { id: 'brawlgear', name: 'Brawl gear', icon: '🥊', slot: 'hand', game: 'brawl-buddies', steps: ['Red foam gloves', 'Blue foam gloves', 'Sweatband gloves', 'Star gloves', 'Hero headband', 'Flame gloves', 'Lightning gloves', 'Rainbow gloves', 'Diamond gloves', 'Golden champion gloves'],
+    ways: [W_.feat('brawl-buddies', 'matches', 1, 'Play a Brawl Buddies fight'), W_.feat('brawl-buddies', 'wins', 1, 'Win a brawl'), W_.lvl('brawl-buddies', 1, 'Brawl Buddies'), W_.lvl('brawl-buddies', 2, 'Brawl Buddies'), W_.feat('brawl-buddies', 'combo', 10, 'Land a 10-hit combo'), W_.feat('brawl-buddies', 'grabs', 10, 'Land 10 grapples'), W_.lvl('brawl-buddies', 3, 'Brawl Buddies'), W_.feat('brawl-buddies', 'juggle', 5, 'Juggle a buddy 5 bounces in the air'), W_.lvl('brawl-buddies', 4, 'Brawl Buddies'), W_.lvl('brawl-buddies', 5, 'Brawl Buddies')] },
+];
+
+/* ============ 📏 RIDE_ONS (from Code.gs) ============ */
+const RIDE_ONS = [
+  { id: 'unicorn', name: 'Unicorn', icon: '🦄', miles: 5 },
+  { id: 'corgi', name: 'Corgi', icon: '🐕', miles: 10 },
+  { id: 'duck', name: 'Duck', icon: '🦆', miles: 16 },
+  { id: 'chicken', name: 'Chicken', icon: '🐔', miles: 24, special: { how: 'or pass Dodgy Hopper Junior', r: x => (x.cleared.hopper || 0) >= 2 } },
+  { id: 'donkey', name: 'Donkey', icon: '🫏', miles: 32 },
+  { id: 'cow', name: 'Cow', icon: '🐄', miles: 42 },
+  { id: 'penguin', name: 'Penguin', icon: '🐧', miles: 52 },
+  { id: 'trex', name: 'T-rex', icon: '🦖', miles: 64, special: { how: 'or pass Maze Intermediate (Jungle maze)', r: x => (x.cleared.maze || 0) >= 3 } },
+  { id: 'camel', name: 'Camel', icon: '🐫', miles: 76 },
+  { id: 'horse', name: 'Horse', icon: '🐎', miles: 90 },
+  { id: 'flamingo', name: 'Flamingo', icon: '🦩', miles: 105 },
+  { id: 'shark', name: 'Shark', icon: '🦈', miles: 120, special: { how: 'or pass Turbo Trail Intermediate (speedboat)', r: x => (x.cleared.turbo || 0) >= 3 } },
+  { id: 'panda', name: 'Panda', icon: '🐼', miles: 138 },
+  { id: 'alligator', name: 'Alligator', icon: '🐊', miles: 156 },
+  { id: 'buffalo', name: 'Buffalo', icon: '🐃', miles: 176 },
+  { id: 'lion', name: 'Lion', icon: '🦁', miles: 198 },
+  { id: 'tiger', name: 'Tiger', icon: '🐅', miles: 222 },
+  { id: 'moose', name: 'Moose', icon: '🫎', miles: 248 },
+  { id: 'elephant', name: 'Elephant', icon: '🐘', miles: 276 },
+  { id: 'dragon', name: 'Dragon', icon: '🐉', miles: 310, special: { how: 'or visit the Dragon\'s Den in Pinball (dragon sky)', r: x => featVal_(x.f, 'pinball', 'scene_castle') >= 1 } },
+  // 🌟 Mystical Beasts (plan 11q, 2026-11-06): need BOTH the miles AND their beast quest. about = kid-friendly story shown in the Collection.
+  { id: 'pegasus', name: 'Pegasus', icon: '🪽', miles: 350, beast: true, quest: { how: 'pass Hard in 3 different games', r: x => (x.hards || 0) >= 3 },
+    about: 'A white horse with big feathered wings from old Greek stories. It gallops on the clouds and flies faster than the wind.' },
+  { id: 'griffin', name: 'Griffin', icon: '🦅', miles: 400, beast: true, quest: { how: 'pass Maze Hard', r: x => (x.cleared['maze'] || 0) >= 4 },
+    about: 'Half eagle, half lion! An eagle\'s head and wings with a strong lion\'s body. In old stories griffins guard gold and treasure.' },
+  { id: 'sphinx', name: 'Sphinx', icon: '🗿', miles: 460, beast: true, quest: { how: 'pass Digitinct Hard', r: x => (x.cleared['number-grid'] || 0) >= 4 },
+    about: 'A wise lion from old Egypt wearing a striped royal headdress. It loves riddles — answer right and it lets you pass!' },
+  { id: 'ninetails', name: 'Nine-tailed Fox', icon: '🦊', miles: 520, beast: true, quest: { how: 'pass Memories Match Extreme', r: x => (x.cleared['memory'] || 0) >= 5 },
+    about: 'A magic fox from Chinese, Japanese and Korean stories. It grows a new tail every hundred years, so nine tails means very old and very wise.' },
+  { id: 'qilin', name: 'Qilin', icon: '🦌', miles: 590, beast: true, quest: { how: 'find 7 daily treasures', r: x => (x.dailies || 0) >= 7 },
+    about: 'A gentle Chinese lucky beast with a deer\'s body, dragon scales and one golden horn. It walks so softly the grass doesn\'t bend, and it brings good luck.' },
+  { id: 'thunderbird', name: 'Thunderbird', icon: '⚡', miles: 660, beast: true, quest: { how: 'pass Block Drop Extreme', r: x => (x.cleared['block-drop'] || 0) >= 5 },
+    about: 'A giant bird from Native American stories. When it flaps its wings you hear thunder, and lightning flashes when it blinks.' },
+  { id: 'naga', name: 'Naga', icon: '🐍', miles: 740, beast: true, quest: { how: 'pass Sweet Swap Hard', r: x => (x.cleared['sweet-swap'] || 0) >= 4 },
+    about: 'A great water serpent from Thai stories with a fan of heads like a crown. Nagas guard rivers and temples and bring the rain.' },
+  { id: 'erawan', name: 'Erawan', icon: '🐘', miles: 820, beast: true, quest: { how: 'pass Lettercraft Hard', r: x => (x.cleared['word-board'] || 0) >= 4 },
+    about: 'The white elephant of Thai stories, drawn with three heads. It carries the sky god Indra and can make rain clouds.' },
+  { id: 'manticore', name: 'Manticore', icon: '🦂', miles: 900, beast: true, quest: { how: 'pass Checkers Extreme', r: x => (x.cleared['checkers'] || 0) >= 5 },
+    about: 'A lion with a spiky scorpion tail from old Persian stories. It looks fierce, but ours is a big friendly cat.' },
+  { id: 'cerberus', name: 'Cerberus', icon: '🐕', miles: 990, beast: true, quest: { how: 'pass Chess Hard', r: x => (x.cleared['chess'] || 0) >= 4 },
+    about: 'A giant three-headed dog from Greek stories that guards a secret gate. Three heads means three times the barking — and three times the cuddles!' },
+  { id: 'phoenix', name: 'Phoenix', icon: '🔥', miles: 1080, beast: true, quest: { how: 'beat any 💀 Hardcore level', r: x => (x.hardcores || 0) >= 1 },
+    about: 'A fire bird that glows like the sun. When it gets old it turns to flames and is born again from the ashes, shiny and new.' },
+  { id: 'hydra', name: 'Hydra', icon: '🐲', miles: 1180, beast: true, quest: { how: 'beat 💀 Hardcore in 3 games', r: x => (x.hardcores || 0) >= 3 },
+    about: 'A many-headed water serpent from Greek stories. If one head is cut off, two more grow back!' },
+  { id: 'roc', name: 'Roc', icon: '🦅', miles: 1280, beast: true, quest: { how: 'pass Turbo Trail Extreme', r: x => (x.cleared['turbo'] || 0) >= 5 },
+    about: 'A bird so huge it can lift an elephant! In the Arabian Nights stories sailors thought its egg was a big white dome.' },
+  { id: 'kraken', name: 'Kraken', icon: '🐙', miles: 1390, beast: true, quest: { how: 'pass Pinball Extreme', r: x => (x.cleared['pinball'] || 0) >= 5 },
+    about: 'A giant sea monster from Norway\'s sailor stories, as big as an island. Its long arms can hug a whole ship.' },
+  { id: 'kaiju', name: 'Titan Kaiju', icon: '🦖', miles: 1500, beast: true, quest: { how: 'make a 2048 tile in Double Up', r: x => featVal_(x.f, 'double-up', 'bestTile') >= 2048 },
+    about: 'Our own giant monster lizard as tall as a city. Kaiju means \"strange beast\" in Japanese. It stomps, roars and its back spikes glow blue.' },
+  { id: 'leviathan', name: 'Leviathan', icon: '🐋', miles: 1620, beast: true, quest: { how: 'beat 💀 Hardcore in 5 games', r: x => (x.hardcores || 0) >= 5 },
+    about: 'A giant sea serpent from very old stories — the biggest creature in the ocean. When it swims, the whole sea swirls.' },
+  { id: 'whitetiger', name: 'White Tiger', icon: '🐯', miles: 1750, beast: true, quest: { how: 'beat 💀 Hardcore in 6 games', r: x => (x.hardcores || 0) >= 6 },
+    about: 'One of the Four Guardians in the Chinese stars (Bai Hu). It guards the West and autumn and stands for being brave.' },
+  { id: 'vermilion', name: 'Vermilion Bird', icon: '🐦', miles: 1880, beast: true, quest: { how: 'beat 💀 Hardcore in 7 games', r: x => (x.hardcores || 0) >= 7 },
+    about: 'Zhu Que, the red fire bird of the Four Guardians. It guards the South and summer — its feathers glow but never burn you.' },
+  { id: 'tortoise', name: 'Black Tortoise', icon: '🐢', miles: 2020, beast: true, quest: { how: 'beat 💀 Hardcore in 8 games', r: x => (x.hardcores || 0) >= 8 },
+    about: 'Xuan Wu, a tortoise with a snake friend wrapped around it. It guards the North and winter and stands for long life and patience.' },
+  { id: 'azure', name: 'Azure Dragon', icon: '🐉', miles: 2200, beast: true, quest: { how: 'own the other 3 Guardians + beat 💀 Hardcore in 10 games', r: x => (x.hardcores || 0) >= 10 },
+    about: 'Qing Long, the blue-green dragon who leads the Four Guardians. It guards the East and spring and brings the rain so plants can grow.' },
+];
+
+/* ============ 📏 ITEM_LINES.push({ id: 'rideon' }) (from Code.gs) ============ */
+ITEM_LINES.push({ id: 'rideon', name: 'Ride-ons', icon: '🐾', slot: 'ride', game: 'any', rides: true, steps: RIDE_ONS.map(r => r.name),
+  ways: RIDE_ONS.map(r => r.beast ? { how: r.icon + ' ' + r.name + ': ' + r.miles + ' Adventure miles + ' + r.quest.how, r: x => x.miles >= r.miles && !!r.quest.r(x) }
+    : ({ how: r.icon + ' ' + r.name + ': ' + r.miles + ' Adventure miles' + (r.special ? ' — ' + r.special.how : ''), r: x => x.miles >= r.miles || (!!r.special && !!r.special.r(x)) })) });
+
+/* ============ 📏 DAILY_GOALS (from Code.gs) ============ */
+const DAILY_GOALS = [
+  { id: 'tdstory', icon: '🏰', how: 'Win a TD-Stories chapter today (any level)', r: d => d.rows.some(r => (r.game === 'td-draprincess' || r.game === 'td-farmer') && r.stars > 0) },   // fd-1b: either book
+  { id: 'gssolve', icon: '🔢', how: 'Solve 8 GeoScout puzzles today', r: d => (d.room.gsSolved || 0) >= 8 },
+  { id: 'gsstory', icon: '📖', how: 'Play a GeoScout Journey chapter or win a Tower battle today', r: d => (d.room.gsStory || 0) >= 1 },
+  { id: 'grwords', icon: '🔤', how: 'Read or build 6 words in GeoRead today', r: d => (d.room.grWords || 0) >= 6 },
+  { id: 'grstory', icon: '📖', how: 'Read a GeoRead story or an Alphabet Road chapter today', r: d => (d.room.grStory || 0) >= 1 },
+  { id: 'wdcards', icon: '🃏', how: 'Win 5 WisDeck cards today', r: d => (d.room.wdCards || 0) >= 5 },
+  { id: 'wddaily', icon: '📅', how: 'Play today\'s WisDeck daily deck', r: d => !!d.room.wdDaily },
+  { id: 'ebrrow', icon: '👀', how: '3 perfect rounds in a row in Eyes Brain Riot today', r: d => (d.room.ebrRow || 0) >= 3 },
+  { id: 'ebrlen', icon: '🏔️', how: 'Remember 10 digits in an Eyes Brain Riot 🏔️ Challenge today', r: d => (d.room.ebrLen || 0) >= 10 },
+  { id: 'ppcatch', icon: '🪤', how: 'Catch 3 creatures in Polyplot today', r: d => (d.room.ppCatch || 0) >= 3 },
+  { id: 'ppchain', icon: '🔗', how: 'Close 5 shapes in one turn in Polyplot today', r: d => (d.room.ppChain || 0) >= 5 },
+  { id: 'sbblocks', icon: '💣', how: 'Break 100 blocks in Soul Bopper today', r: d => (d.room.sbBlocks || 0) >= 100 },
+  { id: 'sbmulti', icon: '🎯', how: 'Catch 2 with one pop in Soul Bopper today', r: d => (d.room.sbMulti || 0) >= 1 },
+  { id: 'sbhits', icon: '🏏', how: 'Hit 5 bombs with 🤾🏏 in Soul Bopper today', r: d => (d.room.sbHits || 0) >= 5 },
+  { id: 'anylevel', icon: '🎮', how: 'Finish any level today', r: d => d.rows.length > 0 },
+  { id: 'hard', icon: '⚡', how: 'Play a Hard or Extreme level today', r: d => d.rows.some(r => MINI_IDS_.indexOf(r.game) === -1 && r.level >= 3) },
+  { id: 'maze', icon: '🧭', how: 'Finish a Maze today', r: d => d.rows.some(r => r.game === 'maze') },
+  { id: 'pinball', icon: '🎯', how: 'Score 30,000 in one Pinball game today', r: d => d.rows.some(r => r.game === 'pinball' && r.score >= 30000) },
+  { id: 'hopper', icon: '🐸', how: 'Score 800 in one Dodgy Hopper game today', r: d => d.rows.some(r => r.game === 'hopper' && r.score >= 800) },
+  { id: 'turbo', icon: '🏎️', how: 'Finish a Turbo Trail race today', r: d => d.rows.some(r => r.game === 'turbo' && r.stars > 0) },
+  { id: 'math', icon: '🧮', how: 'Pass a Math Quest level today', r: d => d.rows.some(r => r.game === 'math-quest' && r.stars > 0) },
+  { id: 'memory', icon: '🃏', how: 'Finish a Memories Match board today', r: d => d.rows.some(r => r.game === 'memory' && r.stars > 0) },
+  { id: 'build', icon: '🔨', how: 'Build something in the Furniture Workshop today', r: d => (d.room.built || 0) >= 1 },
+  { id: 'board', icon: '♟️', how: 'Beat the bot in Checkers or Chess today', r: d => d.rows.some(r => r.game === 'checkers' || r.game === 'chess') },
+  { id: 'brawl', icon: '🥊', how: 'Win 2 brawls in Brawl Buddies today', r: d => d.rows.filter(r => r.game === 'brawl-buddies' && r.stars > 0).length >= 2 },
+  { id: 'sci', icon: '🔬', how: 'Run a science test in Sciencetory today', r: d => d.rows.some(r => r.game === 'sciencetory') },
+  { id: 'poke', icon: '🔍', how: 'Solve a Pokadif case today', r: d => d.rows.some(r => r.game === 'pokadif' && r.stars > 0) },
+  { id: 'pyra', icon: '🔥', how: 'Win a PyraDive volleyball match today', r: d => d.rows.some(r => r.game === 'pyraspike' && r.stars > 0) },
+  { id: 'brawenture', icon: '🗺️', how: 'Finish a Brawenture tale today (any difficulty)', r: d => d.rows.some(r => r.game === 'brawenture' && r.stars > 0) },
+  { id: 'three', icon: '🌈', how: 'Play 3 different games today', r: d => Object.keys(d.rows.reduce((m, r) => { m[r.game] = 1; return m; }, {})).length >= 3 },
+  { id: 'stack', icon: '🏗️', how: 'Finish a Stack It! level today', r: d => d.rows.some(r => r.game === 'stacking-sim') },
+  { id: 'robot', icon: '🤖', how: 'Finish a Code the Robot level today', r: d => d.rows.some(r => r.game === 'robot-adventure') },
+  { id: 'mini', icon: '🎨', how: 'Clear a mini game stage today', r: d => d.rows.some(r => MINI_IDS_.indexOf(r.game) !== -1) },
+  { id: 'stars', icon: '⭐', how: 'Get 3 stars on any level today', r: d => d.rows.some(r => r.stars >= 3) },
+  { id: 'jumps', icon: '🦘', how: 'Jump 20 times in the Family Room today', r: d => (d.room.jumps || 0) >= 20 },
+  { id: 'moves', icon: '💃', how: 'Do 10 moves in the Family Room today', r: d => (d.room.gestures || 0) >= 10 },
+  { id: 'slabrall', icon: '🏓', how: 'Win a SlaBrall match on Junior or harder today', r: d => d.rows.some(r => r.game === 'sla-brall' && r.level >= 1 && r.stars > 0) },
+  { id: 'blasoff', icon: '⚽', how: 'Win a BlasOff match today', r: d => d.rows.some(r => r.game === 'blasoff' && r.stars > 0) },   // ⚽ bo-1
+  { id: 'snakefood', icon: '🐍', how: 'Eat 50 food in Snakize today', r: d => (d.room.snakeFood || 0) >= 50 },
+  { id: 'snakeland', icon: '🏰', how: 'Claim 40 % land in one Snakastle game today', r: d => (d.room.snakeLand || 0) >= 40 },
+  { id: 'snakepop', icon: '💥', how: 'Pop 2 snakes in Snakigate today', r: d => (d.room.snakePop || 0) >= 2 },
+  { id: 'alignext', icon: '🔴', how: 'Win an Alignext game (Drop or Omnifile) today', r: d => d.rows.some(r => (r.game === 'alignext' || r.game === 'omnifile') && r.stars > 0) },
+  { id: 'poseparty', icon: '📷', how: 'Pass a Pose Party level today', r: d => d.rows.some(r => r.game === 'pose-party' && r.stars > 0) },
+];
+
+// (s1) END OF GameData.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
