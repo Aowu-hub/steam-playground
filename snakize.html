@@ -1782,10 +1782,120 @@ function pollPads(){
 function useSkillSeat(si){ if(!G || G.over || G.paused) return; const k = SN.useSkill(G.M, si); if(!k){ UISound.play('bump'); } }
 function turnSeat(si, d, stick){ if(!G || G.over || G.paused || G.mode === 'gate') return; if(stick) SN.stickTurn(G.M, si, d); else SN.turn(G.M, si, d); }   // r36: sticks replace a waiting stick turn
 
+/* 🎬 SNAKIZE BEATS (b3b8, 🧱 baseline chat, 2026-11-18) START — every rider action = 3–5 beats on the shared timeline (Acting.play).
+   The rider's legs stay on the snake (ride pose in every beat); arms, lean, head and a little bounce act. The ENGINE owns contact: its event
+   = the contact tick (snbEvents, right after the step). Grid modes (🍎 / 🏰) see the next step coming (snbAhead): ↪️ the queued turn ·
+   🍎 food in the next cell (⭐ a small nod for every food, the full reach-grab-hold for ✨ gold / ⚡ power) · 🧱 a wall / snake ahead (brace) ·
+   🚩 a loop that closes (claim) · ✂️ a rival trail (slash) — held until the step, let go when the step comes without it. 🧭 Snakigate keeps its
+   smooth steering lean; big food / powers there are seen from the head's speed. 🎯 skills play FROM contact. 💥 a Snakigate pop throws the
+   rider off (fly → tumble → sit) where the snake was. No hit-stop (Aowu b3b7p). Old reactions stay as the fallback; the one an act replaced
+   is not shown again after it. Clock = G.t. Acts: 🎭 BLOCK `snakize` (AvatarActs). Per-snake act state lives outside the engine (WeakMap). */
+const SNB_HAS = typeof Acting !== 'undefined' && typeof Acting.play === 'function', SNB_LEAD = 0.25;
+window.SNB_LOG = window.SNB_LOG || [];
+const SNB_M = new WeakMap();
+function snbH(s){ let H = SNB_M.get(s); if(!H){ H = {act: null, cover: null, head: null, dir: null, pop: null}; SNB_M.set(s, H); } return H; }
+function snbClock(){ return G ? (G.t || 0) : 0; }
+function snbStart(s, act, contactAt, o){
+  o = o || {}; if(!SNB_HAS || !G || !G.M || !s || !Acting.act(act)) return null;
+  const now = snbClock(), H = snbH(s), cur = H.act, from = cur && cur.run.last && !cur.run.done ? cur.run.last : undefined, si = G.M.snakes.indexOf(s);
+  const run = Acting.play({name: s.name, av: G.avs[si]}, act, {t0: now, contactAt, from, onContact: r => {
+    window.SNB_LOG.push({s: si, act, t: snbClock(), at: r.contactT}); if(window.SNB_LOG.length > 300) window.SNB_LOG.shift(); }});
+  H.act = {act, run, wait: !!o.wait, key: o.key || null};
+  run.at(contactAt != null && contactAt <= now + 1e-6 ? Math.max(now, run.contactT) + 1e-6 : now); return H.act;
+}
+// the engine's events (right after the step that made them) → contact now; one act per snake per step (the strongest wins)
+const SNB_RANK = {'snakize.turn': 0, 'snakize.nod': 1, 'snakize.yuck': 2, 'snakize.grab': 3, 'snakize.cast': 4, 'snakize.slash': 4, 'snakize.claim': 5, 'snakize.oops': 6, 'snakize.bump': 7, 'snakize.popped': 8};
+function snbEvents(ev){
+  const M = G && G.M; if(!SNB_HAS || !M) return; const now = snbClock(), grid = G.mode !== 'gate', by = {};
+  const put = (si, act) => { if(si == null || si < 0 || !M.snakes[si]) return; const c = by[si]; if(!c || SNB_RANK[act] > SNB_RANK[c]) by[si] = act; };
+  ev.forEach(e => { const k = e.k;
+    if(k === 'eat') put(e.s, 'snakize.nod');
+    else if(k === 'bad') put(e.s, 'snakize.yuck');
+    else if(k === 'gold' || k === 'power' || k === 'eatBig' || k === 'grow10') put(e.s, 'snakize.grab');
+    else if(k === 'skill') put(e.s, 'snakize.cast');
+    else if(k === 'claim') put(e.s, 'snakize.claim');
+    else if(k === 'cut'){ if(e.by != null && e.by >= 0 && e.by !== e.s) put(e.by, 'snakize.slash'); put(e.s, 'snakize.oops'); }
+    else if(k === 'bump' || k === 'bounce') put(e.s, 'snakize.bump');
+    else if(k === 'pop'){ const s = M.snakes[e.s]; if(s){ snbH(s).pop = {x: e.x, y: e.y, face: Math.cos(s.ang || 0) >= 0 ? 1 : -1}; put(e.s, 'snakize.popped'); } }
+    else if(k === 'respawn'){ const s = M.snakes[e.s]; if(s){ const H = snbH(s); H.act = null; H.pop = null; } } });
+  // ↪️ grid: the head moved this step and its direction changed (a bump / a trip home sets `down` — not a turn)
+  if(grid) M.snakes.forEach((s, si) => { const H = snbH(s), h = s.body && s.body[0]; if(!h) return;
+    if(H.head != null && H.head !== h[0] + ',' + h[1] && s.alive && !(s.down > 0) && H.dir != null && s.dir !== H.dir) put(si, 'snakize.turn'); });
+  Object.keys(by).forEach(si => snbStart(M.snakes[si], by[si], now));
+  // a wind-up whose step came WITHOUT its event (the turn changed, the food ran, a shield…) → let go
+  if(grid) M.snakes.forEach((s, si) => { const H = snbH(s), h = s.body && s.body[0]; if(!h) return; const key = h[0] + ',' + h[1];
+    if(H.head != null && key !== H.head && !by[si]){ const A = H.act; if(A && A.wait && !A.run.fired) H.act = null; }
+    H.head = key; H.dir = s.dir; });
+  snbAhead();
+}
+// look ahead (once a step): grid = the NEXT step of every snake (time = what is left of its tick) · gate = big food / a power on the head's line
+function snbAhead(){
+  const M = G && G.M; if(!SNB_HAS || !M || M.over || G.over) return; const now = snbClock();
+  if(G.mode === 'gate'){ snbAheadGate(M, now); return; }
+  const castle = G.mode === 'castle', n = M.n;
+  M.snakes.forEach((s, si) => {
+    if(!s.alive || s.down > 0 || s.frozenT > 0 || !s.body || !s.body.length) return; const H = snbH(s), A = H.act; if(A && A.wait && !A.run.fired) return;   // a wind-up already waiting
+    const rate = M.slowT > 0 && M.slowBy !== s.i ? 0.5 : 1, iv = (castle ? s.tick : M.tick) / (s.dashT > 0 ? 2 : 1), tn = (iv - s.acc) / rate;
+    if(!(tn > 0.02 && tn <= SNB_LEAD)) return;
+    const d = s.q && s.q.length ? s.q[0] : s.dir, h = s.body[0]; let nx, ny, act = null;
+    if(castle){ const D = SN.DIRS[d]; nx = h[0] + D[0]; ny = h[1] + D[1]; if(!SN.inb(M, nx, ny)) return; const c = ny * n + nx, id = si + 1, tr = M.trail[c];
+      if(tr === id && !(s.ghostT > 0)) act = 'snakize.bump';
+      else if(M.own[c] === id && s.trailCells && s.trailCells.length) act = 'snakize.claim';
+      else if(tr && tr !== id && !(s.ghostT > 0)) act = 'snakize.slash'; }
+    else { const c = SN.nextCell(M, h[0], h[1], d); nx = c.x; ny = c.y; if(M.L.wrap){ nx = (nx % n + n) % n; ny = (ny % n + n) % n; }
+      if(!s.shield && !s.chili && SN.hitAt(M, s, nx, ny)) act = 'snakize.bump'; }
+    if(!act){ const f = M.foods.find(q => q.x === nx && q.y === ny);
+      if(f) act = f.k === 'n' ? 'snakize.nod' : f.k === 'b' ? (castle ? 'snakize.nod' : 'snakize.yuck') : 'snakize.grab'; }
+    if(!act && d !== s.dir) act = 'snakize.turn';
+    if(!act) return; const key = act + '@' + h[0] + ',' + h[1] + '>' + nx + ',' + ny;
+    if(H.planKey === key) return; H.planKey = key; snbStart(s, act, now + tn, {wait: true, key});
+  });
+}
+function snbAheadGate(M, now){
+  M.snakes.forEach((s, si) => {
+    if(!s.alive || s.boss) return; const H = snbH(s);
+    const v = H.gt != null && now > H.gt + 1e-4 ? Math.hypot(s.x - H.gx, s.y - H.gy) / (now - H.gt) : 0; H.gx = s.x; H.gy = s.y; H.gt = now;
+    const A = H.act; if(A && A.wait && !A.run.fired) return; if(!(v > 0.5)) return;
+    const ca = Math.cos(s.ang), sa = Math.sin(s.ang), r = SN.radius(s) + (s.human ? 0.9 : 0.54); let best = null;
+    M.dots.forEach(d => { if(!d.big && !SN.POWERS[d.k]) return; const dx = d.x - s.x, dy = d.y - s.y, al = dx * ca + dy * sa; if(al <= 0) return;
+      if(Math.abs(-dx * sa + dy * ca) > r * 0.8) return; const tc = (al - r) / v; if(tc > 0.02 && tc <= SNB_LEAD && (!best || tc < best.tc)) best = {d, tc}; });
+    if(!best) return; const key = 'g@' + best.d.x.toFixed(2) + ',' + best.d.y.toFixed(2);
+    if(H.planKey === key) return; H.planKey = key; snbStart(s, 'snakize.grab', now + best.tc, {wait: true, key});
+  });
+}
+// the frame to draw now (null = the game's own pose / reaction); a waiting wind-up holds just before contact, then lets go
+function snbFrame(s){
+  const H = s && SNB_M.get(s), A = H && H.act; if(!A || !G) return null; const now = snbClock();
+  if(A.wait && !A.run.fired && now >= A.run.contactT - 0.02){ if(now > A.run.contactT + 0.3){ H.act = null; return null; } return A.run.last; }
+  const f = A.run.at(now); if(f.done){ H.act = null; return null; } return f;
+}
+// drawRider hook: the beat frame for this rider (+ it hides the old reaction the act replaced); null = draw the old way
+function snbRider(si, a){
+  if(!SNB_HAS || !G || !G.M) return null; const s = G.M.snakes[si], H = s && SNB_M.get(s); if(!H) return null;
+  const F = snbFrame(s), r = G.reacts[si];
+  if(F){ H.cover = r || null; return F; }
+  if(r && r === H.cover && !r.keep) a.gest = null;   // the act already played this moment — no second, older move after it
+  return null;
+}
+function snbPaint(g, a, F, x, y, k, t, pose){
+  if(F){ try { Acting.draw(g, Object.assign({}, a, {gest: null}), x, y, k, F, {t, keep: true, ride: 'keep'}); return; } catch(e){ /* fall back to the old drawing */ } }
+  drawAvatar(g, a, x, y, k, {t, pose});
+}
+// 💥 Snakigate: the popped rider flies off where the snake was (fly → tumble → sit), then fades; gone when the snake comes back
+function snbPopped(g, st, X, Y, sc, t){
+  if(!SNB_HAS || st !== G || !G.M) return;
+  G.M.snakes.forEach((s, si) => { const H = SNB_M.get(s); if(!H || !H.pop || s.alive) return;
+    const A = H.act, F = A && A.act === 'snakize.popped' ? snbFrame(s) : null; if(!F){ H.pop = null; return; }
+    const av = G.avs[si]; if(!av) return; const P = H.pop, el = snbClock() - A.run.contactT, D = (A.run.total - A.run.contactMs) / 1000, q = Math.max(0, Math.min(1, el / Math.max(0.1, D)));
+    const k = Math.max(0.24, SN.radius(s) * sc * 2.6 / 70) * (s.human ? 1.15 : 1), x = X(P.x) + P.face * k * 30 * q, y = Y(P.y) - Math.sin(Math.min(1, q * 1.25) * Math.PI) * k * 38;
+    g.save(); g.globalAlpha = q > 0.85 ? Math.max(0, (1 - q) / 0.15) : 1; snbPaint(g, {name: s.name, av, dir: P.face}, F, x, y, k, t); g.restore(); });
+}
+/* 🎬 SNAKIZE BEATS END */
 /* ================= EVENTS → fx, sounds, rider moves ================= */
 function react(si, g, dur){ if(!G) return; G.reacts[si] = {g, t: 0, d: dur || g.d}; }
 function handleEvents(){
   const M = G.M, ev = SN.takeEvents(M), T = THEMES[G.theme];
+  if(typeof snbEvents === 'function') snbEvents(ev);   /* 🎬 b3b8: contact = the engine's event; wind-ups for the next step */
   if(window.GameComic && ev.length) GameComic._feed(G.mode, ev, M);   /* 💥 ck-2c */
   ev.forEach(e => {
     const s = e.s != null ? M.snakes[e.s] : null, me = s && s.human;
@@ -1979,15 +2089,16 @@ function drawRider(g, si, x, y, k, face, lean, t, opts){
   const s = G.M.snakes[si], av = G.avs[si]; if(!av) return;
   const r = G.reacts[si];
   const a = {name: s.name, av, dir: face >= 0 ? 1 : -1, gest: r && r.g ? {g: r.g, t: r.t} : null};
+  const SNF = typeof snbRider === 'function' ? snbRider(si, a) : null;   /* 🎬 b3b8 */
   if(opts.fallen){
     const q = Math.min(1, opts.fallen);
     g.save(); g.translate(x + face * k * 26 * Math.sin(q * Math.PI), y + k * 4 - Math.sin(q * Math.PI) * k * 30); g.rotate(face * 1.2 * Math.sin(q * Math.PI));
-    drawAvatar(g, {name: s.name, av, dir: a.dir}, 0, 0, k, {t, pose: {armL: 2.4, armR: 2.6, legL: 0.6, legR: -0.6, eyes: 'closed', mouth: 'open'}}); g.restore();
+    snbPaint(g, {name: s.name, av, dir: a.dir}, SNF, 0, 0, k, t, {armL: 2.4, armR: 2.6, legL: 0.6, legR: -0.6, eyes: 'closed', mouth: 'open'}); /* 🎬 b3b8 */ g.restore();
     for(let i = 0; i < 3; i++){ const an = t * 6 + i * 2.1; emo(g, i % 2 ? '⭐' : '💫', x + Math.cos(an) * k * 22, y - k * 66 + Math.sin(an) * k * 6, k * 18); }
     return;
   }
-  g.save(); g.translate(x, y); g.rotate(lean * 0.35);
-  drawAvatar(g, a, 0, 0, k, {t, pose: a.gest ? undefined : RIDE_POSE});
+  g.save(); g.translate(x, y); g.rotate((SNF ? 0 : lean) * 0.35);
+  snbPaint(g, a, SNF, 0, 0, k, t, a.gest ? undefined : RIDE_POSE);   /* 🎬 b3b8 */
   g.restore();
   if(!s.human && (s.robo || !s.name)) emo(g, '🤖', x, y - k * 56, k * 26);
   if(s.shield) { g.save(); g.strokeStyle = 'rgba(110,231,249,0.85)'; g.lineWidth = Math.max(2, k * 4); g.beginPath(); g.arc(x, y - k * 34, k * 46, 0, 7); g.stroke(); g.restore(); }
@@ -2163,6 +2274,7 @@ function gatePaint(g, W, H, st, V){
     drawRider(g, o.si, o.x, o.y - o.r * 0.3, k, o.face, (o.s.turning || 0) * o.face, t);
     if(!o.s.human && k > 0.3){ const nm = snakeName(o.s), fs = Math.max(10, Math.min(14, k * 26)); g.font = '800 ' + fs + 'px Nunito, sans-serif'; const w = g.measureText(nm.replace('🤖 ', '')).width + fs * (nm.indexOf('🤖') === 0 ? 2.2 : 1); g.fillStyle = 'rgba(0,0,0,0.45)'; rrect(g, o.x - w / 2, o.y - k * 92 - fs, w, fs * 1.5, fs * 0.7); g.fill(); g.fillStyle = '#fff'; fxTextPlain(g, nm, o.x, o.y - k * 92 - fs * 0.25, fs); }
   });
+  if(typeof snbPopped === 'function') snbPopped(g, st, X, Y, sc, t);   /* 🎬 b3b8: 💥 the popped rider flies off */
   // fx
   st.fx.forEach(f => { const q = f.t / f.life;
     if(f.k === 'burst'){ const x = X(f.x), y = Y(f.y), r = sc * (f.big ? 3 : 1.8) * (0.3 + q); g.save(); g.globalAlpha = 1 - q; g.strokeStyle = '#FFE36E'; g.lineWidth = 3; for(let i = 0; i < 10; i++){ const a = i / 10 * Math.PI * 2; g.beginPath(); g.moveTo(x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.5); g.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); g.stroke(); } emo(g, '💥', x, y, sc * 1.6 * (1 - q * 0.5)); g.restore(); }
@@ -2685,4 +2797,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a+p3e+cs-2b+ck-2c+pz-1+24n+24s+b3w5b+24u-d1+24t-f) END OF Snakize.html -->
+<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a+p3e+cs-2b+ck-2c+pz-1+24n+24s+b3w5b+24u-d1+24t-f+b3b8) END OF Snakize.html -->
