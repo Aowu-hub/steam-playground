@@ -71,7 +71,11 @@ UI.navBar(document.getElementById('back-btn'), {});
 (function(){
 'use strict';
 const L = window.Loot, $ = id => document.getElementById(id), cv = $('cv'), g = cv.getContext('2d'); L.react();   // ☁️ Sky Pop tap reaction on every button
-const VIEWS = [['tiers', '🎁', 'Rarities'], ['roll', '🎲', 'Roll'], ['bag', '🎒', 'Bag'], ['book', '📖', 'Book']];
+const VIEWS = [['tiers', '🎁', 'Rarities'], ['roll', '🎲', 'Roll'], ['bag', '🎒', 'Bag'], ['fight', '⚔️', 'Fight'], ['book', '📖', 'Book']];
+// 🧙 a lab staff (a game marks its mage weapons with staff: true) — a forged staff powers up spells of ITS element (av-r0g)
+L.add('lab', {staff: {name: 'Oak Staff', kind: 'weapon', slot: 'hand', staff: true, paint: (q, tier) => { const c = ['#B07842', '#7CCB55', '#5AA8FF', '#C69CFF', '#FFC21A', '#FF8FD8', '#FFFFFF'][tier] || '#B07842';
+  q.lineCap = 'round'; q.strokeStyle = '#2A1C14'; q.lineWidth = 14; q.beginPath(); q.moveTo(-26, 60); q.lineTo(20, -40); q.stroke(); q.strokeStyle = '#8A5A2B'; q.lineWidth = 9; q.stroke();
+  q.fillStyle = '#2A1C14'; q.beginPath(); q.arc(24, -50, 21, 0, 7); q.fill(); const gr = q.createRadialGradient(18, -56, 2, 24, -50, 18); gr.addColorStop(0, '#FFFFFF'); gr.addColorStop(1, c); q.fillStyle = gr; q.beginPath(); q.arc(24, -50, 17, 0, 7); q.fill(); }}}, {by: 'LootLab'});
 const SRCS = Object.keys(L.SRC), POOL = ['demo.blade', 'demo.helm', 'demo.amulet'];
 const SETS = {boss: {id: 'jungle-gold', tier: 4, pieces: POOL}, eboss: {id: 'jungle-rainbow', tier: 5, pieces: POOL}, awaken: {id: 'temple-sky', tier: 6, pieces: POOL}, hidden: {id: 'jungle-gold', tier: 4, pieces: POOL}};
 const S = {view: 'tiers', src: 'mini', basic: false, dayN: 0, W: 0, H: 0, dpr: 1, last: null, stats: null, busy: false, sheet: null, drawn: [], frameMs: 0, rolls: 0};
@@ -79,6 +83,11 @@ const S = {view: 'tiers', src: 'mini', basic: false, dayN: 0, W: 0, H: 0, dpr: 1
 function demoBag(){ const r = L.rng('lab-bag'), B = L.bag({slots: 40, c: 250});
   for(let i = 0; i < 30; i++){ const tier = [0, 0, 0, 1, 1, 1, 2, 2, 3, 4, 5, 6][Math.floor(r() * 12)]; B.add({base: POOL[i % 3], tier, lv: 1 + Math.floor(r() * 9), seed: Math.floor(r() * 1e9), sock: L.SOCK[tier], runes: []}); }
   B.lock(0, true); B.mat('scrap', 12); B.mat('spark', 3); B.mat('evolve', 1); B.quest('mango-wood', 5);
+  // 🍙 food + 🧪 potions (×99 stacks) · ⚔️ quick bar · 🔥 cores · a forged 🔥 blade + a forged ⚡ staff (av-r0g)
+  B.use('food.rice', 6); B.use('food.fish', 3); B.use('food.coconut', 12); B.use('food.chili', 1); B.use('food.cake', 2); B.use('potion.heal', 9); B.use('potion.shield', 2); B.use('potion.lucky', 1);
+  B.quick(0, 'potion.heal'); B.quick(1, 'food.rice'); B.quick(2, 'potion.shield'); B.mat('core.fire', 4); B.mat('core.bolt', 2); B.mat('herb', 3); B.mat('mango', 4);
+  const fb = {base: 'demo.blade', tier: 3, lv: 6, seed: 21, sock: L.SOCK[3], runes: []}; L.forge(fb, 'fire', 2); B.g.unshift(fb);
+  const st = {base: 'lab.staff', tier: 2, lv: 5, seed: 22, sock: L.SOCK[2], runes: []}; L.forge(st, 'bolt', 3); B.g.unshift(st);
   B.mail.push({base: 'demo.helm', tier: 3, lv: 4, seed: 11, sock: 1, runes: []}, {base: 'demo.amulet', tier: 2, lv: 2, seed: 12, sock: 1, runes: []});
   B.buy.push({base: 'demo.blade', tier: 1, lv: 3, seed: 13, sock: 0, runes: []}, {base: 'demo.helm', tier: 0, lv: 1, seed: 14, sock: 0, runes: []}); return B; }
 let BAG = demoBag();
@@ -91,14 +100,28 @@ function dock(){ const D = $('dock'); D.innerHTML = '';
     const row2 = document.createElement('div'); row2.className = 'chips'; D.appendChild(row2);
     chipRow(row2, [['go', '▶', 'Roll', 'go'], ['basic', '🌱', S.basic ? 'Basic on' : 'Basic off'], ['stats', '📊', '10 000 rolls'], ['day', '⏭', 'Next day']], S.basic ? 'basic' : null, k => {
       if(k === 'go') doRoll(); else if(k === 'basic'){ S.basic = !S.basic; dock(); } else if(k === 'stats') stats(); else { S.dayN++; note(); } }); }
+  else if(S.view === 'fight'){ const bar = L.quickBar(D, BAG, {onUse: r => { toastEff(r); note(); }}); S.bar = bar;
+    const row = document.createElement('div'); row.className = 'chips'; row.id = 'hits'; D.appendChild(row);
+    chipRow(row, [['blade', '🔥', 'Blade hit'], ['staff', '⚡', 'Staff spell'], ['turn', '⏭', 'Next turn']], null, k => { if(k === 'turn'){ bar.newTurn(); S.hits = null; return; } fight(k); }); }
   else if(S.view === 'bag' || S.view === 'book'){ chipRow(D, [['open', S.view === 'bag' ? '🎒' : '📖', S.view === 'bag' ? 'Open bag' : 'Open book'], ['reset', '🔄', 'New demo bag']], null, k => { if(k === 'reset'){ BAG = demoBag(); } openSheet(); }); } }
 function openSheet(){ if(S.sheet){ S.sheet.close(); S.sheet = null; }
-  if(S.view === 'bag') S.sheet = L.bagSheet(document.body, BAG, {onEquip: it => UI.toast ? UI.toast('⭐ ' + L.get(it.base).name + ' equipped') : 0, onClose: () => { S.sheet = null; }, onChange: note});
+  if(S.view === 'bag') S.sheet = L.bagSheet(document.body, BAG, {onUse: r => toastEff(r), onEquip: it => UI.toast ? UI.toast('⭐ ' + L.get(it.base).name + ' equipped') : 0, onClose: () => { S.sheet = null; }, onChange: note});
   else if(S.view === 'book') S.sheet = L.book(document.body, BAG, {list: POOL, onClose: () => { S.sheet = null; }}); note(); }
 function themeRow(){ const cur = L.theme(); chipRow($('themes'), Object.keys(L.THEMES).map(k => [k, L.THEMES[k].icon, L.THEMES[k].name]), cur, k => { L.theme(k); try { localStorage.setItem('sp_loot_theme', k); } catch(e){} themeRow(); if(S.sheet) openSheet(); }); }
 function setView(v){ S.view = v; if(S.sheet){ S.sheet.close(); S.sheet = null; } chipRow($('views'), VIEWS, v, setView); dock(); if(v === 'bag' || v === 'book') openSheet(); note(); }
+function toastEff(r){ const t = (L.useDef(r.id) || {}).name + ': ' + r.eff.map(e => L.effRow(e)).map(x => x[0] + ' ' + x[1] + ' ' + x[2]).join(' · ') + ' · ×' + r.left + ' left'; if(window.UI && UI.toast) UI.toast(t); S.lastUse = t; }
+// ⚔️ the same hit vs the 8 elements: the forged 🔥 blade (Lv 2) or a ⚡ spell from the forged ⚡ staff (Lv 3)
+const FOES = ['leaf', 'water', 'fire', 'rock', 'bolt', 'wind', 'star', 'dark'];
+function fight(k){ const fb = BAG.g.find(i => i.base === 'demo.blade' && i.el), st = BAG.g.find(i => i.base === 'lab.staff'), base = 100;
+  S.hits = {k, list: FOES.map(e => { const m = k === 'staff' ? L.spellMult(st, 'bolt', e) : L.hitMult(fb, e); return {e, n: Math.round(base * m.x), m}; })}; }
+function vFight(){ const W = S.W, H = S.H, h = S.hits; txt(h ? (h.k === 'staff' ? '⚡ Bolt spell · staff ⚡ Lv 3 (+30 %)' : '🔥 Blade · 🔥 Lv 2 (+10 %)') + ' — base 100' : '⚔️ tap 🔥 Blade hit or ⚡ Staff spell · the quick bar is below', W / 2, 26, Math.max(12, Math.min(16, W / 30)));
+  if(!h) return; const n = h.list.length, cols = W > H ? 8 : 4, rows = Math.ceil(n / cols), cw = W / cols, ch = Math.min(110, (H - 46) / rows);
+  h.list.forEach((x, i) => { const cx = cw * (i % cols) + cw / 2, cy = 46 + ch * Math.floor(i / cols) + ch / 2, E = L.ELS[x.e], r = Math.min(cw, ch) * 0.3;
+    g.fillStyle = E.c; g.globalAlpha = 0.25; g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fill(); g.globalAlpha = 1; txt(E.icon, cx, cy + r * 0.35, r * 0.9); rec(cx - r, cy - r, r * 2, r * 2);
+    txt(x.n + (x.m.arrow ? ' ' + x.m.arrow : ''), cx, cy - r - 4, Math.max(13, r * 0.6), x.m.k === 'strong' ? '#E09A00' : x.m.k === 'normal' ? '#24324A' : '#8A93A8'); txt(E.name, cx, cy + r + 14, 12, '#566A84'); }); }
 function note(){ const n = $('note'); if(S.view === 'tiers') n.textContent = '🎁 7 tiers · the item keeps its look — frame, glow, gem shape tell the tier';
   else if(S.view === 'roll') n.textContent = L.SRC[S.src].icon + ' ' + L.SRC[S.src].name + ' · 🍀 ' + BAG.luck().toFixed(1) + ' / ' + L.LUCK_STEPS + ' · ☁️ ' + BAG.shards() + ' · 📅 ' + day();
+  else if(S.view === 'fight') n.textContent = '⚔️ quick bar: ' + BAG.qb.map((id, i) => (i + 1) + ' ' + (id ? (L.useDef(id) || {}).icon + ' ×' + (BAG.u[id] || 0) : '—')).join(' · ') + (S.lastUse ? ' · last: ' + S.lastUse : '');
   else n.textContent = '🎒 ' + BAG.count() + ' / ' + BAG.slots + ' · 📬 ' + BAG.mail.length + ' · save ' + BAG.size() + ' chars'; }
 async function doRoll(){ if(S.busy) return; S.busy = true; S.rolls++;
   const res = L.roll(S.src, {seed: 'lab:' + S.rolls + ':' + Date.now(), luck: 20, lv: 5, state: BAG.st, pool: POOL, boss: S.src === 'monster' || S.src === 'elite' ? null : 'lab-' + S.src, day: day(), set: SETS[S.src], relic: 'demo.amulet'});
@@ -129,14 +152,14 @@ function vRoll(){ const pad = 12, W = S.W, H = S.H; txt('🍀 lucky meter', pad,
     for(let i = 0; i < 7; i++){ if(!w[i] && !st.cnt[i]) continue; y += bh + 4; const got = st.items ? st.cnt[i] / st.items : 0, want = (w[i] || 0) / tot;
       g.fillStyle = '#E4ECF5'; g.fillRect(pad + 90, y - bh, bw - 90, bh); g.fillStyle = i === 5 ? '#C69CFF' : L.RAR[i].col; g.fillRect(pad + 90, y - bh, (bw - 90) * got, bh);
       g.fillStyle = '#2B2D42'; g.fillRect(pad + 90 + (bw - 90) * want - 1, y - bh - 2, 2, bh + 4); txt(L.RAR[i].name + ' ' + (got * 100).toFixed(1) + '%', pad, y - 3, 12, '#24324A', 'left'); } } }
-const DRAW = {tiers: vTiers, roll: vRoll, bag: () => {}, book: () => {}};
+const DRAW = {tiers: vTiers, roll: vRoll, fight: vFight, bag: () => {}, book: () => {}};
 function frame(now){ size(); S.t = now / 1000; S.drawn = []; const t0 = performance.now(); g.setTransform(S.dpr, 0, 0, S.dpr, 0, 0); g.clearRect(0, 0, S.W, S.H);
   try { DRAW[S.view](); } catch(e){ S.err = e.message; } S.frameMs = S.frameMs * 0.9 + (performance.now() - t0) * 0.1; requestAnimationFrame(frame); }
-window.LK_LAB = {S, setView, themeRow, doRoll, stats, bag: () => BAG, setBag: b => { BAG = b; }, demoBag, POOL, SETS, openSheet};
+window.LK_LAB = {S, setView, themeRow, doRoll, stats, bag: () => BAG, setBag: b => { BAG = b; }, demoBag, POOL, SETS, openSheet, fight};
 try { L.theme(localStorage.getItem('sp_loot_theme') || 'gold'); } catch(e){ L.theme('gold'); } themeRow();   // 🪙 gold = the one look (av-r0e4)
 setView('tiers'); requestAnimationFrame(frame);
 })();
 </script>
 </body>
 </html>
-<!-- (av-r0d3+av-r0e4) END OF LootLab.html -->
+<!-- (av-r0d3+av-r0e4+av-r0g) END OF LootLab.html -->
