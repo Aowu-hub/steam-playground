@@ -1,1 +1,0 @@
-/* 📏 b3w5: the ⚾ ball · ☄️ trail · 🪶 feather rows sat on the old setup screen and scrolled sideways → pages with dots, like every other row (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('#scr-menu .balls', {rows: 2}); }
