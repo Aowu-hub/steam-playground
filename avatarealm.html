@@ -355,6 +355,7 @@ function sideFor(C, t){ if(t === 0) return C.side; const r = C.rival || 'auto';
   if(SIDE_KEYS.indexOf(r) >= 0) return r; if(r === 'rand'){ const h = Math.abs(Math.sin((C.seed || 1) * 91.7 + t * 12.9898) * 43758.5453) % 1; return SIDE_KEYS[Math.floor(h * 4) % 4]; }
   return t % 2 ? RIVAL[C.side] : C.side; }
 const ROLE = {worker: ['⛑️', 'Bricklet'], foot: ['🛡️', 'Stomper'], spear: ['🔱', 'Pokelancer'], archer: ['🏹', 'Twangster'], rider: ['🐴', 'Saddlebuddy'], flyer: ['🪽', 'Flapper'], healer: ['🩹', 'Patchie'], siege: ['🛞', 'Bonkwagon'], hero: ['👑', 'Hero']};
+const GEM_IC = {r: '🔴', b: '🔵', g: '🟢', p: '🟣'}, STAGE_IC = ['⚪', '⚪', '🗡️', '🎽', '🔥', '💪'], STAGE_TIP = ['', '', '🗡️ ⚔️ +10 %', '🎽 ❤️ +10 %', '🔥 ⚔️ +10 % more', '💪 ❤️ +10 % more'];   // ⭐ R2.2
 const SLOT_ICON = {house: '🏠', camp: '🏕️', ride: '🎠', nest: '🪽', care: '🩹', workshop: '🔧', tower: '🗼', wardrobe: '🎨'};
 const FIGHT = ['hero', 'foot', 'spear', 'archer', 'rider', 'flyer', 'healer', 'siege'];
 const TRAIN = ['worker', 'foot', 'spear', 'archer', 'rider', 'flyer', 'healer', 'siege'];
@@ -408,14 +409,19 @@ function build(){ const C = S.cfg, L = AR.land({size: C.size, teams: C.teams, se
       const it = addItem(Props.place(map, Props.AR.resKey(side, p.kind === 'c' ? 'coin' : 'brick'), c.i, c.j, {look: side, v: res.length % 3, state: 'full'})); if(it) res.push({kind: p.kind, i: it.x, j: it.y, n: 300, it}); });
     teams.push({side, color: teamHex(t), house: H, door, res, human: t === 0, houseIt: house, form: t === 0 && C.form ? C.form : undefined}); });   /* 🎖️ ar-r1c: My formation = T.form */
   const rich = []; (L.rich || []).forEach(p => { const c = AR.freeNear(map, p.x + 0.5, p.y + 0.5, ctr); if(!c) return; const it = addItem(Props.place(map, 'coinrock', c.i, c.j, {look: 'realm', v: 1, state: 'full'})); if(it) rich.push({kind: 'c', i: c.i, j: c.j, n: 600, it}); });
+  // ⭐💎 R2.2: 💎 gem ore 2 behind every House + 2 in the middle (🌋+) · ⭐ star shrines between every door and the middle + 🌟 the Great one (🔦+)
+  if((C.level | 0) >= 4){ teams.forEach(T => AR.gemSpots(map, T, ctr).forEach((g, q) => { const it = addItem(Props.place(map, Props.AR.resKey(T.side, 'gem'), g.i, g.j, {look: T.side, v: q % 3, state: 'full'})); if(it) T.res.push({kind: 'g', i: it.x, j: it.y, n: AR.GEM_N, it}); }));
+    [[-3, 2], [3, -2]].forEach(([a, b], q) => { const c = AR.freeNear(map, ctr.i + a + 0.5, ctr.j + b + 0.5, ctr); if(!c) return; const it = addItem(Props.place(map, 'gemore', c.i, c.j, {look: 'realm', v: q + 1, state: 'full'})); if(it) rich.push({kind: 'g', i: c.i, j: c.j, n: AR.GEM_N, it}); }); }
+  const shrines = (C.level | 0) >= 2 ? AR.shrineSpots(map, L, teams).map(s => { const it = addItem(Props.place(map, 'realm_shrine', s.i, s.j, {look: 'realm'})); return it ? {i: it.x, j: it.y, great: !!s.great, it} : null; }).filter(Boolean) : [];
+  S.shrineCells = new Set(); shrines.forEach(q => { for(let b = -1; b < 3; b++) for(let a = -1; a < 3; a++) S.shrineCells.add((q.i + a) + ',' + (q.j + b)); });
   decor(map, L, teams);
-  S.M = AR.newMatch({map, teams, level: C.level, seed: C.seed, placer: PLACER, rich});
+  S.M = AR.newMatch({map, teams, level: C.level, seed: C.seed, placer: PLACER, rich, shrines});
   S.M.teams.forEach((T, t) => { T.res.forEach((r, q) => { r.it = teams[t].res[q].it; }); }); S.M.rich.forEach((r, q) => { r.it = rich[q] && rich[q].it; });
   S.M.blds.forEach(b => { if(b.slot === 'house') b.it = teams[b.team].houseIt; });
   S.terr = null; syncUnits(1); }
 // 🌴 jungle decor far from every town + the middle lanes (never inside a territory: towns grow there)
 function decor(map, L, teams){ const keys = ['palm', 'bush', 'fern', 'rock', 'flowerpot'].filter(k => { try{ return !!Props.list().find(p => p.key === k); }catch(e){ return false; } }); if(!keys.length) return;
-  const far = (i, j) => teams.every(T => Math.hypot(i - T.house.i, j - T.house.j) > 11) && Math.hypot(i - L.centre.i, j - L.centre.j) > 6;
+  const far = (i, j) => teams.every(T => Math.hypot(i - T.house.i, j - T.house.j) > 11) && Math.hypot(i - L.centre.i, j - L.centre.j) > 6 && !(S.shrineCells && S.shrineCells.has(i + ',' + j));
   let n = 0; for(let j = 2; j < L.h - 2; j++) for(let i = 2; i < L.w - 2; i++){ const c = map.get(i, j); if(!c || c.t === 'void' || c.fade < 1 || !map.walk(i, j) || !far(i, j)) continue;
     const h = Math.abs(Math.sin(i * 12.9898 + j * 78.233 + S.cfg.seed) * 43758.5453) % 1; if(h > 0.045) continue; if(addItem(Props.place(map, keys[n % keys.length], i, j, {look: 'jungle', v: n % 3}))) n++; } }
 
@@ -439,13 +445,21 @@ function events(){ const M = S.M; for(const e of AR.takeEvents(M)){
     else if(e.k === 'house.up'){ const b = M.blds.find(x => x.id === e.b); if(b && b.it){ b.it.state = String(e.lv); Props.AR.set(b.it, {}, M.map); } }
     else if(e.k === 'res.state'){ const r = M.teams.flatMap(T => T.res).concat(M.rich).find(q => q.i === e.i && q.j === e.j); if(r && r.it){ r.it.state = e.state; Props.AR.set(r.it, {}, M.map); } }
     else if(e.k === 'build.place') S.terr = null;
+    else if(e.k === 'shrine.taken' || e.k === 'shrine.lost'){ const q = M.shrines[e.s]; if(q){ const x = q.i + 1, y = q.j + 1, nm = q.great ? '🌟 Great Shrine' : '⭐ Shrine';
+      if(e.k === 'shrine.taken') sqTag(x, y, 2.2, e.team === 0 ? nm + ' is yours!' : sideOf(e.team).icon + ' took a ' + (q.great ? 'Great Shrine' : 'shrine'), e.team === 0 ? 'go' : 'warn');
+      else if(e.team === 0) sqTag(x, y, 2.2, nm + ' lost!', 'warn'); else if(e.by === 0) sqTag(x, y, 1.8, '⚔️ Shrine freed — hold it!', 'go'); } }
+    else if(e.k === 'gem.slot' && e.team === 0) tip('💎 ' + AR.GEMS[e.gem].name + ' set: ' + AR.GEMS[e.gem].does);
     else if(e.k === 'counter.hit' && e.team === 0) S.ctrT = M.t;
     else if(e.k === 'squad.make' && e.team === 0) M.teams[0].squadsMade = (M.teams[0].squadsMade || 0) + 1;
     else if(e.k === 'squad.drop' && e.team === 0) sqTag(e.x, e.y, 1.8, ROLE[e.role][0] + ' left Squad ' + e.n, 'warn');
     else if(e.k === 'squad.makeway' && e.team === 0){ const sq = AR.squadByN(M, 0, e.n); if(sq) sqTag(sq.a.x, sq.a.y, 1.9, '🛞 Make way!', 'go'); }
     else if(e.k === 'match.win'){ UI.toast && UI.toast('🏆 ' + sideOf(e.team).icon + ' ' + sideOf(e.team).name + ' wins!'); matchEnd(e.team === 0); }
     else if(e.k === 'team.down' && e.team === 0 && !M.over) matchEnd(false); }
-  for(const b of M.blds) if(b.hp <= 0 && b.it && !b.ruined){ b.ruined = true; b.it.cond = 'ruined'; Props.AR.set(b.it, {}, M.map); } }
+  for(const b of M.blds) if(b.hp <= 0 && b.it && !b.ruined){ b.ruined = true; b.it.cond = 'ruined'; Props.AR.set(b.it, {}, M.map); }
+  syncShrines(); }
+// ⭐ shrine props follow the engine: owner colour + the capture ring (redrawn in 5 % steps only)
+function syncShrines(){ const M = S.M; for(const q of M.shrines || []){ if(!q.it) continue; const cap = q.by >= 0 ? Math.round(q.cap / 5) * 5 : 0, k = q.owner + ':' + q.by + ':' + cap; if(q.it._k === k) continue; q.it._k = k;
+    Props.AR.set(q.it, {team: q.owner >= 0 ? teamHex(q.owner) : null, by: q.by >= 0 && cap > 0 ? teamHex(q.by) : null, cap}, M.map); } }
 let lastHurt = new Map();
 function step(dt){ if(S.paused || !S.M) return; const M = S.M; AR.step(M, dt * (S.speed || 1));
   for(const u of M.units){ if(u.hurtT === M.t && lastHurt.get(u.id) !== M.t){ lastHurt.set(u.id, M.t); if(S.sparks.length < 60) S.sparks.push({x: u.x, y: u.y, z: u.fly ? 1.3 : 0, t: S.t, c: teamHex(u.team)}); } }
@@ -486,6 +500,8 @@ function sparks(g, V, t){ for(let q = S.sparks.length - 1; q >= 0; q--){ const s
   g.globalAlpha = 1; }
 // ❤️ HP bars (hurt units + buildings) · 🏗️ build % chips · 🏠 House pins
 function overlay(g, V){ const M = S.M, s = V.zoom; ghostLine(g, V); g.lineWidth = 1;
+  for(const q of M.shrines || []){ if(!q.great) continue; const p = V.toScreen(q.i + 1, q.j + 1, 0), r = Math.max(9, 12 * s), y = p.y - 104 * s - r; if(p.x < -30 || p.y < -60 || p.x > V.W + 30 || p.y > V.H + 60) continue;   /* 🌟 the Great Shrine badge (×2 stars) */
+    g.fillStyle = '#FFF8D6'; g.strokeStyle = q.owner >= 0 ? teamHex(q.owner) : '#E2B53A'; g.lineWidth = 3; g.beginPath(); g.arc(p.x, y, r, 0, 6.2832); g.fill(); g.stroke(); if(typeof emo === 'function') emo(g, '🌟', p.x, y, r * 1.3); g.lineWidth = 1; }
   S.uit.forEach(it => { const u = it.u; if(M.t - u.hurtT > 2 || u.hp >= u.max) return; const p = V.toScreen(it.x, it.y, it.z), w = 22 * s, y = p.y - (u.role === 'hero' ? 52 : 42) * s - (u.role === 'rider' ? 12 * s : 0);
     if(p.x < -30 || p.y < -60 || p.x > V.W + 30 || p.y > V.H + 30) return; bar(g, p.x - w / 2, y, w, 3, u.hp / u.max); });
   for(const b of M.blds){ if(b.gone || b.hp <= 0) continue; const p = V.toScreen(b.i + b.w / 2, b.j + b.d / 2, 0), top = p.y - (b.slot === 'house' ? 112 : b.slot === 'tower' ? 96 : 80) * s;
@@ -522,7 +538,7 @@ function buildCards(){ const box = $('cards'), side = sideOf(0), T = S.M.teams[0
 function costHtml(c){ const side = sideOf(0), E = S.M.teams[0].eco; return '<span' + (E.c < c[0] ? ' class="no"' : '') + '>' + side.res.c[0] + c[0] + '</span>' + (c[1] ? '<span' + (E.b < c[1] ? ' class="no"' : '') + '>' + side.res.b[0] + c[1] + '</span>' : ''); }
 function hud(force){ const M = S.M, T = M.teams[0], side = sideOf(0); if(!M) return;
   const army = AR.count(M, 0), workers = M.units.filter(u => u.team === 0 && !u.dead && u.role === 'worker').length;
-  BAR.count('c', side.res.c[0], Math.floor(T.eco.c), side.res.c[1]); BAR.count('b', side.res.b[0], Math.floor(T.eco.b), side.res.b[1]); BAR.count('army', '👥', army + '/' + T.cap, 'Army / cap', army >= T.cap); BAR.time(Math.floor(M.t));
+  BAR.count('c', side.res.c[0], Math.floor(T.eco.c), side.res.c[1]); BAR.count('b', side.res.b[0], Math.floor(T.eco.b), side.res.b[1]); if(M.kinds.indexOf('s') >= 0) BAR.count('s', side.res.s[0], Math.floor(T.eco.s || 0), side.res.s[1]); if(M.kinds.indexOf('g') >= 0) BAR.count('g', side.res.g[0], Math.floor(T.eco.g || 0), side.res.g[1]); BAR.count('army', '👥', army + '/' + T.cap, 'Army / cap', army >= T.cap); BAR.time(Math.floor(M.t));
   $('army-who').innerHTML = side.icon + ' <b>' + army + ' / ' + T.cap + '</b> · ⛑️ ' + workers;
   const n = {}; M.units.forEach(u => { if(u.team === 0 && !u.dead) n[u.role] = (n[u.role] || 0) + 1; }); const pickedRoles = new Set(); S.sel.forEach(id => { const u = M.byId.get(id); if(u) pickedRoles.add(u.role); });
   document.querySelectorAll('#faces .face').forEach(b => { const r = b.dataset.role; b.querySelector('b').textContent = n[r] || 0; b.classList.toggle('none', !n[r]); b.classList.toggle('on', pickedRoles.has(r)); b.classList.toggle('ctr', S.ctrT != null && M.t - S.ctrT < 1.5 && pickedRoles.has(r)); });
@@ -556,6 +572,7 @@ function onTap(cell, px, py){ const M = S.M; if(!M || S.paused) return; hideInfo
   // nothing picked: a tap only LOOKS (Aowu Q1) — ℹ️ info card, never an order
   if(foe && foe.team !== 0) return showInfo({k: 'unit', u: foe}, px, py);
   if(fb) return showInfo({k: 'bld', b: fb}, px, py);
+  const q = cell && AR.shrineAt(M, cell.i, cell.j); if(q) return showInfo({k: 'shrine', q}, px, py);
   const r = cell && resAt(cell); if(r) return showInfo({k: 'res', r}, px, py);
   if(cell) showInfo({k: 'land', cell}, px, py); }
 function pickNear(u){ const M = S.M; S.sel.clear(); M.units.forEach(x => { if(x.team === 0 && !x.dead && x.role === u.role && Math.hypot(x.x - u.x, x.y - u.y) < 4) S.sel.add(x.id); }); hud(); }
@@ -586,7 +603,8 @@ function placeDom(){ const V = S.V; if(!V) return;
   if(gd && S.cfg.level === 0){ if(gd.spot && gd.slot && S.ghost && S.ghost.slot === gd.slot){ if(S.ghost.i === gd.spot.i && S.ghost.j === gd.spot.j && S.ghost.ok === true){ const r = $('gc-ok').getBoundingClientRect(); hp = {x: r.left + r.width / 2, y: r.bottom - 4}; } else { const f = AR.foot(gd.slot, gd.spot.i, gd.spot.j, gd.spot.turn), p = V.toScreen(f.i + f.w / 2, f.j + f.d / 2, 0); hp = {x: p.x, y: p.y}; } }
     else { const el = gd.k === 'group' && S.sel.size ? document.querySelector('#cmd [data-k="group"]') : gd.k === 'attack' && sqList().length ? document.querySelector('#sqbs .sqb') : document.querySelector('#cards .tcard.glow, #tabs .glow, #army-all.glow'); if(el){ const r = el.getBoundingClientRect(); hp = {x: r.right - 6, y: r.top + r.height * 0.5}; } } }   // 👆 at the button's right edge — its word stays readable
   hand.classList.toggle('hidden', !hp); if(hp){ hand.style.left = hp.x + 'px'; hand.style.top = hp.y + 'px'; }
-  placeBanners(); placeSquad(); if(S.infoAt && !$('info').classList.contains('hidden')){ const a = S.infoAt, w = a.k === 'unit' ? {x: a.u.x, y: a.u.y, z: 1.2} : a.k === 'bld' ? {x: a.b.i + a.b.w / 2, y: a.b.j + a.b.d / 2, z: 3} : a.k === 'res' ? {x: a.r.i + 0.5, y: a.r.j + 0.5, z: 1.5} : {x: a.cell.i + 0.5, y: a.cell.j + 0.5, z: 0}; const p = V.toScreen(w.x, w.y, w.z); placeInfo(p.x, p.y); }
+  placeBanners(); placeSquad(); if(S.infoAt && !$('info').classList.contains('hidden')){ const a = S.infoAt, w = a.k === 'unit' ? {x: a.u.x, y: a.u.y, z: 1.2} : a.k === 'bld' ? {x: a.b.i + a.b.w / 2, y: a.b.j + a.b.d / 2, z: 3} : a.k === 'res' ? {x: a.r.i + 0.5, y: a.r.j + 0.5, z: 1.5} : a.k === 'shrine' ? {x: a.q.i + 1, y: a.q.j + 1, z: 2} : {x: a.cell.i + 0.5, y: a.cell.j + 0.5, z: 0}; const p = V.toScreen(w.x, w.y, w.z);
+    if(a.k === 'shrine'){ const k = a.q.owner + ':' + a.q.by + ':' + Math.round(a.q.cap / 10) + ':' + !!a.q.contest; if(a._k !== k){ a._k = k; showInfo(a, p.x, p.y); } }   /* ⭐ the card follows the capture */ placeInfo(p.x, p.y); }
   const T0 = S.M.teams[0], fl = $('flag'); fl.classList.toggle('hidden', !T0.rally); if(T0.rally){ const p = V.toScreen(T0.rally.x, T0.rally.y, 0); fl.style.left = p.x + 'px'; fl.style.top = p.y + 'px'; } }
 
 /* ---------- 🔲 box pick + 👻 ghost drag (one finger; the camera stays still for that drag) ---------- */
@@ -722,7 +740,16 @@ function showInfo(it, px, py){ const M = S.M, el = $('info'), side0 = sideOf(0);
     if(mine && mk.length) h += '<div class="row">' + (b.q.length ? '<span class="q">' + b.q.map(x => x.role ? ROLE[x.role][0] : '🎨').join('') + '</span>' : '<span class="sub">Queue empty</span>') + '</div><div class="row">' + mk.map(r => '<button class="sp-btn sp-primary" data-train="' + r + '">' + ROLE[r][0] + ' ' + side0.role[r] + '</button>').join('') + '</div>';
     if(mine && mk.length && mk[0] !== 'worker' && sqList().length) h += '<div class="rsq">🚩 New ones join: <button class="sp-btn sp-secondary' + (!b.rallySq ? ' on' : '') + '" data-rsq="0">—</button>' + sqList().map(q => '<button class="sp-btn sp-secondary' + (b.rallySq === q.n ? ' on' : '') + '" data-rsq="' + q.n + '">' + q.n + '</button>').join('') + '</div>';
     if(mine && b.slot === 'house' && AR.HOUSE_UP[b.lv + 1]){ const c = AR.HOUSE_UP[b.lv + 1].cost; h += '<div class="row"><button class="sp-btn sp-secondary" data-up="1">⬆️ ' + sd.house[b.lv] + ' · ' + costHtml(c) + '</button></div>'; }
+    if(mine && b.slot === 'house' && M.level >= 4){ const T = M.teams[0]; h += '<div class="row">' + Object.keys(AR.GEMS).map(k => '<button class="sp-btn ' + (T.gems[k] ? 'sp-ghost on' : 'sp-secondary') + '" data-gem="' + k + '" title="' + AR.GEMS[k].does + '"' + (T.gems[k] ? ' disabled' : '') + '>' + GEM_IC[k] + (T.gems[k] ? ' ✓' : ' ' + side0.res.g[0] + AR.GEM_SLOT) + '</button>').join('') + '</div><div class="sub">👑 hero gems: 🔴 ⚔️ · 🔵 ❤️ · 🟢 💨 · 🟣 ⏱️</div>'; }
+    if(mine && b.slot === 'wardrobe' && b.done){ const rs = Object.keys(ROLE).filter(r => r !== 'hero' && r !== 'worker' && AR.canMake(M, M.teams[0], r)), top = M.level >= 2 ? 5 : 3;
+      h += '<div class="row">' + (rs.length ? rs.map(r => { const s = AR.stageOf(M, 0, r), nx = AR.STAGE_UP[s + 1], can = s < top && nx; return '<button class="sp-btn ' + (can ? 'sp-secondary' : 'sp-ghost') + '" data-stage="' + r + '"' + (can ? '' : ' disabled') + '>' + ROLE[r][0] + ' ' + STAGE_IC[s] + (can ? ' → ' + STAGE_IC[s + 1] + ' ' + costHtml(nx.cost) + (nx.s ? ' ' + side0.res.s[0] + nx.s : '') : ' ✓') + '</button>'; }).join('') : '<span class="sub">Build a 🏕️ first</span>') + '</div><div class="sub">' + STAGE_TIP.slice(2, top + 1).join(' · ') + '</div>'; }
     if(!mine) h += '<div class="tipl">⚡ 🛞 ' + side0.role.siege + ' hits buildings ×3</div>'; }
+  else if(it.k === 'shrine'){ const q = it.q, ow = q.owner >= 0 ? sideOf(q.owner) : null, by = q.by >= 0 ? sideOf(q.by) : null, st = sideOf(0).res.s;
+    h = head(q.great ? '🌟' : '⭐', q.great ? 'Great Star Shrine' : 'Star Shrine', ow ? (q.owner === 0 ? '✓ Yours · ' : '') + ow.icon + ' ' + ow.name : 'Nobody holds it yet')
+      + (by && q.cap > 0 ? hp(q.cap / 100, teamHex(q.by)) + by.icon + ' taking it · ' + Math.round(q.cap) + '%' : '') + (q.contest ? '<div class="tipl" style="background:#FFF0F2;color:#C92C4A">⚔️ Both sides inside — nobody gains</div>' : '')
+      + '<div class="tipl">' + st[0] + ' +' + (q.great ? 2 : 1) + ' ' + st[1] + ' every 4 s · 💚 heals your fighters on it</div><div class="sub">Walk fighters in to take it (8 s, more = faster) · Bricklets can\'t</div>'; }
+  else if(it.k === 'res' && it.r.kind === 'g'){ const r = it.r, g = side0.res.g;
+    h = head('💎', r.rich ? '💎 Middle gem ore' : 'Gem ore', 'Bricklets dig it slowly · ' + g[0] + ' ' + g[1]) + hp(r.n / r.max, '#9B6BFF') + g[0] + ' ' + Math.round(r.n) + ' / ' + r.max + ' left' + '<div class="sub">grows back 120 s after it is empty · 🏠 House → 💎 hero gems</div>'; }
   else if(it.k === 'res'){ const r = it.r, coin = r.kind === 'c', ic = coin ? side0.res.c[0] : side0.res.b[0];
     h = head(coin ? '🪨' : '🌳', coin ? (r.rich ? '💰 Rich coin rock' : 'Coin rock') : 'Brick tree', 'Bricklets gather it by themselves') + hp(r.n / r.max, coin ? '#FFC21A' : '#3DBE6A') + ic + ' ' + Math.round(r.n) + ' / ' + r.max + ' left' + '<div class="sub">grows back 60 s after it is empty</div>'; }
   else { const c = it.cell, cl = S.map.get(c.i, c.j) || {}, own = territory().find(q => q[0] === c.i && q[1] === c.j), who = own ? sideOf(own[2]) : null, can = AR.canPlace(M, 0, 'tower', c.i, c.j, 0) === true;
@@ -730,6 +757,8 @@ function showInfo(it, px, py){ const M = S.M, el = $('info'), side0 = sideOf(0);
     h = head('🗺️', TN[cl.t] || '🌿 Land', who ? who.icon + ' ' + who.name + ' land' : 'Nobody\'s land yet') + '<div class="tipl" style="' + (can ? '' : 'background:#FFF0F2;color:#C92C4A') + '">' + (can ? '✓ You can build here' : cl.t === 'water' ? '✗ Too wet to build' : who && own[2] !== 0 ? '✗ Rival land' : '✗ Build next to your own buildings') + '</div>'; }
   el.innerHTML = h; el.classList.remove('hidden'); cmdBar(true);
   el.querySelectorAll('[data-x]').forEach(b => b.onclick = () => hideInfo()); el.querySelectorAll('[data-train]').forEach(b => b.onclick = () => train(b.dataset.train)); el.querySelectorAll('[data-up]').forEach(b => b.onclick = () => houseUp());
+  el.querySelectorAll('[data-gem]').forEach(b => b.onclick = () => { const r = AR.gemUp(M, 0, b.dataset.gem); if(r !== true) tip(r === 'cost' ? '💎 Need ' + AR.GEM_SLOT + ' ' + sideOf(0).res.g[1] : '💎 Not now'); showInfo(it, px, py); });
+  el.querySelectorAll('[data-stage]').forEach(b => b.onclick = () => { const r = AR.stageUp(M, 0, b.dataset.stage); tip(r === true ? '🎨 Stage up started' : r === 'cost' ? '✗ Not enough yet' : r === 'busy' ? '🎨 Already stepping up' : r === 'full' ? '🎨 The Wardrobe is busy' : '✗ Not now'); showInfo(it, px, py); });
   el.querySelectorAll('[data-rsq]').forEach(x => x.onclick = () => { AR.rallySquad(M, 0, it.b.id, +x.dataset.rsq); showInfo(it, px, py); tip(+x.dataset.rsq ? '🚩 New units join Squad ' + x.dataset.rsq : '🚩 New units stay at the building'); });
   S.infoAt = it; placeInfo(px, py); }
 function placeInfo(px, py){ const el = $('info'); if(el.classList.contains('hidden')) return; const w = el.offsetWidth, h = el.offsetHeight, top = S.top + 6, x = Math.max(w / 2 + 8, Math.min(innerWidth - w / 2 - 8, px)), y = Math.max(top + h, Math.min(S.dockTop - 14, py - 24));
@@ -781,7 +810,7 @@ function layout(){ const gb = $('gbar').getBoundingClientRect(); S.top = Math.ro
 let BAR = null;
 function makeBar(){ if(!BAR) BAR = UI.gameBar($('gbar'), {game: GAME_ID, icon: '🏰', name: 'AvataRealm', levels: () => toSetup(true), playing: () => !!S.M && !S.M.over,
     pauseButton: true, pause: {pause: () => { S.paused = true; }, resume: () => { S.paused = false; }}, onFit: () => requestAnimationFrame(layout), scoreMin: '4ch'});
-  BAR.level(LEVEL_NAMES[S.cfg.level]); const side = SIDE[S.cfg.side]; BAR.count('c', side.res.c[0], 0, side.res.c[1]); BAR.count('b', side.res.b[0], 0, side.res.b[1]); BAR.count('army', '👥', '0/10'); BAR.time(0); BAR.fit(); }
+  BAR.level(LEVEL_NAMES[S.cfg.level]); const side = SIDE[S.cfg.side]; BAR.count('c', side.res.c[0], 0, side.res.c[1]); BAR.count('b', side.res.b[0], 0, side.res.b[1]); const ks = AR.RES_FOR(S.cfg.level | 0); if(ks.indexOf('s') >= 0) BAR.count('s', side.res.s[0], 0, side.res.s[1]); if(ks.indexOf('g') >= 0) BAR.count('g', side.res.g[0], 0, side.res.g[1]); BAR.count('army', '👥', '0/10'); BAR.time(0); BAR.fit(); }
 
 /* ---------- 🔧 boot ---------- */
 async function start(){ S.ready = false; if(S.loop){ S.loop.stop(); S.loop = null; } S.over = false; S.speed = [0.7, 1, 1.5][S.cfg.speed == null ? 1 : S.cfg.speed]; const lb = p => { $('load-bar').style.width = Math.round(p * 100) + '%'; };
@@ -794,7 +823,7 @@ async function start(){ S.ready = false; if(S.loop){ S.loop.stop(); S.loop = nul
   S.V = Iso.view(freshCanvas(), S.map, {bg: 'none', shadow: true, min: 0.3, max: 2.4}); S.V.resize(); S.V.onTap = (c, px, py) => onTap(c, px, py); bindPointer(S.V.cv);
   makeBar(); layout(); const small = Math.min(innerWidth, innerHeight) < 600, d = S.V.dpr || 1; S.V.zoom = Iso.stepFor((small ? 0.75 : 1) * d) / d;
   const H = S.M.teams[0].house; S.V.centerOn(H.i + H.w / 2 + 3, H.j + H.d / 2 + 1);
-  S.mm = Iso.minimap($('mini-cv'), S.map, S.V, {dots: () => { const a = []; S.uit.forEach(it => a.push({x: it.x, y: it.y, c: teamHex(it.u.team)})); return a; }});
+  S.mm = Iso.minimap($('mini-cv'), S.map, S.V, {dots: () => { const a = []; (S.M.shrines || []).forEach(q => a.push({x: q.i + 1, y: q.j + 1, c: q.owner >= 0 ? teamHex(q.owner) : '#FFE27A', r: q.great ? 4 : 3})); S.uit.forEach(it => a.push({x: it.x, y: it.y, c: teamHex(it.u.team)})); return a; }});
   buildFaces(); buildCards(); UI.pageRow($('cards'), {rows: innerWidth / innerHeight < 0.8 ? 2 : 1, edge: true}); layout();
   const pics = []; for(let t = 0; t < S.M.teams.length; t++){ TRAIN.forEach(r => { for(let v = 0; v < SKIN_NV; v++) pics.push(...picsFor(t, r, null, v)); }); pics.push(...picsFor(t, 'hero', null, -1)); }
   lb(0.3); await Props.warm(S.props, S.V, {onProgress: f => lb(0.3 + f * 0.3)}); await Iso.warm(pics, S.V, {onProgress: f => lb(0.6 + f * 0.4)});
@@ -813,7 +842,7 @@ function controls(){
 
 /* ---------- 🧪 test + picture hooks ---------- */
 function ff(sec){ const M = S.M, dt = 1 / 30; for(let k = 0; k < sec * 30 && !M.over; k++){ AR.step(M, dt); events(); } syncUnits(1); hud(true); }
-window.AVATAREALM = {SIDE_KEYS, RIVAL, sideFor, sidesInPlay, selInfo, pickSquad, doGroup, doSplit, openForm, closeForm, moveRole, chipTap, placeBanners, bar: () => BAR, showInfo, cmdDo, cmdBar, dragTo, dropAt, squadMenu, pickNear, S, AR, SIDE, ff, start, onTap, startPlace, moveGhost, cancelPlace, confirmPlace, pickRole, pickAll, arm, boxPick, train, houseUp, layout, hud, buildCards, territory};
+window.AVATAREALM = {SIDE_KEYS, RIVAL, sideFor, sidesInPlay, syncShrines, selInfo, pickSquad, doGroup, doSplit, openForm, closeForm, moveRole, chipTap, placeBanners, bar: () => BAR, showInfo, cmdDo, cmdBar, dragTo, dropAt, squadMenu, pickNear, S, AR, SIDE, ff, start, onTap, startPlace, moveGhost, cancelPlace, confirmPlace, pickRole, pickAll, arm, boxPick, train, houseUp, layout, hud, buildCards, territory};
 /* ================= 🎬 ar-r1c — the game's frame: 🎬 cover B · 🧾 one setup page (+ 🎖️ My formation) · 🏁 result · 💾 saves (plan §16r) =================
    The page opens on the cover (GameFrame GF.cover, btns: 'centre'); ▶ Play → the setup page; ▶ Start builds the match from the picks; the match end → GF.result.
    The hidden test route `?lv=<n>` still drops straight into a match (avatarealm.js). Picks + formation = PLAYER-based (Settings AvaRealm_<Name>, newest wins). */
@@ -959,11 +988,11 @@ function continueFrom(slot, file){ if(!file || !file.data || !file.data.cfg || !
 // 💾 put a saved match back on a freshly built island of the same seed (build() already placed the Houses + resources)
 function restoreMatch(sv){ const old = S.M, houses = old.teams.map((T, t) => { const b = old.blds.find(x => x.team === t && x.slot === 'house'); return b && b.it; }), its = new Map();
   old.teams.forEach(T => T.res.forEach(r => r.it && its.set(r.i + ',' + r.j, r.it))); old.rich.forEach(r => r.it && its.set(r.i + ',' + r.j, r.it));
-  const M = AR.load(sv, {map: S.map, placer: PLACER, houseIt: t => houses[t]});
+  const M = AR.load(sv, {map: S.map, placer: PLACER, houseIt: t => houses[t], shrineIt: n => old.shrines && old.shrines[n] ? old.shrines[n].it : null});
   M.teams.forEach(T => T.res.forEach(r => { r.it = its.get(r.i + ',' + r.j); })); M.rich.forEach(r => { r.it = its.get(r.i + ',' + r.j); });
   M.teams.flatMap(T => T.res).concat(M.rich).forEach(r => { if(r.it){ r.it.state = AR.resState(r); Props.AR.set(r.it, {}, S.map); } });
   M.blds.forEach(b => { if(b.slot === 'house'){ b.it = houses[b.team]; if(b.it){ b.it.state = String(b.lv || 1); } } if(b.it) Props.AR.set(b.it, {build: b.done ? 100 : Math.round((b.prog || 0) * 100)}, S.map); if(b.hp <= 0 && b.it){ b.ruined = true; b.it.cond = 'ruined'; Props.AR.set(b.it, {}, S.map); } });
-  S.M = M; S.terr = null; S.uit.clear(); syncUnits(1); }
+  M.shrines.forEach(q => { if(q.it) q.it._k = null; }); S.M = M; S.terr = null; S.uit.clear(); syncUnits(1); syncShrines(); }
 function stopMatch(keepSave){ if(R1.saves){ if(keepSave) try { const st = S.M && !S.M.over ? {data: {cfg: S.cfg, save: AR.save(S.M)}} : null; if(st) R1.saves.checkpoint(); } catch(e){} R1.saves.stop(); }
   if(S.loop){ S.loop.stop(); S.loop = null; } S.paused = false; cancelPlace(); if(S.form) closeForm(); S.sel.clear(); hideInfo(); }
 function toSetup(){ if(S.M && !S.M.over) stopMatch(true); else stopMatch(false); S.M = null; closeResult(); showSetup(); refreshSaves(); }
@@ -997,4 +1026,4 @@ controls(); boot();
 </script>
 </body>
 </html>
-<!-- (ar-r2-1b) END OF AvataRealm.html -->
+<!-- (ar-r2-2) END OF AvataRealm.html -->
