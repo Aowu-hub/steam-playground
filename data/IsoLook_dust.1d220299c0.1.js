@@ -1,0 +1,417 @@
+
+/* 🌍 IsoLook_dust — 🐰 Dust Bunny Gang — AvataRealm side ④b on 🏜️ desert, dusty: 11 buildings · own floor · own resource shapes (lint heap · button tin · jewel sock) · own walls · 🏺 The Big Bunny Head origin relic (needs realm) — a LOOK file of 🌳 IsoProps (ip-4a: the engine + one file per look).
+   Load it with Props.need(['dust'], start) (the 📲 offline app + tests have it inline already). Runs after IsoProps with Props._K (the kit's insides).
+   Built from Test Harness/isoprops/kit/looks/dust.js by build_isoprops.py — never edit by hand. Same 14 rules as IsoProps (see the top of IsoProps.html). */
+(function(K){
+'use strict';
+if(!K){ console.warn('IsoLook_dust: include IsoProps first'); return; }
+if(!K.AR){ console.warn('IsoLook_dust: load IsoLook_realm first (Props.need does it)'); return; }
+const {HTW, LOOKS, DEFS, MAT, PD, add, lit, sideOf, sh, rnd, addLook, addSet, organic, bareTree, FONT, T} = K;
+/* 🌍 IsoProps LOOK file — 🐰 dust · Dust Bunny Gang (AvataRealm side ④b, ip-4f pictures, 🌳 IsoProps chat 2026-11-20).
+   Built ON 🏜️ desert, dusty (its cacti, date palms, mesa rocks, sand ground, 🍂 versions — under-the-bed / behind-the-couch country:
+   soft lilac-grey fluff, odd striped socks, slippers, thread spools, buttons, thimbles, wicker, felt, cobwebs like lace, little dust motes drifting) + 🏰 realm.
+   11 buildings = AvataRealm §14a: 🏠 sock pile → slipper hut → Laundry-basket Palace · 🏕️ Fluff Pile · 🎠 Robo-vac Dock · 🪽 Fan Perch · 🩹 Cobweb Hammock ·
+   🔧 Sock Factory · 🗼 Broom Tower · 🎨 Lost & Found Box · 🔮 Sneeze Shrine (pepper pot) · 🕵️ Couch Crack · 🐾 Mouse Hole.
+   Own resource shapes: 🧶 dust_coin = a pile of lint balls · 🔘 dust_brick = a sewing tin of lost buttons · 🧦 dust_gem = a sock stuffed with jewels.
+   Own floor (a shaggy carpet + a lost thread, a crumb, a button now and then) and own walls (🧦 striped draught-snake wall · 🧵 thread-spool posts ·
+   📎 clothes-peg gate · 🏯 cushion rampart + spool towers under thimble caps + 🤧 tissue-box gatehouse). Keys dust_<slot>. No words / numbers in the art.
+   🔍 every prop has def.diffs (ip-5): v 1 = the other sock set (bold) · house levels · resource states · gates open / shut. Never scary (rule 9): the spider-less cobwebs are lace. */
+(function(){
+'use strict';
+const {vis, F, line, polyP, ph, lightOf, dome, frustum, halo} = T;
+const {pennant, banner, trim, building, addSide, addFloor, tileBase, hash, teamOf, patOf, inkOf} = K.AR;
+const D = PD, TAU = Math.PI * 2, S2 = Math.SQRT2;
+const FLUFF = '#CFC8DC', FLUFFL = '#ECE7F3', FLUFFD = '#9F97B2', LINEN = '#EFE4D0', LINEND = '#CDBFA4', CARD = '#D8B888', CARDD = '#B39060', WICK = '#D9AE6A', WICKD = '#A87A3A',
+  SPOOL = '#DDB98C', SPOOLD = '#A9825A', STEEL = '#C4CAD4', STEELD = '#8A92A0', INK = '#3A3040', CREAM = '#FFF6E6', ROSE = '#F2A0B4', GOLD = '#F2B731', WHITE = '#FFFFFF', DARK = '#2A2232';
+// 🧦 two sock sets — v 0 = peach · sky · mint stripes · v 1 = sunny · lilac · leaf (the same odd socks in another drawer)
+const SOCKS = [{a: '#FF9A8A', b: '#8EC8F2', c: '#9EE0C0', d: '#FFD27A', e: '#C8A8F0'}, {a: '#FFD45A', b: '#C8A8F0', c: '#A8D86A', d: '#FF9AB8', e: '#7ACCE0'}];
+const sk = v => SOCKS[(v | 0) % 2];
+const dead = c => c && c.broken, dim = (c, col, f) => c ? (c.broken ? D.sh(col, -0.42) : D.sh(col, f == null ? -0.18 : f)) : col;
+const still = c => !!(c && c.still), tw = (t, i, p) => 0.55 + 0.3 * Math.sin(ph(t, p || 2.4) + i * 1.7) + 0.15 * Math.cos(ph(t, p || 2.4) + i * 0.9);
+const team = (c, L) => dead(c) ? '#8A8090' : teamOf(L);
+// 🐰 the side's emblem: a round fluff puff with two tall ears
+function bunnyEm(g, x, y, r, col){ g.fillStyle = col; g.beginPath(); g.arc(x, y + r * 0.25, r * 0.7, 0, TAU); g.fill(); for(let i = 0; i < 8; i++){ const a = i / 8 * TAU; g.beginPath(); g.arc(x + Math.cos(a) * r * 0.66, y + r * 0.25 + Math.sin(a) * r * 0.66, r * 0.2, 0, TAU); g.fill(); }
+  [-1, 1].forEach(s => { g.beginPath(); g.ellipse(x + s * r * 0.3, y - r * 0.62, r * 0.18, r * 0.48, s * 0.2, 0, TAU); g.fill(); }); }
+addSide('dust', {name: 'Dust Bunny Gang', icon: '🐰', look: 'dust', accent: '#9F97B2', emblem: bunnyEm, base: 'desert'});
+addLook('dust', {name: 'Dust Bunny Gang', walls: [LINEN, FLUFFL, CARD], roofs: [FLUFF, WICK, '#C8A8F0'], trim: '#6A5A4A', accent: FLUFFD, stilts: false, flat: true, team: null, side: 'dust',
+  res: {coin: FLUFF, coinDk: FLUFFD, rock: '#B8AE9A', brick: ROSE, brickDk: '#B86A80', leaf: '#9EE0C0', bark: SPOOLD, gem: '#9AE8FF', gemDk: '#4A9AC8', gemHi: WHITE}}, 'desert');
+/* ---------- 🖌️ Dust Bunny painters ---------- */
+// ☁️ a fluff puff (screen space): a scalloped soft ball, lighter on top-left (the same sun as the tiles)
+function fluff(g, x, y, r, col, c, seed){ const R = rnd(seed || 3), cl = dim(c, col), n = 9;
+  g.fillStyle = D.sh(cl, -0.16); for(let i = 0; i < n; i++){ const a = i / n * TAU + R() * 0.3; g.beginPath(); g.arc(x + Math.cos(a) * r * 0.72, y + Math.sin(a) * r * 0.62, r * (0.36 + R() * 0.1), 0, TAU); g.fill(); }
+  g.fillStyle = cl; g.beginPath(); g.arc(x, y, r * 0.8, 0, TAU); g.fill(); g.fillStyle = D.sh(cl, 0.22); g.beginPath(); g.arc(x - r * 0.25, y - r * 0.28, r * 0.42, 0, TAU); g.fill();
+  if(!dead(c)){ g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = Math.max(0.5, r * 0.06); for(let i = 0; i < 5; i++){ const a = R() * TAU, rr = r * (0.3 + R() * 0.5); g.beginPath(); g.arc(x + Math.cos(a) * rr * 0.4, y + Math.sin(a) * rr * 0.4, rr * 0.3, a, a + 1.4); g.stroke(); } } }
+// 🐰 a little dust bunny (screen space): a fluff ball with tall ears, dot eyes, pink cheeks (sleep = eyes shut, ears down)
+function dustBunny(g, x, y, s, c, o){ o = o || {}; const col = o.col || FLUFF, ear = o.ear || 0;
+  g.fillStyle = 'rgba(40,24,40,0.2)'; g.beginPath(); D.ell(g, x, y, 8 * s, 2.6 * s); g.fill();
+  [-1, 1].forEach(sd => { g.save(); g.translate(x + sd * 3 * s, y - 13 * s); g.rotate(sd * (0.18 + ear) + (o.sleep ? sd * 0.9 : 0)); g.fillStyle = dim(c, col); g.beginPath(); g.ellipse(0, -5 * s, 2.4 * s, 6 * s, 0, 0, TAU); g.fill(); g.fillStyle = dim(c, ROSE); g.beginPath(); g.ellipse(0, -5 * s, 1.1 * s, 4 * s, 0, 0, TAU); g.fill(); g.restore(); });
+  fluff(g, x, y - 7 * s, 8 * s, col, c, o.seed || 5);
+  if(o.sleep || dead(c)){ g.strokeStyle = INK; g.lineWidth = 0.9 * s; [-1, 1].forEach(sd => { g.beginPath(); g.arc(x + sd * 2.8 * s, y - 8 * s, 1.2 * s, 0.2, Math.PI - 0.2); g.stroke(); }); }
+  else { g.fillStyle = INK; [-1, 1].forEach(sd => { g.beginPath(); g.arc(x + sd * 2.8 * s, y - 8.4 * s, 1.2 * s, 0, TAU); g.fill(); }); g.fillStyle = WHITE; [-1, 1].forEach(sd => { g.beginPath(); g.arc(x + sd * 2.8 * s - 0.4 * s, y - 8.9 * s, 0.4 * s, 0, TAU); g.fill(); }); }
+  g.fillStyle = 'rgba(255,140,170,0.55)'; [-1, 1].forEach(sd => { g.beginPath(); D.ell(g, x + sd * 4.8 * s, y - 6 * s, 1.5 * s, 0.9 * s); g.fill(); });
+  if(o.bow){ g.fillStyle = o.bow; [-1, 1].forEach(sd => { g.beginPath(); g.moveTo(x + 4 * s, y - 13.4 * s); g.lineTo(x + 4 * s + sd * 3 * s, y - 15.4 * s); g.lineTo(x + 4 * s + sd * 3 * s, y - 11.4 * s); g.closePath(); g.fill(); }); } }
+// 🧦 sock stripes over a face (decal paint): soft bands in the sock set + a little ribbed edge at the top
+const sockFace = (h, v, seed, c) => (g, Q, k) => { const S = sk(v), cols = [S.a, WHITE, S.b, WHITE, S.c], R = rnd(seed || 3), band = Math.max(4, h / 6), o0 = Math.floor(R() * 5);
+  for(let z = 0, i = o0; z < h - 0.3; z += band, i++){ polyP(g, [Q(0, z), Q(1, z), Q(1, Math.min(h, z + band)), Q(0, Math.min(h, z + band))]); g.fillStyle = dim(c, cols[i % 5]); g.fill(); }
+  g.strokeStyle = 'rgba(80,60,80,0.18)'; g.lineWidth = 0.7 * k; for(let u = 0.06; u < 1; u += 0.08) line(g, Q(u, h - 4), Q(u, h - 0.5)); };
+// 🧺 wicker weave over a face (decal paint)
+const wicker = (h, col, c) => (g, Q, k) => { const cl = dim(c, col), rh = 5; for(let z = 0, r = 0; z < h - 0.3; z += rh, r++){ for(let u = (r % 2) * 0.06; u < 1; u += 0.12){ polyP(g, [Q(u, z + 0.5), Q(Math.min(1, u + 0.1), z + 0.5), Q(Math.min(1, u + 0.1), Math.min(h, z + rh) - 0.5), Q(u, Math.min(h, z + rh) - 0.5)]); g.fillStyle = D.sh(cl, ((r + Math.round(u * 8)) % 2) ? 0.08 : -0.06); g.fill(); } }
+  g.strokeStyle = 'rgba(90,60,30,0.3)'; g.lineWidth = 0.7 * k; for(let z = rh; z < h; z += rh) line(g, Q(0, z), Q(1, z)); };
+// 🪡 a stitched felt face (decal paint): dashed stitches round the edge + an optional patch
+const felt = (h, col, c, patch) => (g, Q, k) => { g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 0.9 * k; g.setLineDash([2 * k, 1.6 * k]); polyP(g, [Q(0.05, 2.4), Q(0.95, 2.4), Q(0.95, h - 2.4), Q(0.05, h - 2.4)]); g.stroke(); g.setLineDash([]);
+  if(patch){ polyP(g, [Q(0.6, h * 0.25), Q(0.85, h * 0.28), Q(0.83, h * 0.55), Q(0.58, h * 0.52)]); g.fillStyle = dim(c, patch); g.fill(); g.strokeStyle = 'rgba(80,60,80,0.4)'; g.setLineDash([1.4 * k, 1.2 * k]); g.stroke(); g.setLineDash([]); } };
+// a round button-hole window (decal paint) — glows warm when lit
+const roundWin = (h, c, rim) => (g, Q, k) => { const m = Q(0.5, h / 2), r = Math.abs(Q(1, 0)[0] - Q(0, 0)[0]) * 0.46, lv = lightOf(c); g.fillStyle = dim(c, rim || CREAM); g.beginPath(); D.ell(g, m[0], m[1], r, h * 0.5 * k); g.fill();
+  g.fillStyle = lv === 1 ? '#FFF0C0' : lv ? '#D8C898' : '#3A3440'; g.beginPath(); D.ell(g, m[0], m[1], r * 0.68, h * 0.36 * k); g.fill(); };
+// an arched felt door (decal paint)
+const archDoor = (h, col, c, inner) => (g, Q, k) => { const pts = [Q(0, 0), Q(1, 0)]; for(let i = 0; i <= 12; i++){ const a = i / 12 * Math.PI; pts.push(Q(0.5 + Math.cos(a) * 0.5, h * 0.62 + Math.sin(a) * h * 0.38)); }
+  polyP(g, pts); g.fillStyle = dim(c, col); g.fill(); const p2 = [Q(0.16, 0), Q(0.84, 0)]; for(let i = 0; i <= 12; i++){ const a = i / 12 * Math.PI; p2.push(Q(0.5 + Math.cos(a) * 0.34, h * 0.6 + Math.sin(a) * h * 0.3)); } polyP(g, p2); g.fillStyle = inner || '#4A3A50'; g.fill(); };
+// 🔘 a sewing button (screen space), 4 holes
+function button(g, x, y, r, col, c, sq){ const cl = dim(c, col); g.save(); g.translate(x, y); g.scale(1, sq || 1); g.fillStyle = D.sh(cl, -0.25); g.beginPath(); g.arc(0, 0.8, r, 0, TAU); g.fill(); g.fillStyle = cl; g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fill();
+  g.strokeStyle = D.sh(cl, -0.2); g.lineWidth = Math.max(0.5, r * 0.12); g.beginPath(); g.arc(0, 0, r * 0.72, 0, TAU); g.stroke(); g.fillStyle = D.sh(cl, -0.45); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => { g.beginPath(); g.arc(a * r * 0.26, b * r * 0.26, r * 0.12, 0, TAU); g.fill(); }); g.restore(); }
+// 🧵 a thread spool in world space: two wooden flanges + a thread core (+ the thread wound round)
+function spool(B, c, x, y, z, r, h, thread, o){ o = o || {}; B.drum(x, y, z, r, 3, dim(c, SPOOL), {rings: 0}); B.drum(x, y, z + 3, r * 0.72, h - 6, dim(c, thread), {rings: 0});
+  B.custom(x, y, (g, P, k) => { const q = P(x, y, z + 3), rx = r * 0.72 * HTW * k * S2; g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 0.7 * k; for(let zz = 2; zz < h - 7; zz += 2.4){ g.beginPath(); g.ellipse(q[0], q[1] - zz * k, rx, rx / 2, 0, 0.1, Math.PI - 0.1); g.stroke(); } }, {layer: o.layer || 1, zb: z + 3, top: z + h - 3});
+  if(!o.noTop) B.drum(x, y, z + h - 3, r, 3, dim(c, SPOOL), {rings: 0}); }
+// ✨ dust motes drifting (fx, live) — tiny soft dots slowly rising + swirling (the "dusty" mood)
+function motes(B, c, x, y, z, n, w, seed){ if(dead(c)) return; B.custom(x, y, (g, P, k, t) => { if(still(c)) return; const q = P(x, y, z), R = rnd(seed || 9);
+    for(let i = 0; i < n; i++){ const f = ((t || 0) / 2.4 + i / n) % 1, ox = (R() - 0.5) * w, a = Math.sin(f * Math.PI); g.fillStyle = 'rgba(255,250,240,' + (0.75 * a).toFixed(3) + ')'; g.beginPath(); g.arc(q[0] + (ox + Math.sin(f * TAU + i) * 6) * k, q[1] - f * 30 * k - R() * 8 * k, (1 + R() * 0.8) * k, 0, TAU); g.fill(); } }, {layer: 8, zb: z, top: z + 44, fx: true}); }
+// a team band round a drum (as Gearhaven ip-4e) — the team colour + pattern on round things
+function drumBand(B, L, c, x, y, z, r, h, o){ B.custom(x, y, (g, P, k) => { const r2 = P(x, y, z + h), rx = r * HTW * k * S2, col = dead(c) ? '#8A8090' : teamOf(L);
+    g.fillStyle = col; g.beginPath(); g.ellipse(r2[0], r2[1] + h * k, rx, rx / 2, 0, 0, Math.PI); g.lineTo(r2[0] - rx, r2[1]); g.ellipse(r2[0], r2[1], rx, rx / 2, 0, Math.PI, 0, true); g.closePath(); g.fill();
+    if(!dead(c)) K.AR.patPaint(g, (s, vv) => { const u = -1 + s / (rx * 2 / k) * 2; return [r2[0] + u * rx, r2[1] + h * k + Math.sqrt(Math.max(0, 1 - u * u)) * rx / 2 - vv * k]; }, rx * 2 / k, h, patOf(L), inkOf(col), k); }, Object.assign({layer: 1, zb: z, top: z + h}, o || {})); }
+// 🧦 a rolled-up sock (screen space): a striped roll seen from the side, its cuff turned out
+function sockRoll(g, x, y, r, v, c, i, rot){ const S = sk(v), cols = [S.a, S.b, S.c, S.d, S.e], col = dim(c, cols[i % 5]); g.save(); g.translate(x, y); g.rotate(rot || 0);
+  g.fillStyle = D.sh(col, -0.15); g.beginPath(); D.rr(g, -r * 1.3, -r, r * 2.6, r * 2, r); g.fill(); g.fillStyle = col; g.beginPath(); D.rr(g, -r * 1.3, -r, r * 2.6, r * 1.6, r * 0.9); g.fill();
+  g.fillStyle = dim(c, WHITE); [-0.5, 0.3].forEach(f => g.fillRect(f * r * 1.3, -r, r * 0.4, r * 1.9)); g.fillStyle = D.sh(col, 0.2); g.beginPath(); g.ellipse(r * 1.15, 0, r * 0.4, r * 0.95, 0, 0, TAU); g.fill(); g.fillStyle = 'rgba(80,60,80,0.25)'; g.beginPath(); g.ellipse(r * 1.15, 0, r * 0.18, r * 0.5, 0, 0, TAU); g.fill(); g.restore(); }
+// a little floor bit (deco): a thread curl · a crumb · a button · a fluff — seeded
+function floorBit(B, x, y, c, seed, v){ B.custom(x, y, (g, P, k) => { const q = P(x, y, 0), R = rnd(seed || 4), S = sk(v), kind = Math.floor(R() * 4);
+    if(kind === 0){ g.strokeStyle = dim(c, S.a); g.lineWidth = 1 * k; g.beginPath(); for(let i = 0; i <= 20; i++){ const a = i / 20 * TAU * 2, rr = (2 + i * 0.3) * k; const xx = q[0] + Math.cos(a) * rr, yy = q[1] - 1 * k + Math.sin(a) * rr * 0.5; i ? g.lineTo(xx, yy) : g.moveTo(xx, yy); } g.stroke(); }
+    else if(kind === 1){ g.fillStyle = dim(c, '#D8A860'); g.beginPath(); g.moveTo(q[0] - 4 * k, q[1]); g.lineTo(q[0], q[1] - 4 * k); g.lineTo(q[0] + 4 * k, q[1] - 1 * k); g.closePath(); g.fill(); g.fillStyle = dim(c, '#F0D090'); g.beginPath(); g.arc(q[0] + 6 * k, q[1] - 1 * k, 1.4 * k, 0, TAU); g.fill(); }
+    else if(kind === 2) button(g, q[0], q[1] - 1.6 * k, 4 * k, S.b, c, 0.55);
+    else fluff(g, q[0], q[1] - 3 * k, 4 * k, FLUFF, c, seed); }, {layer: 3, zb: 0, top: 8}); }
+const DB = (slot, o, build) => building('dust', slot, Object.assign({variants: 2}, o), build);
+const POLE = '#6A5A4A', VDIFF = {by: 'v', level: 'bold', name: 'the other sock set (peach · sky ↔ sunny · lilac)'};
+/* ============================ 🏠 HOUSE — 3 levels, each a new SHAPE ============================ */
+DB('house', {name: 'Laundry-basket Palace', h: 138, names: {'1': 'Sock Pile', '2': 'Slipper Hut', '3': 'Laundry-basket Palace'}, live: {period: 2.4, frames: 6},
+  diffs: [{by: 'state', a: '1', b: '2', level: 'bold', name: 'sock pile → slipper hut'}, {by: 'state', a: '2', b: '3', level: 'bold', name: 'slipper hut → Laundry-basket Palace'}, VDIFF]}, (B, v, L) => { const c = L.cond, lv = L.state || '1', S = sk(v), br = dead(c);
+  if(lv === '1'){ // 🧦 a sock pile: a soft fluff mound with rolled-up odd socks heaped on it, a round felt door, a button on a thread hanging
+    B.flat(0.1, 0.1, 2.8, 1.8, LINEN);
+    const m = B.box(0.7, 0.45, 0, 1.6, 1.1, br ? 10 : 18, dim(c, FLUFF)); ['front', 'right', 'left', 'back'].forEach(sd => B.decal(m, sd, ...F(m, sd), 0, br ? 10 : 18, FLUFF, {paint: felt(br ? 10 : 18, FLUFF, c)}));
+    B.decal(m, 'front', 1.25, 0.5, 0, 16, ROSE, {k: 'door', paint: archDoor(16, ROSE, c)}); trim(B, L, m, br ? 2 : 8, 3);
+    B.custom(1.5, 1.0, (g, P, k) => { const q = P(1.5, 1.0, br ? 10 : 18); if(!br) dome(g, P, k, 1.5, 1.0, 18, 0.85, 18, dim(c, FLUFF), {hi: FLUFFL});   // the heap of sock rolls on top
+      const rolls = br ? [[-12, 2, 0, 0.3], [10, 4, 2, -0.4]] : [[-20, 0, 0, 0.2], [-4, -4, 1, -0.1], [14, 0, 2, 0.3], [-12, -14, 3, -0.3], [6, -16, 4, 0.15], [-2, -26, 0, -0.05]]; rolls.forEach(([dx, dy, i, r]) => sockRoll(g, q[0] + dx * k, q[1] + dy * k - 6 * k, 6 * k, v, c, i, r)); }, {layer: 3, zb: 18, top: 56});
+    B.custom(2.45, 1.55, (g, P, k, t) => { const q = P(2.45, 1.55, 0), sw = still(c) ? 0 : Math.sin(ph(t, 2.4)) * 0.18 + Math.cos(ph(t, 2.4)) * 0.08; g.strokeStyle = POLE; g.lineWidth = 1.6 * k; line(g, q, [q[0], q[1] - 30 * k]); line(g, [q[0], q[1] - 30 * k], [q[0] - 8 * k, q[1] - 30 * k]);   // 🔘 a button swinging on a thread
+      const top = [q[0] - 8 * k, q[1] - 30 * k], bot = [top[0] + Math.sin(sw) * 12 * k, top[1] + Math.cos(sw) * 12 * k]; g.strokeStyle = dim(c, S.a); g.lineWidth = 0.8 * k; line(g, top, bot); button(g, bot[0], bot[1] + 3 * k, 4 * k, S.b, c); }, {layer: 3, zb: 0, top: 34});
+    floorBit(B, 0.4, 1.6, c, 5, v); floorBit(B, 2.7, 0.4, c, 8, v);
+    motes(B, c, 1.5, 1.0, 30, 4, 40, 11);
+    pennant(B, L, 0.3, 0.3, 0, 48, {emblem: bunnyEm, pole: POLE});
+    return; }
+  if(lv === '2'){ // 🥿 a slipper hut: a GIANT fluffy bunny slipper — a felt sole, a puffy body, a bunny face on the toe with ears up, the door in the toe, a pompom tail
+    B.flat(0.1, 0.1, 2.8, 1.8, LINEN);
+    B.custom(1.5, 1.0, (g, P, k) => { const pts = []; for(let i = 0; i < 28; i++){ const a = i / 28 * TAU; pts.push(P(1.5 + Math.cos(a) * 1.3, 1.0 + Math.sin(a) * 0.78, 0)); } polyP(g, pts); g.fillStyle = dim(c, '#B88A9A'); g.fill();   // the felt sole
+      const p2 = []; for(let i = 0; i < 28; i++){ const a = i / 28 * TAU; p2.push(P(1.5 + Math.cos(a) * 1.3, 1.0 + Math.sin(a) * 0.78, 6)); } polyP(g, p2); g.fillStyle = dim(c, '#D8A8B8'); g.fill(); }, {layer: -1, zb: 0, top: 6});
+    const sb = B.box(0.55, 0.45, 6, 1.9, 1.1, br ? 8 : 24, dim(c, S.a)); ['front', 'right', 'left', 'back'].forEach(sd => B.decal(sb, sd, ...F(sb, sd), 0, br ? 8 : 24, S.a, {paint: felt(br ? 8 : 24, S.a, c, sd === 'right' ? S.c : null)}));
+    B.decal(sb, 'front', 1.25, 0.5, 0, 20, CREAM, {k: 'door', paint: archDoor(20, CREAM, c)}); B.decal(sb, 'front', 0.75, 0.34, 9, 10, '#FFF0C0', {paint: roundWin(10, c, WHITE)}); B.decal(sb, 'right', 0.75, 0.34, 9, 10, '#FFF0C0', {paint: roundWin(10, c, WHITE)});
+    trim(B, L, sb, br ? 2 : 14, 3);
+    if(!br){ B.custom(1.5, 1.0, (g, P, k) => { dome(g, P, k, 1.5, 1.0, 30, 0.95, 26, dim(c, S.a), {hi: D.sh(S.a, 0.35)}); const q = P(1.5, 1.0, 44); g.fillStyle = dim(c, FLUFFL); for(let i = 0; i < 9; i++){ const a = Math.PI + i / 8 * Math.PI; g.beginPath(); g.arc(q[0] + Math.cos(a) * 30 * k, q[1] + 14 * k + Math.sin(a) * 6 * k, 4 * k, 0, TAU); g.fill(); } }, {layer: 2, zb: 30, top: 58});   // the puffy top + a fluff cuff
+      B.custom(2.3, 1.25, (g, P, k, t) => { const q = P(2.3, 1.25, 30), ear = still(c) ? 0 : Math.sin(ph(t, 2.4)) * 0.12 + Math.cos(ph(t, 2.4)) * 0.05;   // 🐰 the bunny face on the toe, ears up
+        [-1, 1].forEach(sd => { g.save(); g.translate(q[0] + sd * 7 * k, q[1] - 20 * k); g.rotate(sd * (0.25 + ear)); g.fillStyle = dim(c, FLUFFL); g.beginPath(); g.ellipse(0, -12 * k, 5 * k, 14 * k, 0, 0, TAU); g.fill(); g.fillStyle = dim(c, ROSE); g.beginPath(); g.ellipse(0, -12 * k, 2.4 * k, 10 * k, 0, 0, TAU); g.fill(); g.restore(); });
+        fluff(g, q[0], q[1] - 10 * k, 15 * k, FLUFFL, c, 17); g.fillStyle = INK; [-1, 1].forEach(sd => { g.beginPath(); g.arc(q[0] + sd * 5 * k, q[1] - 12 * k, 2 * k, 0, TAU); g.fill(); }); g.fillStyle = WHITE; [-1, 1].forEach(sd => { g.beginPath(); g.arc(q[0] + sd * 5 * k - 0.7 * k, q[1] - 12.8 * k, 0.7 * k, 0, TAU); g.fill(); });
+        g.fillStyle = ROSE; g.beginPath(); D.ell(g, q[0], q[1] - 8 * k, 2 * k, 1.4 * k); g.fill(); g.fillStyle = 'rgba(255,140,170,0.5)'; [-1, 1].forEach(sd => { g.beginPath(); D.ell(g, q[0] + sd * 9 * k, q[1] - 8 * k, 2.4 * k, 1.4 * k); g.fill(); }); }, {layer: 4, zb: 30, top: 84});
+      B.custom(0.4, 0.9, (g, P, k) => { const q = P(0.45, 0.95, 20); fluff(g, q[0], q[1], 7 * k, FLUFFL, c, 23); }, {layer: 1, zb: 14, top: 30}); }
+    floorBit(B, 2.7, 1.7, c, 21, v);
+    motes(B, c, 1.5, 1.0, 50, 4, 40, 13);
+    pennant(B, L, 0.3, 1.7, 0, 52, {emblem: bunnyEm, pole: POLE});
+    return; }
+  // 🧺 L3 Laundry-basket Palace: a big wicker basket with handle holes, folded-towel towers on its rim, a tall rolled-towel keep under a felt dome, clothes pegs, a sock flag
+  const H = br ? 26 : 44, bk = B.box(0.22, 0.22, 0, 2.56, 1.56, H, dim(c, WICK));
+  ['front', 'right', 'left', 'back'].forEach(sd => B.decal(bk, sd, ...F(bk, sd), 0, H, WICK, {paint: wicker(H, WICK, c)}));
+  B.decal(bk, 'front', 1.22, 0.56, 0, 30, CREAM, {k: 'door', paint: archDoor(30, CREAM, c, '#5A4A60')}); [0.55, 2.2].forEach(a => B.decal(bk, 'front', a, 0.34, 20, 12, '#FFF0C0', {paint: roundWin(12, c, WICKD)})); B.decal(bk, 'right', 0.85, 0.5, 24, 10, DARK, {paint: (g, Q, k) => { const p = [Q(0, 2), Q(1, 2), Q(1, 8), Q(0, 8)]; polyP(g, p); g.fillStyle = '#4A3420'; g.fill(); }});
+  trim(B, L, bk, H - 12, 4); B.box(0.18, 0.18, H, 2.64, 1.64, 4, dim(c, WICKD));
+  if(!br){ const towel = (x, y, w, d, n, z0, i0) => { for(let i = 0; i < n; i++){ const col = [S.b, CREAM, S.c, S.a, S.e][(i + i0) % 5], b = B.box(x, y, z0 + i * 9, w, d, 9, dim(c, col)); ['front', 'right'].forEach(sd => B.decal(b, sd, ...F(b, sd), 0, 9, col, {paint: (g, Q, k) => { g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 0.9 * k; line(g, Q(0, 4.5), Q(1, 4.5)); g.strokeStyle = 'rgba(80,60,80,0.2)'; line(g, Q(0.85, 0.5), Q(0.85, 8.5)); }})); } };
+    towel(0.35, 0.35, 0.62, 0.55, 3, H + 4, 0); towel(2.05, 0.35, 0.62, 0.55, 4, H + 4, 2); towel(2.1, 1.25, 0.5, 0.45, 2, H + 4, 1);
+    B.drum(1.5, 0.95, H + 4, 0.42, 56, dim(c, CREAM), {rings: 0}); B.custom(1.5, 0.95, (g, P, k) => { const q = P(1.5, 0.95, H + 4), rx = 0.42 * HTW * k * S2; [S.a, S.b, S.c, S.e].forEach((col, i) => { g.fillStyle = dim(c, col); const z = 10 + i * 12; g.beginPath(); g.ellipse(q[0], q[1] - z * k, rx, rx / 2, 0, 0, Math.PI); g.lineTo(q[0] - rx, q[1] - (z + 5) * k); g.ellipse(q[0], q[1] - (z + 5) * k, rx, rx / 2, 0, Math.PI, 0, true); g.closePath(); g.fill(); });   // the rolled-towel keep with stripes
+      const w0 = P(1.5, 1.37, H + 40); g.fillStyle = lightOf(c) ? '#FFF0C0' : '#3A3440'; g.beginPath(); D.ell(g, w0[0], w0[1], 3.4 * k, 4.4 * k); g.fill(); }, {layer: 2, zb: H + 4, top: H + 60});
+    drumBand(B, L, c, 1.5, 0.95, H + 50, 0.42, 5, {layer: 3});
+    B.custom(1.5, 0.95, (g, P, k) => { dome(g, P, k, 1.5, 0.95, H + 60, 0.5, 18, dim(c, S.e), {hi: D.sh(S.e, 0.35)}); const q = P(1.5, 0.95, H + 60); fluff(g, q[0], q[1] - 20 * k, 5 * k, FLUFFL, c, 31); }, {layer: 4, zb: H + 60, top: H + 86});
+    [[0.6, 1.78], [1.15, 1.78], [1.85, 1.78], [2.78, 1.2], [2.78, 0.6]].forEach(([x, y], i) => B.custom(x, y, (g, P, k) => { const q = P(x, y, H + 4); g.fillStyle = dim(c, i % 2 ? SPOOL : SPOOLD); g.save(); g.translate(q[0], q[1]); g.rotate(i % 2 ? 0.12 : -0.12); g.beginPath(); D.rr(g, -1.8 * k, -12 * k, 3.6 * k, 14 * k, 1.4 * k); g.fill(); g.fillStyle = STEELD; g.fillRect(-2.2 * k, -6 * k, 4.4 * k, 1.6 * k); g.restore(); }, {layer: 3, zb: H, top: H + 18}));   // 📎 clothes pegs on the rim
+    motes(B, c, 1.5, 1.0, H + 30, 5, 60, 17); }
+  B.custom(2.72, 1.75, (g, P, k, t) => { const q = P(2.72, 1.75, 0), wave = still(c) ? 0 : Math.sin(ph(t, 2.4)) * 2 + Math.cos(ph(t, 2.4)) * 1; g.strokeStyle = POLE; g.lineWidth = 1.8 * k; line(g, q, [q[0], q[1] - 58 * k]); if(br) return;   // 🧦 a long striped sock flying as a flag
+    const cols = [S.a, WHITE, S.b, WHITE, S.c]; for(let i = 0; i < 5; i++){ g.fillStyle = dim(c, cols[i]); const x0 = q[0] + i * 4.4 * k, dy = wave * i * 0.4 * k; g.fillRect(x0, q[1] - 58 * k + dy, 4.6 * k, 6 * k); } g.fillStyle = dim(c, S.a); g.beginPath(); D.ell(g, q[0] + 24 * k, q[1] - 53 * k + wave * 2 * k, 4.6 * k, 4 * k); g.fill(); }, {layer: 5, zb: 0, top: 62});
+  banner(B, L, bk, 'right', 0.3, 0.34, 6, 20, bunnyEm);
+  pennant(B, L, 0.22, 1.78, 0, 56, {emblem: bunnyEm, pole: POLE});
+});
+/* ============================ 🏕️ CAMP — Fluff Pile (a soft fluff ring, cotton-ball dummies wobbling on sticks, a tomato pin-cushion target, a spool hurdle) ============================ */
+DB('camp', {name: 'Fluff Pile', h: 72, live: {period: 1.2, frames: 6}, diffs: [VDIFF]}, (B, v, L) => { const c = L.cond, S = sk(v), br = dead(c);
+  B.flat(0.06, 0.06, 1.88, 1.88, LINEN);
+  B.custom(1, 1, (g, P, k) => { for(let i = 0; i < 16; i++){ const a = i / 16 * TAU; if(Math.sin(a) > 0.2) continue; const p = P(1 + Math.cos(a) * 0.78, 1 + Math.sin(a) * 0.78, 0); fluff(g, p[0], p[1] - 4 * k, 6 * k, FLUFF, c, i + 3); } }, {layer: -1, zb: 0, top: 12});   // the back half of the fluff ring
+  B.custom(1, 1, (g, P, k) => { for(let i = 0; i < 16; i++){ const a = i / 16 * TAU; if(Math.sin(a) <= 0.2) continue; const p = P(1 + Math.cos(a) * 0.78, 1 + Math.sin(a) * 0.78, 0); fluff(g, p[0], p[1] - 4 * k, 6 * k, FLUFF, c, i + 3); } }, {layer: 5, zb: 0, top: 12});   // the front half
+  [[0.7, 0.75, 0], [1.3, 0.7, 1], [1.0, 1.25, 2]].forEach(([x, y, i]) => B.custom(x, y, (g, P, k, t) => { const q = P(x, y, 0), w = still(c) || br ? (br ? 1.2 : 0) : Math.sin(ph(t, 1.2) + i * 2.1) * 0.25 + Math.cos(ph(t, 1.2) + i) * 0.08;   // ⚪ cotton-ball training dummies wobbling
+    g.save(); g.translate(q[0], q[1]); g.rotate(w); g.strokeStyle = dim(c, SPOOLD); g.lineWidth = 1.8 * k; line(g, [0, 0], [0, -22 * k]); fluff(g, 0, -26 * k, 7 * k, i === 1 ? WHITE : FLUFFL, c, 40 + i); fluff(g, 0, -15 * k, 6 * k, [S.a, S.b, S.c][i], c, 50 + i);
+    g.fillStyle = teamOf(L); g.fillRect(-5 * k, -20 * k, 10 * k, 2 * k); g.fillStyle = INK; [-1, 1].forEach(sd => { g.beginPath(); g.arc(sd * 2.4 * k, -27 * k, 0.9 * k, 0, TAU); g.fill(); }); g.restore(); }, {layer: 3, zb: 0, top: 40}));
+  B.custom(1.65, 1.55, (g, P, k) => { const q = P(1.65, 1.55, 0); g.fillStyle = dim(c, '#E8584A'); g.beginPath(); D.ell(g, q[0], q[1] - 7 * k, 9 * k, 7 * k); g.fill(); g.strokeStyle = 'rgba(120,30,30,0.35)'; g.lineWidth = 0.9 * k; [-4, 0, 4].forEach(dx => { g.beginPath(); g.moveTo(q[0] + dx * k, q[1] - 14 * k); g.quadraticCurveTo(q[0] + dx * 1.6 * k, q[1] - 7 * k, q[0] + dx * k, q[1] - 0.5 * k); g.stroke(); });   // 🍅 a tomato pin-cushion target
+    g.fillStyle = dim(c, '#5AB85A'); g.beginPath(); D.star(g, q[0], q[1] - 14 * k, 4 * k, 1.6 * k, 5); g.fill(); [[-5, -12, S.b], [3, -13, S.d], [6, -9, WHITE]].forEach(([dx, dy, col]) => { g.strokeStyle = STEELD; g.lineWidth = 0.8 * k; line(g, [q[0] + dx * k, q[1] + dy * k], [q[0] + dx * 1.3 * k, q[1] + (dy - 6) * k]); g.fillStyle = dim(c, col); g.beginPath(); g.arc(q[0] + dx * 1.3 * k, q[1] + (dy - 6) * k, 1.4 * k, 0, TAU); g.fill(); }); }, {layer: 3, zb: 0, top: 24});
+  spool(B, c, 0.35, 1.6, 0, 0.16, 14, S.a); spool(B, c, 0.35, 1.25, 0, 0.16, 14, S.b);
+  B.custom(0.35, 1.42, (g, P, k) => { const a = P(0.35, 1.25, 14), b2 = P(0.35, 1.6, 14); g.strokeStyle = dim(c, SPOOLD); g.lineWidth = 2 * k; line(g, a, b2); }, {layer: 2, zb: 14, top: 16});
+  pennant(B, L, 1.85, 0.25, 0, 50, {emblem: bunnyEm, pole: POLE});
+});
+/* ============================ 🎠 RIDE — Robo-vac Dock (a curved charging dock with a glowing strip, a round robot vacuum gliding out + back, a clean stripe in the fluff, a cable) ============================ */
+DB('ride', {name: 'Robo-vac Dock', h: 80, live: {period: 2.4, frames: 6}, diffs: [VDIFF]}, (B, v, L) => { const c = L.cond, S = sk(v), br = dead(c);
+  B.flat(0.06, 0.06, 1.88, 2.88, LINEN);
+  const d = B.box(0.3, 0.2, 0, 1.4, 0.55, br ? 14 : 26, dim(c, STEEL)); ['front', 'right', 'left', 'back'].forEach(sd => B.decal(d, sd, ...F(d, sd), 0, br ? 14 : 26, STEEL, {paint: (g, Q, k) => { g.strokeStyle = 'rgba(255,255,255,0.5)'; g.lineWidth = 1 * k; line(g, Q(0.05, 3), Q(0.95, 3)); }}));
+  B.decal(d, 'front', 0.6, 0.8, 4, 4, '#7AF0FF', {paint: (g, Q, k) => { polyP(g, [Q(0, 0), Q(1, 0), Q(1, 4), Q(0, 4)]); g.fillStyle = lightOf(c) === 1 ? '#7AF0FF' : lightOf(c) ? '#6AA8B0' : '#3A3440'; g.fill(); }}); trim(B, L, d, br ? 4 : 16, 3);
+  if(!br) B.roof(0.25, 0.15, 26, 1.5, 0.65, 8, dim(c, FLUFFD), {ridge: 'x', ov: 0.04, kind: 'hip'});
+  if(!br) halo(B, 1.0, 0.75, 8, 14, '#7AF0FF', 0.3, {pulse: t => still(c) ? 1 : 0.86 + Math.sin(ph(t, 2.4)) * 0.09 + Math.cos(ph(t, 2.4)) * 0.05});
+  B.custom(1.0, 1.8, (g, P, k, t) => { const f = still(c) || br ? 0.2 : 0.5 + Math.sin(ph(t, 2.4)) * 0.35 + Math.cos(ph(t, 2.4)) * 0.12, y0 = 1.25 + f * 1.1;   // the clean stripe it leaves in the fluff + the robot vacuum gliding
+    const a = P(0.62, 1.0, 0), b2 = P(1.38, 1.0, 0), c2 = P(1.38, y0, 0), d2 = P(0.62, y0, 0); polyP(g, [a, b2, c2, d2]); g.fillStyle = 'rgba(255,255,255,0.35)'; g.fill();
+    const q = P(1.0, y0, 0), rx = 0.42 * HTW * k * S2, ry = rx / 2, h = 7 * k; g.fillStyle = 'rgba(40,24,40,0.22)'; g.beginPath(); D.ell(g, q[0], q[1] + 1 * k, rx * 1.05, ry * 1.05); g.fill();
+    g.fillStyle = dim(c, '#4A4458'); g.beginPath(); g.ellipse(q[0], q[1], rx, ry, 0, 0, Math.PI); g.lineTo(q[0] - rx, q[1] - h); g.ellipse(q[0], q[1] - h, rx, ry, 0, Math.PI, 0, true); g.closePath(); g.fill();
+    g.fillStyle = team(c, L); g.beginPath(); g.ellipse(q[0], q[1] - h * 0.45, rx, ry, 0, 0.15, Math.PI - 0.15); g.ellipse(q[0], q[1] - h * 0.45 - 2 * k, rx * 0.98, ry * 0.98, 0, Math.PI - 0.15, 0.15, true); g.closePath(); g.fill();
+    g.fillStyle = dim(c, '#6A6478'); g.beginPath(); D.ell(g, q[0], q[1] - h, rx, ry); g.fill(); g.fillStyle = dim(c, '#8A84A0'); g.beginPath(); D.ell(g, q[0] - 2 * k, q[1] - h - 1 * k, rx * 0.55, ry * 0.55); g.fill();
+    const on = !br && (still(c) || Math.sin(ph(t, 2.4) * 2) > -0.3); g.fillStyle = on ? '#7AF0B0' : '#3A4440'; g.beginPath(); g.arc(q[0] + rx * 0.4, q[1] - h - ry * 0.2, 1.8 * k, 0, TAU); g.fill();
+    if(br) return; const ba = ph(t, 2.4) * 2; g.strokeStyle = dim(c, S.d); g.lineWidth = 1.2 * k; for(let i = 0; i < 3; i++){ const an = ba + i * TAU / 3, cx = q[0] - rx * 0.72, cy = q[1] + ry * 0.3; line(g, [cx, cy], [cx + Math.cos(an) * 6 * k, cy + Math.sin(an) * 3 * k]); } }, {layer: 3, zb: 0, top: 14});
+  B.custom(0.4, 0.95, (g, P, k) => { const a = P(0.35, 0.75, 4), b2 = P(0.2, 1.4, 0), c2 = P(0.4, 2.2, 0); g.strokeStyle = dim(c, '#3A3440'); g.lineWidth = 1.6 * k; g.beginPath(); g.moveTo(a[0], a[1]); g.quadraticCurveTo(b2[0], b2[1], c2[0], c2[1]); g.stroke(); g.fillStyle = dim(c, WHITE); g.fillRect(c2[0] - 2.4 * k, c2[1] - 3 * k, 4.8 * k, 4 * k); }, {layer: -1, zb: 0, top: 6});   // the power cable
+  B.custom(1.65, 2.5, (g, P, k) => { const q = P(1.65, 2.5, 0); fluff(g, q[0], q[1] - 4 * k, 6 * k, FLUFF, c, 61); g.fillStyle = dim(c, WHITE); g.beginPath(); D.rr(g, q[0] - 18 * k, q[1] - 10 * k, 9 * k, 10 * k, 2 * k); g.fill(); g.fillStyle = dim(c, S.b); g.fillRect(q[0] - 18 * k, q[1] - 6 * k, 9 * k, 2.4 * k); }, {layer: 3, zb: 0, top: 14});   // a dust bag + a fluff it missed
+  motes(B, c, 1.0, 2.0, 8, 3, 30, 19);
+  pennant(B, L, 0.25, 2.75, 0, 48, {emblem: bunnyEm, pole: POLE});
+});
+/* ============================ 🪽 NEST — Fan Perch (a desk fan with spinning blades blowing fluffs, a spool perch with a fluff nest) ============================ */
+DB('nest', {name: 'Fan Perch', h: 108, live: {period: 1.2, frames: 6}, diffs: [VDIFF]}, (B, v, L) => { const c = L.cond, S = sk(v), br = dead(c);
+  B.flat(0.06, 0.06, 1.88, 1.88, LINEN);
+  B.drum(0.8, 0.8, 0, 0.45, 6, dim(c, S.b), {rings: 0}); drumBand(B, L, c, 0.8, 0.8, 1, 0.45, 4); B.drum(0.8, 0.8, 6, 0.08, br ? 16 : 40, dim(c, STEEL), {rings: 0});
+  B.custom(0.8, 0.8, (g, P, k, t) => { const q = P(0.8, 0.8, br ? 22 : 56), R = 22 * k, a0 = still(c) || br ? 0.3 : ph(t, 1.2) / 5 * 2;   // 🌀 the fan head: a cage + 4 spinning blades
+    if(br){ g.save(); g.translate(q[0] + 10 * k, q[1] + 22 * k); g.scale(1, 0.5); g.strokeStyle = STEELD; g.lineWidth = 1.2 * k; g.beginPath(); g.arc(0, 0, R, 0, TAU); g.stroke(); g.restore(); return; }
+    g.fillStyle = dim(c, S.b); g.beginPath(); D.ell(g, q[0] + 4 * k, q[1] + 2 * k, 8 * k, 7 * k); g.fill();
+    g.save(); g.translate(q[0], q[1]); g.scale(0.62, 1); for(let i = 0; i < 4; i++){ const a = a0 + i * TAU / 4; g.fillStyle = dim(c, i % 2 ? S.a : S.c); g.beginPath(); g.ellipse(Math.cos(a) * R * 0.5, Math.sin(a) * R * 0.5, R * 0.48, R * 0.2, a, 0, TAU); g.fill(); }
+    g.strokeStyle = dim(c, STEELD); g.lineWidth = 1 * k / 0.62; g.beginPath(); g.arc(0, 0, R, 0, TAU); g.stroke(); for(let i = 0; i < 8; i++){ const a = i / 8 * TAU; line(g, [0, 0], [Math.cos(a) * R, Math.sin(a) * R]); } g.fillStyle = dim(c, CREAM); g.beginPath(); g.arc(0, 0, R * 0.18, 0, TAU); g.fill(); g.restore(); }, {layer: 3, zb: 30, top: 82});
+  if(!br) B.custom(0.8, 0.8, (g, P, k, t) => { if(still(c)) return; const q = P(0.8, 0.8, 56); for(let i = 0; i < 4; i++){ const f = ((t || 0) / 1.2 / 2 + i / 4) % 1, x = q[0] - 14 * k - f * 34 * k, y = q[1] + 6 * k + f * 14 * k + Math.sin(f * 6 + i) * 4 * k; g.globalAlpha = Math.sin(f * Math.PI); fluff(g, x, y, (3 + i % 2) * k, FLUFFL, null, 70 + i); }   // fluffs blown out (fx)
+    g.globalAlpha = 1; g.strokeStyle = 'rgba(255,255,255,0.6)'; g.lineWidth = 1 * k; [0, 1, 2].forEach(i => { const p0 = q[0] - 16 * k, y0 = q[1] - 4 * k + i * 6 * k; g.beginPath(); g.moveTo(p0, y0); g.quadraticCurveTo(p0 - 10 * k, y0 + 4 * k, p0 - 22 * k, y0 + 2 * k + Math.sin(ph(t, 1.2) + i) * 2 * k); g.stroke(); }); }, {layer: 7, zb: 30, top: 70, fx: true});
+  spool(B, c, 1.45, 1.4, 0, 0.36, 26, S.e);
+  B.custom(1.45, 1.4, (g, P, k, t) => { const q = P(1.45, 1.4, 26); g.fillStyle = dim(c, '#C8A878'); g.beginPath(); D.ell(g, q[0], q[1] - 3 * k, 13 * k, 6 * k); g.fill(); for(let i = 0; i < 7; i++){ const a = i / 7 * TAU; fluff(g, q[0] + Math.cos(a) * 9 * k, q[1] - 4 * k + Math.sin(a) * 4 * k, 3.4 * k, FLUFF, c, 80 + i); }   // a fluff nest on the spool, a sleepy bunny peeking
+    if(!br) dustBunny(g, q[0], q[1] - 3 * k, k * 0.85, c, {sleep: true, ear: still(c) ? 0 : Math.sin(ph(t, 1.2)) * 0.06, col: FLUFFL}); }, {layer: 3, zb: 26, top: 52});
+  floorBit(B, 1.7, 0.4, c, 33, v);
+  pennant(B, L, 0.25, 1.75, 0, 52, {emblem: bunnyEm, pole: POLE});
+});
+/* ============================ 🩹 CARE — Cobweb Hammock (a lace cobweb hammock between two spool posts, a dust bunny napping + swinging, a teacup with steam, a bandage roll) ============================ */
+DB('care', {name: 'Cobweb Hammock', h: 84, live: {period: 2.4, frames: 6}, diffs: [VDIFF]}, (B, v, L) => { const c = L.cond, S = sk(v), br = dead(c);
+  B.flat(0.06, 0.06, 1.88, 1.88, LINEN);
+  spool(B, c, 0.3, 0.45, 0, 0.18, 18, S.a); spool(B, c, 0.3, 0.45, 18, 0.18, 18, S.c); spool(B, c, 1.7, 1.15, 0, 0.18, 18, S.b); spool(B, c, 1.7, 1.15, 18, 0.18, 18, S.e);
+  drumBand(B, L, c, 0.3, 0.45, 8, 0.13, 4, {layer: 2}); drumBand(B, L, c, 1.7, 1.15, 8, 0.13, 4, {layer: 2});
+  B.custom(1.0, 0.8, (g, P, k, t) => { const a = P(0.3, 0.45, 34), b2 = P(1.7, 1.15, 34), sw = still(c) || br ? 0 : Math.sin(ph(t, 2.4)) * 4 + Math.cos(ph(t, 2.4)) * 1.6, sag = br ? 22 : 16, m = [(a[0] + b2[0]) / 2 + sw * k, (a[1] + b2[1]) / 2 + sag * k];   // 🕸️ the lace hammock (sags, swings)
+    g.strokeStyle = br ? 'rgba(150,140,170,0.5)' : 'rgba(150,136,190,0.85)'; g.lineWidth = 1.3 * k; for(let i = 0; i < 6; i++){ const f = i / 4; g.beginPath(); g.moveTo(a[0], a[1] + f * 4 * k); g.quadraticCurveTo(m[0], m[1] + f * 6 * k - 6 * k, b2[0], b2[1] + f * 4 * k); g.stroke(); }
+    for(let i = 1; i < 10; i++){ const f = i / 10, x = a[0] + (b2[0] - a[0]) * f + sw * k * Math.sin(f * Math.PI), y0 = a[1] + (b2[1] - a[1]) * f + (sag - 6) * k * Math.sin(f * Math.PI) * 1.1; line(g, [x, y0], [x + 1.6 * k, y0 + 9 * k]); }
+    g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = 0.6 * k; g.beginPath(); g.moveTo(a[0], a[1] - 0.6 * k); g.quadraticCurveTo(m[0], m[1] - 6.6 * k, b2[0], b2[1] - 0.6 * k); g.stroke();
+    g.fillStyle = 'rgba(200,240,255,0.9)'; [0.25, 0.6, 0.8].forEach((f, i) => { const x = a[0] + (b2[0] - a[0]) * f, y = a[1] + (b2[1] - a[1]) * f + (sag + 2) * k * Math.sin(f * Math.PI); g.beginPath(); g.arc(x, y, 1.2 * k, 0, TAU); g.fill(); });
+    if(!br) dustBunny(g, m[0] - 2 * k, m[1] - 2 * k, k * 1.05, c, {sleep: true, col: FLUFFL, bow: teamOf(L)}); }, {layer: 3, zb: 10, top: 54});
+  B.custom(1.55, 1.7, (g, P, k, t) => { const q = P(1.55, 1.7, 0); g.fillStyle = dim(c, WHITE); g.beginPath(); g.moveTo(q[0] - 6 * k, q[1] - 9 * k); g.lineTo(q[0] + 6 * k, q[1] - 9 * k); g.quadraticCurveTo(q[0] + 6 * k, q[1], q[0], q[1]); g.quadraticCurveTo(q[0] - 6 * k, q[1], q[0] - 6 * k, q[1] - 9 * k); g.fill();   // ☕ a teacup with steam
+    g.fillStyle = dim(c, S.d); g.fillRect(q[0] - 6 * k, q[1] - 7 * k, 12 * k, 2 * k); g.strokeStyle = dim(c, WHITE); g.lineWidth = 1.4 * k; g.beginPath(); g.arc(q[0] + 7 * k, q[1] - 5.6 * k, 2.4 * k, -1.2, 1.2); g.stroke(); g.fillStyle = '#C89A6A'; g.beginPath(); D.ell(g, q[0], q[1] - 9 * k, 6 * k, 1.8 * k); g.fill();
+    if(!br && !still(c)) T.puffs(g, q[0], q[1] - 12 * k, k, t, {n: 2, rise: 12, period: 2.4, r: 1.6, col: 'rgba(255,255,255,0.75)'}); }, {layer: 3, zb: 0, top: 26});
+  B.custom(0.45, 1.6, (g, P, k) => { const q = P(0.45, 1.6, 0); g.fillStyle = dim(c, CREAM); g.beginPath(); g.ellipse(q[0], q[1] - 2 * k, 7 * k, 3 * k, 0, 0, Math.PI); g.lineTo(q[0] - 7 * k, q[1] - 9 * k); g.ellipse(q[0], q[1] - 9 * k, 7 * k, 3 * k, 0, Math.PI, 0, true); g.closePath(); g.fill();   // a bandage roll + a heart patch
+    g.fillStyle = dim(c, '#F0E4CC'); g.beginPath(); D.ell(g, q[0], q[1] - 9 * k, 7 * k, 3 * k); g.fill(); g.fillStyle = dim(c, '#D8C8A8'); g.beginPath(); D.ell(g, q[0], q[1] - 9 * k, 2.4 * k, 1 * k); g.fill();
+    g.fillStyle = dim(c, ROSE); g.save(); g.translate(q[0] + 12 * k, q[1] - 3 * k); g.scale(1, 0.55); g.beginPath(); g.moveTo(0, 5 * k); g.bezierCurveTo(-8 * k, 0, -5 * k, -6 * k, 0, -3 * k); g.bezierCurveTo(5 * k, -6 * k, 8 * k, 0, 0, 5 * k); g.fill(); g.restore(); }, {layer: 3, zb: 0, top: 14});
+  motes(B, c, 1.0, 0.8, 34, 4, 50, 21);
+  pennant(B, L, 1.8, 0.25, 0, 52, {emblem: bunnyEm, pole: POLE});
+});
+/* ============================ 🔧 WORKSHOP — Sock Factory (a tissue-box factory puffing tissue, spool chimneys, two giant knitting needles knitting a long striped sock, yarn balls) ============================ */
+DB('workshop', {name: 'Sock Factory', h: 98, live: {period: 2.4, frames: 6}, diffs: [VDIFF]}, (B, v, L) => { const c = L.cond, S = sk(v), br = dead(c), H = br ? 16 : 32;
+  B.flat(0.06, 0.06, 1.88, 1.88, LINEN);
+  const b = B.box(0.2, 0.2, 0, 1.25, 0.9, H, dim(c, S.b)); ['front', 'right', 'left', 'back'].forEach(sd => B.decal(b, sd, ...F(b, sd), 0, H, S.b, {paint: (g, Q, k) => { for(let i = 0; i < 6; i++){ const u = 0.1 + i * 0.16; g.fillStyle = dim(c, 'rgba(255,255,255,0.5)'); g.beginPath(); const p = Q(u, H * 0.55); g.arc(p[0], p[1], 2 * k, 0, TAU); g.fill(); } g.strokeStyle = 'rgba(255,255,255,0.6)'; g.lineWidth = 1 * k; line(g, Q(0.04, H - 4), Q(0.96, H - 4)); }}));
+  B.decal(b, 'front', 0.55, 0.5, 0, 22, CREAM, {k: 'door', paint: archDoor(22, CREAM, c)}); B.decal(b, 'right', 0.45, 0.34, 12, 10, '#FFF0C0', {paint: roundWin(10, c)}); trim(B, L, b, H - 12, 3);
+  B.custom(0.82, 0.65, (g, P, k, t) => { const q = P(0.82, 0.65, H), f = still(c) || br ? 0.2 : Math.sin(ph(t, 2.4)) * 0.5 + Math.cos(ph(t, 2.4)) * 0.2;   // 🤧 a tissue puffing out of the top slot, waving like smoke
+    g.fillStyle = '#3A3040'; g.beginPath(); D.ell(g, q[0], q[1], 14 * k, 4 * k); g.fill(); if(br) return; g.fillStyle = WHITE; g.beginPath(); g.moveTo(q[0] - 9 * k, q[1]); g.quadraticCurveTo(q[0] - 14 * k + f * 6 * k, q[1] - 16 * k, q[0] - 2 * k + f * 8 * k, q[1] - 28 * k); g.quadraticCurveTo(q[0] + 10 * k + f * 4 * k, q[1] - 16 * k, q[0] + 9 * k, q[1]); g.closePath(); g.fill(); g.strokeStyle = 'rgba(150,150,180,0.35)'; g.lineWidth = 0.8 * k; g.stroke(); }, {layer: 3, zb: H, top: H + 32});
+  spool(B, c, 0.35, 0.3, H, 0.13, br ? 8 : 26, S.a, {layer: 2}); if(!br) B.custom(0.35, 0.3, (g, P, k, t) => { if(still(c)) return; const q = P(0.35, 0.3, H + 26); T.puffs(g, q[0], q[1], k, t, {n: 3, rise: 18, period: 2.4, r: 2.4, col: 'rgba(236,231,243,0.9)'}); }, {layer: 6, zb: H + 26, top: H + 54, fx: true});
+  B.custom(1.4, 1.4, (g, P, k, t) => { const q = P(1.4, 1.4, 0), f = still(c) || br ? 0.5 : 0.5 + Math.sin(ph(t, 2.4)) * 0.3 + Math.cos(ph(t, 2.4)) * 0.12;   // 🧶 two giant knitting needles knitting a long striped sock (it grows + shrinks), a yarn ball feeding it
+    g.fillStyle = dim(c, S.c); g.beginPath(); g.arc(q[0] + 14 * k, q[1] - 7 * k, 7 * k, 0, TAU); g.fill(); g.strokeStyle = 'rgba(255,255,255,0.5)'; g.lineWidth = 0.8 * k; for(let i = -1; i <= 1; i++){ g.beginPath(); g.arc(q[0] + 14 * k, q[1] - 7 * k, 5 * k, i * 0.8, i * 0.8 + 2.4); g.stroke(); }
+    if(br){ g.strokeStyle = STEELD; g.lineWidth = 1.6 * k; line(g, [q[0] - 18 * k, q[1] - 2 * k], [q[0] + 6 * k, q[1] - 6 * k]); return; }
+    const len = (12 + f * 10) * k, cols = [S.a, WHITE, S.b, WHITE, S.d]; for(let i = 0; i < 5; i++){ g.fillStyle = dim(c, cols[i]); g.fillRect(q[0] - 10 * k, q[1] - 30 * k + i * len / 5, 10 * k, len / 5 + 0.5); } g.fillStyle = dim(c, S.a); g.beginPath(); D.ell(g, q[0] - 8 * k, q[1] - 30 * k + len + 1 * k, 7 * k, 3.6 * k); g.fill();
+    g.strokeStyle = dim(c, S.c); g.lineWidth = 1 * k; g.beginPath(); g.moveTo(q[0], q[1] - 30 * k); g.quadraticCurveTo(q[0] + 10 * k, q[1] - 26 * k, q[0] + 12 * k, q[1] - 12 * k); g.stroke();
+    g.strokeStyle = dim(c, STEEL); g.lineWidth = 2 * k; g.lineCap = 'round'; const sw = Math.sin(ph(t, 2.4) * 2) * 2 * k * (still(c) ? 0 : 1); line(g, [q[0] - 22 * k, q[1] - 40 * k + sw], [q[0] + 4 * k, q[1] - 26 * k]); line(g, [q[0] - 2 * k, q[1] - 44 * k], [q[0] - 8 * k, q[1] - 24 * k - sw]);
+    g.fillStyle = dim(c, S.e); [[q[0] - 22 * k, q[1] - 40 * k + sw], [q[0] - 2 * k, q[1] - 44 * k]].forEach(p => { g.beginPath(); g.arc(p[0], p[1], 2.4 * k, 0, TAU); g.fill(); }); }, {layer: 3, zb: 0, top: 52});
+  B.custom(0.45, 1.6, (g, P, k) => { const q = P(0.45, 1.6, 0); [[0, S.d], [10, S.e]].forEach(([dx, col]) => { g.fillStyle = dim(c, col); g.beginPath(); g.arc(q[0] + dx * k, q[1] - 5 * k, 5 * k, 0, TAU); g.fill(); g.strokeStyle = 'rgba(255,255,255,0.5)'; g.lineWidth = 0.8 * k; g.beginPath(); g.arc(q[0] + dx * k, q[1] - 5 * k, 3.4 * k, 0.4, 2.6); g.stroke(); }); }, {layer: 3, zb: 0, top: 12});
+  pennant(B, L, 1.85, 0.25, 0, 52, {emblem: bunnyEm, pole: POLE});
+});
+/* ============================ 🗼 TOWER — Broom Tower (a broom stood on its bristles, a team band tying the straw, a silver thimble crow's nest on top · stand + aim) ============================ */
+DB('tower', {name: 'Broom Tower', h: 140, stand: [0.5, 0.5, 84], aim: [0.5, 0.5, 102], live: {period: 2.4, frames: 6}, diffs: [VDIFF]}, (B, v, L) => { const c = L.cond, S = sk(v), br = dead(c), H = br ? 40 : 76;
+  B.custom(0.5, 0.5, (g, P, k) => { frustum(g, P, k, 0.5, 0.5, 0, 0.44, 0.2, 30, dim(c, '#E8C870'), {}); const q = P(0.5, 0.5, 0), r0 = 0.44 * HTW * k * S2; g.strokeStyle = 'rgba(140,100,30,0.45)'; g.lineWidth = 0.8 * k; for(let i = -6; i <= 6; i++){ const f = i / 6.5; line(g, [q[0] + f * r0, q[1] + Math.sqrt(1 - f * f) * r0 * 0.5], [q[0] + f * r0 * 0.46, q[1] - 30 * k + Math.sqrt(1 - f * f) * r0 * 0.23]); } }, {layer: 1, zb: 0, top: 30});   // the straw bristles
+  drumBand(B, L, c, 0.5, 0.5, 20, 0.24, 6, {layer: 2});
+  B.drum(0.5, 0.5, 30, 0.1, H - 30, dim(c, v % 2 ? '#C8A8F0' : '#E8907A'), {rings: 0});
+  B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 30), rx = 0.1 * HTW * k * S2; g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 1.2 * k; for(let z = 6; z < H - 32; z += 9){ line(g, [q[0] - rx, q[1] - z * k], [q[0] + rx, q[1] - (z + 4) * k]); } }, {layer: 2, zb: 30, top: H});   // the handle's candy stripes
+  if(br) return;
+  B.custom(0.5, 0.5, (g, P, k) => { frustum(g, P, k, 0.5, 0.5, H, 0.3, 0.36, 12, dim(c, STEEL), {}); const q = P(0.5, 0.5, H), r = 0.33 * HTW * k * S2; g.fillStyle = 'rgba(90,96,110,0.45)'; for(let z = 2; z < 12; z += 3.4) for(let i = -4; i <= 4; i++){ const f = i / 4.6; g.beginPath(); g.arc(q[0] + f * r, q[1] - z * k + Math.sqrt(1 - f * f) * r * 0.5, 0.8 * k, 0, TAU); g.fill(); } }, {layer: 3, zb: H, top: H + 12});   // 🪡 the thimble crow's nest (dimples)
+  B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, H + 12), rx = 0.36 * HTW * k * S2; g.fillStyle = dim(c, '#5A5A6A'); g.beginPath(); D.ell(g, q[0], q[1], rx * 0.9, rx * 0.45); g.fill(); g.strokeStyle = dim(c, STEELD); g.lineWidth = 1.4 * k; g.beginPath(); D.ell(g, q[0], q[1], rx, rx / 2); g.stroke(); }, {layer: 1, zb: H + 12, top: H + 13});
+  B.custom(0.5, 0.5, (g, P, k, t) => { const q = P(0.5, 0.5, H + 4); for(let i = 0; i < 3; i++){ const f = ((t || 0) / 2.4 + i / 3) % 1; if(still(c)) break; g.globalAlpha = Math.sin(f * Math.PI) * 0.8; fluff(g, q[0] - 16 * k + i * 12 * k, q[1] + 40 * k + f * 30 * k, 2.6 * k, FLUFFL, null, 90 + i); } g.globalAlpha = 1; }, {layer: 7, zb: 4, top: H, fx: true});   // fluff falling from the straw (fx)
+  pennant(B, L, 0.78, 0.5, H + 12, 18, {w: 12, hh: 8, emblem: bunnyEm, pole: POLE, layer: 5});
+});
+/* ============================ 🎨 WARDROBE — Lost & Found Box (an open cardboard box of lost things, a clothes line of odd socks incl. the team one, a mitten, a hair bow) ============================ */
+DB('wardrobe', {name: 'Lost & Found Box', h: 78, live: {period: 2.4, frames: 6}, diffs: [VDIFF]}, (B, v, L) => { const c = L.cond, S = sk(v), br = dead(c), H = br ? 12 : 22;
+  B.flat(0.06, 0.06, 1.88, 0.88, LINEN);
+  const b = B.box(0.15, 0.15, 0, 0.8, 0.6, H, CARD); ['front', 'right', 'left', 'back'].forEach(sd => B.decal(b, sd, ...F(b, sd), 0, H, CARD, {paint: (g, Q, k) => { g.strokeStyle = 'rgba(110,70,30,0.3)'; g.lineWidth = 0.8 * k; line(g, Q(0, H - 3), Q(1, H - 3)); g.fillStyle = dim(c, '#D8A860'); polyP(g, [Q(0.3, H * 0.4), Q(0.7, H * 0.4), Q(0.7, H * 0.6), Q(0.3, H * 0.6)]); g.fill(); }}));
+  trim(B, L, b, 4, 3);
+  B.decal(b, 'front', 0.35, 0.4, 0, 16, '#4A3A50', {k: 'door'});
+  if(!br) B.custom(0.55, 0.45, (g, P, k) => { const fl = (a, b2, up) => { const p = [P(a[0], a[1], H), P(b2[0], b2[1], H), P(b2[0] + up[0], b2[1] + up[1], H + up[2]), P(a[0] + up[0], a[1] + up[1], H + up[2])]; polyP(g, p); g.fillStyle = dim(c, D.sh(CARD, 0.08)); g.fill(); g.strokeStyle = 'rgba(110,70,30,0.3)'; g.lineWidth = 0.8 * k; g.stroke(); };   // the box flaps open + things peeking
+    fl([0.15, 0.15], [0.95, 0.15], [0, -0.12, 12]); fl([0.15, 0.15], [0.15, 0.75], [-0.12, 0, 12]); const q = P(0.55, 0.45, H); g.fillStyle = dim(c, S.d); g.beginPath(); D.ell(g, q[0] - 6 * k, q[1] - 3 * k, 6 * k, 4 * k); g.fill(); button(g, q[0] + 6 * k, q[1] - 4 * k, 4 * k, S.b, c);
+    g.fillStyle = dim(c, '#E8584A'); g.beginPath(); g.arc(q[0], q[1] - 8 * k, 3.6 * k, 0, TAU); g.fill(); g.strokeStyle = dim(c, WHITE); g.lineWidth = 0.8 * k; line(g, [q[0] - 3.6 * k, q[1] - 8 * k], [q[0] + 3.6 * k, q[1] - 8 * k]); }, {layer: 3, zb: H, top: H + 14});
+  [[1.15, 0.5], [1.85, 0.5]].forEach(([x, y]) => B.custom(x, y, (g, P, k) => { const q = P(x, y, 0); g.strokeStyle = POLE; g.lineWidth = 1.8 * k; line(g, q, [q[0], q[1] - 40 * k]); }, {layer: 2, zb: 0, top: 40}));
+  B.custom(1.5, 0.5, (g, P, k, t) => { const a = P(1.15, 0.5, 38), b2 = P(1.85, 0.5, 38), sw = still(c) ? 0 : Math.sin(ph(t, 2.4)) * 0.12 + Math.cos(ph(t, 2.4)) * 0.05; g.strokeStyle = 'rgba(80,70,90,0.6)'; g.lineWidth = 0.9 * k; g.beginPath(); g.moveTo(a[0], a[1]); g.quadraticCurveTo((a[0] + b2[0]) / 2, (a[1] + b2[1]) / 2 + 6 * k, b2[0], b2[1]); g.stroke(); if(br) return;   // 🧦 the line of odd socks (team sock in the middle)
+    [[0.18, S.a, 'sock'], [0.42, teamOf(L), 'sock'], [0.64, S.c, 'mitt'], [0.84, S.e, 'bow']].forEach(([f, col, kind], i) => { const x = a[0] + (b2[0] - a[0]) * f, y = a[1] + (b2[1] - a[1]) * f + Math.sin(f * Math.PI) * 6 * k; g.save(); g.translate(x, y); g.rotate(sw * (i % 2 ? 1 : -1)); g.fillStyle = SPOOLD; g.fillRect(-1 * k, -1.4 * k, 2 * k, 4 * k);
+      if(kind === 'sock'){ g.fillStyle = dim(c, col); g.fillRect(-2.6 * k, 2 * k, 5.2 * k, 11 * k); g.beginPath(); D.ell(g, 0.6 * k, 13 * k, 4.4 * k, 3 * k); g.fill(); g.fillStyle = 'rgba(255,255,255,0.75)'; g.fillRect(-2.6 * k, 4 * k, 5.2 * k, 1.6 * k); g.fillRect(-2.6 * k, 8 * k, 5.2 * k, 1.6 * k); }
+      else if(kind === 'mitt'){ g.fillStyle = dim(c, col); g.beginPath(); D.rr(g, -4 * k, 2 * k, 8 * k, 11 * k, 3.6 * k); g.fill(); g.beginPath(); D.ell(g, -4.6 * k, 6 * k, 2 * k, 3 * k); g.fill(); g.fillStyle = WHITE; g.fillRect(-4 * k, 2 * k, 8 * k, 2 * k); }
+      else { g.fillStyle = dim(c, col); [-1, 1].forEach(sd => { g.beginPath(); g.moveTo(0, 5 * k); g.lineTo(sd * 6 * k, 2 * k); g.lineTo(sd * 6 * k, 9 * k); g.closePath(); g.fill(); }); g.beginPath(); g.arc(0, 5.4 * k, 1.8 * k, 0, TAU); g.fill(); } g.restore(); }); }, {layer: 3, zb: 20, top: 40});
+  pennant(B, L, 1.9, 0.1, 0, 46, {emblem: bunnyEm, pole: POLE, layer: 1});
+});
+/* ============================ 🔮 SPELL — Sneeze Shrine (a GIANT pepper pot on a lace doily + a coaster plinth, a tickly feather circling, pepper puffs bursting from the cap) ============================ */
+DB('spell', {name: 'Sneeze Shrine', h: 124, live: {period: 2.4, frames: 6}, diffs: [VDIFF]}, (B, v, L) => { const c = L.cond, S = sk(v), br = dead(c);
+  B.flat(0.06, 0.06, 1.88, 1.88, LINEN);
+  B.custom(1, 1, (g, P, k) => { const n = 18, pts = []; for(let i = 0; i < n * 2; i++){ const a = i / (n * 2) * TAU, r = i % 2 ? 0.78 : 0.86; pts.push(P(1 + Math.cos(a) * r, 1 + Math.sin(a) * r, 0)); } polyP(g, pts); g.fillStyle = dim(c, WHITE); g.fill();   // 🕸️ a lace doily
+    g.fillStyle = 'rgba(160,150,180,0.35)'; for(let i = 0; i < 12; i++){ const a = i / 12 * TAU, p = P(1 + Math.cos(a) * 0.6, 1 + Math.sin(a) * 0.6, 0); g.beginPath(); D.ell(g, p[0], p[1], 2.4 * k, 1.2 * k); g.fill(); } }, {layer: -1, zb: 0, top: 1});
+  B.drum(1, 1, 0, 0.62, 6, dim(c, S.b), {rings: 0}); B.drum(1, 1, 6, 0.55, 6, dim(c, S.d), {rings: 0}); drumBand(B, L, c, 1, 1, 7, 0.55, 4, {layer: 2});
+  const PH = br ? 30 : 56; B.drum(1, 1, 12, 0.4, PH, dim(c, WHITE), {rings: 0});
+  B.custom(1, 1, (g, P, k) => { const q = P(1, 1, 12), rx = 0.4 * HTW * k * S2; g.fillStyle = dim(c, S.e); g.beginPath(); g.ellipse(q[0], q[1] - PH * 0.42 * k, rx, rx / 2, 0, 0, Math.PI); g.lineTo(q[0] - rx, q[1] - PH * 0.58 * k); g.ellipse(q[0], q[1] - PH * 0.58 * k, rx, rx / 2, 0, Math.PI, 0, true); g.closePath(); g.fill();   // a lilac band + a pepper-grain window
+    const w = P(1, 1.4, 12 + PH * 0.28); g.fillStyle = 'rgba(60,50,60,0.75)'; g.beginPath(); D.ell(g, w[0], w[1], 4 * k, 5 * k); g.fill(); g.fillStyle = 'rgba(255,255,255,0.4)'; g.beginPath(); D.ell(g, w[0] - 1.4 * k, w[1] - 1.6 * k, 1.2 * k, 2 * k); g.fill(); }, {layer: 2, zb: 12, top: 12 + PH});
+  if(!br){ B.custom(1, 1, (g, P, k) => { dome(g, P, k, 1, 1, 12 + PH, 0.42, 22, dim(c, STEEL), {hi: WHITE}); const q = P(1, 1, 12 + PH); g.fillStyle = '#4A4A5A'; [[-6, -12], [0, -16], [6, -12], [-3, -7], [3, -7], [0, -20]].forEach(([dx, dy]) => { g.beginPath(); g.arc(q[0] + dx * k, q[1] + dy * k, 1.3 * k, 0, TAU); g.fill(); }); }, {layer: 3, zb: 12 + PH, top: 36 + PH});   // the domed silver cap with holes
+    B.custom(1, 1, (g, P, k, t) => { if(still(c)) return; const q = P(1, 1, 34 + PH), f = ((t || 0) / 2.4) % 1, burst = Math.max(0, Math.sin(f * TAU));   // 🤧 pepper puffs + sparkles (the sneeze magic)
+      for(let i = 0; i < 4; i++){ const a = -Math.PI / 2 + (i - 1.5) * 0.5, r = (6 + burst * 16) * k; g.fillStyle = 'rgba(236,231,243,' + (0.4 + burst * 0.5).toFixed(3) + ')'; g.beginPath(); g.arc(q[0] + Math.cos(a) * r, q[1] + Math.sin(a) * r, (3 + burst * 3) * k, 0, TAU); g.fill(); }
+      g.fillStyle = 'rgba(90,80,90,0.7)'; for(let i = 0; i < 6; i++){ const a = i / 6 * TAU + f * 3; g.beginPath(); g.arc(q[0] + Math.cos(a) * (4 + burst * 12) * k, q[1] - 2 * k + Math.sin(a) * (3 + burst * 8) * k, 0.8 * k, 0, TAU); g.fill(); }
+      g.fillStyle = 'rgba(255,255,255,0.95)'; [[-12, -10], [12, -6]].forEach(([dx, dy], i) => { g.beginPath(); D.star(g, q[0] + dx * k, q[1] + dy * k, 3 * tw(t, i), 1, 4); g.fill(); }); }, {layer: 7, zb: 30 + PH, top: 64 + PH, fx: true});
+    halo(B, 1, 1, 30 + PH, 22, '#E8E0FF', 0.3, {pulse: t => still(c) ? 1 : 0.86 + Math.sin(ph(t, 2.4)) * 0.09 + Math.cos(ph(t, 2.4)) * 0.05}); }
+  B.custom(1, 1, (g, P, k, t) => { const a = still(c) ? 0.8 : ph(t, 2.4), q = P(1 + Math.cos(a) * 0.75, 1 + Math.sin(a) * 0.75, br ? 0 : 40 + Math.sin(a * 2) * 6), rot = br ? 1.2 : -0.6 + Math.sin(a) * 0.3;   // 🪶 a tickly feather circling the pot
+    g.save(); g.translate(q[0], q[1] - (br ? 2 * k : 0)); g.rotate(rot); g.fillStyle = dim(c, S.a); g.beginPath(); g.moveTo(0, -12 * k); g.quadraticCurveTo(6 * k, -4 * k, 0, 10 * k); g.quadraticCurveTo(-6 * k, -4 * k, 0, -12 * k); g.fill(); g.strokeStyle = dim(c, WHITE); g.lineWidth = 0.8 * k; line(g, [0, -11 * k], [0, 12 * k]);
+    for(let i = -3; i <= 3; i++){ line(g, [0, i * 3 * k], [(i % 2 ? 3 : -3) * k, i * 3 * k - 2 * k]); } g.restore(); }, {layer: 4, zb: 0, top: 54});
+  pennant(B, L, 0.25, 1.75, 0, 52, {emblem: bunnyEm, pole: POLE});
+});
+/* ============================ 🕵️ HIDEOUT — Couch Crack (two plump couch cushions, a dark crack between them, eyes peeking out, a lost coin + a crumb) ============================ */
+DB('hideout', {name: 'Couch Crack', h: 66, live: {period: 2.4, frames: 6}, diffs: [VDIFF]}, (B, v, L) => { const c = L.cond, S = sk(v), br = dead(c), H = br ? 14 : 26, CU = v % 2 ? '#B8A0D8' : '#E8A07A';
+  B.flat(0.06, 0.06, 1.88, 1.88, LINEN);
+  [[0.15, 0.95], [1.05, 0.95]].forEach(([x0, w], i) => { const b = B.box(x0, 0.3, 0, w - 0.1 + (i ? -0.1 : 0), 1.25, H, dim(c, CU)); ['front', 'right', 'left', 'back'].forEach(sd => B.decal(b, sd, ...F(b, sd), 0, H, CU, {paint: (g, Q, k) => { g.strokeStyle = D.sh(CU, -0.25); g.lineWidth = 1.6 * k; line(g, Q(0, H - 1.5), Q(1, H - 1.5)); line(g, Q(0, 1.5), Q(1, 1.5)); button(g, ...Q(0.5, H / 2), 2.2 * k, D.sh(CU, -0.15), c); }}));
+    if(i === 0) trim(B, L, b, 6, 3);
+    if(!br) B.custom(x0 + (w - 0.1) / 2, 0.92, (g, P, k) => { dome(g, P, k, x0 + (w - 0.1) / 2 - (i ? 0.05 : 0), 0.92, H, 0.48, 8, dim(c, CU), {hi: D.sh(CU, 0.3)}); }, {layer: 2, zb: H, top: H + 9}); });
+  B.custom(1.02, 1.55, (g, P, k, t) => { const a = P(0.95, 1.55, 0), b2 = P(1.0, 1.55, 0), c2 = P(1.0, 1.55, H), d2 = P(0.95, 1.55, H); g.fillStyle = DARK; polyP(g, [P(0.92, 1.55, 0), P(1.03, 1.55, 0), P(1.03, 1.55, H + 4), P(0.92, 1.55, H + 4)]); g.fill();   // the crack + eyes peeking
+    if(br) return; const q = P(0.975, 1.55, H * 0.5), bl = still(c) ? 1 : Math.max(0, Math.min(1, Math.sin(ph(t, 2.4)) * 1.4 + Math.cos(ph(t, 2.4)) * 0.6 + 0.2)); g.fillStyle = '#FFF6D8'; [-1, 1].forEach(sd => { g.beginPath(); D.ell(g, q[0] + sd * 1.8 * k, q[1] + sd * 1 * k, 1.5 * k, 2 * k * bl); g.fill(); }); }, {layer: 3, zb: 0, top: H + 4});
+  B.custom(0.4, 1.7, (g, P, k) => { const q = P(0.4, 1.7, 0); g.fillStyle = dim(c, GOLD); g.beginPath(); D.ell(g, q[0], q[1] - 1.6 * k, 5 * k, 2.4 * k); g.fill(); g.fillStyle = dim(c, '#C88A1A'); g.beginPath(); D.star(g, q[0], q[1] - 1.8 * k, 2 * k, 0.9 * k, 5); g.fill(); }, {layer: 3, zb: 0, top: 4});   // a lost coin
+  floorBit(B, 1.7, 1.75, c, 41, v); floorBit(B, 1.75, 0.25, c, 44, v);
+  motes(B, c, 1.0, 1.4, 10, 3, 30, 23);
+  pennant(B, L, 0.2, 0.2, 0, 46, {emblem: bunnyEm, pole: POLE});
+});
+/* ============================ 🐾 DEN — Mouse Hole (a skirting-board wall piece with an arched mouse hole, a little mouse peeking, a cheese wedge, a thimble water bowl, a matchbox bed) ============================ */
+DB('den', {name: 'Mouse Hole', h: 74, live: {period: 2.4, frames: 6}, diffs: [VDIFF]}, (B, v, L) => { const c = L.cond, S = sk(v), br = dead(c), H = br ? 22 : 44;
+  B.flat(0.06, 0.06, 1.88, 1.88, LINEN);
+  const w = B.box(0.2, 0.2, 0, 1.6, 0.4, H, dim(c, v % 2 ? '#DCD0F0' : '#F2E0C8')); ['front', 'right', 'left', 'back'].forEach(sd => B.decal(w, sd, ...F(w, sd), 0, H, '#F2E0C8', {paint: (g, Q, k) => { polyP(g, [Q(0, 0), Q(1, 0), Q(1, 8), Q(0, 8)]); g.fillStyle = dim(c, WHITE); g.fill(); g.strokeStyle = 'rgba(120,100,90,0.3)'; g.lineWidth = 0.8 * k; line(g, Q(0, 8), Q(1, 8));   // the skirting + a little wallpaper flower print
+    for(let u = 0.12; u < 1; u += 0.22) for(let z = 16; z < H - 3; z += 11){ const p = Q(u + (Math.round(z) % 2 ? 0.1 : 0), z); g.fillStyle = dim(c, S.a); g.beginPath(); g.arc(p[0], p[1], 1.4 * k, 0, TAU); g.fill(); } }}));
+  B.decal(w, 'front', 0.8, 0.4, 0, 22, DARK, {k: 'door', paint: archDoor(22, '#B8A890', c, DARK)}); trim(B, L, w, H - 8, 3);
+  B.custom(1.0, 0.62, (g, P, k, t) => { const q = P(1.0, 0.62, 2), wig = still(c) || br ? 0 : Math.sin(ph(t, 2.4)) * 1.2 + Math.cos(ph(t, 2.4) * 1) * 0.6;   // 🐭 a little mouse peeking out of the hole
+    if(br) return; g.fillStyle = '#B8B0C0'; g.beginPath(); D.ell(g, q[0] + 3 * k, q[1] - 6 * k, 6 * k, 4.4 * k); g.fill(); [-1, 1].forEach(sd => { g.beginPath(); g.arc(q[0] + (3 + sd * 4) * k, q[1] - 11 * k, 3 * k, 0, TAU); g.fill(); g.fillStyle = ROSE; g.beginPath(); g.arc(q[0] + (3 + sd * 4) * k, q[1] - 11 * k, 1.6 * k, 0, TAU); g.fill(); g.fillStyle = '#B8B0C0'; });
+    g.beginPath(); g.moveTo(q[0] + 8 * k, q[1] - 6 * k); g.lineTo(q[0] + 13 * k + wig * k, q[1] - 4 * k); g.lineTo(q[0] + 8 * k, q[1] - 3 * k); g.fill(); g.fillStyle = ROSE; g.beginPath(); g.arc(q[0] + 13 * k + wig * k, q[1] - 4 * k, 1.2 * k, 0, TAU); g.fill();
+    g.fillStyle = INK; g.beginPath(); g.arc(q[0] + 5 * k, q[1] - 7 * k, 0.9 * k, 0, TAU); g.fill(); g.strokeStyle = 'rgba(80,70,90,0.6)'; g.lineWidth = 0.5 * k; [-1, 0, 1].forEach(i => line(g, [q[0] + 12 * k, q[1] - 4 * k], [q[0] + 17 * k, q[1] - 4 * k + i * 2 * k + wig * 0.3 * k])); }, {layer: 3, zb: 0, top: 18});
+  B.custom(1.5, 1.35, (g, P, k) => { const q = P(1.5, 1.35, 0); g.fillStyle = dim(c, '#FFD45A'); g.beginPath(); g.moveTo(q[0] - 9 * k, q[1] - 2 * k); g.lineTo(q[0] + 9 * k, q[1] - 2 * k); g.lineTo(q[0] + 9 * k, q[1] - 10 * k); g.closePath(); g.fill(); g.fillStyle = dim(c, '#FFE68A'); g.beginPath(); g.moveTo(q[0] - 9 * k, q[1] - 2 * k); g.lineTo(q[0] + 9 * k, q[1] - 10 * k); g.lineTo(q[0] + 5 * k, q[1] - 12 * k); g.closePath(); g.fill();   // 🧀 a cheese wedge with holes
+    g.fillStyle = dim(c, '#E8B840'); [[2, -5], [6, -4], [5, -8]].forEach(([dx, dy]) => { g.beginPath(); g.arc(q[0] + dx * k, q[1] + dy * k, 1.1 * k, 0, TAU); g.fill(); }); }, {layer: 3, zb: 0, top: 14});
+  B.custom(0.45, 1.3, (g, P, k) => { const q = P(0.45, 1.3, 0); g.fillStyle = dim(c, STEEL); g.beginPath(); g.ellipse(q[0], q[1] - 2 * k, 4.4 * k, 2 * k, 0, 0, Math.PI); g.lineTo(q[0] - 4 * k, q[1] - 9 * k); g.ellipse(q[0], q[1] - 9 * k, 4 * k, 1.8 * k, 0, Math.PI, 0, true); g.closePath(); g.fill(); g.fillStyle = '#9AD8F0'; g.beginPath(); D.ell(g, q[0], q[1] - 9 * k, 3.6 * k, 1.5 * k); g.fill(); }, {layer: 3, zb: 0, top: 12});   // a thimble of water
+  B.custom(0.9, 1.7, (g, P, k) => { const q = P(0.9, 1.7, 0); g.fillStyle = dim(c, '#E8584A'); g.beginPath(); D.rr(g, q[0] - 10 * k, q[1] - 7 * k, 20 * k, 6 * k, 1 * k); g.fill(); g.fillStyle = dim(c, CREAM); g.beginPath(); D.rr(g, q[0] - 8 * k, q[1] - 9 * k, 16 * k, 4 * k, 2 * k); g.fill(); g.fillStyle = dim(c, S.b); g.beginPath(); D.rr(g, q[0] - 2 * k, q[1] - 10 * k, 10 * k, 4 * k, 2 * k); g.fill(); }, {layer: 3, zb: 0, top: 12});   // a matchbox bed + a sock blanket
+  pennant(B, L, 1.85, 0.25, 0, 50, {emblem: bunnyEm, pole: POLE, layer: 1});
+});
+/* ---------- 🟩 territory floor: a shaggy carpet (soft tufts) · now and then a lost thread · a crumb · a button · a fluff ---------- */
+addFloor('dust', {name: 'Shaggy carpet + lost threads + buttons', top: '#D8CCE0', top2: '#CEC2D8', side: '#9A8EA8', paint: (g, q, s, i, j) => { const r = hash(i, j, 51), r2 = hash(j, i, 52);
+  tileBase(g, q, s, '#DACEE2', '#D0C4DA', r);
+  const R = rnd(Math.floor(r * 1e6)); g.lineWidth = 0.9 * s; g.lineCap = 'round'; for(let n = 0; n < 16; n++){ const u = 0.1 + R() * 0.8, v2 = 0.1 + R() * 0.8, p = q(u, v2); g.strokeStyle = R() < 0.5 ? 'rgba(255,255,255,0.5)' : 'rgba(130,110,150,0.3)'; line(g, p, [p[0] + (R() - 0.5) * 2 * s, p[1] - 2.4 * s]); }
+  if(r2 > 0.9){ const p = q(0.5, 0.5); g.strokeStyle = ['#FF9A8A', '#8EC8F2', '#9EE0C0'][Math.floor(r * 3)]; g.lineWidth = 0.9 * s; g.beginPath(); for(let n = 0; n <= 16; n++){ const a = n / 16 * TAU * 1.6, rr = (1.6 + n * 0.25) * s; const x = p[0] + Math.cos(a) * rr, y = p[1] + Math.sin(a) * rr * 0.5; n ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
+  else if(r2 < 0.07){ const p = q(0.4 + r * 0.2, 0.5); button(g, p[0], p[1], 3 * s, ['#FF9A8A', '#8EC8F2', '#FFD27A'][Math.floor(r * 3)], null, 0.55); }
+  else if(r2 > 0.84){ const p = q(0.55, 0.45); g.fillStyle = 'rgba(236,231,243,0.95)'; [[0, 0], [2, -1], [-2, -1], [0, -2]].forEach(([dx, dy]) => { g.beginPath(); g.arc(p[0] + dx * s, p[1] + dy * s, 1.8 * s, 0, TAU); g.fill(); }); }
+  else if(r2 < 0.13){ const p = q(0.6, 0.6); g.fillStyle = '#D8A860'; g.beginPath(); g.arc(p[0], p[1], 1.2 * s, 0, TAU); g.fill(); g.beginPath(); g.arc(p[0] + 2.4 * s, p[1] + 0.6 * s, 0.8 * s, 0, TAU); g.fill(); } }});
+/* ---------- 🧶🔘🧦 own resource shapes (1 × 1, states full · half · empty) — Props.AR.resKey('dust', 'coin' | 'brick' | 'gem') ---------- */
+// 🧶 Lint Balls: a soft heap of lilac-grey lint balls, the top one wobbling (half = 2 · empty = a few wisps)
+function lintPaint(g, x, y, k, t, v, L, c){ const st = L.state || 'full'; g.save(); g.translate(x, y); g.scale(k * 1.2 * (v % 3 === 1 ? -1 : 1), k * 1.2);
+  g.fillStyle = 'rgba(40,24,40,0.2)'; g.beginPath(); D.ell(g, 0, 1, 15, 5); g.fill(); const cols = [[FLUFF, FLUFFL, '#D8D0E8'], ['#B8C8E8', '#E0ECFA', '#A8B8D8'], ['#F0C0D4', '#FFE6F0', '#E0A8C4']][v % 3];
+  if(st === 'empty'){ g.strokeStyle = dim(c, FLUFFD); g.lineWidth = 0.9; [[-6, -1], [2, -2], [7, 0]].forEach(([dx, dy], i) => { g.beginPath(); g.arc(dx, dy - 1.4, 2.4, i, i + 3.6); g.stroke(); }); fluff(g, 0, -2, 2.4, cols[1], c, 7); g.restore(); return; }
+  const wob = c ? 0 : Math.sin(ph(t, 2.4)) * 0.8 + Math.cos(ph(t, 2.4)) * 0.4, lay = st === 'full' ? [[-6, -4, 6, 0], [6, -4, 6, 1], [0, -6, 6.4, 2], [-2, -14, 5.4, 1], [3, -21 + wob, 4.4, 0]] : [[-4, -4, 6, 0], [4, -9 + wob, 5.4, 1]];
+  lay.forEach(([cx, cy, r, i], n) => fluff(g, cx, cy, r, cols[i], c, 11 + n)); if(st === 'full' && !c){ g.fillStyle = 'rgba(255,255,255,0.95)'; g.beginPath(); D.star(g, 9, -22, 2.2 * tw(t, 1), 0.8, 4); g.fill(); }
+  g.restore(); }
+// 🔘 Lost Buttons: an open round sewing tin full of buttons (half = a few · empty = the open tin + one button)
+function buttonPaint(g, x, y, k, t, v, L, c){ const st = L.state || 'full', S = sk(v); g.save(); g.translate(x, y); g.scale(k * 1.2 * (v % 3 === 2 ? -1 : 1), k * 1.2);
+  g.fillStyle = 'rgba(40,24,40,0.2)'; g.beginPath(); D.ell(g, 0, 1, 15, 5); g.fill(); const tin = dim(c, ['#8EC8F2', '#F2A0B4', '#9EE0C0'][v % 3]);
+  g.fillStyle = D.sh(tin, -0.2); g.beginPath(); g.ellipse(0, -2, 12, 5, 0, 0, Math.PI); g.lineTo(-12, -7); g.ellipse(0, -7, 12, 5, 0, Math.PI, 0, true); g.closePath(); g.fill(); g.fillStyle = D.sh(tin, 0.15); g.beginPath(); D.ell(g, 0, -7, 12, 5); g.fill(); g.fillStyle = '#6A5A70'; g.beginPath(); D.ell(g, 0, -7, 10.4, 4.2); g.fill();
+  g.fillStyle = D.sh(tin, 0.1); g.save(); g.translate(-14, -9); g.rotate(-0.5); g.beginPath(); D.ell(g, 0, 0, 4, 9); g.fill(); g.restore();   // the lid leaning
+  const cols = [S.a, S.b, S.c, S.d, S.e, WHITE], all = [[-6, -9, 3.2], [0, -10, 3.4], [6, -8.6, 3.2], [-3, -6, 3], [3, -5.6, 3.2], [-1, -14, 3.4], [5, -14, 3], [-6, -13, 2.8]], n = st === 'full' ? 8 : st === 'half' ? 3 : 0;
+  all.slice(0, n).forEach(([bx, by, r], i) => button(g, bx, by, r, cols[(i + v) % 6], c, 0.8)); if(st === 'empty') button(g, 10, -1, 3, S.a, c, 0.6);
+  g.restore(); }
+// 🧦 Sock Jewels: a striped sock stuffed with sparkling gems poking out of the cuff (half = a few · empty = a flat sock + one gem)
+function sockGemPaint(g, x, y, k, t, v, L, c){ const st = L.state || 'full', S = sk(v), br = dead(c); g.save(); g.translate(x, y); g.scale(k * 1.2 * (v % 3 === 1 ? -1 : 1), k * 1.2);
+  g.fillStyle = 'rgba(40,24,40,0.2)'; g.beginPath(); D.ell(g, 0, 1, 15, 5); g.fill(); const cols = [S.a, WHITE, S.b, WHITE, S.c], gem = (gx, gy, r, col) => { const cl = dim(c, col); g.fillStyle = cl; g.beginPath(); g.moveTo(gx, gy - r); g.lineTo(gx + r * 0.8, gy - r * 0.2); g.lineTo(gx, gy + r * 0.8); g.lineTo(gx - r * 0.8, gy - r * 0.2); g.closePath(); g.fill(); g.fillStyle = 'rgba(255,255,255,0.65)'; g.beginPath(); g.moveTo(gx, gy - r); g.lineTo(gx - r * 0.8, gy - r * 0.2); g.lineTo(gx - r * 0.2, gy - r * 0.2); g.closePath(); g.fill(); };
+  if(st === 'empty'){ for(let i = 0; i < 5; i++){ g.fillStyle = dim(c, cols[i]); g.fillRect(-12 + i * 4, -4, 4.2, 4); } g.fillStyle = dim(c, S.a); g.beginPath(); D.ell(g, 9, -2, 4, 2.6); g.fill(); gem(-14, -3, 3, '#9AE8FF'); g.restore(); return; }
+  const fat = st === 'full' ? 1 : 0.7; if(v % 3 === 2) cols.reverse(); g.save(); g.rotate(-0.25); for(let i = 0; i < 5; i++){ g.fillStyle = dim(c, cols[i]); g.beginPath(); D.rr(g, -7 * fat, -22 + i * 4.2, 14 * fat, 4.6, 1.6); g.fill(); } g.fillStyle = dim(c, S.a); g.beginPath(); D.ell(g, 3, -1.6, 9 * fat, 4.6); g.fill(); g.restore();
+  const G2 = v % 3 === 2 ? ['#FFE070', '#B8A8FF', '#FF8AB8', '#9AE8FF'] : ['#9AE8FF', '#FF8AB8', '#B8F08A', '#FFE070'], gs = st === 'full' ? [[-4, -24, 4, G2[0]], [2, -26, 4.4, G2[1]], [6, -23, 3.6, G2[2]], [0, -21, 3, G2[3]]] : [[-2, -22, 3.6, G2[0]], [3, -23, 3.2, G2[1]]];
+  gs.forEach(([gx, gy, r, col]) => gem(gx, gy, r, col)); if(!c){ g.fillStyle = 'rgba(255,255,255,0.95)'; g.beginPath(); D.star(g, -6 + 4 * Math.sin(ph(t, 2.4)), st === 'full' ? -30 : -27, 2.6 * tw(t, 2), 0.8, 4); g.fill(); }
+  g.restore(); }
+const RES = (slot, name, h, tag, paint, live) => organic('dust', 'dust_' + slot, Object.assign({name, look: 'dust', side: 'dust', slot, kind: 'thing', foot: [1, 1], h, variants: 3, block: true, states: ['full', 'half', 'empty'], state: 'full', dead: 'keep',
+  tags: ['ar', 'ar-res', 'resource', tag, 'ar-dust'], conds: {'*': (g, x, y, k, t, v, c, L) => paint(g, x, y, k, t, v, L, c)},
+  diffs: [{by: 'state', a: 'full', b: 'half', level: 'bold', name: 'half gathered'}, {by: 'state', a: 'half', b: 'empty', level: 'bold', name: 'all gathered'}, {by: 'v', level: 'quiet', name: 'colour'}]}, live ? {live, liveStates: ['full', 'half']} : {}), (g, x, y, k, t, v, L) => paint(g, x, y, k, t, v, L, null));
+RES('coin', 'Lint balls', 36, 'coin', lintPaint, {period: 2.4, frames: 6}); RES('brick', 'Button tin', 30, 'brick', buttonPaint); RES('gem', 'Sock of jewels', 40, 'gem', sockGemPaint, {period: 2.4, frames: 6});
+/* ---------- 🏺 ORIGIN RELIC (ip-4f sample, Aowu 2026-11-20 12:39 "a Rabbit might be a Big Rabbit head") — 🐰 the Big Bunny Head:
+   a GIANT fluffy dust-bunny head (tall ears, sleepy smile, pink nose, a sock scarf in the team colour) resting on a big thread spool on a lace doily, dust motes swirling.
+   2 × 2, states home · taken. Props.AR.ORIGIN.dust.icon(g, x, y, k, lit) = the carried / dropped / HUD form. ---------- */
+function bunnyHead(g, x, y, s, c, o){ o = o || {}; const ear = o.ear || 0, col = FLUFFL;
+  [-1, 1].forEach(sd => { g.save(); g.translate(x + sd * 8 * s, y - 14 * s); g.rotate(sd * (0.16 + ear) + (sd > 0 ? 0.25 : 0)); g.fillStyle = dim(c, col); g.beginPath(); g.ellipse(0, -14 * s, 6.4 * s, 16 * s, 0, 0, TAU); g.fill();
+    g.fillStyle = dim(c, ROSE); g.beginPath(); g.ellipse(0, -14 * s, 3.2 * s, 11 * s, 0, 0, TAU); g.fill(); g.restore(); });
+  fluff(g, x, y, 20 * s, col, c, 77);
+  g.strokeStyle = INK; g.lineWidth = 1.4 * s; g.lineCap = 'round'; [-1, 1].forEach(sd => { g.beginPath(); g.arc(x + sd * 7 * s, y - 2 * s, 3 * s, 0.25, Math.PI - 0.25); g.stroke(); });
+  g.fillStyle = dim(c, ROSE); g.beginPath(); g.moveTo(x - 2.6 * s, y + 3 * s); g.lineTo(x + 2.6 * s, y + 3 * s); g.lineTo(x, y + 5.6 * s); g.closePath(); g.fill();
+  g.strokeStyle = INK; g.lineWidth = 1 * s; g.beginPath(); g.arc(x - 2.4 * s, y + 6 * s, 2.4 * s, 0.3, Math.PI - 0.6); g.stroke(); g.beginPath(); g.arc(x + 2.4 * s, y + 6 * s, 2.4 * s, 0.6, Math.PI - 0.3); g.stroke();
+  g.fillStyle = 'rgba(255,140,170,0.5)'; [-1, 1].forEach(sd => { g.beginPath(); D.ell(g, x + sd * 12 * s, y + 4 * s, 3.4 * s, 2 * s); g.fill(); });
+  if(o.scarf){ const S = SOCKS[0], cols = [o.scarf, WHITE, o.scarf, WHITE, o.scarf]; for(let i = 0; i < 5; i++){ g.fillStyle = dead(c) ? '#8A8090' : cols[i]; g.beginPath(); D.rr(g, x - 16 * s + i * 6.4 * s, y + 13 * s, 6.6 * s, 6 * s, 1.4 * s); g.fill(); }
+    g.fillStyle = dead(c) ? '#8A8090' : o.scarf; g.beginPath(); D.rr(g, x + 9 * s, y + 16 * s, 5 * s, 12 * s, 1.6 * s); g.fill(); } }
+(function(){ const S0 = SOCKS[0], def = add('dust', 'dust_relic', {name: 'The Big Bunny Head', look: 'dust', side: 'dust', slot: 'origin', kind: 'landmark', foot: [2, 2], door: null, h: 134, variants: 1, block: true,
+    states: ['home', 'taken'], state: 'home', tags: ['ar', 'ar-origin', 'ar-dust', 'relic', 'origin'], live: {period: 2.4, frames: 6},
+    diffs: [{by: 'state', a: 'home', b: 'taken', level: 'bold', name: 'the Big Bunny Head carried off (spool empty)'}]});
+  def.build = (B, v, L) => { const c = L.cond, br = dead(c), home = (L.state || 'home') === 'home' && !br; K.AR.kerb(B, L, 2, 2);
+    B.flat(0.06, 0.06, 1.88, 1.88, LINEN);
+    B.custom(1, 1, (g, P, k) => { const n = 16, pts = []; for(let i = 0; i < n * 2; i++){ const a = i / (n * 2) * TAU, r = i % 2 ? 0.74 : 0.84; pts.push(P(1 + Math.cos(a) * r, 1 + Math.sin(a) * r, 0)); } polyP(g, pts); g.fillStyle = dim(c, WHITE); g.fill(); }, {layer: -1, zb: 0, top: 1});   // a lace doily
+    spool(B, c, 1, 1, 0, 0.62, br ? 22 : 44, S0.e); drumBand(B, L, c, 1, 1, 18, 0.45, 6, {layer: 2});
+    if(home){ halo(B, 1, 1, 90, 46, '#EDE4FF', 0.45, {pulse: t => still(c) ? 1 : 0.88 + Math.sin(ph(t, 2.4)) * 0.08 + Math.cos(ph(t, 2.4)) * 0.04});
+      B.custom(1, 1, (g, P, k, t) => { const bob = still(c) ? 0 : Math.sin(ph(t, 2.4)) * 1.4 + Math.cos(ph(t, 2.4)) * 0.6, q = P(1, 1, 44), x = q[0], y = q[1] - 30 * k - bob * k, ear = still(c) ? 0 : Math.sin(ph(t, 2.4)) * 0.08 + Math.cos(ph(t, 2.4)) * 0.03;   // 🐰 the giant bunny head
+        bunnyHead(g, x, y, k * 1.45, c, {ear, scarf: teamOf(L)}); }, {layer: 6, zb: 44, top: 132});
+      motes(B, c, 1, 1, 70, 7, 70, 61);
+    } else if(!br) B.custom(1, 1, (g, P, k, t) => { const q = P(1, 1, 44); g.strokeStyle = 'rgba(150,136,190,0.9)'; g.lineWidth = 1.6 * k; g.setLineDash([3 * k, 2.4 * k]); g.beginPath(); D.ell(g, q[0], q[1], 14 * k, 7 * k); g.stroke(); g.setLineDash([]);
+      fluff(g, q[0] - 6 * k, q[1] - 2 * k, 3 * k, FLUFF, c, 5); g.fillStyle = 'rgba(255,240,190,0.9)'; g.beginPath(); D.star(g, q[0] + 8 * k, q[1] - 8 * k, (2.4 + tw(t, 1)) * k, 0.9 * k, 4); g.fill(); }, {layer: 6, zb: 44, top: 60});
+    [[0.2, 1.8], [1.8, 0.2]].forEach(([x, y]) => pennant(B, L, x, y, 0, 46, {emblem: bunnyEm, pole: POLE})); };
+  const AR = Props.AR; AR.ORIGIN = AR.ORIGIN || {}; AR.ORIGIN.dust = {key: 'dust_relic', name: 'The Big Bunny Head', icon: (g, x, y, k, lit) => bunnyHead(g, x, y, k * 0.55, lit === false ? {} : null, {scarf: '#A43BEA'})};
+})();
+/* ---------- 🧱 walls: a striped DRAUGHT-SNAKE wall (a long stuffed sock cushion) · posts = thread spools · gate = two spool pillars under a giant wooden CLOTHES PEG ·
+   🏯 tall = a stacked-cushion rampart + tall spool towers under silver thimble caps + a 🤧 tissue-box gatehouse with a tissue waving ---------- */
+(function(){ const {wallProp, gateProp, gateDoors, longFaces, tallWallProp, tallGateProp} = K.AR, S0 = SOCKS[0];
+  const skin = {name: 'Draught-snake wall', gateName: 'Clothes-peg gate', h: 46, gateH: 90,
+    seg(B, L, r, c, v){ const [x, y, w, d, ax] = r, br = dead(c), H = br ? 9 : 18, b = B.box(x, y, 0, w, d, H, S0.a);
+      ['front', 'right', 'left', 'back'].forEach((s, i) => B.decal(b, s, ...F(b, s), 0, H, S0.a, {paint: (g, Q, k) => { const cols = [S0.a, WHITE, S0.b, WHITE, S0.c], n = 5; for(let j = 0; j < n; j++){ polyP(g, [Q(j / n, 0), Q((j + 1) / n, 0), Q((j + 1) / n, H), Q(j / n, H)]); g.fillStyle = dim(c, cols[(j + i + Math.round((x + y) * 10)) % 5]); g.fill(); } }}));
+      trim(B, L, b, br ? 2 : 6, 3, longFaces(ax)); if(br) return;
+      B.custom(x + w / 2, y + d / 2, (g, P, k) => { const a = ax === 'x' ? P(x, y + d / 2, H) : P(x + w / 2, y, H), b2 = ax === 'x' ? P(x + w, y + d / 2, H) : P(x + w / 2, y + d, H); g.strokeStyle = dim(c, FLUFFL); g.lineWidth = 6 * k; g.lineCap = 'round'; line(g, a, b2); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 2 * k; line(g, [a[0], a[1] - 1.6 * k], [b2[0], b2[1] - 1.6 * k]); }, {layer: 1, zb: H, top: H + 5}); },
+    post(B, L, kind, c){ const br = dead(c), end = kind === 'end' || kind === 'solo'; spool(B, c, 0.5, 0.5, 0, 0.21, br ? 12 : 26, end ? S0.b : S0.c, {layer: 1});
+      B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 5), rx = 0.15 * HTW * k * S2, col = team(c, L); g.fillStyle = col; g.beginPath(); g.ellipse(q[0], q[1] - 4 * k, rx, rx / 2, 0, 0, Math.PI); g.lineTo(q[0] - rx, q[1] - 8 * k); g.ellipse(q[0], q[1] - 8 * k, rx, rx / 2, 0, Math.PI, 0, true); g.closePath(); g.fill(); }, {layer: 2, zb: 5, top: 13});
+      if(!br && end) B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 26); g.strokeStyle = STEELD; g.lineWidth = 1 * k; line(g, q, [q[0] + 4 * k, q[1] - 12 * k]); g.fillStyle = STEEL; g.beginPath(); g.arc(q[0] + 4.4 * k, q[1] - 13 * k, 1.6 * k, 0, TAU); g.fill(); }, {layer: 3, zb: 26, top: 40}); },   // a needle in the end spool
+    gate(B, L, open, c, v){ const t = 0.17, H = 44, br = dead(c);
+      [[0.15, S0.b], [0.85, S0.e]].forEach(([x, col], i) => { spool(B, c, x, 0.5, 0, 0.15, br ? 16 : H, col, {layer: 1}); drumBand(B, L, c, x, 0.5, 10, 0.11, 4, {layer: 2}); });
+      gateDoors(B, open, c, 30, dim(c, FLUFF), S0.a, {paint: (g, Q, k) => { felt(30, FLUFF, c)(g, Q, k); button(g, ...Q(0.5, 15), 2.4 * k, S0.d, c); }});
+      B.custom(0.5, 0.5, (g, P, k) => { const a = P(0.05, 0.5, H + 4), b2 = P(0.95, 0.5, H + 4); if(br){ g.save(); g.translate((a[0] + b2[0]) / 2, (a[1] + b2[1]) / 2 + 36 * k); g.rotate(0.3); g.fillStyle = SPOOLD; g.fillRect(-14 * k, -2 * k, 28 * k, 4 * k); g.restore(); return; }   // 📎 a giant wooden clothes peg across the top
+        const m = [(a[0] + b2[0]) / 2, (a[1] + b2[1]) / 2], dx = b2[0] - a[0], dy = b2[1] - a[1], ln = Math.hypot(dx, dy), ux = dx / ln, uy = dy / ln;
+        [[0, SPOOL], [-5, SPOOLD]].forEach(([off, col]) => { g.fillStyle = dim(c, col); g.beginPath(); g.moveTo(a[0] + off * 0.2 * k, a[1] + off * k); g.lineTo(b2[0], b2[1] + off * k - 2 * k); g.lineTo(b2[0], b2[1] + off * k + 3 * k); g.lineTo(a[0], a[1] + off * k + 4 * k); g.closePath(); g.fill(); });
+        g.fillStyle = dim(c, STEEL); g.beginPath(); D.rr(g, m[0] - 6 * k, m[1] - 6 * k, 12 * k, 10 * k, 3 * k); g.fill(); g.strokeStyle = dim(c, STEELD); g.lineWidth = 1 * k; g.beginPath(); g.arc(m[0], m[1] - 1 * k, 3 * k, 0, TAU); g.stroke();
+        const col = teamOf(L); g.fillStyle = col; g.beginPath(); g.arc(m[0], m[1] - 14 * k, 6.4 * k, 0, TAU); g.fill(); bunnyEm(g, m[0], m[1] - 14 * k, 4 * k, inkOf(col)); }, {layer: 2, zb: H, top: H + 28}); } };
+  wallProp('dust', 'dust', skin); gateProp('dust', 'dust', skin);
+  const tall = {name: 'Cushion rampart', gateName: 'Tissue-box gatehouse', base: 30, h: 122, gateH: 128,
+    rampart(B, L, r, c, hb){ const [x, y, w, d, ax] = r, e = 0.08, n = 3, cols = [S0.e, S0.b, '#E8A07A'];
+      for(let i = 0; i < n; i++){ const z = i * hb / n, h = hb / n, b = ax === 'x' ? B.box(x, y - e + i * 0.01, z, w, d + 2 * e - i * 0.02, h, dim(c, cols[i])) : B.box(x - e + i * 0.01, y, z, w + 2 * e - i * 0.02, d, h, dim(c, cols[i]));
+        ['front', 'right', 'left', 'back'].forEach(s => B.decal(b, s, ...F(b, s), 0, h, cols[i], {paint: (g, Q, k) => { g.strokeStyle = D.sh(cols[i], -0.25); g.lineWidth = 1.4 * k; line(g, Q(0, h - 1), Q(1, h - 1)); g.strokeStyle = 'rgba(255,255,255,0.4)'; g.lineWidth = 0.8 * k; g.setLineDash([1.6 * k, 1.4 * k]); line(g, Q(0, h * 0.5), Q(1, h * 0.5)); g.setLineDash([]); }})); } },
+    tower(B, L, c, cx, cy, hb, kind, hw){ const br = dead(c), H = hb + (kind === 'gate' ? 30 : 40), HH = br ? H - 14 : H, col = kind === 'gate' ? S0.b : [S0.a, S0.c, S0.e][Math.round(cx * 7 + cy * 3) % 3];
+      spool(B, c, cx, cy, 0, hw * 1.15, HH, col, {layer: 1, noTop: br}); drumBand(B, L, c, cx, cy, HH - 12, hw * 0.83, 5, {layer: 2});
+      B.custom(cx, cy, (g, P, k) => { const w0 = P(cx, cy + hw * 0.83, hb + 8); g.fillStyle = lightOf(c) ? '#FFF0C0' : '#3A3440'; g.beginPath(); D.ell(g, w0[0], w0[1], 2.4 * k, 3.4 * k); g.fill(); }, {layer: 3, zb: hb, top: hb + 14});
+      if(br) return; B.custom(cx, cy, (g, P, k) => { frustum(g, P, k, cx, cy, HH, hw * 1.05, hw * 0.8, kind === 'gate' ? 12 : 16, STEEL, {}); const q = P(cx, cy, HH), r = hw * 0.95 * HTW * k * S2; g.fillStyle = 'rgba(90,96,110,0.45)'; for(let z = 3; z < (kind === 'gate' ? 12 : 16); z += 4) for(let i = -3; i <= 3; i++){ const f = i / 3.4; g.beginPath(); g.arc(q[0] + f * r * 0.9, q[1] - z * k + Math.sqrt(1 - f * f) * r * 0.45, 0.8 * k, 0, TAU); g.fill(); } }, {layer: 3, zb: HH, top: HH + 18});
+      pennant(B, L, cx, cy, HH + (kind === 'gate' ? 12 : 16), kind === 'gate' ? 10 : 12, {w: 11, hh: 7, emblem: bunnyEm, pole: POLE}); },
+    gatehouse(B, L, open, c, hb){ const br = dead(c), z0 = 44, t = 0.2;
+      gateDoors(B, open, c, 40, dim(c, FLUFF), S0.a, {paint: (g, Q, k) => { felt(40, FLUFF, c)(g, Q, k); button(g, ...Q(0.5, 20), 3 * k, S0.d, c); }});
+      const b = B.box(0.24, 0.5 - t, z0, 0.52, 2 * t, br ? 8 : 22, dim(c, S0.b)); if(br) return; ['front', 'back'].forEach(s => B.decal(b, s, ...F(b, s), 0, 22, S0.b, {paint: (g, Q, k) => { for(let i = 0; i < 5; i++){ const p = Q(0.12 + i * 0.19, 11); g.fillStyle = 'rgba(255,255,255,0.55)'; g.beginPath(); g.arc(p[0], p[1], 1.8 * k, 0, TAU); g.fill(); } }})); trim(B, L, b, 14, 3, ['front', 'back']);
+      B.custom(0.5, 0.5, (g, P, k, t2) => { const q = P(0.5, 0.5, z0 + 22), f = still(c) ? 0.2 : Math.sin(ph(t2 || 0, 2.4)) * 0.5 + Math.cos(ph(t2 || 0, 2.4)) * 0.2;   // 🤧 a tissue waving out of the top like a flag
+        g.fillStyle = '#3A3040'; g.beginPath(); D.ell(g, q[0], q[1], 9 * k, 2.6 * k); g.fill(); g.fillStyle = WHITE; g.beginPath(); g.moveTo(q[0] - 7 * k, q[1]); g.quadraticCurveTo(q[0] - 10 * k + f * 6 * k, q[1] - 14 * k, q[0] + f * 9 * k, q[1] - 26 * k); g.quadraticCurveTo(q[0] + 10 * k + f * 4 * k, q[1] - 14 * k, q[0] + 7 * k, q[1]); g.closePath(); g.fill(); g.strokeStyle = 'rgba(150,150,180,0.35)'; g.lineWidth = 0.8 * k; g.stroke(); }, {layer: 3, zb: z0 + 22, top: z0 + 52}); } };
+  tallWallProp('dust', 'dust', skin, tall); tallGateProp('dust', 'dust', skin, tall);
+  DEFS.dust_wall.diffs = [{by: 'gone', level: 'bold', name: 'wall piece gone'}]; DEFS.dust_tallwall.diffs = [{by: 'v', level: 'bold', name: 'a tower on the straight piece'}];
+  DEFS.dust_gate.diffs = DEFS.dust_tallgate.diffs = [{by: 'state', a: 'closed', b: 'open', level: 'bold', name: 'gate open ↔ shut'}];
+})();
+})();
+K.loaded('dust', 'ip-6a');
+})(window.Props && window.Props._K);

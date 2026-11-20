@@ -1,0 +1,454 @@
+
+/* 🌍 IsoLook_reef — 🐠 Reef Riders — AvataRealm side ⑤a on 🌊 coral: 11 buildings · own floor · own resource shapes (pearl oyster · coral chunks · sea glass) · own walls (needs realm) · 🏺 The Great Pearl origin relic — a LOOK file of 🌳 IsoProps (ip-4a: the engine + one file per look).
+   Load it with Props.need(['reef'], start) (the 📲 offline app + tests have it inline already). Runs after IsoProps with Props._K (the kit's insides).
+   Built from Test Harness/isoprops/kit/looks/reef.js by build_isoprops.py — never edit by hand. Same 14 rules as IsoProps (see the top of IsoProps.html). */
+(function(K){
+'use strict';
+if(!K){ console.warn('IsoLook_reef: include IsoProps first'); return; }
+if(!K.AR){ console.warn('IsoLook_reef: load IsoLook_realm first (Props.need does it)'); return; }
+const {HTW, LOOKS, DEFS, MAT, PD, add, lit, sideOf, sh, rnd, addLook, addSet, organic, bareTree, FONT, T} = K;
+/* 🌍 IsoProps LOOK file — 🐠 reef · Reef Riders (AvataRealm side ⑤a, ip-4d pictures, 🌳 IsoProps chat 2026-11-20).
+   Built ON 🌊 coral (its coral trees, kelp, anemones, sea-floor ground, 🍂 versions — a sunny sea-shore town: sandstone, pink coral, shells, pearls, sea glass, sails)
+   + 🏰 realm (team colours · 🏗️ site steps · slots · walls). 11 buildings = AvataRealm §14a:
+   🏠 clam → shell house → Coral Castle · 🏕️ Crab Barracks · 🎠 Seahorse Corral · 🪽 Flying-fish Spout · 🩹 Anemone Spa · 🔧 Whale Dock ·
+   🗼 Coral Lighthouse · 🎨 Pearl Tailor · 🔮 Bubble Temple · 🕵️ Kelp Cave · 🐾 Turtle Pond.
+   Own resource shapes: 🫧 reef_coin = pearls in an open oyster · 🪸 reef_brick = coral chunks · 💎 reef_gem = sea glass + a bottle.
+   Own floor (wet sand + ripples + shells + tide pools) and own walls (🐚 shell-stone wall · 🪸 coral-pillar posts · 🐚 scallop-arch gate · 🏯 sandstone rampart + conch towers + 🐋 whale-tail gatehouse). Keys reef_<slot>. */
+(function(){
+'use strict';
+const {vis, F, line, polyP, ph, lightOf, dome, frustum, halo} = T;
+const {pennant, banner, trim, building, addSide, addFloor, tileBase, hash, teamOf, patOf, inkOf, blocks, awning} = K.AR;
+const D = PD, TAU = Math.PI * 2, S2 = Math.SQRT2;
+const SAND = '#F2DCAE', SAND2 = '#E6C88E', SANDD = '#C9A46A', STONE = '#EBD3A4', CORAL = '#FF7F6E', CORALP = '#FFB0A0', CORALD = '#D9534F', AQUA = '#4FD1C5', AQUAD = '#2C9C9A',
+  SEA = '#49B6E8', SEAD = '#2A7FB8', PEARL = '#FFF7EE', SHELL = '#FFE4CC', SHELLD = '#E8B898', KELP = '#4FAE5A', KELPD = '#2E7A3E', DRIFT = '#C29A6C', DRIFTD = '#7A5A3A',
+  GOLD = '#F2B731', GOLDD = '#B8862A', ROPE = '#D8B878', SAIL = '#FFF8EC', LILAC = '#B9A3E8', WHALE = '#4C7FC8', WHALEB = '#DCE8F6';
+const GLASS = ['#7BD8B0', '#6EC6FF', '#9EE6E0', '#F7C873', '#B8E8C8'];
+const dead = c => c && c.broken, dim = (c, col, f) => c ? (c.broken ? D.sh(col, -0.42) : D.sh(col, f == null ? -0.18 : f)) : col;
+// 🐚 the side's emblem: a scallop shell (a fan with ridges and two little ears)
+function shellEm(g, x, y, r, col){ g.fillStyle = col; g.beginPath(); g.moveTo(x, y + r * 0.75); g.lineTo(x - r * 0.95, y - r * 0.15); g.quadraticCurveTo(x - r * 0.9, y - r * 0.95, x, y - r * 1.0); g.quadraticCurveTo(x + r * 0.9, y - r * 0.95, x + r * 0.95, y - r * 0.15); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(x - r * 0.38, y + r * 0.55); g.lineTo(x - r * 0.62, y + r * 0.9); g.lineTo(x + r * 0.62, y + r * 0.9); g.lineTo(x + r * 0.38, y + r * 0.55); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(0,0,0,0.28)'; g.lineWidth = Math.max(0.6, r * 0.1); for(let i = -2; i <= 2; i++){ g.beginPath(); g.moveTo(x, y + r * 0.7); g.lineTo(x + i * r * 0.36, y - r * 0.82 + Math.abs(i) * r * 0.12); g.stroke(); } }
+addSide('reef', {name: 'Reef Riders', icon: '🐠', look: 'reef', accent: CORAL, emblem: shellEm, base: 'coral'});
+addLook('reef', {name: 'Reef Riders', walls: [STONE, '#FFE9D2', '#F6D8C8'], roofs: [AQUA, CORAL, SEA], trim: '#3A4A6A', accent: CORAL, stilts: false, team: null, side: 'reef',
+  res: {coin: PEARL, coinDk: SHELLD, rock: '#8A6A50', brick: CORAL, brickDk: CORALD, leaf: KELP, bark: DRIFTD, gem: '#7BD8B0', gemDk: AQUAD, gemHi: '#FFFFFF'}}, 'coral');
+/* ---------- 🖌️ reef painters ---------- */
+// 🐚 a scallop shell in screen space (fan + ridges), any colour
+function scallop(g, x, y, r, col, c){ const cl = dim(c, col, -0.12); g.fillStyle = cl; g.beginPath(); g.moveTo(x, y); g.lineTo(x - r, y - r * 0.55); g.quadraticCurveTo(x - r * 0.95, y - r * 1.25, x, y - r * 1.3); g.quadraticCurveTo(x + r * 0.95, y - r * 1.25, x + r, y - r * 0.55); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(120,60,40,0.32)'; g.lineWidth = Math.max(0.5, r * 0.07); for(let i = -3; i <= 3; i++){ g.beginPath(); g.moveTo(x, y - r * 0.05); g.lineTo(x + i * r * 0.3, y - r * 1.2 + Math.abs(i) * r * 0.16); g.stroke(); }
+  g.fillStyle = D.sh(cl, -0.12); g.beginPath(); g.moveTo(x - r * 0.3, y); g.lineTo(x - r * 0.45, y + r * 0.22); g.lineTo(x + r * 0.45, y + r * 0.22); g.lineTo(x + r * 0.3, y); g.closePath(); g.fill(); }
+// ⭐ a starfish (screen space)
+function starfish(g, x, y, r, col, c, rot){ g.fillStyle = dim(c, col); g.beginPath(); D.star(g, x, y, r, r * 0.42, 5, rot == null ? -Math.PI / 2 : rot); g.fill(); if(dead(c)) return; g.fillStyle = 'rgba(255,255,255,0.55)'; for(let i = 0; i < 5; i++){ const a = (rot == null ? -Math.PI / 2 : rot) + i * TAU / 5; g.beginPath(); g.arc(x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.5, Math.max(0.4, r * 0.09), 0, TAU); g.fill(); } }
+// ⚪ a pearl (screen space)
+function pearl(g, x, y, r, col){ g.fillStyle = D.rad(g, x - r * 0.35, y - r * 0.4, r * 0.1, r * 1.1, [[0, '#FFFFFF'], [0.5, col || PEARL], [1, '#D8C4C8']]); g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
+// 🪸 a branching coral (screen space, grows up from x, y)
+function coralBranch(g, x, y, h, col, k, c, seed){ const R = rnd(seed || 3), cl = dim(c, col), br = dead(c), hh = br ? h * 0.5 : h; g.strokeStyle = cl; g.lineCap = 'round';
+  const arm = (x0, y0, a, len, w, d) => { const x1 = x0 + Math.sin(a) * len, y1 = y0 - Math.cos(a) * len; g.lineWidth = w; g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo(x0 + Math.sin(a) * len * 0.3, y0 - len * 0.6, x1, y1); g.stroke();
+    if(d > 0){ arm(x1, y1, a - 0.45 - R() * 0.3, len * 0.66, w * 0.72, d - 1); arm(x1, y1, a + 0.45 + R() * 0.3, len * 0.62, w * 0.72, d - 1); } else if(!br){ g.fillStyle = D.sh(cl, 0.25); g.beginPath(); g.arc(x1, y1, w * 0.7, 0, TAU); g.fill(); } };
+  arm(x, y, 0, hh * 0.45, 3.2 * k, br ? 1 : 2); }
+// 🌿 kelp strands (screen space, live sway with sin + cos)
+function kelp(g, x, y, h, k, t, c, n){ const br = dead(c), s = c && c.still ? 0 : Math.sin(ph(t, 2.4)), cc = c && c.still ? 0 : Math.cos(ph(t, 2.4)); for(let i = 0; i < (n || 3); i++){ const ox = (i - ((n || 3) - 1) / 2) * 4 * k, hh = (br ? h * 0.45 : h) * (0.75 + 0.25 * ((i * 37) % 7) / 7);
+  g.strokeStyle = br ? '#8A8460' : c ? '#7A9A50' : (i % 2 ? KELP : KELPD); g.lineWidth = 2.4 * k; g.lineCap = 'round'; g.beginPath(); g.moveTo(x + ox, y);
+  for(let j = 1; j <= 6; j++){ const f = j / 6; g.lineTo(x + ox + Math.sin(f * 4 + i) * 3 * k * f + (i % 2 ? s * 0.6 + cc * 0.4 : cc * 0.6 + s * 0.4) * 2.4 * k * f, y - f * hh); } g.stroke(); } }
+// 🐟 a tiny fish (screen space)
+function fish(g, x, y, r, col, dir){ g.save(); g.translate(x, y); g.scale(dir || 1, 1); g.fillStyle = col; g.beginPath(); D.ell(g, 0, 0, r, r * 0.55); g.fill(); g.beginPath(); g.moveTo(-r * 0.8, 0); g.lineTo(-r * 1.6, -r * 0.6); g.lineTo(-r * 1.6, r * 0.6); g.closePath(); g.fill();
+  g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(r * 0.45, -r * 0.12, r * 0.2, 0, TAU); g.fill(); g.fillStyle = '#1E2A3A'; g.beginPath(); g.arc(r * 0.5, -r * 0.12, r * 0.1, 0, TAU); g.fill(); g.restore(); }
+// 💧 a pool of sea water inside a model ellipse (screen space at P), live ripples
+function pool(g, P, k, t, cx, cy, z, r, c, o){ o = o || {}; const q = P(cx, cy, z), rx = r * HTW * k * S2, br = dead(c);
+  g.fillStyle = br ? '#B8A888' : D.rad(g, q[0] - rx * 0.3, q[1] - rx * 0.12, 1, rx, [[0, o.hi || '#C8F4FF'], [1, o.col || SEA]]); g.beginPath(); D.ell(g, q[0], q[1], rx, rx / 2); g.fill();
+  if(br || (c && c.still)) return q; for(let i = 0; i < 2; i++){ const f = ((t / 2.4) + i / 2) % 1; g.strokeStyle = 'rgba(255,255,255,' + (0.7 * (1 - f)) + ')'; g.lineWidth = 0.9 * k; g.beginPath(); D.ell(g, q[0] + (o.dx || 0) * k, q[1], rx * (0.2 + f * 0.6), rx * (0.1 + f * 0.3)); g.stroke(); } return q; }
+// 🐚 a conch-shell cone roof (spiral stripes), standing on z
+function conch(B, x, y, z, r, h, col, c){ B.cone(x, y, z, r, dead(c) ? h * 0.45 : h, col);
+  if(!dead(c)) B.custom(x, y, (g, P, k) => { const b = P(x, y, z), tp = P(x, y, z + h), rx = r * HTW * k * S2; g.strokeStyle = 'rgba(160,80,60,0.42)'; g.lineWidth = 1.3 * k; g.beginPath();
+    for(let i = 0; i <= 40; i++){ const f = i / 40, a = f * Math.PI * 5.2 + 0.3, rr = rx * (1 - f), xx = b[0] + Math.cos(a) * rr, yy = b[1] + (tp[1] - b[1]) * f + Math.sin(a) * rr * 0.5; if(Math.sin(a) < -0.05){ g.moveTo(xx, yy); continue; } g.lineTo(xx, yy); } g.stroke();
+    g.fillStyle = PEARL; g.beginPath(); g.arc(tp[0], tp[1], 1.8 * k, 0, TAU); g.fill(); }, {layer: 2, zb: z, top: z + h}); }
+// a round porthole window (decal paint) — brass rim, sea-glass glass, glows when lit
+const porthole = (h, c) => (g, Q, k) => { const m = Q(0.5, h / 2), r = Math.abs(Q(1, 0)[0] - Q(0, 0)[0]) * 0.42, lv = lightOf(c); g.fillStyle = GOLD; g.beginPath(); D.ell(g, m[0], m[1], r, h * 0.48 * k); g.fill();
+  g.fillStyle = lv === 1 ? '#CFF6FF' : lv ? '#A8C8D0' : '#3A4A58'; g.beginPath(); D.ell(g, m[0], m[1], r * 0.7, h * 0.34 * k); g.fill(); if(lv){ g.fillStyle = 'rgba(255,255,255,0.7)'; g.beginPath(); D.ell(g, m[0] - r * 0.2, m[1] - h * 0.1 * k, r * 0.18, h * 0.1 * k); g.fill(); } };
+// a round-top door (decal paint) — driftwood planks under a coral arch
+const reefDoor = (h, fill) => (g, Q, k) => { const a = Q(0, 0), b = Q(1, 0), sp = Q(0, h * 0.62), sq = Q(1, h * 0.62), tp = Q(0.5, h);
+  g.fillStyle = CORAL; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(sp[0], sp[1]); g.quadraticCurveTo(sp[0], tp[1], tp[0], tp[1]); g.quadraticCurveTo(sq[0], tp[1], sq[0], sq[1]); g.lineTo(b[0], b[1]); g.closePath(); g.fill();
+  const a2 = Q(0.12, 0), b2 = Q(0.88, 0), sp2 = Q(0.12, h * 0.6), sq2 = Q(0.88, h * 0.6), tp2 = Q(0.5, h - 2); g.fillStyle = fill || DRIFT; g.beginPath(); g.moveTo(a2[0], a2[1]); g.lineTo(sp2[0], sp2[1]); g.quadraticCurveTo(sp2[0], tp2[1], tp2[0], tp2[1]); g.quadraticCurveTo(sq2[0], tp2[1], sq2[0], sq2[1]); g.lineTo(b2[0], b2[1]); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(70,40,20,0.35)'; g.lineWidth = 0.8 * k; [0.37, 0.63].forEach(u => line(g, Q(u, 0.5), Q(u, h - 3))); g.fillStyle = GOLD; const q = Q(0.72, h * 0.4); g.beginPath(); g.arc(q[0], q[1], 1.1 * k, 0, TAU); g.fill(); };
+// sandstone with shells set in it (decal paint over a whole face)
+const shellStone = (h, seed) => (g, Q, k) => { const R = rnd(seed || 7); blocks(h, STONE, seed, 8)(g, Q, k); for(let i = 0; i < 3; i++){ const u = 0.12 + R() * 0.76, z = 3 + R() * (h - 8); const q = Q(u, z); scallop(g, q[0], q[1] + 2 * k, 2.4 * k, [SHELL, CORALP, '#FFF2C8'][i % 3], null); } };
+const RF = (slot, o, build) => building('reef', slot, o, build);
+// a sandstone box with shells on the seen faces
+function stoneBox(B, x, y, z, w, d, h, col, seed){ const b = B.box(x, y, z, w, d, h, col || STONE); ['front', 'right', 'left', 'back'].forEach((s, i) => B.decal(b, s, ...F(b, s), 0, h, col || STONE, {paint: shellStone(h, (seed || 5) + i)})); return b; }
+// a little sand patch with a starfish + shell (ground deco)
+function beach(B, x, y, c, seed){ B.custom(x, y, (g, P, k) => { const q = P(x, y, 0), R = rnd(seed || 4); starfish(g, q[0] - 4 * k, q[1] - 1 * k, 3.4 * k, ['#FF8A5B', '#FFB347', '#F76E8A'][Math.floor(R() * 3)], c, R() * TAU); scallop(g, q[0] + 5 * k, q[1] + 1 * k, 2.6 * k, SHELL, c); }, {layer: 3, zb: 0, top: 6}); }
+// the team rope on two little posts (ground marker in team colour)
+function teamRope(B, L, x0, y0, x1, y1, c){ B.custom((x0 + x1) / 2, (y0 + y1) / 2, (g, P, k) => { const a = P(x0, y0, 0), b2 = P(x1, y1, 0), col = dead(c) ? '#8A8090' : teamOf(L);
+  [a, b2].forEach(p => { g.fillStyle = DRIFTD; g.fillRect(p[0] - 1.2 * k, p[1] - 9 * k, 2.4 * k, 9 * k); g.fillStyle = GOLD; g.beginPath(); g.arc(p[0], p[1] - 9 * k, 1.6 * k, 0, TAU); g.fill(); });
+  g.strokeStyle = col; g.lineWidth = 2.2 * k; g.beginPath(); g.moveTo(a[0], a[1] - 7 * k); g.quadraticCurveTo((a[0] + b2[0]) / 2, (a[1] + b2[1]) / 2 - 3 * k, b2[0], b2[1] - 7 * k); g.stroke(); }, {layer: 3, zb: 0, top: 10}); }
+/* ============================ 🏠 HOUSE — 3 levels, each a new SHAPE ============================ */
+RF('house', {name: 'Coral Castle', h: 140, names: {'1': 'Clam Hut', '2': 'Shell House', '3': 'Coral Castle'}, live: {period: 2.4, frames: 6}}, (B, v, L) => { const c = L.cond, lv = L.state || '1';
+  if(lv === '1'){ // 🦪 a giant clam: a ridged bottom shell, the lid propped open on a driftwood stick, a pearl bed inside, a team rug, a starfish
+    B.flat(0.1, 0.1, 2.8, 1.8, SAND);
+    B.custom(1.5, 1.0, (g, P, k, t) => { const q = P(1.5, 1.05, 0), rx = 1.25 * HTW * k * S2 * 0.82, br = dead(c), lid = br ? 0.15 : 1, shellC = dim(c, '#F6C9B6');
+      // the lid, hinged at the back, propped up by a driftwood stick
+      const hy = q[1] - 14 * k - rx * 0.28, top = hy - (br ? 8 : 56) * k * lid;       g.fillStyle = D.lin(g, q[0] - rx, top, q[0] + rx, hy, [[0, D.sh(shellC, 0.18)], [1, D.sh(shellC, -0.12)]]); g.beginPath(); g.moveTo(q[0] - rx, hy + 2 * k); g.quadraticCurveTo(q[0] - rx * 1.05, top + 4 * k, q[0], top); g.quadraticCurveTo(q[0] + rx * 1.05, top + 4 * k, q[0] + rx, hy + 2 * k); g.quadraticCurveTo(q[0], hy - 6 * k, q[0] - rx, hy + 2 * k); g.fill();
+      g.strokeStyle = 'rgba(160,80,60,0.35)'; g.lineWidth = 1.2 * k; for(let i = -4; i <= 4; i++){ g.beginPath(); g.moveTo(q[0] + i * rx * 0.2, hy - 2 * k); g.quadraticCurveTo(q[0] + i * rx * 0.24, (hy + top) / 2, q[0] + i * rx * 0.14, top + 6 * k + Math.abs(i) * 3 * k); g.stroke(); }
+      // bottom shell = a ribbed bowl
+      g.fillStyle = D.lin(g, q[0] - rx, 0, q[0] + rx, 0, [[0, D.sh(shellC, 0.12)], [0.5, shellC], [1, D.sh(shellC, -0.2)]]); g.beginPath(); g.moveTo(q[0] - rx, q[1] - 14 * k); g.quadraticCurveTo(q[0] - rx * 0.95, q[1] + rx * 0.32, q[0], q[1] + rx * 0.36); g.quadraticCurveTo(q[0] + rx * 0.95, q[1] + rx * 0.32, q[0] + rx, q[1] - 14 * k); g.closePath(); g.fill();
+      g.strokeStyle = 'rgba(160,80,60,0.35)'; g.lineWidth = 1.1 * k; for(let i = -4; i <= 4; i++){ g.beginPath(); g.moveTo(q[0] + i * rx * 0.2, q[1] - 13 * k); g.quadraticCurveTo(q[0] + i * rx * 0.2, q[1] + rx * 0.2, q[0] + i * rx * 0.12, q[1] + rx * 0.3); g.stroke(); }
+      // the inside: pearly pink + a cushion bed with a big pearl
+      g.fillStyle = br ? '#B8A8A0' : '#FFE8EE'; g.beginPath(); D.ell(g, q[0], q[1] - 14 * k, rx * 0.94, rx * 0.3); g.fill();
+      if(!br){ g.fillStyle = AQUA; g.beginPath(); D.rr(g, q[0] - rx * 0.55, q[1] - 22 * k, rx * 0.7, 9 * k, 4 * k); g.fill(); pearl(g, q[0] + rx * 0.35, q[1] - 22 * k, 7 * k, PEARL); }
+      if(!br){ g.strokeStyle = DRIFTD; g.lineWidth = 2.4 * k; line(g, [q[0] - rx * 0.62, q[1] - 16 * k], [q[0] - rx * 0.55, hy - (hy - top) * 0.7]); }
+      if(!br && !(c && c.still)) T.bubbles(g, q[0] + rx * 0.5, q[1] - 30 * k, k, t, {n: 3, rise: 22, period: 2.4}); }, {layer: 1, zb: 0, top: 70});
+    B.custom(1.5, 1.85, (g, P, k) => { const a = P(1.05, 1.72, 0.6), b2 = P(1.95, 1.72, 0.6), d2 = P(1.95, 1.98, 0.6), e = P(1.05, 1.98, 0.6), col = dead(c) ? '#8A8090' : teamOf(L); polyP(g, [a, b2, d2, e]); g.fillStyle = col; g.fill();
+      if(!dead(c)){ g.save(); polyP(g, [a, b2, d2, e]); g.clip(); K.AR.patPaint(g, (s, vv) => P(1.05 + s / 22, 1.98 - vv / 22, 0.6), 19.8, 5.7, patOf(L), inkOf(col), k); g.restore(); }
+      g.strokeStyle = ROPE; g.lineWidth = 1.2 * k; polyP(g, [a, b2, d2, e]); g.stroke(); }, {layer: -6, zb: 0, top: 1});
+    beach(B, 2.6, 1.7, c, 11);
+    B.custom(0.3, 1.6, (g, P, k) => { const q = P(0.32, 1.62, 0); coralBranch(g, q[0], q[1], 26 * k, CORAL, k, c, 5); }, {layer: 3, zb: 0, top: 28});
+    pennant(B, L, 2.7, 0.3, 0, 52, {emblem: shellEm, pole: DRIFTD});
+    return; }
+  if(lv === '2'){ // 🐚 shell house: a round sandstone house with porthole windows under a GIANT conch-shell roof, a coral chimney blowing bubbles, a rain barrel of sea water
+    B.flat(0.1, 0.1, 2.8, 1.8, SAND);
+    B.drum(1.4, 0.95, 0, 0.82, 40, STONE, {rings: 0});
+    B.custom(1.4, 0.95, (g, P, k) => { const q = P(1.4, 0.95, 0), rx = 0.82 * HTW * k * S2, d = P(1.4, 0.95 + 0.82, 0);
+      g.fillStyle = CORAL; g.beginPath(); g.moveTo(d[0] - 9 * k, d[1] - 1 * k); g.lineTo(d[0] - 9 * k, d[1] - 22 * k); g.quadraticCurveTo(d[0], d[1] - 33 * k, d[0] + 9 * k, d[1] - 22 * k); g.lineTo(d[0] + 9 * k, d[1] - 1 * k); g.closePath(); g.fill();
+      g.fillStyle = DRIFT; g.beginPath(); g.moveTo(d[0] - 7 * k, d[1] - 1 * k); g.lineTo(d[0] - 7 * k, d[1] - 21 * k); g.quadraticCurveTo(d[0], d[1] - 30 * k, d[0] + 7 * k, d[1] - 21 * k); g.lineTo(d[0] + 7 * k, d[1] - 1 * k); g.closePath(); g.fill();
+      [-0.62, 0.55].forEach(u => { const w0 = [q[0] + u * rx, q[1] + Math.sqrt(1 - u * u) * rx / 2 - 24 * k]; g.fillStyle = GOLD; g.beginPath(); g.arc(w0[0], w0[1], 5 * k, 0, TAU); g.fill(); g.fillStyle = lightOf(c) === 1 ? '#CFF6FF' : lightOf(c) ? '#A8C8D0' : '#3A4A58'; g.beginPath(); g.arc(w0[0], w0[1], 3.4 * k, 0, TAU); g.fill(); });
+      const col = dead(c) ? '#8A8090' : teamOf(L), r2 = P(1.4, 0.95, 36); g.fillStyle = col; g.beginPath(); g.ellipse(r2[0], r2[1], rx, rx / 2, 0, 0, Math.PI); g.lineTo(r2[0] - rx, r2[1] - 6 * k); g.ellipse(r2[0], r2[1] - 6 * k, rx, rx / 2, 0, Math.PI, 0, true); g.closePath(); g.fill();
+      if(!dead(c)) K.AR.patPaint(g, (s, vv) => { const u = -1 + s / (rx * 2 / k) * 2; return [r2[0] + u * rx, r2[1] + Math.sqrt(Math.max(0, 1 - u * u)) * rx / 2 - vv * k]; }, rx * 2 / k, 6, patOf(L), inkOf(col), k); }, {layer: 1, zb: 0, top: 40});
+    conch(B, 1.4, 0.95, 40, 0.98, 48, '#FFD2BC', c);
+    B.drum(2.3, 0.5, 30, 0.12, dead(c) ? 6 : 26, CORAL, {rings: 0});
+    B.custom(2.3, 0.5, (g, P, k, t) => { if(dead(c)) return; const q = P(2.3, 0.5, 58); T.bubbles(g, q[0], q[1], k, t, {n: 4, rise: 26, period: 2.4}); }, {layer: 4, zb: 56, top: 86, fx: true});
+    B.drum(2.5, 1.55, 0, 0.2, 16, DRIFT, {rings: 2}); B.custom(2.5, 1.55, (g, P, k, t) => { const q = P(2.5, 1.55, 16); pool(g, P, k, t, 2.5, 1.55, 16, 0.16, c); }, {layer: 2, zb: 16, top: 18});
+    beach(B, 2.72, 0.42, c, 21);
+    B.custom(0.3, 0.5, (g, P, k, t) => { const q = P(0.32, 0.52, 0); kelp(g, q[0], q[1], 30 * k, k, t, c, 3); }, {layer: 3, zb: 0, top: 32, fx: true});
+    pennant(B, L, 0.22, 1.78, 0, 50, {emblem: shellEm, pole: DRIFTD});
+    halo(B, 1.4, 0.95, 50, 22, '#CFF6FF', lightOf(c) * 0.25, {pulse: t => 0.88 + Math.sin(ph(t, 2.4)) * 0.08 + Math.cos(ph(t, 2.4)) * 0.04});
+    return; }
+  // 🏰 L3 Coral Castle: a shell-stone keep with crenels, 2 PINK CORAL towers with conch roofs, a big PEARL dome on a scallop crown, coral branches climbing, a fish banner
+  const w = stoneBox(B, 0.36, 0.3, 0, 2.28, 1.36, 44, STONE, 31);
+  B.decal(w, 'front', 1.22, 0.56, 0, 36, DRIFT, {k: 'door', paint: reefDoor(36)}); [0.5, 2.06].forEach(a => B.decal(w, 'front', a, 0.3, 16, 16, '#CFF6FF', {paint: porthole(16, c)})); [0.5, 1.0].forEach(a => B.decal(w, 'right', a, 0.3, 16, 16, '#CFF6FF', {paint: porthole(16, c)}));
+  trim(B, L, w, 40, 4);
+  B.box(0.3, 0.24, 44, 2.4, 1.48, 4, SAND2);
+  B.custom(1.5, 1.0, (g, P, k, t, T2) => { if(!vis(T2, 0, 1)) return; for(let i = 0; i < 7; i++){ const x = 0.42 + i * 0.36; const q = P(x, 1.72, 48); scallop(g, q[0], q[1] + 1 * k, 4.4 * k, i % 2 ? CORALP : SHELL, c); } }, {layer: 2, zb: 48, top: 56});
+  [[0.36, 0.42], [2.64, 0.42]].forEach(([x, y], n) => { B.drum(x, y, 0, 0.3, 70, n ? CORALP : CORAL, {rings: 0}); B.custom(x, y, (g, P, k) => { const r2 = P(x, y, 66), rx = 0.3 * HTW * k * S2, col2 = dead(c) ? '#8A8090' : teamOf(L);
+      g.fillStyle = col2; g.beginPath(); g.ellipse(r2[0], r2[1], rx, rx / 2, 0, 0, Math.PI); g.lineTo(r2[0] - rx, r2[1] - 6 * k); g.ellipse(r2[0], r2[1] - 6 * k, rx, rx / 2, 0, Math.PI, 0, true); g.closePath(); g.fill();
+      if(!dead(c)) K.AR.patPaint(g, (s, vv) => { const u = -1 + s / (rx * 2 / k) * 2; return [r2[0] + u * rx, r2[1] + Math.sqrt(Math.max(0, 1 - u * u)) * rx / 2 - vv * k]; }, rx * 2 / k, 6, patOf(L), inkOf(col2), k);
+      g.fillStyle = 'rgba(255,255,255,0.3)'; [[-0.4, 20], [0.3, 38], [-0.1, 52]].forEach(([u, z]) => { const p = P(x, y, z); g.beginPath(); g.arc(p[0] + u * rx, p[1] + rx * 0.3, 2 * k, 0, TAU); g.fill(); });
+      const wq = P(x, y + 0.3, 44); g.fillStyle = GOLD; g.beginPath(); g.arc(wq[0], wq[1], 4 * k, 0, TAU); g.fill(); g.fillStyle = lightOf(c) ? '#CFF6FF' : '#3A4A58'; g.beginPath(); g.arc(wq[0], wq[1], 2.6 * k, 0, TAU); g.fill(); }, {layer: 1, zb: 30, top: 72});
+    conch(B, x, y, 70, 0.4, 34, '#FFD2BC', c); });
+  B.custom(1.5, 0.96, (g, P, k, t) => { const q = P(1.5, 0.96, 48), br = dead(c);   // 👑 a scallop crown holding a GIANT pearl dome
+    for(let i = -3; i <= 3; i++) scallop(g, q[0] + i * 9 * k, q[1] + Math.abs(i) * 1.5 * k, 9 * k, i % 2 ? CORALP : SHELL, c);
+    if(br){ pearl(g, q[0], q[1] - 14 * k, 9 * k, '#D8CCC8'); return; } const R = 25 * k, cy = q[1] - 26 * k; pearl(g, q[0], cy, R, PEARL);
+    g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = 1.4 * k; g.beginPath(); g.arc(q[0], cy, R * 0.78, Math.PI * 1.1, Math.PI * 1.45); g.stroke();
+    const s = 1 + 0.4 * Math.sin(ph(t, 2.4)) + 0.2 * Math.cos(ph(t, 2.4)); g.fillStyle = 'rgba(255,255,255,0.95)'; g.beginPath(); D.star(g, q[0] + R * 0.7, cy - R * 0.7, 3 * s * k, 1 * s * k, 4); g.fill(); }, {layer: 2, zb: 48, top: 104, fx: false});
+  [[0.6, 1.66], [2.4, 1.66]].forEach(([x, y], i) => B.custom(x, y, (g, P, k) => { const q = P(x, y + 0.02, 0); coralBranch(g, q[0], q[1], 34 * k, i ? CORALP : CORAL, k, c, 9 + i); }, {layer: 3, zb: 0, top: 36}));
+  halo(B, 1.5, 0.96, 74, 34, '#FFF0F4', lightOf(c) * 0.32, {pulse: t => 0.86 + Math.sin(ph(t, 2.4)) * 0.1 + Math.cos(ph(t, 2.4)) * 0.05});
+  banner(B, L, w, 'right', 0.66, 0.3, 6, 22, shellEm);
+  [0.36, 2.64].forEach(x => { if(!dead(c)) pennant(B, L, x, 0.42, 104, 14, {emblem: shellEm, pole: DRIFTD, layer: 3, w: 15, hh: 9}); });
+});
+/* ============================ 🏕️ CAMP — Crab Barracks (a sand bunker shaped like a big friendly crab: shell dome, two claw arches, eye stalks; a driftwood target post) ============================ */
+RF('camp', {name: 'Crab Barracks', h: 78, live: {period: 2.4, frames: 6}}, (B, v, L) => { const c = L.cond;
+  B.flat(0.06, 0.06, 1.88, 1.88, SAND);
+  B.custom(1, 0.9, (g, P, k, t) => { const br = dead(c), shell = dim(c, '#F06A4A'), dm = dome(g, P, k, 1, 0.9, 0, 0.74, br ? 22 : 40, shell, {hi: '#FFB49A'}), q = dm.c;   // 🦀 shell dome
+    g.fillStyle = 'rgba(255,255,255,0.28)'; [[-0.4, -0.5], [0.1, -0.7], [0.45, -0.4]].forEach(([fx, fy]) => { g.beginPath(); D.ell(g, q[0] + fx * dm.rx, q[1] + fy * dm.hh, 3 * k, 2 * k); g.fill(); });
+    if(!br) [-1, 1].forEach(sd => { const s0 = [q[0] + sd * dm.rx * 0.3, q[1] - dm.hh * 0.85], wob = c && c.still ? 0 : Math.sin(ph(t, 2.4) + sd) * 1.2; g.strokeStyle = shell; g.lineWidth = 2.4 * k; line(g, s0, [s0[0] + sd * 2 * k, s0[1] - 12 * k + wob * k]);   // 👀 eye stalks
+      g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(s0[0] + sd * 2 * k, s0[1] - 14 * k + wob * k, 3.6 * k, 0, TAU); g.fill(); g.fillStyle = '#1E2A3A'; g.beginPath(); g.arc(s0[0] + sd * 2.6 * k, s0[1] - 13.4 * k + wob * k, 1.8 * k, 0, TAU); g.fill(); });
+    const col = br ? '#8A8090' : teamOf(L); g.strokeStyle = col; g.lineWidth = 3.4 * k; g.beginPath(); g.ellipse(q[0], q[1] - dm.hh * 0.22, dm.rx * 0.98, dm.ry * 0.98, 0, 0.1, Math.PI - 0.1); g.stroke(); }, {layer: 1, zb: 0, top: 60});
+  B.custom(1, 1.6, (g, P, k, t, T2) => { if(!vis(T2, 0, 1)) return; const br = dead(c), shell = dim(c, '#F06A4A');   // ✊ two big claws make the door arch
+    [-1, 1].forEach(sd => { const b0 = P(1 + sd * 0.42, 1.62, 0); g.fillStyle = shell; g.beginPath(); g.moveTo(b0[0] - 4 * k, b0[1]); g.quadraticCurveTo(b0[0] - sd * 2 * k, b0[1] - 20 * k, b0[0] - sd * 9 * k, b0[1] - 30 * k); g.lineTo(b0[0] - sd * 16 * k, b0[1] - (br ? 20 : 36) * k); g.lineTo(b0[0] - sd * 4 * k, b0[1] - 30 * k); g.quadraticCurveTo(b0[0] + sd * 5 * k, b0[1] - 18 * k, b0[0] + 4 * k, b0[1]); g.closePath(); g.fill();
+      g.fillStyle = D.sh(shell, 0.2); g.beginPath(); D.ell(g, b0[0] - sd * 2 * k, b0[1] - 18 * k, 2.4 * k, 4 * k); g.fill(); });
+    const d = P(1, 1.62, 0); g.fillStyle = '#5A3A2A'; g.beginPath(); g.moveTo(d[0] - 7 * k, d[1]); g.lineTo(d[0] - 7 * k, d[1] - 12 * k); g.quadraticCurveTo(d[0], d[1] - 20 * k, d[0] + 7 * k, d[1] - 12 * k); g.lineTo(d[0] + 7 * k, d[1]); g.closePath(); g.fill(); }, {layer: 2, zb: 0, top: 40});
+  B.custom(1.7, 0.5, (g, P, k) => { const q = P(1.72, 0.48, 0), col = dead(c) ? '#8A8090' : teamOf(L); g.strokeStyle = DRIFT; g.lineWidth = 2.4 * k; line(g, q, [q[0], q[1] - 34 * k]); line(g, [q[0] - 8 * k, q[1] - 26 * k], [q[0] + 8 * k, q[1] - 26 * k]);   // 🎯 driftwood target
+    g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(q[0], q[1] - 36 * k, 9 * k, 0, TAU); g.fill(); g.fillStyle = col; g.beginPath(); g.arc(q[0], q[1] - 36 * k, 6.4 * k, 0, TAU); g.fill(); g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(q[0], q[1] - 36 * k, 3.6 * k, 0, TAU); g.fill(); g.fillStyle = col; g.beginPath(); g.arc(q[0], q[1] - 36 * k, 1.4 * k, 0, TAU); g.fill(); }, {layer: 2, zb: 0, top: 48});
+  B.custom(0.36, 1.6, (g, P, k) => { const q = P(0.34, 1.62, 0); [0, 1, 2].forEach(i => { g.fillStyle = i === 1 ? '#D8B47A' : '#E6C88E'; g.beginPath(); D.rr(g, q[0] - 9 * k + (i % 2) * 4 * k, q[1] - 6 * k - i * 4.6 * k, 14 * k, 5.4 * k, 2.4 * k); g.fill(); }); }, {layer: 3, zb: 0, top: 16});
+  pennant(B, L, 1.8, 1.8, 0, 52, {emblem: shellEm, pole: DRIFTD});
+});
+/* ============================ 🎠 RIDE — Seahorse Corral (a lagoon pen with coral posts + a kelp rope, a shell-roofed stable at the back, a seahorse sign, a saddle on the rail) ============================ */
+RF('ride', {name: 'Seahorse Corral', h: 96, live: {period: 2.4, frames: 6}}, (B, v, L) => { const c = L.cond;
+  B.flat(0.06, 0.06, 1.88, 2.88, SAND);
+  B.custom(1, 1.9, (g, P, k, t) => { const a = P(0.2, 1.2, 0.5), b2 = P(1.8, 1.2, 0.5), d2 = P(1.8, 2.8, 0.5), e = P(0.2, 2.8, 0.5), br = dead(c); polyP(g, [a, b2, d2, e]); g.fillStyle = br ? '#C8B898' : D.lin(g, a[0], a[1], d2[0], d2[1], [[0, '#7FD8F0'], [1, SEA]]); g.fill();   // 🌊 the lagoon
+    if(br || (c && c.still)) return; for(let i = 0; i < 3; i++){ const f = ((t / 2.4) + i / 3) % 1, m = P(1, 2.0, 0.6); g.strokeStyle = 'rgba(255,255,255,' + (0.6 * (1 - f)) + ')'; g.lineWidth = 0.9 * k; g.beginPath(); D.ell(g, m[0], m[1], (10 + f * 30) * k, (5 + f * 15) * k); g.stroke(); } }, {layer: -6, zb: 0, top: 1});
+  const s = stoneBox(B, 0.2, 0.2, 0, 1.6, 0.8, 34, STONE, 41);
+  B.decal(s, 'front', 0.6, 0.8, 0, 30, DRIFT, {k: 'door', paint: reefDoor(30)});
+  trim(B, L, s, 30, 3);
+  B.roof(0.12, 0.12, 34, 1.76, 0.96, 26, AQUA, {ridge: 'x', ov: 0.1, kind: 'gable'});
+  B.custom(1, 0.6, (g, P, k) => { if(dead(c)) return; const q = P(1, 0.6, 62); scallop(g, q[0], q[1], 7 * k, SHELL, c); }, {layer: 3, zb: 56, top: 70});
+  [[0.2, 1.2], [1.8, 1.2], [0.2, 2.0], [1.8, 2.0], [0.2, 2.8], [1.8, 2.8], [1.0, 2.8]].forEach(([x, y], i) => B.custom(x, y, (g, P, k) => { const q = P(x, y, 0); g.fillStyle = dim(c, i % 2 ? CORALP : CORAL); g.beginPath(); D.rr(g, q[0] - 2.4 * k, q[1] - 16 * k, 4.8 * k, 16 * k, 2.4 * k); g.fill(); g.fillStyle = D.sh(dim(c, CORAL), 0.3); g.beginPath(); g.arc(q[0], q[1] - 16 * k, 2.6 * k, 0, TAU); g.fill(); }, {layer: 2, zb: 0, top: 18}));
+  B.custom(1, 2.0, (g, P, k) => { const pts = [[0.2, 1.2], [0.2, 2.0], [0.2, 2.8], [1.0, 2.8], [1.8, 2.8], [1.8, 2.0], [1.8, 1.2]], br = dead(c); g.strokeStyle = br ? '#8A8460' : KELP; g.lineWidth = 1.8 * k;
+    for(let i = 0; i < pts.length - 1; i++){ if(br && i % 2) continue; const a = P(pts[i][0], pts[i][1], 12), b2 = P(pts[i + 1][0], pts[i + 1][1], 12); g.beginPath(); g.moveTo(a[0], a[1]); g.quadraticCurveTo((a[0] + b2[0]) / 2, (a[1] + b2[1]) / 2 + 4 * k, b2[0], b2[1]); g.stroke(); } }, {layer: 2, zb: 8, top: 14});
+  B.custom(1.0, 2.85, (g, P, k, t, T2) => { const q = P(1.0, 2.86, 0), br = dead(c), col = dim(c, '#FFB347'), bob = c && c.still ? 0 : Math.sin(ph(t, 2.4)) * 1.5 + Math.cos(ph(t, 2.4)) * 0.6;   // 🐴 a seahorse sign on a post
+    g.strokeStyle = DRIFTD; g.lineWidth = 2 * k; line(g, q, [q[0], q[1] - 40 * k]); const hx = q[0] + 2 * k, hy = q[1] - 54 * k + bob * k;
+    g.fillStyle = col; g.beginPath(); g.moveTo(hx - 3 * k, hy - 10 * k); g.quadraticCurveTo(hx + 7 * k, hy - 14 * k, hx + 9 * k, hy - 8 * k); g.lineTo(hx + 15 * k, hy - 8 * k); g.lineTo(hx + 15 * k, hy - 5 * k); g.lineTo(hx + 7 * k, hy - 4 * k);
+    g.quadraticCurveTo(hx + 7 * k, hy + 4 * k, hx + 2 * k, hy + 8 * k); g.quadraticCurveTo(hx - 2 * k, hy + 14 * k, hx + 3 * k, hy + 16 * k); g.quadraticCurveTo(hx - 6 * k, hy + 18 * k, hx - 4 * k, hy + 8 * k); g.quadraticCurveTo(hx - 7 * k, hy, hx - 3 * k, hy - 10 * k); g.fill();
+    if(!br){ g.fillStyle = D.sh(col, -0.2); for(let i = 0; i < 4; i++){ g.beginPath(); g.arc(hx - 5 * k, hy - 6 * k + i * 4 * k, 1.6 * k, 0, TAU); g.fill(); } g.fillStyle = '#1E2A3A'; g.beginPath(); g.arc(hx + 4 * k, hy - 8 * k, 1.2 * k, 0, TAU); g.fill(); g.fillStyle = teamOf(L); g.beginPath(); D.rr(g, hx - 6 * k, hy, 9 * k, 4 * k, 1.6 * k); g.fill(); } }, {layer: 3, zb: 0, top: 72});
+  B.custom(1.86, 1.6, (g, P, k) => { const q = P(1.84, 1.6, 12), col = dead(c) ? '#8A8090' : teamOf(L); g.fillStyle = col; g.beginPath(); g.moveTo(q[0] - 7 * k, q[1]); g.quadraticCurveTo(q[0], q[1] - 7 * k, q[0] + 7 * k, q[1]); g.lineTo(q[0] + 5 * k, q[1] + 5 * k); g.lineTo(q[0] - 5 * k, q[1] + 5 * k); g.closePath(); g.fill(); g.fillStyle = GOLD; g.beginPath(); g.arc(q[0], q[1] - 2 * k, 1.4 * k, 0, TAU); g.fill(); }, {layer: 3, zb: 8, top: 18});
+  banner(B, L, s, 'right', 0.06, 0.24, 6, 20, shellEm);
+  pennant(B, L, 1.7, 0.3, 54, 22, {emblem: shellEm, pole: DRIFTD});
+});
+/* ============================ 🪽 NEST — Flying-fish Spout (a rock stack with a blowhole shooting a water spout, flying fish leaping through the spray, a little perch) ============================ */
+RF('nest', {name: 'Flying-fish Spout', h: 118, live: {period: 1.6, frames: 6}}, (B, v, L) => { const c = L.cond;
+  B.flat(0.06, 0.06, 1.88, 1.88, SAND);
+  B.custom(1, 1, (g, P, k, t) => { const br = dead(c), rock = dim(c, '#9A8A7A', -0.1); pool(g, P, k, t, 1, 1, 0.4, 0.9, c); frustum(g, P, k, 1, 1, 0, 0.6, 0.4, 30, rock); frustum(g, P, k, 1, 1, 30, 0.4, 0.26, 24, D.sh(rock, 0.1));
+    const q = P(1, 1, 54); g.fillStyle = '#3A3430'; g.beginPath(); D.ell(g, q[0], q[1], 7 * k, 3.4 * k); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.22)'; [[-6, 40], [5, 26], [-3, 12]].forEach(([dx, z]) => { const p = P(1, 1, z); g.beginPath(); D.ell(g, p[0] + dx * k, p[1], 4 * k, 2.2 * k); g.fill(); });
+    g.fillStyle = c ? '#9AA05A' : KELP; [[-8, 6], [9, 14], [-4, 26]].forEach(([dx, z]) => { const p = P(1, 1.4, z); g.beginPath(); D.ell(g, p[0] + dx * k, p[1], 4 * k, 2 * k, 0.4); g.fill(); }); }, {layer: 1, zb: 0, top: 56});
+  B.custom(1, 1, (g, P, k, t) => { if(dead(c)) return; const q = P(1, 1, 54), still = c && c.still, f = still ? 0.4 : (Math.sin(ph(t, 1.6)) * 0.5 + 0.5) * 0.7 + (Math.cos(ph(t, 1.6)) * 0.5 + 0.5) * 0.3, H = (still ? 18 : 30 + f * 28) * k;   // 💦 the spout
+    g.fillStyle = 'rgba(200,240,255,0.85)'; g.beginPath(); g.moveTo(q[0] - 4 * k, q[1]); g.quadraticCurveTo(q[0] - 2 * k, q[1] - H * 0.6, q[0] - 1.5 * k, q[1] - H); g.lineTo(q[0] + 1.5 * k, q[1] - H); g.quadraticCurveTo(q[0] + 2 * k, q[1] - H * 0.6, q[0] + 4 * k, q[1]); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(230,250,255,0.9)'; [[-8, -2], [-3, -6], [3, -7], [8, -2], [0, -4]].forEach(([dx, dy]) => { g.beginPath(); g.arc(q[0] + dx * k, q[1] - H + dy * k + 6 * k, 4.2 * k, 0, TAU); g.fill(); });
+    if(still) return; [[0, '#7FC8F0'], [0.5, '#F7C873']].forEach(([o, col], i) => { const p = (t / 1.6 + o) % 1, x = q[0] + (p - 0.5) * 50 * k * (i ? -1 : 1), y = q[1] - H * 0.7 - Math.sin(p * Math.PI) * 22 * k; fish(g, x, y, 4.6 * k, col, i ? -1 : 1);
+      g.fillStyle = 'rgba(255,255,255,0.8)'; g.beginPath(); g.moveTo(x - 1 * k, y - 1 * k); g.quadraticCurveTo(x - 2 * k, y - 8 * k, x + 4 * k * (i ? -1 : 1), y - 6 * k); g.closePath(); g.fill(); }); }, {layer: 3, zb: 54, top: 116, fx: true});
+  B.custom(1.6, 0.4, (g, P, k) => { const q = P(1.62, 0.4, 0); g.strokeStyle = DRIFTD; g.lineWidth = 2 * k; line(g, q, [q[0], q[1] - 30 * k]); g.fillStyle = DRIFT; g.beginPath(); D.rr(g, q[0] - 8 * k, q[1] - 32 * k, 16 * k, 3 * k, 1.4 * k); g.fill(); g.fillStyle = dead(c) ? '#8A8090' : teamOf(L); g.beginPath(); D.rr(g, q[0] - 6 * k, q[1] - 36 * k, 12 * k, 4 * k, 1.4 * k); g.fill(); }, {layer: 2, zb: 0, top: 40});
+  pennant(B, L, 0.3, 0.3, 0, 54, {emblem: shellEm, pole: DRIFTD});
+  B.custom(1, 1.6, (g, P, k) => { const q = P(1, 1.74, 0.4), col = dead(c) ? '#8A8090' : teamOf(L); g.fillStyle = col; g.beginPath(); D.ell(g, q[0], q[1], 14 * k, 4 * k); g.fill(); }, {layer: -6, zb: 0, top: 1});
+  beach(B, 1.66, 1.7, c, 41);
+});
+/* ============================ 🩹 CARE — Anemone Spa (a round sandstone pool of warm sea water with a GIANT swaying anemone in the middle, a starfish sign with a heart) ============================ */
+RF('care', {name: 'Anemone Spa', h: 92, live: {period: 2.4, frames: 6}}, (B, v, L) => { const c = L.cond;
+  B.flat(0.06, 0.06, 1.88, 1.88, SAND);
+  B.custom(1, 1, (g, P, k, t) => { const br = dead(c); frustum(g, P, k, 1, 1, 0, 0.84, 0.82, 12, br ? SANDD : STONE, {top: false}); const q = P(1, 1, 12), rx = 0.82 * HTW * k * S2;
+    g.fillStyle = SAND2; g.beginPath(); D.ell(g, q[0], q[1], rx, rx / 2); g.fill(); pool(g, P, k, t, 1, 1, 12.4, 0.7, c, {col: AQUA, hi: '#D8FFF6'}); }, {layer: 1, zb: 0, top: 14});
+  B.custom(1, 1, (g, P, k, t) => { const q = P(1, 1, 12), br = dead(c), n = br ? 7 : 14, s = c && c.still ? 0 : 1;   // 🌺 the anemone: a stalk + swaying tentacles with glowing tips
+    g.fillStyle = dim(c, '#C86AD8'); g.beginPath(); D.rr(g, q[0] - 8 * k, q[1] - 22 * k, 16 * k, 22 * k, 6 * k); g.fill();
+    for(let i = 0; i < n; i++){ const a = -Math.PI + (i + 0.5) / n * Math.PI, sw = s * (Math.sin(ph(t, 2.4) + i * 0.7) * 0.18 + Math.cos(ph(t, 2.4) + i) * 0.08), len = (br ? 14 : 30 + (i % 3) * 5) * k, x0 = q[0] + Math.cos(a) * 7 * k, y0 = q[1] - 22 * k;
+      const x1 = x0 + Math.cos(a + sw) * len, y1 = y0 + Math.sin(a + sw) * len * 0.9 - 4 * k; g.strokeStyle = dim(c, i % 2 ? '#FF7FB0' : '#F05AA0'); g.lineWidth = 3.4 * k; g.lineCap = 'round'; g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo(x0 + Math.cos(a) * len * 0.3, y0 - len * 0.6, x1, y1); g.stroke();
+      if(!br){ g.fillStyle = '#FFE0F0'; g.beginPath(); g.arc(x1, y1, 2.4 * k, 0, TAU); g.fill(); } }
+    if(!br){ g.fillStyle = '#FFE58A'; g.beginPath(); D.ell(g, q[0], q[1] - 22 * k, 6 * k, 2.6 * k); g.fill(); } }, {layer: 2, zb: 12, top: 70, fx: false});
+  halo(B, 1, 1, 46, 26, '#FF9ACD', lightOf(c) * 0.32, {pulse: t => 0.85 + Math.sin(ph(t, 2.4)) * 0.1 + Math.cos(ph(t, 2.4)) * 0.05});
+  B.custom(1, 1.86, (g, P, k) => { const a = P(0.7, 1.86, 1), b2 = P(1.3, 1.86, 1), col = dead(c) ? '#8A8090' : teamOf(L); g.strokeStyle = col; g.lineWidth = 4 * k; g.lineCap = 'round'; line(g, a, b2); }, {layer: -6, zb: 0, top: 1});
+  B.custom(1.8, 0.24, (g, P, k) => { const q = P(1.8, 0.26, 0); g.fillStyle = DRIFTD; g.fillRect(q[0] - 1.2 * k, q[1] - 40 * k, 2.4 * k, 40 * k); starfish(g, q[0], q[1] - 50 * k, 12 * k, '#FF8A5B', c);   // ⭐🩹 the Starfish Stitcher sign
+    if(dead(c)) return; const hx = q[0], hy = q[1] - 49 * k, r = 3.6 * k; g.fillStyle = '#FFFFFF'; g.beginPath(); g.moveTo(hx, hy + r * 1.1); g.bezierCurveTo(hx - r * 1.6, hy - r * 0.1, hx - r * 0.8, hy - r * 1.2, hx, hy - r * 0.4); g.bezierCurveTo(hx + r * 0.8, hy - r * 1.2, hx + r * 1.6, hy - r * 0.1, hx, hy + r * 1.1); g.fill(); }, {layer: 3, zb: 0, top: 64});
+  B.custom(0.3, 1.66, (g, P, k) => { const q = P(0.3, 1.7, 0); g.fillStyle = dim(c, AQUA); g.beginPath(); D.rr(g, q[0] - 9 * k, q[1] - 5 * k, 18 * k, 5 * k, 2 * k); g.fill(); g.fillStyle = '#FFFFFF'; g.beginPath(); D.rr(g, q[0] - 8 * k, q[1] - 7 * k, 7 * k, 3 * k, 1.4 * k); g.fill(); }, {layer: 3, zb: 0, top: 8});
+  pennant(B, L, 0.24, 0.24, 0, 54, {emblem: shellEm, pole: DRIFTD});
+});
+/* ============================ 🔧 WORKSHOP — Whale Dock (a driftwood dock over the water, a FRIENDLY WHALE rising beside it, a crane lifting a net of coral, barrels) ============================ */
+RF('workshop', {name: 'Whale Dock', h: 92, live: {period: 2.4, frames: 6}}, (B, v, L) => { const c = L.cond;
+  B.custom(1, 1, (g, P, k, t) => { const a = P(0.06, 0.06, 0.4), b2 = P(1.94, 0.06, 0.4), d2 = P(1.94, 1.94, 0.4), e = P(0.06, 1.94, 0.4), br = dead(c); polyP(g, [a, b2, d2, e]); g.fillStyle = br ? '#B8A888' : D.lin(g, a[0], a[1], d2[0], d2[1], [[0, '#8FE0F8'], [1, SEAD]]); g.fill();
+    if(br || (c && c.still)) return; g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 1 * k; for(let i = 0; i < 4; i++){ const m = P(0.5 + (i % 2) * 0.9, 0.5 + Math.floor(i / 2) * 0.9, 0.5), s = Math.sin(ph(t, 2.4) + i) * 3 * k; g.beginPath(); g.moveTo(m[0] - 7 * k + s, m[1]); g.quadraticCurveTo(m[0] + s, m[1] - 2 * k, m[0] + 7 * k + s, m[1]); g.stroke(); } }, {layer: -7, zb: 0, top: 1});
+  [[0.2, 1.1], [0.2, 1.8], [1.0, 1.1], [1.0, 1.8]].forEach(([x, y]) => B.box(x, y, 0, 0.08, 0.08, 8, DRIFTD, {layer: -1}));
+  const dk = B.box(0.12, 1.0, 8, 1.0, 0.92, 3, DRIFT); B.decal(dk, 'front', ...F(dk, 'front'), 0, 3, DRIFT, {paint: (g, Q, k) => { g.strokeStyle = 'rgba(70,40,20,0.35)'; g.lineWidth = 0.8 * k; for(let u = 0.12; u < 1; u += 0.12) line(g, Q(u, 0.2), Q(u, 2.8)); }});
+  B.custom(1.4, 0.7, (g, P, k, t) => { const br = dead(c), q = P(1.42, 0.7, 0), rise = br ? 0 : c && c.still ? 4 : 6 + Math.sin(ph(t, 2.4)) * 2 + Math.cos(ph(t, 2.4)) * 1, body = dim(c, WHALE);   // 🐋 the friendly whale
+    g.fillStyle = body; g.beginPath(); g.moveTo(q[0] - 26 * k, q[1]); g.quadraticCurveTo(q[0] - 24 * k, q[1] - (22 + rise) * k, q[0], q[1] - (26 + rise) * k); g.quadraticCurveTo(q[0] + 22 * k, q[1] - (24 + rise) * k, q[0] + 24 * k, q[1]); g.closePath(); g.fill();
+    g.fillStyle = dim(c, WHALEB); g.beginPath(); g.moveTo(q[0] - 24 * k, q[1]); g.quadraticCurveTo(q[0] - 16 * k, q[1] - 8 * k, q[0] - 6 * k, q[1] - 6 * k); g.lineTo(q[0] - 6 * k, q[1]); g.closePath(); g.fill();
+    g.fillStyle = '#1E2A3A'; g.beginPath(); g.arc(q[0] - 14 * k, q[1] - (13 + rise * 0.6) * k, 2 * k, 0, TAU); g.fill(); g.strokeStyle = '#1E2A3A'; g.lineWidth = 1.2 * k; g.beginPath(); g.arc(q[0] - 19 * k, q[1] - (6 + rise * 0.3) * k, 4 * k, 0.2, 1.4); g.stroke();
+    if(!br){ g.fillStyle = '#F7A8C8'; g.beginPath(); g.arc(q[0] - 10 * k, q[1] - (8 + rise * 0.4) * k, 2.2 * k, 0, TAU); g.fill(); }
+    const tl = [q[0] + 30 * k, q[1] - 4 * k]; g.fillStyle = body; g.beginPath(); g.moveTo(tl[0] - 8 * k, tl[1] + 4 * k); g.quadraticCurveTo(tl[0] - 2 * k, tl[1] - 6 * k, tl[0] - 4 * k, tl[1] - 14 * k); g.quadraticCurveTo(tl[0] + 4 * k, tl[1] - 10 * k, tl[0] + 10 * k, tl[1] - 16 * k); g.quadraticCurveTo(tl[0] + 6 * k, tl[1] - 4 * k, tl[0] - 2 * k, tl[1] + 4 * k); g.fill();
+    if(!br && !(c && c.still)){ const sp = [q[0] - 2 * k, q[1] - (26 + rise) * k]; g.fillStyle = 'rgba(210,245,255,0.9)'; [[-5, -8], [0, -12], [5, -8]].forEach(([dx, dy]) => { g.beginPath(); g.arc(sp[0] + dx * k, sp[1] + dy * k - Math.cos(ph(t, 2.4)) * 2 * k, 3 * k, 0, TAU); g.fill(); }); }
+    g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 1.1 * k; g.beginPath(); D.ell(g, q[0], q[1], 28 * k, 6 * k); g.stroke(); }, {layer: 2, zb: 0, top: 46, fx: false});
+  B.custom(0.3, 1.2, (g, P, k, t) => { const a = P(0.3, 1.24, 11), br = dead(c), tip = br ? [a[0] + 14 * k, a[1] - 20 * k] : [a[0] + 30 * k, a[1] - 64 * k];   // 🏗️ a slanted driftwood boom (like a fishing crane) lifting a net of coral chunks
+    g.fillStyle = DRIFTD; g.beginPath(); D.rr(g, a[0] - 6 * k, a[1] - 6 * k, 12 * k, 6 * k, 2 * k); g.fill(); g.strokeStyle = DRIFT; g.lineWidth = 3 * k; g.lineCap = 'round'; line(g, [a[0], a[1] - 4 * k], tip); if(br) return;
+    g.strokeStyle = DRIFTD; g.lineWidth = 1.2 * k; line(g, [a[0] - 4 * k, a[1] - 4 * k], [tip[0] - 10 * k, tip[1] + 22 * k]); g.fillStyle = GOLD; g.beginPath(); g.arc(tip[0], tip[1], 2.4 * k, 0, TAU); g.fill();
+    const sw = c && c.still ? 0 : Math.sin(ph(t, 2.4)) * 2 + Math.cos(ph(t, 2.4)) * 0.8, hk = [tip[0] + sw * k, tip[1] + 22 * k]; g.strokeStyle = ROPE; g.lineWidth = 1 * k; line(g, tip, hk);
+    g.fillStyle = 'rgba(120,90,60,0.55)'; g.beginPath(); g.arc(hk[0], hk[1] + 6 * k, 7 * k, 0, TAU); g.fill(); [[-3, 4, CORAL], [3, 6, CORALP], [0, 9, CORAL]].forEach(([dx, dy, col]) => { g.fillStyle = col; g.beginPath(); D.ell(g, hk[0] + dx * k, hk[1] + dy * k, 3 * k, 2.2 * k); g.fill(); });
+    g.strokeStyle = ROPE; g.lineWidth = 0.7 * k; for(let i = -2; i <= 2; i++) line(g, [hk[0] + i * 2.4 * k, hk[1]], [hk[0] + i * 3 * k, hk[1] + 12 * k]); }, {layer: 3, zb: 11, top: 82});
+  [[0.4, 1.7], [0.7, 1.75]].forEach(([x, y], i) => { B.drum(x, y, 11, 0.12, 12, i ? '#B98A56' : DRIFT, {rings: 2}); });
+  B.custom(1.0, 1.7, (g, P, k) => { const a = P(0.86, 1.86, 11), b2 = P(1.1, 1.86, 11), col = dead(c) ? '#8A8090' : teamOf(L); g.strokeStyle = col; g.lineWidth = 3.4 * k; g.lineCap = 'round'; line(g, a, b2); }, {layer: 3, zb: 11, top: 12});
+  pennant(B, L, 1.0, 1.1, 11, 46, {emblem: shellEm, pole: DRIFTD});
+});
+/* ============================ 🗼 TOWER — Coral Lighthouse (a striped coral-and-pearl tower, a railed balcony, a glowing lamp room, a conch roof · stand + aim) ============================ */
+RF('tower', {name: 'Coral Lighthouse', h: 136, stand: [0.5, 0.5, 80], aim: [0.5, 0.5, 98], live: {period: 2.4, frames: 6}}, (B, v, L) => { const c = L.cond;
+  B.drum(0.5, 0.5, 0, 0.4, 8, SAND2, {rings: 1});
+  B.custom(0.5, 0.5, (g, P, k) => { const br = dead(c); for(let i = 0; i < 6; i++){ const z0 = 8 + i * 11, r0 = 0.3 - i * 0.012, r1 = 0.3 - (i + 1) * 0.012; frustum(g, P, k, 0.5, 0.5, z0, r0, r1, 11, br ? (i % 2 ? '#B8A898' : '#C8B8B0') : (i % 2 ? PEARL : CORAL), {top: i === 5}); }
+    const w0 = P(0.5, 0.78, 44); g.fillStyle = GOLD; g.beginPath(); g.arc(w0[0], w0[1], 3.6 * k, 0, TAU); g.fill(); g.fillStyle = lightOf(c) ? '#CFF6FF' : '#3A4A58'; g.beginPath(); g.arc(w0[0], w0[1], 2.4 * k, 0, TAU); g.fill(); }, {layer: 1, zb: 8, top: 74});
+  B.drum(0.5, 0.5, 74, 0.46, 5, SAND2, {rings: 0});
+  B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 77), rx = 0.46 * HTW * k * S2, col = dead(c) ? '#8A8090' : teamOf(L); g.strokeStyle = col; g.lineWidth = 3.4 * k; g.beginPath(); g.ellipse(q[0], q[1], rx, rx / 2, 0, 0, Math.PI); g.stroke();
+    if(dead(c)) return; g.strokeStyle = DRIFTD; g.lineWidth = 1.3 * k; for(let i = 0; i <= 8; i++){ const a = i / 8 * Math.PI, x = q[0] + Math.cos(a) * rx * 0.96, y = q[1] + Math.sin(a) * rx * 0.48; line(g, [x, y - 2 * k], [x, y - 11 * k]); }
+    g.beginPath(); g.ellipse(q[0], q[1] - 11 * k, rx * 0.96, rx * 0.48, 0, 0, Math.PI); g.stroke(); }, {layer: 3, zb: 74, top: 90});
+  B.custom(0.5, 0.5, (g, P, k, t) => { const q = P(0.5, 0.5, 79), lv = lightOf(c), br = dead(c); if(br) return; g.fillStyle = br ? '#5A5A64' : lv === 1 ? '#FFF4B0' : '#C8C0A0'; g.beginPath(); D.rr(g, q[0] - 8 * k, q[1] - 18 * k, 16 * k, 18 * k, 3 * k); g.fill();
+    g.strokeStyle = GOLDD; g.lineWidth = 1.2 * k; [-4, 0, 4].forEach(dx => line(g, [q[0] + dx * k, q[1] - 18 * k], [q[0] + dx * k, q[1]]));
+    if(lv === 1 && !(c && c.still)){ const a = ph(t, 2.4); g.save(); g.globalCompositeOperation = 'lighter'; g.fillStyle = 'rgba(255,240,160,0.35)'; g.beginPath(); g.moveTo(q[0], q[1] - 9 * k); g.lineTo(q[0] + Math.cos(a) * 34 * k, q[1] - 9 * k + Math.sin(a) * 8 * k - 6 * k); g.lineTo(q[0] + Math.cos(a) * 34 * k, q[1] - 9 * k + Math.sin(a) * 8 * k + 6 * k); g.closePath(); g.fill(); g.restore(); } }, {layer: 2, zb: 79, top: 98, fx: true});
+  conch(B, 0.5, 0.5, 97, 0.38, 30, '#FFD2BC', c);
+  pennant(B, L, 0.5, 0.5, 108, 18, {emblem: shellEm, pole: DRIFTD, layer: 4});
+});
+/* ============================ 🎨 WARDROBE — Pearl Tailor (a driftwood stall under a striped sail awning, pearl necklaces + sashes on a line, a GIANT shell mirror) ============================ */
+RF('wardrobe', {name: 'Pearl Tailor', h: 80, live: {period: 2.4, frames: 6}}, (B, v, L) => { const c = L.cond;
+  B.flat(0.06, 0.06, 1.88, 0.88, SAND);
+  [[0.24, 0.3], [1.3, 0.3], [0.24, 0.72], [1.3, 0.72]].forEach(([x, y]) => B.box(x, y, 0, 0.06, 0.06, 46, DRIFT));
+  const ct = B.box(0.3, 0.34, 0, 1.0, 0.4, 18, DRIFT); B.decal(ct, 'front', ...F(ct, 'front'), 0, 18, DRIFT, {paint: (g, Q, k) => { g.strokeStyle = 'rgba(70,40,20,0.35)'; g.lineWidth = 0.8 * k; for(let z = 4; z < 18; z += 4.5) line(g, Q(0.02, z), Q(0.98, z)); }}); trim(B, L, ct, 12, 3, ['front']);
+  awning(B, 'front', 0.78, 0.2, 1.36, 50, 0.12, 6, AQUA, SAIL, 6, {cond: c});
+  B.box(0.2, 0.28, 46, 1.16, 0.5, 4, SAIL, {layer: 1});
+  B.custom(0.8, 0.5, (g, P, k, t) => { const br = dead(c), sw = c && c.still ? 0 : Math.sin(ph(t, 2.4)) * 1.4 + Math.cos(ph(t, 2.4)) * 0.6, a = P(0.3, 0.52, 40), b2 = P(1.28, 0.52, 40);   // 📿 necklaces + sashes on a line
+    g.strokeStyle = ROPE; g.lineWidth = 0.9 * k; g.beginPath(); g.moveTo(a[0], a[1]); g.quadraticCurveTo((a[0] + b2[0]) / 2, (a[1] + b2[1]) / 2 + 4 * k, b2[0], b2[1]); g.stroke();
+    [0.18, 0.42, 0.66, 0.86].forEach((f, i) => { const p = [a[0] + (b2[0] - a[0]) * f, a[1] + (b2[1] - a[1]) * f + Math.sin(f * Math.PI) * 4 * k];
+      if(i % 2 === 0){ if(br && i) return; for(let j = 0; j < 9; j++){ const an = Math.PI * (0.1 + j / 8 * 0.8); pearl(g, p[0] + Math.cos(an) * 6 * k + sw * k * 0.3, p[1] + Math.sin(an) * 10 * k, 1.5 * k, j % 4 ? PEARL : '#FFD8E8'); } }
+      else { const col = br ? '#9A9088' : i === 1 ? teamOf(L) : CORAL; g.fillStyle = col; g.beginPath(); g.moveTo(p[0] - 3 * k, p[1]); g.lineTo(p[0] + 3 * k, p[1]); g.lineTo(p[0] + 4 * k + sw * k, p[1] + 18 * k); g.lineTo(p[0] + 1 * k + sw * k, p[1] + 15 * k); g.lineTo(p[0] - 2 * k + sw * k, p[1] + 18 * k); g.closePath(); g.fill(); } }); }, {layer: 2, zb: 22, top: 42});
+  B.custom(1.66, 0.5, (g, P, k) => { const q = P(1.66, 0.56, 0), br = dead(c); g.strokeStyle = DRIFTD; g.lineWidth = 2 * k; line(g, [q[0] - 4 * k, q[1]], [q[0] - 2 * k, q[1] - 14 * k]); line(g, [q[0] + 4 * k, q[1]], [q[0] + 2 * k, q[1] - 14 * k]);   // 🐚 the giant shell mirror
+    scallop(g, q[0], q[1] - 12 * k, 15 * k, '#FFD2BC', c); if(br) return; g.fillStyle = D.lin(g, q[0] - 8 * k, q[1] - 30 * k, q[0] + 8 * k, q[1] - 16 * k, [[0, '#E8F8FF'], [1, '#A8D8F0']]); g.beginPath(); D.ell(g, q[0], q[1] - 22 * k, 7 * k, 7.6 * k); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 1 * k; line(g, [q[0] - 3 * k, q[1] - 26 * k], [q[0] + 1 * k, q[1] - 20 * k]); }, {layer: 3, zb: 0, top: 36});
+  pennant(B, L, 0.16, 0.16, 0, 56, {emblem: shellEm, pole: DRIFTD});
+});
+/* ============================ 🔮 SPELL — Bubble Temple (a round temple of coral columns under a GIANT shimmering bubble dome, bubbles rising, a pearl altar) ============================ */
+RF('spell', {name: 'Bubble Temple', h: 118, live: {period: 2.4, frames: 6}}, (B, v, L) => { const c = L.cond;
+  B.flat(0.06, 0.06, 1.88, 1.88, SAND);
+  B.drum(1, 1, 0, 0.84, 6, SAND2, {rings: 0}); B.drum(1, 1, 6, 0.74, 4, STONE, {rings: 0});
+  B.custom(1, 1, (g, P, k) => { const q = P(1, 1, 10), col = dead(c) ? '#8A8090' : teamOf(L), rx = 0.74 * HTW * k * S2; g.strokeStyle = col; g.lineWidth = 3 * k; g.beginPath(); g.ellipse(q[0], q[1], rx, rx / 2, 0, 0.15, Math.PI - 0.15); g.stroke(); }, {layer: 1, zb: 10, top: 11});
+  const cols = [0, 1, 2, 3, 4, 5].map(i => { const a = i / 6 * TAU + 0.5; return [1 + Math.cos(a) * 0.58, 1 + Math.sin(a) * 0.58]; });
+  cols.forEach(([x, y], i) => { const hh = dead(c) && i % 2 ? 18 : 40; B.drum(x, y, 10, 0.08, hh, i % 2 ? CORALP : CORAL, {rings: 0}); B.drum(x, y, 10 + hh, 0.11, 3, dead(c) ? SANDD : GOLD); });
+  B.custom(1, 1, (g, P, k) => { const q = P(1, 1, 10); pearl(g, q[0], q[1] - 14 * k, 6 * k, PEARL); g.fillStyle = STONE; g.beginPath(); D.rr(g, q[0] - 5 * k, q[1] - 9 * k, 10 * k, 9 * k, 1.6 * k); g.fill(); }, {layer: 1, zb: 10, top: 34});
+  B.custom(1, 1, (g, P, k, t) => { const br = dead(c), q = P(1, 1, 53), rx = 0.82 * HTW * k * S2, hh = (br ? 14 : 56) * k;   // 🫧 the giant bubble dome
+    if(br){ g.strokeStyle = 'rgba(180,200,210,0.7)'; g.lineWidth = 1.2 * k; g.beginPath(); g.ellipse(q[0], q[1], rx, hh, 0, Math.PI, Math.PI * 1.35); g.stroke(); return; }
+    g.fillStyle = D.rad(g, q[0] - rx * 0.3, q[1] - hh * 0.5, 2, rx * 1.2, [[0, 'rgba(255,255,255,0.7)'], [0.5, 'rgba(180,240,255,0.32)'], [1, 'rgba(150,200,255,0.42)']]); g.beginPath(); g.ellipse(q[0], q[1], rx, hh, 0, Math.PI, TAU); g.ellipse(q[0], q[1], rx, rx / 2, 0, 0, Math.PI); g.fill();
+    const sh = (t / 2.4) * TAU; ['#FF9AC8', '#FFE66D', '#7BE4C0', '#8EC8FF', '#C8A8FF'].forEach((col, i) => { g.strokeStyle = col; g.globalAlpha = 0.55; g.lineWidth = 1.6 * k; g.beginPath(); g.ellipse(q[0], q[1], rx * (0.92 - i * 0.04), hh * (0.92 - i * 0.04), 0, Math.PI * 1.08 + Math.sin(sh + i) * 0.05, Math.PI * 1.5 + Math.cos(sh) * 0.05); g.stroke(); });
+    g.globalAlpha = 1; g.strokeStyle = 'rgba(255,255,255,0.95)'; g.lineWidth = 1.6 * k; g.beginPath(); g.ellipse(q[0], q[1], rx, hh, 0, Math.PI, TAU); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,0.9)'; g.beginPath(); D.ell(g, q[0] - rx * 0.42, q[1] - hh * 0.62, 5 * k, 3 * k, -0.6); g.fill();
+    if(!(c && c.still)) T.bubbles(g, q[0] + rx * 0.2, q[1] - hh * 0.9, k, t, {n: 4, rise: 22, period: 2.4}); }, {layer: 3, zb: 53, top: 116, fx: true});
+  pennant(B, L, 1.84, 0.2, 0, 58, {emblem: shellEm, pole: DRIFTD});
+  beach(B, 1.7, 1.72, c, 51);
+});
+/* ============================ 🕵️ HIDEOUT — Kelp Cave (a rock mound draped in kelp curtains, a dark mouth with peeking eyes, an old anchor) ============================ */
+RF('hideout', {name: 'Kelp Cave', h: 66, live: {period: 2.4, frames: 6}}, (B, v, L) => { const c = L.cond;
+  B.custom(1, 1, (g, P, k) => { const q = P(1, 0.9, 0), rx = 1.05 * HTW * k * S2, ry = rx / 2; g.fillStyle = dead(c) ? '#8A8078' : '#A8968A'; g.beginPath(); g.moveTo(q[0] - rx, q[1]); g.quadraticCurveTo(q[0] - rx * 0.9, q[1] - 38 * k, q[0] - rx * 0.25, q[1] - 50 * k); g.quadraticCurveTo(q[0] + rx * 0.45, q[1] - 56 * k, q[0] + rx * 0.8, q[1] - 32 * k); g.quadraticCurveTo(q[0] + rx, q[1] - 14 * k, q[0] + rx, q[1]); g.ellipse(q[0], q[1], rx, ry, 0, 0, Math.PI); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.15)'; g.beginPath(); D.ell(g, q[0] - rx * 0.3, q[1] - 40 * k, rx * 0.25, 6 * k); g.fill(); g.fillStyle = 'rgba(40,30,50,0.18)'; g.beginPath(); D.ell(g, q[0] + rx * 0.55, q[1] - 14 * k, rx * 0.35, 12 * k); g.fill();
+    [[-0.5, -38], [0.1, -48], [0.6, -30]].forEach(([fx, dy], i) => { const p = [q[0] + fx * rx, q[1] + dy * k]; scallop(g, p[0], p[1] + 3 * k, 3.4 * k, i % 2 ? CORALP : SHELL, c); }); }, {layer: 0, zb: 0, top: 58});
+  B.custom(1, 1.7, (g, P, k, t, T2) => { if(!vis(T2, 0, 1)) return; const a = P(0.62, 1.62, 0), b2 = P(1.38, 1.62, 0), tp = P(1.0, 1.62, 30); g.fillStyle = '#1E2A3A'; g.beginPath(); g.moveTo(a[0], a[1]); g.quadraticCurveTo(a[0] - 2 * k, tp[1], tp[0], tp[1]); g.quadraticCurveTo(b2[0] + 2 * k, tp[1], b2[0], b2[1]); g.closePath(); g.fill();
+    const m = P(1.0, 1.62, 12), bl = c && c.still ? 1 : (Math.sin(ph(t, 2.4) * 2) > 0.92 ? 0.2 : 1); if(!dead(c)) [[-6, 0], [4, -5], [8, 3]].forEach(([dx, dy], i) => { g.fillStyle = i === 1 ? '#FFE58A' : '#C8F4FF'; [-1.8, 1.8].forEach(e => { g.beginPath(); D.ell(g, m[0] + dx * k + e * k, m[1] + dy * k, 1.3 * k, 1.5 * k * bl); g.fill(); }); });
+    const col = dead(c) ? '#8A8090' : teamOf(L), mq = [P(0.66, 1.72, 0.4), P(1.34, 1.72, 0.4), P(1.34, 1.9, 0.4), P(0.66, 1.9, 0.4)]; polyP(g, mq); g.fillStyle = col; g.fill();
+    if(!dead(c)){ g.save(); polyP(g, mq); g.clip(); K.AR.patPaint(g, (s, vv) => P(0.66 + s / 22, 1.9 - vv / 22, 0.4), 15, 4, patOf(L), inkOf(col), k); g.restore(); } }, {layer: 2, zb: 0, top: 34});
+  B.custom(1, 1.62, (g, P, k, t) => { const a = P(0.56, 1.62, 32), b2 = P(1.44, 1.62, 32); for(let i = 0; i < 6; i++){ const f = i / 5, p = [a[0] + (b2[0] - a[0]) * f, a[1] + (b2[1] - a[1]) * f - Math.sin(f * Math.PI) * 4 * k]; g.save(); g.translate(p[0], p[1]); g.scale(1, -1); kelp(g, 0, 0, (i % 2 ? 14 : 20) * k, k, t, c, 1); g.restore(); } }, {layer: 3, zb: 12, top: 36, fx: true});
+  B.custom(1.7, 1.5, (g, P, k) => { const q = P(1.72, 1.54, 0), col = dead(c) ? '#6A6460' : '#7A7A84'; g.save(); g.translate(q[0], q[1] - 6 * k); g.rotate(0.5); g.strokeStyle = col; g.lineWidth = 2.2 * k; g.lineCap = 'round'; line(g, [0, -12 * k], [0, 8 * k]); line(g, [-5 * k, -8 * k], [5 * k, -8 * k]);   // ⚓ an old anchor
+    g.beginPath(); g.arc(0, 2 * k, 7 * k, 0.2, Math.PI - 0.2); g.stroke(); g.beginPath(); g.arc(0, -14 * k, 2.2 * k, 0, TAU); g.stroke(); g.restore(); }, {layer: 3, zb: 0, top: 18});
+  pennant(B, L, 1.7, 0.4, 24, 24, {emblem: shellEm, pole: DRIFTD});
+});
+/* ============================ 🐾 DEN — Turtle Pond (a round tide pool, a rock island with a big friendly sea turtle napping on it, baby turtles + shells round the rim) ============================ */
+RF('den', {name: 'Turtle Pond', h: 66, live: {period: 2.4, frames: 6}}, (B, v, L) => { const c = L.cond;
+  B.flat(0.06, 0.06, 1.88, 1.88, SAND);
+  B.custom(1, 1, (g, P, k, t) => { const q = P(1, 1, 0.5), rx = 0.82 * HTW * k * S2; g.fillStyle = SAND2; g.beginPath(); D.ell(g, q[0], q[1], rx, rx / 2); g.fill(); pool(g, P, k, t, 1, 1, 0.6, 0.72, c, {col: '#3FB8D8'});
+    for(let i = 0; i < 12; i++){ const a = i / 12 * TAU; const p = [q[0] + Math.cos(a) * rx * 0.94, q[1] + Math.sin(a) * rx * 0.47]; if(i % 3 === 0) scallop(g, p[0], p[1] + 1.5 * k, 2.2 * k, i % 2 ? CORALP : SHELL, c); else { g.fillStyle = '#B8A890'; g.beginPath(); D.ell(g, p[0], p[1], 2.6 * k, 1.6 * k); g.fill(); } } }, {layer: -7, zb: 0, top: 1});
+  B.custom(1, 0.95, (g, P, k, t) => { const q = P(1, 0.95, 0), br = dead(c), breathe = c && c.still ? 0 : Math.sin(ph(t, 2.4)) * 0.6 + Math.cos(ph(t, 2.4)) * 0.3;   // 🐢 the turtle on its rock
+    g.fillStyle = dim(c, '#A89A8A'); g.beginPath(); D.ell(g, q[0], q[1] - 3 * k, 20 * k, 9 * k); g.fill(); g.fillStyle = 'rgba(255,255,255,0.18)'; g.beginPath(); D.ell(g, q[0] - 6 * k, q[1] - 7 * k, 8 * k, 3 * k); g.fill();
+    const tb = q[1] - 11 * k, body = dim(c, '#6CC07A'); g.fillStyle = body; [[-14, 3], [12, 3], [-10, -5], [9, -5]].forEach(([dx, dy]) => { g.beginPath(); D.ell(g, q[0] + dx * k, tb + dy * k, 5 * k, 2.6 * k, dx < 0 ? 0.4 : -0.4); g.fill(); });
+    g.beginPath(); D.ell(g, q[0] + 19 * k, tb - 2 * k, 5.4 * k, 4.4 * k); g.fill(); g.fillStyle = '#1E2A3A'; g.beginPath(); g.arc(q[0] + 21 * k, tb - 3.4 * k, 1 * k, 0, TAU); g.fill();
+    g.fillStyle = dim(c, '#3E8A5A'); g.beginPath(); g.ellipse(q[0], tb - 1 * k - breathe * k, 15 * k, 11 * k + breathe * 0.5 * k, 0, Math.PI, TAU); g.ellipse(q[0], tb - 1 * k - breathe * k, 15 * k, 4 * k, 0, 0, Math.PI); g.fill();
+    if(!br){ g.strokeStyle = 'rgba(255,240,180,0.6)'; g.lineWidth = 1.1 * k; [[0, -7], [-7, -3], [7, -3]].forEach(([dx, dy]) => { g.beginPath(); D.star(g, q[0] + dx * k, tb + dy * k - breathe * k, 3.2 * k, 2.8 * k, 6, 0); g.stroke(); }); }
+    const col = br ? '#8A8090' : teamOf(L); g.fillStyle = col; g.beginPath(); g.ellipse(q[0], tb - 1 * k - breathe * k, 15 * k, 4 * k, 0, 0.2, Math.PI - 0.2); g.lineTo(q[0] - 14 * k, tb + 1 * k); g.closePath(); g.fill();
+    if(!br && !(c && c.still)){ const z = (t / 2.4) % 1; g.strokeStyle = 'rgba(255,255,255,' + (0.9 * (1 - z)) + ')'; g.lineWidth = 0.9 * k; [0, 0.5].forEach(o2 => { const f = (z + o2) % 1; g.beginPath(); g.arc(q[0] + 23 * k + f * 3 * k, tb - 6 * k - f * 14 * k, (1.2 + f * 1.4) * k, 0, TAU); g.stroke(); }); } }, {layer: 2, zb: 0, top: 30, fx: false});
+  [[0.4, 1.55, 0.3], [1.55, 1.5, -0.4]].forEach(([x, y, r], i) => B.custom(x, y, (g, P, k) => { const q = P(x, y, 0.6), body = dim(c, '#6CC07A'); g.save(); g.translate(q[0], q[1]); g.rotate(r); g.fillStyle = body; g.beginPath(); D.ell(g, 6 * k, -1 * k, 2.6 * k, 2 * k); g.fill(); g.fillStyle = dim(c, '#3E8A5A'); g.beginPath(); D.ell(g, 0, -2 * k, 5 * k, 3.4 * k); g.fill(); g.restore(); }, {layer: 3, zb: 0, top: 6}));
+  B.custom(1.6, 0.5, (g, P, k, t) => { const q = P(1.62, 0.5, 0); kelp(g, q[0], q[1], 24 * k, k, t, c, 2); }, {layer: 3, zb: 0, top: 26, fx: true});
+  pennant(B, L, 0.24, 0.24, 0, 52, {emblem: shellEm, pole: DRIFTD});
+});
+/* ---------- 🟩 territory floor: wet sand with ripple lines + shells + a starfish + now and then a tiny tide pool with a coral sprig ---------- */
+addFloor('reef', {name: 'Wet sand + shells + tide pools', top: '#F0D9A8', top2: '#E8CC94', side: '#C9A46A', paint: (g, q, s, i, j) => { const r = hash(i, j, 18), r2 = hash(j, i, 19);
+  tileBase(g, q, s, '#F2DCAE', '#EAD09A', r);
+  g.strokeStyle = 'rgba(190,150,90,0.45)'; g.lineWidth = 0.9 * s; for(let n = 0; n < 3; n++){ const v = 0.22 + n * 0.28 + (r - 0.5) * 0.06; g.beginPath(); for(let u = 0.06; u <= 0.94; u += 0.11){ const p = q(u, v + Math.sin(u * 9 + n + r * 5) * 0.025); u < 0.07 ? g.moveTo(p[0], p[1]) : g.lineTo(p[0], p[1]); } g.stroke(); }
+  if(r2 > 0.9){ const p = q(0.5, 0.5); g.fillStyle = D.rad(g, p[0] - 3 * s, p[1] - 1 * s, 1, 12 * s, [[0, '#C8F4FF'], [1, '#5CC4E4']]); g.beginPath(); D.ell(g, p[0], p[1], 11 * s, 5 * s); g.fill(); g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 0.8 * s; g.beginPath(); D.ell(g, p[0], p[1], 6 * s, 2.6 * s); g.stroke(); coralBranch(g, p[0] + 4 * s, p[1] + 2 * s, 10 * s, CORAL, s * 0.5, null, i + j); }
+  else if(r2 < 0.12){ const p = q(0.3 + r * 0.4, 0.4 + r2); starfish(g, p[0], p[1], 3.6 * s, ['#FF8A5B', '#FFB347', '#F76E8A'][(i + j) % 3], null, r * TAU); }
+  if(r < 0.32){ const p = q(0.7 - r, 0.25 + r2 * 0.5); scallop(g, p[0], p[1], 2.6 * s, [SHELL, CORALP, '#FFF2C8'][(i * 3 + j) % 3], null); }
+  if(r > 0.85){ const p = q(0.2, 0.8); g.fillStyle = 'rgba(255,255,255,0.75)'; g.beginPath(); D.ell(g, p[0], p[1], 2 * s, 1 * s); g.fill(); g.beginPath(); D.ell(g, p[0] + 3 * s, p[1] - 1 * s, 1.4 * s, 0.8 * s); g.fill(); } }});
+/* ---------- 🫧🪸💎 own resource shapes (1 × 1, states full · half · empty) — Props.AR.resKey('reef', 'coin' | 'brick' | 'gem') ---------- */
+// 🫧 Pearls: a big open oyster with pearls in it + loose pearls on the sand (half = 1 pearl · empty = the oyster shut, a crab-claw peeking)
+function oysterPaint(g, x, y, k, t, v, L, c){ const st = L.state || 'full', br = dead(c), shellC = dim(c, '#B8A8B8'), inner = br ? '#C8C0C0' : c ? '#E8DCE0' : '#FFEAF2'; g.save(); g.translate(x, y); g.scale(k * 1.3 * (v % 3 === 1 ? -1 : 1), k * 1.3);
+  g.fillStyle = 'rgba(40,24,30,0.22)'; g.beginPath(); D.ell(g, 0, 1, 16, 5); g.fill();
+  g.fillStyle = shellC; g.beginPath(); g.moveTo(-14, -4); g.quadraticCurveTo(-15, 2, 0, 3); g.quadraticCurveTo(15, 2, 14, -4); g.quadraticCurveTo(0, -1, -14, -4); g.fill();
+  if(st === 'empty'){ g.fillStyle = D.sh(shellC, 0.1); g.beginPath(); g.moveTo(-14, -4); g.quadraticCurveTo(-12, -11, 0, -12); g.quadraticCurveTo(12, -11, 14, -4); g.quadraticCurveTo(0, -2, -14, -4); g.fill();
+    g.strokeStyle = 'rgba(80,60,80,0.4)'; g.lineWidth = 0.8; for(let i = -3; i <= 3; i++){ g.beginPath(); g.moveTo(i * 3.6, -3); g.quadraticCurveTo(i * 3.4, -8, i * 2.6, -11.2); g.stroke(); } g.restore(); return; }
+  g.fillStyle = inner; g.beginPath(); D.ell(g, 0, -3.4, 12.6, 3.8); g.fill();
+  const lid = st === 'full' ? -26 : -20; g.fillStyle = D.sh(shellC, 0.12); g.beginPath(); g.moveTo(-13, -6); g.quadraticCurveTo(-15, lid + 6, 0, lid); g.quadraticCurveTo(15, lid + 6, 13, -6); g.quadraticCurveTo(0, -9, -13, -6); g.fill();
+  g.fillStyle = inner; g.beginPath(); g.moveTo(-10, -7.5); g.quadraticCurveTo(-11, lid + 8, 0, lid + 3); g.quadraticCurveTo(11, lid + 8, 10, -7.5); g.quadraticCurveTo(0, -10, -10, -7.5); g.fill();
+  const ps = st === 'full' ? [[0, -5, 4.2], [-6, -4, 2.8], [6, -4.4, 3], [-11, 2, 2.2], [10, 1, 2]] : [[0, -5, 3.6]]; ps.forEach(([px, py, pr]) => pearl(g, px, py, pr, br ? '#D8CCC8' : PEARL));
+  if(!br && !(c && c.still)){ const s = 1 + 0.4 * Math.sin(ph(t, 2.4)) + 0.2 * Math.cos(ph(t, 2.4)); g.fillStyle = 'rgba(255,255,255,0.95)'; g.beginPath(); D.star(g, 3, -10, 2.2 * s, 0.8 * s, 4); g.fill(); }
+  g.restore(); }
+// 🪸 Coral Chunks: a heap of pink + orange coral pieces (branches + round brain coral) (half = 2 pieces · empty = a stump + crumbs + a little chisel)
+function coralPaint(g, x, y, k, t, v, L, c){ const st = L.state || 'full', br = dead(c); g.save(); g.translate(x, y); g.scale(k * 1.3 * (v % 3 === 1 ? -1 : 1), k * 1.3);
+  g.fillStyle = 'rgba(40,24,30,0.2)'; g.beginPath(); D.ell(g, 0, 1, 17, 6); g.fill(); const cols = [CORAL, '#FF9A5A', CORALP];
+  if(st === 'empty'){ g.fillStyle = dim(c, CORALD); g.beginPath(); D.rr(g, -3, -6, 6, 6, 2); g.fill(); [[-8, 0], [6, 1], [10, -2]].forEach(([dx, dy], i) => { g.fillStyle = dim(c, cols[i]); g.beginPath(); g.arc(dx, dy - 1, 1.6, 0, TAU); g.fill(); });
+    g.strokeStyle = '#8A8A94'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(-14, -2); g.lineTo(-6, -7); g.stroke(); g.fillStyle = DRIFTD; g.fillRect(-16, -2, 3, 2); g.restore(); return; }
+  const brain = (bx, by, r, col) => { g.fillStyle = dim(c, col); g.beginPath(); g.ellipse(bx, by, r, r * 0.8, 0, Math.PI, TAU); g.ellipse(bx, by, r, r * 0.3, 0, 0, Math.PI); g.fill(); g.strokeStyle = 'rgba(140,40,30,0.35)'; g.lineWidth = 0.7; for(let i = -1; i <= 1; i++){ g.beginPath(); g.moveTo(bx - r * 0.7, by - r * 0.2 + i * r * 0.22); g.quadraticCurveTo(bx, by - r * 0.6 + i * r * 0.22, bx + r * 0.7, by - r * 0.2 + i * r * 0.22); g.stroke(); } };
+  brain(-5, 0, 8, cols[0]); brain(8, -1, 6, cols[1]); if(st === 'full'){ brain(2, -8, 6.4, cols[2]); }
+  coralBranch(g, st === 'full' ? -12 : -11, 0, st === 'full' ? 30 : 20, cols[st === 'full' ? 1 : 2], 0.9, c, 4 + v);
+  if(st === 'full') coralBranch(g, 12, -2, 22, cols[0], 0.8, c, 7 + v);
+  g.restore(); }
+// 💎 Sea Glass: a pile of frosted sea-glass pebbles + a little bottle with a rolled-up map (half = fewer pebbles · empty = just the bottle on its side)
+function glassPaint(g, x, y, k, t, v, L, c){ const st = L.state || 'full', br = dead(c), cols = v % 3 === 0 ? GLASS : v % 3 === 1 ? ['#6EC6FF', '#9EE6E0', '#7BD8B0', '#B8E8FF', '#5AA8E8'] : ['#F7C873', '#7BD8B0', '#C8A8FF', '#9EE6E0', '#FFB0A0']; g.save(); g.translate(x, y); g.scale(k * 1.3, k * 1.3);
+  g.fillStyle = 'rgba(40,24,30,0.2)'; g.beginPath(); D.ell(g, 0, 1, 16, 5.6); g.fill();
+  const bottle = (bx, by, rot) => { g.save(); g.translate(bx, by); g.rotate(rot); g.fillStyle = br ? 'rgba(170,190,180,0.7)' : 'rgba(150,230,200,0.75)'; g.beginPath(); D.rr(g, -4, -14, 8, 14, 3); g.fill(); g.fillRect(-1.6, -19, 3.2, 6); g.fillStyle = DRIFT; g.fillRect(-1.8, -21, 3.6, 3);
+    if(!br){ g.fillStyle = '#F6E8C8'; g.beginPath(); D.rr(g, -2, -11, 4, 8, 1.4); g.fill(); g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = 0.9; line(g, [-2.4, -12], [-2.4, -3]); } g.restore(); };
+  if(st === 'empty'){ bottle(2, -2, -1.35); g.restore(); return; }
+  const n = st === 'full' ? 9 : 4, R = rnd(31 + v); const pts = []; for(let i = 0; i < n; i++){ const a = R() * TAU, rr = R() * (st === 'full' ? 9 : 6); pts.push([Math.cos(a) * rr, Math.sin(a) * rr * 0.4 - (st === 'full' && i > 5 ? 5 : 0)]); }
+  if(st === 'full') bottle(10, -2, 0.2);
+  pts.sort((a, b) => a[1] - b[1]).forEach(([px, py], i) => { const col = br ? '#B8C0BC' : c ? D.sh(cols[i % cols.length], -0.15) : cols[i % cols.length]; g.fillStyle = col; g.beginPath(); g.moveTo(px - 4, py); g.lineTo(px - 2, py - 4); g.lineTo(px + 3, py - 3.4); g.lineTo(px + 4.4, py); g.lineTo(px + 1, py + 2); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.5)'; g.beginPath(); g.moveTo(px - 2, py - 3.4); g.lineTo(px + 1, py - 3); g.lineTo(px - 1, py - 1.4); g.closePath(); g.fill(); });
+  if(!br && !(c && c.still)){ const s = 1 + 0.4 * Math.sin(ph(t, 2.4)) + 0.2 * Math.cos(ph(t, 2.4)); g.fillStyle = 'rgba(255,255,255,0.95)'; g.beginPath(); D.star(g, -6, -10, 2.2 * s, 0.8 * s, 4); g.fill(); }
+  g.restore(); }
+const RES = (slot, name, h, tag, paint, live) => organic('reef', 'reef_' + slot, Object.assign({name, look: 'reef', side: 'reef', slot, kind: 'thing', foot: [1, 1], h, variants: 3, block: true, states: ['full', 'half', 'empty'], state: 'full', dead: 'keep',
+  tags: ['ar', 'ar-res', 'resource', tag, 'ar-reef'], conds: {'*': (g, x, y, k, t, v, c, L) => paint(g, x, y, k, t, v, L, c)}}, live ? {live, liveStates: ['full', 'half']} : {}), (g, x, y, k, t, v, L) => paint(g, x, y, k, t, v, L, null));
+RES('coin', 'Pearl oyster', 38, 'coin', oysterPaint, {period: 2.4, frames: 6}); RES('brick', 'Coral chunks', 40, 'brick', coralPaint); RES('gem', 'Sea glass', 36, 'gem', glassPaint, {period: 2.4, frames: 6});
+/* ---------- 🧱 walls: 🐚 a shell-stone wall (sandstone blocks with shells set in, a row of little scallops on top) · posts = pink coral pillars with a pearl ·
+   gate = two sandstone pillars under a GIANT scallop-shell arch over driftwood doors · 🏯 tall = a sandstone rampart + round towers with conch roofs + a 🐋 whale-tail gatehouse ---------- */
+(function(){ const {wallProp, gateProp, gateDoors, longFaces, tallWallProp, tallGateProp} = K.AR;
+  const skin = {name: 'Shell-stone wall', gateName: 'Scallop gate', h: 46, gateH: 92,
+    seg(B, L, r, c, v){ const [x, y, w, d, ax] = r, H = 20, br = dead(c), b = B.box(x, y, 0, w, d, br ? 12 : H, STONE);
+      ['front', 'right', 'left', 'back'].forEach((s, i) => B.decal(b, s, ...F(b, s), 0, br ? 12 : H, STONE, {paint: shellStone(br ? 12 : H, 17 + i + Math.round((x + y) * 10))}));
+      trim(B, L, b, br ? 6 : 14, 3, longFaces(ax)); if(br) return;
+      const len = ax === 'x' ? w : d, n = Math.max(1, Math.round(len / 0.2));
+      B.custom(x + w / 2, y + d / 2, (g, P, k) => { for(let i = 0; i < n; i++){ const f = (i + 0.5) / n, px = ax === 'x' ? x + w * f : x + w / 2, py = ax === 'x' ? y + d / 2 : y + d * f, a = P(px, py, H); scallop(g, a[0], a[1] + 1.5 * k, 4.6 * k, i % 2 ? CORALP : SHELL, c); } }, {layer: 1, zb: H, top: H + 7}); },
+    post(B, L, kind, c){ const br = dead(c); B.drum(0.5, 0.5, 0, 0.2, 4, SAND2); B.drum(0.5, 0.5, 4, 0.14, br ? 12 : 28, kind === 'end' || kind === 'solo' ? CORALP : CORAL, {rings: 0});
+      B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 4), rx = 0.14 * HTW * k * S2, col = br ? '#8A8090' : teamOf(L); g.fillStyle = col; g.beginPath(); g.ellipse(q[0], q[1] - 7 * k, rx, rx / 2, 0, 0, Math.PI); g.lineTo(q[0] - rx, q[1] - 12 * k); g.ellipse(q[0], q[1] - 12 * k, rx, rx / 2, 0, Math.PI, 0, true); g.closePath(); g.fill(); }, {layer: 1, zb: 4, top: 16});
+      if(!br) B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 32); coralBranch(g, q[0], q[1] + 2 * k, 12 * k, CORAL, k * 0.6, c, 3); pearl(g, q[0], q[1] - 3 * k, 3.6 * k, PEARL); }, {layer: 3, zb: 32, top: 44}); },
+    gate(B, L, open, c, v){ const t = 0.18, H = 48, br = dead(c);
+      [[0.02, 0.24], [0.74, 0.24]].forEach(([x0, w]) => { const pb = stoneBox(B, x0, 0.5 - t, 0, w, 2 * t, H, STONE, 61 + x0 * 10); trim(B, L, pb, 36, 3); B.box(x0 - 0.02, 0.5 - t - 0.02, H, w + 0.04, 2 * t + 0.04, 3, SAND2);
+        if(!br) B.custom(x0 + w / 2, 0.5, (g, P, k) => { const q = P(x0 + w / 2, 0.5, H + 3); pearl(g, q[0], q[1] - 4 * k, 4 * k, PEARL); }, {layer: 3, zb: H + 3, top: H + 12}); });
+      gateDoors(B, open, c, 32, DRIFT, ROPE, {paint: (g, Q, k) => { g.strokeStyle = 'rgba(70,40,20,0.3)'; g.lineWidth = 0.9 * k; for(let u = 0.25; u < 1; u += 0.25) line(g, Q(u, 1), Q(u, 31)); const q = Q(0.5, 20); starfish(g, q[0], q[1], 3.4 * k, '#FF8A5B', c); }});
+      B.custom(0.5, 0.5, (g, P, k, t2, T2) => { const m = P(0.5, 0.5, 52), br2 = dead(c); if(br2){ scallop(g, m[0] - 10 * k, m[1] + 4 * k, 12 * k, '#C8B8B0', c); return; } scallop(g, m[0], m[1] + 6 * k, 30 * k, '#FFD2BC', c);   // 🐚 the giant scallop arch
+        const col = teamOf(L); g.fillStyle = col; g.beginPath(); D.rr(g, m[0] - 13 * k, m[1] + 2 * k, 26 * k, 6 * k, 2 * k); g.fill(); shellEm(g, m[0], m[1] + 4.6 * k, 2.6 * k, inkOf(col)); }, {layer: 2, zb: 48, top: 92});
+      if(!br) [[0.14], [0.86]].forEach(([x]) => pennant(B, L, x, 0.5, 52, 16, {w: 11, hh: 7, emblem: shellEm, pole: DRIFTD})); } };
+  wallProp('reef', 'reef', skin); gateProp('reef', 'reef', skin);
+  const tall = {name: 'Sandstone rampart', gateName: 'Whale-tail gatehouse', base: 30, h: 120, gateH: 126,
+    rampart(B, L, r, c, hb){ const [x, y, w, d, ax] = r, e = 0.08, b = ax === 'x' ? B.box(x, y - e, 0, w, d + 2 * e, hb, SAND2) : B.box(x - e, y, 0, w + 2 * e, d, hb, SAND2);
+      ['front', 'right', 'left', 'back'].forEach(s => B.decal(b, s, ...F(b, s), 0, hb, SAND2, {paint: shellStone(hb, 31 + Math.round((x + y) * 10))})); },
+    tower(B, L, c, cx, cy, hb, kind, hw){ const br = dead(c), H = hb + (kind === 'gate' ? 30 : 38); B.drum(cx, cy, 0, hw * 1.05, br ? H - 14 : H, kind === 'gate' ? STONE : CORALP, {rings: 0});
+      B.custom(cx, cy, (g, P, k) => { const rx = hw * 1.05 * HTW * k * S2, b0 = P(cx, cy, (br ? H - 14 : H) - 7), col = br ? '#8A8090' : teamOf(L); g.fillStyle = col; g.beginPath(); g.ellipse(b0[0], b0[1], rx, rx / 2, 0, 0, Math.PI); g.lineTo(b0[0] - rx, b0[1] - 5 * k); g.ellipse(b0[0], b0[1] - 5 * k, rx, rx / 2, 0, Math.PI, 0, true); g.closePath(); g.fill();
+        const w0 = P(cx, cy + hw * 1.05, hb + 8); g.fillStyle = GOLD; g.beginPath(); g.arc(w0[0], w0[1], 3 * k, 0, TAU); g.fill(); g.fillStyle = lightOf(c) ? '#CFF6FF' : '#3A4A58'; g.beginPath(); g.arc(w0[0], w0[1], 2 * k, 0, TAU); g.fill(); }, {layer: 2, zb: hb, top: H});
+      if(br) return; conch(B, cx, cy, H, hw * 1.25, kind === 'gate' ? 22 : 30, '#FFD2BC', c);
+      pennant(B, L, cx, cy, H + (kind === 'gate' ? 24 : 32), kind === 'gate' ? 10 : 14, {w: 11, hh: 7, emblem: shellEm, pole: DRIFTD}); },
+    gatehouse(B, L, open, c, hb){ const br = dead(c), z0 = 44, t = 0.18;
+      gateDoors(B, open, c, 40, DRIFT, ROPE, {paint: (g, Q, k) => { g.strokeStyle = 'rgba(70,40,20,0.3)'; g.lineWidth = 0.9 * k; for(let z = 4; z < 38; z += 5) line(g, Q(0.08, z), Q(0.92, z)); }});
+      const b = stoneBox(B, 0.26, 0.5 - t, z0, 0.48, 2 * t, br ? 6 : 16, STONE, 91); if(br) return; trim(B, L, b, 8, 3, ['front', 'back']); B.box(0.24, 0.5 - t - 0.02, z0 + 16, 0.52, 2 * t + 0.04, 3, SAND2);
+      B.custom(0.5, 0.5, (g, P, k, t2) => { const q = P(0.5, 0.5, z0 + 19), body = WHALE, sw = Math.sin(ph(t2 || 0, 2.4)) * 0.04;   // 🐋 a whale tail rising over the gatehouse
+        g.save(); g.translate(q[0], q[1]); g.rotate(sw); g.fillStyle = body; g.beginPath(); g.moveTo(-5 * k, 0); g.quadraticCurveTo(-4 * k, -14 * k, -2 * k, -20 * k); g.quadraticCurveTo(-14 * k, -22 * k, -22 * k, -34 * k); g.quadraticCurveTo(-8 * k, -32 * k, 0, -24 * k);
+        g.quadraticCurveTo(8 * k, -32 * k, 22 * k, -34 * k); g.quadraticCurveTo(14 * k, -22 * k, 2 * k, -20 * k); g.quadraticCurveTo(4 * k, -14 * k, 5 * k, 0); g.closePath(); g.fill();
+        g.fillStyle = WHALEB; g.beginPath(); g.moveTo(-2 * k, -21 * k); g.quadraticCurveTo(-12 * k, -24 * k, -18 * k, -31 * k); g.quadraticCurveTo(-8 * k, -28 * k, 0, -23 * k); g.closePath(); g.fill();
+        g.fillStyle = 'rgba(210,245,255,0.85)'; [[-20, -36], [20, -36], [-12, -40], [14, -39]].forEach(([dx, dy]) => { g.beginPath(); g.arc(dx * k, dy * k, 1.8 * k, 0, TAU); g.fill(); }); g.restore(); }, {layer: 3, zb: z0 + 19, top: z0 + 60}); } };
+  tallWallProp('reef', 'reef', skin, tall); tallGateProp('reef', 'reef', skin, tall);
+})();
+/* ---------- 🏺 ORIGIN RELIC (ip-4g, 🌳 IsoProps chat 2026-11-20, Aowu "go" on the 10 names) — 🐠 The Great Pearl:
+   a giant shining pearl in a golden clam on a shell-stone block (coral + kelp round it); the clam BREATHES — its lid slowly opens + closes,
+   a shine sweeps across the pearl and bubbles float up. 2 × 2 landmark, states home · taken (the clam stays wide open and EMPTY: a pink dimple where the
+   pearl sat + its outline + a twinkle). Props.AR.ORIGIN.reef.icon(g, x, y, k, lit) = the carried / dropped / HUD form (the pearl). ---------- */
+(function(){ const dead = c => !!(c && c.broken), still = c => !!(c && c.still), dim = (c, col, f) => c ? (c.broken ? D.sh(col, -0.42) : D.sh(col, f == null ? -0.18 : f)) : col,
+    tw = (t, i) => 0.55 + 0.3 * Math.sin(ph(t, 2.4) + i * 1.7) + 0.15 * Math.cos(ph(t, 2.4) + i * 0.9);
+  // a ribbed fan (half a scallop shell) seen from the front: x, y = the hinge middle, R radius, open 0..1 (how tall the fan stands up), down = true → the lower bowl
+  function fan(g, x, y, R, open, col, c, down){ const gd = D.sh(col, -0.3), ry = R * (down ? 0.5 : 0.18 + open * 0.82);
+    g.fillStyle = D.lin(g, x - R, y, x + R, y, [[0, D.sh(col, 0.3)], [0.5, col], [1, gd]]); g.beginPath(); g.moveTo(x - R, y);
+    for(let i = 0; i <= 12; i++){ const a = Math.PI + i / 12 * Math.PI, bump = i % 2 ? 1 : 0.93; g.lineTo(x + Math.cos(a) * R * bump, y + (down ? -1 : 1) * Math.sin(a) * ry * bump); } g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(120,70,20,0.35)'; g.lineWidth = Math.max(0.6, R * 0.03); for(let i = 1; i < 12; i += 2){ const a = Math.PI + i / 12 * Math.PI; line(g, [x, y], [x + Math.cos(a) * R * 0.97, y + (down ? -1 : 1) * Math.sin(a) * ry * 0.97]); } }
+  // 🐚 the clam + pearl: x, y = the front lip of the bowl. o.open 0..1 · o.pearl (bool) · o.shine (-1..1)
+  function clam(g, x, y, s, c, o){ o = o || {}; const gold = dim(c, GOLD), R = 30 * s, op = o.open == null ? 0.7 : o.open, hy = y - 6 * s;
+    fan(g, x, hy, R * 0.98, op, D.sh(gold, -0.08), c, false);   // the lid (behind)
+    g.fillStyle = dim(c, CORALP); g.beginPath(); g.ellipse(x, hy, R * 0.86, 9 * s * (0.4 + op * 0.6), 0, 0, TAU); g.fill();   // the pink lining
+    if(o.pearl){ const pr = 12 * s, px = x, py = hy - 4 * s; pearl(g, px, py, pr, dim(c, PEARL)); const sh2 = o.shine || 0; g.save(); g.beginPath(); g.arc(px, py, pr, 0, TAU); g.clip();
+        g.fillStyle = 'rgba(255,255,255,0.75)'; g.beginPath(); g.ellipse(px + sh2 * pr * 0.8, py - pr * 0.2, pr * 0.22, pr * 1.1, 0.5, 0, TAU); g.fill(); g.restore();
+        g.fillStyle = 'rgba(255,190,220,0.35)'; g.beginPath(); g.arc(px + pr * 0.35, py + pr * 0.35, pr * 0.45, 0, TAU); g.fill(); }
+    else { g.fillStyle = 'rgba(200,90,120,0.38)'; g.beginPath(); D.ell(g, x, hy - 2 * s, 11 * s, 4 * s); g.fill(); }
+    fan(g, x, y, R, 1, gold, c, true);   // the bowl (in front)
+    g.fillStyle = 'rgba(255,255,255,0.35)'; g.beginPath(); g.ellipse(x - R * 0.4, y + 4 * s, R * 0.22, 2 * s, -0.1, 0, TAU); g.fill(); }
+  const def = add('reef', 'reef_relic', {name: 'The Great Pearl', look: 'reef', side: 'reef', slot: 'origin', kind: 'landmark', foot: [2, 2], door: null, h: 132, variants: 1, block: true,
+    states: ['home', 'taken'], state: 'home', tags: ['ar', 'ar-origin', 'ar-reef', 'relic', 'origin'], live: {period: 2.4, frames: 6},
+    diffs: [{by: 'state', a: 'home', b: 'taken', level: 'bold', name: 'the Great Pearl carried off (the clam open + empty)'}]});
+  def.build = (B, v, L) => { const c = L.cond, br = dead(c), home = (L.state || 'home') === 'home' && !br, H = br ? 10 : 22, PZ = br ? 0 : 14; K.AR.kerb(B, L, 2, 2);
+    B.flat(0.06, 0.06, 1.88, 1.88, SAND);
+    const b = stoneBox(B, 0.3, 0.3, 0, 1.4, 1.4, H, STONE, 37); trim(B, L, b, H - 7, 3);   // 🪨 the shell-stone block
+    B.custom(1, 1, (g, P, k) => { const q = P(1, 1, H); g.fillStyle = dim(c, SAND2); g.beginPath(); D.ell(g, q[0], q[1], 40 * k, 18 * k); g.fill(); [[-26, 2, '#FFB0A0'], [24, 5, '#FFF2C8']].forEach(([dx, dy, col]) => scallop(g, q[0] + dx * k, q[1] + dy * k, 3.4 * k, col, c)); }, {layer: 2, zb: H, top: H + 2});
+    if(!br){ B.drum(1, 1, H, 0.36, PZ, dim(null, CORALD), {rings: 2}); B.drum(1, 1, H + PZ - 3, 0.44, 3, CORALP); }   // a coral-rock pillar lifts the clam up
+    if(!br) B.custom(1, 1, (g, P, k, t) => { const a = P(0.45, 0.42, H), bq = P(1.6, 0.45, H), cq = P(0.42, 1.55, H); coralBranch(g, a[0], a[1], 34, CORAL, k, c, 5); coralBranch(g, bq[0], bq[1], 26, AQUA, k, c, 9); kelp(g, cq[0], cq[1], 30, k, t, c, 2); }, {layer: 3, zb: H, top: H + 34});
+    B.custom(1, 1, (g, P, k, t) => { if(br) return; const q = P(1, 1, H + PZ), th = ph(t, 2.4), op = home ? (still(c) ? 0.6 : 0.6 + 0.34 * Math.sin(th)) : 1;   // 🐚 the clam breathes (taken: wide open, empty)
+      clam(g, q[0], q[1] + 4 * k, k * 1.4, c, {open: op, pearl: home, shine: still(c) ? 0 : Math.cos(th)}); }, {layer: 6, zb: H + PZ, top: 126});
+    if(home){ halo(B, 1, 1, H + PZ + 26, 44, '#DFFBFF', 0.3, {pulse: t => still(c) ? 1 : 0.9 + Math.sin(ph(t, 2.4)) * 0.07 + Math.cos(ph(t, 2.4)) * 0.03});
+      B.custom(1, 1, (g, P, k, t) => { if(still(c)) return; const q = P(1, 1, H + PZ), th = ph(t, 2.4);
+        for(let i = 0; i < 4; i++){ const f = (th / TAU + i / 4) % 1, x = q[0] + (-10 + i * 7) * k + Math.sin(th * 2 + i) * 3 * k, y = q[1] - (26 + f * 70) * k, r = (1.6 + f * 2.6) * k; g.strokeStyle = 'rgba(255,255,255,' + (0.95 - f * 0.6) + ')'; g.lineWidth = 1.1 * k; g.beginPath(); g.arc(x, y, r, 0, TAU); g.stroke(); g.fillStyle = 'rgba(255,255,255,0.6)'; g.beginPath(); g.arc(x - r * 0.35, y - r * 0.35, r * 0.25, 0, TAU); g.fill(); }   // bubbles
+        D.glow(g, q[0], q[1] - 14 * k, 18 * k, '#FFFFFF', 0.25 + 0.15 * Math.sin(th)); }, {layer: 7, zb: H, top: 124, fx: true});
+    } else if(!br) B.custom(1, 1, (g, P, k, t) => { const q = P(1, 1, H + PZ), s = k * 1.4; g.strokeStyle = 'rgba(255,255,255,0.95)'; g.lineWidth = 1.6 * k; g.setLineDash([3 * k, 2.4 * k]); g.beginPath(); g.arc(q[0], q[1] - 6 * s, 12 * s, 0, TAU); g.stroke(); g.setLineDash([]);   // taken: the pearl's outline + a twinkle
+      g.fillStyle = 'rgba(230,255,255,0.95)'; g.beginPath(); D.star(g, q[0] + 14 * k, q[1] - 30 * k, (2.6 + tw(t, 1)) * k, 1 * k, 4); g.fill(); }, {layer: 7, zb: H, top: H + 50});
+    [[0.2, 1.8], [1.8, 0.2]].forEach(([x, y]) => pennant(B, L, x, y, 0, 46, {emblem: shellEm, pole: DRIFTD})); };
+  const AR = Props.AR; AR.ORIGIN = AR.ORIGIN || {}; AR.ORIGIN.reef = {key: 'reef_relic', name: 'The Great Pearl', icon: (g, x, y, k, lit) => { const r = 9 * k; pearl(g, x, y, r, lit === false ? '#C8C0C4' : PEARL); if(lit !== false){ g.fillStyle = 'rgba(255,255,255,0.8)'; g.beginPath(); g.ellipse(x + r * 0.2, y - r * 0.2, r * 0.2, r * 0.8, 0.5, 0, TAU); g.fill(); }
+    g.fillStyle = lit === false ? '#9A8A60' : GOLD; g.beginPath(); g.ellipse(x, y + r * 0.95, r * 1.1, r * 0.32, 0, 0, TAU); g.fill(); }};
+})();
+/* 🏺 end ip-4g relic */
+})();
+K.loaded('reef', 'ip-6a');
+})(window.Props && window.Props._K);
