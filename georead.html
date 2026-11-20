@@ -1047,6 +1047,7 @@ const Voice = (function(){
   // items = [{t, rate, gap}] spoken in order; a new say() cancels the old one
   function say(items){
     cancel(); const my = ++token; let p = Promise.resolve();
+    try{ if(window.UI && UI.voicePack && UI.voicePack.prefetch) UI.voicePack.prefetch((items || []).map(it => it.t)); }catch(e){}   // 🎧 vp-4: the whole line decodes at once
     (items || []).forEach(it => { p = p.then(() => { if(my !== token) return null; if(it.on) try{ it.on(); }catch(e){} try{ bubble(it.show != null ? it.show : it.t); }catch(e){} return one(it.t, it.rate, my).then(() => wait(it.gap == null ? 120 : it.gap)); }); });
     p = p.then(() => { if(my === token) try{ bubbleLater(); }catch(e){} });   // 💬 gr-7: the avatar's speech bubble shows what is said
     return p;
@@ -1259,6 +1260,16 @@ function nextRound(){
   $('h-round').textContent = (ROUND_WORD[R.type] || 'Word ') + (G.i + 1) + ' / ' + G.game.rounds.length;
   const fn = {sound: soundRound, blend: blendRound, magic: magicRound, build: buildRound, swap: swapRound, odd: oddRound, scene: sceneRound, ysound: ysoundRound, finale: finaleRound, sight: sightRound, trace: traceRound, match: matchRound, memory: memoryRound, story: storyRound, sort: sortRound}[R.type];
   fn(R); layout(); if(G.game.time) startTimer(R.time || ROUND_TIME[R.type] || G.game.time);
+  prefetchRound(R); prefetchRound(G.game.rounds[G.i + 1]);   // 🎧 vp-4
+}
+// 🎧 vp-4: fetch + decode this round's natural-voice clips while the boxes fly in (sounds · the word · its blend), so the first tap is instant
+function prefetchRound(R){
+  try{ const VP = window.UI && UI.voicePack; if(!R || !VP || !VP.prefetch) return; const t = [];
+    [R.word, R.from].forEach(w => { if(w && GR.BY[w]) GR.blendScript(w, {syllables: G && G.game && G.game.syllables}).forEach(x => t.push(x.t)); });
+    [R.target].concat(R.choices || []).forEach(s => { if(s && GR.SAY[s]) t.push(GR.SAY[s]); });
+    if(R.target && GR.KEY[R.target]) t.push('like ' + GR.KEY[R.target][0]);
+    (R.pics || []).forEach(w => t.push(w));
+    VP.prefetch(t); }catch(e){}
 }
 // boxes start in the avatar's arms, then fly down to where they belong
 function unload(list, intoId){
@@ -2124,4 +2135,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (gr-7+mg-1+p1d+p3a+cs-4b+b3w3+24u-c+an-4+an-6+vp-3) END OF GeoRead.html -->
+<!-- (gr-7+mg-1+p1d+p3a+cs-4b+b3w3+24u-c+an-4+an-6+vp-3+vp-4) END OF GeoRead.html -->
