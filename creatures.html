@@ -52,9 +52,11 @@
 <script src="inc/MotionTurn.js"></script>
 <script src="inc/MotionWear.js"></script>
 <script src="inc/MotionCarry.js"></script>
+<script src="inc/MotionGround.js"></script>
 <script src="inc/AvatarActs.js"></script>
 <script src="inc/AvatarWeapons.js"></script>
 <script src="inc/CreatureKit.js"></script>
+<script src="inc/CreatureSea.js"></script>
 <script src="inc/MotionCreature.js"></script>
 </head>
 <body ontouchstart="">
@@ -76,10 +78,14 @@ UI.navBar(document.getElementById('back-btn'), {});
 (function(){
 'use strict';
 const C = window.Creatures, $ = id => document.getElementById(id), cv = $('cv'), g = cv.getContext('2d');
-const VIEWS = [['all', '📚', 'All'], ['sizes', '📏', 'Sizes'], ['battle', '⚔️', 'Battle'], ['map', '🗺️', 'Map'], ['pets', '🐣', 'Pets']];
+const VIEWS = [['all', '📚', 'All'], ['sizes', '📏', 'Sizes'], ['battle', '⚔️', 'Battle'], ['map', '🗺️', 'Map'], ['pets', '🐣', 'Pets']].concat(C.SEA ? [['sea', '🌊', 'Sea']] : []);   // 🌊 av-naga4: CreatureSea families
 const ACTS = [['attack', '⚔️', 'Attack'], ['cast', '✨', 'Cast'], ['hurt', '🤕', 'Hurt'], ['ko', '💫', 'KO'], ['cheer', '🎉', 'Cheer']];
+const SEA_ACTS = [['rise', '🔥', 'Rise'], ['lunge', '🐍', 'Lunge'], ['sweep', '🌀', 'Sweep'], ['dive', '🤿', 'Dive']].filter(a => C.ACTS[a[0]]).concat([['fish', '🐟', 'Fish moves']]);   // 🐟 = every fish plays its own move
+const FISH_ACT = {glidray: 'glide', mudhopper: 'hop', bettaflare: 'flare'};
+const SEA = C.list().filter(id => ['serpent', 'fish'].indexOf(C.LIST[id].fam) >= 0), SV = [['SW', '↙'], ['SE', '↘'], ['NW', '↖'], ['NE', '↗']];   // 🧭 the 4 main views
+const actList = () => S.view === 'sea' ? SEA_ACTS : ACTS;
 const ALL = C.list().filter(id => !C.LIST[id].pet);
-const S = {view: 'all', act: null, actT0: 0, sel: 0, form: 2, pet: 0, W: 0, H: 0, dpr: 1, fits: null, frameMs: 0, drawn: [], log: []};
+const S = {view: 'all', act: null, actT0: 0, sel: 0, form: 2, pet: 0, sv: 0, W: 0, H: 0, dpr: 1, fits: null, frameMs: 0, drawn: [], log: []};
 const name = CURRENT_PLAYER && CURRENT_PLAYER.indexOf('<' + '?') < 0 ? CURRENT_PLAYER : 'Aowu';
 const who = {name, av: (typeof defaultAvatar === 'function') ? defaultAvatar(name) : null, dir: 1, walkT: 0};
 let AVH = 0; function avH(){ if(!AVH) AVH = C.box('lab:av', q => drawAvatar(q, who, 0, 0, 1, {t: 0.5, still: true})).h; return AVH; }
@@ -87,17 +93,17 @@ function avatarAt(x, y, px){ drawAvatar(g, who, x, y, px / avH(), {t: S.t, still
 const PETS = C.list().filter(id => { const d = C.LIST[id]; return d.rank !== 'boss' && d.fam !== 'giant' && C.friendChance(d) > 0 || d.pet; });
 function chipRow(box, list, cur, on){ box.innerHTML = ''; list.forEach(([k, ic, lb]) => { const b = document.createElement('button'); b.className = 'chip' + (k === cur ? ' on' : ''); b.dataset.k = k;
     b.innerHTML = ic + '<span class="lb"> ' + lb + '</span>'; b.onclick = () => on(k, b); box.appendChild(b); }); }
-function pickRow(){ const P = $('pick'); P.innerHTML = ''; if(S.view !== 'battle' && S.view !== 'pets') return;
-  const lab = S.view === 'battle' ? ['Grand Yak', '✦ Elite', '✦✦ Awakened'][S.form] : C.LIST[PETS[S.pet]].name;
+function pickRow(){ const P = $('pick'); P.innerHTML = ''; if(S.view !== 'battle' && S.view !== 'pets' && S.view !== 'sea') return;
+  const lab = S.view === 'sea' ? SV[S.sv][1] + ' ' + SV[S.sv][0] : S.view === 'battle' ? ['Grand Yak', '✦ Elite', '✦✦ Awakened'][S.form] : C.LIST[PETS[S.pet]].name;
   P.innerHTML = '<button class="chip" id="pk-prev">◀</button><b id="pk-name">' + lab + '</b><button class="chip" id="pk-next">▶</button>';
-  const step = d => { if(S.view === 'battle') S.form = (S.form + d + 3) % 3; else S.pet = (S.pet + d + PETS.length) % PETS.length; pickRow(); };
+  const step = d => { if(S.view === 'sea') S.sv = (S.sv + d + 4) % 4; else if(S.view === 'battle') S.form = (S.form + d + 3) % 3; else S.pet = (S.pet + d + PETS.length) % PETS.length; pickRow(); };
   $('pk-prev').onclick = () => step(-1); $('pk-next').onclick = () => step(1); }
-function setView(v){ S.view = v; chipRow($('views'), VIEWS, v, setView); pickRow(); }
-function playAct(a){ S.act = a; S.actT0 = performance.now(); S.log.push(a); chipRow($('acts'), ACTS, a, playAct); }
+function setView(v){ const was = S.view === 'sea'; S.view = v; if(was !== (v === 'sea')){ S.act = null; chipRow($('acts'), actList(), null, playAct); } chipRow($('views'), VIEWS, v, setView); pickRow(); }
+function playAct(a){ S.act = a; S.actT0 = performance.now(); S.log.push(a); chipRow($('acts'), actList(), a, playAct); }
 function size(){ const r = $('stage').getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1); if(r.width === S.W && r.height === S.H && dpr === S.dpr) return;
   S.W = r.width; S.H = r.height; S.dpr = dpr; cv.width = Math.round(S.W * dpr); cv.height = Math.round(S.H * dpr); }
-function opt(extra){ const ms = S.act ? performance.now() - S.actT0 : 0; const total = S.act ? C.ACTS[S.act].reduce((a, b) => a + b.ms, 0) + 500 : 0;
-  if(S.act && ms > total){ S.act = null; chipRow($('acts'), ACTS, null, playAct); }
+function opt(extra){ const ms = S.act ? performance.now() - S.actT0 : 0; const total = S.act ? (C.ACTS[S.act] ? C.ACTS[S.act].reduce((a, b) => a + b.ms, 0) + 500 : 3000) : 0;   // 🐟 'fish' = each fish its own move
+  if(S.act && ms > total){ S.act = null; chipRow($('acts'), actList(), null, playAct); }
   return Object.assign(S.act ? {act: S.act, ms} : {pose: 'idle'}, {t: S.t}, extra || {}); }
 function rec(x, y, w, h){ S.drawn.push({x, y, w, h}); }
 // ---- views ----
@@ -135,16 +141,23 @@ function vPets(){ const d = C.LIST[PETS[S.pet]], st = C.stagesFor(d), cols = S.W
     g.fillStyle = '#24324A'; g.font = '700 ' + Math.max(10, Math.min(14, cw / 8)) + 'px Fredoka'; g.textAlign = 'center';
     g.fillText(d.names ? d.names[i] : '★'.repeat(i + 1), cx, base + 18); });
   $('note').textContent = '🤝 ' + d.name + ' · befriend ' + (C.friendChance(d) ? '1 in ' + Math.round(1 / C.friendChance(d)) : 'starter'); }
-const DRAW = {all: vAll, sizes: vSizes, battle: vBattle, map: vMap, pets: vPets};
+// 🌊 av-naga4: every sea creature in the picked main view (↘ ↗ = ↙ ↖ mirrored), Phaya Naga as ✦✦✦ Prime Nakkharat (9 heads)
+function vSea(){ const n = SEA.length, cols = Math.max(2, Math.round(Math.sqrt(n * S.W / S.H))), rows = Math.ceil(n / cols), cw = S.W / cols, ch = S.H / rows, view = SV[S.sv][0];
+  SEA.forEach((id, i) => { const x = (i % cols) * cw, y = ((i / cols) | 0) * ch, form = id === 'phayanaga' ? 3 : 0, f = C.fit(id, cw - 12, ch - 26, {pad: 0.12, form});
+    const o = opt({view, form}); if(o.act === 'fish'){ if(FISH_ACT[id]) o.act = FISH_ACT[id]; else { delete o.act; delete o.ms; o.pose = 'idle'; } }
+    C.draw(g, id, x + 6 + f.x, y + 4 + f.y, f.size, o); rec(x, y, cw, ch);
+    g.font = '700 ' + Math.max(10, Math.min(14, cw / 9)) + 'px Fredoka'; g.textAlign = 'center'; g.fillStyle = '#24324A'; g.fillText(id === 'phayanaga' ? '✦✦✦ Nakkharat' : C.LIST[id].name, x + cw / 2, y + ch - 6); });
+  $('note').textContent = '🌊 ' + n + ' sea creatures · 🧭 ' + SV[S.sv][1] + ' ' + view + ' · ' + (C.SEA || ''); }
+const DRAW = {all: vAll, sizes: vSizes, battle: vBattle, map: vMap, pets: vPets, sea: vSea};
 function frame(now){ size(); S.t = now / 1000; S.drawn = []; const t0 = performance.now();
-  g.setTransform(S.dpr, 0, 0, S.dpr, 0, 0); g.clearRect(0, 0, S.W, S.H); if(S.view !== 'battle' && S.view !== 'map' && S.view !== 'pets') $('note').textContent = '🐾 ' + C.list().length + ' creatures · v ' + C.VERSION;
+  g.setTransform(S.dpr, 0, 0, S.dpr, 0, 0); g.clearRect(0, 0, S.W, S.H); if(S.view !== 'battle' && S.view !== 'map' && S.view !== 'pets' && S.view !== 'sea') $('note').textContent = '🐾 ' + C.list().length + ' creatures · v ' + C.VERSION;
   try { DRAW[S.view](); } catch(e){ S.err = e.message; }
   S.frameMs = S.frameMs * 0.9 + (performance.now() - t0) * 0.1; requestAnimationFrame(frame); }
 setView('all'); chipRow($('acts'), ACTS, null, playAct);
-window.CK_LAB = {S, setView, playAct, PETS, ALL};
+window.CK_LAB = {S, setView, playAct, PETS, ALL, SEA, SV, seaView(v){ S.sv = v; pickRow(); }};
 requestAnimationFrame(frame);
 })();
 </script>
 </body>
 </html>
-<!-- (av-r0c) END OF CreatureLab.html -->
+<!-- (av-r0c+av-naga4) END OF CreatureLab.html -->

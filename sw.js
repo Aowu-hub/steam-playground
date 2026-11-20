@@ -7,11 +7,14 @@
      Cache Storage is per ORIGIN. So every cache name starts with this app's own prefix (build.js sets PFX: 'sapp-' for
      steam-app, 'steam-' for the old address) and tidy() deletes ONLY '<PFX>v<digit or ->…' versions — never another app's caches,
      never 'steam-voices' (UiKitPlay vp-4b GeoRead clips). The old SW_REV 2 deleted every 'steam-*' cache.
+   • 🔁 sw-1a (2026-11-20): steam-playground is THE offline app again (prefix 'steam-', what the devices have) — this worker
+     clears its own old 'steam-v<digit>…' versions, never 'sapp-…' (devices installed at /steam-app/ that night), never
+     'steam-voices', never the IndexedDB 'steam-offline' (results + family link live there; this file never opens it).
    • ./?page=gameroom&player=… is answered with gameroom.html straight away (no hop through index.html)
    This file rarely changes; the app's own version lives in files.json. */
 'use strict';
 const SW_REV = 3;
-const PFX = "steam-";   // 📲 sa-1: build.js writes the app's own prefix here
+const PFX = "steam-";   // 📲 sa-1: build.js writes the app's own prefix here (🔁 sw-1a: 'steam-' = steam-playground, the normal build)
 const META = PFX + 'meta';
 const SCOPE = new URL('./', self.location.href).href;
 let STATE = null;   // {current, pending, previous}

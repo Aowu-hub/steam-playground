@@ -202,6 +202,7 @@
 <script src="inc/MotionTurn.js"></script>
 <script src="inc/MotionWear.js"></script>
 <script src="inc/MotionCarry.js"></script>
+<script src="inc/MotionGround.js"></script>
 <script src="inc/AvatarActs.js"></script>
 <script src="inc/AvatarWeapons.js"></script>
 <script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-4b: the cheering crowd (CheerSquad.html) -->
@@ -1043,19 +1044,204 @@ function renderBar(){
 }
 function bumpK(d){ const s = selStack(); if(!s) return; G.splitK = Math.max(1, Math.min(s.n - 1, G.splitK + d)); const el = $('split-k'); if(el) el.textContent = G.splitK; }
 function snapshot(){ G.hist.push(JSON.stringify(G.M.item.stacks)); if(G.hist.length > 30) G.hist.shift(); }
-function undo(){ if(!G || G.phase !== 'play' || !G.hist.length) return; G.M.item.stacks = JSON.parse(G.hist.pop()); G.sel = 0; renderBar(); }
-function showHint(){ G.hints++; banner('💡 ' + GS.hintFor(G.M), ''); setTimeout(hideBanner, 1800 * SPEED + 1); }
-function doSnap(aId, bId){
-  const it = G.M.item, a = it.stacks.find(s => s.id === aId), b = it.stacks.find(s => s.id === bId); if(!a || !b) return;
+function undo(){ if(G && GSStack.busy()){ GSStack.skip(); return; } if(!G || G.phase !== 'play' || !G.hist.length) return; G.M.item.stacks = JSON.parse(G.hist.pop()); G.sel = 0; renderBar(); }
+function showHint(){ if(GSStack.busy()){ GSStack.skip(); return; } G.hints++; banner('💡 ' + GS.hintFor(G.M), ''); setTimeout(hideBanner, 1800 * SPEED + 1); }
+/* 🧊 STACK START (gs-anim, Aowu 2026-11-20 21:59 "play the stacking first, THEN count" · ✨ Polish chat)
+   A join plays in beats (🎬 Action beats · Motion Bible M1 / M11 · FX Bible F2 / F11): ① ready → ② crouch → ③ jump (the number flies as ONE
+   character, stretch + small tilt, arc capped under the goal panel) → ④ contact × N (its blocks land one after another, bottom first:
+   clack + tower squash from Motion.landInfo, held 60 ms) → ⑤ sway (overshoot) → ⑥ settle → 🔟 make ten on the way (the column
+   splits in the air, the first part fills up to 10 = a ten-rod with a gold frame + Motion.fx('glint') + "10!", the rest hops down
+   next door) → 🔢 COUNT (each block lights + a number chip BESIDE the tower, never on a face; 🌱 Basic counts every block from 1,
+   🐣 Junior+ counts ON from the bottom number, ✖️ copies count by groups) → ✨ morph (the new colour runs up, the faces become one)
+   → sum words + the 🎯 check. Tap / any key = ×4 fast. The round clock (speed points, 💀 Hardcore timer) waits while it plays.
+   SPEED 0 = instant (harness) · FX 0 = calm (no dust / glint / sway, shorter).
+   GSStack.start({aN, bN, bId, from: {x, floor}, u, sum, after, groups?, by?}) · .tick(dt) · .draw(g, t, P, u, skin, mat) · .skip() · .busy()
+   · .pointing() · .morphDone() · GSStack.drop(kind, o) = the light landing beat for 🏗️ Wobble + 🔟 Tens. */
+const GSStack = (function(){
+  const cl = (v, a, b) => Math.max(a, Math.min(b, v));
+  const sineInOut = p => 0.5 - 0.5 * Math.cos(Math.PI * p), cubicOut = p => 1 - Math.pow(1 - p, 3);
+  const PITCH = 0.95, ROD = 0.9;                       // NumberSkins.layout: a rod is 0.9u wide, the next one starts 0.95u on
+  const onesX = T => T > 0 ? T * PITCH + 0.05 : 0;     // the ones column's x (in u) after T rods
+  const colN = n => n <= 10 ? n : (n % 10 || 10);
+  const STEP = [0.17, 0.13, 0.11, 0.08, 0.07, 0.06];   // count step (s) per level: Basic slow, Hardcore quick
+  const TRAIL = 0.07;                                   // each higher block lands this much later (overlap)
+  // never fly up behind the 🎯 goal panel: its real box (top on phones, top-left on wide screens) — only where the jump passes under it
+  const topY = (xa, xb) => { const base = (G && G.cl ? G.cl.top : 26) + 10, el = document.getElementById('goal'); if(!el || !el.offsetHeight) return base;
+    const r = el.getBoundingClientRect(), c = CV.getBoundingClientRect(), L = r.left - c.left, R = r.right - c.left, B = r.bottom - c.top + 8;
+    if(xa == null) return Math.max(base, B); return Math.min(xa, xb) <= R + 4 && Math.max(xa, xb) >= L - 4 ? Math.max(base, B) : base; };
+  function plan(o){
+    const n = o.bN + (o.groups || [o.aN]).reduce((a, b) => a + b, 0), Li = G.M ? G.M.level : 1, calm = !FX;
+    const S = {t: 0, real: 0, fast: false, bId: o.bId, jId: o.jId, aN: o.aN, bN: o.bN, n, after: o.after, sum: o.sum, u: o.u, dir: 1, calm,
+      countAll: Li === 0 && !o.by, by: o.by || 0, step: o.by ? 0.24 : STEP[Li] || 0.07};
+    S.bR = o.bN > 10 ? Math.floor(o.bN / 10) : 0; S.bO = o.bN > 10 ? o.bN % 10 : o.bN;
+    if(S.bO === 10 && n > 10){ S.bR = 1; S.bO = 0; }   // a 10 joined by more = it stands as a ten-rod
+    // groups: one jump each (a snap = 1 group; ✖️ copies = one group per copy, dropping in one after another)
+    const list = o.groups || [o.aN]; let rods = S.bR, col = S.bO, L0 = calm ? 0.12 : 0.26;
+    S.G = []; S.lands = [];
+    list.forEach((aN, gi) => {
+      const g = {aN, aR: aN > 10 ? Math.floor(aN / 10) : 0, aO: aN > 10 ? aN % 10 : aN, L: L0, F: calm ? 0.22 : (o.groups ? 0.3 : 0.36), from: gi === 0 ? o.from : null, pop: !!o.groups, lands: []};
+      let j = 0;
+      for(let r = 0; r < g.aR; r++){ const L = {g: gi, rod: true, src: r, slot: rods++, C: g.L + g.F + (j++) * TRAIL}; g.lands.push(L); }
+      g.onesSlot0 = rods;
+      for(let i = 0; i < g.aO; i++){ const L = {g: gi, rod: false, src: i, slot: rods, k: col, C: g.L + g.F + (j++) * (calm ? 0.04 : TRAIL)}; g.lands.push(L); col++;
+        if(col === 10 && n > 10){ L.click = rods; rods++; col = 0; } }
+      // 🔟 make ten: the blocks after the click split off in the air and hop down next door only AFTER it
+      const ck = g.lands.find(L => L.click != null); let q = 0;
+      if(ck) g.lands.forEach(L => { if(!L.rod && L.src > ck.src){ L.next = true; L.C = ck.C + (calm ? 0.1 : 0.2) + (q++) * (calm ? 0.04 : TRAIL); } });
+      g.click = ck || null; g.endC = Math.max(...g.lands.map(L => L.C));
+      S.G.push(g); S.lands.push(...g.lands); L0 = g.endC + (calm ? 0.12 : 0.3);   // the next copy pops in only after this one has landed
+    });
+    S.rodsEnd = rods; S.colEnd = col;
+    const lastC = Math.max(...S.lands.map(L => L.C), L0);
+    S.T_hold = lastC + 0.08; S.T_count = S.T_hold + (calm ? 0.06 : 0.5);
+    S.countN = S.by ? Math.round(n / S.by) : S.countAll ? n : 1 + (n - o.bN);
+    S.T_morph = S.T_count + S.countN * S.step + 0.2; S.T_end = S.T_morph + 0.4;
+    return S;
+  }
+  // the count step of block i in count order (B = bottom → top, rods first) and the number its chip shows (0 = no chip)
+  function stepOf(S, i, isB, bCount){ return S.by ? Math.floor(i / S.by) + 1 : S.countAll ? i + 1 : isB ? 1 : 1 + i - bCount + 1; }
+  function chipOf(S, i, isB, bCount){ if(S.by) return (i + 1) % S.by === 0 ? i + 1 : 0; if(S.countAll) return i + 1; if(isB) return i === bCount - 1 ? S.bN : 0; return S.bN + (i - bCount + 1); }
+  const API = {
+    start(o){ if(!SPEED){ G.st = null; o.after(); return; } G.st = plan(o); tone(260, 0.1, 'sine', 0.14, 520, 0.2); },   // a little whoosh as it jumps
+    skip(){ if(G && G.st) G.st.fast = true; },
+    busy(){ return !!(G && G.st); },
+    pointing(){ const S = G && G.st; return !!(S && S.lit && S.morphT == null); },
+    morphDone(){ const S = G && G.st; return !!(S && S.morphT != null && S.t - S.morphT >= 0.26); },
+    tick(dt){
+      const S = G && G.st; if(!S) return; const t0 = S.t; S.real += dt; S.t += dt * (S.fast ? 4 : 1); const t = S.t, X = x => t0 < x && t >= x;
+      S.lands.forEach((L, i) => { if(X(L.C)){
+        S.sq = {t: L.C, s: cl(Motion.landInfo({height: 0.3 + i * 0.04}).squash / 100 * 0.55, 0.025, 0.09)};
+        tone(300 * Math.pow(2, Math.min(16, S.bN + i) / 12), 0.06, 'triangle', 0.22); tone(140, 0.045, 'square', 0.05);
+        if(i === 0 && !S.calm) S.puff = {t: L.C, k: L.rod ? 0 : L.k};
+        if(L.click != null){ S.click = {t: L.C, slot: L.click}; tone(880, 0.09, 'triangle', 0.22); tone(1320, 0.14, 'triangle', 0.18, null, 0.06); }
+      } });
+      if(X(S.T_hold) && !S.calm) S.sway = {t: S.T_hold};
+      for(let k = 0; k < S.countN; k++) if(X(S.T_count + k * S.step)){ S.lit = k + 1; S.litT = S.T_count + k * S.step; tone(523 * Math.pow(2, Math.min(19, k) / 12), 0.08, 'sine', 0.2); }
+      if(X(S.T_morph)){ S.morphT = S.T_morph; SND.snap(S.n); avatarDo('cheer'); if(S.sum) floatText(S.sum, S.bId, '#FFE14D'); const P = G.pos && G.pos[S.bId]; if(P) P.pop = 1; if(S.onMorph) S.onMorph(); }
+      if(t >= S.T_end){ const a = S.after; G.st = null; if(G.roundT0) G.roundT0 += S.real * 1000; a && a(); }   // the round clock waited while it played
+    },
+    // paint the tower (b + arrivals) at P (x = left, y = floor) + the jumping numbers
+    draw(g, t, P, u, skin, mat){
+      const S = G.st, T = S.t, x0 = P.x;
+      const colB = NumberSkins.colour(skin, colN(S.bN)), colNew = NumberSkins.colour(skin, colN(S.n)), col10 = NumberSkins.colour(skin, 10);
+      const landed = S.lands.filter(L => T >= L.C), clicks = S.lands.filter(L => L.click != null && T >= L.C);
+      const rodsIn = S.bR + landed.filter(L => L.rod).length + clicks.length;
+      // ---- the standing tower, in COUNT order: rods (b's, arrived, clicked) left → right, then the ones column
+      const B = [];
+      const rodsAt = []; for(let r = 0; r < S.bR; r++) rodsAt.push({slot: r, b: true});
+      landed.filter(L => L.rod).forEach(L => rodsAt.push({slot: L.slot}));
+      // ones on the column (b's own + every one landed); a 🔟 click turns the first 10 of the column into a rod
+      let col = []; for(let k = 0; k < S.bO; k++) col.push({b: true, col: colB});
+      const order = S.lands.slice().sort((a, b) => a.C - b.C), clickAnims = [];
+      order.forEach(L => { if(T < L.C || L.rod) return; const ga = S.G[L.g]; col.push({col: NumberSkins.colour(skin, colN(ga.aN)), g: L.g});
+        if(L.click != null){ const e = cl((T - L.C) / 0.16, 0, 1); clickAnims.push({slot: L.click, e, blocks: col.slice(0, 10)}); col = col.slice(10); } });
+      rodsAt.sort((a, b) => a.slot - b.slot).forEach(r => { for(let k = 0; k < 10; k++) B.push({x: x0 + r.slot * PITCH * u, y: P.y - (k + 1) * ROD * u, s: ROD * u, col: col10, b: r.b}); });
+      clickAnims.forEach(c => { const sz = 1 - c.e * (1 - ROD); c.blocks.forEach((o, k) => B.push({x: x0 + c.slot * PITCH * u, y: P.y - (k + 1) * u * sz, s: u * sz, col: c.e >= 1 ? col10 : o.col, b: o.b && c.e < 1, g: o.g})); });
+      const cx1 = x0 + onesX(rodsIn) * u; col.forEach((o, k) => B.push({x: cx1, y: P.y - (k + 1) * u, s: u, col: o.col, b: o.b, g: o.g}));
+      // ---- squash (contact, held 60 ms → springs back with overshoot) + sway (follow-through)
+      let sy = 1, ang = 0;
+      if(S.sq){ const e = T - S.sq.t; sy = e < 0.06 ? 1 - S.sq.s : 1 - S.sq.s * Math.exp(-(e - 0.06) / 0.07) * Math.cos((e - 0.06) * Math.PI * 2 / 0.2); }
+      if(S.sway){ const e = T - S.sway.t, A = 0.045 * cl(S.n / 8, 0.35, 1); ang = A * Math.exp(-e / 0.16) * Math.sin(e * Math.PI * 2 / 0.3) * S.dir; }
+      const morphP = S.morphT != null ? cl((T - S.morphT) / 0.26, 0, 1) : 0, piv = x0 + u / 2;
+      g.save(); g.translate(piv, P.y); g.rotate(ang); g.scale(1 + (1 - sy) * 0.6, sy); g.translate(-piv, -P.y);
+      const bCount = B.filter(o => o.b).length, tens = S.n > 10 ? Math.floor(S.n / 10) * 10 : 0;
+      B.forEach((o, i) => {
+        const w = morphP * (B.length + 2) - i, changed = morphP > 0 && w > 0, pop = changed && w < 1 ? 1 + 0.12 * Math.sin(w * Math.PI) : 1;   // ✨ the new colour runs up
+        const c = changed ? (i < tens ? col10 : colNew) : o.col, top = !B[i + 1] || Math.abs(B[i + 1].x - o.x) > 2;
+        g.save(); if(pop !== 1){ g.translate(o.x + o.s / 2, o.y + o.s); g.scale(pop, pop); g.translate(-(o.x + o.s / 2), -(o.y + o.s)); }
+        NumberSkins.block(g, o.x, o.y, o.s, c, mat, t, i, {noTop: !top});
+        const st = stepOf(S, i, o.b, bCount);
+        if(S.lit && st <= S.lit && morphP < 1){ g.globalAlpha = st === S.lit ? 0.45 : 0.2; g.fillStyle = '#FFFFFF'; g.fillRect(o.x + o.s * 0.08, o.y + o.s * 0.08, o.s * 0.84, o.s * 0.84); g.globalAlpha = 1; }
+        g.restore();
+      });
+      // faces: b's face on b's own top block · the last number's face on its top block — at the morph they become ONE face
+      const bTop = B.filter(o => o.b).slice(-1)[0], aTop = B.filter(o => !o.b && o.g != null).slice(-1)[0], allIn = landed.length === S.lands.length;
+      if(morphP < 0.5){ if(bTop) NumberSkins.face(g, bTop.x + bTop.s / 2, bTop.y + bTop.s / 2, bTop.s, S.bN, skin, S.lit ? 'happy' : 'wow', t);
+        if(aTop && allIn) NumberSkins.face(g, aTop.x + aTop.s / 2, aTop.y + aTop.s / 2, aTop.s, S.G[aTop.g].aN, skin, S.lit ? 'happy' : 'wow', t); }
+      g.restore();
+      // 🔢 count chips BESIDE the tower (never on a face): the fresh one big + gold, the earlier ones small
+      if(S.lit && morphP < 1){ g.save(); g.globalAlpha = 1 - morphP;
+        B.forEach((o, i) => { const st = stepOf(S, i, o.b, bCount), num = chipOf(S, i, o.b, bCount); if(st > S.lit || !num) return;
+          const fresh = st === S.lit, popK = fresh ? 1 + 0.35 * Math.max(0, 1 - (T - S.litT) / 0.12) : 1;
+          const right = B.every(q => q.x <= o.x + 1), cx = right ? o.x + o.s + u * 0.42 : o.x - u * 0.42, cy = o.y + o.s / 2;
+          const fs = Math.max(9, u * (fresh ? 0.6 : 0.42) * popK), txt = String(num); g.font = '800 ' + Math.round(fs) + 'px Fredoka, sans-serif'; const tw = Math.max(fs * 1.15, g.measureText(txt).width + fs * 0.55);
+          g.fillStyle = fresh ? '#FFE14D' : 'rgba(20,14,40,0.78)'; g.beginPath(); g.roundRect(cx - tw / 2, cy - fs * 0.62, tw, fs * 1.24, fs * 0.5); g.fill();
+          if(fresh){ g.lineWidth = 2; g.strokeStyle = '#8A5A00'; g.stroke(); }
+          g.fillStyle = fresh ? '#1A1230' : '#FFFFFF'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, cx, cy + fs * 0.05); });
+        g.restore(); }
+      // ---- the jumping numbers: standing (crouch / pop in) or in the air as ONE character; higher blocks trail a little and land later
+      const colsBefore = gi => { let rods = S.bR, c = S.bO; for(let k = 0; k < gi; k++){ const ga = S.G[k]; rods += ga.aR; c += ga.aO; while(c >= 10 && S.n > 10){ c -= 10; rods++; } } return {rods, c}; };
+      S.G.forEach((ga, gi) => {
+        if(ga.lands.every(L => T >= L.C)) return;
+        const before = colsBefore(gi), rodsG = before.rods + ga.aR, topNow = P.y - (before.c + ga.aO) * u;
+        if(!ga.from) ga.from = {x: x0 + onesX(before.rods) * u, floor: Math.max(topY(x0, x0 + u * 2) + ga.aO * u + u * 0.4, P.y - before.c * u - u * 1.7)};   // ✖️ a copy pops in just above the tower
+        if(ga.pop && T < ga.L - 0.2) return;
+        const popK = ga.pop ? cubicOut(cl((T - (ga.L - 0.2)) / 0.18, 0, 1)) : 1;
+        const colA = NumberSkins.colour(skin, colN(ga.aN)), aX0 = ga.from.x, aOX = aX0 + onesX(ga.aR) * u;
+        const crouch = T < ga.L ? cubicOut(cl((T - (ga.L - 0.18)) / 0.16, 0, 1)) : 0, csy = 1 - crouch * 0.12;
+        const first = ga.lands[0], C0 = first.C, fsx = first.rod ? aX0 : aOX, fsy = first.rod ? ga.from.floor - 10 * ROD * u : ga.from.floor - u;
+        const fex = first.rod ? x0 + first.slot * PITCH * u : x0 + onesX(rodsG) * u, fe = first.rod ? P.y - 10 * ROD * u : P.y - (before.c + 1) * u;
+        const d = Math.hypot(fex - fsx, fe - fsy), roof = Math.min(fsy, fe) - (ga.aO - 1) * u - topY(Math.min(fsx, fex), Math.max(fsx, fex) + u * 1.5), H = Math.max(u * 0.35, Math.min(Math.max(u * 1.0, d * 0.3), roof));
+        const ride = (TT, L, ey2) => { const p = cl((TT - ga.L) / (C0 - ga.L), 0, 1), up = L.rod ? 0 : L.src - (first.rod ? 0 : first.src);
+          const bxp = fsx + (fex - fsx) * sineInOut(p), byp = fsy + (fe - fsy) * p - H * 4 * p * (1 - p);
+          const gap = 0.16 * Math.sin(p * Math.PI / 2) * (TT < C0 ? 1 : Math.max(0, 1 - Math.pow((TT - C0) / Math.max(0.01, L.C - C0), 2)));
+          return {p, up, x: bxp + (L.rod ? (L.src - (first.rod ? first.src : 0)) * PITCH * u : 0), y: byp - up * u * (1 + gap) + (ey2 - (fe - up * u)) * (TT < C0 ? p * p : 1)}; };
+        ga.lands.forEach((L, i) => { if(T >= L.C) return;
+          const s = L.rod ? ROD * u : u, sx = L.rod ? aX0 + L.src * PITCH * u : aOX, sy0 = L.rod ? ga.from.floor - 10 * ROD * u * csy : ga.from.floor - (L.src + 1) * u * csy;
+          const nextSlot = ga.click ? ga.click.click + 1 : rodsG;
+          const ex = L.rod ? x0 + L.slot * PITCH * u : x0 + onesX(L.next ? nextSlot : rodsG) * u, ey = L.rod ? P.y - 10 * ROD * u : P.y - (L.k + 1) * u;
+          let x = sx, y = sy0, rot = 0, st = 1;
+          if(T >= ga.L && !L.next){ const r = ride(T, L, ey); x = r.x + (ex - fex) * (T < C0 ? sineInOut(r.p) : 1); y = r.y; S.dir = fex >= fsx ? 1 : -1; st = 1 + 0.08 * Math.sin(r.p * Math.PI); rot = T < C0 ? Math.sin(r.p * Math.PI) * 0.12 * S.dir : 0; }
+          else if(T >= ga.L){ const Ts = ga.L + (C0 - ga.L) * 0.3, r0 = ride(Math.min(T, Ts), L, fe - (L.src - (first.rod ? 0 : first.src)) * u), hx = ex, hy = ey - u * 1.5, C1 = ga.click.C + 0.06;
+            if(T < Ts){ x = r0.x; y = r0.y; rot = Math.sin(r0.p * Math.PI) * 0.12 * S.dir; }
+            else if(T < C1){ const e = sineInOut(cl((T - Ts) / Math.max(0.01, C0 - Ts), 0, 1)); x = r0.x + (hx - r0.x) * e; y = r0.y + (hy - r0.y) * e - u * 0.8 * Math.sin(e * Math.PI) + (e >= 1 ? Math.sin(T * 9 + L.src) * u * 0.04 : 0); rot = 0.1 * Math.sin(e * Math.PI) * S.dir; }
+            else { const p = cl((T - C1) / Math.max(0.01, L.C - C1), 0, 1); x = hx; y = hy + (ey - hy) * p * p; st = 1 + 0.06 * Math.sin(p * Math.PI); } }
+          g.save(); const bx = x + s / 2, by = y + s, k2 = popK; g.translate(bx, by); g.rotate(rot); g.scale(k2 / Math.sqrt(st), k2 * st); g.translate(-bx, -by);
+          if(L.rod) for(let k = 0; k < 10; k++) NumberSkins.block(g, x, y + (9 - k) * s, s, col10, mat, t, k, {noTop: k < 9});
+          else { NumberSkins.block(g, x, y, s, colA, mat, t, i, {noTop: L.src < ga.aO - 1 && T < ga.L}); if(L.src === ga.aO - 1) NumberSkins.face(g, x + s / 2, y + s / 2, s, ga.aN, skin, 'wow', t); }
+          g.restore(); });
+      });
+      // ---- small dust at the first contact (🎬 Motion.fx 'puff', beside the seam — never on a face)
+      if(S.puff){ if(!S.puff.E) S.puff.E = [-1, 1].map(d => Motion.fx('puff', {x: cx1 + u / 2 + d * u * 0.78, y: P.y - S.puff.k * u, k: u / 40, r: 8, t0: S.puff.t})); S.puff.E.forEach(E => Motion.drawFx(g, E, T)); }
+      // ---- 🔟 ten click: a gold frame snaps round the new rod + a glint on top + a small "10!"
+      if(S.click && T - S.click.t < 0.4){ const e = (T - S.click.t) / 0.4, rx = x0 + S.click.slot * PITCH * u, ry = P.y - 10 * ROD * u;
+        g.save(); g.globalAlpha = 1 - e; g.strokeStyle = '#FFF2A0'; g.lineWidth = Math.max(2, u * 0.1); g.beginPath(); g.roundRect(rx - 4 - e * 6, ry - 4 - e * 6, ROD * u + 8 + e * 12, 10 * ROD * u + 8 + e * 6, u * 0.2); g.stroke(); g.restore();
+        if(!S.calm){ if(!S.glint || S.glint.t0 !== S.click.t){ S.glint = Motion.fx('glint', {x: rx + ROD * u / 2, y: ry - u * 0.3, k: u / 34, r: 15, t0: S.click.t}); S.glint.t0 = S.click.t; } Motion.drawFx(g, S.glint, T); }
+        if(T - S.click.t < 0.32){ g.save(); g.globalAlpha = 1 - (T - S.click.t) / 0.32; g.font = '800 ' + Math.round(Math.max(12, u * 0.55)) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,0.6)'; const ty = Math.max(topY(rx - u, rx + u * 2) + 6, ry - u * 0.9 - (T - S.click.t) * u * 2); g.strokeText('10!', rx + ROD * u / 2, ty); g.fillStyle = '#FFE14D'; g.fillText('10!', rx + ROD * u / 2, ty); g.restore(); } }
+      // the name badge under the tower: b's number until the morph, then the new one
+      if(S.jId == null){ const txt = String(S.morphT != null ? S.n : S.bN), fs = Math.max(11, u * 0.62), w0 = NumberSkins.measure(S.morphT != null ? S.n : S.bN, u).w;
+        g.save(); g.font = '800 ' + Math.round(fs) + 'px Fredoka, sans-serif'; const tw = g.measureText(txt).width + fs * 0.7, bx = x0 + w0 / 2 - tw / 2, by = P.y + u * 0.12;
+        g.fillStyle = 'rgba(20,14,40,0.82)'; g.beginPath(); g.roundRect(bx, by, tw, fs * 1.15, fs * 0.4); g.fill(); g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, x0 + w0 / 2, by + fs * 0.6); g.restore(); }
+    },
+    // 🏗️ Wobble + 🔟 Tens: the light landing beat (fall with gravity → contact squash + clack → small overshoot → the count chip pops) — then `after`
+    drop(o){ if(!G) return; const D = {t: 0, real: 0, fall: FX ? 0.28 : 0.16, after: o.after, kind: o.kind}; G.dropA = D; if(!SPEED){ G.dropA = null; o.after && o.after(); } },
+    dropTick(dt){ const D = G && G.dropA; if(!D) return; const t0 = D.t; D.real += dt; D.t += dt;
+      if(t0 < D.fall && D.t >= D.fall){ tone(330, 0.06, 'triangle', 0.22); tone(140, 0.045, 'square', 0.05); }
+      if(D.t >= D.fall + 0.42){ const a = D.after; G.dropA = null; if(G.roundT0) G.roundT0 += D.real * 1000; a && a(); } },
+    // dy = how far the new piece still is above its spot (px, give the fall height) · sy = the squash of the pile · chip = 0…1 pop of the count tag
+    dropState(Hpx){ const D = G && G.dropA; if(!D) return {dy: 0, sy: 1, chip: 0, on: false}; const p = cl(D.t / D.fall, 0, 1), e = D.t - D.fall;
+      return {on: true, dy: Hpx * (1 - p * p), sy: e < 0 ? 1 : e < 0.06 ? 0.93 : 1 - 0.07 * Math.exp(-(e - 0.06) / 0.07) * Math.cos((e - 0.06) * Math.PI * 2 / 0.2), chip: e < 0.1 ? 0 : cl((e - 0.1) / 0.12, 0, 1), landed: e >= 0}; }
+  };
+  return API;
+})();
+/* 🧊 STACK END */
+function doSnap(aId, bId, from){   // 🧊 gs-anim: jump → land one by one → sway → COUNT → morph, then the 🎯 check
+  if(GSStack.busy()) return; const it = G.M.item, a = it.stacks.find(s => s.id === aId), b = it.stacks.find(s => s.id === bId); if(!a || !b) return;
+  const Pa = G.pos[aId] || {}; from = from || {x: Pa.x != null ? Pa.x : W / 2, floor: Pa.y != null ? Pa.y : H * 0.8};
   snapshot(); const an = a.n, bn = b.n, r = GS.cSnap(G.M, aId, bId); if(!r){ G.hist.pop(); return; }
-  SND.snap(r.n); floatText(bn + ' + ' + an + ' = ' + r.n, bId, '#FFE14D'); const P = G.pos[bId] || (G.pos[bId] = {}); P.liftK = an; P.liftU = Math.min(6, an * 0.9 + 1.5); P.whole = false; P.pop = 1; helperGo(bId, an); G.sel = 0; afterMove(r);
+  const keep = {done: it.done, ok: it.ok, hit: it.hit}; it.done = false; G.sel = 0;
+  GSStack.start({aN: an, bN: bn, bId, from, u: G.cl ? G.cl.u : 30, sum: bn + ' + ' + an + ' = ' + r.n, after(){ Object.assign(it, keep); afterMove(r); }});
+  renderBar();
 }
 function doSplit(k){
+  if(GSStack.busy()){ GSStack.skip(); return; }   // 🧊 gs-anim
   const s = selStack(); if(!s) return; k = k || G.splitK; const n0 = s.n; snapshot(); const r = GS.cSplit(G.M, s.id, k); if(!r){ G.hist.pop(); UISound.play('error'); return; }
   SND.split(); floatText(n0 + ' − ' + k + ' = ' + r.n, s.id, '#9FE8FF'); const P0 = G.pos[s.id] || {}; G.pos[r.newId] = {x: P0.x, liftU: Math.min(10, r.n + 0.5), whole: true, pop: 0.6}; P0.pop = 0.5; helperGo(r.newId, k); G.sel = 0; afterMove(r);
 }
-function doCopy(m){ const s = selStack(); if(!s) return; const n0 = s.n; snapshot(); const r = GS.cCopy(G.M, s.id, m); if(!r){ G.hist.pop(); UISound.play('error'); UI.toast('Too big to copy'); return; } SND.copy(); floatText(n0 + ' × ' + m + ' = ' + r.n, s.id, '#FFD08A'); burst(s.id, m); const P = G.pos[s.id] || (G.pos[s.id] = {}); P.liftK = Math.min(10, r.n) - Math.min(10, n0); P.liftU = 4; P.pop = 1; helperGo(s.id, n0); G.sel = 0; afterMove(r); }
-function doShare(m){ const s = selStack(); if(!s) return; const n0 = s.n; snapshot(); const r = GS.cShare(G.M, s.id, m); if(!r){ G.hist.pop(); UISound.play('error'); UI.toast(n0 + ' can\'t be shared fairly into ' + m); return; } SND.share(); floatText(n0 + ' ÷ ' + m + ' = ' + r.n, s.id, '#D8C2FF'); r.newIds.forEach((id, i) => G.pos[id] = {x: (G.pos[s.id] || {}).x, liftU: 1.5 + i * 0.6, whole: true, pop: 0.8}); (G.pos[s.id] || {}).pop = 0.8; helperGo(s.id, 0); G.sel = 0; afterMove(r); }
+function doCopy(m){ if(GSStack.busy()){ GSStack.skip(); return; } const s = selStack(); if(!s) return; const n0 = s.n; snapshot(); const r = GS.cCopy(G.M, s.id, m); if(!r){ G.hist.pop(); UISound.play('error'); UI.toast('Too big to copy'); return; } SND.copy();   // 🧊 gs-anim
+  const it = G.M.item, keep = {done: it.done, ok: it.ok, hit: it.hit}; it.done = false; G.sel = 0;
+  GSStack.start({aN: n0, bN: n0, bId: s.id, groups: Array(m - 1).fill(n0), by: n0, u: G.cl ? G.cl.u : 30, sum: n0 + ' × ' + m + ' = ' + r.n, after(){ Object.assign(it, keep); burst(s.id, m); afterMove(r); }}); renderBar(); }
+function doShare(m){ if(GSStack.busy()){ GSStack.skip(); return; } const s = selStack(); if(!s) return; const n0 = s.n; snapshot(); const r = GS.cShare(G.M, s.id, m); if(!r){ G.hist.pop(); UISound.play('error'); UI.toast(n0 + ' can\'t be shared fairly into ' + m); return; } SND.share(); floatText(n0 + ' ÷ ' + m + ' = ' + r.n, s.id, '#D8C2FF'); r.newIds.forEach((id, i) => G.pos[id] = {x: (G.pos[s.id] || {}).x, liftU: 1.5 + i * 0.6, whole: true, pop: 0.8}); (G.pos[s.id] || {}).pop = 0.8; helperGo(s.id, 0); G.sel = 0; afterMove(r); }
 function afterMove(r){ renderBar(); if(r.done) roundDone(true); }
 function markAnswers(picked, right){
   document.querySelectorAll('#bar .tb').forEach(b => { b.disabled = true; const k = b.dataset.opt != null ? b.dataset.opt : b.dataset.sym; if(k == null) return;
@@ -1091,11 +1277,15 @@ function drawReveal(g){
 }
 function gridTap(x, y, on){ const r = GS.gridToggle(G.M, x, y, on); if(!r || r.same) return r; SND.split(); if(r.done) roundDone(true); return r; }
 function gridClear(){ const it = G.M.item; if(G.phase !== 'play' || !it.cells.length) return; it.cells = []; it.moves++; }
-function tensBtn(u){ if(!G || G.phase !== 'play') return; const r = GS.tensAdd(G.M, u); if(!r){ UISound.play('error'); return; } SND.snap(Math.abs(u)); if(r.snapped){ G.fx.push({kind: 'txt', text: '10 ones → 1 ten! ✨', x: W / 2, y: H * 0.35, col: '#FFE14D', size: 22, t: 0, life: 1.4}); avatarDo('clap'); } if(r.done) roundDone(true); }
+function tensBtn(u){ dropNow(); if(!G || G.phase !== 'play') return; const v0 = G.M.item.value, r = GS.tensAdd(G.M, u); if(!r){ UISound.play('error'); return; }   // 🧊 gs-anim
+  if(u < 0){ SND.split(); if(r.done) roundDone(true); return; }
+  G.tensFrom = {v0, unit: u, snapped: r.snapped}; GSStack.drop({kind: 'tens', after(){ G.tensFrom = null; SND.snap(Math.abs(u)); if(r.snapped){ G.fx.push({kind: 'txt', text: '10 ones → 1 ten! ✨', x: W / 2, y: H * 0.35, col: '#FFE14D', size: 22, t: 0, life: 1.4}); avatarDo('clap'); } if(r.done) roundDone(true); }}); }
 function colourTap(i){ const r = GS.colourToggle(G.M, i); if(!r) return; SND.drop(); if(r.done) roundDone(true); }
 function colourClear(){ const it = G.M.item; if(G.phase !== 'play' || !it.on.length) return; it.on = []; it.moves++; }
-function wobBtn(z){ if(!G || G.phase !== 'play') return; const r = GS.wobAdd(G.M, z); if(!r) return; G.wobDrop = 1; helperGo(0, z); SND.snap(r.height); if(r.over){ UISound.play('error'); avatarDo('shrug'); } if(r.done) roundDone(true); }
-function wobUndo(){ if(!G || G.phase !== 'play') return; if(GS.wobPop(G.M)) SND.split(); }
+function dropNow(){ const D = G && G.dropA; if(D){ G.dropA = null; D.after && D.after(); } }   // 🧊 a quick next tap finishes the last drop at once
+function wobBtn(z){ dropNow(); if(!G || G.phase !== 'play') return; const r = GS.wobAdd(G.M, z); if(!r) return; SND.drop();   // 🧊 gs-anim: fall → land → height pops → check
+  GSStack.drop({kind: 'wob', after(){ SND.snap(r.height); if(r.over){ UISound.play('error'); avatarDo('shrug'); } else avatarDo('clap'); if(r.done) roundDone(true); }}); }
+function wobUndo(){ dropNow(); if(!G || G.phase !== 'play') return; if(GS.wobPop(G.M)) SND.split(); }
 function putOnPan(id){ if(!G || G.phase !== 'play') return; const r = GS.scalePut(G.M, id); if(!r) return; SND.drop(); if(!r.balanced) SND.tilt(); renderBar(); if(r.balanced) roundDone(true); }
 function takeBack(id){ if(!G || G.phase !== 'play') return; const r = GS.scaleTake(G.M, id); if(!r) return; SND.drop(); renderBar(); }
 function takeAll(){ const it = G.M.item; it.right.filter(x => !x.fixed).map(x => x.id).forEach(takeBack); }
@@ -1259,11 +1449,11 @@ const CV = $('cv'); let CTX = CV.getContext('2d'), W = 0, H = 0, DPR = 1, RAF = 
 function sizeCanvas(){ const r = CV.getBoundingClientRect(); DPR = Math.min(2, window.devicePixelRatio || 1); W = Math.max(1, r.width); H = Math.max(1, r.height); CV.width = Math.round(W * DPR); CV.height = Math.round(H * DPR); CTX.setTransform(DPR, 0, 0, DPR, 0, 0); if(G){ G.avFit = null; if(G.M.item) renderGoal(); } }
 let RO = null; try{ RO = new ResizeObserver(() => { const r = CV.getBoundingClientRect(); if(Math.abs(r.width - W) > 1 || Math.abs(r.height - H) > 1) sizeCanvas(); }); RO.observe(CV); }catch(e){}
 function startLoop(){ stopLoop(); LAST = performance.now(); const step = now => { RAF = requestAnimationFrame(step); const dt = Math.min(0.05, Math.max(0, (now - LAST) / 1000)); LAST = now; tick(dt, now); draw(now / 1000); }; RAF = requestAnimationFrame(step);
-  if(G && G.timeLeft){ stopTimer(); TIMER = setInterval(() => { if(!G || G.phase === 'over') return; G.timeLeft -= 1; const el = $('h-time'); el.textContent = '⏱️ ' + fmtS(G.timeLeft); el.classList.toggle('low', G.timeLeft <= 30); if(G.timeLeft <= 0){ stopTimer(); endGame(true); } }, 1000); } }
+  if(G && G.timeLeft){ stopTimer(); TIMER = setInterval(() => { if(!G || G.phase === 'over' || G.st || G.dropA) return; G.timeLeft -= 1; const el = $('h-time'); el.textContent = '⏱️ ' + fmtS(G.timeLeft); el.classList.toggle('low', G.timeLeft <= 30); if(G.timeLeft <= 0){ stopTimer(); endGame(true); } }, 1000); } }
 function stopLoop(){ if(RAF) cancelAnimationFrame(RAF); RAF = 0; }
 function stopTimer(){ if(TIMER) clearInterval(TIMER); TIMER = 0; }
 function tick(dt){
-  if(!G) return; helperTick(dt); revealTick(dt); if(G.throwT != null) G.throwT += dt; try{ guideTick(); }catch(e){} const A = G.A;
+  if(!G) return; helperTick(dt); revealTick(dt); GSStack.tick(dt); GSStack.dropTick(dt);   /* 🧊 gs-anim */ if(G.throwT != null) G.throwT += dt; try{ guideTick(); }catch(e){} const A = G.A;
   const it0 = G.M && G.M.item; if(FX && it0 && G.phase === 'play' && (it0.kind === 'choice' || it0.kind === 'compare') && !A.gest){ G.idleT = (G.idleT || 0) + dt; if(G.idleT > 4.5){ G.idleT = 0; avatarDo('think'); } } if(A.gest){ A.gest.t += dt; if(A.gest.t > A.gest.g.d) A.gest = null; }
   G.fx = G.fx.filter(f => (f.t += dt) < f.life);
   if(G.B2 && G.B2.gest){ G.B2.gest.t += dt; if(G.B2.gest.t > G.B2.gest.g.d) G.B2.gest = null; }
@@ -1405,18 +1595,22 @@ function drawCount(g, t, gy){
   G.goalBox = {x: CL.goalX, y: gy - gm.h - u * 1.5, w: CL.goalW, h: gm.h + u * 1.5};
   // stacks in a row
   const widths = it.stacks.map(s => NumberSkins.measure(s.n, u).w), gap = u * 1.0, tot = widths.reduce((a, b) => a + b, 0) + gap * Math.max(0, widths.length - 1);
-  const x0 = CL.aw + Math.max(8, (CL.goalX - CL.aw - 16 - tot) / 2); let x = x0;
+  const x0 = CL.aw + Math.max(8, (CL.goalX - CL.aw - 16 - tot) / 2); let x = x0, later = null;
   it.stacks.forEach((s, i) => {
     const w = widths[i], m = NumberSkins.measure(s.n, u); let P = G.pos[s.id]; if(!P || P.x == null) P = G.pos[s.id] = {x, y: gy - 4};
-    const hitDone = it.done && it.hit === s.id, tx = hitDone ? gx : x; P.x += (tx - P.x) * Math.min(1, 0.22); P.y = gy - 4;
+    const hitDone = it.done && it.hit === s.id, tx = hitDone ? gx : x; if(hitDone && P.hop0 == null) P.hop0 = P.x; P.x += (tx - P.x) * Math.min(1, 0.22);
+    const hopP = hitDone && P.hop0 != null && Math.abs(tx - P.hop0) > 2 ? Math.max(0, Math.min(1, 1 - Math.abs(tx - P.x) / Math.abs(tx - P.hop0))) : 1; P.y = gy - 4 - (FX ? Math.sin(hopP * Math.PI) * Math.min(u * 2.2, (gy - CL.top) * 0.25) : 0);   // 🧊 hop onto the 🎯 pad
     const liftPx = (P.liftU || 0) * u; if(P.liftU){ P.liftU *= 0.84; if(P.liftU < 0.03) P.liftU = 0; } const pop = P.pop || 0; if(pop){ P.pop *= 0.9; if(P.pop < 0.02) P.pop = 0; }
     const dragging = G.drag && G.drag.id === s.id && G.drag.on, sel = G.sel === s.id || (G.kbd && G.kbdIdx === i);
+    const paint = () => { if(!dragging && G.st && G.st.bId === s.id && G.st.jId == null && !GSStack.morphDone()){ GSStack.draw(g, t, P, u, G.skin, THEMES[G.theme].mat); return; }   // 🧊 gs-anim
     if(!dragging){ g.save(); if(pop){ const sy = 1 + Math.sin(pop * Math.PI * 3) * 0.16 * pop, cx = P.x + w / 2; g.translate(cx, P.y); g.scale(1 / Math.sqrt(sy), sy); g.translate(-cx, -P.y); }
-      NumberSkins.draw(g, s.n, P.x, P.y, u, {skin: G.skin, mat: THEMES[G.theme].mat, t, label: true, sel, mood: hitDone || pop > 0.3 ? 'wow' : 'happy', lift: P.liftK && liftPx > 0.5 ? {k: Math.min(P.liftK, s.n), dy: liftPx} : (P.whole && liftPx > 0.5 ? {k: s.n, dy: liftPx / 1.4} : null)}); g.restore(); }
+      NumberSkins.draw(g, s.n, P.x, P.y, u, {skin: G.skin, mat: THEMES[G.theme].mat, t, label: true, sel, mood: hitDone || pop > 0.3 ? 'wow' : 'happy', lift: P.liftK && liftPx > 0.5 ? {k: Math.min(P.liftK, s.n), dy: liftPx} : (P.whole && liftPx > 0.5 ? {k: s.n, dy: liftPx / 1.4} : null)}); g.restore(); } };
+    if(hitDone) later = paint; else paint();   // 🧊 the finished tower is painted last (in front of the others)
     G.stackX[s.id] = P.x + w / 2;
     G.hits.push({kind: 'stack', id: s.id, x: P.x, y: P.y - m.h, w: m.w, h: m.h + u * 0.9, u, n: s.n, floor: P.y});
     x += w + gap;
   });
+  later && later();
 }
 function drawAvatarCorner(g, t, gy){
   const it = G.M.item; if(it.kind === 'avatar' && !it.done) return;   // on the pan
@@ -1427,7 +1621,8 @@ function drawAvatarCorner(g, t, gy){
   const key = aw + 'x' + ah; if(!G.avFit || G.avFit.key !== key){ const F = avatarFit(myAvatar(S.player), S.player, aw, ah, {gests: IDLE, pad: 2}); G.avFit = {key, k: F.k, cx: F.cx}; }
   const Hh = G.helper; if(Hh){ Hh.home = ax + G.avFit.cx; if(Hh.id && G.stackX && G.stackX[Hh.id] != null) Hh.tx = G.stackX[Hh.id] - (G.stackX[Hh.id] > W * 0.6 ? 34 : -34); else if(it.kind === 'wobble') Hh.tx = W / 2 - 80; }
   const moving = Hh && Hh.state && Hh.x != null, carrying = moving && Hh.carry && Hh.state !== 'back';
-  const throwing = G.throwT != null && G.throwT < 0.45, pose = throwing ? {armL: 0.5, armR: 2.9 - G.throwT * 3, mouth: 'open'} : (G.drag && G.drag.on) || carrying || (Hh && Hh.state === 'lift') ? {armL: 2.6, armR: 2.6, mouth: 'open'} : null, hx = moving ? Hh.x : ax + G.avFit.cx;
+  const cntBeat = GSStack.pointing() ? Math.max(0, 1 - (G.st.t - G.st.litT) / 0.12) : 0;   // 🧊 gs-anim: points at the tower, bobs on each count
+  const throwing = G.throwT != null && G.throwT < 0.45, pose = GSStack.pointing() ? {armL: 0.35, armR: 2.2 + cntBeat * 0.35, mouth: cntBeat > 0.3 ? 'open' : 'smile'} : throwing ? {armL: 0.5, armR: 2.9 - G.throwT * 3, mouth: 'open'} : (G.drag && G.drag.on) || carrying || (Hh && Hh.state === 'lift') ? {armL: 2.6, armR: 2.6, mouth: 'open'} : null, hx = moving ? Hh.x : ax + G.avFit.cx;
   G.avHand = {x: hx + G.avFit.k * 30, y: gy - 2 - G.avFit.k * 118}; G.avHead = {x: hx, y: gy - 2 - G.avFit.k * 150};
   try{ drawAvatar(g, {name: S.player, av: myAvatar(S.player), dir: moving && Hh.state !== 'lift' ? Hh.dir || 1 : 1, walkT: moving && Hh.state !== 'lift' ? Hh.walkT : 0, gest: pose ? null : G.A.gest}, hx, gy - 2, G.avFit.k, {t, pose}); }catch(e){}
   const waiting = G.phase === 'play' && (it.kind === 'choice' || it.kind === 'compare') && !it.done && !moving;
@@ -1482,7 +1677,14 @@ function drawTens(g, t, gy){
   const it = G.M.item, v = it.value, top = boardTop(), left = sideRoom(), maxH = gy - top - 40, maxW = W - left - 30;
   const u = Math.max(6, Math.min(56, maxH / 10.5, maxW / Math.max(2, NumberSkins.measure(Math.max(v, 1), 1).w + 1)));
   const m = NumberSkins.measure(Math.max(v, 1), u), x = left + (W - left - m.w) / 2;
-  if(v > 0) NumberSkins.draw(g, v, x, gy - 26, u, {skin: G.skin, mat: THEMES[G.theme].mat, t, mood: it.done ? 'wow' : 'happy'});
+  const TF = G.tensFrom, DS = GSStack.dropState(Math.min(u * 6, gy - 26 - top)), mat = THEMES[G.theme].mat;   // 🧊 gs-anim: the new piece falls into its place, lands, then the number changes
+  if(TF && DS.on && !DS.landed){ const m0 = NumberSkins.measure(Math.max(TF.v0, 1), u); if(TF.v0 > 0) NumberSkins.draw(g, TF.v0, left + (W - left - m0.w) / 2, gy - 26, u, {skin: G.skin, mat, t, mood: 'wow'});
+    const L = NumberSkins.layout(v, u), cols = L.cols, fl = gy - 26, kind = TF.unit === 100 ? 'slab' : TF.unit === 10 || TF.snapped ? 'rod' : 'one', c = cols.filter(q => q.kind === kind).slice(-1)[0] || cols[cols.length - 1], cx = x + c.x;
+    if(kind === 'slab'){ const col = NumberSkins.colour(G.skin, 10), yy = fl - c.k * c.sh - DS.dy; g.fillStyle = col; roundRect(g, cx, yy + 1, c.w, c.sh - 2, c.sh * 0.3); g.fill(); g.strokeStyle = NumberSkins.shade(col, -0.4); g.lineWidth = 2; g.stroke(); }
+    else if(kind === 'rod' && !TF.snapped){ const s2 = c.w; for(let k = 0; k < 10; k++) NumberSkins.block(g, cx, fl - (k + 1) * s2 - DS.dy, s2, NumberSkins.colour(G.skin, 10), mat, t, k, {noTop: k < 9}); }
+    else { const s2 = kind === 'rod' ? c.w : u, k = kind === 'rod' ? 9 : c.k - 1; NumberSkins.block(g, cx, fl - (k + 1) * s2 - DS.dy, s2, NumberSkins.colour(G.skin, v <= 10 ? v : v % 10 || 10), mat, t, k, {}); } }
+  else if(v > 0){ g.save(); if(DS.on && DS.sy !== 1){ g.translate(W / 2, gy - 26); g.scale(1 + (1 - DS.sy) * 0.6, DS.sy); g.translate(-W / 2, -(gy - 26)); } NumberSkins.draw(g, v, x, gy - 26, u, {skin: G.skin, mat, t, mood: it.done || DS.on ? 'wow' : 'happy'}); g.restore();
+    if(TF && TF.snapped && DS.on && DS.chip < 1){ const c = NumberSkins.layout(v, u).cols.filter(q => q.kind === 'rod').slice(-1)[0]; if(c){ g.save(); g.globalAlpha = 1 - DS.chip; g.strokeStyle = '#FFF2A0'; g.lineWidth = Math.max(2, u * 0.1); g.beginPath(); g.roundRect(x + c.x - 4, gy - 26 - c.h - 4, c.w + 8, c.h + 8, u * 0.2); g.stroke(); g.restore(); } } }
   else textTag(g, 'Tap +1 to add a block', W / 2, gy - 60, 15);
   const H_ = Math.floor(v / 100), T_ = Math.floor(v % 100 / 10), O_ = v % 10;
   textTag(g, (H_ ? H_ + ' hundred' + (H_ > 1 ? 's' : '') + ' + ' : '') + (T_ || H_ ? T_ + ' ten' + (T_ !== 1 ? 's' : '') + ' + ' : '') + O_ + ' one' + (O_ !== 1 ? 's' : '') + ' = ' + v, W / 2 + left / 2, gy - 10, 15);
@@ -1536,11 +1738,13 @@ function drawWobble(g, t, gy){
   const ty = fl - it.target * u; g.save(); g.setLineDash([8, 6]); g.strokeStyle = '#FFE14D'; g.lineWidth = 3; g.beginPath(); g.moveTo(x - 60, ty); g.lineTo(x + tw + 60, ty); g.stroke(); g.restore();
   textTag(g, '🎯 ' + it.target, x + tw + 70, ty, 15);
   g.save(); if(over){ g.translate(x + tw / 2, fl); g.rotate(Math.sin(t * 9) * 0.05); g.translate(-(x + tw / 2), -fl); }
-  const dropPx = (G.wobDrop || 0) * Math.min(90, (gy - top) * 0.3); if(G.wobDrop){ G.wobDrop *= 0.82; if(G.wobDrop < 0.02) G.wobDrop = 0; }
+  const DS = GSStack.dropState(Math.min(Math.max(90, u * 6), (fl - h * u) - top)), dropPx = DS.on ? DS.dy : 0;   // 🧊 gs-anim: gravity fall + landing squash
+  if(DS.on && DS.sy !== 1){ g.translate(x + tw / 2, fl); g.scale(1 + (1 - DS.sy) * 0.6, DS.sy); g.translate(-(x + tw / 2), -fl); }
   let y = fl; it.tower.forEach((s, i) => { const hh = s * u; if(i === it.tower.length - 1) y -= dropPx; const ci = it.sizes.indexOf(s), col = WOB_COLS[ci] || '#FF8A3D'; g.fillStyle = col; roundRect(g, x, y - hh + 1, tw, hh - 2, Math.min(8, hh / 3)); g.fill(); g.strokeStyle = NumberSkins.shade(col, -0.4); g.lineWidth = 2; g.stroke();
     if(hh > 12){ g.fillStyle = '#fff'; g.font = '800 ' + Math.round(Math.min(18, hh * 0.6)) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(s), x + tw / 2, y - hh / 2); } y -= hh; });
   g.restore();
-  textTag(g, 'height ' + h + (over ? ' — too tall! 😬' : h === it.target ? ' ✅' : ''), x + tw / 2, fl - h * u - 18, 15);
+  const lastZ = it.tower.length ? it.tower[it.tower.length - 1] : 0, hShow = DS.on && !DS.landed ? h - lastZ : h, tagK = DS.on && DS.chip > 0 && DS.chip < 1 ? 1 + 0.3 * Math.sin(DS.chip * Math.PI) : 1;   // 🧊 the height counts up only when it lands
+  textTag(g, 'height ' + hShow + (DS.on && !DS.landed ? '' : over ? ' — too tall! 😬' : h === it.target ? ' ✅' : ''), x + tw / 2, fl - h * u - 18, Math.round(15 * tagK));
 }
 
 /* ================= ⚔️ TOWER BATTLE ================= */
@@ -1633,7 +1837,9 @@ async function jRun(){
     GS.castStep(J.counts || (J.counts = {}), st);
     if(st.t === 'enter'){ J.cast[st.id] = {n: st.n, xf: st.x > 0.5 ? 1.15 : -0.15, tx: st.x}; if(st.id !== 'a') J.cast[st.id].xf = 1.15; SND.drop(); await wait(650); }
     else if(st.t === 'exit'){ const c = J.cast[st.id]; if(c) c.tx = 1.25; await wait(600); delete J.cast[st.id]; }
-    else if(st.t === 'join'){ const a = J.cast[st.a], b = J.cast[st.b]; a.tx = b.tx; G.helper && (G.helper.state = ''); await wait(650); b.n += a.n; b.liftK = Math.min(10, a.n); b.liftU = 3; b.pop = 1; delete J.cast[st.a]; SND.snap(b.n); jFloat(b, '+'); avatarDo('clap'); await wait(700); }
+    else if(st.t === 'join'){ const a = J.cast[st.a], b = J.cast[st.b]; G.helper && (G.helper.state = '');   // 🧊 gs-anim: a jumps onto b, lands block by block, they count, then become one
+      const u = J.u || 20, ma = NumberSkins.measure(a.n, u, true), from = {x: a.xf * W - ma.w / 2, floor: (J.gy || H * 0.8) - 6}, an = a.n, bn = b.n; b.n += a.n; delete J.cast[st.a];
+      await new Promise(res => GSStack.start({aN: an, bN: bn, bId: 'j:' + st.b, jId: st.b, from, u, after: res})); if(!G || G.id !== id) return; b.pop = 1; jFloat(b, '+'); avatarDo('clap'); await wait(500); }
     else if(st.t === 'split'){ const a = J.cast[st.id]; a.n -= st.k; J.cast[st.out] = {n: st.k, xf: a.tx, tx: Math.min(0.9, a.tx + 0.22), liftU: Math.min(10, a.n + 0.5), whole: true}; a.pop = 0.6; SND.split(); jFloat(a, '−'); await wait(800); }
     else if(st.t === 'copy'){ const a = J.cast[st.id], n0 = a.n; a.n *= st.m; a.pop = 1; a.liftK = Math.min(10, a.n) - Math.min(10, n0); a.liftU = 4; SND.copy(); jFloat(a, '×'); await wait(800); }
     else if(st.t === 'share'){ const a = J.cast[st.id]; a.n /= st.m; (st.out || []).forEach((o, k) => J.cast[o] = {n: a.n, xf: a.tx, tx: Math.min(0.9, a.tx + 0.24 * (k + 1)), liftU: 2, whole: true, pop: 0.8}); a.pop = 0.8; SND.share(); jFloat(a, '÷'); await wait(800); }
@@ -1664,7 +1870,7 @@ function jEnd(){
     .withFailureHandler(() => putNote('⚠️ Could not save yet — play the chapter again later to collect the miles.')).geoJourneyDone(name, ch.id);
 }
 function drawJourney(g, t, gy){
-  const J = G.J, top = boardTop() + 10, u = Math.max(8, Math.min(34, (gy - top - 60) / 11)); G.hits = [];
+  const J = G.J, top = boardTop() + 10, u = Math.max(8, Math.min(34, (gy - top - 60) / 11)); G.hits = []; J.u = u; J.gy = gy;   // 🧊 gs-anim reads these
   if(J.line){ const x0 = W * 0.08, x1 = W * 0.92, y = gy + 12; g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = 3; g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke();
     for(let k = 0; k <= 10; k++){ const x = x0 + (x1 - x0) * k / 10; g.beginPath(); g.moveTo(x, y - 6); g.lineTo(x, y + 6); g.stroke(); g.fillStyle = '#fff'; g.font = '800 12px Nunito, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'top'; g.fillText(String(k), x, y + 8); } }
   let moving = false;
@@ -1672,8 +1878,10 @@ function drawJourney(g, t, gy){
     if(c.liftU){ c.liftU *= 0.84; if(c.liftU < 0.03) c.liftU = 0; } if(c.pop){ c.pop *= 0.9; if(c.pop < 0.02) c.pop = 0; }
     const m = NumberSkins.measure(c.n, u, true), speaking = J.say && J.say.id === id, x = c.xf * W - m.w / 2, bob = speaking ? Math.abs(Math.sin(t * 5)) * 6 : 0, fl = gy - 6 - bob;
     g.save(); if(c.pop){ const sy = 1 + Math.sin(c.pop * Math.PI * 3) * 0.16 * c.pop; g.translate(x + m.w / 2, fl); g.scale(1 / Math.sqrt(sy), sy); g.translate(-(x + m.w / 2), -fl); }
+    const jS = G.st && G.st.jId === id && !GSStack.morphDone() ? G.st : null;   // 🧊 gs-anim: this friend is mid-join
+    if(jS) GSStack.draw(g, t, {x: c.xf * W - NumberSkins.measure(jS.bN, u, true).w / 2, y: fl}, u, G.skin, THEMES[G.theme].mat); else
     NumberSkins.draw(g, c.n, x, fl, u, {tens: true, skin: G.skin, mat: THEMES[G.theme].mat, t, sel: speaking, mood: speaking ? 'happy' : c.pop > 0.3 ? 'wow' : 'happy', lift: c.liftU > 0.05 ? (c.whole ? {k: Math.min(10, c.n), dy: c.liftU * u / 1.4} : {k: c.liftK || 1, dy: c.liftU * u}) : null}); g.restore();
-    textTag(g, GS.charName(c.n) + ' · ' + c.n, c.xf * W, gy + (J.line ? -m.h - 28 : 14) + (J.line ? 0 : 0), 13);
+    const shownN = jS && jS.morphT == null ? jS.bN : c.n; textTag(g, GS.charName(shownN) + ' · ' + shownN, c.xf * W, gy + (J.line ? -m.h - 28 : 14) + (J.line ? 0 : 0), 13);
     c.topY = fl - m.h; });
   // 🧑 the avatar walks the road next to the number friends
   const aw = Math.min(90, W * 0.14), ah = Math.min(gy - top - 20, aw * 1.5);
@@ -1688,8 +1896,9 @@ function drawJourney(g, t, gy){
 function ptPos(e){ const r = CV.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top}; }
 function hitAt(x, y){ const list = G.hits || []; for(let i = list.length - 1; i >= 0; i--){ const h = list[i]; if(x >= h.x - 6 && x <= h.x + h.w + 6 && y >= h.y - 6 && y <= h.y + h.h + 6) return h; } return null; }
 CV.addEventListener('pointerdown', e => {
+  if(G && G.st){ GSStack.skip(); e.preventDefault(); return; }   // 🧊 gs-anim: tap = ×4 fast
   if(G && G.battle){ const p = ptPos(e), h = hitAt(p.x, p.y); if(h && h.kind === 'bat') batToggle(h.i); return; }
-  if(G && G.J && !G.M.item){ jNext(); return; }
+  if(G && G.J && !G.M.item){ jNext(); return; }   /* (a tap during a 🧊 join = ×4 fast, above) */
   if(!G || G.phase !== 'play') return; const p = ptPos(e); G.kbd = false; const it0 = G.M.item;
   if(it0.kind === 'grid'){ const c = cellAt(p.x, p.y); if(c){ const has = it0.cells.some(q => q[0] === c[0] && q[1] === c[1]); G.paint = {on: !has}; gridTap(c[0], c[1], !has); try{ CV.setPointerCapture(e.pointerId); }catch(err){} e.preventDefault(); } return; }
   if(it0.kind === 'colour'){ const B = G.barGeo; if(B && p.y >= B.y - 8 && p.y <= B.y + B.c + 8){ const i = Math.floor((p.x - B.x) / B.c); colourTap(i); } return; }
@@ -1706,7 +1915,7 @@ function endDrag(e){
   if(!d.on){ tapOn(d.hit, p); return; }
   if(d.kind === 'stack'){
     const tgt = (G.hits || []).find(h => h.kind === 'stack' && h.id !== d.id && p.x >= h.x - h.u * 0.6 && p.x <= h.x + h.w + h.u * 0.6 && p.y >= h.y - h.u * 1.2 && p.y <= h.floor + h.u * 0.8);
-    if(tgt){ doSnap(d.id, tgt.id); return; }
+    if(tgt){ doSnap(d.id, tgt.id, {x: d.px - d.ox, floor: d.py - d.oy}); return; }   // 🧊 gs-anim: it jumps from where the finger let go
     const gb = G.goalBox; if(gb && p.x >= gb.x && p.x <= gb.x + gb.w && p.y >= gb.y - 20){ const s = it.stacks.find(q => q.id === d.id); if(s && s.n !== it.target){ UISound.play('error'); banner('That\'s <b>' + s.n + '</b> — we need <b>' + it.target + '</b>', 'bad'); setTimeout(hideBanner, 1200 * SPEED + 1); avatarDo('think'); } }
     return;
   }
@@ -1728,6 +1937,7 @@ function tapOn(h, p){
 /* ================= KEYBOARD ================= */
 document.addEventListener('keydown', e => {
   if(!G || $('scr-play').classList.contains('hidden') || !$('sheet').classList.contains('hidden') || !$('result').classList.contains('hidden')) return;
+  if(G.st){ GSStack.skip(); e.preventDefault(); return; }   // 🧊 gs-anim: any key = ×4 fast
   if(G.J && !G.M.item){ if(G.phase === 'story' && (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight')){ e.preventDefault(); jNext(); } return; }
   if(G.battle){ const T = G.battle; if(T.phase === 'build' && /^[1-5]$/.test(e.key)) batToggle(Number(e.key) - 1); else if(e.key === 'Enter'){ e.preventDefault(); if(T.phase === 'build') batLock(); else if(T.phase === 'pass') batReady(); else if(T.phase === 'reveal') batNext(); } return; }
   const it = G.M.item, k = e.key; if(!it) return;
@@ -1834,4 +2044,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (gs-4+p1d+p3a+cs-4b+b3w3+24u-c) END OF GeoScout.html -->
+<!-- (gs-4+p1d+p3a+cs-4b+b3w3+24u-c+gs-anim) END OF GeoScout.html -->

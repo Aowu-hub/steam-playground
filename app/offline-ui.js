@@ -150,8 +150,10 @@
      The offline app now lives at its own address (aowu-hub/steam-app). This card sends every waiting result to the family
      Sheet FIRST — on an iPad / iPhone the new Home Screen icon has its own storage, so a result left here would be lost when
      the old icon is deleted — and only then unlocks "Open the new app". Home page only, never in a game; "Later" = until the
-     app is opened again (the games keep working here, Aowu Q1 ⭐). */
-  var MOVED_TO = "https://aowu-hub.github.io/steam-app/";
+     app is opened again (the games keep working here, Aowu Q1 ⭐).
+     🔁 sw-1a (2026-11-20): DORMANT — steam-playground is the offline app again; the normal build writes MOVED_TO = "" (no
+     card, the 📲 Add-to-home-screen invite is back). Kept only for the bridge test build. */
+  var MOVED_TO = "";
   function movedState() {
     var n = S.pending || 0;
     if (S.mode !== 'family') return { ready: true, cls: 'good', text: '🧪 Guest copy — there is nothing to save here.' };

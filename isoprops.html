@@ -95,6 +95,7 @@
 <script src="inc/MotionTurn.js"></script>
 <script src="inc/MotionWear.js"></script>
 <script src="inc/MotionCarry.js"></script>
+<script src="inc/MotionGround.js"></script>
 <script src="inc/AvatarActs.js"></script>
 <script src="inc/AvatarWeapons.js"></script>
 <script src="inc/IsoKit.js"></script>
@@ -125,6 +126,7 @@
 <script src="inc/IsoLook_toybox.js"></script>
 <script src="inc/IsoLook_dust.js"></script>
 <script src="inc/IsoLook_trail.js"></script>
+<script src="inc/IsoLook_wonder.js"></script>
 </head>
 <body ontouchstart="">
 <button class="top-btn" id="back-btn" data-sound="none">◀ Back</button>
@@ -137,6 +139,7 @@
   <button id="s-var" class="sp-btn sp-secondary sp-sm" data-sound="none"><span class="bi">🎲</span> <span class="bl">Variant</span></button>
   <button id="s-state" class="sp-btn sp-secondary sp-sm hidden" data-sound="none"><span class="bi">🔀</span> <span class="bl">State</span></button>
   <button id="s-touch" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">🔥</span> <span class="bl">Fire</span></button>
+  <button id="s-wonder" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">⏱️</span> <span class="bl">Claim</span></button>
   <button id="s-shrink" class="sp-btn sp-secondary sp-sm hidden" data-sound="none"><span class="bi">◀</span> <span class="bl">Shrink</span></button>
   <button id="s-grow" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">🌱</span> <span class="bl">Grow</span></button>
   <button id="s-grow2" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">🌱</span> <span class="bl">②</span></button>
@@ -170,7 +173,7 @@ const $ = id => document.getElementById(id);
 let LOOK_KEYS = Object.keys(Props.LOOKS), SET_KEYS = Object.keys(Props.SETS);   /* 📦 ip-4a: filled again once every look file is in (keysNow) */
 const inOrder = (keys, first) => first.filter(k => keys.indexOf(k) >= 0).concat(keys.filter(k => first.indexOf(k) < 0));
 function keysNow(){ LOOK_KEYS = inOrder(Object.keys(Props.LOOKS), ['jungle', 'cherry', 'desert', 'snow', 'farm', 'lava', 'coral', 'moon', 'castle', 'raptor', 'bolt']);
-  SET_KEYS = inOrder(Object.keys(Props.SETS), ['jungle', 'village', 'temple', 'bits', 'landmark', 'cherry', 'desert', 'snow', 'farm', 'grow', 'lava', 'coral', 'moon', 'castle', 'realm', 'raptor', 'bolt', 'wild', 'kitchen', 'horde', 'monster', 'myth', 'reef', 'cloud', 'wizard', 'gear', 'detective', 'toybox', 'dust', 'trail']); }
+  SET_KEYS = inOrder(Object.keys(Props.SETS), ['jungle', 'village', 'temple', 'bits', 'landmark', 'cherry', 'desert', 'snow', 'farm', 'grow', 'lava', 'coral', 'moon', 'castle', 'realm', 'raptor', 'bolt', 'wild', 'kitchen', 'horde', 'monster', 'myth', 'reef', 'cloud', 'wizard', 'gear', 'detective', 'toybox', 'dust', 'trail', 'wonder']); }
 const S = {set: 'village', look: 'jungle', cond: null, hold: null, sel: null, props: [], walkers: [], items: [], walk: true, M: null, V: null, ghost: null, drag: null, placed: 0, missed: []};
 const sound = k => { try{ if(window.UI && UI.sound) UI.sound(k); }catch(e){} };
 const shake = el => { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); };
@@ -246,7 +249,7 @@ function select(it){ S.sel = it; showBar(); }
 function showBar(){ const it = S.sel, h = S.hold, bar = $('selbar'); if(!it && !h){ bar.classList.add('hidden'); return; }
   const key = it ? it.prop : h.key, def = Props.DEFS[key]; $('sel-name').textContent = (h ? '✋ ' : '') + def.name + ' · ' + def.foot.join('×');
   const stNow = it ? it.state : h.state != null ? h.state : def.states ? Props.stateOf(key) : null; const plainWall = def.wall && !def.gate, shrine = key === 'realm_shrine' && !!it; $('s-state').classList.toggle('hidden', !(def.states && !plainWall) && !shrine); if(def.states && !plainWall) $('sel-name').textContent += ' · ' + stNow;   /* 🧱 ar-4: a wall's state = its joins (made by the helper) · ⭐ shrine = capture steps */
-  growBar(def, stNow); touchBar(def, it);   /* 🌍 ip-6a */
+  growBar(def, stNow); touchBar(def, it);   /* 🌍 ip-6a */ wonderBar(def, it);   /* 🌌 ip-7a */
   $('s-move').classList.toggle('hidden', !it); $('s-del').classList.toggle('hidden', !it); $('s-var').classList.toggle('hidden', def.variants < 2); bar.classList.remove('hidden'); placeUi(); }
 // re-place a prop with new settings (turn / variant); it stays put when the new shape doesn't fit
 function reshape(it, o){ const keep = {v: it.v, turn: it.turn, state: it.state, text: it.text}; Props.remove(S.M, it); const n = Props.place(S.M, it.prop, it.x, it.y, Object.assign({look: S.look, cond: S.cond}, keep, o));
@@ -287,6 +290,25 @@ $('s-touch').onclick = () => touchNow();
 function touches(g, V, t){ S.props.forEach(it => { if(it.touchT == null) return; if(!Props.touchFx(g, V, it, (t - it.touchT) / (Props.TOUCH_MS / 1000))) it.touchT = null; }); }
 function touchHints(g, V, t){ const el = touchElNow(); if(el) Props.touchHint(g, V, S.sel, el, t); }
 S.touchNow = touchNow; S.touchElNow = touchElNow;
+// 🌌 ip-7a WONDERS: pick a wonder → ONE button plays its next moment: ⏱️ Claim (the capture ring fills in team blue, 2.4 s) → ✨ Burst (the power badge pops out) →
+//   🏚️ Collapse (Props.wonderAct → cond ruined, the fx shakes + slumps it) → 🔮 Reborn (it moves to another free spot: motes fly there, a light column, it rises)
+const W_STEPS = [['claim', '⏱️ Claim'], ['burst', '✨ Burst'], ['collapse', '🏚️ Collapse'], ['reborn', '🔮 Reborn']], W_CLAIM = 2.4;
+function wonderBar(def, it){ const b = $('s-wonder'), on = !!(def && def.wonder && it && !S.hold); b.classList.toggle('hidden', !on); if(!on) return; const st = W_STEPS[(it.wStep || 0) % 4];
+  label(b, st[1]); b.title = st[1] + ' · ' + Props.wonderOf(it).powerName; }
+function wonderSpot(it){ const M = S.M, o = {v: it.v, turn: it.turn, look: S.look, state: it.state, ignore: it}, c = [];
+  for(let j = 1; j < M.h - 1; j++) for(let i = 1; i < M.w - 1; i++) if(Math.abs(i - it.x) + Math.abs(j - it.y) >= 5 && Props.fits(M, it.prop, i, j, o)) c.push([i, j]);
+  return c.length ? c[Math.floor(Math.random() * c.length)] : null; }
+function wonderNow(){ const it = S.sel; if(!it || !Props.DEFS[it.prop].wonder) return null; const step = W_STEPS[(it.wStep || 0) % 4][0], t0 = S.lastT || 0, w = Props.wonderOf(it);
+  if(step === 'claim'){ it.wClaim = {t0}; tip('⏱️ ' + w.name + ' · hold it: the ring fills'); }
+  else if(step === 'burst'){ it.wClaim = null; it.wMo = {m: 'burst', t0}; tip('✨ ' + w.powerName + ' — ' + w.sum); }
+  else if(step === 'collapse'){ Props.wonderAct(it, 'collapse', S.M); it.wMo = {m: 'collapse', t0}; tip('🏚️ ' + w.name + ' loses its power'); }
+  else { const sp = wonderSpot(it); if(!sp){ shake($('selbar')); sound('error'); return null; } const from = {x: it.x + it.w / 2, y: it.y + it.d / 2}, o = {v: it.v, turn: it.turn, look: S.look, state: it.state};
+    Props.remove(S.M, it); const n = Props.place(S.M, it.prop, sp[0], sp[1], o); swap(it, n); Props.wonderAct(n, 'reborn', S.M, {from}); n.wMo = {m: 'reborn', t0}; n.wStep = -1; S.sel = n; tip('🔮 ' + w.name + ' is reborn somewhere else'); }
+  const cur = S.sel; cur.wStep = (cur.wStep || 0) + 1; showBar(); sound(step === 'collapse' ? 'error' : 'success'); return step; }
+$('s-wonder').onclick = () => wonderNow();
+function wondersGround(g, V, t){ S.props.forEach(it => { if(!it.wClaim) return; const p = (t - it.wClaim.t0) / W_CLAIM; Props.wonderFx(g, V, it, Math.min(1, p), 'claim', {team: 'blue', t}); if(p > 3) it.wClaim = null; }); }
+function wondersAir(g, V, t){ S.props.forEach(it => { if(!it.wMo) return; const p = (t - it.wMo.t0) / (Props.WONDER_MS[it.wMo.m] / 1000); if(!Props.wonderFx(g, V, it, p, it.wMo.m, {team: 'blue', t})){ it.wMo = null; Props.wonderEnd(it); } }); }
+S.wonderNow = wonderNow;
 $('s-del').onclick = () => { if(S.sel){ del(S.sel); sound('pop'); } };
 $('s-x').onclick = () => { drop(); select(null); };
 
@@ -315,7 +337,7 @@ function render(alpha, t){ S.lastT = t;
   for(const w of S.walkers){ const it = w.it; it.x = w.px + (w.x - w.px) * alpha; it.y = w.py + (w.y - w.py) * alpha; it.pic = w.frames[w.path ? Math.floor(w.dist * 3.2) % Iso.WALK_N : 0]; it.flip = w.flip; }
   Props.tick(S.props, t);
   if(t - seeT > 0.1){ seeT = t; Props.seeThrough(S.V, S.props, S.walkers.map(w => w.it)); }
-  const st = Iso.frame(S.V, {items: S.items, t, groundFx: (g, V) => touchHints(g, V, t), overlay: (g, V) => { burst(g, V, t); morphs(g, V, t); touches(g, V, t); ringSel(g, V, t); ghostDraw(g, V, t); }});
+  const st = Iso.frame(S.V, {items: S.items, t, groundFx: (g, V) => { touchHints(g, V, t); wondersGround(g, V, t); }, overlay: (g, V) => { burst(g, V, t); morphs(g, V, t); touches(g, V, t); wondersAir(g, V, t); ringSel(g, V, t); ghostDraw(g, V, t); }});
   if(performance.now() - lastInfo > 400){ lastInfo = performance.now(); S.ms = st.ms; info(); }
 }
 function diamond(g, V, x, y, w, d, z){ const p = (a, b) => { const s = V.toScreen(a, b, z || 0); return [s.x - V._sx(), s.y - V._sy()]; }; g.beginPath(); [p(x, y), p(x + w, y), p(x + w, y + d), p(x, y + d)].forEach((q, k) => k ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.closePath(); }
@@ -400,4 +422,4 @@ start();
 </script>
 </body>
 </html>
-<!-- (ip-2+ip-3b+ip-3c+ip-4a+ar-1+ar-4+ar-7+ip-4b+ip-4c+ip-4d+ip-4d2+ip-4e+ip-5+ip-4f+ip-6a) END OF IsoPropsLab.html -->
+<!-- (ip-2+ip-3b+ip-3c+ip-4a+ar-1+ar-4+ar-7+ip-4b+ip-4c+ip-4d+ip-4d2+ip-4e+ip-5+ip-4f+ip-6a+ip-7a) END OF IsoPropsLab.html -->
