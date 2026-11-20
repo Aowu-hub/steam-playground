@@ -1,0 +1,247 @@
+
+var LINKPADS_CSS = "/* 🕹️ LinkPads (lk-8a) — the phone controller page. Everything scoped under #lp. */\nhtml.lp-on, html.lp-on body{overflow:hidden!important;overscroll-behavior:none;}\n#lp{--pc:#4f8cff;position:fixed;inset:0;z-index:9000;display:grid;color:#fff;font-family:\"Fredoka\",\"Nunito\",system-ui,sans-serif;\n  background:radial-gradient(120% 70% at 50% 38%,color-mix(in srgb,var(--pc) 42%,#141a3a) 0%,#10142e 58%,#0a0d20 100%);\n  touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;overflow:hidden;\n  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);box-sizing:border-box;}\n#lp *{box-sizing:border-box;}\n#lp.port{grid-template-rows:auto minmax(0,1fr) auto;grid-template-columns:minmax(0,1fr);}\n#lp.land{grid-template-rows:auto minmax(0,1fr);grid-template-columns:auto minmax(0,1fr) auto;}\n#lp .lp-top{min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 10px;background:rgba(0,0,0,.28);border-bottom:3px solid var(--pc);min-height:58px;}\n#lp.land .lp-top{grid-column:1 / 4;min-height:50px;padding:5px 12px;}\n#lp .lp-av{width:44px;height:44px;border-radius:50%;background:color-mix(in srgb,var(--pc) 35%,#fff);box-shadow:0 0 0 3px var(--pc),0 0 14px var(--pc);flex:0 0 auto;}\n#lp .lp-who{display:flex;flex-direction:column;min-width:0;line-height:1.1;}\n#lp .lp-who b{font-size:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:34vw;}\n#lp .lp-you{font-size:12.5px;opacity:.9;color:color-mix(in srgb,var(--pc) 45%,#fff);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40vw;}\n#lp .lp-chips{flex:1;display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap;min-width:0;}\n#lp.port .lp-chips{order:5;flex:1 1 100%;justify-content:center;}\n#lp.port .lp-who{flex:1;}\n#lp.port .lp-who b,#lp.port .lp-you{max-width:none;}\n#lp .lp-chip{display:inline-flex;align-items:center;gap:3px;background:rgba(255,255,255,.12);border-radius:999px;padding:3px 8px;font-size:14px;white-space:nowrap;}\n#lp .lp-chip b{font-size:14px;}\n#lp .lp-ps,#lp .lp-out{flex:0 0 auto;width:44px;height:44px;border-radius:14px;border:0;background:rgba(255,255,255,.14);color:#fff;font-size:20px;cursor:pointer;touch-action:manipulation;}\n#lp .lp-ps:active,#lp .lp-out:active{transform:scale(.92);background:rgba(255,255,255,.26);}\n#lp .lp-mid{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:0;padding:6px 10px;}\n#lp.land .lp-mid{grid-column:2;grid-row:2;}\n#lp .lp-ring{position:relative;width:min(58vw,32vh,250px);aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 50% 60%,color-mix(in srgb,var(--pc) 55%,transparent),transparent 70%);\n  box-shadow:0 0 0 4px color-mix(in srgb,var(--pc) 60%,transparent),0 0 40px color-mix(in srgb,var(--pc) 55%,transparent);display:flex;align-items:flex-end;justify-content:center;overflow:hidden;}\n#lp.land .lp-ring{width:min(24vw,44vh,170px);}\n#lp .lp-buddy{width:86%;height:92%;}\n#lp .lp-title{font-size:13px;opacity:.75;text-align:center;}\n#lp .lp-msg{min-height:30px;font-size:22px;font-weight:700;text-align:center;text-shadow:0 2px 0 rgba(0,0,0,.4);max-width:92%;line-height:1.15;}\n#lp .lp-msg.pop{animation:lp-pop .42s cubic-bezier(.2,1.6,.4,1);}\n@keyframes lp-pop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.12);opacity:1}100%{transform:scale(1)}}\n#lp .lp-hint{font-size:15px;font-weight:600;text-align:center;background:rgba(255,255,255,.12);border:2px dashed color-mix(in srgb,var(--pc) 70%,#fff);border-radius:14px;padding:6px 12px;max-width:94%;animation:lp-hint 1.6s ease-in-out infinite;transition:opacity .5s,max-height .5s;max-height:80px;overflow:hidden;}\n#lp .lp-hint.done{opacity:0;max-height:0;padding:0;border-width:0;}\n@keyframes lp-hint{50%{transform:scale(1.04)}}\n#lp .lp-tv{font-size:12px;opacity:.6;text-align:center;}\n#lp.short .lp-tv,#lp.land.short .lp-title{display:none;}\n#lp .lp-pad{position:relative;display:flex;align-items:flex-end;justify-content:space-between;padding:0 var(--pad-edge) calc(var(--pad-edge) + env(safe-area-inset-bottom));min-height:calc(var(--pad-stick) + var(--pad-edge) + 18px);}\n#lp.land .lp-pad{display:contents;}\n#lp .lp-stick{position:relative;width:var(--pad-stick);height:var(--pad-stick);border-radius:50%;flex:0 0 auto;touch-action:none;\n  background:radial-gradient(circle,rgba(255,255,255,.10) 0 30%,rgba(255,255,255,.05) 31% 100%);box-shadow:inset 0 0 0 4px color-mix(in srgb,var(--pc) 70%,#fff),0 0 22px color-mix(in srgb,var(--pc) 45%,transparent);}\n#lp.land .lp-stick{grid-column:1;grid-row:2;align-self:end;margin:0 0 calc(var(--pad-edge) + env(safe-area-inset-bottom)) calc(var(--pad-edge) + env(safe-area-inset-left));}\n#lp .lp-stick.on{box-shadow:inset 0 0 0 5px #fff,0 0 30px var(--pc);}\n#lp .lp-knob{position:absolute;left:30%;top:30%;width:40%;height:40%;border-radius:50%;background:radial-gradient(circle at 40% 35%,#fff,color-mix(in srgb,var(--pc) 70%,#fff) 45%,var(--pc));box-shadow:0 4px 0 rgba(0,0,0,.35),0 0 16px var(--pc);pointer-events:none;transition:transform .05s linear;}\n#lp .lp-stick .ar{position:absolute;font-size:calc(var(--pad-stick) * .13);opacity:.5;pointer-events:none;transition:opacity .08s,transform .08s;}\n#lp .lp-stick .ar.u{left:50%;top:5%;transform:translateX(-50%);} #lp .lp-stick .ar.d{left:50%;bottom:5%;transform:translateX(-50%);}\n#lp .lp-stick .ar.l{left:5%;top:50%;transform:translateY(-50%);} #lp .lp-stick .ar.r{right:5%;top:50%;transform:translateY(-50%);}\n#lp .lp-stick .ar.lit{opacity:1;color:#fff;text-shadow:0 0 10px var(--pc);}\n#lp .lp-stick.lp-free .ar{opacity:.28;}\n#lp .lp-stick.lp-lr .ar.u,#lp .lp-stick.lp-lr .ar.d{display:none;}\n#lp .lp-fan{flex:0 0 auto;}\n#lp.land .lp-fan{grid-column:3;grid-row:2;align-self:end;justify-self:end;margin:0 calc(var(--pad-edge) + env(safe-area-inset-right)) calc(var(--pad-edge) + env(safe-area-inset-bottom)) 0;}\n#lp .lp-b.lp-off{filter:grayscale(.8) brightness(.7);}\n#lp.lp-ghost{background:radial-gradient(120% 70% at 50% 38%,#4b3d7a 0%,#1a1640 60%,#0c0a22 100%);}\n#lp.lp-ghost .lp-ring{filter:grayscale(.5) brightness(1.2);opacity:.75;}\n#lp.lp-gone .lp-stick,#lp.lp-gone .lp-fan{opacity:.4;}\n#lp.lp-fl{animation:lp-fl .35s ease-out;} #lp.lp-flbad{animation:lp-flbad .45s ease-out;}\n@keyframes lp-fl{0%{box-shadow:inset 0 0 0 14px #fff}100%{box-shadow:inset 0 0 0 0 transparent}}\n@keyframes lp-flbad{0%{box-shadow:inset 0 0 0 18px #ff4d6d}100%{box-shadow:inset 0 0 0 0 transparent}}\n#lp .lp-cover{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:rgba(8,10,26,.78);backdrop-filter:blur(3px);padding:16px;}\n#lp .lp-cover.hidden{display:none;}\n#lp .lp-cbox{background:#1b2350;border:3px solid var(--pc);border-radius:22px;padding:18px 18px 14px;max-width:420px;width:100%;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.45);animation:lp-pop .35s ease-out;}\n#lp .lp-cic{font-size:46px;line-height:1.1;}\n#lp .lp-ct{font-size:22px;font-weight:800;margin:4px 0;}\n#lp .lp-cl{font-size:15px;opacity:.92;margin-bottom:10px;}\n#lp .lp-wait{font-size:13px;opacity:.75;margin-top:8px;}\n#lp .lp-cb{display:flex;flex-direction:column;gap:8px;}\n#lp .lp-cbtn{min-height:50px;font-size:18px;}\n";
+/* 🕹️ LINK PADS (lk-8a, 📡 Multiplayer chat, Aowu 2026-11-20 22:24 "go") — own devices for ACTION games (LinkKit plan §55).
+   ONE device runs the game (📺 TV / tablet / PC = the screen); every phone is a 🕹️ controller. No game picture travels — only:
+     phone → screen   pdin {q, x, y, d, h}   stick in SCREEN directions (x, y −1…1 · d = 'u' | 'd' | 'l' | 'r' | null) + held buttons
+                                            — on change + every 200 ms (fast line; q = count, an older one is dropped)
+                      pdbt {k, on}           a button goes down / up (sure line — a 💣 plant is never lost)
+                      pdps {on}              ⏸ / ▶ (sure, any phone)
+     screen → phone   pdgo {…}               you are seat N: name · colour · where you start · the pad layout · title (sure, to one phone)
+                      pdst {…}               MY status 4× a second: chips · ready rings · glowing button · state · button names (fast)
+                      pdbz {k, t}            a buzz moment: 💥 hit · 🎯 got one · 🏆 win · 💀 out · 👻 ghost … (sure)
+                      pdps {on, by} · pdend {…}   pause everywhere · the result line for each phone (sure)
+   📺 Screen:  S = Link.pads.screen({game, title, kind, seats: [{lseat, gseat, name, col, cname, where}], pad, onDir(g, d), onStick(g, x, y),
+                 onBtn(g, k, on), onDrop(g), onBack(g), onPause(on, name), status(g) → {chips: [[icon, text]], cool: {k: 0…1}, glow: {k: 1},
+                 btns: {k: [icon, name, off]}, state: 'play' | 'ghost' | 'out' | 'wait', line}})
+               S.buzz(g, k, t) · S.buzzAll(k, t) · S.end({icon, title, lines: {g: text}, wins: {g: 1}}) · S.stop() · S.input(g) · S.away(g)
+   📱 Phone:   opens by itself on pdgo (guest side) — the game's link part sets Link.pads.config({drawAvatar(cv, name), avatar(name), onRoom(), onLeave()}).
+   Drop: LinkKit 'leave' or no pdin for 1.5 s → onDrop (the game's own 🤖 brain plays that seat) · the phone talks again → onBack.
+   The phone keeps its screen on while it is a controller (Wake Lock); a phone that sleeps anyway = a normal drop-out. */
+(function () {
+  const L = window.Link; if (!L || L.pads) return;
+  const T = window.LINK_TIMING || {};
+  const DROP_MS = T.padDrop || 1500, KEEP_MS = T.padKeep || 200, STAT_MS = T.padStat || 250;
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  const snd = k => { try { if (window.UISound) UISound.play(k); } catch (e) { /* */ } };
+  const now = () => performance.now();
+  const CFG = {};
+  let SC = null;    // 📺 the screen side of the running match
+  let PH = null;    // 📱 the controller on this phone
+  let wired = false;
+
+  function css() { if (document.getElementById('lp-css') || !window.LINKPADS_CSS) return; const st = document.createElement('style'); st.id = 'lp-css'; st.textContent = window.LINKPADS_CSS; (document.head || document.documentElement).appendChild(st); }   // only once a pad is used
+  // ======================= 📺 SCREEN =======================
+  function screen(o) {
+    stopScreen(); wire();
+    const id = Date.now().toString(36);
+    SC = {o, id, by: {}, g: {}, timer: null, over: false, paused: false};
+    (o.seats || []).forEach(s => { const r = Object.assign({d: null, x: 0, y: 0, held: {}, q: -1, last: now(), away: false}, s); SC.by[s.lseat] = r; SC.g[s.gseat] = r; });
+    Object.values(SC.by).forEach(s => goTo(s));
+    SC.timer = setInterval(tick, STAT_MS);
+    return {
+      buzz: (g, k, t) => { const s = SC && SC.g[g]; if (s) L.send('pdbz', {k, t: t || ''}, {sure: true, to: s.lseat}); },
+      buzzAll: (k, t) => { if (SC) Object.values(SC.by).forEach(s => L.send('pdbz', {k, t: t || ''}, {sure: true, to: s.lseat})); },
+      end: res => endAll(res), stop: () => stopScreen(),
+      input: g => { const s = SC && SC.g[g]; return s ? {d: s.d, x: s.x, y: s.y, held: Object.assign({}, s.held), away: s.away} : null; },
+      away: g => !!(SC && SC.g[g] && SC.g[g].away), id, paused: on => { if (SC) { SC.paused = !!on; L.send('pdps', {on: !!on, by: ''}, {sure: true}); } }
+    };
+  }
+  function goTo(s) {
+    const o = SC.o;
+    L.send('pdgo', {id: SC.id, game: o.game, title: o.title || '', kind: o.kind || '', pad: o.pad, seat: s.lseat, g: s.gseat, name: s.name, col: s.col || '#4f8cff', cname: s.cname || '', where: s.where || '',
+      tv: !!(L.hostess && L.hostess()), host: o.host || ''}, {sure: true, to: s.lseat});
+  }
+  function tick() {
+    if (!SC) return;
+    const t = now(), o = SC.o;
+    Object.values(SC.by).forEach(s => {
+      if (!SC.over && !s.away && t - s.last > DROP_MS) drop(s);
+      let st = null; try { st = o.status ? o.status(s.gseat) : null; } catch (e) { st = null; }
+      if (st) { st.paused = SC.paused; L.send('pdst', st, {to: s.lseat}); }
+    });
+  }
+  function drop(s) {
+    if (s.away) return; s.away = true; s.d = null; s.x = s.y = 0;
+    Object.keys(s.held).forEach(k => { if (s.held[k]) { s.held[k] = 0; call('onBtn', s.gseat, k, false); } });
+    call('onDir', s.gseat, null); call('onDrop', s.gseat);
+  }
+  function back(s) { if (!s.away) return; s.away = false; s.last = now(); call('onBack', s.gseat); }
+  function call(fn, ...a) { try { if (SC && SC.o[fn]) SC.o[fn](...a); } catch (e) { console.error('LinkPads ' + fn, e); } }
+  function endAll(res) {
+    if (!SC) return; SC.over = true; SC.res = res || {};
+    Object.values(SC.by).forEach(s => endTo(s));
+  }
+  function endTo(s) {
+    const r = SC.res || {};
+    L.send('pdend', {id: SC.id, icon: r.icon || '🏁', title: r.title || '', line: (r.lines || {})[s.gseat] || '', win: !!(r.wins || {})[s.gseat], again: r.again !== false}, {sure: true, to: s.lseat});
+  }
+  function stopScreen() { if (SC && SC.timer) clearInterval(SC.timer); SC = null; }
+
+  // ======================= 🔌 messages (both sides, wired once) =======================
+  function wire() {
+    if (wired) return; wired = true;
+    // ---- screen side ----
+    L.on('pdin', (d, seat) => { const s = SC && SC.by[seat]; if (!s || !d) return;
+      const q = Number(d.q) || 0; if (q <= s.q) return; s.q = q; s.last = now(); back(s); if (SC.over) return;
+      const x = Math.max(-1, Math.min(1, Number(d.x) || 0)), y = Math.max(-1, Math.min(1, Number(d.y) || 0)), dir = /^[udlr]$/.test(d.d || '') ? d.d : null;
+      s.x = x; s.y = y; call('onStick', s.gseat, x, y);
+      if (dir !== s.d) { s.d = dir; call('onDir', s.gseat, dir); }
+      const h = d.h || {}; Object.keys(s.held).forEach(k => { if (s.held[k] && !h[k]) { s.held[k] = 0; call('onBtn', s.gseat, k, false); } });   // a lost "up" is fixed by the next keep-alive
+    });
+    L.on('pdbt', (d, seat) => { const s = SC && SC.by[seat]; if (!s || !d || !d.k) return; s.last = now(); back(s); if (SC.over) return;
+      const k = String(d.k), on = !!d.on; if (!!s.held[k] === on && !on) return; s.held[k] = on ? 1 : 0; call('onBtn', s.gseat, k, on); });
+    L.on('pdps', (d, seat) => {
+      if (L.isHost()) { const s = SC && SC.by[seat]; if (!s || SC.over) return; SC.paused = !!(d && d.on); call('onPause', SC.paused, s.name); L.send('pdps', {on: SC.paused, by: s.name}, {sure: true}); return; }
+      if (PH) phPause(!!(d && d.on), d && d.by);
+    });
+    L.on('leave', e => { const s = SC && e && SC.by[e.seat]; if (s && !SC.over) drop(s); });
+    const again = e => { const s = SC && e && SC.by[e.seat]; if (!s) return; goTo(s); if (SC.over) endTo(s); };
+    L.on('rejoin', again); L.on('join', again);
+    // ---- phone side ----
+    L.on('pdgo', d => { if (L.isHost() || !d || !d.pad) return; phOpen(d); });
+    L.on('pdst', d => { if (PH && d) phStatus(d); });
+    L.on('pdbz', d => { if (PH && d) phBuzz(d.k, d.t); });
+    L.on('pdend', d => { if (PH && d && d.id === PH.d.id) phEnd(d); });
+    L.on('hostleft', e => { if (!PH) return; phCover('👋', (e && e.reason === 'lost') ? '📶 Lost the link to the game' : 'The game screen ended the room', [['◀ Back', () => phClose(true)]]); });
+    addEventListener('pagehide', () => { if (PH) relock(false); });
+  }
+
+  // ======================= 📱 PHONE (the controller) =======================
+  const VIB = {hit: [70, 40, 120], got: [25, 30, 25], win: [40, 40, 40, 40, 160], lose: [160], out: [220], ghost: [30, 60, 30], go: [30], pick: [15], round: [40, 60, 40], tick: [8]};
+  const MOOD = {hit: 'miss', got: 'joy', win: 'win', lose: 'lose', out: 'lose', ghost: 'surprise', go: 'happy', pick: 'happy', round: 'happy'};
+  function phOpen(d) {
+    wire(); css();
+    if (PH && PH.d.id === d.id && PH.el.isConnected) { PH.d = d; phCover(null); return; }   // the same match (a rejoin) → just carry on
+    phClose(false);
+    const el = document.createElement('div'); el.id = 'lp'; el.className = 'lp'; el.style.setProperty('--pc', d.col);
+    el.innerHTML = '<div class="lp-top"><canvas class="lp-av" width="80" height="80"></canvas><div class="lp-who"><b>' + esc(d.name) + '</b><span class="lp-you">' + esc(d.cname || '') + (d.where ? ' · ' + esc(d.where) : '') + '</span></div>' +
+      '<div class="lp-chips"></div><button class="lp-ps" data-sound="none" aria-label="Pause">⏸</button><button class="lp-out" data-sound="none" aria-label="Leave">🚪</button></div>' +
+      '<div class="lp-mid"><div class="lp-ring"><canvas class="lp-buddy"></canvas></div><div class="lp-title">' + esc(d.title) + '</div><div class="lp-msg"></div>' + (d.pad.hint ? '<div class="lp-hint">' + esc(d.pad.hint) + '</div>' : '') + '<div class="lp-tv">📺 ' + esc(d.tv ? 'Look at the TV — this phone is your controller' : 'Look at ' + (d.host || 'the big screen') + ' — this phone is your controller') + '</div></div>' +
+      '<div class="lp-pad"><div class="lp-stick lp-' + esc(d.pad.stick || 'free') + '"><span class="ar u">▲</span><span class="ar d">▼</span><span class="ar l">◀</span><span class="ar r">▶</span><div class="lp-knob"></div></div><div class="lp-fan"></div></div>' +
+      '<div class="lp-cover hidden"><div class="lp-cbox"><div class="lp-cic"></div><div class="lp-ct"></div><div class="lp-cl"></div><div class="lp-cb"></div></div></div>';
+    document.body.appendChild(el); document.documentElement.classList.add('lp-on');
+    PH = {d, el, q: 0, dir: null, x: 0, y: 0, held: {}, btn: {}, keep: null, lock: null, buddy: null, msgT: 0, st: null};
+    // 🧑 my avatar (top) + my buddy (middle, reacts to the buzz moments)
+    try { if (CFG.drawAvatar) CFG.drawAvatar(el.querySelector('.lp-av'), d.name); } catch (e) { /* */ }
+    try { const av = CFG.avatar ? CFG.avatar(d.name) : null; if (av && window.UI && UI.buddy) PH.buddy = UI.buddy(el.querySelector('.lp-buddy'), {name: d.name, av}, {per: 2, fps: 8}); } catch (e) { /* */ }
+    buildStick(el.querySelector('.lp-stick'));
+    buildBtns(el.querySelector('.lp-fan'), d.pad.btns || []);
+    el.querySelector('.lp-ps').onclick = () => { snd('tap'); L.send('pdps', {on: !(PH.st && PH.st.paused)}, {sure: true}); };
+    el.querySelector('.lp-out').onclick = () => { snd('tap'); phCover('🚪', 'Leave the game?', [['🚪 Leave', () => { try { L.leave(); } catch (e) { /* */ } phClose(true); if (CFG.onLeave) CFG.onLeave(); }], ['▶ Keep playing', () => phCover(null)]], 'A 🤖 robot plays for you'); };
+    layout(); addEventListener('resize', layout); addEventListener('orientationchange', () => setTimeout(layout, 80));
+    PH.keep = setInterval(() => sendIn(), KEEP_MS);
+    relock(true); document.addEventListener('visibilitychange', onVis);
+    msg('💣 Get ready!', 1600); snd('success');
+    sendIn();
+  }
+  function onVis() { if (!PH) return; if (!document.hidden) { relock(true); sendIn(); } }
+  async function relock(on) {
+    try {
+      if (!on) { if (PH && PH.lock) { PH.lock.release(); PH.lock = null; } return; }
+      if (PH && !PH.lock && navigator.wakeLock && navigator.wakeLock.request) { PH.lock = await navigator.wakeLock.request('screen'); PH.lock.addEventListener('release', () => { if (PH) PH.lock = null; }); }
+    } catch (e) { /* no wake lock here (old phone) — a sleeping phone = a normal drop-out */ }
+  }
+  function layout() {
+    if (!PH) return; const W = innerWidth, H = innerHeight, land = W > H;
+    PH.el.classList.toggle('land', land); PH.el.classList.toggle('port', !land); PH.el.classList.toggle('short', Math.min(W, H) < 420);
+    requestAnimationFrame(() => { try { if (window.UI && UI.pad && UI.pad.arcAll) UI.pad.arcAll(PH.el); } catch (e) { /* */ } });
+  }
+  function sendIn() { if (!PH) return; PH.q++; L.send('pdin', {q: PH.q, x: Math.round(PH.x * 100) / 100, y: Math.round(PH.y * 100) / 100, d: PH.dir, h: Object.assign({}, PH.held)}); }
+  function buildStick(pad) {
+    const kind = PH.d.pad.stick || 'free', knob = pad.querySelector('.lp-knob'); let pid = null;
+    const Tk = window.UI && UI.stickTracker ? UI.stickTracker(pad, {player: PH.d.name}) : null;
+    const set = (e, first) => {
+      if (!Tk) return; const v = first ? Tk.start(e) : Tk.at(e), prev = PH.dir;
+      let d = null, x = 0, y = 0;
+      if (kind === '4way') { d = UI.stickDir(v, prev, 0.5, 0); if (prev && v.m < 0.3 && Math.hypot(v.fx, v.fy) < 0.25) d = null; x = d === 'l' ? -1 : d === 'r' ? 1 : 0; y = d === 'u' ? -1 : d === 'd' ? 1 : 0; }
+      else { const m = Math.min(1, v.m); x = m > 0.18 ? (v.x / Math.max(1, v.m)) * m : 0; y = m > 0.18 ? (v.y / Math.max(1, v.m)) * m : 0; if (kind === 'lr') y = 0; d = UI.stickDir(v, prev, 0.5, 0.3); }
+      const fm = Math.min(1, Math.hypot(v.fx, v.fy)), a = Math.atan2(v.fy, v.fx), r = pad.getBoundingClientRect();
+      knob.style.transform = 'translate(' + (Math.cos(a) * fm * 0.3 * r.width) + 'px,' + (Math.sin(a) * fm * 0.3 * r.height) + 'px)';
+      pad.querySelectorAll('.ar').forEach(z => z.classList.toggle('lit', z.classList.contains(d || '-')));
+      const ch = d !== PH.dir || Math.abs(x - PH.x) > 0.12 || Math.abs(y - PH.y) > 0.12;
+      PH.dir = d; PH.x = x; PH.y = y;
+      if (d && !PH.moved) { PH.moved = true; setTimeout(() => { const h = PH && PH.el.querySelector('.lp-hint'); if (h) h.classList.add('done'); }, 2500); }   // 👆 the first-time hint fades once the kid walks
+      if (ch) { if (d && d !== prev && navigator.vibrate) try { navigator.vibrate(6); } catch (er) { /* */ } sendIn(); }
+    };
+    pad.addEventListener('pointerdown', e => { e.preventDefault(); pad.classList.add('on'); pid = e.pointerId; try { pad.setPointerCapture(pid); } catch (er) { /* */ } set(e, true); });
+    if (window.UI && UI.onFastMove) UI.onFastMove(pad, e => { if (e.pointerId === pid) set(e); }); else pad.addEventListener('pointermove', e => { if (e.pointerId === pid) set(e); });
+    const end = e => { if (e.pointerId !== pid) return; pid = null; pad.classList.remove('on'); knob.style.transform = ''; pad.querySelectorAll('.ar').forEach(z => z.classList.remove('lit')); PH.dir = null; PH.x = PH.y = 0; sendIn(); };
+    pad.addEventListener('pointerup', end); pad.addEventListener('pointercancel', end);
+  }
+  function buildBtns(box, list) {
+    const els = list.map(b => {
+      const el = document.createElement('button'); el.className = 'lp-b'; el.dataset.k = b.k; el.dataset.sound = 'none'; box.appendChild(el);
+      if (window.UI && UI.pad) UI.pad.dress(el, b.ic, b.nm, b.rim, !!b.main); else el.textContent = b.ic + ' ' + b.nm;
+      const down = e => { e.preventDefault(); if (PH.held[b.k]) return; el.classList.add('pz-down'); PH.held[b.k] = 1; L.send('pdbt', {k: b.k, on: 1}, {sure: true}); if (navigator.vibrate) try { navigator.vibrate(10); } catch (er) { /* */ } };
+      const up = () => { el.classList.remove('pz-down'); if (!PH || !PH.held[b.k]) return; PH.held[b.k] = 0; L.send('pdbt', {k: b.k, on: 0}, {sure: true}); };
+      el.addEventListener('pointerdown', down); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up); el.addEventListener('pointerleave', up);
+      PH.btn[b.k] = {el, b, ic: b.ic, nm: b.nm}; return el;
+    });
+    const main = els[list.findIndex(b => b.main)] || els[0];
+    if (window.UI && UI.pad && main) UI.pad.fan(box, main, els.filter(x => x !== main), {side: 'right'});
+  }
+  function phStatus(d) {
+    PH.st = d; const el = PH.el;
+    const chips = (d.chips || []).map(c => '<span class="lp-chip">' + esc(c[0]) + '<b>' + esc(c[1]) + '</b></span>').join('');
+    const box = el.querySelector('.lp-chips'); if (box.__h !== chips) { box.__h = chips; box.innerHTML = chips; }
+    Object.keys(PH.btn).forEach(k => { const B = PH.btn[k], nb = (d.btns || {})[k];
+      const ic = nb ? nb[0] : B.b.ic, nm = nb ? nb[1] : B.b.nm, off = !!(nb && nb[2]);
+      if (ic !== B.ic || nm !== B.nm) { B.ic = ic; B.nm = nm; const i = B.el.querySelector('.ic'), n = B.el.querySelector('.nm'); if (i) i.textContent = ic; if (n) n.textContent = nm; }
+      B.el.classList.toggle('lp-off', off);
+      B.el.classList.toggle('pz-glow', !!(d.glow || {})[k]);
+      if (window.UI && UI.pad && UI.pad.cool) UI.pad.cool(B.el, (d.cool || {})[k] || 0); });
+    el.classList.toggle('lp-ghost', d.state === 'ghost'); el.classList.toggle('lp-gone', d.state === 'out');
+    const line = d.line || ''; const m = el.querySelector('.lp-msg'); if (now() > PH.msgT && m.__l !== line) { m.__l = line; m.textContent = line; m.classList.remove('pop'); }
+    const pc = el.querySelector('.lp-cover');
+    if (d.paused && !PH.pause) phPause(true, ''); else if (!d.paused && PH.pause) phPause(false);
+    if (pc.classList.contains('hidden') && d.state === 'out' && !PH.outShown) { PH.outShown = true; }
+  }
+  function msg(t, ms) { if (!PH || !t) return; const m = PH.el.querySelector('.lp-msg'); m.textContent = t; m.__l = null; m.classList.remove('pop'); void m.offsetWidth; m.classList.add('pop'); PH.msgT = now() + (ms || 1400); }
+  function phBuzz(k, t) {
+    if (!PH) return;
+    try { if (navigator.vibrate) navigator.vibrate(VIB[k] || [20]); } catch (e) { /* */ }
+    const el = PH.el; el.classList.remove('lp-fl', 'lp-flbad'); void el.offsetWidth; el.classList.add(k === 'hit' || k === 'out' || k === 'lose' ? 'lp-flbad' : 'lp-fl');   // iPhone has no vibrate → the whole pad flashes
+    if (t) msg(t, k === 'win' ? 2600 : 1500);
+    try { if (PH.buddy && MOOD[k]) PH.buddy.react(MOOD[k], 1600); } catch (e) { /* */ }
+    if (k === 'win') snd('success'); else if (k === 'hit' || k === 'out') snd('error'); else if (k === 'got') snd('pop');
+  }
+  function phPause(on, by) {
+    if (!PH) return; PH.pause = !!on;
+    if (on) phCover('⏸', (by ? by + ' paused' : 'Paused'), [['▶ Play on', () => L.send('pdps', {on: false}, {sure: true})]]);
+    else if (!PH.ended) phCover(null);
+  }
+  function phEnd(d) {
+    PH.ended = true; PH.held = {}; PH.dir = null; PH.x = PH.y = 0;
+    try { if (navigator.vibrate) navigator.vibrate(d.win ? VIB.win : VIB.lose); } catch (e) { /* */ }
+    try { if (PH.buddy) PH.buddy.react(d.win ? 'win' : 'lose', 4000); } catch (e) { /* */ }
+    snd(d.win ? 'success' : 'tap');
+    const cap = L.hostess && L.hostess() && L.captain && L.captain() === L.seat();
+    const btns = [];
+    if (cap && d.again) btns.push(['🔁 Play again', b => { if (window.UI && UI.busy) UI.busy(b, PH.d.kind || 'link', 'Asking the TV…'); L.ask('again'); }]);
+    btns.push(['◀ Room', () => { phClose(true); if (CFG.onRoom) CFG.onRoom(); }]);
+    phCover(d.icon || '🏁', d.title || 'Game over', btns, (d.line || '') + (cap ? '' : '<div class="lp-wait">⏳ ' + esc(L.hostess && L.hostess() ? 'The TV or the first player' : (PH.d.host || 'The host')) + ' can start the next game<span class="lk-dots"></span></div>'), true);
+  }
+  // the card over the pad: pause · result · leave · the room is gone
+  function phCover(icon, title, btns, html, raw) {
+    if (!PH) return; const c = PH.el.querySelector('.lp-cover');
+    if (icon == null) { c.classList.add('hidden'); PH.ended = false; return; }
+    c.querySelector('.lp-cic').textContent = icon; c.querySelector('.lp-ct').textContent = title || '';
+    c.querySelector('.lp-cl').innerHTML = raw ? (html || '') : esc(html || '');
+    const bb = c.querySelector('.lp-cb'); bb.innerHTML = '';
+    (btns || []).forEach((x, i) => { const b = document.createElement('button'); b.className = 'sp-btn ' + (i ? 'sp-secondary' : 'sp-primary') + ' lp-cbtn'; b.dataset.sound = 'none'; b.textContent = x[0]; b.onclick = () => { snd('tap'); x[1](b); }; bb.appendChild(b); });
+    c.classList.remove('hidden');
+  }
+  function phClose(byKid) {
+    if (!PH) return; const P = PH; PH = null;
+    clearInterval(P.keep); relock(false); try { if (P.buddy) P.buddy.stop(); } catch (e) { /* */ }
+    document.removeEventListener('visibilitychange', onVis); removeEventListener('resize', layout);
+    P.el.remove(); document.documentElement.classList.remove('lp-on');
+  }
+
+  L.pads = {screen, config: c => Object.assign(CFG, c || {}), active: () => !!PH, screenOn: () => !!SC, close: () => phClose(false),
+    resultCard: () => PH && PH.ended ? PH.el.querySelector('.lp-cover:not(.hidden) .lp-cbox') : null,   // 📺 the Game Station puts its 🗳️ vote bar here (lk-8b)
+    _test: {phone: () => PH ? {d: PH.d, st: PH.st, dir: PH.dir, x: PH.x, y: PH.y, held: Object.assign({}, PH.held), cover: !PH.el.querySelector('.lp-cover').classList.contains('hidden'), q: PH.q} : null,
+      screen: () => SC ? {id: SC.id, over: SC.over, paused: SC.paused, seats: Object.values(SC.by).map(s => ({lseat: s.lseat, g: s.gseat, name: s.name, d: s.d, away: s.away, held: Object.assign({}, s.held)}))} : null}};
+  wire();   // a phone must hear pdgo before it ever opens a pad
+})();
+GameParts.loaded('LinkPads', 'lk-8b');
