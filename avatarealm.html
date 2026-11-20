@@ -488,6 +488,7 @@ function syncUnits(alpha){ const M = S.M, seen = S._seen || (S._seen = new Set()
     it.sw = u.swing;
     if(u.swing >= 0 && !ak){ const p = Math.sin(Math.min(1, u.swing / 0.45) * Math.PI) * 0.22; x += u.dir * p * 0.7; y -= u.dir * p * 0.7; }
     it.x = x; it.y = y; it.z = S.map.heightAt(Math.floor(x), Math.floor(y)) + (u.fly ? 1.3 + Math.sin(S.t * 3 + u.id) * 0.15 : 0);
+    if(u.man || u.role === 'spy' || it.depth != null || u.fallT) wallUnitZ(it, u);   // 🏯 R2.4b: 🧗 on the walkway · 😵 tumble · 🕵️ see-through
     it.pic = it.frames[u.moving ? Math.floor(u.walk / 0.571 * 4) % 4 : 0]; it.flip = u.dir < 0; }
   if(S.uit.size !== seen.size){ for(const [id, it] of S.uit) if(!seen.has(id)){ S.uit.delete(id); S.sel.delete(id); const k = S.items.indexOf(it); if(k >= 0) S.items.splice(k, 1); } } }
 
@@ -531,7 +532,7 @@ function territory(){ const M = S.M; if(S.terr && S.terr.ver === M.blds.length +
 function groundFx(g, V){ const M = S.M, s = V.zoom;
   for(const [i, j, t] of territory()){ const p = V.toScreen(i + 0.5, j + 0.5, 0); if(p.x < -40 || p.y < -30 || p.x > V.W + 40 || p.y > V.H + 30) continue; const F = Props.AR.FLOORS[M.teams[t].side]; if(!F) continue;
     const q = (u, v) => { const r = V.toScreen(i + u, j + v, 0); return [r.x, r.y]; }; g.save(); g.globalAlpha = 0.9; try{ F.paint(g, q, s, i, j); }catch(e){} g.restore(); }
-  const by = {}; S.uit.forEach(it => { const p = V.toScreen(it.x, it.y, S.map.heightAt(Math.floor(it.x), Math.floor(it.y))); if(p.x < -30 || p.y < -30 || p.x > V.W + 30 || p.y > V.H + 30) return;
+  const by = {}; S.uit.forEach(it => { if(it.u.hid && it.u.team !== 0) return; const p = V.toScreen(it.x, it.y, it.u.manUp ? it.z : S.map.heightAt(Math.floor(it.x), Math.floor(it.y)));   /* 🕵️ no ring under a hiding rival · 🧗 the ring sits on the walkway */ if(p.x < -30 || p.y < -30 || p.x > V.W + 30 || p.y > V.H + 30) return;
     const c = S.sel.has(it.u.id) ? 'sel' : teamHex(it.u.team), k = (it.u.role === 'hero' ? 1.35 : 1) * s; (by[c] || (by[c] = [])).push(p.x, p.y, k); });
   for(const c in by){ const a = by[c]; g.beginPath(); for(let q = 0; q < a.length; q += 3){ g.moveTo(a[q] + 11 * a[q + 2], a[q + 1]); g.ellipse(a[q], a[q + 1], 11 * a[q + 2], 4.6 * a[q + 2], 0, 0, 6.2832); }
     if(c === 'sel'){ g.fillStyle = 'rgba(255,214,60,.45)'; g.fill(); g.strokeStyle = '#FFC21A'; g.lineWidth = 2.4 * s; g.stroke(); } else { g.fillStyle = c; g.globalAlpha = 0.45; g.fill(); g.globalAlpha = 1; } }
@@ -554,7 +555,7 @@ function sparks(g, V, t){ for(let q = S.sparks.length - 1; q >= 0; q--){ const s
 function overlay(g, V){ const M = S.M, s = V.zoom; ghostLine(g, V); g.lineWidth = 1;
   for(const q of M.shrines || []){ if(!q.great) continue; const p = V.toScreen(q.i + 1, q.j + 1, 0), r = Math.max(9, 12 * s), y = p.y - 104 * s - r; if(p.x < -30 || p.y < -60 || p.x > V.W + 30 || p.y > V.H + 60) continue;   /* 🌟 the Great Shrine badge (×2 stars) */
     g.fillStyle = '#FFF8D6'; g.strokeStyle = q.owner >= 0 ? teamHex(q.owner) : '#E2B53A'; g.lineWidth = 3; g.beginPath(); g.arc(p.x, y, r, 0, 6.2832); g.fill(); g.stroke(); if(typeof emo === 'function') emo(g, '🌟', p.x, y, r * 1.3); g.lineWidth = 1; }
-  S.uit.forEach(it => { const u = it.u; if(M.t - u.hurtT > 2 || u.hp >= u.max) return; const p = V.toScreen(it.x, it.y, it.z), w = 22 * s, y = p.y - (u.role === 'hero' ? 52 : 42) * s - (u.role === 'rider' ? 12 * s : 0);
+  S.uit.forEach(it => { const u = it.u; if(M.t - u.hurtT > 2 || u.hp >= u.max || (u.hid && u.team !== 0)) return; const p = V.toScreen(it.x, it.y, it.z), w = 22 * s, y = p.y - (u.role === 'hero' ? 52 : 42) * s - (u.role === 'rider' ? 12 * s : 0);
     if(p.x < -30 || p.y < -60 || p.x > V.W + 30 || p.y > V.H + 30) return; bar(g, p.x - w / 2, y, w, 3, u.hp / u.max); });
   for(const b of M.blds){ if(b.gone || b.hp <= 0) continue; const p = V.toScreen(b.i + b.w / 2, b.j + b.d / 2, 0), top = p.y - (b.slot === 'house' ? 112 : b.slot === 'tower' ? 96 : 80) * s;
     if(p.x < -60 || p.x > V.W + 60 || top < -40 || top > V.H + 40) continue;
@@ -649,7 +650,7 @@ function refreshGhost(){ const G = S.ghost, M = S.M; if(!G) return; G.ok = AR.ca
   $('gc-name').textContent = SLOT_ICON[G.slot] + ' ' + sideOf(0).bld[G.slot]; const mk = AR.SLOTS[G.slot].makes; $('gc-more').textContent = (mk.length ? 'makes ' + mk.map(r => ROLE[r][0]).join(' ') : G.slot === 'tower' ? 'shoots rivals near it' : G.slot === 'wardrobe' ? 'role stages 🗡️ 🎽' : '') + ' · ' + sideOf(0).res.c[0] + c[0] + ' ' + sideOf(0).res.b[0] + c[1]; $('gc-why').textContent = G.ok === true ? '' : (WHY[G.ok] || ''); $('gc-ok').disabled = G.ok !== true; $('ghost-card').classList.remove('hidden'); }
 function cancelPlace(){ S.ghost = null; $('ghost-card').classList.add('hidden'); hud(true); }
 function confirmPlace(){ const G = S.ghost; if(!G || G.ok !== true) return; const b = AR.place(S.M, 0, G.slot, G.i, G.j, G.turn); if(b && b.id){ window.UISound && UISound.play && UISound.play('pop'); cancelPlace(); tip('🔨 Bricklets are on their way'); } else { G.ok = b; refreshGhost(); } }
-function placeDom(){ const V = S.V; if(!V) return; wallCardPlace();
+function placeDom(){ const V = S.V; if(!V) return; wallCardPlace(); if(S.frame % 10 === 0) infoNudge();   // 🐞 R2.4b
   if(S.ghost){ const f = AR.foot(S.ghost.slot, S.ghost.i, S.ghost.j, S.ghost.turn), p = V.toScreen(f.i + f.w / 2, f.j + f.d / 2, 0), card = $('ghost-card'), top = p.y - (S.ghost.slot === 'tower' ? 96 : 86) * V.zoom - 10;
     const w = card.offsetWidth, x = Math.max(w / 2 + 6, Math.min(innerWidth - w / 2 - 6, p.x)), gl = $('goal'), gb = gl.classList.contains('hidden') ? S.top : gl.getBoundingClientRect().bottom + 6, y = Math.max(gb + card.offsetHeight + 4, Math.min(S.dockTop - 8, top)); card.style.left = x + 'px'; card.style.top = y + 'px'; } else $('ghost-card').classList.add('hidden');
   const gd = S.guide, hand = $('hand'); let hp = null;
@@ -682,8 +683,9 @@ const CMD = {
   squad: [['charge', '⚔️', 'Charge', 'sp-danger'], ['defend', '🛡️', 'Defend'], ['form', '🔀', 'Formation', 'sp-primary'], ['unpick', '✕', 'Unpick']],   /* 👥 R1b2: a whole squad picked */
   sub: [['charge', '⚔️', 'Charge', 'sp-danger'], ['defend', '🛡️', 'Defend'], ['split', '✂️', 'Split', 'sp-primary'], ['unpick', '✕', 'Unpick']],   /* some roles of one squad picked → ✂️ they leave */
   bld: [['train', '👥', 'Train', 'sp-primary'], ['level', '⬆️', 'Level'], ['rallyb', '🚩', 'Rally point'], ['town', '🏠', 'Town'], ['unpick', '✕', 'Close']]};
-function cmdBar(force){ const ctx = S.sel.size ? selInfo().kind : S.inspect && S.inspect.k === 'bld' && S.inspect.b.team === 0 ? 'bld' : 'none', key = ctx + ':' + (S.arm || ''); if(!force && S.cmdKey === key) return; S.cmdKey = key;
-  const box = $('cmd'); box.innerHTML = ''; CMD[ctx].forEach(([k, ic, lb, cls]) => { if(k === 'level' && !(S.inspect && S.inspect.b.slot === 'house')) return;
+function cmdBar(force){ const ctx = S.sel.size ? selInfo().kind : S.inspect && S.inspect.k === 'bld' && S.inspect.b.team === 0 ? 'bld' : 'none', mw = ctx !== 'none' && ctx !== 'bld' && wallManCan(), key = ctx + ':' + (S.arm || '') + (mw ? ':man' : ''); if(!force && S.cmdKey === key) return; S.cmdKey = key;
+  const box = $('cmd'); box.innerHTML = ''; if(mw) wallCmd(box);   // 🧗 R2.4b: Man wall first (gold)
+  CMD[ctx].forEach(([k, ic, lb, cls]) => { if(k === 'level' && !(S.inspect && S.inspect.b.slot === 'house')) return;
     const b = document.createElement('button'); b.className = 'sp-btn cb ' + (cls || 'sp-secondary') + (S.arm === k ? ' armed' : ''); b.dataset.k = k; b.dataset.sound = 'tap'; b.innerHTML = ic + '<small>' + lb + '</small>'; b.onclick = () => cmdDo(k); box.appendChild(b); });
   requestAnimationFrame(layout); }
 function cmdDo(k){ const M = S.M, ids = [...S.sel];
@@ -809,14 +811,19 @@ function showInfo(it, px, py){ const M = S.M, el = $('info'), side0 = sideOf(0);
   else { const c = it.cell, cl = S.map.get(c.i, c.j) || {}, own = territory().find(q => q[0] === c.i && q[1] === c.j), who = own ? sideOf(own[2]) : null, can = AR.canPlace(M, 0, 'tower', c.i, c.j, 0) === true;
     const TN = {grass: '🌿 Grass', flower: '🌼 Meadow', sand: '🏖️ Sand', water: '🌊 Water', path: '🟫 Path'};
     h = head('🗺️', TN[cl.t] || '🌿 Land', who ? who.icon + ' ' + who.name + ' land' : 'Nobody\'s land yet') + '<div class="tipl" style="' + (can ? '' : 'background:#FFF0F2;color:#C92C4A') + '">' + (can ? '✓ You can build here' : cl.t === 'water' ? '✗ Too wet to build' : who && own[2] !== 0 ? '✗ Rival land' : '✗ Build next to your own buildings') + '</div>'; }
+  h += wallInfoHtml(it);   // 🏯 R2.4b: 🔭 Lookout row · 🧗 / 🕵️ lines
   if(it.k === 'unit' && it.u.role === 'hero' && it.u.team === 0) h += skillCardHtml();   // 👑 R2.3: the 3 skills + Lv up
   el.innerHTML = h; el.classList.remove('hidden'); cmdBar(true);
-  el.querySelectorAll('[data-x]').forEach(b => b.onclick = () => hideInfo()); el.querySelectorAll('[data-train]').forEach(b => b.onclick = () => train(b.dataset.train)); el.querySelectorAll('[data-up]').forEach(b => b.onclick = () => houseUp());
+  wallInfoBind(el, it, px, py); el.querySelectorAll('[data-x]').forEach(b => b.onclick = () => hideInfo()); el.querySelectorAll('[data-train]').forEach(b => b.onclick = () => train(b.dataset.train)); el.querySelectorAll('[data-up]').forEach(b => b.onclick = () => houseUp());
   el.querySelectorAll('[data-gem]').forEach(b => b.onclick = () => { const r = AR.gemUp(M, 0, b.dataset.gem); if(r !== true) tip(r === 'cost' ? '💎 Need ' + AR.GEM_SLOT + ' ' + sideOf(0).res.g[1] : '💎 Not now'); showInfo(it, px, py); });
   el.querySelectorAll('[data-stage]').forEach(b => b.onclick = () => { const r = AR.stageUp(M, 0, b.dataset.stage); tip(r === true ? '🎨 Stage up started' : r === 'cost' ? '✗ Not enough yet' : r === 'busy' ? '🎨 Already stepping up' : r === 'full' ? '🎨 The Wardrobe is busy' : '✗ Not now'); showInfo(it, px, py); });
   el.querySelectorAll('[data-rsq]').forEach(x => x.onclick = () => { AR.rallySquad(M, 0, it.b.id, +x.dataset.rsq); showInfo(it, px, py); tip(+x.dataset.rsq ? '🚩 New units join Squad ' + x.dataset.rsq : '🚩 New units stay at the building'); });
   skillCardBind(el, it, px, py); S.infoAt = it; placeInfo(px, py); }
-function placeInfo(px, py){ const el = $('info'); if(el.classList.contains('hidden')) return; const w = el.offsetWidth, h = el.offsetHeight, top = S.top + 6, x = Math.max(w / 2 + 8, Math.min(innerWidth - w / 2 - 8, px)), y = Math.max(top + h, Math.min(S.dockTop - 14, py - 24));
+// 🐞 R2.4b: the bar's 🪙 pill can wrap to a 2nd row once the numbers grow (phones) → cards stop under its LIVE bottom, not the bottom measured at layout time
+function topEdge(){ let ib = $('gbar').getBoundingClientRect().bottom; $('gbar').querySelectorAll('.gb-g, .gb-board, .gb-stats').forEach(q => { const r = q.getBoundingClientRect(); if(r.height && r.top < innerHeight * 0.3) ib = Math.max(ib, r.bottom); }); return Math.max(S.top, Math.round(ib + 6)); }
+S.topEdge = topEdge;
+function infoNudge(){ const el = $('info'); if(!el || el.classList.contains('hidden')) return; const r = el.getBoundingClientRect(), te = topEdge(); if(r.top < te - 1) el.style.top = (parseFloat(el.style.top) + te + 2 - r.top) + 'px'; }   // the bar grew a 2nd row under an open card → push the card down
+function placeInfo(px, py){ const el = $('info'); if(el.classList.contains('hidden')) return; const w = el.offsetWidth, h = el.offsetHeight, top = topEdge() + 6, x = Math.max(w / 2 + 8, Math.min(innerWidth - w / 2 - 8, px)), y = Math.max(top + h, Math.min(S.dockTop - 14, py - 24));
   el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.setProperty('--tail', Math.max(18, Math.min(w - 18, px - (x - w / 2))) + 'px'); }
 
 /* ---------- 🚩 squad banner over the picked units: drag = order with a 👣 path (ground = go · rival = attack · own House = defend) · tap = its buttons ---------- */
@@ -900,8 +907,8 @@ function ff(sec){ const M = S.M, dt = 1 / 30; for(let k = 0; k < sec * 30 && !M.
 window.AVATAREALM = {SIDE_KEYS, RIVAL, sideFor, sidesInPlay, syncShrines, selInfo, pickSquad, doGroup, doSplit, openForm, closeForm, moveRole, chipTap, placeBanners, bar: () => BAR, showInfo, cmdDo, cmdBar, dragTo, dropAt, squadMenu, pickNear, S, AR, SIDE, ff, start, onTap, startPlace, moveGhost, cancelPlace, confirmPlace, pickRole, pickAll, arm, boxPick, train, houseUp, layout, hud, buildCards, territory};
 const {skillEvent, skillGround, skillOver, skillDockBuild, skillHud, skillLayout, skillCardHtml, skillCardBind, skillPress, skAimStart, skAimMove, skAimEnd, skAimClear} = window.ARSkills.init({S, AR, $, sideOf, tip, showInfo, events, whoOf, varOf});   // 👑 ar-r2-3: the skills part gets the page's pieces
 Object.assign(window.AVATAREALM, {skillPress, skillHud, skillDockBuild, skillLayout, skAimStart, skAimMove, skAimEnd, skAimClear, skillCardHtml});
-const {wallEvent, wallTick, wallTrayCard, wallCardHud, wallMode, wallDrag, wallConfirm, wallTapCell, wallGateBtn, wallDown, wallMoveP, wallUp, wallGround, wallOver, showWallCard, wallCardPlace} = window.ARWalls.init({S, AR, $, sideOf, tip, hud, cmdBar, events, cancelPlace, hideInfo, placeInfo, sqTag, chip, bar, cardPic, teamHex, addItem, dropItem, PLACER});   // 🧱 ar-r2-4a: the walls part gets the page's pieces
-Object.assign(window.AVATAREALM, {wallMode, wallDrag, wallConfirm, wallTapCell, showWallCard, hideInfo});
+const {wallEvent, wallTick, wallTrayCard, wallCardHud, wallMode, wallDrag, wallConfirm, wallTapCell, wallGateBtn, wallDown, wallMoveP, wallUp, wallGround, wallOver, showWallCard, wallCardPlace, wallUnitZ, wallManCan, wallCmd, wallInfoHtml, wallInfoBind, manDo, lookDo} = window.ARWalls.init({S, AR, $, sideOf, tip, hud, cmdBar, events, cancelPlace, hideInfo, placeInfo, sqTag, chip, bar, cardPic, teamHex, addItem, dropItem, PLACER, costHtml, showInfo, ROLE});   // 🧱 ar-r2-4a + 🏯 ar-r2-4b: the walls part gets the page's pieces
+Object.assign(window.AVATAREALM, {wallMode, wallDrag, wallConfirm, wallTapCell, showWallCard, hideInfo, manDo, lookDo, wallManCan});
 /* ================= 🎬 ar-r1c — the game's frame: 🎬 cover B · 🧾 one setup page (+ 🎖️ My formation) · 🏁 result · 💾 saves (plan §16r) =================
    The page opens on the cover (GameFrame GF.cover, btns: 'centre'); ▶ Play → the setup page; ▶ Start builds the match from the picks; the match end → GF.result.
    The hidden test route `?lv=<n>` still drops straight into a match (avatarealm.js). Picks + formation = PLAYER-based (Settings AvaRealm_<Name>, newest wins). */
@@ -1085,4 +1092,4 @@ controls(); boot();
 </script>
 </body>
 </html>
-<!-- (ar-r2-4a) END OF AvataRealm.html -->
+<!-- (ar-r2-4b) END OF AvataRealm.html -->
