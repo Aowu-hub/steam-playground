@@ -122,6 +122,7 @@
 <script src="inc/IsoLook_detective.js"></script>
 <script src="inc/IsoLook_toybox.js"></script>
 <script src="inc/IsoLook_dust.js"></script>
+<script src="inc/IsoLook_trail.js"></script>
 </head>
 <body ontouchstart="">
 <button class="top-btn" id="back-btn" data-sound="none">◀ Back</button>
@@ -133,6 +134,7 @@
   <button id="s-turn" class="sp-btn sp-secondary sp-sm" data-sound="none"><span class="bi">🔄</span> <span class="bl">Turn</span></button>
   <button id="s-var" class="sp-btn sp-secondary sp-sm" data-sound="none"><span class="bi">🎲</span> <span class="bl">Variant</span></button>
   <button id="s-state" class="sp-btn sp-secondary sp-sm hidden" data-sound="none"><span class="bi">🔀</span> <span class="bl">State</span></button>
+  <button id="s-touch" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">🔥</span> <span class="bl">Fire</span></button>
   <button id="s-shrink" class="sp-btn sp-secondary sp-sm hidden" data-sound="none"><span class="bi">◀</span> <span class="bl">Shrink</span></button>
   <button id="s-grow" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">🌱</span> <span class="bl">Grow</span></button>
   <button id="s-grow2" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">🌱</span> <span class="bl">②</span></button>
@@ -166,7 +168,7 @@ const $ = id => document.getElementById(id);
 let LOOK_KEYS = Object.keys(Props.LOOKS), SET_KEYS = Object.keys(Props.SETS);   /* 📦 ip-4a: filled again once every look file is in (keysNow) */
 const inOrder = (keys, first) => first.filter(k => keys.indexOf(k) >= 0).concat(keys.filter(k => first.indexOf(k) < 0));
 function keysNow(){ LOOK_KEYS = inOrder(Object.keys(Props.LOOKS), ['jungle', 'cherry', 'desert', 'snow', 'farm', 'lava', 'coral', 'moon', 'castle', 'raptor', 'bolt']);
-  SET_KEYS = inOrder(Object.keys(Props.SETS), ['jungle', 'village', 'temple', 'bits', 'landmark', 'cherry', 'desert', 'snow', 'farm', 'grow', 'lava', 'coral', 'moon', 'castle', 'realm', 'raptor', 'bolt', 'wild', 'kitchen', 'horde', 'monster', 'myth', 'reef', 'cloud', 'wizard', 'gear', 'detective', 'toybox', 'dust']); }
+  SET_KEYS = inOrder(Object.keys(Props.SETS), ['jungle', 'village', 'temple', 'bits', 'landmark', 'cherry', 'desert', 'snow', 'farm', 'grow', 'lava', 'coral', 'moon', 'castle', 'realm', 'raptor', 'bolt', 'wild', 'kitchen', 'horde', 'monster', 'myth', 'reef', 'cloud', 'wizard', 'gear', 'detective', 'toybox', 'dust', 'trail']); }
 const S = {set: 'village', look: 'jungle', cond: null, hold: null, sel: null, props: [], walkers: [], items: [], walk: true, M: null, V: null, ghost: null, drag: null, placed: 0, missed: []};
 const sound = k => { try{ if(window.UI && UI.sound) UI.sound(k); }catch(e){} };
 const shake = el => { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); };
@@ -242,7 +244,7 @@ function select(it){ S.sel = it; showBar(); }
 function showBar(){ const it = S.sel, h = S.hold, bar = $('selbar'); if(!it && !h){ bar.classList.add('hidden'); return; }
   const key = it ? it.prop : h.key, def = Props.DEFS[key]; $('sel-name').textContent = (h ? '✋ ' : '') + def.name + ' · ' + def.foot.join('×');
   const stNow = it ? it.state : h.state != null ? h.state : def.states ? Props.stateOf(key) : null; const plainWall = def.wall && !def.gate, shrine = key === 'realm_shrine' && !!it; $('s-state').classList.toggle('hidden', !(def.states && !plainWall) && !shrine); if(def.states && !plainWall) $('sel-name').textContent += ' · ' + stNow;   /* 🧱 ar-4: a wall's state = its joins (made by the helper) · ⭐ shrine = capture steps */
-  growBar(def, stNow);
+  growBar(def, stNow); touchBar(def, it);   /* 🌍 ip-6a */
   $('s-move').classList.toggle('hidden', !it); $('s-del').classList.toggle('hidden', !it); $('s-var').classList.toggle('hidden', def.variants < 2); bar.classList.remove('hidden'); placeUi(); }
 // re-place a prop with new settings (turn / variant); it stays put when the new shape doesn't fit
 function reshape(it, o){ const keep = {v: it.v, turn: it.turn, state: it.state, text: it.text}; Props.remove(S.M, it); const n = Props.place(S.M, it.prop, it.x, it.y, Object.assign({look: S.look, cond: S.cond}, keep, o));
@@ -252,7 +254,8 @@ $('s-turn').onclick = () => { if(S.hold){ S.hold.turn = (S.hold.turn + 1) % 4; s
 $('s-var').onclick = () => { const d = Props.DEFS[S.hold ? S.hold.key : S.sel && S.sel.prop]; if(!d) return; if(S.hold){ S.hold.v = (S.hold.v + 1) % d.variants; sound('tap'); return; } reshape(S.sel, {v: (S.sel.v + 1) % d.variants}); };
 $('s-move').onclick = () => { const it = S.sel; if(!it) return; const o = {v: it.v, turn: it.turn, state: it.state, text: it.text}; del(it); holdKey(it.prop, o); tip('👆 tap where it should go'); sound('tap'); };
 // 🔀 ip-3b a prop with states (gate open · closed · new, bridge down · lifted, hay bale whole · flat, pumpkin pile 1–12): flip it in place — the map follows (Props.setState)
-$('s-state').onclick = () => { const key = S.hold ? S.hold.key : S.sel && S.sel.prop, d = Props.DEFS[key]; if(!S.hold && S.sel && key === 'realm_shrine'){ tip('⭐ ' + arCapStep(S.sel)); sound('tap'); return; } if(!d || !d.states) return; const cur = S.hold ? (S.hold.state != null ? S.hold.state : Props.stateOf(key)) : S.sel.state, nx = d.states[(d.states.indexOf(cur) + 1) % d.states.length];
+$('s-state').onclick = () => { const key = S.hold ? S.hold.key : S.sel && S.sel.prop, d = Props.DEFS[key];
+  if(!S.hold && S.sel && d && d.gate){ const open = S.sel.state !== 'ready'; Props.setGate(S.sel, open, S.M); if(open) S.sel.touchT = S.lastT || 0; showBar(); sound(open ? 'success' : 'tap'); tip((open ? '✨ ' : '🔒 ') + d.name + ' · ' + S.sel.state); return; }   /* 🧭 ip-6a gates */ if(!S.hold && S.sel && key === 'realm_shrine'){ tip('⭐ ' + arCapStep(S.sel)); sound('tap'); return; } if(!d || !d.states) return; const cur = S.hold ? (S.hold.state != null ? S.hold.state : Props.stateOf(key)) : S.sel.state, nx = d.states[(d.states.indexOf(cur) + 1) % d.states.length];
   if(S.hold){ S.hold.state = nx; } else { Props.setState(S.sel, nx, S.M); pop(S.sel); } showBar(); sound('tap'); tip('🔀 ' + d.name + ' · ' + nx); };
 // 🌱 ip-3c growing props: ◀ Shrink · 🌱 Grow (at the young stage: ① / ② = the two branches, in their SkillKit colours) — Props.grow + the ✨ morph moment
 function growBar(def, st){ const G = def.grow, ids = ['s-shrink', 's-grow', 's-grow2']; if(!G){ ids.forEach(x => $(x).classList.add('hidden')); return; }
@@ -269,6 +272,19 @@ $('s-grow2').onclick = () => growTo(1, 'b');
 $('s-shrink').onclick = () => growTo(-1);
 // ✨ the morph moment over a plant that just changed stage (🐣 rule: 1.2 s)
 function morphs(g, V, t){ S.props.forEach(it => { if(it.morphT == null) return; if(!Props.morphFx(g, V, it, (t - it.morphT) / 1.2)) it.morphT = null; }); }
+// 🌍 ip-6a ELEMENT TOUCH: a lamp / gate / any prop with def.touch shows ONE button = the next element that would change it (🔥 when out, 💧 when lit …);
+//   tap = Props.touch + the ✨ 5-beat moment (Props.touchFx, 0.9 s) · the "try it here" ring (Props.touchHint) shows while it is picked
+const EL_ICON = {fire: '🔥', water: '💧', nature: '🌱', earth: '🪨', wind: '🌪️', zap: '⚡', light: '✨', shadow: '🌑', ice: '❄️'};
+S.touchI = 0;
+function touchEls(it){ const d = it && Props.DEFS[it.prop]; return d && d.touch ? Object.keys(d.touch).filter(e => Props.canTouch(it, e) != null) : []; }
+function touchElNow(){ const els = S.sel && !S.hold ? touchEls(S.sel) : []; return els.length ? els[S.touchI % els.length] : null; }
+function touchBar(def, it){ const b = $('s-touch'), el = it && !S.hold ? touchElNow() : null; b.classList.toggle('hidden', !el); if(!el) return; label(b, EL_ICON[el] + ' ' + Props.ELEMENTS[el].name); b.title = EL_ICON[el] + ' touch with ' + Props.ELEMENTS[el].name; }
+function touchNow(el){ const it = S.sel; el = el || touchElNow(); if(!it || !el) return null; const r = Props.touch(it, el, S.M); if(!r.changed) return r; it.touchT = S.lastT || 0; S.touchI++; showBar(); sound('success');
+  tip(EL_ICON[el] + ' ' + Props.DEFS[it.prop].name + ' → ' + it.state); return r; }
+$('s-touch').onclick = () => touchNow();
+function touches(g, V, t){ S.props.forEach(it => { if(it.touchT == null) return; if(!Props.touchFx(g, V, it, (t - it.touchT) / (Props.TOUCH_MS / 1000))) it.touchT = null; }); }
+function touchHints(g, V, t){ const el = touchElNow(); if(el) Props.touchHint(g, V, S.sel, el, t); }
+S.touchNow = touchNow; S.touchElNow = touchElNow;
 $('s-del').onclick = () => { if(S.sel){ del(S.sel); sound('pop'); } };
 $('s-x').onclick = () => { drop(); select(null); };
 
@@ -297,7 +313,7 @@ function render(alpha, t){ S.lastT = t;
   for(const w of S.walkers){ const it = w.it; it.x = w.px + (w.x - w.px) * alpha; it.y = w.py + (w.y - w.py) * alpha; it.pic = w.frames[w.path ? Math.floor(w.dist * 3.2) % Iso.WALK_N : 0]; it.flip = w.flip; }
   Props.tick(S.props, t);
   if(t - seeT > 0.1){ seeT = t; Props.seeThrough(S.V, S.props, S.walkers.map(w => w.it)); }
-  const st = Iso.frame(S.V, {items: S.items, t, overlay: (g, V) => { burst(g, V, t); morphs(g, V, t); ringSel(g, V, t); ghostDraw(g, V, t); }});
+  const st = Iso.frame(S.V, {items: S.items, t, groundFx: (g, V) => touchHints(g, V, t), overlay: (g, V) => { burst(g, V, t); morphs(g, V, t); touches(g, V, t); ringSel(g, V, t); ghostDraw(g, V, t); }});
   if(performance.now() - lastInfo > 400){ lastInfo = performance.now(); S.ms = st.ms; info(); }
 }
 function diamond(g, V, x, y, w, d, z){ const p = (a, b) => { const s = V.toScreen(a, b, z || 0); return [s.x - V._sx(), s.y - V._sy()]; }; g.beginPath(); [p(x, y), p(x + w, y), p(x + w, y + d), p(x, y + d)].forEach((q, k) => k ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.closePath(); }
@@ -382,4 +398,4 @@ start();
 </script>
 </body>
 </html>
-<!-- (ip-2+ip-3b+ip-3c+ip-4a+ar-1+ar-4+ar-7+ip-4b+ip-4c+ip-4d+ip-4d2+ip-4e+ip-5+ip-4f) END OF IsoPropsLab.html -->
+<!-- (ip-2+ip-3b+ip-3c+ip-4a+ar-1+ar-4+ar-7+ip-4b+ip-4c+ip-4d+ip-4d2+ip-4e+ip-5+ip-4f+ip-6a) END OF IsoPropsLab.html -->
