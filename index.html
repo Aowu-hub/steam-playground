@@ -67,6 +67,25 @@
   .brand.has-appb .logo{background:none;box-shadow:none;overflow:visible;}
   h1{font-family:var(--font-display,'Fredoka',sans-serif);font-weight:700;font-size:2rem;margin:0;line-height:1.05;}
   .sub{margin:2px 0 0;color:var(--ink-soft);font-weight:800;font-size:0.98rem;}
+  /* 🌟 b6c ⭐ STEP OF THE DAY (Motto kit): a chip INSIDE the .sub line — never adds height (one-screen Dashboard, ws-5).
+     It fits itself (fitMottoChip): line text off → "Who's playing today?" off → step name off; phone sideways hides .sub (below). */
+  .dash-head .brand{flex:1 1 auto;}
+  .brand-col{flex:1 1 auto;min-width:0;}
+  .brand .sub{display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap;overflow:hidden;}
+  .sub-who{flex:none;}
+  .motto-chip{display:inline-flex;align-items:center;gap:4px;flex:0 1 auto;min-width:0;height:1.5em;margin:0;padding:0 10px 0 5px;border:0;border-radius:999px;cursor:pointer;
+    font:inherit;font-size:.9em;font-weight:800;line-height:1;color:var(--ink);background:var(--panel);box-shadow:inset 0 0 0 1.5px var(--mc-col,#D4A20A);-webkit-tap-highlight-color:transparent;}
+  .motto-chip:active{transform:translateY(1px);}
+  .motto-chip > span,.motto-chip > b{flex:none;}
+  .motto-chip .mc-star{display:inline-block;animation:mc-twinkle 3.2s ease-in-out infinite;}
+  @keyframes mc-twinkle{0%,78%,100%{transform:none;}84%{transform:scale(1.28) rotate(-14deg);}90%{transform:scale(.95) rotate(8deg);}}
+  .motto-chip .mc-n{font-family:var(--font-display,'Fredoka',sans-serif);font-weight:700;color:var(--mc-ink,var(--ink));}
+  .motto-chip .mc-l{flex:none;font-weight:700;color:var(--ink-soft);}   /* whole line or none (fit1) — never a stray "—…" */
+  .motto-chip.th .mc-n,.motto-chip.th .mc-l{font-family:'Mitr',var(--font-body,'Nunito'),sans-serif;font-weight:500;}
+  .sub.fit1 .mc-l,.sub.fit3 .mc-n{display:none;}
+  .sub.fit2 .sub-who{display:none;}
+  @media (max-height:560px){ .brand .sub{display:none;} }   /* phone sideways: no .sub line → no chip (one-screen Dashboard) */
+  @media (prefers-reduced-motion: reduce){ .motto-chip .mc-star{animation:none;} }
   .look-btn{
     flex-shrink:0;display:flex;align-items:center;gap:10px;border:none;cursor:pointer;text-align:left;
     background:var(--card);border-radius:18px;padding:8px 14px 8px 8px;box-shadow:0 4px 0 rgba(0,0,0,0.08);
@@ -402,6 +421,7 @@
 <script src="inc/AvatarWeapons.js"></script>
 <script src="inc/ComicKit.js"></script>
 <script src="inc/GameLogos.js"></script>   <!-- 🎮 ap-1: the code-drawn app logo (🏷️ logo chat's kit) for the header + 🎉 Welcome Show -->
+<script src="inc/Motto.js"></script>   <!-- 🌟 b6c: the 11 Steps of Creation → ⭐ step-of-the-day chip in the header + 🪜 ladder sheet -->
 <script src="inc/WelcomeShow.js"></script>
 </head>
 <!-- ontouchstart="" is a deliberate no-op: iOS only shows :active press
@@ -427,7 +447,7 @@
       <div class="brand-col">
         <div class="app-logo" id="app-logo" aria-hidden="true"></div>   <!-- 🎮 ap-1 -->
         <h1 class="t-head">STEAM Playground</h1>
-        <p class="sub">Who's playing today?</p>
+        <p class="sub"><span class="sub-who">Who's playing today?</span><button class="motto-chip hidden" id="motto-chip" data-sound="pop" onclick="openMottoLadder()"></button></p>   <!-- 🌟 b6c -->
       </div>
     </div>
     <div class="head-btns">
@@ -751,6 +771,39 @@ function welcomeStep(k){ try { WelcomeShow.step(k); } catch(e){} }
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => place()); else place();
 })();
 window.miniShowAvatar = () => (selectedPlayer ? avatarOf(selectedPlayer) : null);   // ⚡ ws-3 mini show: your avatar runs to the Gameroom
+/* ---------- 🌟 b6c ⭐ STEP OF THE DAY chip (Motto kit) — one step a day for the whole family; TH for a Thai player; tap = 🪜 ladder ---------- */
+let MOTTO_SIG = '';
+function paintMottoChip(){
+  const c = document.getElementById('motto-chip'); if(!c) return;
+  if(!window.Motto){ c.classList.add('hidden'); return; }
+  const k = Motto.today(), st = Motto.step(k), ph = Motto.phase(st.phase), lg = selectedPlayer ? Motto.lang(selectedPlayer) : 'en', th = lg === 'th';
+  const sig = k + '|' + lg; c.classList.remove('hidden');
+  if(sig !== MOTTO_SIG){ MOTTO_SIG = sig;
+    c.style.setProperty('--mc-col', ph.col); c.style.setProperty('--mc-ink', ph.ink); c.classList.toggle('th', th); c.dataset.step = k; c.dataset.lang = lg;
+    c.setAttribute('aria-label', (th ? 'ขั้นของวันนี้: ' + st.th : 'Step of the day: ' + st.en) + ' — ' + (th ? st.lineTh : st.line) + ' (tap: the 11 Steps of Creation)');
+    c.title = th ? 'ขั้นของวันนี้ — แตะเพื่อดู 11 ขั้นของการสร้างสรรค์' : 'Step of the day — tap for the 11 Steps of Creation';
+    c.innerHTML = '<span class="mc-star" aria-hidden="true">⭐</span><span class="mc-i" aria-hidden="true">' + st.icon + '</span><b class="mc-n">' + UI.esc(th ? st.th : st.en) + '</b>' +
+      '<span class="mc-l">— ' + UI.esc(th ? st.lineTh : st.line) + '</span>'; }
+  fitMottoChip();
+}
+function fitMottoChip(){   // drop pieces until the .sub line fits on ONE line (no extra height, no "…" on the step name)
+  const c = document.getElementById('motto-chip'), sub = c && c.parentNode; if(!sub || c.classList.contains('hidden')) return;
+  sub.classList.remove('fit1', 'fit2', 'fit3'); if(!sub.clientWidth) return;
+  for(const f of ['fit1', 'fit2', 'fit3']){ if(sub.scrollWidth <= sub.clientWidth + 1) break; sub.classList.add(f); }
+}
+function openMottoLadder(){
+  if(!window.Motto) return; const me = selectedPlayer || 'Guest';
+  Motto.sheet({me, sel: Motto.today(), who: selectedPlayer ? {name: selectedPlayer, av: avatarOf(selectedPlayer)} : null,
+    onClose: () => { MOTTO_SIG = ''; paintMottoChip(); }});   // the ladder's EN ⇄ ไทย is saved per player → the chip follows
+}
+(function(){
+  let rq = 0; const later = () => { cancelAnimationFrame(rq); rq = requestAnimationFrame(fitMottoChip); };
+  addEventListener('resize', later);
+  try { new ResizeObserver(later).observe(document.querySelector('.dash-head')); } catch(e){}
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(later);
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', paintMottoChip); else paintMottoChip();
+  setInterval(() => { if(window.Motto && MOTTO_SIG.split('|')[0] !== Motto.today()) paintMottoChip(); }, 60000);   // past midnight → tomorrow's step
+})();
 
 /* ---------- BOOT: one server call + instant paint from the last visit ---------- */
 const DASH_CACHE_KEY = 'sp_dash_v2';
@@ -865,6 +918,7 @@ function renderPlayers(){
     grid.appendChild(tile); paintBody(tile.querySelector('.avatar canvas'), p.Name);
   });
   startTileActs();   // as-2 🎭
+  try { paintMottoChip(); } catch(e){}   // 🌟 b6c: the picked player's language
   const add = document.createElement('button');
   add.className = 'add-player-tile t-chip';
   add.setAttribute('data-sound', 'pop');
@@ -1224,4 +1278,4 @@ loadDashboard();
 </script>
 </body>
 </html>
-<!-- (r24+emoji+news-1+ebr-4+wd-5+modes-2+af-4+ws-5+as-2+ck-1b+lk-2a+lk-2c+st-1+ap-1+bo-10b+an-5+st-3) END OF Landing.html -->
+<!-- (r24+emoji+news-1+ebr-4+wd-5+modes-2+af-4+ws-5+as-2+ck-1b+lk-2a+lk-2c+st-1+ap-1+bo-10b+an-5+st-3+b6c) END OF Landing.html -->
