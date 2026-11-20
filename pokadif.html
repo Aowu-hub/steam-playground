@@ -102,6 +102,16 @@
   @keyframes pk-glass{0%,100%{transform:rotate(-10deg);}50%{transform:rotate(12deg) translateY(-3px);}}
   .goal{flex:1;min-width:0;font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(.82rem,2.4vw,1.02rem);line-height:1.15;background:rgba(255,255,255,0.95);color:#26203F;border-radius:14px;padding:6px 10px;box-shadow:0 3px 0 rgba(0,0,0,0.25);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;transition:background .25s;}
   .goal.oops{background:#FFE3EA;} .goal.yay{background:#DDF8E8;}
+  /* 📌 pk-7c guests: the sticker in the goal line (beside the pictures, never on them) + the 🏁 result row */
+  .pkg-stk{display:inline-block;margin-left:4px;padding:1px 8px;border-radius:999px;background:#FFF1C9;color:#5A3A00;border:2px solid #F2B83A;font-size:.86em;line-height:1.25;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;}
+  .pkg-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;width:100%;}
+  .pkg-h{font-weight:800;font-size:.92rem;width:100%;}
+  .pkg-chip{display:inline-flex;align-items:center;gap:5px;min-height:44px;padding:4px 12px;border-radius:999px;border:2px solid #2B2140;background:#FFF8E8;color:#26203F;font:700 .9rem 'Fredoka',Nunito,sans-serif;max-width:100%;box-shadow:0 3px 0 rgba(0,0,0,.2);}
+  .pkg-chip b{background:#4B3FD1;color:#fff;border-radius:999px;padding:2px 9px;font-weight:800;white-space:nowrap;}
+  button.pkg-chip{cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none;}
+  button.pkg-chip:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.2);}
+  .pkg-chip.soon{opacity:.92;border-style:dashed;}
+  .pkg-chip.soon i{font-style:normal;font-weight:600;font-size:.82rem;color:#5B5470;}
   .dots{flex:0 0 auto;display:flex;gap:4px;flex-wrap:wrap;max-width:96px;justify-content:center;}
   .dots i{width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,0.18);border:2px solid rgba(255,255,255,0.5);transition:transform .2s;}
   .dots i.on{background:var(--ok);border-color:#fff;animation:pk-pop .4s cubic-bezier(.2,1.8,.4,1) both;}
@@ -1688,6 +1698,7 @@ function pkBackground(g, sc){
   if(typeof emo === 'function') sc.deco.forEach(d => emo(g, d.ch, d.x, d.y, d.sz, 0.55));
 }
 function pkItem(g, it){
+  if(it.k === 'guest'){ if(window.PKGUEST) PKGUEST.flat(g, it); return; }   // 📌 pk-7c: a guest from another game
   const K = PK.KINDS[it.k] || {s: 1}, r = it.r * K.s, P = PK_PAINT[it.k] || PK_PAINT.circle, sx = it.sx || 1;
   g.save(); g.translate(it.x, it.y);
   if(it.k !== 'pt'){ g.fillStyle = 'rgba(0,0,0,0.16)'; g.beginPath(); g.ellipse(0, r * 0.92, r * 0.66 * sx, r * 0.14, 0, 0, 7); g.fill(); }   // ✨ particles float: no shadow
@@ -1795,7 +1806,16 @@ function familyList(){ const names = [S.player].concat((S.players || []).map(p =
   while(names.length < 2) names.push('Friend ' + names.length);
   return names.map(n => ({name: n, av: myAvatar(n)})); }
 function photoActs(){ return Object.keys(PK.PHOTO_ACTS).filter(a => !window.Acting || Acting.has('acts', a)); }
-function makePicture(theme, opt){   // a Spot / Blink / Arcade picture: a normal scene, or a 📸 family photo when the 📸 Family trip scene is picked
+/* 📌 pk-7c (plan §22c): guests from other games (part Pokadif_guests). A flat picture (🎲 Mix · the house scenes) is made with ONE change less and the
+   guest brings the last one — proven fair on the whole 1× picture pair before it is used; no kit in yet / no room → the normal picture, no wait.
+   🧱 islands get their guests inside Pokadif_iso (the island engine measures them). 📸 Family trip + 📖 cases + 🎯 Odd One Out: no guests. */
+function makePicture(theme, opt){
+  const gp = window.PKGUEST && G && theme !== 'trip' && theme !== 'iso' ? PKGUEST.plan(G.level) : null;
+  if(!gp) return makePicture0(theme, opt);
+  const n = Math.max(1, ((opt && opt.n) || G.L.n) - 1);
+  for(let t = 0; t < 2; t++){ const sc = makePicture0(theme, Object.assign({}, opt || {}, {n})); if(sc && sc.iso) return sc; if(sc && PKGUEST.dress(sc, G.level, gp)) return sc; }   // 2 tries, then a picture without guests
+  return makePicture0(theme, opt); }
+function makePicture0(theme, opt){   // a Spot / Blink / Arcade picture: a normal scene, or a 📸 family photo when the 📸 Family trip scene is picked
   const iz = pkIsoPick(theme); if(iz) return iz; if(theme === 'iso') theme = 'mix';   // 🧱 pk-7b: a ready 2.5D diorama (else a 🎲 Mix picture)
   if(theme === 'mix'){   // 🎲 pk-5c Mix = 5 random layers (scenery · people · props · particles · others) — a new combo every picture
     window.PK_FAMILY = familyList();
@@ -1916,7 +1936,9 @@ function PK_PART_OF(k){ return k === 'detective' ? 'Pokadif_cases' : k === 'race
 function pkPartReady(k){ const f = PK_PART_OF(k); return !f || (typeof GameParts !== 'undefined' && GameParts.has(f)); }
 /* 🎆 pk-7f: the FX part (every mode uses it) starts loading with the menu */
 function pkFxLoad(){ if(typeof GameParts !== 'undefined' && !GameParts.has('Pokadif_fx')) GameParts.need('Pokadif_fx'); }
-function pkPrefetch(k){ pkFxLoad(); if(SET.house === 'iso' && PK_ISO_MODES.indexOf(k) >= 0) pkIsoPrefetch(); const f = PK_PART_OF(k); if(f && typeof GameParts !== 'undefined' && !GameParts.has(f)) GameParts.need(f, ok => { if(ok) pkMoodWrap(); }); }
+/* 📌 pk-7c: the guests part (+ the first guest kit) loads with the menu, like 🎆 FX — every picture mode can meet a guest */
+function pkGuestLoad(){ if(typeof GameParts === 'undefined') return; const go = () => { if(window.PKGUEST) PKGUEST.prefetch(SET.level || 0); }; if(GameParts.has('Pokadif_guests')) go(); else GameParts.need('Pokadif_guests', ok => { if(ok) go(); }); }
+function pkPrefetch(k){ pkFxLoad(); pkGuestLoad(); if(SET.house === 'iso' && PK_ISO_MODES.indexOf(k) >= 0) pkIsoPrefetch(); const f = PK_PART_OF(k); if(f && typeof GameParts !== 'undefined' && !GameParts.has(f)) GameParts.need(f, ok => { if(ok) pkMoodWrap(); }); }
 function pkMoodWrap(){   // same wraps as the 🎵 MOOD block (its __gmood flags → never twice), for functions that arrived in a part after it ran
   if(typeof GMOOD === 'undefined' || !GMOOD) return;
   const w = (n, fn, after) => { const f = window[n], flag = after ? '__gmoodA' : '__gmood'; if(typeof f !== 'function' || f[flag]) return;
@@ -1989,7 +2011,7 @@ function calloutSetup(){ if(!(window.UI && UI.callout)) return;
   }); }
 function startCase(lvl){
   if(!pkPartReady(SET.mode)) return pkNeed(SET.mode, () => startCase(lvl));   /* 📏 pk-7a: wait for the mode's part file */
-  hideResult(); stopTicker();
+  hideResult(); stopTicker(); if(window.PKGUEST) PKGUEST.reset();   // 📌 pk-7c
   stopBlink(); storyReset(); clearMarks(); calloutSetup(); /* 💬 24t-c */
   if(SET.mode === 'detective') return storyStart(lvl);
   if(SET.mode === 'race') return raceStart(lvl);   // 👥 pk-4d
@@ -2020,7 +2042,7 @@ function nextPicture(){
   G.pic++; const L = G.L;
   let theme = SET.house;   // 🎲 pk-5c: Mix builds its own 5-layer picture (its scene = sc.theme)
   let sc = null; for(let i = 0; i < 12 && !sc; i++){ sc = makePicture(theme, G.A ? {n: G.A.n} : null); if(sc && G.used[sc.sig]) sc = null; }
-  G.lastTheme = sc.mix ? sc.theme : theme; G.used[sc.sig] = 1; G.scene = sc; G.found = sc.diffs.map(() => false); G.pOops = 0; G.pHints = 0; G.pSecs = 0; G.lastFind = performance.now(); G.glowAt = -1;
+  G.lastTheme = sc.mix ? sc.theme : theme; G.used[sc.sig] = 1; G.scene = sc; if(window.PKGUEST) PKGUEST.seenScene(sc); G.found = sc.diffs.map(() => false); G.pOops = 0; G.pHints = 0; G.pSecs = 0; G.lastFind = performance.now(); G.glowAt = -1;
   if(G.mode !== 'arcade') G.hints = L.hints;
   const nN = sc.diffs.length;
   clearMarks(); if(G.mode === 'arcade') BAR.count('pic', '📸', G.pics + '/' + G.rounds, 'Pictures to the 🏁'); else BAR.count('pic', MODE_ICON[G.mode], (G.pic + 1) + '/' + G.rounds, 'Picture'); BAR.count('found', '🔎', '0/' + nN, 'Found');
@@ -2101,8 +2123,8 @@ function found(i){
   if(G.mode === 'detective' && G.step && G.step.verb === 'find') BAR.count('found', '👣', n + '/' + N, 'Footprints'); else BAR.count('found', '🔎', n + '/' + N, 'Found');
   if(G.mode === 'arcade'){ G.total.found++; if(G.A.bonus){ G.extra += G.A.bonus; arcClock(); timePop('⏳ +' + G.A.bonus + ' s'); } }   // pk-3d: run time never shrinks; 🌋 / 💀 finds give ⏳ more time LEFT (Aowu 14:44)
   UISound.play('success'); bdReact('happy', 1300);
-  goal((FOUND_SAY[d.sub] || '🎉 Found one!') + ' ' + (n < N ? (N - n) + ' more to find.' : ''), 'yay');
-  moment('found', {i, type: d.t, sub: d.sub, n});
+  goal((FOUND_SAY[d.sub] || '🎉 Found one!') + (d.guest && window.PKGUEST ? PKGUEST.found(d) : '') + ' ' + (n < N ? (N - n) + ' more to find.' : ''), 'yay');   // 📌 pk-7c guest sticker
+  moment('found', {i, type: d.t, sub: d.sub, n, guest: d.guest ? d.guest.key : undefined});
   if(n >= N) pictureDone();
 }
 function oops(side, p){
@@ -2264,7 +2286,7 @@ function saveText(res, cleared){
   const h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New best for this level!' : cleared ? (res.best && res.best.score ? 'Best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Saved') : '✅ Saved — solve the case to unlock the next level';
   return featText(res.feats, h);
 }
-function showResult(html){ /* 💬 24t-c result */ if(window.UI && UI.callout) UI.callout.setup(null); $('result-card').innerHTML = html; $('result').classList.remove('hidden'); }
+function showResult(html){ /* 💬 24t-c result */ if(window.UI && UI.callout) UI.callout.setup(null); if(window.PKGUEST && G && G.over) html = PKGUEST.row(html); /* 📌 pk-7c */ $('result-card').innerHTML = html; if(window.PKGUEST) PKGUEST.wire($('result-card')); $('result').classList.remove('hidden'); }
 function hideResult(){ $('result').classList.add('hidden'); }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
 function goBack(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
@@ -2496,6 +2518,10 @@ boot();
 <script src="inc/Pokadif_race.js"></script>
 <script src="inc/Pokadif_fx.js"></script>
 <script src="inc/Pokadif_iso.js"></script>
+<script src="inc/Pokadif_guests.js"></script>
+<script src="inc/CreatureKit.js"></script>
+<script src="inc/LootKit.js"></script>
+<script src="inc/GameLogos.js"></script>
 <script src="inc/IsoKit.js"></script>
 <script src="inc/IsoProps.js"></script>
 <script src="inc/IsoLook_jungle.js"></script>
@@ -2572,4 +2598,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d+pk-4a+pk-4b+pk-4c+pk-4d+pk-5a+pk-5b+pk-5c+pk-5d+pk-6a+pk-6b+pk-6c+pk-6d+24t-c+24u-d1+pk-7a+pk-7f+pk-7a2+pk-7b+pk-7m1) END OF Pokadif.html -->
+<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d+pk-4a+pk-4b+pk-4c+pk-4d+pk-5a+pk-5b+pk-5c+pk-5d+pk-6a+pk-6b+pk-6c+pk-6d+24t-c+24u-d1+pk-7a+pk-7f+pk-7a2+pk-7b+pk-7m1+pk-7c) END OF Pokadif.html -->

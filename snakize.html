@@ -305,6 +305,7 @@
 <script src="inc/CardArt.js"></script>
 <script src="inc/GameLogos.js"></script>
 <script src="inc/Motto.js"></script>   <!-- 🧱 b3w5b: 🎬 cover + 🏁 result card (GameFrame + GameCovers + CardArt) -->
+<script src="inc/LinkKit.js"></script>   <!-- 📡 lk-8c: own devices (LinkKit plan §55) — the link code is the part Snakize_link + LinkPads -->
 </head>
 <body ontouchstart="">
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
@@ -1617,6 +1618,7 @@ function openCover(){
   if(SnakeCover && SnakeCover.who !== S.player){ SnakeCover.destroy(); SnakeCover = null; }
   if(!SnakeCover){ SnakeCover = GF.cover(document.body, {game: GAME_ID, title: 'Snakize', icon: '🐍', version: SNAKE_VERSION, me: S.player, players: S.players, avatarOf: myAvatar, seats: {min: 1, max: 4},
       acts: ['beat.wave', 'beat.jump'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms',
+      own: C => snlOwn(C),   /* 📡 lk-8c: the room lives on the cover — the TV / tablet runs the board, phones are 🕹️ controllers */
       onPlay: line => { SnakeCover.hide(); snakeLineup(line); renderMenu(); showScreen('menu'); } }); SnakeCover.who = S.player; }
   SnakeCover.show();
 }
@@ -2794,7 +2796,27 @@ msAfter('choosePlayer', name => {
   UI.alsoTry({game: MS_GAME, player: name, current: msNow, at: () => document.querySelector('#scr-menu .title'), open: msOpen});
 });
 /* ✨ END MODE SPOTLIGHT */
+/* 📡 lk-8c: 🐍 own devices — the TV / tablet runs the board, phones are 🕹️ controllers (LinkKit plan §55). Born split: the link code is the part
+   Snakize_link + the shared LinkPads (GameParts), loaded on the first 📱 Own devices tap, a ?link=<room> QR or the 📺 Game Station. Here only the door. */
+function snlNeed(go){
+  if(!(window.Link && Link.cover)){ UI.toast('📡 Own devices need the internet'); return; }
+  if(typeof GameParts === 'undefined') return setTimeout(() => snlNeed(go), 40);   // the loader comes right after this script
+  if(GameParts.has('LinkPads') && GameParts.has('Snakize_link')) return go();
+  UI.loading('snakize', '📡 Getting the room ready…');
+  GameParts.need(['LinkPads', 'Snakize_link'], ok => { UI.loaded(); if(ok) return go(); UISound.play('error'); UI.toast('📡 The room did not load — check the internet, then tap 📱 Own devices again'); });
+}
+function snlOwn(C){ snlNeed(() => snlOpen(C)); }
+function snlUrlCode(cb){
+  try{ if(window.google && google.script && google.script.url && google.script.url.getLocation){ google.script.url.getLocation(l => cb(((l && l.parameter) || {}).link || '')); return; } }catch(e){}
+  try{ cb(new URLSearchParams(location.search).get('link') || ''); }catch(e){ cb(''); }
+}
+msAfter('choosePlayer', () => snlUrlCode(c => { c = String(c || '').replace(/[^0-9]/g, '').slice(0, 4); if(c.length === 4) setTimeout(() => snlNeed(() => snlUrl(c)), 0); }));
+msAfter('choosePlayer', () => { if(window.Station) Station.params().then(p => { if(p.mode === 'ltv' && p.stv === '1' && /^\d{4}$/.test(String(p.st || ''))) setTimeout(() => snlNeed(() => snlStation()), 0); }); });   // 📺 from the TV Game Station
+/* 📡 END lk-8c */
 </script>
+<script src="inc/SnakizeParts.js"></script>
+<script src="inc/Snakize_link.js"></script>
+<script src="inc/LinkPads.js"></script>   <!-- 📏 lk-8c: the part loader (+ offline app / tests: the parts inline), after the main script -->
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.themes', {rows: 2}); UI.pageRows('.skins', {rows: 2}); }</script>
 <script>
 /* 🎵 MOOD (24u-b) START — ✨ polish chat · UiKit ambient mood (UISound.mood, plan `Ambient Moods — full plan.md` §7). Don't edit by hand:
@@ -2938,4 +2960,4 @@ const ANN = (function(){
 </script>
 </body>
 </html>
-<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a+p3e+cs-2b+ck-2c+pz-1+24n+24s+b3w5b+24u-d1+24t-f+b3b8+an-1+an-2+24y-b) END OF Snakize.html -->
+<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a+p3e+cs-2b+ck-2c+pz-1+24n+24s+b3w5b+24u-d1+24t-f+b3b8+an-1+an-2+24y-b+lk-8c) END OF Snakize.html -->
