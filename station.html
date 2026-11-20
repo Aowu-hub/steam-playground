@@ -85,6 +85,8 @@
   .lcard .votes span{background:#FFC845;color:#3B2A78;border-radius:99px;padding:1px 6px;font:800 .7rem Nunito,sans-serif}
   .lcard.mine{outline:3px solid #FFC845}
   .lcard.rec::before{content:'⭐';position:absolute;top:4px;left:6px;font-size:.8rem}
+  .lcard.off{opacity:.38;cursor:default;box-shadow:none} .lcard.off small{opacity:1;color:#E0446A}   /* ✋ lk-pp1b: a way that doesn't fit the number of players */
+  .lv.w4{grid-template-columns:repeat(4,1fr)} .phone .lv.w4{grid-template-columns:repeat(2,1fr)}   /* ✋ lk-pp1b: ⬛ 4 ways */
   .lcard{text-align:center} .lcard small{display:block;font:800 .72rem Nunito,sans-serif;opacity:.75;margin-top:1px}   /* 📺 st-2b: 🏓 sport card = icon · name · what it is (centred on the TV too) */
   .big{text-align:center;padding:26px 10px}
   .big .ic{font-size:5rem;display:block;animation:bob 1.2s ease-in-out infinite}
@@ -124,6 +126,7 @@
     .phone .shelf{grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px} .phone .gcard{min-height:74px} .phone .gcard .ic{font-size:1.5rem} .phone .gcard .lg{height:36px} .phone .gcard .lg img{max-height:36px} .phone .gcard .pl{display:none} .leave{margin-top:6px} }
   @media (max-height:520px) and (min-width:700px){ .phone{max-width:820px} }
   @media (max-height:520px) and (min-width:600px){ .phone .lv{grid-template-columns:repeat(6,1fr);gap:8px} .phone .lcard{padding:7px 4px} .phone .lcard .e{font-size:1.45rem} }   /* 📺 st-2b: a phone held sideways = level / sport cards in ONE row (first screen) */
+  @media (max-height:520px) and (min-width:600px){ .phone .lv.w4{grid-template-columns:repeat(4,1fr)} .phone .lv.w3{grid-template-columns:repeat(3,1fr)} }   /* ✋ lk-pp1b */
   @media (max-width:820px){ .tv{grid-template-columns:1fr} .qr{width:120px;height:120px} }
   @media (prefers-reduced-motion:reduce){ .gcard.win,.big .ic,.mem.in{animation:none} }
 </style>
@@ -196,10 +199,24 @@ const SHELF = [
   {k: 'memory', page: 'memory', icon: '🃏', name: 'Memories Match', max: 4, lvl: true, c: ['#7A5CFA', '#2BB0C8'], logo: 'memory'},
   {k: 'lettercraft', page: 'wordboard', icon: '🔤', name: 'Lettercraft', max: 4, lvl: true, c: ['#2E7D5B', '#2EC4B6'], logo: 'lettercraft', kind: 'word-board'},   // 📺 st-2a: the level = the 🤖's level + words + board
   {k: 'algebros', page: 'numberboard', icon: '➗', name: 'Algebros', max: 4, lvl: true, c: ['#E8742A', '#FFB020'], logo: 'algebros', kind: 'number-board'},   // 📺 st-2a
-  {k: 'slabrall', page: 'slabrall', icon: '🏓', name: 'SlaBrall', max: 4, lvl: true, top: 4, sports: true, c: ['#1E88E5', '#22C55E'], logo: 'slabrall', kind: 'sla-brall'}   // 📺 st-2b: phones = controllers · 1 = you vs 🤖 · 2 = 1 vs 1 · 3–4 = 2 vs 2 · levels 🌱–🌋 (💀 is you vs the robot only) · then a 🗳️ sport vote
+  {k: 'slabrall', page: 'slabrall', icon: '🏓', name: 'SlaBrall', max: 4, lvl: true, top: 4, sports: true, c: ['#1E88E5', '#22C55E'], logo: 'slabrall', kind: 'sla-brall'},   // 📺 st-2b: phones = controllers · 1 = you vs 🤖 · 2 = 1 vs 1 · 3–4 = 2 vs 2 · levels 🌱–🌋 (💀 is you vs the robot only) · then a 🗳️ sport vote
+  {k: 'polyplot', page: 'polyplot', icon: '⬛', name: 'Polyplot', max: 4, lvl: true, top: 4, ways: true, c: ['#2F8CFF', '#22C3A1'], logo: 'polyplot', kind: 'polyplot'},   // 📺 lk-pp1b: 1 = you vs 🤖 (🛡️ Co-op: on your own) · ✋ mode vote
+  {k: 'wisdeck', page: 'wisdeck', icon: '🃏', name: 'WisDeck', max: 4, lvl: true, top: 4, ways: true, c: ['#7A3CFF', '#FF4F8B'], logo: 'wisdeck', kind: 'wisdeck'}   // 📺 lk-pp1b: ✋ 🔔 WisBuzz (2–4) · 🔢 WisCount / 🂡 WisJack (1 = vs 🤖, 2)
 ];
 // 🏓 st-2b: SlaBrall's sports (same keys + order as the game's SB.SPORT_ORDER) — the players vote one after the level
 const SB_SPORTS = [['slashot', '🏒', 'SlaShot', 'Table hockey'], ['slapoof', '🥒', 'SlaPoof', 'Pickleball'], ['slaball', '🎾', 'SlaBall', 'Tennis'], ['slapong', '🏓', 'SlaPong', 'Ping-pong'], ['slabam', '🏸', 'SlaBam', 'Badminton'], ['slawall', '🧱', 'SlaWall', 'Squash']];
+// ✋ lk-pp1b: the "how we play" vote after the level (server phase + vote kind `sport`, go.sport = the key) — per game [key, icon, name, what, min, max players]
+const WAYS = {
+  slabrall: {tv: 'vote the sport!', ph: 'pick a sport', list: SB_SPORTS.map(x => x.concat([1, 4]))},
+  polyplot: {tv: 'how do we play?', ph: 'how do we play?', list: [['classic', '⬜', 'Classic', 'Claim the most boxes', 1, 4], ['hunt', '🏹', 'Hunt', 'Coins, creatures + cards', 1, 4],
+    ['fort', '🏰', 'Fortiplot', 'Build towers, knock theirs', 1, 4], ['coop', '🛡️', 'Co-op', 'All together vs the waves', 1, 4]]},
+  wisdeck: {tv: 'which game?', ph: 'which game?', list: [['buzz', '🔔', 'WisBuzz', 'Every phone a buzzer', 2, 4], ['count', '🔢', 'WisCount', 'Your hand vs theirs', 1, 2], ['jack', '🂡', 'WisJack', 'Get close to 21', 1, 2]]}};
+function waysOf(g, n){ const w = g && (g.ways || g.sports) && WAYS[g.k]; return w ? w.list.map(x => ({k: x[0], icon: x[1], name: x[2], what: x[3], ok: n >= x[4] && n <= x[5], why: n < x[4] ? 'needs ' + x[4] + '+' : x[5] + ' players'})) : []; }
+function wayCards(g, go, st, btn){   // TV (div) or phone (button) cards; a way that doesn't fit = greyed + why
+  const W = waysOf(g, (go.players || []).length), mine = btn ? (((st.votes || {}).sport || {})[S.me] || S.mine['sport' + st.round + st.phase] || '') : '';
+  return '<div class="lv w' + W.length + '">' + W.map(w => (btn ? '<button' : '<div') + ' class="lcard' + (w.ok ? '' : ' off') + (mine === w.k ? ' mine' : '') + '" data-sp="' + w.k + '"' + (btn ? ' data-sound="none"' + (w.ok ? '' : ' disabled') : '') + '><span class="e">' + w.icon + '</span>' + esc(w.name) +
+    '<small>' + esc(w.ok ? w.what : w.why) + '</small><div class="votes">' + votesHtml((st.votes || {}).sport, w.k) + '</div>' + (btn ? '</button>' : '</div>')).join('') + '</div>';
+}
 const lvOf = g => LV.slice(0, ((g && g.top != null) ? g.top : 5) + 1);   // 📺 st-2b: a game may stop below 💀 Hardcore
 // 🏷️ LOGO SHELL (st-1b, Aowu 2026-11-17 "the shelf = the games' logos being created"): each card shows the game's code logo from GameLogos
 // ONLY when Aowu approved it (GameLogos.ok); else the icon + name. New logos appear by themselves once the 🏷️ logo chat approves them.
@@ -307,15 +324,15 @@ function paintTvStage(){
       '<div class="lv">' + lvOf(g).map((l, i) => '<div class="lcard"><span class="e">' + l[0] + '</span>' + l[1] + '<div class="votes">' + votesHtml((st.votes || {}).lvl, i) + '</div></div>').join('') + '</div>';
   } else if(st.phase === 'sport'){   /* 📺 st-2b: 🏓 vote the sport */
     const g = gameOf(go.game) || {};
-    el.innerHTML = '<h2>' + esc(g.icon + ' ' + g.name) + ' — vote the sport!</h2><div class="hint">' + (go.alone ? esc(go.players[0]) + ' picks' : 'The players vote · a tie = 🎲') + (go.lvl != null ? ' · ' + LV[go.lvl][0] + ' ' + LV[go.lvl][1] : '') + '</div>' +
-      '<div class="lv">' + SB_SPORTS.map(x => '<div class="lcard" data-sp="' + x[0] + '"><span class="e">' + x[1] + '</span>' + x[2] + '<small>' + x[3] + '</small><div class="votes">' + votesHtml((st.votes || {}).sport, x[0]) + '</div></div>').join('') + '</div>';
+    el.innerHTML = '<h2>' + esc(g.icon + ' ' + g.name) + ' — ' + esc((WAYS[g.k] || WAYS.slabrall).tv) + '</h2><div class="hint">' + (go.alone ? esc(go.players[0]) + ' picks' : 'The players vote · a tie = 🎲') + (go.lvl != null ? ' · ' + LV[go.lvl][0] + ' ' + LV[go.lvl][1] : '') + '</div>' +
+      wayCards(g, go, st, false);   /* ✋ lk-pp1b */
   } else {
     const g = gameOf(go.game) || {};
     el.innerHTML = '<div class="big"><span class="ic">' + (g.icon || '🎮') + '</span><h2>🔀 Off to ' + esc(g.name || 'the game') + '!</h2><div class="hint">' + (go.lvl != null ? LV[go.lvl][0] + ' ' + LV[go.lvl][1] : '') + sportTxt(go) + '</div>' +
       '<div class="names">' + (go.players || []).map(n => '<span>🎮 ' + esc(n) + '</span>').join('') + (go.watchers || []).map(n => '<span class="w">👀 ' + esc(n) + '</span>').join('') + '</div></div>';
   }
 }
-function sportTxt(go){ const x = go && go.sport && SB_SPORTS.find(y => y[0] === go.sport); return x ? ' · ' + x[1] + ' ' + x[2] : ''; }   /* 📺 st-2b */
+function sportTxt(go){ const w = go && go.sport && WAYS[go.game], x = w && w.list.find(y => y[0] === go.sport); return x ? ' · ' + x[1] + ' ' + x[2] : ''; }   /* 📺 st-2b · ✋ lk-pp1b: any game's way */
 function tally(map, keys){
   const n = {}; Object.keys(map || {}).forEach(k => { const v = String(map[k]); if(keys.indexOf(v) >= 0) n[v] = (n[v] || 0) + 1; });
   const top = Math.max(0, ...Object.values(n)); return Object.keys(n).filter(k => n[k] === top);
@@ -349,8 +366,9 @@ async function tvDecide(){
     const g = gameOf(go.game) || {};   /* 📺 st-2b */
     const tops = tally(Object.fromEntries(got.map(n => [n, votes[n]])), lvOf(g).map((l, i) => String(i))).map(Number), lvl = tops.length ? Math.min(...tops) : 0;   // a tie = the easier level
     const map = go.game === 'memory' ? (go.players.length >= 3 || lvl >= 3 ? '8' : '6') : '';
-    const next = g.sports ? 'sport' : 'go';   /* 📺 st-2b: 🏓 then the players vote a sport */
-    const r = await Station.run('stationSet', S.code, {name: S.me, token: S.tok}, {phase: next, lvl, map}).catch(() => null);
+    const W = waysOf(g, go.players.length).filter(w => w.ok), next = W.length > 1 ? 'sport' : 'go';   /* 📺 st-2b → ✋ lk-pp1b: then the players vote how to play (one way left = it just goes) */
+    const patch = {phase: next, lvl, map}; if(W.length === 1) patch.sport = W[0].k;
+    const r = await Station.run('stationSet', S.code, {name: S.me, token: S.tok}, patch).catch(() => null);
     S.deadline = 0; S.deciding = false; if(r && r.state){ S.st = r.state; paintTvStage(); if(r.state.phase === 'go') tvGo(); }
     return;
   }
@@ -360,9 +378,10 @@ async function tvDecide(){
     if(!S.deadline) S.deadline = Date.now() + VOTE_MS * 0.75;
     if(got.length < go.players.length && Date.now() < S.deadline) return;
     S.deciding = true;
-    const tops = tally(Object.fromEntries(got.map(n => [n, votes[n]])), SB_SPORTS.map(x => x[0])), k = tops[Math.floor(Math.random() * tops.length)] || SB_SPORTS[0][0];
-    const x = SB_SPORTS.find(y => y[0] === k);
-    if(tops.length > 1) UI.toast('🎲 A tie — the dice picks ' + x[1] + ' ' + x[2]);
+    const W = waysOf(gameOf(go.game), go.players.length).filter(w => w.ok);   /* ✋ lk-pp1b: only the ways that fit */
+    const tops = tally(Object.fromEntries(got.map(n => [n, votes[n]])), W.map(w => w.k)), k = tops[Math.floor(Math.random() * tops.length)] || (W[0] || {}).k || SB_SPORTS[0][0];
+    const x = W.find(w => w.k === k) || {icon: '', name: k};
+    if(tops.length > 1) UI.toast('🎲 A tie — the dice picks ' + x.icon + ' ' + x.name);
     const r = await Station.run('stationSet', S.code, {name: S.me, token: S.tok}, {phase: 'go', sport: k}).catch(() => null);
     S.deadline = 0; S.deciding = false; if(r && r.state){ S.st = r.state; paintTvStage(); tvGo(); }
     return;
@@ -427,10 +446,9 @@ function paintPhone(){
     return;
   }
   if(st.phase === 'sport' && playing){   /* 📺 st-2b: 🏓 pick a sport (alone = you pick) */
-    const mine = ((st.votes || {}).sport || {})[S.me] || S.mine['sport' + st.round + st.phase] || '';
-    el.innerHTML = '<h2>' + esc(g.icon + ' ' + g.name) + ' — pick a sport</h2><div class="hint">' + (go.alone ? 'You play alone against the 🤖' : 'Everyone votes · a tie = 🎲') + (go.lvl != null ? ' · ' + LV[go.lvl][0] + ' ' + LV[go.lvl][1] : '') + '</div>' +
-      '<div class="lv">' + SB_SPORTS.map(x => '<button class="lcard' + (mine === x[0] ? ' mine' : '') + '" data-sp="' + x[0] + '" data-sound="none"><span class="e">' + x[1] + '</span>' + x[2] + '<small>' + x[3] + '</small><div class="votes">' + votesHtml((st.votes || {}).sport, x[0]) + '</div></button>').join('') + '</div>';
-    el.querySelectorAll('[data-sp]').forEach(b => { b.onclick = () => vote('sport', b.dataset.sp); });
+    el.innerHTML = '<h2>' + esc(g.icon + ' ' + g.name) + ' — ' + esc((WAYS[g.k] || WAYS.slabrall).ph) + '</h2><div class="hint">' + (go.alone ? (g.k === 'slabrall' ? 'You play alone against the 🤖' : 'You pick · alone = you vs the 🤖') : 'Everyone votes · a tie = 🎲') + (go.lvl != null ? ' · ' + LV[go.lvl][0] + ' ' + LV[go.lvl][1] : '') + '</div>' +
+      wayCards(g, go, st, true);   /* ✋ lk-pp1b */
+    el.querySelectorAll('[data-sp]:not([disabled])').forEach(b => { b.onclick = () => vote('sport', b.dataset.sp); });
     return;
   }
   if(!playing){
@@ -450,4 +468,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (st-1+st-1b+st-2a+st-2a2+st-2b+st-3) END OF Station.html -->
+<!-- (st-1+st-1b+st-2a+st-2a2+st-2b+st-3+lk-pp1b) END OF Station.html -->
