@@ -1,5 +1,6 @@
 <!-- MoodLab.html — 🎵 Mood Lab (24u-a, ✨ polish chat, hidden: ?page=moodlab). Not in the Gameroom. Listen to every game's ambient mood on the
      REAL engine (UiKit UISound.mood): drag 😌→😬 Tension, try 🤫 robot thinks · 💥 game sound (ducks the music) · 🎉 big win · ⏸ · ⏱️ run out the clock.
+     🎊 24y-c: the day row plays any special day over any mood (📅 Today = what the app plays today).
      The 🎵 button = this player's music on / off + volume (same pop-over as the 🎵 chip in every game bar). Plan: Drive `Ambient Moods — full plan.md`. -->
 <!DOCTYPE html>
 <html>
@@ -45,6 +46,9 @@
   .card .fb{position:absolute;right:8px;top:8px;font-size:.72rem;font-weight:800;padding:2px 7px;border-radius:10px;background:var(--fc,#EEE);color:#2B2440;}
   .card.on{box-shadow:0 0 0 3px var(--game-a),0 6px 16px rgba(124,92,255,.3);animation:mlBeat 1.2s ease-in-out infinite;}
   @keyframes mlBeat{50%{transform:scale(1.025);}}
+  .days{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:0 0 10px;}   /* 🎊 24y-c */
+  .day{min-height:40px;padding:0 11px;border:0;border-radius:20px;font-family:'Fredoka',sans-serif;font-weight:600;font-size:.88rem;cursor:pointer;background:#FFF7E6;color:var(--ink);box-shadow:0 2px 0 rgba(43,36,64,.12);}
+  .day.on{background:linear-gradient(135deg,#F2B640,#E8724A);color:#fff;}
   .own{margin:0 0 12px;text-align:center;font-weight:700;font-size:.82rem;color:var(--ink-soft);}
   .panel{position:sticky;bottom:0;z-index:6;width:100%;background:rgba(255,255,255,.95);backdrop-filter:blur(6px);box-shadow:0 -4px 18px rgba(60,40,90,.14);padding:8px 10px var(--safe-b,18px);}
   .pin{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:6px;}
@@ -76,6 +80,7 @@
 </div>
 <main>
   <div class="fams" id="fams"></div>
+  <div class="days" id="days" aria-label="Special day"></div>
   <div class="grid" id="grid"></div>
   <p class="own">🎵 BeatCorner and 📷 Pose Party play their own music, so they have no mood.</p>
 </main>
@@ -106,7 +111,7 @@ const FAM_ORDER = ['think', 'detective', 'climb', 'sport', 'arena', 'board', 'st
 const FAM_LABEL = {think: '🧠 Think', detective: '🔬 Lab & detective', climb: '🏃 Arcade', sport: '🏟️ Sport', arena: '🥊 Arena', board: '♟️ Board', story: '📖 Story'};
 const FAM_COL = {think: '#DDF1EF', detective: '#E8E4FB', climb: '#FDE3D7', sport: '#FFF1C9', arena: '#FBDCD9', board: '#EFE6DC', story: '#DFF0DA'};
 const SCALE_NAME = {pent: 'pentatonic', minpent: 'minor pentatonic', dorian: 'dorian', lydian: 'lydian', major: 'major', minor: 'minor'};
-let FAM = 'all', CUR = null, CUR_ID = '', ramp = 0;
+let FAM = 'all', CUR = null, CUR_ID = '', ramp = 0, DAY = null;   // 🎊 24y-c: null = today's day (if any) · '' = none · key = that day
 // back: names where it goes (◀ Dashboard when there is no trail)
 $('back').textContent = UI.backLabel ? UI.backLabel() : '◀ Back';
 $('back').onclick = () => { stop(); UI.back ? UI.back() : history.back(); };
@@ -142,11 +147,12 @@ function lit(id, on){ $(id).classList.toggle('lit', !!on); }
 function toggle(k){
   UISound.wake && UISound.wake();
   const was = CUR_ID; stop(); if(was === k) return;
-  CUR = UISound.mood(k); CUR_ID = k;
+  CUR = UISound.mood(k, DAY == null ? {} : {day: DAY, jingle: !!DAY}); CUR_ID = k;   // 🎊 24y-c: a picked day plays its jingle every time
   $('ten').value = 0; lit('a-hush', false); lit('a-pause', false); $('a-pause').textContent = '⏸ Pause';
   $('panel').classList.remove('idle');
   const R = UISound.MOODS[k];
-  $('now-t').textContent = '▶ ' + R.icon + ' ' + R.name + ' — ' + (GAME_OF[k] || k);
+  const D = UISound.DAYS && CUR.day ? UISound.DAYS[CUR.day] : null;
+  $('now-t').textContent = '▶ ' + R.icon + ' ' + R.name + ' — ' + (GAME_OF[k] || k) + (D ? ' · ' + D.icon + ' ' + D.name : '');
   document.querySelectorAll('.card').forEach(c => c.classList.toggle('on', c.dataset.k === k));
 }
 function stop(){
@@ -168,9 +174,18 @@ setInterval(() => {
   if(!CUR || !CUR.live){ if(CUR_ID && !(CUR && CUR.why === 'own-music')) $('now-l').textContent = CUR && !CUR.live ? '🔇 (silent here)' : ''; return; }
   const S = CUR.S; $('now-l').textContent = '🎚️ ' + Math.round(S.bpmNow) + ' bpm · ' + (S.paused ? 'paused' : (S.layers || '…'));
 }, 250);
-renderFams(); renderGrid();
+function renderDays(){   // 🎊 24y-c: hear any special day over any mood
+  const box = $('days'); if(!box || !UISound.DAYS) return; box.innerHTML = '';
+  const today = UISound.days ? UISound.days.on(new Date(), UISound.music.state().who) : '';
+  [[null, '📅 Today' + (today ? ' ' + UISound.DAYS[today].icon : '')], ['', '🎵 No day']].concat(UISound.days.ORDER.map(k => [k, UISound.DAYS[k].icon + ' ' + UISound.DAYS[k].name])).forEach(([k, t]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'day' + (DAY === k ? ' on' : ''); b.textContent = t; b.dataset.k = k == null ? 'today' : k; b.setAttribute('data-sound', 'tap');
+    b.onclick = () => { DAY = k; box.querySelectorAll('.day').forEach(x => x.classList.toggle('on', x === b)); const id = CUR_ID; if(id){ stop(); toggle(id); } };
+    box.appendChild(b);
+  });
+}
+renderFams(); renderGrid(); renderDays();
 window.MoodLab = {toggle: toggle, stop: stop, cur: () => CUR};
 </script>
 </body>
 </html>
-<!-- (24u-a) END OF MoodLab.html -->
+<!-- (24u-a+24y-c) END OF MoodLab.html -->

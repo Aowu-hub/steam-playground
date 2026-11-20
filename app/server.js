@@ -496,6 +496,28 @@ function saveMusic(name, on, v, at, fx, acc) {   // 🗣️ an-4: + acc = readin
   return { ok: true };
 }
 
+function saveMusicPicks(name, json) {   // 🎊 24y-c: per-player music picks → Settings MusicPicks_<Name> {days: {on, dress, at}, …}; newest wins per part (24y-d adds its tune / style picks)
+  name = String(name || '').slice(0, 40);
+  if (!name) return { ok: false };
+  let inc = null; try { inc = JSON.parse(String(json || '')); } catch (e) {}
+  if (!inc || typeof inc !== 'object') return { ok: false };
+  let cur = {}; try { cur = JSON.parse(getSettings()['MusicPicks_' + name] || '{}') || {}; } catch (e) { cur = {}; }
+  if (typeof cur !== 'object' || Array.isArray(cur)) cur = {};
+  let changed = false;
+  Object.keys(inc).slice(0, 20).forEach(k => {
+    if (!/^[a-z][a-z0-9_]{0,23}$/i.test(k)) return;
+    let v = inc[k]; if (!v || typeof v !== 'object' || Array.isArray(v)) return;
+    const at = Number(v.at) || Date.now();
+    if (k === 'days') v = { on: v.on !== false && v.on !== 'false', dress: v.dress === 'full' ? 'full' : 'touch', at: at };
+    if (cur[k] && Number(cur[k].at) > at) return;
+    cur[k] = v; changed = true;
+  });
+  const out = JSON.stringify(cur);
+  if (out.length > 4000) return { ok: false, why: 'too big' };
+  if (changed) saveSetting('MusicPicks_' + name, out);
+  return changed ? { ok: true } : { ok: true, kept: 'newer' };
+}
+
 // 🏰⚔️ AvataRealm (ar-r1c-b): a player's setup picks + 🎖️ formation = Settings `AvaRealm_<Name>` (player-based, follows them to every
 // device). Checked here (only known keys, numbers clamped) and the NEWEST `at` wins, so a late answer or an offline replay never
 // overwrites a newer choice (✨ wd-1 save pattern). The page also keeps a copy on the device and reads whichever is newer.
@@ -3328,7 +3350,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d+gl-r24+av-r0e3+ip-4a+bo-10b+ar-r0b+b3b4+s1+s2a+s2b+s2c+ar-7+ip-4b+av-r0i+s3+mo-3+ip-4c+an-2+an-4+b4a+s4a+av-wear2+b6a+s-brawl+lk-pp1+lk-wd1+b6b+ar-r1c-b+ip-4d+pk-7a+s-sla+mo-10+ip-4e+b6e+ar-r2-1b+mo-12+ip-5+b6d+24y-b+ip-4f+pk-7f+ip-4g) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d+gl-r24+av-r0e3+ip-4a+bo-10b+ar-r0b+b3b4+s1+s2a+s2b+s2c+ar-7+ip-4b+av-r0i+s3+mo-3+ip-4c+an-2+an-4+b4a+s4a+av-wear2+b6a+s-brawl+lk-pp1+lk-wd1+b6b+ar-r1c-b+ip-4d+pk-7a+s-sla+mo-10+ip-4e+b6e+ar-r2-1b+mo-12+ip-5+b6d+24y-b+ip-4f+pk-7f+ip-4g+24y-c) END OF Code.gs
 
 ;
 /* ===== GameData.gs ===== */
@@ -6623,6 +6645,7 @@ return {"include": typeof include === 'function' ? include : undefined,
 "saveSetting": typeof saveSetting === 'function' ? saveSetting : undefined,
 "saveSettings": typeof saveSettings === 'function' ? saveSettings : undefined,
 "saveMusic": typeof saveMusic === 'function' ? saveMusic : undefined,
+"saveMusicPicks": typeof saveMusicPicks === 'function' ? saveMusicPicks : undefined,
 "saveAvaRealm": typeof saveAvaRealm === 'function' ? saveAvaRealm : undefined,
 "saveFavorites": typeof saveFavorites === 'function' ? saveFavorites : undefined,
 "getScreenTimeMinutesForAge": typeof getScreenTimeMinutesForAge === 'function' ? getScreenTimeMinutesForAge : undefined,
