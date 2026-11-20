@@ -1878,7 +1878,7 @@ function renderLevels(){
 /* 🧱 b3w5 (Game Baseline): ONE setup page — 🏓 sport → 🎚️ level → 👥 who plays → 🎨 court → ⚙️ options → ▶ Start */
 let chosenLevel = 0;
 function openSetup(lvl){   // the old entry point (tests, old links): picks the level + fills the page + shows it
-  if(SlaCover) SlaCover.hide(); if(lvl != null) chosenLevel = lvl; fillSetup(); markPicks(); showScreen('menu');
+  if(SlaCover) SlaCover.hide(); slaPrefetch();   /* 📏 s-sla */ if(lvl != null) chosenLevel = lvl; fillSetup(); markPicks(); showScreen('menu');
 }
 function fillSetup(){
   const lvl = chosenLevel; SET.level = lvl; const sp = SB.SPORTS[SET.sport], L = SB.LEVELS[lvl];
@@ -1923,7 +1923,7 @@ function openCover(){
   if(!SlaCover){ SlaCover = GF.cover(document.body, {game: GAME_ID, title: 'SlaBrall', icon: '🏓', version: SLA_VERSION, me: S.player, players: S.players, avatarOf: myAvatar, seats: {min: 1, max: 4},
       acts: ['beat.throw', 'beat.cheer'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms', logoSrc: SLA_LOGO_SRC, logo: {kind: 'main'},
       own: C => { if(!(window.Link && Link.cover)){ SlaCover.hide(); SET.mode = 'link'; savePrefs(); renderMenu(); showScreen('menu'); return; } lkWire(); Link.cover(C, SLA_ROOM); },   /* 📡 lk-6c: the room lives on the cover (LinkKit Link.cover) */
-      onPlay: line => { SlaCover.hide(); slaLineup(line); renderMenu(); showScreen('menu'); } }); SlaCover.who = S.player; }
+      onPlay: line => { SlaCover.hide(); slaPrefetch();   /* 📏 s-sla */ slaLineup(line); renderMenu(); showScreen('menu'); } }); SlaCover.who = S.player; }
   if(window.Link && Link.cover && Link.cover.active(SlaCover)){ Link.cover.show(SlaCover); return; }   /* 📡 lk-6c: the room is still open → back to its cover */
   SlaCover.show();
 }
@@ -2015,179 +2015,43 @@ const CUP_BOTS = ['Robo Rex', 'Bolt', 'Gizmo', 'Sprocket', 'Beep', 'Widget', 'Ru
 let CUP = null, CS = null, cupRaf = 0;
 function cupKey(){ return 'sp_slabrall_cup:' + (S.player || ''); }
 function loadCup(){ try{ const c = JSON.parse(ls(cupKey()) || 'null'); return c && c.v === 1 && SB.SPORTS[c.sport] && Array.isArray(c.rounds) ? c : null; }catch(e){ return null; } }
-function saveCup(){ ls(cupKey(), JSON.stringify(CUP)); }
-function shuffle(a){ a = a.slice(); for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-function roundName(size, r){ const n = Math.log2(size) - r; return n === 1 ? 'Final' : n === 2 ? 'Semi-final' : 'Quarter-final'; }
-function cupTargetText(c){ const sp = SB.SPORTS[c.sport], t = c.short ? sp.targets[0] : sp.targets[c.level]; return targetText(sp, c.level, t); }
+/* 📏 s-sla cup#1 → SlaBrall_cup.html */
 function cupBtnLabel(){ const c = loadCup(); const t = $('cup-btn-t'), s = $('cup-btn-s'); if(!t) return;
   if(c && !c.done){ t.textContent = 'Continue tournament'; s.textContent = SB.SPORTS[c.sport].icon + ' ' + SB.SPORTS[c.sport].name + ' · ' + c.size + ' teams'; }
   else { t.textContent = 'Tournament'; s.textContent = '4 or 8 teams · bracket · trophy'; } }
-function openCup(){
+/* ================= 📏 S-SLA PARTS — play + 🏆 tournament load on demand (✨ Polish chat s-sla, rule "📏 Born split + split your own") =================
+   SlaBrall_play.html = what only a running match uses (loop · input · events → sounds · 💥 comic hooks · 📣 crowd row · HUD) ·
+   SlaBrall_cup.html = the 🏆 tournament (cup setup · bracket · robot-only matches). Built by Test Harness/parts/build_parts.py from
+   parts/SlaBrall/<part>.js — edit those. startMatch() + openCup() wait for their part (GameParts.need, with the game's own loader); the
+   cover, setup page, theme previews and the court painter stay HERE. The play part is fetched when the kid taps ▶ Play on the 🎬 cover (slaPrefetch) so ▶ Start is instant.
+   📲 offline app + tests: both parts are inline (Code.gs INCLUDE_ALSO_ SlaBrallParts) → there at once. slaLateWraps = the 🎵 mood
+   (cheerMount / cheerEnd / cheerPoint) + ✨ spotlight (playCupMatch) wrappers, put on once a part is in. */
+function slaPartReady(k){ return typeof GameParts !== 'undefined' && GameParts.has('SlaBrall_' + k); }
+function slaLateWraps(){
+  const wrapBefore = (n, flag, before) => { const f = window[n]; if(typeof f !== 'function' || f[flag]) return; const w = function(){ try{ before.apply(this, arguments); }catch(e){} return f.apply(this, arguments); }; w[flag] = 1; window[n] = w; };
+  if(typeof GMOOD !== 'undefined' && GMOOD){   /* 🎵 the same three hooks the 24u-b MOOD block puts on when the part is inline */
+    wrapBefore('cheerMount', '__gmood', () => GMOOD.start()); wrapBefore('cheerEnd', '__gmood', () => GMOOD.stop());
+    wrapBefore('cheerPoint', '__gmood', function(e){ const M = G && G.M; if(!M || !e) return; const mine = M.players.some(p => p.human && !p.remote && p.side === e.side), anyHuman = M.players.some(p => p.human && !p.remote); if(mine || !anyHuman) GMOOD.lift(); }); }
+  if(typeof playCupMatch === 'function' && !playCupMatch.__msLate && typeof msWrap === 'function'){ msWrap('playCupMatch', () => 'cup'); window.playCupMatch.__msLate = 1; }   /* ✨ modes-3: a cup match counts as tried */
+}
+document.addEventListener('DOMContentLoaded', slaLateWraps);   /* inline parts (offline app / tests): they ran right after this script */
+function slaPrefetch(){ if(typeof GameParts !== 'undefined' && !slaPartReady('play')) GameParts.need('SlaBrall_play', ok => { if(ok) slaLateWraps(); }); }   /* online: ▶ Play on the 🎬 cover (or openSetup) → fetch the play part now (nothing at boot), so ▶ Start is instant */
+function slaNeed(k, go){
+  if(typeof GameParts === 'undefined') return setTimeout(() => slaNeed(k, go), 40);   // the loader comes right after this script
+  if(slaPartReady(k)){ slaLateWraps(); return go(); }
+  UI.loading(GAME_ID, k === 'cup' ? '🏆 Getting the tournament…' : '🏓 Getting the court ready…');
+  GameParts.need('SlaBrall_' + k, ok => { UI.loaded(); if(ok){ slaLateWraps(); return go(); } UISound.play('error'); UI.toast('📡 SlaBrall did not load — check the internet, then tap again', 'err'); }); }
+/* ================= 📏 END S-SLA PARTS ================= */
+function openCup(){ if(!slaPartReady('cup')) return slaNeed('cup', openCup);   /* 📏 s-sla */
   CUP = loadCup();
   if(CUP && !CUP.done){ renderBracket(); showScreen('bracket'); return; }
   let lv = 0; for(let i = 0; i < 5; i++) if(canPlay(i)) lv = i;
   CS = {sport: SET.sport, fmt: 'single', size: 4, level: Math.min(1, lv), short: true, who: [S.player], names: shuffle(CUP_NAMES).slice(0, 8)};
   renderCupSetup(); showScreen('cup');
 }
-function cupChips(id, list, cur, pick){ const row = $(id); row.innerHTML = list.map(([k, n, lock]) => '<button class="chip' + (String(k) === String(cur) ? ' on' : '') + (lock ? ' lock' : '') + '" data-k="' + k + '" data-sound="' + (lock ? 'none' : 'tap') + '">' + n + '</button>').join('');
-  row.querySelectorAll('.chip').forEach(b => b.onclick = () => { if(b.classList.contains('lock')){ UISound.play('error'); UI.toast('Win that level against the robot first to use it in a tournament'); return; } pick(b.dataset.k); renderCupSetup(); }); }
-function cupPer(){ return CS.fmt === 'double' ? 2 : 1; }
-function cupTeamsDraft(){
-  const per = cupPer(), hs = CS.who.slice(), teams = [];
-  for(let i = 0; i < CS.size; i++){ const m = []; for(let k = 0; k < per; k++) m.push(hs.length ? hs.shift() : null); teams.push({name: CS.names[i] || CUP_NAMES[i], members: m}); }
-  return teams;
-}
-function renderCupSetup(){
-  const sp = SB.SPORTS[CS.sport]; $('cup-sub').textContent = sp.icon + ' ' + sp.name + ' — knock-out: win and go to the next round. Last team standing lifts the 🏆!';
-  cupChips('cup-fmt', [['single', '👤 Singles'], ['double', '👥 Doubles']], CS.fmt, k => { CS.fmt = k; CS.who = CS.who.slice(0, CS.size * cupPer()); });
-  cupChips('cup-size', [[4, '4 teams'], [8, '8 teams']], CS.size, k => { CS.size = Number(k); CS.who = CS.who.slice(0, CS.size * cupPer()); });
-  cupChips('cup-level', [0, 1, 2, 3, 4].map(i => [i, LEVEL_UI[i].emoji + ' ' + SB.LEVELS[i].name, !canPlay(i)]), CS.level, k => { CS.level = Number(k); });
-  const tShort = targetText(sp, CS.level, sp.targets[0]), tNorm = targetText(sp, CS.level, sp.targets[CS.level]);
-  cupChips('cup-len', [['short', '⚡ Short · ' + tShort.replace(/\.$/, '')], ['normal', '🏁 Normal · ' + tNorm.replace(/\.$/, '')]], CS.short ? 'short' : 'normal', k => { CS.short = k === 'short'; });
-  const max = CS.size * cupPer(), names = S.players.map(p => p.Name);
-  $('cup-who-note').textContent = 'Tap family players to add them (up to ' + max + '). Robots fill the empty places.' + (cupPer() > 1 ? ' Picked in pairs: 1st + 2nd are a team, 3rd + 4th…' : '');
-  const row = $('cup-who'); row.innerHTML = names.map(n => { const i = CS.who.indexOf(n); return '<button class="chip' + (i >= 0 ? ' on' : '') + '" data-n="' + UI.esc(n) + '" data-sound="tap">' + (i >= 0 ? (i + 1) + ' · ' : '') + UI.esc(n) + (n === S.player ? ' (you)' : '') + '</button>'; }).join('');
-  row.querySelectorAll('.chip').forEach(b => b.onclick = () => { const n = b.dataset.n, i = CS.who.indexOf(n);
-    if(i >= 0){ if(n === S.player && CS.who.length === 1){ UI.toast('Someone has to play! 🙂'); return; } CS.who.splice(i, 1); }
-    else { if(CS.who.length >= max){ UISound.play('error'); UI.toast('All ' + max + ' places are taken by people'); return; } CS.who.push(n); }
-    renderCupSetup(); });
-  const box = $('cup-teams'), teams = cupTeamsDraft();
-  box.innerHTML = teams.map((t, i) => '<div class="cteam"><span class="dot" style="background:' + CUP_COLS[i] + '"></span><input maxlength="18" data-i="' + i + '" value="' + UI.esc(t.name) + '" aria-label="Team ' + (i + 1) + ' name"><span class="mem">' + t.members.map(m => m ? UI.esc(m) : '🤖').join(' + ') + '</span></div>').join('');
-  box.querySelectorAll('input').forEach(inp => inp.oninput = () => { CS.names[Number(inp.dataset.i)] = inp.value.trim() || CUP_NAMES[Number(inp.dataset.i)]; });
-  $('cup-names-btn').onclick = () => { CS.names = shuffle(CUP_NAMES).slice(0, 8); renderCupSetup(); };
-  $('cup-go').onclick = drawCup;
-}
-function drawCup(){
-  const draft = cupTeamsDraft(), bots = shuffle(CUP_BOTS); let bi = 0;
-  const teams = draft.map((t, i) => ({name: t.name, col: CUP_COLS[i], members: t.members, bots: t.members.map(m => m ? null : bots[bi++ % bots.length])}));
-  // people first, spread over different first-round matches; robots fill the rest
-  const spread = CS.size === 8 ? [0, 2, 4, 6, 1, 3, 5, 7] : [0, 2, 1, 3], slots = new Array(CS.size).fill(-1);
-  const people = shuffle(teams.map((t, i) => i).filter(i => teams[i].members.some(Boolean))), robots = shuffle(teams.map((t, i) => i).filter(i => !teams[i].members.some(Boolean)));
-  people.concat(robots).forEach((ti, k) => { slots[spread[k]] = ti; });
-  const rounds = []; let n = CS.size / 2;
-  rounds.push(Array.from({length: n}, (_, m) => ({a: slots[m * 2], b: slots[m * 2 + 1], w: -1, sc: ''})));
-  while(n > 1){ n /= 2; rounds.push(Array.from({length: n}, () => ({a: -1, b: -1, w: -1, sc: ''}))); }
-  CUP = {v: 1, sport: CS.sport, level: CS.level, fmt: CS.fmt, size: CS.size, short: CS.short, theme: SET.theme, powers: SET.powers, teams, rounds, done: false, champ: -1, at: Date.now()};
-  saveCup(); UISound.play('unlock'); renderBracket(); showScreen('bracket');
-  if(FX) confetti(['🎲', '🏆', '🏓'], 14);
-}
-function newCup(){
-  const go = () => { ls(cupKey(), ''); CUP = null; openCup(); };
-  if(CUP && !CUP.done){ UI.confirm({icon: '🗑️', title: 'Start a new tournament?', body: 'This bracket will be thrown away.', okText: 'New tournament', cancelText: 'Keep it'}).then(ok => { if(ok) go(); }); }
-  else go();
-}
-function nextMatch(){ if(!CUP) return null; for(let r = 0; r < CUP.rounds.length; r++) for(let m = 0; m < CUP.rounds[r].length; m++){ const x = CUP.rounds[r][m]; if(x.w < 0 && x.a >= 0 && x.b >= 0) return {r, m, x}; } return null; }
-function hasPeople(ti){ return ti >= 0 && CUP.teams[ti].members.some(Boolean); }
-function memberText(t){ return t.members.map((m, k) => m ? UI.esc(m) : '🤖 ' + UI.esc(t.bots[k])).join(' + '); }
-function renderBracket(){
-  if(!CUP) return; const sp = SB.SPORTS[CUP.sport];
-  $('br-title').textContent = sp.icon + ' ' + sp.name + ' Cup'; slaLogoInto(document.querySelector('#scr-bracket .title .logo'), sp.id, 76);   // 🏷️ lg-1
-  $('br-sub').textContent = (CUP.fmt === 'double' ? '👥 Doubles' : '👤 Singles') + ' · ' + CUP.size + ' teams · 🤖 ' + SB.LEVELS[CUP.level].name + ' robots · ' + cupTargetText(CUP);
-  const nx = nextMatch(), T = CUP.teams;
-  const row = (ti, x, side) => { if(ti < 0) return '<div class="bt tbd"><span class="dot" style="background:#ccc"></span><span class="n">waiting…</span></div>';
-    const t = T[ti], cls = x.w < 0 ? '' : x.w === ti ? ' win' : ' lose', sc = x.sc ? x.sc.split('–')[side] : '';
-    return '<div class="bt' + cls + '" title="' + memberText(t).replace(/"/g, '') + '"><span class="dot" style="background:' + t.col + '"></span><span class="n">' + UI.esc(t.name) + (hasPeople(ti) ? ' <span class="me">🙂</span>' : '') + '</span><span class="s">' + UI.esc(sc) + '</span></div>'; };
-  let h = '';
-  CUP.rounds.forEach((rd, r) => { h += '<div class="bcol"><h4>' + roundName(CUP.size, r) + (rd.length > 1 ? 's' : '') + '</h4>' + rd.map((x, m) => '<div class="bm' + (nx && nx.r === r && nx.m === m ? ' cur' : '') + '" data-r="' + r + '" data-m="' + m + '">' + row(x.a, x, 0) + row(x.b, x, 1) + '</div>').join('') + '</div>'; });
-  h += '<div class="bchamp' + (CUP.done ? ' won' : '') + '"><div class="tro">🏆</div><div>' + (CUP.done ? UI.esc(T[CUP.champ].name) : 'Champion?') + '</div></div>';
-  $('bracket').innerHTML = h;
-  const card = $('br-next'); cancelAnimationFrame(cupRaf);
-  if(CUP.done){
-    const t = T[CUP.champ];
-    card.innerHTML = '<h3>🏆 Champions!</h3><canvas id="cup-cv" width="720" height="360"></canvas><div class="vsl">' + UI.esc(t.name) + '</div><div class="note">' + memberText(t) + '</div><div class="btns" style="margin-top:10px"><button class="btn sp-btn sp-primary" data-sound="pop" onclick="newCup()">🏆 New tournament</button></div>';
-    champLoop();
-    return;
-  }
-  if(!nx){ card.innerHTML = ''; return; }
-  const A = T[nx.x.a], B = T[nx.x.b], people = hasPeople(nx.x.a) || hasPeople(nx.x.b), alive = CUP.teams.some((t, i) => hasPeople(i) && !lostAlready(i));
-  card.innerHTML = '<h3>' + roundName(CUP.size, nx.r) + ' · next match</h3><div class="vsl"><span style="color:' + A.col + '">●</span> ' + UI.esc(A.name) + ' <small>vs</small> ' + UI.esc(B.name) + ' <span style="color:' + B.col + '">●</span></div>' +
-    '<div class="note" style="margin-bottom:10px">' + memberText(A) + ' &nbsp;vs&nbsp; ' + memberText(B) + '</div><div class="btns">' +
-    (people ? '<button class="btn sp-btn sp-primary" id="cup-play" data-sound="pop">🏓 Play!</button>' : '<button class="btn sp-btn sp-primary" id="cup-skip" data-sound="pop">⏩ Skip — robots play</button><button class="btn soft sp-btn sp-secondary" id="cup-watch" data-sound="tap">👀 Watch</button>' + (alive || nextRobotRun() > 1 ? '<button class="btn soft sp-btn sp-secondary" id="cup-skipall" data-sound="tap">⏩⏩ ' + (alive ? 'Skip to my next match' : 'Skip to the end') + '</button>' : '')) + '</div>';
-  if($('cup-play')) $('cup-play').onclick = () => playCupMatch(false);
-  if($('cup-watch')) $('cup-watch').onclick = () => playCupMatch(true);
-  if($('cup-skip')) $('cup-skip').onclick = e => skipRobots(e.currentTarget, false);
-  if($('cup-skipall')) $('cup-skipall').onclick = e => skipRobots(e.currentTarget, true);
-}
-function lostAlready(ti){ return CUP.rounds.some(rd => rd.some(x => x.w >= 0 && (x.a === ti || x.b === ti) && x.w !== ti)); }
-function nextRobotRun(){ let n = 0; for(const rd of CUP.rounds) for(const x of rd) if(x.w < 0 && x.a >= 0 && x.b >= 0 && !hasPeople(x.a) && !hasPeople(x.b)) n++; return n; }
-function recordCup(r, m, winTeam, sc){
-  const x = CUP.rounds[r][m]; x.w = winTeam; x.sc = sc;
-  if(r + 1 < CUP.rounds.length){ const nx = CUP.rounds[r + 1][m >> 1]; if(m % 2) nx.b = winTeam; else nx.a = winTeam; }
-  else { CUP.done = true; CUP.champ = winTeam; }
-  saveCup();
-}
-function cupPlayers(x){ const per = CUP.fmt === 'double' ? 2 : 1, list = []; for(let k = 0; k < per; k++){ list.push({ti: x.a, k, side: 0}); list.push({ti: x.b, k, side: 1}); } return list; }
-function simCup(nx){
-  const sp = SB.SPORTS[CUP.sport], players = cupPlayers(nx.x).map(q => ({side: q.side}));
-  const M = SB.simulate({sport: CUP.sport, level: CUP.level, powers: CUP.powers, target: CUP.short ? sp.targets[0] : 0, seed: (Date.now() & 0xffff) + nx.r * 31 + nx.m, players}, 2400);
-  let w = M.score.winner; const pts = s => sp.scoring === 'tennis' ? M.score.games[s] : M.score.pts[s];
-  if(!M.score.done || w < 0) w = pts(0) === pts(1) ? (Math.random() < 0.5 ? 0 : 1) : pts(0) > pts(1) ? 0 : 1;
-  recordCup(nx.r, nx.m, w === 0 ? nx.x.a : nx.x.b, pts(0) + '–' + pts(1));
-  return w === 0 ? nx.x.a : nx.x.b;
-}
-function skipRobots(btn, all){
-  UI.busy(btn, 'sla-brall', 'Robots playing…');
-  setTimeout(() => {
-    let last = null, n = 0;
-    while(true){ const nx = nextMatch(); if(!nx || hasPeople(nx.x.a) || hasPeople(nx.x.b)) break; const a = nx.x.a, b = nx.x.b, w = simCup(nx); last = {w, l: w === a ? b : a, sc: nx.x.sc}; n++; if(!all) break; }
-    UI.idle(btn); renderBracket(); UISound.play('pop');
-    if(last) UI.toast('🤖 ' + CUP.teams[last.w].name + ' beat ' + CUP.teams[last.l].name + ' ' + last.sc + (n > 1 ? ' (+' + (n - 1) + ' more)' : ''));
-  }, FX ? 450 : 0);
-}
-function playCupMatch(watch){
-  const nx = nextMatch(); if(!nx) return; const sp = SB.SPORTS[CUP.sport];
-  const flip = !hasPeople(nx.x.a) && hasPeople(nx.x.b);   // people play from the near side
-  const seats = [], list = cupPlayers(nx.x).map(q => ({ti: q.ti, k: q.k, side: flip ? 1 - q.side : q.side}));
-  list.sort((p, q) => p.k - q.k || p.side - q.side);
-  list.forEach(q => { const t = CUP.teams[q.ti], n = t.members[q.k]; seats.push(n ? {name: n, side: q.side, human: true} : {name: t.bots[q.k], side: q.side, human: false}); });
-  const hs = seats.filter(s => s.human);
-  if(hs.length === 1) hs[0].seat = -1; else { let a = 0, b = 1; hs.forEach(s => { if(s.side === 0){ s.seat = a; a += 2; } else { s.seat = b; b += 2; } }); }
-  const ta = CUP.teams[flip ? nx.x.b : nx.x.a], tb = CUP.teams[flip ? nx.x.a : nx.x.b];
-  startMatch({seats, sport: CUP.sport, level: CUP.level, theme: CUP.theme, powers: CUP.powers, target: CUP.short ? sp.targets[0] : 0, names: [ta.name, tb.name], round: roundName(CUP.size, nx.r), r: nx.r, m: nx.m, flip, watch});
-}
-function cupFinish(win, secs, scoreFor){
-  const M = G.M, c = G.cup, sp = G.sp, st = M.stats, x = CUP.rounds[c.r][c.m];
-  const winTeam = (win === 0) !== c.flip ? x.a : x.b;
-  const pts = s => sp.scoring === 'tennis' ? M.score.games[s] : M.score.pts[s];
-  const sa = c.flip ? pts(1) : pts(0), sb = c.flip ? pts(0) : pts(1);
-  recordCup(c.r, c.m, winTeam, sa + '–' + sb);
-  const final = CUP.done, humans = M.players.filter(p => p.human), peopleWon = humans.some(p => p.side === win);
-  if(FX) confetti(final ? ['🏆', '🎉', '⭐', '🥇', '🏓'] : peopleWon ? ['🏓', '⭐', '🎉'] : ['🏓'], final ? 44 : peopleWon ? 24 : 6);
-  UISound.play(peopleWon || !humans.length ? 'success' : 'error');
-  const wt = CUP.teams[winTeam];
-  const head = final ? '<div class="big">🏆</div><h2 class="cheer">' + UI.esc(wt.name) + ' win the ' + UI.esc(sp.name) + ' Cup!</h2>'
-    : '<div class="big">' + (peopleWon ? '🎉' : humans.length ? '🤖' : '🏓') + '</div><h2' + (peopleWon ? ' class="cheer"' : '') + '>' + UI.esc(wt.name) + ' go through!</h2>';
-  const tip = humans.length && !peopleWon ? '<div class="note">💡 Out of the cup this time — start a new tournament and try again!</div>' : '';
-  showResult(head + '<div class="score-big">' + (c.flip ? sb + ' – ' + sa : sa + ' – ' + sb) + '</div>' +
-    '<div class="stats"><span>🔁 best rally ' + Math.max(st[0].rally, st[1].rally) + '</span><span>💥 ' + st[0].smash + ' smashes</span><span>⏱ ' + fmt(secs * 1000) + '</span></div>' + tip +
-    '<div class="save-note" id="save-note">' + (humans.some(p => p.name !== 'Guest') ? '💾 Saving…' : '') + '</div>' +
-    '<div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="pop" onclick="backToBracket()">🏆 ' + (final ? 'See the champions' : 'Back to the bracket') + '</button></div>');
-  NOTES.length = 0;
-  humans.forEach((p, seat) => {
-    if(p.name === 'Guest') return; const s = st[p.side], won = p.side === win;
-    const stats = {wins: won ? 1 : 0, rally: s.rally, smash: s.smash, aces: s.aces, perfect: s.perfect, powers: s.powers, legend: s.legend, goals: s.goals, jumpHits: s.jumpHits, jumpPerfect: s.jumpPerfect, diveSaves: s.diveSaves, matches: 1, cupMatches: 1};
-    stats['win_' + sp.id] = won ? 1 : 0; if(final && won) stats.cups = 1;
-    saveFeatsOnly(p.name, stats, seat);
-  });
-}
+/* 📏 s-sla cup#2 → SlaBrall_cup.html */
 function backToBracket(){ if(window.Cheer) Cheer.unmount(); if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); $('pads').innerHTML = ''; CUP = loadCup(); renderBracket(); showScreen('bracket'); }
-function champLoop(){
-  const cv = $('cup-cv'); if(!cv || !CUP || !CUP.done) return; const g = cv.getContext('2d'), t = CUP.teams[CUP.champ], sp = SB.SPORTS[CUP.sport];
-  const avs = t.members.map((m, k) => m ? withRacket(myAvatar(m === 'Guest' ? 'Guest' : m), m) : robotAvatar(t.bots[k], sp)), cheer = gestOf('cheer');
-  const t0 = performance.now();
-  const tick = now => {
-    if(!$('cup-cv') || $('scr-bracket').classList.contains('hidden')) return;
-    const s = (now - t0) / 1000; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height);
-    const grd = g.createLinearGradient(0, 0, 0, cv.height); grd.addColorStop(0, 'rgba(255,200,69,0.35)'); grd.addColorStop(1, 'rgba(255,122,26,0.05)'); g.fillStyle = grd; g.fillRect(0, 0, cv.width, cv.height);
-    for(let i = 0; i < 18; i++){ const a = i * 0.35 + s * 0.4; g.fillStyle = 'rgba(255,255,255,0.18)'; g.beginPath(); g.moveTo(360, 380); g.arc(360, 380, 520, a, a + 0.12); g.fill(); }
-    g.fillStyle = '#C9A227'; g.fillRect(170, 318, 380, 42); g.fillStyle = '#E8C547'; g.fillRect(195, 300, 330, 22);
-    const n = avs.length; avs.forEach((av, i) => { const x = n === 1 ? 330 : 250 + i * 220; drawAvatar(g, {name: t.members[i] || t.bots[i], av, dir: 1, walkT: 0, gest: {g: cheer, t: (s + i * 0.3) % (cheer.d || 1.6)}}, x, 304, 1.75, {t: s}); });
-    emo(g, '🏆', n === 1 ? 520 : 360, 90 + Math.sin(s * 3) * 12, 96);
-    if(Math.random() < 0.2){ /* sparkle */ g.fillStyle = '#fff'; g.fillRect(Math.random() * 720, Math.random() * 200, 4, 4); }
-    cupRaf = requestAnimationFrame(tick);
-  };
-  cupRaf = requestAnimationFrame(tick);
-}
+/* 📏 s-sla cup#3 → SlaBrall_cup.html */
 
 // 🪶 shuttle feathers (sb2-2): owned count from the server (Collection line "feather"), pick per person per device; the feather of whoever hit it last
 function ownedFeathers(name){ return Math.min(BallSkins.featherCount, Number((S.feathers || {})[name || S.player]) || 0); }
@@ -2250,7 +2114,7 @@ function takeKey(e){
 }
 
 /* ================= MATCH ================= */
-function startMatch(cfg){
+function startMatch(cfg){ if(!slaPartReady('play')) return slaNeed('play', () => startMatch(cfg));   /* 📏 s-sla */
   if(SlaCover) SlaCover.hide();   /* 🧱 b3w5 */
   hideResult(); savePrefs();
   if(!cfg || !cfg.seats) cfg = null;   // cfg = a 🏆 tournament match (see playCupMatch) or a 📡 linked match (cfg.link, lk-1b)
@@ -2282,7 +2146,7 @@ function startMatch(cfg){
   G.last = performance.now(); G.raf = requestAnimationFrame(frame);
 }
 function robotAvatar(name, sp){ const a = defaultAvatar(name + '·bot'); a.eq = a.eq || {}; const v = sp.id === 'slashot' ? 3 : sp.id === 'slapong' ? 1 : sp.id === 'slapoof' ? 0 : 2; a.eq.hand = {id: 'racket', v, o: racketDesign(v, {c1: '#8D99AE', c2: '#2B2D42'})}; return a; }
-function teamName(side){ if(G.cup) return G.cup.names[side]; const t = G.M.players.filter(p => p.side === side); return t.map(p => p.name).join(' + '); }
+/* 📏 s-sla play#1 → SlaBrall_play.html */
 
 /* ---------- view: world (metres-ish) → screen ---------- */
 function sideView(W0, H0, sp, box){   // ⚽ the old 2.5D side view — kept for a later soccer game (sb2-1: not used by SlaBrall any more)
@@ -2536,308 +2400,9 @@ function sbCatchWatch(now){ if(!G) return; const b = !!(window.Comic && Comic.bu
 function sbCatchHold(now){ return !!(G && G.catchAt && now - G.catchAt < SB_CATCH.hold); }
 function sbCatchK(now){ if(!G || !G.catchAt) return 1; const x = (now - G.catchAt - SB_CATCH.hold) / SB_CATCH.ramp; if(x >= 1){ G.catchAt = 0; return 1; } const e = Math.max(0, x); return SB_CATCH.from + (1 - SB_CATCH.from) * e * e * (3 - 2 * e); }
 function sbCatching(){ return !!(G && (G.catchAt || G.cbusy)); }
-/* 💥 an-1 CATCH-UP END */
-/* ---------- loop ---------- */
-function frame(now){
-  if(!G) return;
-  const dt = Math.min(0.05, Math.max(0, (now - G.last) / 1000)); G.last = now;
-  if(V && V.follow){ const me = G.M.players.find(p => p.human && p.side === V.camSide) || G.M.players.find(p => p.side === V.camSide); if(me){ G.camY += (me.y * 0.32 - G.camY) * Math.min(1, dt * 3); V.follow(G.camY); } }   // 📷 sb2-3 camera follows you sideways
-  sbCatchWatch(now);   // 💥 an-1
-  if(G.link && G.link.role === 'guest'){ if(!G.over) readInputs(); lkGuestFrame(now); }   // 📡 a guest never runs the engine: it shows the host's match
-  else if(!G.paused && !G.over && !Comic.busy() && !sbCatchHold(now)){   // 💥 the game waits while a comic panel / strip shows (+ an-1 catch-up hold)
-    readInputs();
-    G.acc += dt * sbCatchK(now); let n = 0;
-    while(G.acc >= SB.DT && n < 12){ SB.step(G.M, SB.DT); G.acc -= SB.DT; n++; }
-    const evs = SB.takeEvents(G.M); handleEvents(evs); if(typeof sbbAhead === 'function') sbbAhead(); /* 🎬 b3b5 */ if(G.lk && evs.length) G.lk.evs.push.apply(G.lk.evs, evs);
-    if(G.M.score.done && !G.over) finishMatch();
-  }
-  if(G && G.link && G.link.role === 'host') lkHostTick(now);
-  if(window.Cheer) Cheer.pause(!!(G.paused || Comic.busy()));   // 📣 cs-1
-  G.anim += dt; if(!G.ctl) draw(now / 1000);
-  hud();   // 📺 lk-5e: a controller phone (G.ctl) doesn't draw the court — it is on the TV
-  G.raf = requestAnimationFrame(frame);
-}
-function togglePause(){ if(!G || G.over) return; if(G.link && G.link.role === 'guest'){ Link.send('sbpause', {on: !G.paused}, {sure: true}); return; } G.paused = !G.paused; UI.pauseIcon($('pause-btn'), G.paused); banner(G.paused ? '⏸ Paused — tap ▶ to play' : '▶ Go!', 'good'); }
+/* 📏 s-sla play#2 → SlaBrall_play.html */
 function pauseGame(){ if(G && G.link && G.link.role === 'guest'){ if(!G.paused && !G.over) Link.send('sbpause', {on: true}, {sure: true}); return; } if(G && !G.paused){ G.paused = true; UI.pauseIcon($('pause-btn'), true); } }
-function leavePlay(){
-  if(!G) return; const was = G.paused; G.paused = true;
-  const lb = G.link ? (G.link.role === 'host' ? 'This ends the match on every device.' : 'A 🤖 robot plays for you until you come back.') : null;   // 📡 lk-1b
-  UI.confirm({icon: '◀', title: 'Leave this match?', body: lb || (G.cup ? 'You can play this tournament match again from the bracket.' : 'This match won\'t be saved.'), okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(!G) return; G.paused = was; if(ok){ if(G.link) lkExit(); else if(G.cup) backToBracket(); else backToMenu(); } });
-}
-function backToMenu(){ if(window.Cheer) Cheer.unmount(); /* 💬 24t off */ if(window.UI && UI.callout) UI.callout.setup(null); if(G && G.link){ lkExit(); return; } if(G) cancelAnimationFrame(G.raf); G = null; hideResult(); $('pads').innerHTML = ''; renderMenu(); showScreen('menu'); }
-
-/* ---------- input ---------- */
-document.addEventListener('keydown', e => {
-  if(takeKey(e)) return;
-  if(!G || $('scr-play').classList.contains('hidden')) return;
-  if(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'PageUp', 'PageDown', 'Home', 'End'].indexOf(e.code) >= 0) e.preventDefault();
-  if(e.code === 'Escape'){ togglePause(); return; }
-  if(e.repeat){ return; }
-  G.held.add(e.code); $('pads').classList.add('kbd');
-  if(G.paused || G.over) return;
-  G.M.players.forEach(p => { if(!p.human || p.remote) return; keySetsOf(p).forEach(K => {
-    ['smash', 'drop', 'lob', 'slice'].forEach(a => { if(K[a] === e.code) shot(p.i, a); });
-    if(K.power === e.code) firePower(p.i); }); });
-  if(e.code === 'Space'){ const me = G.M.players.find(p => p.human && !p.remote && (p.seat === -1 || p.seat === 0)); if(me) shot(me.i, 'normal'); }
-});
-document.addEventListener('keyup', e => { if(G) G.held.delete(e.code); });
-window.addEventListener('blur', () => { if(G) G.held.clear(); });
-function keySetsOf(p){ return p.seat === -1 ? [KEYS[0], KEYS[1]] : [KEYS[p.seat] || KEYS[0]]; }
-function readInputs(){
-  const M = G.M;
-  M.players.forEach(p => { if(!p.human || p.remote) return;   // 📡 remote players send their own stick
-    if(p.auto) return;   // test autopilot
-    // 🕹️ stick first (analog), else keys — both are SCREEN directions, the view turns them into the world (sb2-1)
-    const st = G.sticks && G.sticks.get(p.i);
-    let sx = 0, sy = 0;
-    if(st && st.v){ const m = Math.hypot(st.v.x, st.v.y); if(m > 0.12){ const k = Math.min(1, m) / m; sx = st.v.x * k; sy = st.v.y * k; } }
-    else { keySetsOf(p).forEach(K => { if(G.held.has(K.left)) sx -= 1; if(G.held.has(K.right)) sx += 1; if(G.held.has(K.up)) sy -= 1; if(G.held.has(K.down)) sy += 1; });
-      sx = Math.max(-1, Math.min(1, sx)); sy = Math.max(-1, Math.min(1, sy)); }
-    const w = V ? V.k2w(sx, sy) : {x: sx, y: sy}; p.input.x = w.x; p.input.y = w.y;
-  });
-}
-function shot(i, kind){ const p = G.M.players[i]; if(!p || G.paused) return; if(G.link && G.link.role === 'guest'){ if(!G.over) Link.send('sbshot', {a: kind}, {sure: true}); if(kind !== 'normal') floatAt(p, SHOT_ICON[kind] || '', 0.6); return; } SB.pressShot(G.M, i, kind); if(kind !== 'normal') floatAt(p, SHOT_ICON[kind] || '', 0.6); }
-function firePower(i){ const p = G.M.players[i]; if(p && G.link && G.link.role === 'guest'){ if(p.power) Link.send('sbshot', {a: 'power'}, {sure: true}); else UISound.play('error'); return; } if(!p || !p.power){ if(p && p.human) UISound.play('error'); return; } SB.usePower(G.M, i); }
-// touch (sb2-1): a short tap on the court = serve / normal hit; moving is the 🕹️ stick
-function humanFor(side, px, py){
-  const hs = G.M.players.filter(p => p.human && !p.remote); if(hs.length === 1) return hs[0];
-  const w = V.inv(px, py), mine = hs.filter(p => p.side === (w.x < 0 ? 0 : 1)); if(!mine.length) return null;
-  return mine.reduce((a, b) => (Math.hypot(a.x - w.x, a.y - w.y) <= Math.hypot(b.x - w.x, b.y - w.y) ? a : b));
-}
-(function(){
-  const cv = $('court');
-  cv.addEventListener('pointerdown', e => {
-    if(!G || G.paused || G.over) return; const r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
-    const p = humanFor(0, px, py); if(!p) return;
-    G.pointers.set(e.pointerId, {p, x0: px, y0: py, t0: performance.now()}); $('pads').classList.remove('kbd');
-  });
-  const up = e => { if(!G) return; const d = G.pointers.get(e.pointerId); if(!d) return; G.pointers.delete(e.pointerId); const r = cv.getBoundingClientRect();
-    if(Math.hypot(e.clientX - r.left - d.x0, e.clientY - r.top - d.y0) < 12 && performance.now() - d.t0 < 350) shot(d.p.i, 'normal'); };
-  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-})();
-const SHOT_NAME = {smash: 'Smash', lob: 'Lob', drop: 'Drop', slice: 'Slice'};
-function buildPads(){
-  const box = $('pads'); box.innerHTML = ''; G.sticks = new Map(); const hs = G.M.players.filter(p => p.human && !p.remote), two = hs.length > 1;
-  const portrait = V && V.H > V.W * 1.05, short = V && !portrait && V.H < 520;
-  box.classList.toggle('two', two); box.classList.toggle('port', !!portrait); box.classList.toggle('short', !!short); box.style.removeProperty('--stick');
-  const usedSide = {};
-  hs.forEach(p => {
-    // one touch set per side (2 vs 2 with two people on one side: the 2nd one plays with keys)
-    if(usedSide[p.side]) return; usedSide[p.side] = true;
-    const K = keySetsOf(p)[0], where = !two ? 'solo' : portrait ? (p.side === 0 ? 'bottom' : 'topband') : (p.side === 0 ? 'lside' : 'rside');
-    const st = document.createElement('div'); st.className = 'stick ' + where; st.dataset.p = p.i; st.innerHTML = '<div class="ring"></div><div class="knob"></div><span class="tip">🕹️ move + aim</span>';
-    const cl = document.createElement('div'); cl.className = 'shotpad ' + where; cl.dataset.p = p.i;
-    cl.innerHTML = '<button class="sbtn pw" data-a="power" title="Power"><span class="ic">⚡</span><span class="nm">Power</span><small>' + UI.esc(keyName(K.power)) + '</small></button>'
-      + '<div class="shots">' + ['smash', 'lob', 'drop', 'slice'].map(a => '<button class="sbtn s-' + a + '" data-a="' + a + '" title="' + SHOT_NAME[a] + '"><span class="ic">' + SHOT_ICON[a] + '</span><span class="nm">' + SHOT_NAME[a] + '</span><small>' + UI.esc(keyName(K[a])) + '</small></button>').join('') + '</div>';
-    cl.querySelectorAll('.sbtn').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); b.classList.remove('flash'); void b.offsetWidth; b.classList.add('down', 'flash'); setTimeout(() => b.classList.remove('down'), 160); if(navigator.vibrate) try{ navigator.vibrate(8); }catch(err){}
-      $('pads').classList.remove('kbd'); if(b.dataset.a === 'power') firePower(p.i); else shot(p.i, b.dataset.a); }));
-    // 🕹️ the shared UiKit stick (r33 instant start, r36 calm feel per device): analog, screen direction → world direction of this view
-    const T = UI.stickTracker(st, {player: p.name, av: p.av}), kn = st.querySelector('.knob'), S = {id: null, v: null};   // 🕹️ sk-1: wears this player's joystick skin
-    JoySkins.buttons(cl, p.name, p.av);   // …and the shot buttons wear its ring + glow (they keep the SlaBrall colours)
-    const show = v => { const m = Math.min(1, Math.hypot(v.fx, v.fy)), k = m > 0 ? Math.min(1, m) / m : 0; kn.style.transform = 'translate(calc(-50% + ' + (v.fx * k * 38) + '%), calc(-50% + ' + (v.fy * k * 38) + '%))'; };
-    st.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); try{ st.setPointerCapture(e.pointerId); }catch(err){} S.id = e.pointerId; S.v = T.start(e); show(S.v); st.classList.add('on'); $('pads').classList.remove('kbd'); });
-    UI.onFastMove(st, e => { if(e.pointerId !== S.id) return; S.v = T.at(e); show(S.v); });
-    const end = e => { if(e.pointerId !== S.id) return; S.id = null; S.v = null; kn.style.transform = ''; st.classList.remove('on'); p.input.x = p.input.y = 0; };
-    st.addEventListener('pointerup', end); st.addEventListener('pointercancel', end);
-    G.sticks.set(p.i, S);
-    box.appendChild(st); box.appendChild(cl);
-    if(where === 'solo' && window.UI && UI.pad){   // 🕹️ pz-1: 👉 💥 Smash = main, the fan (most used first): 🌈 Lob ← · 🪶 Drop ↑ · 🔪 Slice ↙ · ⚡ Power ↗ (a ring around Smash)
-      box.style.setProperty('--stick', UI.pad.stickFor(box.clientWidth, UI.pad.geo(box.clientWidth, box.clientHeight, 4).w) + 'px');   // never touches the 👉 group
-      const B = a => cl.querySelector('[data-a="' + a + '"]'); UI.pad.arc(cl, B('smash'), [B('lob'), B('drop'), B('slice'), B('power')], {fit: true});
-      const z = document.createElement('div'); z.className = 'stickzone'; const pb = padBox(box.clientWidth, box.clientHeight);
-      z.style.width = (pb.l || box.clientWidth * 0.42) + 'px'; z.style.height = (pb.l ? box.clientHeight * 0.78 : (pb.b || box.clientHeight * 0.4)) + 'px';
-      box.insertBefore(z, st); UI.pad.stick(st, z); }
-  });
-  if(window.matchMedia && matchMedia('(pointer:fine)').matches && !isTouch()) box.classList.add('kbd');
-}
-
-/* 📣 CHEERSQUAD (cs-1) START — the cheering crowd (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
-const CHEER_ROW = 46;
-let CHEER_HULL = null;
-function cheerRowOn(){ return isTouch() && window.Cheer && Cheer.active() && Cheer.stats().size === 'party'; }
-function cheerMount(){
-  if(!window.Cheer) return; Cheer.unmount();
-  const M = G.M, me = M.players.find(p => p.human && !p.remote);
-  Cheer.mount($('stage') || document.body, {game: 'slabrall', players: M.players.map(p => ({name: p.name, side: p.side, human: !!p.human})),
-    me: me ? {name: me.name} : {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'scene', ref: $('court'),
-    avoid: () => Array.from(document.querySelectorAll('#pads .stick, #pads .shotpad, #pads .sbtn, #pads button, #gbar')),
-    clear: b => !cheerOnCourt(b), edge: innerHeight > innerWidth * 1.05 ? 0.4 : 0});   // phones held upright: fans may peek in from the screen edge
-}
-// the court + its run-off + the air above it (where the ball flies) = never covered
-function cheerHull(V, sp){ const pts = [], add = (L, W, z) => [[-L, -W], [L, -W], [L, W], [-L, W]].forEach(q => pts.push(V.P(q[0], q[1], z)));
-  add(sp.Lh + 1.3, sp.Wh + 1.3, 0); add(sp.Lh, sp.Wh, sp.squash ? (sp.wallH || 4.6) : 2.2);   // ground + run-off, and the air above the court where the ball flies
-  pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]); const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = [];
-  pts.forEach(p => { while(lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); });
-  pts.slice().reverse().forEach(p => { while(up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); });
-  return lo.slice(0, -1).concat(up.slice(0, -1)); }
-function cheerOnCourt(b){ const H = CHEER_HULL; if(!H) return false;
-  const inside = (x, y) => { let c = false; for(let i = 0, j = H.length - 1; i < H.length; j = i++){ const a = H[i], q = H[j]; if((a[1] > y) !== (q[1] > y) && x < (q[0] - a[0]) * (y - a[1]) / (q[1] - a[1]) + a[0]) c = !c; } return c; };
-  for(const fx of [0, 0.5, 1]) for(const fy of [0, 0.5, 1]) if(inside(b.l + (b.r - b.l) * fx, b.t + (b.b - b.t) * fy)) return true; return false; }
-// fans stand on the grass beside the long sides of the court (candidates on both halves, each team's half first), never behind the far baseline (the ball flies there)
-function cheerScene(g, V, M, t){
-  if(!window.Cheer || !Cheer.active() || !V || !V.P || !V.sc) return false;
-  const sp = M.sp, party = Cheer.stats().size === 'party', cands = [], XS = [0.35, 0.55, 0.15, 0.75, 0.95, -0.05, 1.12];
-  CHEER_HULL = cheerHull(V, sp);
-  [0, 1].forEach(row => XS.forEach(u => [0, 1].forEach(half => [-1, 1].forEach(side => {
-    const x = (half ? 1 : -1) * u * (sp.Lh + 1.2), y = side * (sp.Wh + (sp.squash ? 1.6 : 2.1) + row * 1.25), p = V.P(x, y, 0);
-    cands.push({x: p[0], y: p[1], k: V.sc(x, y, 0) * (party ? 0.019 : 0.016), half}); }))));
-  Cheer.place(g, cands);
-  return true;
-}
-function cheerRow(g){ if(!cheerRowOn() || !V) return; const box = padBox(V.W, V.H); Cheer.row(g, {x: 0, y: V.H - box.b, w: V.W, h: CHEER_ROW - 4}); }
-function cheerScore(){ const sc = G.M.score; return G.sp.scoring === 'tennis' ? sc.games.map((x, i) => x * 4 + sc.pts[i]) : sc.pts.slice(); }
-// match point (or game point that wins the match) for side s → the crowd leans in
-function cheerCloseSide(){ const M = G.M, sc = M.score; if(sc.done) return -1;
-  for(const s of [0, 1]){ const a = sc.pts[s] + 1, o = sc.pts[1 - s];
-    if(G.sp.scoring === 'tennis'){ const noAd = M.level <= 1; if(a >= 4 && (a - o >= 2 || (noAd && a > o)) && sc.games[s] + 1 >= M.target) return s; }
-    else { const t = M.target; if((a >= t && a - o >= 2) || a >= t + 4) return s; } }
-  return -1; }
-function cheerPoint(e){ if(!window.Cheer || !Cheer.active()) return; const L = G.plog, lastP = G.M.players[L.lastHit];
-  const big = e.why === 'ace' || e.why === 'goal' || e.why === 'legend' || L.rally >= 8 || L.jumpPerfect || (L.lastShot === 'smash' && lastP && lastP.side === e.side);
-  Cheer.react(big ? 'big' : 'goal', {side: e.side, score: cheerScore()});
-  const s = cheerCloseSide(); if(s >= 0) setTimeout(() => { if(G && !G.over && window.Cheer) Cheer.react('close', {side: s}); }, 2300); }
-function cheerEnd(){ if(!window.Cheer || !Cheer.active() || !G) return; const win = G.M.score.winner; Cheer.react('win', {side: win});
-  setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
-    const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
-    const at = card.querySelector('.res-btns'); card.insertBefore(c, at); card.insertBefore(cap, at); }, 120); }
-/* 📣 CHEERSQUAD END */
-/* ---------- events → sounds, words, fx ---------- */
-const WHY = {floor: 'it touched the floor', net: 'into the net', out: 'out!', own: 'on their own side', twice: 'bounced twice', past: 'got past', ace: 'ACE!', kitchen: 'kitchen volley!', wall: 'hit the glass first', serve: 'serve fault', goal: 'GOAL!', legend: 'LEGENDARY GOAL!', stuck: 'too long a rally', hardcore: ''};
-function handleEvents(list){
-  const M = G.M;
-  if(typeof sbbEvent === 'function') list.forEach(sbbEvent);   /* 🎬 b3b5: contact = the engine's event */
-  if(typeof sbsEvent === 'function') list.forEach(sbsEvent);   /* 🎾 b3b6 the toss */
-  list.forEach(e => {
-    if(e.k === 'hit'){ UISound.play(e.shot === 'smash' ? 'whoosh' : 'pop'); const p = M.players[e.p]; if(e.perfect && p.human && !FX){ bigWord('PERFECT!'); } if(e.shot === 'smash' && p.human && !FX) floatAt(p, '💥 SMASH', 0.9);   // st-1: with effects on, the Sla… callouts say it
-      if(e.rally === 10 || e.rally === 20 || e.rally === 30) banner('🔁 ' + e.rally + '-hit rally!', 'gold');
-      logHit(e); }
-    else if(e.k === 'serve'){ UISound.play('tap'); G.plog = newPlog(); }
-    else if(e.k === 'jump') onJump(e);
-    else if(e.k === 'point'){ const win = M.players.filter(p => p.side === e.side), human = win.some(p => p.human && !p.remote), lost = M.players.some(p => p.human && !p.remote && p.side !== e.side);
-      UISound.play(human || !lost ? 'success' : 'bump');
-      banner((e.why === 'ace' ? '🎾 ' : e.why === 'goal' || e.why === 'legend' ? '🥅 ' : '') + teamName(e.side) + ' ' + (G.sp.scoring === 'goals' ? 'scores' : 'wins the point') + (WHY[e.why] ? ' — ' + WHY[e.why] : ''), human ? 'good' : 'bad');
-      if(e.why === 'goal' || e.why === 'legend' || e.why === 'ace') bigWord(e.why === 'ace' ? 'ACE!' : e.why === 'legend' ? '⭐ GOAL!' : 'GOAL!');
-      cheerPoint(e); comicPoint(e); }
-    else if(e.k === 'game'){ setTimeout(() => banner('🏆 Game to ' + teamName(e.side) + '!', 'gold'), 900); if(G.stripNext) comicStripNow(); }
-    else if(e.k === 'orb'){ UISound.play('unlock'); banner(['⚪ Power orb!', '🔵 Rare power orb!', '🟡 LEGENDARY orb!'][e.tier] + ' Hit the ball through it!', 'gold'); }
-    else if(e.k === 'gotpower'){ const p = M.players[e.p], P = SB.POWERS[e.power]; UISound.play('unlock'); banner(P.icon + ' ' + p.name + ' got ' + P.name + (p.human && !p.remote ? ' — press ' + keyName(keySetsOf(p)[0].power) + ' or ⚡' : ''), 'gold'); }
-    else if(e.k === 'power'){ const p = M.players[e.p], P = SB.POWERS[e.power]; UISound.play('whoosh'); bigWord(P.icon + ' ' + P.name, p); if(FX) say(P.name); }
-    else if(e.k === 'legendmiss'){ banner('⭐ Too strong! Only a PERFECT hit sends a Legendary back', 'bad'); }
-    else if(e.k === 'mirage'){ bigWord('🎭 Fooled you!'); }
-    else if(e.k === 'broken'){ bigWord('💔 Broken spin!'); }
-    else if(e.k === 'splorf'){ bigWord('🌊 SPLORF!'); UISound.play('drop'); }
-    else if(e.k === 'patch'){ const E = SB.ELEMENTS[e.el]; banner(E.icon + ' ' + E.name + ' patch on the court!', 'gold'); }
-    else if(e.k === 'zap'){ floatAt(M.players[e.p], '⚡ zapped!', 0.7); UISound.play('bump'); }
-    else if(e.k === 'buddywall'){ banner('🧱 Buddy Wall saved it!', 'good'); UISound.play('bump'); }
-    else if(e.k === 'split'){ bigWord('✂️ Which one is real?'); }
-    else if(e.k === 'special'){ if(e.kind === 'legend' || e.kind === 'mirage'){ bigWord('⭐ LEGENDARY SHOT!'); comicImpact(M.players[e.p], 'Sla… LEGEND!!!', 'power', 'smash', 'Legendary shot!'); } G.plog.power = true; }
-    else if(e.k === 'power'){ G.plog.power = true; }
-    else if(e.k === 'unstick'){ banner('🏒 Puck back to the middle', ''); }
-  });
-}
-let bannerTimer = 0;
-function banner(text, kind){ const b = $('banner'); b.textContent = text; b.className = 'banner on' + (kind ? ' ' + kind : ''); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('on'), 2000); }
-function bigWord(text, who){ if(!FX) return; /* 💬 24t bigWord */ if(UI.callout && UI.callout.active()){ UI.callout(text, {who, rank: UI.callout.guess(text) === 'big' ? 'big' : 'good'}); return; } const host = $('bigword-host'); host.innerHTML = ''; const d = document.createElement('div'); d.className = 'big-word'; d.textContent = text; host.appendChild(d); setTimeout(() => d.remove(), 950); }
-function floatAt(p, text, life){ G.fx.push({k: 'txt', x: p.x, y: p.y, z: 2.4, txt: text, t: 0, life: life || 0.8}); }
-
-/* ---------- 💥 comics (sb2-3) — ComicKit: impact panels, Sla… callouts, strips. Off (💬 chip) = small callouts only ---------- */
-function newPlog(){ return {rally: 0, jump: false, jumpPerfect: false, jumpBy: -1, dive: false, diveBy: -1, diveMiss: false, diveMissBy: -1, power: false, smash: false, drop: false, lastHit: -1, lastShot: '', lastJump: null}; }
-const SLA_SHOT = {smash: 'Sla… SMASH!', lob: 'Sla… LOB!', drop: 'Sla… plop.', slice: 'Sla… SLICE!'};   // st-1
-function logHit(e){ const hp = G.M.players[e.p]; if(hp && hp.human && !hp.auto && !hp.remote && !e.jump){ const w = e.perfect ? 'Sla… PERFECT!' : SLA_SHOT[e.shot]; if(w && performance.now() - (G.lastSla || 0) > 1200){ G.lastSla = performance.now(); sla(hp, w); } }
-  const L = G.plog; L.rally = e.rally; L.lastHit = e.p; L.lastShot = e.shot; L.lastJump = e.jump || null; if(e.shot === 'smash') L.smash = true; if(e.shot === 'drop') L.drop = true;
-  if(e.rally === 15) comicImpact(G.M.players[e.p], 'Sla… 15 HITS!', 'rally', 'smash', '🔁 What a rally!'); }
-function sla(p, text){ if(!FX) return; /* 💬 24t sla */ if(UI.callout && UI.callout.active()){ UI.callout(text, {who: p, say: G.comics}); return; } Comic.callout(text, {small: !G.comics, say: G.comics}); }
-/* 💬 24t-a: words during play (UiKit UI.callout) — the court + people + ball stay clear, crowd fans on #court can say it */
-function calloutSetup(){ if(!(window.UI && UI.callout)) return;
-  const scr = (x, y, z) => { if(!G || !V) return null; const c = $('court').getBoundingClientRect(), d = V.dpr || 1, q = V.P(x, y, z || 0); return {x: c.left + q[0] / d, y: c.top + q[1] / d}; };
-  const pl = w => !G ? null : typeof w === 'number' ? G.M.players[w] : w && w.side != null ? w : null;
-  const me = () => G && (G.M.players.find(p => p.human && !p.remote && !p.auto) || G.M.players.find(p => p.human));
-  UI.callout.setup({
-    get me(){ return me(); },
-    at: w => { const p = pl(w) || me(); if(!p) return null; const h = scr(p.x, p.y, 2.25); return h ? {x: h.x, y: h.y - 6} : null; },
-    side: w => { const p = pl(w) || me(); return p ? p.side : null; },
-    crowd: () => $('court'),
-    poly: () => { if(!G || !V) return null; const S = G.sp, P = [scr(-S.Lh, -S.Wh), scr(S.Lh, -S.Wh), scr(S.Lh, S.Wh), scr(-S.Lh, S.Wh)]; return P.some(q => !q) ? null : P.map(q => [q.x, q.y]); },
-    inside: (x, y) => { if(!G || !V) return false; const S = G.sp, P = [scr(-S.Lh, -S.Wh), scr(S.Lh, -S.Wh), scr(S.Lh, S.Wh), scr(-S.Lh, S.Wh)]; if(P.some(q => !q)) return false;
-      let ins = false; for(let i = 0, j = 3; i < 4; j = i++){ const a = P[i], b = P[j]; if(((a.y > y) !== (b.y > y)) && (x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x)) ins = !ins; } return ins; },
-    keep: () => { if(!G) return []; const out = [];
-      G.M.players.forEach(p => { const f = scr(p.x, p.y, 0), h = scr(p.x, p.y, 2.3); if(!f || !h) return; const w = Math.max(26, Math.abs(f.y - h.y) * 0.45); out.push({l: f.x - w, r: f.x + w, t: h.y - 18, b: f.y + 8}); });
-      (G.M.balls || []).forEach(b => { if(!b) return; const q = scr(b.x, b.y, b.z || 0), g = scr(b.x, b.y, 0); if(!q) return; out.push({l: q.x - 26, r: q.x + 26, t: q.y - 26, b: Math.max(q.y, g ? g.y : q.y) + 14}); });
-      return out; }
-  }); }
-function comicImpact(p, words, design, pose, sub){
-  if(!p) return false; const M = G.M; if(!G.comics || M.t - G.lastImpact < 10){ sla(p, words); return false; }   // Off / too soon → just the callout
-  G.lastImpact = M.t; Comic.impact({who: {name: p.name, av: p.av}, words, design, pose, sub, ms: 1100, ball: comicBall}); return true;
-}
-function onJump(e){
-  const M = G.M, p = M.players[e.p], L = G.plog;
-  if(e.kind === 'v'){ if(e.ok){ L.jump = true; L.jumpBy = e.p; if(e.perfect) L.jumpPerfect = true; } UISound.play(e.ok ? 'whoosh' : 'bump');
-    if(e.ok && e.perfect) comicImpact(p, 'Sla… SMASH!!!', 'jump', 'jump', '🦘 Jump smash!'); else sla(p, e.ok ? 'Sla… JUMP!' : 'Sla… oops!'); }
-  else { if(e.ok){ L.dive = true; L.diveBy = e.p; } else { L.diveMiss = true; L.diveMissBy = e.p; } UISound.play('drop');
-    if(e.ok) comicImpact(p, 'Sla… DIVE!', 'dive', 'dive', '🤸 Dive save!'); else sla(p, 'Sla… so close!'); }
-  G.mlog.push({k: e.kind, ok: e.ok, perfect: e.perfect, p: e.p, t: M.t});
-}
-function comicBall(g, x, y, r, t){ const sp = G.sp; if(sp.kind === 'shuttle'){ BallSkins.shuttle(g, G.ball, G.feathers ? G.feathers[0] : -1, x, y, r * 1.2, t, Math.PI * 0.9); return; }
-  if(G.ball >= 0 && sp.kind !== 'puck') BallSkins.draw(g, G.ball, x, y, r, t); else { g.save(); drawSportBall(g, sp, x, y, r, t, 0); g.restore(); } }
-function momentOf(e){   // what happened in this point → Comic.pick
-  const L = G.plog, M = G.M, sc = M.score, lastP = M.players[L.lastHit], ten = G.sp.scoring === 'tennis';
-  const close = ten ? sc.pts[0] >= 3 && sc.pts[1] >= 3 : Math.abs(sc.pts[0] - sc.pts[1]) <= 1 && Math.max(sc.pts[0], sc.pts[1]) >= M.target - 2;
-  return {dive: L.dive && L.lastJump === 'h' && lastP && lastP.side === e.side, diveMiss: L.diveMiss, jump: L.jump, jumpPerfect: L.jumpPerfect, power: L.power, ace: e.why === 'ace', glitch: !!(lastP && lastP.robot && lastP.side !== e.side && /out|net|wide|own/.test(e.why || '')),
-    rally: L.rally, close, drop: L.lastShot === 'drop' && lastP && lastP.side === e.side, smash: L.smash};
-}
-function comicPoint(e){
-  const M = G.M, L = G.plog, lastP = M.players[L.lastHit];
-  if(L.dive && L.lastJump === 'h' && lastP && lastP.side === e.side) sla(lastP, 'Sla… DIVE… WINNER!!');
-  else if(e.why === 'ace') sla(lastP, 'Sla… ACE!'); else if(e.why === 'goal' || e.why === 'legend') sla(lastP, 'Sla… GOAL!!');
-  else if(L.lastShot === 'drop' && lastP && lastP.side === e.side) sla(lastP, 'Sla… plop.');
-  G.lastPoint = {e, m: momentOf(e), plog: Object.assign({}, L)};
-  if(L.rally >= 8 || L.dive || L.jumpPerfect) G.mlog.push({k: 'point', rally: L.rally, side: e.side, m: G.lastPoint.m, t: M.t});
-  if(!G.comics || M.score.done) return;
-  if(G.sp.scoring === 'tennis'){ G.stripNext = true; setTimeout(() => { G.stripNext = false; }, 50); return; }   // tennis-style: a strip on each GAME-winning point (the 'game' event follows)
-  if(--G.nextStrip <= 0){ G.nextStrip = 2 + Math.floor(Math.random() * 3); comicStripNow(); }   // point sports: every 2–4 points
-}
-function comicStripNow(){ const LP = G.lastPoint; if(!LP || !G.comics) return; const design = Comic.pick(LP.m), panels = stripPanels(design, LP); G.stripNext = false;
-  setTimeout(() => { if(G && !G.over) Comic.strip(design, {panels}); }, 650); }
-function heroOf(LP, design){ const M = G.M, L = LP.plog, by = i => M.players[i];
-  const i = design === 'dive' ? L.diveBy : design === 'divemiss' ? L.diveMissBy : design === 'jump' ? L.jumpBy : design === 'glitch' ? L.lastHit : L.lastHit;
-  return by(i >= 0 ? i : 0) || M.players.find(p => p.side === LP.e.side) || M.players[0]; }
-function stripPanels(design, LP){
-  const M = G.M, hero = heroOf(LP, design), who = q => ({name: q.name, av: q.av}), opp = M.players.find(q => q.side !== hero.side) || hero, won = hero.side === LP.e.side;
-  const W = Comic.DESIGNS[design].words, n = LP.plog.rally;
-  const P1 = {who: who(hero), pose: 'ready', cap: hero.name + (n > 1 ? ' · rally ' + n : ''), words: W[0]};
-  const P2 = {who: who(hero), pose: design === 'dive' || design === 'divemiss' ? 'dive' : design === 'glitch' ? 'glitch' : design === 'slowmo' ? 'ready' : 'smash', ball: comicBall, words: W[1], cap: Comic.DESIGNS[design].name};
-  const P3 = {who: who(won ? hero : opp), pose: won ? 'cheer' : 'sad', words: won ? W[2] : 'Point ' + teamName(LP.e.side) + '!', cap: SB.pointText(M, 0) + ' – ' + SB.pointText(M, 1)};
-  return [P1, P2, P3];
-}
-function winnerPanels(win){   // the 4-panel match strip: start · the best moment of the match · match point · the winner
-  const M = G.M, ws = M.players.filter(p => p.side === win), ls2 = M.players.filter(p => p.side !== win), A = ws[0], B = ls2[0] || ws[0], who = q => ({name: q.name, av: q.av});
-  const best = G.mlog.filter(x => x.k === 'h' && x.ok)[0] || G.mlog.filter(x => x.k === 'v' && x.ok && x.perfect)[0] || G.mlog.filter(x => x.k === 'point').sort((a, b) => b.rally - a.rally)[0];
-  const bp = best ? M.players[best.p != null ? best.p : (M.players.find(q => q.side === best.side) || A).i] || A : A;
-  const bw = !best ? 'What a match!' : best.k === 'h' ? 'Sla… DIVE!' : best.k === 'v' ? 'Sla… SMASH!!!' : 'Sla… ' + best.rally + ' HITS!';
-  const scoreLine = G.sp.scoring === 'tennis' ? M.score.games[0] + ' – ' + M.score.games[1] : M.score.pts[0] + ' – ' + M.score.pts[1];
-  return [{who: who(A), who2: who(B), pose: 'ready', pose2: 'ready', cap: G.sp.icon + ' ' + G.sp.name, words: 'Game on!'},
-    {who: who(bp), pose: best && best.k === 'h' ? 'dive' : 'smash', ball: comicBall, cap: 'The big moment', words: bw},
-    {who: who(A), pose: 'smash', ball: comicBall, cap: 'Match point', words: 'MATCH POINT!'},
-    {who: who(A), who2: who(B), pose: 'cheer', pose2: 'sad', cap: scoreLine, words: 'SLA-BRALL!!!'}];
-}
-
-/* ---------- HUD ---------- */
-function hud(){
-  if(!G) return; const M = G.M, sc = M.score, ten = G.sp.scoring === 'tennis';
-  BAR.players([0, 1].map(i => ({k: i, name: G.tn[i] + (ten ? ' · G' + sc.games[i] : ''), score: SB.pointText(M, i), on: G.sp.kind !== 'puck' && sc.serveSide === i, col: i ? '#18B8A6' : '#FF7A1A'})));
-  BAR.count('rally', G.sp.kind === 'puck' ? '🏒' : '🔁', M.rally + (M.lv.hardcore ? ' · 💀' + (3 - sc.hcLost) : ''), 'Rally — hits in a row');
-  [0, 1].forEach(side => { const tag = $('ptag-' + side), hold = M.players.filter(p => p.side === side && p.power);
-    if(!hold.length){ tag.classList.add('hidden'); return; }
-    tag.classList.remove('hidden'); tag.classList.toggle('gold', hold.some(p => SB.POWERS[p.power].tier === 2));
-    tag.textContent = hold.map(p => SB.POWERS[p.power].icon + ' ' + (M.players.length > 2 ? p.name + ': ' : '') + SB.POWERS[p.power].name + (p.human ? ' (' + keyName(keySetsOf(p)[0].power) + ')' : '')).join(' · '); });
-  $('pads').querySelectorAll('.shotpad').forEach(d => { const p = M.players[Number(d.dataset.p)]; const b = d.querySelector('.pw'); if(b) b.classList.toggle('ready', !!(p && p.power));
-    d.querySelectorAll('.sbtn[data-a]').forEach(x => { if(x.dataset.a !== 'power') x.classList.toggle('armed', !!(p && p.queued === x.dataset.a && M.t - p.queuedT < 0.6)); }); });
-  const sh = $('serve-hint'), b0 = M.balls[0], server = b0 && b0.held != null ? M.players[b0.held] : null;
-  const stx = M.state === 'serve' && server && server.human && !server.remote && !G.paused ? sbsHint(M, sh, server) : null;   // 🎾 b3b6 toss → ⭕ glow
-  if(stx){ if(sh.textContent !== stx) sh.textContent = stx; sh.classList.remove('hidden'); sh.classList.toggle('gold', stx.indexOf('⭕') === 0); }
-  else sh.classList.add('hidden');
-  sbsPads(M);
-}
+/* 📏 s-sla play#3 → SlaBrall_play.html */
 
 /* ---------- drawing ---------- */
 const BG_CACHE = {key: '', cv: null};
@@ -3667,6 +3232,9 @@ msAfter('choosePlayer', () => { if(LK.urlDone) return; LK.urlDone = true;   // �
   lkUrlCode(c => { c = String(c || '').toLowerCase().replace(/[^0-9a-f]/g, '').slice(0, 4); if(c.length === 4) lkOpenJoin(c); }); });
 /* ✨ END MODE SPOTLIGHT */
 </script>
+<script src="inc/SlaBrallParts.js"></script>
+<script src="inc/SlaBrall_cup.js"></script>
+<script src="inc/SlaBrall_play.js"></script>   <!-- 📏 s-sla: the part loader + (offline app / tests) the play + 🏆 tournament parts inline, after the main script -->
 <script>
 /* 🎵 MOOD (24u-b) START — ✨ polish chat · UiKit ambient mood (UISound.mood, plan `Ambient Moods — full plan.md` §7). Don't edit by hand:
    Test Harness/patch_24ub_moods.py re-applies it. Starts with the game's cheerMount() (= play starts, also 🔄 Again), stops with
@@ -3805,4 +3373,4 @@ const ANN = (function(){
 </script>
 </body>
 </html>
-<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+lk-1b+p1d+lk-1c+cs-1+lk-2e+dv-1+tb-1+lk-5e+lk-5f+ls-1b+pz-1+24t-a+b3w5+st-2b+lk-6c+24u-d1+b3b5+b3b6+b3b6b+an-1+an-2) END OF SlaBrall.html -->
+<!-- (11m-2+back-1+modes-3+mg-1+mc-1+sb2-1b+sb2-2+sb2-3+sk-1+bs-1+le-1+nr-1+st-1+p1c+lk-1b+p1d+lk-1c+cs-1+lk-2e+dv-1+tb-1+lk-5e+lk-5f+ls-1b+pz-1+24t-a+b3w5+st-2b+lk-6c+24u-d1+b3b5+b3b6+b3b6b+an-1+an-2+s-sla) END OF SlaBrall.html -->
