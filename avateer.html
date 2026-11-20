@@ -90,6 +90,9 @@
 <script src="inc/AvatarActs.js"></script>
 <script src="inc/AvatarWeapons.js"></script>
 <script src="inc/IsoKit.js"></script>
+<script src="inc/LootKit.js"></script>
+<script src="inc/AvatarWear.js"></script>
+<script src="inc/LootWear.js"></script>
 </head>
 <body ontouchstart="">
 <section id="scr-play" class="screen">
@@ -102,6 +105,7 @@
     <div class="seg" id="counts"><span class="lb" title="monsters">👾</span><button class="candy" data-n="0">0</button><button class="candy" data-n="20">20</button><button class="candy on" data-n="40">40</button><button class="candy" data-n="80">80</button></div>
     <button class="candy go" id="t-run" data-sound="tap">▶ <span class="bl">Speed test</span></button>
     <button class="candy" id="t-fit" data-sound="tap" title="see both islets">🔍</button>
+    <button class="candy" id="t-bag" data-sound="none" title="bag · my look" aria-label="Bag and my look">🎒</button>
   </div>
   <div id="stick" aria-label="move"><i class="knob"></i></div>
   <div id="btns"><button id="b-jump" data-sound="none"></button><button id="b-emote" data-sound="none"></button><button id="b-swing" data-sound="none"></button></div>
@@ -722,7 +726,7 @@ function monStep(m, dt){ m.px = m.x; m.py = m.y; m.ph += dt;
   if(!S.run && Math.hypot(m.x - H.x, m.y - H.y) < 0.75 && H.jump < 0){ m.back = 0.6; battlePop(m); }
 }
 let popT = 0;
-function battlePop(m){ const n = AvWorld.MON[m.id].name, el = $('pop'); S.pops++; el.textContent = '⚔️ ' + n + ' wants to battle! (R1)'; const p = S.V.toScreen(m.x, m.y, 2); el.style.left = p.x + 'px'; el.style.top = p.y + 'px';
+function battlePop(m){ const n = AvWorld.MON[m.id].name, el = $('pop'); S.pops++; lwDrop(m); el.textContent = '⚔️ ' + n + ' wants to battle! (R1)'; const p = S.V.toScreen(m.x, m.y, 2); el.style.left = p.x + 'px'; el.style.top = p.y + 'px';
   el.classList.add('on'); clearTimeout(popT); popT = setTimeout(() => el.classList.remove('on'), 1300); if(window.UISound) UISound.play('pop'); }
 function setCount(want){ const n = Math.min(want, Iso.budget.units || want); S.count = n;
   document.querySelectorAll('#counts [data-n]').forEach(b => b.classList.toggle('on', Number(b.dataset.n) === want));
@@ -735,7 +739,7 @@ function render(alpha, t){ S.t = t;
   H.it.x = H.px + (H.x - H.px) * alpha; H.it.y = H.py + (H.y - H.py) * alpha; H.it.z = H.z;
   PET.it.x = PET.px + (PET.x - PET.px) * alpha; PET.it.y = PET.py + (PET.y - PET.py) * alpha; PET.it.z = PET.z; PET.it.pic = PET.pics[Math.floor(t * 6) % 4]; PET.it.flip = PET.dir < 0;
   for(const m of S.mons){ const it = m.it; it.x = m.px + (m.x - m.px) * alpha; it.y = m.py + (m.y - m.py) * alpha; it.pic = m.frames[Math.floor(m.ph * 5) % 4]; it.flip = m.flip; }
-  under();
+  under(); lwFrame(t);
   const st = Iso.frame(S.V, {items: S.items, t, overlay: (g, V) => AvArch.ropePosts(g, [23.6, 20.8], [27.4, 17.2], V, 0, 0)});
   meter(st);
 }
@@ -832,6 +836,29 @@ function sendResult(){ const L = S.last, b = $('r-send'); if(!L) return;
     .withFailureHandler(e => { UI.idle(b); if(UI.toast) UI.toast('⚠️ ' + ((e && e.message) || 'Could not send')); })
     .sendFeedback({kind: 'idea', player: CURRENT_PLAYER, text, page: 'avateer', game: 'avateer', level: 'proto', device: L.dev}); }
 
+/* ---------- 🎁 av-wear4: 🎒 bag · 👗 my look · 🧱 map drops (LootKit + AvatarWear + LootWear) ----------
+   speed page only: the bag + look live in localStorage (sp_avateer_bag / sp_avateer_look:<Name>) — R1 moves them into the GF.saves character.
+   Touching a monster now also drops loot (a ⚠️ mini-boss roll, so the test always shows a drop) → hop to a free cell → 🌟 tier beam → 🧲 into the 🎒. */
+const LW = (window.LootWear && window.Loot) ? {bag: null, look: {}, D: null, cool: new Map(), seed: 1} : null;
+const LW_POOL = LW ? LootWear.IDS.filter(id => /^wear\.isl\./.test(id)) : [];
+function lwSave(){ try { localStorage.setItem('sp_avateer_bag:' + ME.name, JSON.stringify(LW.bag.toJSON())); localStorage.setItem('sp_avateer_look:' + ME.name, JSON.stringify(LW.look)); } catch(e){} }
+function lwLoad(){ let s = null, l = null; try { s = JSON.parse(localStorage.getItem('sp_avateer_bag:' + ME.name) || 'null'); l = JSON.parse(localStorage.getItem('sp_avateer_look:' + ME.name) || 'null'); } catch(e){}
+  LW.bag = Loot.bag(s || {}); LW.look = l || {};
+  if(!s){ ['head', 'body', 'feet'].forEach((sl, i) => { LW.bag.add({base: 'wear.isl.jungle.' + sl, tier: 0, lv: 1, seed: 11 + i, sock: 0, runes: []}); LW.bag.wear(LW.bag.g.length - 1, sl); }); lwSave(); } }
+function lwDress(){ if(!LW) return; H.av = LootWear.dressFor(H.base || H.av, LW.bag, LW.look); }
+function lwDrop(m, src){ if(!LW || !LW.D) return; const now = S.t || 0; if((LW.cool.get(m) || -9) > now - 3) return; LW.cool.set(m, now);
+  const res = Loot.roll(src || (AvWorld.MON[m.id] && AvWorld.MON[m.id].mini ? 'boss' : 'mini'), {seed: 'av:' + ME.name + ':' + (LW.seed++), pool: LW_POOL, state: LW.bag.st, lv: 3, noMats: true});
+  LW.bag.st = res.state; if(res.items.length) LW.D.addMany(res.items, {i: Math.floor(m.x), j: Math.floor(m.y)}, {t: now}); }
+function lwStart(){ if(!LW) return; H.base = H.av; lwLoad(); lwDress();
+  LW.D = LootWear.dropper(S.V, S.M, {to: () => ({x: H.it.x, y: H.it.y}), blocked: (i, j) => PROPS.some(p => Math.floor(p.x) === i && Math.floor(p.y) === j), calm: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
+    onBag: it => { const where = LW.bag.add(it); lwSave(); const p = S.V.toScreen(H.it.x, H.it.y, 5); LootWear.chip($('scr-play'), it, p.x, p.y, where); if(window.UISound) UISound.play('pop'); return where; }});
+  $('t-bag').onclick = () => { if(window.Loot && Loot.react) Loot.react(); document.body.classList.add('lw-open');   // the page's ◀ buttons step aside while the bag is open (they sat on the bag header on phones)
+    LootWear.bagSheet($('scr-play'), LW.bag, {av: H.base, look: LW.look, jobs: {knight: 7}, theme: 'gold', basic: true,
+    onLook: l => { LW.look = l; lwDress(); lwSave(); }, onChange: () => { lwDress(); lwSave(); }, onClose: () => document.body.classList.remove('lw-open')}); };
+  if(!document.getElementById('lw-av-css')){ const st = document.createElement('style'); st.id = 'lw-av-css'; st.textContent = 'body.lw-open #back-btn, body.lw-open #home-btn, body.lw-open #hud, body.lw-open #tools{visibility:hidden!important;}'; document.head.appendChild(st); }
+  window.AV_WEAR = {LW, drop: (tier, n) => { const it = {base: LW_POOL[(LW.seed++ * 7) % LW_POOL.length], tier: tier | 0, lv: 3, seed: LW.seed, sock: 0, runes: []}; LW.D.addMany(new Array(n || 1).fill(0).map((_, k) => Object.assign({}, it, {seed: it.seed + k})), {i: Math.floor(H.x + 2), j: Math.floor(H.y)}, {t: S.t || 0}); }, dress: lwDress}; }
+function lwFrame(t){ if(!LW || !LW.D) return; for(let i = S.items.length - 1; i >= 0; i--) if(S.items[i].drop) S.items.splice(i, 1); LW.D.update(t).forEach(it => S.items.push(it)); }
+
 /* ---------- 🔧 boot ---------- */
 async function boot(){
   const lb = p => { $('load-bar').style.width = Math.round(p * 100) + '%'; };
@@ -839,7 +866,7 @@ async function boot(){
   H.av = heroAv(); PET.pics = [0, 1, 2, 3].map(f => pic('pet:ember:' + f, (g, x, y) => AvPets.draw(g, 'emberpup', 0, x, y, 52, {t: f * 0.25})));
   S.items.push(H.it, PET.it);
   S.V = Iso.view($('iso'), S.M, {bg: 'none', shadow: false, min: 0.35, max: 2.6}); S.V.resize(); lb(0.4);
-  controls(); setCount(S.count);
+  controls(); setCount(S.count); lwStart();
   const tall = S.V.H > S.V.W * 1.2, d = S.V.dpr || 1; S.V.zoom = Iso.stepFor((tall ? 1 : S.V.W > 1000 ? 1 : 0.8) * d) / d; S.V.follow(H.it); S.V.centerOn(H.x, H.y);   // a baked zoom step (an in-between zoom costs ~4× per frame)
   const pics = PROPS.map(p => p.pic).filter(Boolean).concat(PET.pics, ...Object.values(MPIC));
   await Iso.warm(pics, S.V, {onProgress: f => lb(0.4 + f * 0.6)});
@@ -852,4 +879,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (av-r0b) END OF Avateer.html -->
+<!-- (av-r0b+av-wear4) END OF Avateer.html -->

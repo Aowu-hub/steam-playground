@@ -48,6 +48,9 @@
 <script src="inc/AvatarActs.js"></script>
 <script src="inc/AvatarWeapons.js"></script>
 <script src="inc/AvatarWear.js"></script>
+<script src="inc/IsoKit.js"></script>
+<script src="inc/LootKit.js"></script>
+<script src="inc/LootWear.js"></script>
 </head>
 <body ontouchstart="">
 <div id="app">
@@ -56,7 +59,7 @@
     <span id="ttl">👕 AvatarWear lab</span>
     <div class="chips" id="views"></div>
   </div>
-  <div id="stage"><canvas id="cv"></canvas><div id="note"></div></div>
+  <div id="stage"><canvas id="cv"></canvas><canvas id="iso" style="position:absolute;inset:0;width:100%;height:100%;display:none;touch-action:none"></canvas><div id="note"></div></div>
   <div id="dock"><div class="chips" id="opts"></div><div id="pick"></div></div>
 </div>
 <script>
@@ -69,7 +72,7 @@ UI.navBar(document.getElementById('back-btn'), {});
 'use strict';
 const A = window.AvatarWear, $ = id => document.getElementById(id), cv = $('cv'), g = cv.getContext('2d');
 const name = CURRENT_PLAYER || 'Aowu', BASE = (typeof defaultAvatar === 'function') ? defaultAvatar(name) : {};
-const VIEWS = [['job', '👕', 'Jobs'], ['island', '🏝️', 'Islands'], ['camp', '🦖', 'Camps'], ['sky', '☀️', 'Sky God'], ['prime', '✦', 'Primes'], ['mix', '👗', 'My look'], ['drop', '🧱', 'Drops']];
+const VIEWS = [['job', '👕', 'Jobs'], ['island', '🏝️', 'Islands'], ['camp', '🦖', 'Camps'], ['sky', '☀️', 'Sky God'], ['prime', '✦', 'Primes'], ['mix', '👗', 'My look'], ['drop', '🧱', 'Drops'], ['bag', '🎒', 'Bag'], ['first', '☀️', 'First pick'], ['map', '🗺️', 'Map drops'], ['beam', '🌟', 'Beams']];   // 🎁 av-wear4 phase B
 const EL_IC = {fire: '🔥', water: '💧', nature: '🌱', stone: '🪨', wind: '🌪️', zap: '⚡', light: '✨', shadow: '🌑'};
 const TIER_IC = ['⚪', '🟢', '🔵', '🟣', '🟡'];
 const JOB_N = {knight: 'Knight', mage: 'Mage', chef: 'Chef', gardener: 'Gardener', ranger: 'Ranger', scholar: 'Scholar', inventor: 'Inventor', ninja: 'Ninja', brawler: 'Brawler', summoner: 'Summoner', smasher: 'Smasher', lancer: 'Lancer', sharp: 'Sharpshooter', ronin: 'Ronin'};
@@ -81,13 +84,15 @@ function pages(){ const v = S.view;
   if(v === 'sky') return A.REGIONS.map(k => ({label: A.info('sky.' + k).name, ids: ['sky.' + k], sub: ['8 / 8'], icons: 'sky.' + k}));
   if(v === 'prime') return A.PRIMES.map(n => ({label: '#' + n + ' ' + A.look('prime.' + n + '.sig').piece, ids: ['prime.' + n + '.sig', 'prime.' + n + '.guard'], sub: ['✨ ' + A.info('prime.' + n + '.sig').name, '🛡️ ' + A.info('prime.' + n + '.guard').name]}));
   if(v === 'mix') return [{label: 'Show my look', mix: true}];
+  if(v === 'bag' || v === 'first' || v === 'map' || v === 'beam') return [{label: {bag: '🎒 Bag · 👗 Look tab', first: '☀️ Pick your first Sky God piece', map: '🗺️ Drops on the island', beam: '🌟 A beam for every tier'}[v], lwb: v}];
   if(v === 'drop') return ['job.knight@1', 'isl.frost@2', 'isl.cherry@3', 'sky.temple', 'prime.4.sig'].map(id => ({label: A.info(id).name, drop: id}));
   return []; }
-function setView(v){ S.view = v; S.page = 0; [...$('views').children].forEach(b => b.classList.toggle('on', b.dataset.v === v)); opts(); pick(); }
+function setView(v){ if(window.LW_B) LW_B.leave(); S.view = v; S.page = 0; [...$('views').children].forEach(b => b.classList.toggle('on', b.dataset.v === v)); opts(); pick(); if(window.LW_B) LW_B.enter(v); }
 function chipRow(box, list, on, fn){ box.innerHTML = ''; list.forEach(([k, ic, lb]) => { const b = document.createElement('button'); b.className = 'chip' + (k === on ? ' on' : ''); b.dataset.v = k; b.innerHTML = ic + (lb ? ' <span class="lb">' + lb + '</span>' : ''); b.onclick = () => fn(k); box.appendChild(b); }); }
 function opts(){ const box = $('opts'); box.innerHTML = '';
   if(S.view === 'job') chipRow(box, [['', '🎨', 'Own']].concat(A.ELEMENTS.map(e => [e, EL_IC[e], ''])), S.el || '', k => { S.el = k || null; opts(); });
-  if(S.view === 'mix') chipRow(box, [['shuffle', '🎲', 'Shuffle'], ['clear', '🧽', 'Clear']], null, k => { if(k === 'clear') S.mix = {}; else shuffle(); }); }
+  if(S.view === 'mix') chipRow(box, [['shuffle', '🎲', 'Shuffle'], ['clear', '🧽', 'Clear']], null, k => { if(k === 'clear') S.mix = {}; else shuffle(); });
+  if(window.LW_B) LW_B.opts(box); }
 function shuffle(){ const all = A.ids(); A.SLOTS.forEach(s => { const c = all.filter(id => A.look(id).slots.includes(s)); S.mix[s] = Math.random() < 0.15 ? '' : c[Math.floor(Math.random() * c.length)]; }); }
 function pick(){ const P = pages(), box = $('pick'); box.innerHTML = ''; if(P.length < 2){ const b = document.createElement('b'); b.textContent = P[0] ? P[0].label : ''; box.appendChild(b); return; }
   const mk = (t, d) => { const b = document.createElement('button'); b.className = 'chip'; b.textContent = t; b.onclick = () => { S.page = (S.page + d + P.length) % P.length; pick(); }; return b; };
@@ -111,15 +116,56 @@ const DRAW = {
 };
 function frame(){ const t0 = performance.now(), t = t0 / 1000; S.drawn = [];
   g.setTransform(S.dpr, 0, 0, S.dpr, 0, 0); g.clearRect(0, 0, S.W, S.H);
-  try { const P = pages()[S.page]; if(P){ if(P.mix) DRAW.mix(P, t); else if(P.drop) DRAW.drop(P, t); else if(P.icons) DRAW.sky(P, t); else DRAW.row(P, t); } S.err = null; } catch(e){ S.err = e.message; }
+  try { const P = pages()[S.page]; if(P && P.lwb){ LW_B.draw(P, t); } else if(P){ if(P.mix) DRAW.mix(P, t); else if(P.drop) DRAW.drop(P, t); else if(P.icons) DRAW.sky(P, t); else DRAW.row(P, t); } S.err = null; } catch(e){ S.err = e.message; }
   $('note').textContent = '👕 ' + A.ids().length + ' looks · ' + A.VERSION + (S.err ? ' · ⚠️ ' + S.err : '');
   S.frameMs = S.frameMs * 0.9 + (performance.now() - t0) * 0.1; requestAnimationFrame(frame); }
+/* ---------- 🎁 av-wear4 phase B: 🎒 bag + 👗 look · ☀️ first pick · 🗺️ map drops · 🌟 beams (LootKit + LootWear + IsoKit) ---------- */
+const LW_B = window.LW_B = (function(){ const X = {bag: null, look: {head: 'job.mage@3'}, sheet: null, V: null, M: null, D: null, items: [], calm: false, t0: 0, first: null, n: 0, beamOn: true};
+  const L = window.Loot, W = window.LootWear; if(!L || !W) return {enter(){}, leave(){}, opts(){}, draw(){}};
+  function bag(){ if(X.bag) return X.bag; const B = L.bag({}), add = (b, t, w, x) => { B.add(Object.assign({base: 'wear.' + b, tier: t, lv: 8, seed: b.length * 31 + t, sock: L.SOCK[t], runes: []}, x || {})); if(w) B.wear(B.g.length - 1, w); };
+    add('isl.jungle.head', 2, 'head'); add('isl.jungle.body', 2, 'body'); add('isl.jungle.feet', 2, 'feet'); add('isl.cherry.back', 4, 'back'); add('isl.reef.acc', 1, 'acc');
+    add('isl.cherry.body', 4); add('isl.cherry.feet', 3); add('isl.ember.head', 3, null, {el: 'fire', elv: 3}); add('isl.frost.feet', 1); add('sky.temple.body', 6); add('camp.bone.head', 3); add('prime.3.sig', 6); add('isl.star.feet', 4); add('isl.sand.back', 0);
+    return X.bag = B; }
+  function sheetClose(){ if(X.sheet){ try { X.sheet.close(); } catch(e){} X.sheet = null; } $('stage').querySelectorAll('.lw-ov').forEach(o => o.remove()); }
+  function openBag(){ sheetClose(); X.sheet = W.bagSheet($('stage'), bag(), {av: BASE, look: X.look, jobs: {knight: 20, mage: 14, chef: 7, ninja: 1}, theme: 'gold', basic: true, onLook: l => { X.look = l; }, onClose: () => { X.sheet = null; }}); }
+  function first(){ sheetClose(); X.n++; const set = W.skySet('temple', 'demo.blade'), res = L.roll('awaken', {seed: 'lab:first:' + X.n, set, lv: 10, boss: 'lab:temple:' + X.n});
+    W.chooseSheet($('stage'), res, {set, basic: true, lv: 10, weapon: {name: 'Sun Blade', base: 'demo.blade'}}).then(it => { X.first = it; const d = L.get(it.base); $('note').textContent = '☀️ you picked ' + (d ? d.name : it.base) + ' — 🔁 to try again'; }); }
+  function isle(){ if(X.V) return; const cell = (i, j) => ((i === 0 && j === 0) || (i === 9 && j === 7) || (i === 9 && j === 0) || (i === 0 && j > 5)) ? {t: 'void'} : ((i === 6 || i === 7) && j <= 2 ? {t: 'water', block: 1} : {t: (i + j) % 5 === 0 ? 'flower' : i === 2 && j >= 4 ? 'path' : 'grass', h: 0});
+    X.M = Iso.map({w: 10, h: 8, theme: 'meadow', cell, seed: 4}); X.V = Iso.view($('iso'), X.M, {bg: 'none', min: 0.5, max: 2.6}); X.V.resize(); X.V.fit();
+    const rock = Iso.sprite('wl-rock', 50, 40, (g, w, h) => { g.fillStyle = '#9AA3AE'; g.beginPath(); g.moveTo(5, h - 6); g.lineTo(14, 10); g.lineTo(34, 6); g.lineTo(46, h - 8); g.closePath(); g.fill(); g.fillStyle = '#C7CED6'; g.beginPath(); g.moveTo(14, 10); g.lineTo(34, 6); g.lineTo(28, 20); g.closePath(); g.fill(); }, {ax: 25, ay: 34, outline: true});
+    const tree = Iso.sprite('wl-tree', 70, 96, (g) => { g.fillStyle = '#8A5A3C'; g.fillRect(31, 54, 9, 38); [[35, 40, 24, '#2FA24D'], [22, 50, 17, '#3FB75C'], [48, 50, 17, '#3FB75C'], [35, 26, 18, '#56C96B']].forEach(([x, y, r, c]) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }); }, {ax: 35, ay: 90, outline: true});
+    X.props = [{x: 4.5, y: 1.5, pic: rock, c: [4, 1]}, {x: 7.5, y: 5.5, pic: tree, c: [7, 5]}]; X.props.forEach(p => X.M.setBlock && X.M.setBlock(p.c[0], p.c[1], 1));
+    X.me = {x: 2.5, y: 5.5}; X.D = W.dropper(X.V, X.M, {to: () => X.me, blocked: (i, j) => X.props.some(p => p.c[0] === i && p.c[1] === j), seed: 9, calm: X.calm,
+      onBag: it => { const where = bag().add(it), q = X.V.toScreen(X.me.x, X.me.y, 5); W.chip($('stage'), it, q.x, q.y, where); return where; }}); }
+  function drop(tier, n){ isle(); const pool = W.IDS.filter(id => tier >= 6 ? /^wear\.sky\./.test(id) : /^wear\.isl\./.test(id)), t = performance.now() / 1000 - X.t0;
+    const list = []; for(let k = 0; k < (n || 1); k++){ const base = pool[(X.n++ * 7 + k * 3) % pool.length], tt = n > 1 ? [6, 4, 3, 2, 1, 0][k % 6] : tier; list.push({base: tt >= 6 && !/sky/.test(base) ? 'wear.sky.temple.body' : base, tier: tt, lv: 5, seed: X.n * 13 + k, sock: 0, runes: [], el: tier === 3 ? 'fire' : undefined, elv: 3}); }
+    if(tier === 7) list[0] = {base: 'wear.prime.3.sig', tier: 6, lv: 10, seed: 3, sock: 3, runes: []};
+    X.D.addMany(list, {i: 4, j: 3}, {t}); }
+  function draw(P, t){ const v = P.lwb, W2 = S.W, H2 = S.H;
+    if(v === 'map'){ isle(); const tt = performance.now() / 1000 - X.t0, items = X.props.map(p => ({x: p.x, y: p.y, pic: p.pic}));
+      items.push({x: X.me.x, y: X.me.y, pic: Iso.avatar({name, av: W.dressFor(BASE, bag(), X.look)}, {pose: 'still', size: 0.6})}); X.D.update(tt).forEach(i => items.push(i)); Iso.frame(X.V, {items, t: tt});
+      S.drawn.push('map:' + X.D.live.length); return; }
+    if(v === 'beam'){ const tt = performance.now() / 1000 - X.t0, cols = W2 > H2 ? 4 : 2, rows = 8 / cols, cw = W2 / cols, ch = H2 / rows, k = Math.min(cw / 120, ch / 210) * 0.9;
+      const names = ['⚪ Common', '🟢 Good', '🔵 Rare', '🟣 Epic', '🟡 Legendary', '🌈 Rainbow', '☀️ Sky God', '✦ Sky Prime'], piece = [['isl.jungle@0', 'head'], ['isl.cherry@1', 'back'], ['isl.frost@2', 'feet'], ['isl.ember@3', 'body'], ['isl.star@4', 'feet'], ['isl.reef@4', 'head'], ['sky.temple', 'body'], ['prime.3.sig', 'back']];
+      for(let i = 0; i < 8; i++){ const c = i % cols, r = Math.floor(i / cols), x = cw * (c + 0.5), y = r * ch + ch * 0.8, life = W.BEAM_LIFE[i] + 0.6, u = (tt + i * 0.21) % life;
+        g.fillStyle = '#7CC36A'; g.beginPath(); g.moveTo(x - 46 * k, y); g.lineTo(x, y - 23 * k); g.lineTo(x + 46 * k, y); g.lineTo(x, y + 23 * k); g.closePath(); g.fill();
+        const ly = AvatarWear.lying(piece[i][0], piece[i][1], 40); g.drawImage(ly, x - ly.width * k * 0.45, y - ly.height * k * 0.56, ly.width * k * 0.9, ly.height * k * 0.9);
+        if(u < W.BEAM_LIFE[i]) W.beam(g, x, y, Math.min(i, 6), u, {k: k * 0.9, calm: X.calm, prime: i === 7, seed: i + 1}); label(names[i], x, y + 40 * k, 13); S.drawn.push('beam:' + i); } return; }
+    g.fillStyle = 'rgba(36,50,74,.45)'; g.font = '700 15px Fredoka, Nunito, sans-serif'; g.textAlign = 'center'; g.fillText(v === 'bag' ? '🎒 the bag is open — ✕ closes it, 🎒 again opens it' : '☀️ pick one — 🔁 for another try', W2 / 2, H2 / 2); }
+  function opts(box){ const v = S.view; if(v === 'map') chipRow(box, [['0', '⚪', ''], ['1', '🟢', ''], ['2', '🔵', ''], ['3', '🟣', '🔥'], ['4', '🟡', ''], ['5', '🌈', ''], ['6', '☀️', ''], ['7', '✦', ''], ['chest', '👑', 'Boss chest'], ['calm', X.calm ? '🌱' : '🎆', X.calm ? 'Calm' : 'Full']], null, k => { if(k === 'calm'){ X.calm = !X.calm; X.D = null; X.V = null; isle(); opts(box); } else if(k === 'chest') drop(4, 6); else drop(+k, 1); });
+    if(v === 'beam') chipRow(box, [['calm', X.calm ? '🌱' : '🎆', X.calm ? 'Calm' : 'Full']], null, () => { X.calm = !X.calm; opts(box); });
+    if(v === 'bag') chipRow(box, [['open', '🎒', 'Open the bag']], null, openBag);
+    if(v === 'first') chipRow(box, [['again', '🔁', 'Again']], null, first); }
+  function enter(v){ X.t0 = performance.now() / 1000; const map = v === 'map'; $('iso').style.display = map ? 'block' : 'none'; cv.style.display = map ? 'none' : 'block';
+    if(map){ X.V = null; X.D = null; requestAnimationFrame(() => { isle(); }); } if(v === 'bag') openBag(); if(v === 'first') first(); }
+  function leave(){ sheetClose(); $('iso').style.display = 'none'; cv.style.display = 'block'; }
+  return {X, bag, enter, leave, opts, draw, drop, first, openBag}; })();
 chipRow($('views'), VIEWS, 'job', setView); setView('job');
 fit(); window.addEventListener('resize', () => { fit(); pick(); });
-window.WEAR_LAB = {S, setView, pages, shuffle};
+window.WEAR_LAB = {S, setView, pages, shuffle, B: LW_B};
 requestAnimationFrame(frame);
 })();
 </script>
 </body>
 </html>
-<!-- (av-wear2) END OF WearLab.html -->
+<!-- (av-wear2+av-wear4) END OF WearLab.html -->
