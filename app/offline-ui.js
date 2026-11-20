@@ -85,10 +85,10 @@
   });
 
   /* ---------- 🔑 family key ---------- */
-  function overlay(id, html) {
+  function overlay(id, html) {   // 📲 sa-1: 'off-moved' (like 'off-online-only') closes only with its own buttons
     var o = document.getElementById(id); if (o) o.remove();
     o = document.createElement('div'); o.className = 'off-ov'; o.id = id; o.innerHTML = '<div class="off-card" role="dialog">' + html + '</div>';
-    o.addEventListener('click', function (e) { if (e.target === o && id !== 'off-online-only') o.remove(); });
+    o.addEventListener('click', function (e) { if (e.target === o && id !== 'off-online-only' && id !== 'off-moved') o.remove(); });
     document.body.appendChild(o); return o;
   }
   function keyCard() {
@@ -146,6 +146,59 @@
     note(); window.addEventListener('online', note); window.addEventListener('offline', note);
   }
 
+  /* ---------- 📲 the app moved (sa-1, 2026-11-20 — bridge build at the OLD address only; build.js fills MOVED_TO) ----------
+     The offline app now lives at its own address (aowu-hub/steam-app). This card sends every waiting result to the family
+     Sheet FIRST — on an iPad / iPhone the new Home Screen icon has its own storage, so a result left here would be lost when
+     the old icon is deleted — and only then unlocks "Open the new app". Home page only, never in a game; "Later" = until the
+     app is opened again (the games keep working here, Aowu Q1 ⭐). */
+  var MOVED_TO = "https://aowu-hub.github.io/steam-app/";
+  function movedState() {
+    var n = S.pending || 0;
+    if (S.mode !== 'family') return { ready: true, cls: 'good', text: '🧪 Guest copy — there is nothing to save here.' };
+    if (S.keyBad) return { ready: false, cls: 'err', text: '🔑 The family key was changed — type the new one first, so your results can reach the Sheet.', key: true };
+    if (!S.online) return { ready: false, cls: 'err', text: '📶 Connect to the internet first' + (n ? ' — ' + n + ' result' + (n === 1 ? '' : 's') + ' wait on this ' + KIND + '.' : ' — the new app downloads itself once.') };
+    if (S.syncing || n) return { ready: false, cls: '', text: '<span class="spin">🔄</span> Saving ' + (n ? n + ' result' + (n === 1 ? '' : 's') : 'your results') + ' to the family Sheet…', sync: !S.syncing };
+    if (S.error && S.error !== 'key') return { ready: false, cls: 'err', text: '⚠️ The family Sheet did not answer (' + esc(S.error) + ').', retry: true };
+    if (!S.lastPull) return { ready: false, cls: '', text: '<span class="spin">🔄</span> Checking with the family Sheet…', sync: true };
+    return { ready: true, cls: 'good', text: '✅ All saved — safe to move' };
+  }
+  var movedSynced = 0;
+  function movedCard() {
+    if (!MOVED_TO || PAGE !== 'home') return;
+    var later = false; try { later = !!sessionStorage.getItem('sp_off_moved_later'); } catch (e) {}
+    if (later || document.getElementById('off-moved')) return;
+    if (showOn() || playing() || document.querySelector('.off-ov') || document.getElementById('off-upd')) return setTimeout(movedCard, 800);
+    var apple = KIND === 'iPad' || KIND === 'iPhone';
+    var o = overlay('off-moved', '<div style="text-align:center"><div style="font-size:52px;line-height:1.1">🏠➡️🏡</div><h3>The app has a new home!</h3>' +
+      '<p>STEAM Playground moved to a new address. Your players, scores and rooms come along — they live on the family Sheet.</p></div>' +
+      '<div class="off-msg" id="off-moved-st"></div>' +
+      '<p style="margin:8px 0 2px"><small>New address</small><br><b style="font-size:17px;word-break:break-all">' + esc(MOVED_TO.replace(/^https:\/\//, '')) + '</b></p>' +
+      '<ol>' + (apple
+        ? '<li>Tap <b>Open the new app</b> (if it opens inside this app, tap the 🧭 Safari button to open it in <b>Safari</b>).</li><li>In Safari: <b>Share</b> ⬆️ → <b>Add to Home Screen</b> → <b>Add</b>.</li><li>Open the new icon once with internet — a grown-up types the <b>family key</b> once.</li><li>Press and hold the OLD icon → <b>Remove App</b> → <b>Delete</b>.</li>'
+        : '<li>Tap <b>Open the new app</b>.</li><li>Install it (⊕ in the address bar, or menu → <b>Install</b>).</li><li>Open it once with internet (the family key is asked only if this device needs it).</li><li>Uninstall the OLD STEAM Playground app.</li>') + '</ol>' +
+      '<div class="off-btns"><a id="off-moved-go" href="' + esc(MOVED_TO) + '" target="_blank" rel="noopener">Open the new app ➜</a>' +
+      '<button class="ghost" id="off-moved-copy">📋 Copy address</button><button class="ghost" id="off-moved-retry" style="display:none">🔄 Try again</button>' +
+      '<button class="ghost" id="off-moved-key" style="display:none">🔑 Family key</button><button class="ghost" id="off-moved-x">Later — keep playing here</button></div>');
+    var go = o.querySelector('#off-moved-go'), st = o.querySelector('#off-moved-st');
+    function paintMoved() {
+      if (!document.body.contains(o)) return clearInterval(tm);
+      var m = movedState();
+      st.className = 'off-msg' + (m.cls ? ' ' + m.cls : ''); st.innerHTML = m.text;
+      go.style.opacity = m.ready ? '' : '.45'; go.setAttribute('aria-disabled', m.ready ? 'false' : 'true'); go.dataset.ready = m.ready ? '1' : '';
+      o.querySelector('#off-moved-retry').style.display = m.retry ? '' : 'none';
+      o.querySelector('#off-moved-key').style.display = m.key ? '' : 'none';
+      if (m.sync && Date.now() - movedSynced > 8000) { movedSynced = Date.now(); A.sync(); }
+    }
+    go.addEventListener('click', function (e) { if (!go.dataset.ready) { e.preventDefault(); st.classList.add('err'); } });
+    o.querySelector('#off-moved-copy').onclick = function () { var b = this; var done = function () { b.textContent = '✅ Copied'; }; try { navigator.clipboard.writeText(MOVED_TO).then(done, function () { prompt('Copy this address', MOVED_TO); }); } catch (e) { prompt('Copy this address', MOVED_TO); } };
+    o.querySelector('#off-moved-retry').onclick = function () { movedSynced = Date.now(); A.sync(); };
+    o.querySelector('#off-moved-key').onclick = function () { o.remove(); keyCard(); };
+    o.querySelector('#off-moved-x').onclick = function () { try { sessionStorage.setItem('sp_off_moved_later', '1'); } catch (e) {} o.remove(); };
+    var tm = setInterval(paintMoved, 700); paintMoved();
+  }
+  A.movedTo = MOVED_TO; A.movedState = movedState; A.movedCard = movedCard;
+  if (MOVED_TO && PAGE === 'home') setTimeout(movedCard, 1200);
+
   /* ---------- 📲 install guide (Dashboard, until the app is on the home screen) ---------- */
   function installGuide(force) {
     var o = overlay('off-install-card', '<h3>📲 Put STEAM Playground on this ' + KIND + '</h3>' +
@@ -161,7 +214,7 @@
   A.installGuide = installGuide;
   var deferredInstall = null;
   window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferredInstall = e; });
-  if (PAGE === 'home' && !STANDALONE) {
+  if (PAGE === 'home' && !STANDALONE && !MOVED_TO) {   // 📲 sa-1: the old address never invites a NEW install of itself
     var hideKey = 'sp_off_install_hide'; var hidden = 0; try { hidden = Number(localStorage.getItem(hideKey)) || 0; } catch (e) {}
     if (Date.now() - hidden > 7 * 864e5) setTimeout(function wait() {
       if (showOn()) return setTimeout(wait, 600);

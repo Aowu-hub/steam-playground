@@ -3,11 +3,16 @@
    • updates: files.json lists every file + its hash; a new version downloads ONLY the files whose hash changed
      (the rest is copied from the old cache), then waits as "pending" — the page shows "🆕 New update ready! ⟳".
      It is switched on only when the kid taps ⟳ or the next time the app is opened — never in the middle of a game.
+   • 📲 sa-1 (2026-11-20): two apps share the origin aowu-hub.github.io (old /steam-playground/ + new /steam-app/), and
+     Cache Storage is per ORIGIN. So every cache name starts with this app's own prefix (build.js sets PFX: 'sapp-' for
+     steam-app, 'steam-' for the old address) and tidy() deletes ONLY '<PFX>v<digit or ->…' versions — never another app's caches,
+     never 'steam-voices' (UiKitPlay vp-4b GeoRead clips). The old SW_REV 2 deleted every 'steam-*' cache.
    • ./?page=gameroom&player=… is answered with gameroom.html straight away (no hop through index.html)
    This file rarely changes; the app's own version lives in files.json. */
 'use strict';
-const SW_REV = 2;
-const META = 'steam-meta';
+const SW_REV = 3;
+const PFX = "steam-";   // 📲 sa-1: build.js writes the app's own prefix here
+const META = PFX + 'meta';
 const SCOPE = new URL('./', self.location.href).href;
 let STATE = null;   // {current, pending, previous}
 async function state() {
@@ -17,7 +22,8 @@ async function state() {
   return STATE;
 }
 async function saveState(s) { STATE = s; const c = await caches.open(META); await c.put(SCOPE + '__state', new Response(JSON.stringify(s), { headers: { 'Content-Type': 'application/json' } })); }
-const cacheName = v => 'steam-' + v;
+const cacheName = v => PFX + v;   // versions look like v2026.11.20-3
+const VER_RE = new RegExp('^' + PFX + 'v[0-9-]');   // 📲 sa-1: a version cache of THIS app — never 'steam-voices' ('steam-v' + 'oices')
 async function listOf(v) { if (!v) return null; const c = await caches.open(cacheName(v)); const r = await c.match(SCOPE + 'files.json'); return r ? r.json() : null; }
 
 // Download version `list` into its own cache, copying unchanged files from `fromVer`.
@@ -38,7 +44,7 @@ async function download(list, fromVer, report) {
   return { fetched, copied };
 }
 async function freshList() { const r = await fetch(SCOPE + 'files.json?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) throw new Error('files.json ' + r.status); return r.json(); }
-async function tidy() { const s = await state(); const keep = new Set([META, cacheName(s.current), cacheName(s.pending), cacheName(s.previous)]); for (const k of await caches.keys()) if (k.indexOf('steam-') === 0 && !keep.has(k)) await caches.delete(k); }
+async function tidy() { const s = await state(); const keep = new Set([META, cacheName(s.current), cacheName(s.pending), cacheName(s.previous)]); for (const k of await caches.keys()) if (VER_RE.test(k) && !keep.has(k)) await caches.delete(k); }   // 📲 sa-1: only this app's own versions
 
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
