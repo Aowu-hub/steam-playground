@@ -101,6 +101,38 @@
 <script src="inc/AvatarWeapons.js"></script>
 <script src="inc/GameFrame.js"></script>
 <script src="inc/GameCovers.js"></script>
+<script src="inc/Cover_maze.js"></script>
+<script src="inc/Cover_chess.js"></script>
+<script src="inc/Cover_memory.js"></script>
+<script src="inc/Cover_hopper.js"></script>
+<script src="inc/Cover_robot_adventure.js"></script>
+<script src="inc/Cover_stacking_sim.js"></script>
+<script src="inc/Cover_pinball.js"></script>
+<script src="inc/Cover_turbo.js"></script>
+<script src="inc/Cover_alignext.js"></script>
+<script src="inc/Cover_block_drop.js"></script>
+<script src="inc/Cover_checkers.js"></script>
+<script src="inc/Cover_double_up.js"></script>
+<script src="inc/Cover_pop_blocks.js"></script>
+<script src="inc/Cover_sweet_swap.js"></script>
+<script src="inc/Cover_eyes_brain.js"></script>
+<script src="inc/Cover_geoscout.js"></script>
+<script src="inc/Cover_georead.js"></script>
+<script src="inc/Cover_beat_corner.js"></script>
+<script src="inc/Cover_polyplot.js"></script>
+<script src="inc/Cover_wisdeck.js"></script>
+<script src="inc/Cover_sla_brall.js"></script>
+<script src="inc/Cover_soul_bopper.js"></script>
+<script src="inc/Cover_snakeast.js"></script>
+<script src="inc/Cover_brawl_buddies.js"></script>
+<script src="inc/Cover_minigames.js"></script>
+<script src="inc/Cover_number_board.js"></script>
+<script src="inc/Cover_word_board.js"></script>
+<script src="inc/Cover_number_grid.js"></script>
+<script src="inc/Cover_math_quest.js"></script>
+<script src="inc/Cover_sciencetory.js"></script>
+<script src="inc/Cover_avatarealm.js"></script>
+<script src="inc/Cover_starter.js"></script>
 <script src="inc/CardArt.js"></script>
 <script src="inc/GameLogos.js"></script>   <!-- 🧱 🎬 cover + 🏁 result card + 💾 saves (GameFrame + GameCovers + CardArt + GameLogos) -->
 </head>
@@ -200,6 +232,20 @@ const MODES = [
   {k: 'race', g: 'vs', icon: '🤖', name: 'Robot Race', type: 'A race', sub: 'Catch more stars than the robot in 1 minute'}
 ];
 window.MODE_TYPE = {classic: 'A catching game', race: 'A race'};
+// 🌱 BORN SPLIT (📏 rule "Born split + split your own", 🧱 b6a): a NEW big piece of this game — a mode, a book, a world, a question bank
+// (over ~30 KB, used by only some rounds) — is born as a PART file, never inside this page (Test Harness/parts/README.md, model ➗ Math Quest):
+//   1. write it in Test Harness/parts/<Game>/<part>.js (+ game.json) → python3 parts/build_parts.py <app> <round> <Game>
+//   2. python3 parts/rounds/s4/patch_parts_code.py Code.gs <round> StarCatchParts StarCatch_story + its names in steam-source tools/remote.json kits
+//   3. add the include line for StarCatchParts right after this page's main script (see the 🌱 note there) · 4. map the mode below.
+// startGame waits for the part (shared loader GameParts: site → backup copy, a toast if both fail); a mode pick starts the download early.
+const PART_OF = mode => null;   // 🌱 e.g. mode => mode === 'story' ? 'StarCatch_story' : null
+function partReady(mode){ const f = PART_OF(mode); return !f || (typeof GameParts !== 'undefined' && GameParts.has(f)); }
+function partPrefetch(mode){ const f = PART_OF(mode); if(f && typeof GameParts !== 'undefined' && !GameParts.has(f)) GameParts.need(f); }
+function partNeed(mode, go){ const f = PART_OF(mode); if(!f) return go();
+  if(typeof GameParts === 'undefined' || !GameParts.need){ UI.toast('📡 This way to play is missing its part file', 'err'); return; }
+  if(GameParts.has(f)) return go();
+  UI.loading(GAME_ID); GameParts.need(f, ok => { UI.loaded(); if(ok) return go(); UI.toast('📡 This way to play did not load — check the internet, then tap ▶ Start again', 'err'); });
+}
 const ROBOTS = [{k: 0, icon: '🐢', name: 'Sleepy bot'}, {k: 1, icon: '🙂', name: 'Quick bot'}, {k: 2, icon: '🚀', name: 'Pro bot'}];
 
 /* ================= ③ ENGINE — DOM-free, fixed 120 Hz steps, seeded (node tests load it: // ENGINE START … END) ================= */
@@ -348,7 +394,7 @@ function openCover(){
 }
 function renderSetup(){
   // 🎮 1. modes (UI.modeGroups = the shared mode boxes)
-  UI.modeGroups($('mode-box'), MODE_GROUPS, MODES.map(m => Object.assign({}, m, {on: m.k === PICK.mode})), {onPick: k => { PICK.mode = k; ls.set('mode', k); renderSetup(); return false; }});
+  UI.modeGroups($('mode-box'), MODE_GROUPS, MODES.map(m => Object.assign({}, m, {on: m.k === PICK.mode})), {onPick: k => { PICK.mode = k; ls.set('mode', k); partPrefetch(k); renderSetup(); return false; }});
   // 🗺️ 2. field size
   const mb = $('map-list'); mb.innerHTML = '';
   MAP_SIZES.forEach(m => { const b = document.createElement('button'); b.className = 'pick card map'; b.dataset.k = m.k; b.setAttribute('data-sound', 'pop');
@@ -481,6 +527,7 @@ function drawActor(A, P, isBot){
 
 /* ================= the game loop ================= */
 function startGame(lvl){
+  if(!partReady(PICK.mode)) return partNeed(PICK.mode, () => startGame(lvl));   // 🌱 b6a: a mode born as a part waits for its file
   cancelAnimationFrame(rafId); hideResult(); if(Cover) Cover.hide();
   const L = levelFor(lvl, PICK.size), mode = PICK.mode;
   const M = ENG.newMatch({L, mode, robot: PICK.robot, seed: (Date.now() >>> 0) ^ 0x5eed});
@@ -632,6 +679,7 @@ function boot(){
 }
 boot();
 </script>
+<!-- 🌱 born split (b6a): when this game's first part is born, its loader's include line (StarCatchParts, a raw print scriptlet like MathQuest.html's MathQuestParts line) goes right here, after the main script -->
 </body>
 </html>
-<!-- (b4a) END OF GameStarter.html -->
+<!-- (b4a+b6a) END OF GameStarter.html -->
