@@ -1,0 +1,366 @@
+
+/* 🌍 IsoLook_detective — 🕵️ Detective Town — a world look for 🔍 Pokadif: agency · museum · kiosk · clue board · street clock · gas lamp · clue tape · crates · finger post · townhouse · cottage · mystery mansion · lighthouse · clock tower · footprints · bike · cat · lost & found (every prop has def.diffs) — a LOOK file of 🌳 IsoProps (ip-4a: the engine + one file per look).
+   Load it with Props.need(['detective'], start) (the 📲 offline app + tests have it inline already). Runs after IsoProps with Props._K (the kit's insides).
+   Built from Test Harness/isoprops/kit/looks/detective.js by build_isoprops.py — never edit by hand. Same 14 rules as IsoProps (see the top of IsoProps.html). */
+(function(K){
+'use strict';
+if(!K){ console.warn('IsoLook_detective: include IsoProps first'); return; }
+const {HTW, LOOKS, DEFS, MAT, PD, add, lit, sideOf, sh, rnd, addLook, addSet, organic, bareTree, FONT, T} = K;
+/* 🌍 IsoProps LOOK file — 🕵️ detective · Detective Town (ip-5p, 🌳 IsoProps chat, 2026-11-20 — for 🔍 Pokadif's 🧱 2.5D dioramas, Pokadif plan §22d).
+   A cosy foggy harbour town where a kid detective lives: red-brick + sage + lilac shopfronts, slate roofs, gas lamps, cobbles, a magnifier on every sign.
+   Runs after the engine with Props._K (kit insides) + T (tools). Village footprints (Props.town works) through look.swap + look.roles.
+   🔍 SPOT-THE-DIFFERENCE FRIENDLY: every prop has ≥ 2 states / variants that differ by ≥ 45 changed px at zoom 1 — declared in def.diffs (the ip-5 convention):
+     def.diffs = [{by: 'state', a, b, level: 'bold' | 'quiet', name}, {by: 'v', level, name}, {by: 'text', level, name}] — what a game may change on this prop;
+     the engine measures it (Props.diffs, build round) and gives a game only the ones that really reach 45 px at the turn / look / condition it asks for.
+   Never: real police boxes, real brands, scary crime scenes (rule 9 Sky Pop) — the mansion is mysterious-cosy, the tape says nothing, nobody is hurt. */
+(function(){
+'use strict';
+const {vis, F, line, polyP, ph, lightOf, dome, halo} = T;
+const D = PD, M = MAT, TAU = Math.PI * 2, S2 = Math.SQRT2;
+const own = (set) => (key, o) => add(set, key, Object.assign({look: set}, o));
+const org = (set) => (key, o, fn) => organic(set, key, Object.assign({look: set}, o), fn);
+addSet('detective', {name: 'Detective', icon: '🕵️', accent: '#F2B731'});
+/* ============================ 🕵️ DETECTIVE — Detective Town (a cosy foggy harbour town) ============================ */
+if(typeof Iso !== 'undefined' && Iso.addTheme && !Iso.THEMES.detective)
+  Iso.addTheme('detective', {base: '#8E7A6A', baseDark: '#5E4E44', bg: ['#AEB9D8', '#F4EEE4'], tile: {grass: {top: '#9CCB8C', top2: '#8EBF7E', lip: '#76A866'},
+    flower: {top: '#A2CE90', top2: '#94C282', lip: '#76A866', deco: 'flower'}, path: {top: '#CFC6D2', top2: '#C0B6C6', deco: 'cobble'}, stone: {top: '#BDB6C4', top2: '#B0A8B8'}}}, 'storybook');
+addLook('detective', {name: 'Detective Town', walls: ['#B8533A', '#9DC2B6', '#C7A6C9', '#F2E6CF'], roofs: ['#4A5A78', '#6A4A6A', '#3E6A5A', '#5A4A3E'], trim: '#2E3A4A', accent: '#F2B731', stilts: false, ground: 'detective'}, 'jungle');
+const DA = own('detective'), DO = org('detective');
+const BRICK = '#B8533A', SAGE = '#9DC2B6', LILAC = '#C7A6C9', CREAM = '#F2E6CF', SLATE = '#4A5A78', IRON = '#2F4A44', BRASS = '#E0B040', STONE = '#C9C2B2',
+  LIT = '#FFD86A', LIT_DIM = '#E2C27E', DARKWIN = '#34405A', CORK = '#C8925A', INK = '#2A1C14';
+const glassOf = (on, c) => { const lv = lightOf(c); return on && lv ? (lv === 1 ? LIT : LIT_DIM) : DARKWIN; };
+// 🧱 brick courses on a face (decal paint, z 0 … hgt px)
+const bricks = (hgt, a) => (g, Q, k) => { g.strokeStyle = 'rgba(70,26,16,' + (a || 0.3) + ')'; g.lineWidth = 0.8 * k; const rows = Math.max(2, Math.round(hgt / 5));
+  for(let r = 1; r < rows; r++){ const z = r * hgt / rows; line(g, Q(0, z), Q(1, z)); for(let i = 0; i < 7; i++){ const u = (i + (r % 2) * 0.5) / 7; if(u > 0.03 && u < 0.97) line(g, Q(u, z), Q(u, z - hgt / rows)); } } };
+// 📐 paint in a face's own flat frame: local x 0 … W along the face (zoom-1 px), y DOWN from zTop — never mirrored (words + clocks always read the right way)
+function faceXf(g, Q, k, zTop, fn){ let o = Q(0, zTop), e = Q(1, zTop); const flip = e[0] < o[0]; if(flip){ const t = o; o = e; e = t; }
+  const W = Math.hypot(e[0] - o[0], e[1] - o[1]) / k; g.save(); g.transform((e[0] - o[0]) / W, (e[1] - o[1]) / W, 0, k, o[0], o[1]); fn(W, flip); g.restore(); }
+// 🪧 a short word centred on a face band (kit font, rule 7)
+function faceWord(g, Q, k, s, h, col){ faceXf(g, Q, k, h, W => { g.font = '700 12px ' + FONT; const tw = g.measureText(s).width || 1, size = Math.max(6, Math.min(h * 0.66, 12 * W * 0.84 / tw));
+  D.txt(g, s, W / 2, h / 2 + size * 0.06, {size, align: 'center', base: 'middle', col: col || '#FFE9A8', w: 700}); }); }
+// ⏰ a clock face (local frame, centre x, y, radius r) — hands from the state 'h:mm'
+function clock(g, x, y, r, time, o){ o = o || {}; const [hh, mm] = String(time || '3:00').split(':').map(Number), hA = ((hh % 12) + (mm || 0) / 60) / 12 * TAU - Math.PI / 2, mA = (mm || 0) / 60 * TAU - Math.PI / 2;
+  g.fillStyle = o.rim || BRASS; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); g.fillStyle = o.face || '#FFF8E6'; g.beginPath(); g.arc(x, y, r * 0.82, 0, TAU); g.fill();
+  g.strokeStyle = '#5A4A3A'; g.lineCap = 'round'; for(let i = 0; i < 12; i++){ const a = i / 12 * TAU; g.lineWidth = (i % 3 ? 0.8 : 1.6) * (r / 12); g.beginPath(); g.moveTo(x + Math.cos(a) * r * 0.66, y + Math.sin(a) * r * 0.66); g.lineTo(x + Math.cos(a) * r * 0.76, y + Math.sin(a) * r * 0.76); g.stroke(); }
+  g.strokeStyle = o.hand || '#22202A'; g.lineWidth = Math.max(1.8, r * 0.22); g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(hA) * r * 0.46, y + Math.sin(hA) * r * 0.42); g.stroke();
+  g.lineWidth = Math.max(1.4, r * 0.15); g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(mA) * r * 0.68, y + Math.sin(mA) * r * 0.66); g.stroke();
+  g.fillStyle = '#C8323A'; g.beginPath(); g.arc(x, y, Math.max(1.1, r * 0.1), 0, TAU); g.fill(); }
+// 🔍 the town's emblem: a magnifying glass (local frame) — gold ring, sky glass with a glint, a handle down-right
+function magnifier(g, x, y, r, o){ o = o || {}; g.save(); g.lineCap = 'round'; g.strokeStyle = '#5A3A20'; g.lineWidth = r * 0.42; g.beginPath(); g.moveTo(x + r * 0.7, y + r * 0.7); g.lineTo(x + r * 1.55, y + r * 1.55); g.stroke();
+  g.fillStyle = D.lin(g, x - r, y - r, x + r, y + r, o.lit ? ['#FFF6C8', '#FFD86A'] : ['#D8F2FF', '#8EC8E8']); g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+  g.strokeStyle = BRASS; g.lineWidth = r * 0.26; g.stroke(); g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = r * 0.14; g.beginPath(); g.arc(x - r * 0.12, y - r * 0.12, r * 0.55, Math.PI * 1.05, Math.PI * 1.5); g.stroke(); g.restore(); }
+// 🪟 blinds pulled down over a window (decal paint over the glass)
+const blinds = (h) => (g, Q, k) => { polyP(g, [Q(0.06, h * 0.06), Q(0.94, h * 0.06), Q(0.94, h * 0.96), Q(0.06, h * 0.96)]); g.fillStyle = '#EADFC4'; g.fill();
+  g.strokeStyle = 'rgba(120,96,60,0.55)'; g.lineWidth = 0.8 * k; for(let z = h * 0.2; z < h * 0.95; z += 2.4) line(g, Q(0.06, z), Q(0.94, z)); g.strokeStyle = '#8A6A44'; line(g, Q(0.5, h * 0.06), Q(0.5, -2)); };
+// 🪟 open shutters beside a window / closed shutters over it (decal paint, u = 0 … 1 over the window)
+const shutters = (h, col, shut) => (g, Q, k) => { const panel = (a, b) => { polyP(g, [Q(a, 0), Q(b, 0), Q(b, h), Q(a, h)]); g.fillStyle = col; g.fill(); g.strokeStyle = 'rgba(30,30,40,0.45)'; g.lineWidth = 0.8 * k; g.stroke();
+    for(let z = 2; z < h - 1; z += 2.2) line(g, Q(a + 0.04 * Math.sign(b - a), z), Q(b - 0.04 * Math.sign(b - a), z)); };
+  if(shut){ panel(-0.02, 0.5); panel(0.5, 1.02); } else { panel(-0.5, -0.04); panel(1.04, 1.5); } };
+
+/* ---------------------------------------------------------------- 🏘️ village swaps (same foot + door, so Props.town works) ---------------------------------------------------------------- */
+// 🔍 Detective agency (smithy 2 × 2): brick shopfront, a big window, a GIANT magnifier emblem upstairs, a sign word, a slate mansard + chimney
+(function(){ const def = DA('det_agency', {name: 'Detective agency', foot: [2, 2], h: 108, variants: 3, door: [0.86, 2], states: ['lit', 'dark', 'blinds'], state: 'lit', text: 'DETECTIVE', tags: ['house', 'home', 'shop', 'agency', 'clue'],
+  diffs: [{by: 'state', a: 'lit', b: 'dark', level: 'bold', name: 'lights on / off'}, {by: 'state', a: 'lit', b: 'blinds', level: 'bold', name: 'blinds down'}, {by: 'v', level: 'quiet', name: 'wall + shopfront colour'}]});   /* the sign word is a game's choice (o.text) but NOT a fair change: 6 px letters on a wall → one letter ≈ 18 px (ip-5p check) */
+  def.build = (B, v, L) => { const c = L.cond, st = L.state || 'lit', wall = [BRICK, SAGE, LILAC][v % 3], shop = ['#2F5E52', '#7A3A4A', '#2E4A6A'][v % 3], roof = [SLATE, '#6A4A6A', '#3E6A5A'][v % 3];
+    const gl = glassOf(st !== 'dark', c), bl = st === 'blinds' && !(c && c.broken);
+    const b = B.box(0.16, 0.16, 0, 1.68, 1.68, 40, wall); if(v % 3 === 0){ B.decal(b, 'front', ...F(b, 'front'), 0, 40, wall, {paint: bricks(40)}); B.decal(b, 'right', ...F(b, 'right'), 0, 40, wall, {paint: bricks(40)}); }
+    B.decal(b, 'front', 0.2, 1.6, 0, 40, shop);   // the painted wooden shopfront
+    B.win(b, 'front', 1.18, 0.56, 8, 20, {fill: gl, paint: bl ? blinds(20) : null}); B.door(b, 'front', 0.62, 0.48, 28, {fill: '#1E3A34'});
+    B.decal(b, 'front', 0.24, 1.52, 31, 7, '#1E2A26', {paint: (g, Q, k) => faceWord(g, Q, k, L.text || 'DETECTIVE', 7, '#FFE9A8')});
+    B.win(b, 'right', 0.4, 0.42, 12, 14, {fill: gl, paint: bl ? blinds(14) : null}); B.win(b, 'right', 1.06, 0.42, 12, 14, {fill: gl, paint: bl ? blinds(14) : null});
+    const u = B.box(0.16, 0.16, 40, 1.68, 1.68, 30, wall, {layer: 1}); if(v % 3 === 0){ B.decal(u, 'front', ...F(u, 'front'), 0, 30, wall, {paint: bricks(30)}); B.decal(u, 'right', ...F(u, 'right'), 0, 30, wall, {paint: bricks(30)}); }
+    B.win(u, 'front', 0.3, 0.32, 9, 14, {fill: gl, paint: bl ? blinds(14) : null}); B.win(u, 'front', 1.4, 0.32, 9, 14, {fill: gl, paint: bl ? blinds(14) : null});
+    B.decal(u, 'front', 0.66, 0.68, 3, 26, wall, {paint: (g, Q, k) => faceXf(g, Q, k, 26, W => magnifier(g, W * 0.42, 10, 8.4, {lit: st !== 'dark' && lightOf(c) === 1}))});
+    B.win(u, 'right', 0.4, 0.42, 9, 14, {fill: gl, paint: bl ? blinds(14) : null}); B.win(u, 'right', 1.06, 0.42, 9, 14, {fill: gl, paint: bl ? blinds(14) : null});
+    ['back', 'left'].forEach(sd => { [0.4, 1.06].forEach(a => { B.win(b, sd, a + 0.1, 0.4, 12, 14, {fill: gl}); B.win(u, sd, a + 0.1, 0.4, 9, 14, {fill: gl}); }); });   // turn 2 / 3: the back has windows too
+    B.box(0.1, 0.1, 70, 1.8, 1.8, 3, '#2E3A4A', {layer: 2});   // cornice
+    B.roof(0.12, 0.12, 73, 1.76, 1.76, 26, roof, {kind: 'hip', ov: 0.06, stripes: 8, layer: 2});
+    const dm = B.box(0.78, 1.42, 76, 0.44, 0.3, 14, roof, {layer: 3}); B.win(dm, 'front', 0.86, 0.28, 3, 9, {fill: gl}); B.roof(0.78, 1.42, 90, 0.44, 0.3, 7, roof, {ridge: 'y', ov: 0.04, layer: 3});
+    B.box(1.3, 0.4, 82, 0.26, 0.26, 26, BRICK, {trim: 6, layer: 3}); B.box(1.27, 0.37, 106, 0.32, 0.32, 2, '#3A3A40', {layer: 3});
+  }; })();
+// 🏛️ Museum (inn 3 × 2): stone plinth + steps, four columns, banners, a pediment with MUSEUM, a little dome — the window shows an exhibit (or an empty plinth!)
+(function(){ const def = DA('det_museum', {name: 'Museum', foot: [3, 2], h: 128, variants: 3, door: [1, 2], states: ['exhibit', 'empty'], state: 'exhibit', text: 'MUSEUM', tags: ['house', 'big', 'rest', 'inn', 'museum', 'clue'],
+  diffs: [{by: 'state', a: 'exhibit', b: 'empty', level: 'bold', name: 'golden vase gone from the window'}, {by: 'v', level: 'bold', name: 'banner colour'}]});   /* frieze word: a choice, not a fair change (one letter ≈ 20–36 px) */
+  def.build = (B, v, L) => { const c = L.cond, st = L.state || 'exhibit', banner = ['#C8323A', '#2E6AA8', '#3E8A4A'][v % 3], wall = '#F1EADB', roof = '#7A8AA8';
+    B.box(0.08, 0.08, 0, 2.84, 1.62, 8, STONE, {layer: -1}); B.box(1.04, 1.7, 0, 0.92, 0.26, 4, STONE, {layer: 1}); B.box(1.12, 1.66, 4, 0.76, 0.12, 4, STONE, {layer: 1});   /* the plinth goes FIRST (a floor plate drawn later hides the walls, ip-4d lesson) */
+    const h = B.box(0.22, 0.2, 8, 2.56, 1.24, 50, wall); B.door(h, 'front', 1.24, 0.52, 30, {fill: '#5A3A2A'});
+    B.win(h, 'front', 0.4, 0.5, 10, 26, {fill: '#3E4A66', paint: (g, Q, k) => { faceXf(g, Q, k, 26, W => { g.fillStyle = 'rgba(255,240,180,0.35)'; g.beginPath(); g.moveTo(W * 0.5, 0); g.lineTo(W * 0.12, 26); g.lineTo(W * 0.88, 26); g.closePath(); g.fill();
+      g.fillStyle = '#E8E0D0'; g.fillRect(W * 0.2, 20, W * 0.6, 6);   // the plinth
+      if(st === 'exhibit' && !(c && c.broken)){ g.fillStyle = D.lin(g, W * 0.3, 0, W * 0.7, 0, ['#FFE58A', '#E0A030', '#B8781E']); g.beginPath(); g.moveTo(W * 0.36, 20); g.quadraticCurveTo(W * 0.12, 11, W * 0.36, 5); g.lineTo(W * 0.33, 1.5); g.lineTo(W * 0.67, 1.5); g.lineTo(W * 0.64, 5); g.quadraticCurveTo(W * 0.88, 11, W * 0.64, 20); g.closePath(); g.fill();
+        g.strokeStyle = '#8A5A14'; g.lineWidth = 0.8; g.stroke(); g.fillStyle = '#C8323A'; g.fillRect(W * 0.2, 9.5, W * 0.6, 2.2); g.fillStyle = '#FFF6C8'; g.fillRect(W * 0.38, 6, W * 0.05, 9); } }); }});
+    B.win(h, 'front', 2.1, 0.5, 10, 26, {fill: '#3E4A66', paint: (g, Q, k) => faceXf(g, Q, k, 26, W => { g.fillStyle = '#E8E0D0'; g.fillRect(W * 0.2, 18, W * 0.6, 6);
+      g.fillStyle = '#F4EEDC'; g.strokeStyle = '#8A7A62'; g.lineWidth = 0.9; g.beginPath(); g.ellipse(W * 0.5, 12, W * 0.24, 5.4, 0, 0, TAU); g.fill(); g.stroke(); g.fillStyle = '#3A3036'; g.beginPath(); g.arc(W * 0.42, 11, 1.3, 0, TAU); g.fill(); [0.52, 0.6].forEach(u => g.fillRect(W * u, 14.5, 1.4, 2.4)); })});
+    B.win(h, 'right', 0.5, 0.36, 14, 20, {fill: '#3E4A66'});
+    B.decal(h, 'right', 0.96, 0.3, 4, 40, banner, {paint: (g, Q, k) => faceXf(g, Q, k, 40, W => { g.fillStyle = BRASS; g.beginPath(); g.arc(W / 2, 14, 3.4, 0, TAU); g.fill(); })});
+    [0.26, 2.62].forEach(a => B.decal(h, 'front', a, 0.14, 6, 40, banner, {paint: (g, Q, k) => faceXf(g, Q, k, 40, W => { g.fillStyle = '#FFFFFF'; g.beginPath(); g.moveTo(0, 40); g.lineTo(W / 2, 35); g.lineTo(W, 40); g.closePath(); g.fill(); g.fillStyle = BRASS; g.beginPath(); g.arc(W / 2, 12, Math.min(3.4, W * 0.32), 0, TAU); g.fill(); })}));
+    [1.04, 1.3, 1.7, 1.96].forEach(x => B.drum(x, 1.7, 8, 0.075, 50, '#FBF6EA', {layer: 2}));
+    const en = B.box(0.14, 0.14, 58, 2.72, 1.66, 9, '#EDE4D2', {layer: 2}); B.decal(en, 'front', 0.5, 2.0, 1, 7, '#EDE4D2', {paint: (g, Q, k) => faceWord(g, Q, k, L.text || 'MUSEUM', 7, '#6A5A40')});
+    B.roof(0.14, 0.14, 67, 2.72, 1.66, 26, roof, {ridge: 'y', ov: 0.06, stripes: 10, gable: '#EDE4D2', layer: 2});
+    B.custom(1.5, 0.9, (g, P, k) => { dome(g, P, k, 1.5, 0.9, 92, 0.34, 24, '#8AA8C8'); const q = P(1.5, 0.9, 116); g.strokeStyle = '#5A4A3A'; g.lineWidth = 1.2 * k; line(g, q, [q[0], q[1] - 10 * k]); g.fillStyle = BRASS; g.beginPath(); g.arc(q[0], q[1] - 10 * k, 2.2 * k, 0, TAU); g.fill(); }, {layer: 4});
+  }; })();
+// 🗞️ Newspaper kiosk (stall 2 × 1): a painted kiosk, a headline board, a counter with paper stacks (1 – 3), a hip roof with a ball on top
+(function(){ const def = DA('det_kiosk', {name: 'Newspaper kiosk', foot: [2, 1], h: 60, variants: 3, door: [1, 1], states: ['1', '2', '3'], state: '2', text: 'NEWS', tags: ['shop', 'news', 'clue'],
+  diffs: [{by: 'state', a: '1', b: '3', level: 'bold', name: 'paper stacks 1 ↔ 3'}, {by: 'state', a: '2', b: '3', level: 'quiet', name: 'one more paper stack'}, {by: 'v', level: 'bold', name: 'kiosk colour'}, {by: 'text', level: 'quiet', name: 'headline word'}]});
+  def.build = (B, v, L) => { const c = L.cond, n = +(L.state || 2), col = ['#2F6E5E', '#B8433A', '#C8822A'][v % 3];
+    const b = B.box(0.12, 0.12, 0, 1.76, 0.6, 34, col); B.decal(b, 'front', 0.2, 1.6, 14, 16, '#2A2630'); B.decal(b, 'front', 0.16, 1.68, 30, 4, BRASS);
+    B.decal(b, 'right', 0.18, 0.46, 6, 22, '#FFF4DC', {paint: (g, Q, k) => faceXf(g, Q, k, 22, W => { g.fillStyle = '#3A3036'; g.fillRect(W * 0.14, 3, W * 0.72, 3.2); for(let i = 0; i < 4; i++) g.fillRect(W * 0.14, 9 + i * 3, W * (0.5 + (i % 2) * 0.22), 1.2); magnifier(g, W * 0.72, 15, 2.6); })});
+    B.box(0.16, 0.72, 12, 1.68, 0.12, 3, '#8A5A2B', {layer: 1});
+    for(let i = 0; i < n; i++){ const x = 0.32 + i * 0.5; B.box(x, 0.74, 15, 0.34, 0.18, 4 + (i % 2) * 2, '#FBF8F0', {trim: 1.4, layer: 2, topFill: '#FBF8F0'}); B.custom(x + 0.17, 0.83, (g, P, k) => { const q = P(x + 0.17, 0.83, 21 + (i % 2) * 2); g.fillStyle = '#3A3036'; g.fillRect(q[0] - 5 * k, q[1] - 1 * k, 10 * k, 1.8 * k); }, {layer: 3}); }
+    const hb = B.box(0.36, 0.7, 34, 1.28, 0.08, 10, '#FFF4DC', {layer: 2}); B.decal(hb, 'front', 0.36, 1.28, 0, 10, '#FFF4DC', {paint: (g, Q, k) => faceWord(g, Q, k, L.text || 'NEWS', 10, '#B8323A')});
+    B.roof(0.04, 0.04, 34, 1.92, 0.76, 14, sh(col, -0.15), {kind: 'hip', ov: 0.04, stripes: 8});
+    B.custom(1, 0.42, (g, P, k) => { const q = P(1, 0.42, 48); g.strokeStyle = '#3A3036'; g.lineWidth = 1.4 * k; line(g, q, [q[0], q[1] - 6 * k]); g.fillStyle = BRASS; g.beginPath(); g.arc(q[0], q[1] - 8 * k, 3 * k, 0, TAU); g.fill(); }, {layer: 4});
+  }; })();
+// 🧶 Clue board (quest board 1 × 1): a cork board on two posts under a little roof — pinned notes, a photo, red string between the pins (3 ↔ 4 clues)
+(function(){ const def = DA('det_clueboard', {name: 'Clue board', foot: [1, 1], h: 48, variants: 2, states: ['3', '4'], state: '3', tags: ['quest', 'clue'],
+  diffs: [{by: 'state', a: '3', b: '4', level: 'bold', name: 'one more clue pinned'}, {by: 'v', level: 'quiet', name: 'note colours'}]});
+  def.build = (B, v, L) => { const n = +(L.state || 3), notes = v % 2 ? ['#9EE6E0', '#FFB4D2', '#C9F07A', '#FFE07A'] : ['#FFE07A', '#FFB4A2', '#B8E0FF', '#C9F07A'];
+    [0.14, 0.78].forEach(x => B.box(x, 0.46, 0, 0.08, 0.08, 42, M.wood));
+    const b = B.box(0.1, 0.42, 12, 0.8, 0.1, 26, CORK, {layer: 1});
+    B.decal(b, 'front', 0.1, 0.8, 0, 26, CORK, {paint: (g, Q, k) => faceXf(g, Q, k, 26, W => { const P4 = [[0.2, 6], [0.72, 5], [0.3, 17], [0.76, 18]], pins = P4.slice(0, n);
+      g.fillStyle = 'rgba(90,50,20,0.25)'; for(let i = 0; i < 14; i++) g.fillRect((i * 37 % 100) / 100 * W, (i * 53 % 24) + 1, 1, 1);
+      pins.forEach(([u, y], i) => { const x = u * W; if(i === 0){ g.fillStyle = '#FFFFFF'; g.fillRect(x - 6, y - 4, 11, 10); g.fillStyle = '#7A9AC8'; g.fillRect(x - 5, y - 3, 9, 6); g.fillStyle = '#3A3036'; g.beginPath(); g.arc(x - 0.5, y - 0.6, 1.8, 0, TAU); g.fill(); }
+        else { g.fillStyle = notes[i]; g.fillRect(x - 6, y - 4, 12, 10); g.fillStyle = 'rgba(60,40,30,0.5)'; g.fillRect(x - 4, y, 8, 0.9); g.fillRect(x - 4, y + 2.4, 6, 0.9); } });
+      g.strokeStyle = '#D8323A'; g.lineWidth = 1.2; g.beginPath(); pins.forEach(([u, y], i) => i ? g.lineTo(u * W, y - 3) : g.moveTo(u * W, y - 3)); if(n === 4) g.lineTo(pins[0][0] * W, pins[0][1] - 3); g.stroke();
+      pins.forEach(([u, y]) => { g.fillStyle = '#E2334A'; g.beginPath(); g.arc(u * W, y - 3, 1.6, 0, TAU); g.fill(); }); })});
+    B.roof(0.04, 0.36, 38, 0.92, 0.22, 8, '#3E6A5A', {ridge: 'x', ov: 0.04, layer: 2});
+  }; })();
+// ⏰ Street clock (well 1 × 1, the plaza centre): a green iron pillar with a round station clock on top — 4 times of day
+(function(){ const def = DA('det_clockpost', {name: 'Street clock', foot: [1, 1], h: 56, variants: 2, states: ['3:00', '6:30', '9:15', '12:45'], state: '3:00', tags: ['water', 'clock', 'clue'],
+  diffs: [{by: 'state', a: '3:00', b: '6:30', level: 'bold', name: 'clock hands'}, {by: 'state', a: '9:15', b: '12:45', level: 'bold', name: 'clock hands'}, {by: 'v', level: 'bold', name: 'pillar colour (green ↔ red)'}]});
+  def.build = (B, v, L) => { const col = v % 2 ? '#8A2A2E' : IRON;
+    B.drum(0.5, 0.5, 0, 0.2, 6, STONE, {rings: 2}); B.drum(0.5, 0.5, 6, 0.12, 6, col); B.drum(0.5, 0.5, 12, 0.06, 26, col, {layer: 1}); B.drum(0.5, 0.5, 36, 0.1, 3, BRASS, {layer: 1});
+    B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 39); g.save(); g.translate(q[0], q[1] - 8 * k); g.scale(k, k); g.fillStyle = col; g.beginPath(); g.arc(0, 0, 13.6, 0, TAU); g.fill(); clock(g, 0, 0, 12.2, L.state); g.restore();
+      g.fillStyle = BRASS; g.beginPath(); g.arc(q[0], q[1] - 22.6 * k, 2.2 * k, 0, TAU); g.fill(); }, {layer: 2});
+  }; })();
+// 🏮 Foggy gas lamp (lantern 1 × 1): a green iron post, a four-pane lantern (v 1: two lanterns on a T-arm), a warm glow + a curl of fog when lit
+(function(){ const def = (K.lamp || (d => d))(DA('det_gaslamp', {name: 'Gas lamp', foot: [1, 1], h: 50, kind: 'post', block: false, variants: 2, states: ['lit', 'out'], state: 'lit', liveStates: ['lit'], tags: ['light', 'night', 'clue'], live: {period: 1.4, frames: 6},
+  diffs: [{by: 'state', a: 'lit', b: 'out', level: 'bold', name: 'lamp on / off'}, {by: 'v', level: 'bold', name: 'one lantern ↔ two'}]}));   // 💡 ip-6a touch rules (its own lit · out states)
+  def.build = (B, v, L) => { const c = L.cond, on = (L.state || 'lit') === 'lit' && lightOf(c) > 0, pane = on ? (lightOf(c) === 1 ? '#FFE07A' : '#E2C27E') : '#4A5468';
+    B.drum(0.5, 0.5, 0, 0.12, 4, '#3A3A40'); B.drum(0.5, 0.5, 4, 0.045, 32, IRON, {layer: 1});
+    const heads = v % 2 ? [[0.28, 0.5], [0.72, 0.5]] : [[0.5, 0.5]];
+    if(v % 2) B.box(0.28, 0.48, 34, 0.44, 0.04, 2, IRON, {layer: 2});
+    heads.forEach(([x, y]) => { const z = v % 2 ? 28 : 36; B.box(x - 0.08, y - 0.08, z, 0.16, 0.16, 10, pane, {layer: 3, topFill: '#2A3A34'}); B.cone(x, y, z + 10, 0.13, 5, IRON, {layer: 3});
+      if(on) halo(B, x, y, z + 5, 14, '#FFD86A', 0.5, {pulse: t => 1 + 0.06 * Math.sin(ph(t, 1.4)) + 0.04 * Math.cos(ph(t, 1.4))}); });
+    if(on) B.custom(0.5, 0.5, (g, P, k, t) => { const q = P(0.5, 0.5, 46), f = ph(t, 1.4); g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 1.6 * k; g.lineCap = 'round'; g.beginPath();
+      g.moveTo(q[0] - 2 * k, q[1]); g.bezierCurveTo(q[0] + (4 + 2 * Math.sin(f)) * k, q[1] - 3 * k, q[0] - (3 + 2 * Math.cos(f)) * k, q[1] - 6 * k, q[0] + (2 + Math.sin(f)) * k, q[1] - 9 * k); g.stroke(); }, {fx: true, layer: 9});
+  }; })();
+// 🎗️ Clue tape (fence 2 × 1): three striped bollards with a bright tape between them (no words, no real police) — whole ↔ a gap with two loose ends
+(function(){ const def = DA('det_tape', {name: 'Clue tape', foot: [2, 1], h: 20, kind: 'fence', variants: 2, states: ['whole', 'gap'], state: 'whole', tags: ['wall', 'clue'],
+  diffs: [{by: 'state', a: 'whole', b: 'gap', level: 'bold', name: 'tape cut'}, {by: 'v', level: 'bold', name: 'tape colour'}]});
+  def.build = (B, v, L) => { const st = L.state || 'whole', tape = v % 2 ? ['#5AA8E8', '#FFFFFF'] : ['#FFD23F', '#2A2A2E'], X = [0.14, 1, 1.86];
+    X.forEach(x => { B.drum(x, 0.5, 0, 0.07, 16, '#F4F0E8', {layer: 0}); B.custom(x, 0.5, (g, P, k) => { const q = P(x, 0.5, 0), rx = 0.07 * HTW * k * S2; [[4, 8], [10, 13]].forEach(([z0, z1]) => { g.fillStyle = '#E2453A'; g.beginPath(); g.ellipse(q[0], q[1] - z0 * k, rx, rx / 2, 0, 0, Math.PI); g.lineTo(q[0] - rx, q[1] - z1 * k); g.ellipse(q[0], q[1] - z1 * k, rx, rx / 2, 0, Math.PI, 0, true); g.closePath(); g.fill(); }); }, {layer: 1}); });
+    const seg = (x0, x1, loose) => B.custom((x0 + x1) / 2, 0.5, (g, P, k) => { const a = P(x0, 0.5, 14), b = P(x1, 0.5, 14), w = 4.6 * k;
+      const strip = (p0, p1, s0, s1) => { const n = 12; g.save(); g.beginPath(); for(let i = 0; i <= n; i++){ const f = i / n, y = Math.sin(f * Math.PI) * (s1 == null ? 3 : 0) * k + (s1 != null ? f * f * s1 * k : 0); g.lineTo(p0[0] + (p1[0] - p0[0]) * f, p0[1] + (p1[1] - p0[1]) * f + y); }
+        for(let i = n; i >= 0; i--){ const f = i / n, y = Math.sin(f * Math.PI) * (s1 == null ? 3 : 0) * k + (s1 != null ? f * f * s1 * k : 0); g.lineTo(p0[0] + (p1[0] - p0[0]) * f, p0[1] + (p1[1] - p0[1]) * f + y + w); } g.closePath(); g.fillStyle = tape[0]; g.fill(); g.clip();
+        g.fillStyle = tape[1]; for(let i = -2; i < 14; i++){ const f = i / 10, x = p0[0] + (p1[0] - p0[0]) * f, y = p0[1] + (p1[1] - p0[1]) * f; g.beginPath(); g.moveTo(x, y - 2 * k); g.lineTo(x + 3 * k, y - 2 * k); g.lineTo(x + 1 * k, y + w + 6 * k); g.lineTo(x - 2 * k, y + w + 6 * k); g.closePath(); g.fill(); } g.restore(); };
+      if(!loose) strip(a, b); else { const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; strip(a, [a[0] + (m[0] - a[0]) * 0.55, a[1] + (m[1] - a[1]) * 0.55], 0, 9); strip(b, [b[0] + (m[0] - b[0]) * 0.55, b[1] + (m[1] - b[1]) * 0.55], 0, 9); } }, {layer: 2});
+    seg(X[0], X[1], false); seg(X[1], X[2], st === 'gap');
+  }; })();
+// 📦 Crate pile (crates 1 × 1): 1 · 2 · 3 crates with a painted magnifier stencil
+(function(){ const def = DA('det_crates', {name: 'Crate pile', foot: [1, 1], h: 34, kind: 'thing', variants: 3, states: ['1', '2', '3'], state: '2', tags: ['cargo', 'clue'],
+  diffs: [{by: 'state', a: '1', b: '2', level: 'bold', name: 'one more crate'}, {by: 'state', a: '2', b: '3', level: 'bold', name: 'one more crate'}, {by: 'v', level: 'quiet', name: 'crate wood'}]});
+  def.build = (B, v, L) => { const n = +(L.state || 2), wood = ['#C8925A', '#A8743E', '#D9B07A'][v % 3];
+    const crate = (x, y, z, s, lay) => { const b = B.box(x, y, z, s, s, s * 30, wood, {trim: s * 10, layer: lay}); B.decal(b, 'front', x + s * 0.2, s * 0.6, s * 6, s * 18, wood, {paint: (g, Q, k) => faceXf(g, Q, k, s * 18, W => magnifier(g, W * 0.42, s * 7, s * 5.4))}); };
+    crate(0.1, 0.36, 0, 0.5, 0); if(n >= 2) crate(0.58, 0.48, 0, 0.36, 1); if(n >= 3) crate(0.22, 0.44, 15, 0.36, 2);
+  }; })();
+// 🪧 Finger post (signpost 1 × 1): an iron post, the top arrow points left or right (its word on it), a second arrow across
+(function(){ const def = DA('det_signpost', {name: 'Finger post', foot: [1, 1], h: 46, kind: 'post', block: false, variants: 2, states: ['left', 'right'], state: 'left', text: 'CLUES', tags: ['way', 'clue', 'words'],
+  diffs: [{by: 'state', a: 'left', b: 'right', level: 'bold', name: 'arrow points the other way'}, {by: 'v', level: 'quiet', name: 'arrow colour'}, {by: 'text', level: 'quiet', name: 'arrow word'}]});
+  def.build = (B, v, L) => { const st = L.state || 'left', col = v % 2 ? '#2E5A8A' : '#F2E6CF', ink = v % 2 ? '#FFF4DC' : '#3A2A20';
+    B.drum(0.5, 0.5, 0, 0.1, 3, '#3A3A40'); B.drum(0.5, 0.5, 3, 0.04, 40, IRON, {layer: 1}); B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 45); g.fillStyle = BRASS; g.beginPath(); g.arc(q[0], q[1], 2.2 * k, 0, TAU); g.fill(); }, {layer: 3});
+    const x0 = st === 'left' ? 0.08 : 0.46, b = B.box(x0, 0.46, 32, 0.46, 0.06, 9, col, {layer: 2});
+    B.decal(b, 'front', x0 + (st === 'left' ? 0.02 : 0.06), 0.38, 0, 9, col, {paint: (g, Q, k) => faceWord(g, Q, k, L.text || 'CLUES', 8, ink)});
+    B.custom(0.5, 0.5, (g, P, k) => { const tip = st === 'left' ? 0.0 : 1.0, base = st === 'left' ? 0.08 : 0.92, a = P(base, 0.52, 32), b2 = P(base, 0.52, 41), t = P(tip, 0.52, 36.5); polyP(g, [a, b2, t]); g.fillStyle = col; g.fill(); }, {layer: 2});
+    const c2 = B.box(0.46, 0.56, 24, 0.06, 0.34, 6, '#B8433A', {layer: 2}); B.custom(0.5, 0.95, (g, P, k) => { polyP(g, [P(0.49, 0.9, 24), P(0.49, 0.9, 30), P(0.49, 0.98, 27)]); g.fillStyle = '#B8433A'; g.fill(); }, {layer: 2});
+  }; })();
+
+/* ---------------------------------------------------------------- 🏠 homes (the town's own home shapes) ---------------------------------------------------------------- */
+// 🏠 Townhouse (2 × 2): tall and narrow, a bay window, front steps, a fanlight door, a slate roof + two chimneys — every window lit ↔ dark
+(function(){ const def = DA('det_townhouse', {name: 'Townhouse', foot: [2, 2], h: 104, variants: 4, door: [1, 2], states: ['lit', 'dark'], state: 'dark', tags: ['house', 'home'],
+  diffs: [{by: 'state', a: 'lit', b: 'dark', level: 'bold', name: 'lights on / off'}, {by: 'v', level: 'quiet', name: 'wall + door colour'}]});
+  def.build = (B, v, L) => { const c = L.cond, wall = L.walls[v % L.walls.length], roof = L.roofs[v % L.roofs.length], doorC = ['#2F5E52', '#B8323A', '#2E4A6A', '#E0A030'][v % 4], gl = glassOf((L.state || 'dark') === 'lit', c), brick = wall === BRICK;
+    const b = B.box(0.3, 0.24, 0, 1.4, 1.5, 70, wall); if(brick){ B.decal(b, 'front', ...F(b, 'front'), 0, 70, wall, {paint: bricks(70)}); B.decal(b, 'right', ...F(b, 'right'), 0, 70, wall, {paint: bricks(70)}); }
+    B.door(b, 'front', 1.1, 0.4, 26, {fill: doorC}); B.decal(b, 'front', 1.12, 0.36, 22, 5, gl);
+    [[0.48, 34], [1.18, 34], [0.48, 52], [1.18, 52]].forEach(([a, z]) => B.win(b, 'front', a, 0.32, z, 13, {fill: gl}));
+    [[0.44, 10], [1.06, 10], [0.44, 34], [1.06, 34], [0.44, 52], [1.06, 52]].forEach(([a, z]) => B.win(b, 'right', a, 0.3, z, 12, {fill: gl}));
+    [[0.48, 34], [1.18, 34], [0.48, 52], [1.18, 52], [0.48, 12], [1.18, 12]].forEach(([a, z]) => B.win(b, 'back', a, 0.32, z, 13, {fill: gl})); [[0.44, 34], [1.06, 34], [0.44, 52], [1.06, 52]].forEach(([a, z]) => B.win(b, 'left', a, 0.3, z, 12, {fill: gl}));
+    const bay = B.box(0.4, 1.74, 0, 0.6, 0.18, 26, wall, {layer: 1}); B.win(bay, 'front', 0.46, 0.48, 8, 14, {fill: gl}); B.win(bay, 'right', 1.76, 0.14, 8, 14, {fill: gl}); B.roof(0.38, 1.72, 26, 0.64, 0.22, 6, roof, {ridge: 'x', ov: 0.02, layer: 1});
+    B.box(1.06, 1.74, 0, 0.5, 0.22, 3, STONE, {layer: 1}); B.box(1.1, 1.8, 3, 0.42, 0.14, 2, STONE, {layer: 1});
+    B.box(0.24, 0.18, 70, 1.52, 1.62, 3, CREAM, {layer: 2}); B.roof(0.24, 0.18, 73, 1.52, 1.62, 20, roof, {ridge: 'y', ov: 0.08, stripes: 8, gable: CREAM, layer: 2});
+    [[0.36, 0.36], [1.38, 0.36]].forEach(([x, y]) => { B.box(x, y, 78, 0.24, 0.24, 24, BRICK, {trim: 6, layer: 3}); B.box(x - 0.03, y - 0.03, 102, 0.3, 0.3, 2, '#3A3A40', {layer: 3}); });
+  }; })();
+// 🏡 Cottage (2 × 2): a brick cottage with a round-top door, a flower box and a round window — the door shut ↔ wide open (with a welcome mat)
+(function(){ const def = DA('det_cottage', {name: 'Cottage', foot: [2, 2], h: 86, variants: 3, door: [1, 2], states: ['closed', 'open'], state: 'closed', tags: ['house', 'home'],
+  diffs: [{by: 'state', a: 'closed', b: 'open', level: 'bold', name: 'door open'}, {by: 'v', level: 'quiet', name: 'roof + flower colour'}]});
+  def.build = (B, v, L) => { const c = L.cond, open = (L.state || 'closed') === 'open', roof = [SLATE, '#6A4A6A', '#3E6A5A'][v % 3], fl = ['#FF5A7A', '#FFD23F', '#B07AE8'][v % 3], doorC = ['#2F5E52', '#7A3A4A', '#2E4A6A'][v % 3];
+    const b = B.box(0.2, 0.24, 0, 1.6, 1.5, 40, BRICK); B.decal(b, 'front', ...F(b, 'front'), 0, 40, BRICK, {paint: bricks(40)}); B.decal(b, 'right', ...F(b, 'right'), 0, 40, BRICK, {paint: bricks(40)});
+    B.decal(b, 'front', 0.86, 0.36, 0, 26, open ? '#1E1A20' : doorC, {paint: (g, Q, k) => { if(!open) return; polyP(g, [Q(0, 0), Q(-0.7, 2), Q(-0.7, 27), Q(0, 25)]); g.fillStyle = doorC; g.fill(); g.strokeStyle = 'rgba(20,20,30,0.5)'; g.lineWidth = 0.9 * k; g.stroke();
+      polyP(g, [Q(0.1, 0.4), Q(0.9, 0.4), Q(0.9, 9), Q(0.1, 9)]); g.fillStyle = 'rgba(255,216,106,0.55)'; g.fill(); }});
+    if(open) B.flat(0.82, 1.76, 0.44, 0.22, '#C8323A', {fill: '#C8323A'});
+    B.win(b, 'front', 0.3, 0.38, 12, 13); B.win(b, 'right', 0.5, 0.4, 12, 13); B.win(b, 'right', 1.1, 0.4, 12, 13); B.win(b, 'back', 0.5, 0.4, 12, 13); B.win(b, 'back', 1.2, 0.4, 12, 13); B.win(b, 'left', 0.8, 0.4, 12, 13);
+    const fb = B.box(0.26, 1.74, 9, 0.5, 0.1, 4, '#8A5A2B', {layer: 1}); B.custom(0.5, 1.8, (g, P, k) => { if(c && c.broken) return; [0.3, 0.42, 0.54, 0.66].forEach((x, i) => { const q = P(x, 1.8, 14); g.fillStyle = i % 2 ? '#5DA84A' : fl; g.beginPath(); g.arc(q[0], q[1] - 1.6 * k, 2.3 * k, 0, TAU); g.fill(); }); }, {layer: 2});
+    B.roof(0.1, 0.14, 40, 1.8, 1.7, 36, roof, {ridge: 'x', ov: 0.12, stripes: 9, gable: CREAM});
+    B.box(1.4, 0.5, 58, 0.24, 0.24, 26, BRICK, {trim: 6, layer: 2}); B.box(1.37, 0.47, 84, 0.3, 0.3, 2, '#3A3A40', {layer: 2});
+  }; })();
+
+/* ---------------------------------------------------------------- 🏛️ big places · landmarks ---------------------------------------------------------------- */
+// 🏚️ Mystery mansion (3 × 3, big): a lilac Victorian manor with a turret + weathervane, gingerbread gables, ivy, a porch, a low iron fence with a gate —
+//    quiet (shutters open, dark) · shut (every shutter closed) · light (ONE attic window glows) · open (the gate swung open)
+(function(){ const def = DA('det_mansion', {name: 'Mystery mansion', foot: [3, 3], h: 140, variants: 2, door: [1.5, 3], states: ['quiet', 'shut', 'light', 'open'], state: 'quiet', tags: ['house', 'big', 'mansion', 'clue'],
+  diffs: [{by: 'state', a: 'quiet', b: 'shut', level: 'bold', name: 'shutters closed'}, {by: 'state', a: 'quiet', b: 'light', level: 'quiet', name: 'a light in one window'}, {by: 'state', a: 'quiet', b: 'open', level: 'bold', name: 'gate open'}, {by: 'v', level: 'quiet', name: 'wall + shutter colour'}]});
+  def.build = (B, v, L) => { const c = L.cond, st = L.state || 'quiet', wall = v % 2 ? '#9DB8C8' : '#B8A4CC', shut = v % 2 ? '#3E6A5A' : '#6A3A5A', roof = v % 2 ? '#4A5A78' : '#5A4A6A', isShut = st === 'shut', attic = st === 'light' && lightOf(c) > 0;
+    const W = (b, s, a, z, h) => B.win(b, s, a, 0.3, z, h, {fill: DARKWIN, paint: shutters(h, shut, isShut)});
+    const g0 = B.box(0.3, 0.3, 0, 2.1, 1.9, 40, wall); W(g0, 'front', 0.62, 12, 16); W(g0, 'front', 1.98, 12, 16); W(g0, 'right', 0.66, 12, 16); W(g0, 'right', 1.4, 12, 16);
+    B.door(g0, 'front', 1.24, 0.42, 28, {fill: '#3A2A3A'});
+    B.decal(g0, 'front', 0.32, 0.3, 2, 30, '#4E8A44', {paint: (g, Q, k) => { g.fillStyle = '#3E7A3A'; for(let i = 0; i < 16; i++){ const p = Q((i * 0.37) % 1, (i * 7) % 30); g.beginPath(); g.arc(p[0], p[1], 2.4 * k, 0, TAU); g.fill(); } }});
+    const g1 = B.box(0.3, 0.3, 40, 2.1, 1.9, 34, wall, {layer: 1}); W(g1, 'front', 0.62, 10, 15); W(g1, 'front', 1.98, 10, 15); W(g1, 'right', 0.66, 10, 15); W(g1, 'right', 1.4, 10, 15);
+    B.win(g1, 'front', 1.3, 0.3, 10, 15, {fill: DARKWIN}); [g0, g1].forEach((bx, n) => { W(bx, 'back', 0.7, 12 - n * 2, 15); W(bx, 'back', 1.9, 12 - n * 2, 15); W(bx, 'left', 0.9, 12 - n * 2, 15); W(bx, 'left', 1.6, 12 - n * 2, 15); });
+    B.box(0.24, 0.24, 74, 2.22, 2.02, 3, CREAM, {layer: 2});
+    B.roof(0.22, 0.22, 77, 2.26, 2.06, 34, roof, {ridge: 'y', ov: 0.1, stripes: 12, gable: CREAM, layer: 2});
+    B.custom(1.35, 2.28, (g, P, k, t, T) => { if(!vis(T, 0, 1)) return; const q = P(1.35, 2.28, 92), lit = attic ? (lightOf(c) === 1 ? '#FFE07A' : '#E2C27E') : DARKWIN;
+      g.fillStyle = CREAM; g.beginPath(); g.arc(q[0], q[1], 6.4 * k, 0, TAU); g.fill(); g.fillStyle = lit; g.beginPath(); g.arc(q[0], q[1], 4.8 * k, 0, TAU); g.fill();
+      g.strokeStyle = 'rgba(42,28,20,0.5)'; g.lineWidth = 0.9 * k; line(g, [q[0] - 4.8 * k, q[1]], [q[0] + 4.8 * k, q[1]]); line(g, [q[0], q[1] - 4.8 * k], [q[0], q[1] + 4.8 * k]);
+      g.strokeStyle = CREAM; g.lineWidth = 1.4 * k; for(let i = -3; i <= 3; i++){ const a = P(1.35 + i * 0.16, 2.28, 82 - Math.abs(i) * 2); g.beginPath(); g.arc(a[0], a[1], 1.6 * k, 0, Math.PI); g.stroke(); } }, {layer: 3});
+    if(attic) halo(B, 1.35, 2.28, 92, 15, '#FFD86A', 0.55);
+    // turret on the front-right corner + a magnifier weathervane
+    B.drum(2.5, 2.32, 0, 0.36, 92, wall, {rings: 6, layer: 3});
+    B.custom(2.5, 2.32, (g, P, k, t, T) => { const q = P(2.5, 2.32, 0), r = 0.36 * HTW * k * S2; [[-0.4, 18], [0.36, 18], [-0.4, 56], [0.36, 56]].forEach(([u, z]) => { const x = q[0] + u * r, y = q[1] - z * k + Math.sqrt(1 - u * u) * r * 0.5;
+      g.fillStyle = CREAM; g.fillRect(x - 3.4 * k, y - 8 * k, 6.8 * k, 10 * k); g.fillStyle = isShut ? shut : DARKWIN; g.fillRect(x - 2.4 * k, y - 7 * k, 4.8 * k, 8 * k); }); }, {layer: 3});
+    B.cone(2.5, 2.32, 92, 0.44, 38, roof, {stripes: 9, layer: 3});
+    B.custom(2.5, 2.32, (g, P, k) => { const q = P(2.5, 2.32, 130); g.strokeStyle = '#3A3036'; g.lineWidth = 1.2 * k; line(g, q, [q[0], q[1] - 6 * k]); g.save(); g.translate(q[0], q[1] - 6 * k); g.scale(k, k); magnifier(g, -1, -1.6, 2.4); g.restore(); }, {layer: 4});
+    // porch on two posts
+    B.box(1.02, 2.2, 0, 0.92, 0.42, 4, STONE, {layer: 3}); [1.08, 1.86].forEach(x => B.box(x, 2.54, 4, 0.06, 0.06, 24, CREAM, {layer: 4})); B.roof(0.98, 2.16, 28, 1.0, 0.5, 8, roof, {ridge: 'x', ov: 0.04, layer: 4});
+    // low iron fence along the front edge + the gate in the middle (open = both leaves swung in)
+    B.custom(1.5, 2.9, (g, P, k) => { g.strokeStyle = '#2A2E36'; g.lineCap = 'round'; const rail = (x0, x1) => { g.lineWidth = 1.3 * k; [7, 13].forEach(z => line(g, P(x0, 2.9, z), P(x1, 2.9, z))); g.lineWidth = 1.1 * k;
+        for(let x = x0; x <= x1 + 0.001; x += 0.12){ const a = P(x, 2.9, 0), b = P(x, 2.9, 15); line(g, a, b); g.fillStyle = '#2A2E36'; g.beginPath(); g.arc(b[0], b[1], 1.2 * k, 0, TAU); g.fill(); } };
+      rail(0.08, 1.16); rail(1.84, 2.92); [1.18, 1.82].forEach(x => { g.lineWidth = 2 * k; line(g, P(x, 2.9, 0), P(x, 2.9, 20)); g.fillStyle = BRASS; const q = P(x, 2.9, 21); g.beginPath(); g.arc(q[0], q[1], 1.8 * k, 0, TAU); g.fill(); });
+      const leaf = (hx, dir) => { const ang = st === 'open' ? 1.25 : 0, ex = hx + dir * 0.3 * Math.cos(ang), ey = 2.9 - 0.3 * Math.sin(ang); g.lineWidth = 1.3 * k; [3, 10, 16].forEach(z => line(g, P(hx, 2.9, z), P(ex, ey, z)));
+        g.lineWidth = 1 * k; for(let f = 0.25; f <= 1.001; f += 0.25){ const x = hx + (ex - hx) * f, y = 2.9 + (ey - 2.9) * f; line(g, P(x, y, 3), P(x, y, 17)); } };
+      leaf(1.2, 1); leaf(1.8, -1); }, {layer: 6});
+  }; })();
+// 🗼 Lighthouse (landmark 1 × 1): a striped tower on harbour rocks, a gallery rail, a glass lamp room (on = a sweeping beam), a red cap — 3 ↔ 4 stripes
+(function(){ const def = DA('det_lighthouse', {name: 'Lighthouse', foot: [1, 1], h: 150, kind: 'landmark', variants: 2, states: ['on', 'off'], state: 'on', liveStates: ['on'], tags: ['landmark', 'harbour', 'light', 'clue'], live: {period: 2.4, frames: 6},
+  diffs: [{by: 'state', a: 'on', b: 'off', level: 'bold', name: 'lamp on / off'}, {by: 'v', level: 'bold', name: '3 ↔ 4 stripes'}]});
+  def.build = (B, v, L) => { const c = L.cond, on = (L.state || 'on') === 'on' && lightOf(c) > 0, n = v % 2 ? 4 : 3;
+    B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 0); [[-12, 2, 9, '#8E8A82'], [10, 3, 8, '#7E7A72'], [0, 6, 10, '#9E9A92']].forEach(([dx, dy, r, col]) => { g.fillStyle = col; g.beginPath(); g.ellipse(q[0] + dx * k, q[1] + dy * k - r * 0.5 * k, r * k, r * 0.7 * k, 0, 0, TAU); g.fill(); }); }, {layer: -1});
+    B.drum(0.5, 0.5, 4, 0.3, 104, '#FBF6EA', {layer: 0});
+    B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 0), rx = 0.3 * HTW * k * S2, ry = rx / 2, H = 104 / (n * 2); for(let i = 0; i < n; i++){ const z0 = 4 + H * (i * 2 + 1), z1 = z0 + H;
+      const gr = g.createLinearGradient(q[0] - rx, 0, q[0] + rx, 0); gr.addColorStop(0, '#F0605A'); gr.addColorStop(0.45, '#D8403A'); gr.addColorStop(1, '#A82A26'); g.fillStyle = gr;
+      g.beginPath(); g.ellipse(q[0], q[1] - z0 * k, rx, ry, 0, 0, Math.PI); g.lineTo(q[0] - rx, q[1] - z1 * k); g.ellipse(q[0], q[1] - z1 * k, rx, ry, 0, Math.PI, 0, true); g.closePath(); g.fill(); }
+      const d = P(0.5, 0.5, 4); g.fillStyle = '#5A3A2A'; g.beginPath(); g.moveTo(d[0] - 3 * k, d[1] + ry - 1 * k); g.lineTo(d[0] - 3 * k, d[1] + ry - 11 * k); g.arc(d[0], d[1] + ry - 11 * k, 3 * k, Math.PI, 0); g.lineTo(d[0] + 3 * k, d[1] + ry - 1 * k); g.closePath(); g.fill(); }, {layer: 1});
+    B.drum(0.5, 0.5, 108, 0.4, 4, '#3A3A40', {layer: 2});
+    B.drum(0.5, 0.5, 112, 0.22, 18, on ? (lightOf(c) === 1 ? '#FFE07A' : '#E2C27E') : '#9EC8DC', {layer: 3});
+    B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 112), rx = 0.4 * HTW * k * S2; g.strokeStyle = '#3A3A40'; g.lineWidth = 1.1 * k; g.beginPath(); g.ellipse(q[0], q[1] - 7 * k, rx, rx / 2, 0, 0, Math.PI); g.stroke();
+      for(let i = 0; i <= 8; i++){ const a = i / 8 * Math.PI, x = q[0] + Math.cos(a) * rx, y = q[1] + Math.sin(a) * rx / 2; line(g, [x, y], [x, y - 7 * k]); }
+      const r2 = 0.22 * HTW * k * S2; g.lineWidth = 1 * k; [-0.5, 0, 0.5].forEach(u => { const x = q[0] + u * r2; line(g, [x, q[1] + Math.sqrt(1 - u * u) * r2 * 0.5], [x, q[1] - 18 * k + Math.sqrt(1 - u * u) * r2 * 0.5]); }); }, {layer: 4});
+    B.cone(0.5, 0.5, 130, 0.27, 14, '#C8323A', {layer: 5}); B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 146); g.fillStyle = '#2A2A2E'; g.beginPath(); g.arc(q[0], q[1], 2.4 * k, 0, TAU); g.fill(); }, {layer: 6});
+    if(on){ halo(B, 0.5, 0.5, 121, 22, '#FFE07A', 0.55);
+      B.custom(0.5, 0.5, (g, P, k, t) => { const q = P(0.5, 0.5, 121), a = ph(t, 2.4), dx = Math.cos(a) * 30 * k, dy = Math.sin(a) * 6 * k; g.save(); g.globalCompositeOperation = 'lighter';
+        g.fillStyle = D.lin(g, q[0], q[1], q[0] + dx, q[1] + dy, [[0, 'rgba(255,236,150,0.55)'], [1, 'rgba(255,236,150,0)']]); g.beginPath(); g.moveTo(q[0], q[1] - 2 * k); g.lineTo(q[0] + dx, q[1] + dy - 8 * k); g.lineTo(q[0] + dx, q[1] + dy + 8 * k); g.lineTo(q[0], q[1] + 2 * k); g.closePath(); g.fill(); g.restore(); }, {fx: true, layer: 9}); }
+  }; })();
+// ⏰ Town clock tower (landmark 2 × 2): a brick tower, a clock on EVERY side (4 times of day), an open belfry with a gold bell, a slate spire + a pennant
+(function(){ const def = DA('det_clocktower', {name: 'Clock tower', foot: [2, 2], h: 188, kind: 'landmark', variants: 2, door: [1, 2], states: ['3:00', '6:30', '9:15', '12:45'], state: '3:00', tags: ['landmark', 'clock', 'clue'],
+  diffs: [{by: 'state', a: '3:00', b: '6:30', level: 'bold', name: 'clock hands'}, {by: 'state', a: '9:15', b: '12:45', level: 'bold', name: 'clock hands'}, {by: 'v', level: 'quiet', name: 'brick ↔ stone + pennant'}]});
+  def.build = (B, v, L) => { const c = L.cond, wall = v % 2 ? STONE : BRICK, roof = v % 2 ? '#3E6A5A' : SLATE, pen = v % 2 ? '#2E6AA8' : '#E2453A';
+    const b = B.box(0.36, 0.36, 0, 1.28, 1.28, 76, wall); if(!(v % 2)){ B.decal(b, 'front', ...F(b, 'front'), 0, 76, wall, {paint: bricks(76)}); B.decal(b, 'right', ...F(b, 'right'), 0, 76, wall, {paint: bricks(76)}); }
+    B.door(b, 'front', 0.8, 0.4, 26, {fill: '#5A3A2A'}); B.win(b, 'front', 0.86, 0.28, 44, 16); B.win(b, 'right', 0.86, 0.28, 30, 16);
+    B.box(0.3, 0.3, 76, 1.4, 1.4, 4, CREAM, {layer: 1});
+    const cb = B.box(0.36, 0.36, 80, 1.28, 1.28, 36, wall, {layer: 1});
+    ['front', 'right', 'back', 'left'].forEach(s => B.decal(cb, s, ...F(cb, s), 0, 36, wall, {paint: (g, Q, k) => faceXf(g, Q, k, 36, W => clock(g, W / 2, 18, 15, L.state))}));
+    B.box(0.3, 0.3, 116, 1.4, 1.4, 4, CREAM, {layer: 2});
+    [[0.36, 0.36], [1.42, 0.36], [0.36, 1.42], [1.42, 1.42]].forEach(([x, y], i) => B.box(x, y, 120, 0.22, 0.22, 22, wall, {layer: i === 3 ? 4 : 2}));
+    B.custom(1, 1, (g, P, k) => { const q = P(1, 1, 138); g.strokeStyle = '#5A4A3A'; g.lineWidth = 1.2 * k; line(g, q, [q[0], q[1] + 3 * k]); g.fillStyle = D.lin(g, q[0] - 7 * k, 0, q[0] + 7 * k, 0, ['#FFE58A', '#E0A030', '#A86A18']);
+      g.beginPath(); g.moveTo(q[0] - 7 * k, q[1] + 14 * k); g.quadraticCurveTo(q[0] - 6 * k, q[1] + 3 * k, q[0], q[1] + 3 * k); g.quadraticCurveTo(q[0] + 6 * k, q[1] + 3 * k, q[0] + 7 * k, q[1] + 14 * k); g.closePath(); g.fill(); }, {layer: 3});
+    B.box(0.3, 0.3, 142, 1.4, 1.4, 4, CREAM, {layer: 5}); B.roof(0.28, 0.28, 146, 1.44, 1.44, 30, roof, {kind: 'hip', ov: 0.04, stripes: 8, layer: 5});
+    B.custom(1, 1, (g, P, k) => { const q = P(1, 1, 176); g.strokeStyle = '#3A3036'; g.lineWidth = 1.3 * k; line(g, q, [q[0], q[1] - 12 * k]); g.fillStyle = pen; g.beginPath(); g.moveTo(q[0], q[1] - 12 * k); g.lineTo(q[0] + 9 * k, q[1] - 9.5 * k); g.lineTo(q[0], q[1] - 7 * k); g.closePath(); g.fill(); }, {layer: 6});
+  }; })();
+
+/* ---------------------------------------------------------------- 🐾 small clue things (1 × 1) ---------------------------------------------------------------- */
+// 👣 Footprints (walk-on, flat): three steps of shoe prints (v 1: paw prints) — walking IN (toward the front) ↔ OUT (away); turn = which way the path runs
+(function(){ const def = DA('det_prints', {name: 'Footprints', kind: 'deco', foot: [1, 1], door: null, h: 4, variants: 2, block: false, states: ['in', 'out'], state: 'in', tags: ['clue', 'walkon', 'decal'],
+  diffs: [{by: 'state', a: 'in', b: 'out', level: 'bold', name: 'prints walk the other way'}, {by: 'v', level: 'bold', name: 'shoes ↔ paws'}]});
+  def.build = (B, v, L) => { const c = L.cond, st = L.state || 'in';
+    B.custom(0.5, 0.5, (g, P, k) => { const ink = c && c.broken ? 'rgba(60,40,30,0.4)' : c ? 'rgba(128,96,62,0.66)' : 'rgba(52,34,30,0.78)'   /* 🍂 dry = dusty prints (fx parts skip the colour grade) */, dir = st === 'in' ? 1 : -1;
+      const oval = (cx, cy, rx, ry, n) => { const pts = []; for(let i = 0; i < (n || 14); i++){ const an = i / (n || 14) * TAU; pts.push(P(cx + Math.cos(an) * rx, cy + Math.sin(an) * ry, 0)); } return pts; };
+      const fill = pts => { polyP(g, pts); g.fillStyle = ink; g.fill(); };
+      [[0.36, 0.14], [0.62, 0.38], [0.38, 0.62], [0.64, 0.86]].forEach(([x, y0], i) => { const y = dir > 0 ? y0 : 1 - y0, toe = y + dir * 0.055, heel = y - dir * 0.06;
+        if(v % 2){ fill(oval(x, heel + dir * 0.01, 0.07, 0.055)); [-0.06, -0.02, 0.02, 0.06].forEach((d, n) => fill(oval(x + d * 1.1, toe + dir * (n === 0 || n === 3 ? 0.0 : 0.025), 0.026, 0.026, 10))); }
+        else { fill(oval(x, toe + dir * 0.01, 0.065, 0.09)); fill(oval(x, heel - dir * 0.035, 0.05, 0.05, 12)); }
+        polyP(g, oval(x, (v % 2 ? heel + dir * 0.01 : toe + dir * 0.01), 0.018, 0.018, 8)); g.fillStyle = '#2A1C14'; g.fill(); /* a dark sole mark in the rim ink: the mark has no baked rim */ }); }, {layer: -8, zb: 0, top: 1, fx: true});
+  }; })();
+// 🚲 Bicycle (1 × 1): a bike leaning in an iron rack (wheels in 3-D, so it turns with the map) ↔ gone (only the rack is left)
+(function(){ const def = DA('det_bike', {name: 'Bicycle', foot: [1, 1], h: 30, kind: 'thing', variants: 3, states: ['parked', 'gone'], state: 'parked', tags: ['ride', 'clue'],
+  diffs: [{by: 'state', a: 'parked', b: 'gone', level: 'bold', name: 'bike gone'}, {by: 'v', level: 'bold', name: 'bike colour'}]});
+  def.build = (B, v, L) => { const c = L.cond, gone = (L.state || 'parked') === 'gone', frame = ['#E2453A', '#2EA8B8', '#F2B731'][v % 3];
+    B.custom(0.5, 0.3, (g, P, k) => { g.strokeStyle = '#4A4E58'; g.lineWidth = 2 * k; g.lineCap = 'round'; const n = 16; g.beginPath(); for(let i = 0; i <= n; i++){ const a = i / n * Math.PI, q = P(0.5 + Math.cos(a) * 0.3, 0.3, Math.sin(a) * 20); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); } g.stroke(); }, {layer: 0});
+    if(gone) return;
+    const wheel = (x) => B.custom(x, 0.5, (g, P, k) => { const n = 20, R = 0.17, RZ = 7; g.strokeStyle = '#26262C'; g.lineWidth = 2.2 * k; g.beginPath(); for(let i = 0; i <= n; i++){ const a = i / n * TAU, q = P(x + Math.cos(a) * R, 0.5, RZ + Math.sin(a) * RZ); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); } g.stroke();
+      g.strokeStyle = 'rgba(160,160,170,0.8)'; g.lineWidth = 0.7 * k; for(let i = 0; i < 6; i++){ const a = i / 6 * Math.PI; line(g, P(x + Math.cos(a) * R, 0.5, RZ + Math.sin(a) * RZ), P(x - Math.cos(a) * R, 0.5, RZ - Math.sin(a) * RZ)); } }, {layer: 1});
+    wheel(0.24); wheel(0.76);
+    B.custom(0.5, 0.5, (g, P, k) => { g.strokeStyle = frame; g.lineWidth = 2.1 * k; g.lineCap = 'round'; g.lineJoin = 'round'; const A = P(0.24, 0.5, 7), Bq = P(0.76, 0.5, 7), S = P(0.4, 0.5, 18), H = P(0.68, 0.5, 20), Cn = P(0.46, 0.5, 7);
+      g.beginPath(); g.moveTo(A[0], A[1]); g.lineTo(Cn[0], Cn[1]); g.lineTo(S[0], S[1]); g.lineTo(A[0], A[1]); g.moveTo(Cn[0], Cn[1]); g.lineTo(H[0], H[1]); g.lineTo(S[0], S[1]); g.moveTo(H[0], H[1]); g.lineTo(Bq[0], Bq[1]); g.stroke();
+      g.strokeStyle = '#2A2A2E'; g.lineWidth = 2 * k; const s2 = P(0.37, 0.5, 22), s3 = P(0.44, 0.5, 22); line(g, s2, s3); const h2 = P(0.66, 0.42, 24), h3 = P(0.66, 0.58, 24); line(g, h2, h3); line(g, H, P(0.66, 0.5, 24));
+      const bk = P(0.74, 0.5, 20); g.fillStyle = '#C8925A'; g.fillRect(bk[0] - 4 * k, bk[1] - 5 * k, 8 * k, 6 * k); g.strokeStyle = 'rgba(90,50,20,0.6)'; g.lineWidth = 0.7 * k; line(g, [bk[0] - 4 * k, bk[1] - 2 * k], [bk[0] + 4 * k, bk[1] - 2 * k]); }, {layer: 2});
+  }; })();
+// 🐈 Cat on a wall (1 × 1): a low brick wall with a stone top; a cat sits on it (tail hanging down) · curls up asleep · is gone
+(function(){ const def = DA('det_catwall', {name: 'Cat on a wall', foot: [1, 1], h: 38, kind: 'thing', variants: 3, states: ['sit', 'sleep', 'gone'], state: 'sit', tags: ['wall', 'cat', 'clue'],
+  diffs: [{by: 'state', a: 'sit', b: 'gone', level: 'bold', name: 'cat gone'}, {by: 'state', a: 'sit', b: 'sleep', level: 'bold', name: 'cat curled up'}, {by: 'v', level: 'bold', name: 'cat colour'}]});
+  def.build = (B, v, L) => { const st = L.state || 'sit', fur = [['#F0A050', '#C8722A'], ['#3A3640', '#26222A'], ['#A8A8B4', '#7E7E8C']][v % 3], belly = v % 3 === 1 ? '#F4F0E8' : null;
+    const w = B.box(0.06, 0.36, 0, 0.88, 0.28, 18, BRICK); B.decal(w, 'front', ...F(w, 'front'), 0, 18, BRICK, {paint: bricks(18)}); B.decal(w, 'right', ...F(w, 'right'), 0, 18, BRICK, {paint: bricks(18)});
+    B.box(0.02, 0.32, 18, 0.96, 0.36, 3, STONE, {layer: 1});
+    if(st === 'gone') return;
+    B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 21); g.save(); g.translate(q[0], q[1]); g.scale(k, k); const fill = (fn, col) => { g.beginPath(); fn(); g.fillStyle = col; g.fill(); };
+      if(st === 'sleep'){ fill(() => D.ell(g, 0, -4, 9, 4.6), D.lin(g, -9, -8, 9, 0, fur)); fill(() => D.ell(g, 6, -6, 4, 3.4), fur[0]); fill(() => { g.moveTo(4, -9); g.lineTo(5, -12); g.lineTo(7, -9); g.moveTo(7, -9.4); g.lineTo(9, -12); g.lineTo(9.6, -8.6); }, fur[1]);
+        g.strokeStyle = fur[1]; g.lineWidth = 2.2; g.lineCap = 'round'; g.beginPath(); g.moveTo(-8, -2); g.quadraticCurveTo(-4, 1, 3, -1); g.stroke(); g.strokeStyle = '#2A1C14'; g.lineWidth = 0.8; [[5, -6], [7.6, -6]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 0.9, 0, Math.PI); g.stroke(); });
+        g.fillStyle = '#5A7AC8'; D.txt(g, 'z', 10, -14, {size: 5, w: 700, col: '#5A7AC8'}); }
+      else { g.strokeStyle = fur[1]; g.lineWidth = 2.4; g.lineCap = 'round'; g.beginPath(); g.moveTo(3, -1); g.quadraticCurveTo(7, 6, 4, 14); g.stroke();
+        fill(() => { g.moveTo(-5, 0); g.quadraticCurveTo(-7, -10, -3, -14); g.lineTo(3, -14); g.quadraticCurveTo(7, -10, 5, 0); g.closePath(); }, D.lin(g, -6, -14, 6, 0, fur)); if(belly) fill(() => D.ell(g, 0, -5, 2.6, 4), belly);
+        fill(() => D.ell(g, 0, -18, 5.4, 4.8), fur[0]); fill(() => { g.moveTo(-5, -20); g.lineTo(-4.4, -25); g.lineTo(-1.4, -22); g.moveTo(5, -20); g.lineTo(4.4, -25); g.lineTo(1.4, -22); }, fur[1]);
+        g.fillStyle = '#7ADC5A'; [[-2, -18.4], [2, -18.4]].forEach(([x, y]) => { g.beginPath(); D.ell(g, x, y, 1.2, 1.5); g.fill(); }); g.fillStyle = '#1E1A20'; [[-2, -18.4], [2, -18.4]].forEach(([x, y]) => g.fillRect(x - 0.3, y - 1.2, 0.6, 2.4));
+        g.fillStyle = '#FF8FA3'; g.beginPath(); g.moveTo(-0.8, -16.4); g.lineTo(0.8, -16.4); g.lineTo(0, -15.6); g.closePath(); g.fill(); }
+      g.restore(); }, {layer: 2});
+  }; })();
+// 🧺 Lost-and-found basket (1 × 1): a wicker basket with a "?" tag — 1 · 2 · 3 lost things in it (a red umbrella, a blue hat, a teddy)
+(function(){ const def = DA('det_basket', {name: 'Lost-and-found basket', foot: [1, 1], h: 24, kind: 'deco', variants: 2, states: ['1', '2', '3'], state: '2', tags: ['clue', 'lost'],
+  diffs: [{by: 'state', a: '1', b: '2', level: 'bold', name: 'one more lost thing'}, {by: 'state', a: '2', b: '3', level: 'bold', name: 'one more lost thing'}, {by: 'v', level: 'quiet', name: 'basket colour'}]});
+  def.build = (B, v, L) => { const n = +(L.state || 2), wick = v % 2 ? '#C8A060' : '#B07A40';
+    const b = B.box(0.22, 0.26, 0, 0.56, 0.48, 12, wick, {trim: 3}); B.decal(b, 'front', ...F(b, 'front'), 0, 12, wick, {paint: (g, Q, k) => { g.strokeStyle = 'rgba(70,40,14,0.4)'; g.lineWidth = 0.8 * k; for(let i = 1; i < 8; i++) line(g, Q(i / 8, 0), Q(i / 8, 12)); }});
+    B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 12); g.save(); g.translate(q[0], q[1]); g.scale(k, k);
+      if(n >= 1){ g.strokeStyle = '#4A3A2A'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(-6, -2); g.lineTo(-6, -13); g.arc(-8.4, -13, 2.4, 0, Math.PI, true); g.stroke(); g.fillStyle = '#E2334A'; g.beginPath(); g.moveTo(-6, -12); g.lineTo(-10, -1); g.lineTo(-2, -1); g.closePath(); g.fill(); }
+      if(n >= 2){ g.fillStyle = '#2E5A8A'; g.beginPath(); g.ellipse(4, -3, 7, 2.6, 0, 0, TAU); g.fill(); g.beginPath(); g.moveTo(0, -3); g.quadraticCurveTo(0, -10, 4, -10); g.quadraticCurveTo(8, -10, 8, -3); g.closePath(); g.fill(); g.fillStyle = '#F2B731'; g.fillRect(0.4, -5, 7.2, 1.6); }
+      if(n >= 3){ g.fillStyle = '#C8925A'; g.beginPath(); g.arc(0, -10, 4.4, 0, TAU); g.fill(); [[-3.6, -13.4], [3.6, -13.4]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 1.8, 0, TAU); g.fill(); }); g.fillStyle = '#2A1C14'; [[-1.5, -10.6], [1.5, -10.6]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 0.7, 0, TAU); g.fill(); }); g.fillStyle = '#E8C8A0'; g.beginPath(); g.ellipse(0, -8.6, 1.8, 1.2, 0, 0, TAU); g.fill(); }
+      g.fillStyle = '#FFF4DC'; g.strokeStyle = '#8A6A44'; g.lineWidth = 0.6; g.beginPath(); D.rr(g, 8, -6, 6, 7, 1.2); g.fill(); g.stroke(); D.txt(g, '?', 11, -0.4, {size: 6, align: 'center', col: '#B8323A', w: 800, font: '"Baloo 2"'}); g.restore(); }, {layer: 2});
+  }; })();
+
+/* ---------------------------------------------------------------- 🌳 organics ---------------------------------------------------------------- */
+// 🌳 Plane tree: a mottled trunk in an iron tree guard, a big lumpy crown (v: green · yellow-green · autumn)
+DO('det_plane', {name: 'Plane tree', h: 84, variants: 3, tags: ['tree', 'street'], diffs: [{by: 'v', level: 'bold', name: 'leaf colour'}]}, (g, x, y, k, t, v) => { g.save(); g.translate(x, y); g.scale(k, k);
+  const leaf = [['#8ED86A', '#56A844', '#2E7A30'], ['#C8DC6A', '#94B23E', '#5E7E28'], ['#FFB25A', '#E2782E', '#A8481E']][v % 3];
+  g.strokeStyle = '#2A2E36'; g.lineWidth = 1.2; g.beginPath(); g.ellipse(0, -1, 9, 4.4, 0, 0, TAU); g.stroke(); for(let i = 0; i < 7; i++){ const a = Math.PI * (0.08 + i * 0.14), px = Math.cos(a) * 9, py = Math.sin(a) * 4.4 - 1; g.beginPath(); g.moveTo(px, py); g.lineTo(px, py - 9); g.stroke(); }
+  g.beginPath(); g.ellipse(0, -10, 9, 4.4, 0, 0, Math.PI); g.stroke();
+  D.piece(g, [{path: g => { g.moveTo(-4, 0); g.lineTo(-3, -40); g.lineTo(3, -40); g.lineTo(4, 0); g.closePath(); }, fill: g => D.lin(g, -4, 0, 4, 0, ['#D8CCA8', '#B8A878'])}], '#000', 0);
+  g.fillStyle = '#8E8A64'; [[-1.6, -12, 1.6, 2.6], [1.4, -22, 1.4, 2], [-1, -32, 1.4, 2.4]].forEach(p => { g.beginPath(); D.ell(g, p[0], p[1], p[2], p[3]); g.fill(); });
+  const blobs = v % 2 ? [[-14, -54, 13], [12, -56, 13], [0, -70, 15], [-4, -50, 12], [8, -46, 10]] : [[-16, -52, 12], [14, -52, 12], [-6, -68, 14], [8, -70, 13], [0, -48, 12]];
+  D.piece(g, [{path: g => { blobs.forEach(p => { g.moveTo(p[0] + p[2], p[1]); g.arc(p[0], p[1], p[2], 0, TAU); }); }, fill: g => D.rad(g, -6, -66, 3, 34, leaf)}], '#000', 0);
+  g.fillStyle = 'rgba(255,255,255,0.2)'; [[-12, -60, 5], [4, -74, 5]].forEach(p => { g.beginPath(); g.arc(p[0], p[1], p[2], 0, TAU); g.fill(); }); g.restore(); });
+// 🌲 Box hedge: a clipped hedge cube (v 1: two clipped balls on a stem)
+DO('det_hedge', {name: 'Box hedge', h: 30, kind: 'bush', variants: 2, tags: ['plant', 'garden'], diffs: [{by: 'v', level: 'bold', name: 'cube ↔ balls'}]}, (g, x, y, k, t, v) => { g.save(); g.translate(x, y); g.scale(k, k);
+  const leaf = ['#7ACB62', '#4C9C42', '#2E6E30'];
+  if(v % 2){ g.strokeStyle = '#6A4A2A'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -12); g.stroke(); [[0, -8, 7], [0, -21, 8]].forEach(p => { g.fillStyle = D.rad(g, p[0] - 3, p[1] - 3, 1, p[2] + 3, leaf); g.beginPath(); g.arc(p[0], p[1], p[2], 0, TAU); g.fill(); }); }
+  else { g.fillStyle = D.lin(g, -15, -24, 15, 0, leaf); g.beginPath(); D.rr(g, -15, -24, 30, 24, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,0.16)'; g.beginPath(); D.rr(g, -12, -22, 18, 7, 4); g.fill(); }
+  g.restore(); });
+// 🌷 Flower planter: an iron planter box spilling flowers (v: red · yellow · purple)
+DO('det_planter', {name: 'Flower planter', h: 24, kind: 'bush', block: false, variants: 3, tags: ['plant', 'flower'], diffs: [{by: 'v', level: 'quiet', name: 'flower colour'}]}, (g, x, y, k, t, v) => { g.save(); g.translate(x, y); g.scale(k, k);
+  const fl = ['#E2334A', '#FFD23F', '#A866E8'][v % 3];
+  g.fillStyle = D.lin(g, -12, 0, 12, 0, ['#3E5A52', '#2A3E38']); g.beginPath(); g.moveTo(-12, -10); g.lineTo(12, -10); g.lineTo(10, 0); g.lineTo(-10, 0); g.closePath(); g.fill(); g.fillStyle = BRASS; g.fillRect(-12, -11, 24, 2);
+  g.fillStyle = '#4C9C42'; [[-9, -13], [-3, -15], [3, -14], [9, -13]].forEach(p => { g.beginPath(); D.ell(g, p[0], p[1], 4.4, 3.4); g.fill(); });
+  const R = D.rnd(41 + v); for(let i = 0; i < 9; i++){ const fx = (R() - 0.5) * 22, fy = -13 - R() * 9; g.fillStyle = fl; g.beginPath(); g.arc(fx, fy, 2.6, 0, TAU); g.fill(); g.fillStyle = '#FFF4DC'; g.beginPath(); g.arc(fx, fy, 0.9, 0, TAU); g.fill(); }
+  g.restore(); });
+
+/* ---------------------------------------------------------------- 🗺️ the look: its own town ---------------------------------------------------------------- */
+Object.assign(LOOKS.detective, {swap: {palm: 'det_plane', jtree: 'det_plane', mango: 'det_plane', bamboo: 'det_hedge', banana: 'det_hedge', bush: 'det_hedge', flowers: 'det_planter',
+    stilt: 'det_townhouse', inn: 'det_museum', smithy: 'det_agency', well: 'det_clockpost', stall: 'det_kiosk', qboard: 'det_clueboard', lantern: 'det_gaslamp', fence: 'det_tape', crates: 'det_crates', signpost: 'det_signpost'},
+  roles: {home: ['det_townhouse', 'det_cottage', 'det_townhouse', 'det_cottage'], tall: ['det_plane', 'det_plane', 'det_hedge', 'det_plane'], small: ['det_planter', 'det_hedge', 'rock', 'det_planter']}});
+})();
+K.loaded('detective', 'ip-7a');
+})(window.Props && window.Props._K);

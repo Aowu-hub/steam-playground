@@ -1,0 +1,409 @@
+
+/* 🌍 IsoLook_myth — 🦄 Myth Realm — AvataRealm side ③b on 🏰 castle: 11 buildings · own floor · own resource shapes (pot of gold · marble blocks · dragon pearl) · own walls (needs realm) · 🏺 The Rainbow Horn origin relic — a LOOK file of 🌳 IsoProps (ip-4a: the engine + one file per look).
+   Load it with Props.need(['myth'], start) (the 📲 offline app + tests have it inline already). Runs after IsoProps with Props._K (the kit's insides).
+   Built from Test Harness/isoprops/kit/looks/myth.js by build_isoprops.py — never edit by hand. Same 14 rules as IsoProps (see the top of IsoProps.html). */
+(function(K){
+'use strict';
+if(!K){ console.warn('IsoLook_myth: include IsoProps first'); return; }
+if(!K.AR){ console.warn('IsoLook_myth: load IsoLook_realm first (Props.need does it)'); return; }
+const {HTW, LOOKS, DEFS, MAT, PD, add, lit, sideOf, sh, rnd, addLook, addSet, organic, bareTree, FONT, T} = K;
+/* 🌍 IsoProps LOOK file — 🦄 myth · Myth Realm (AvataRealm side ③b, ip-4c pictures, 🌳 IsoProps chat 2026-11-18).
+   Built ON 🏰 castle (its oaks, topiary, rose bushes, storybook ground, 🍂 versions — a fairy-tale marble town: white marble, lilac + sky-blue roofs, gold trim, crystals, rainbows, flower rings)
+   + 🏰 realm (team colours · 🏗️ site steps · slots · walls). 11 buildings = AvataRealm §14a:
+   🏠 silk tent → marble hall → Crystal Palace (rainbow spire) · 🏕️ Faun Grove · 🎠 Unicorn Stable · 🪽 Griffin Aerie · 🩹 Phoenix Fountain · 🔧 Golem Forge ·
+   🗼 Elf Watch Spire · 🎨 Silk Loom · 🔮 Star Observatory · 🕵️ Mist Grotto · 🐾 Fairy-ring Glade.
+   Own resource shapes: ✨ myth_coin = pot of fairy gold · 🏛️ myth_brick = marble blocks · 🐉 myth_gem = dragon pearls on a gold claw.
+   Own floor (marble tiles + flower rings) and own walls (🏛️ marble balustrade · 💎 crystal-column posts · 🌈 rainbow-arch gate · 🏯 marble rampart + blue-cone towers + horn gatehouse). Keys myth_<slot>. */
+(function(){
+'use strict';
+const {vis, F, line, polyP, ph, lightOf, dome, frustum, halo} = T;
+const {pennant, banner, trim, building, addSide, addFloor, tileBase, hash, teamOf, patOf, inkOf, tent, blocks} = K.AR;
+const D = PD, TAU = Math.PI * 2, S2 = Math.SQRT2;
+const MARBLE = '#F4F1EA', MARBLE2 = '#E6E0D4', MARBLED = '#C9C0B0', VEIN = 'rgba(150,140,170,0.35)', LILAC = '#B9A3E8', LILACD = '#8E78C8', SKY = '#8FD3F4', ROOFB = '#6A8AD8', ROOFL = '#9A7AD8',
+  GOLD = '#F2B731', GOLDD = '#B8862A', ROSE = '#F7A8C8', MINT = '#8EE0C0', IVY = '#5DBB46', IVYD = '#3C9440', STONEM = '#B8B0A4', WOOD = '#A87A50', WOODD = '#6A4A2E', PEARL = '#FFF6FA', FLAMEO = '#FF8A2E';
+const RAIN = ['#FF6B6B', '#FFB347', '#FFE66D', '#7BE495', '#6EC6FF', '#B28DFF'];
+// 🦄 the side's emblem: a spiral unicorn horn with a little star
+function hornEm(g, x, y, r, col){ g.fillStyle = col; g.beginPath(); g.moveTo(x - r * 0.42, y + r * 0.7); g.lineTo(x + r * 0.1, y - r * 1.15); g.lineTo(x + r * 0.42, y + r * 0.7); g.quadraticCurveTo(x, y + r * 0.9, x - r * 0.42, y + r * 0.7); g.fill();
+  g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = Math.max(0.6, r * 0.1); for(let i = 1; i < 4; i++){ const f = i / 4, yy = y + r * 0.7 - f * r * 1.7, hw = r * 0.42 * (1 - f); g.beginPath(); g.moveTo(x - hw + f * r * 0.1, yy + r * 0.08); g.lineTo(x + hw + f * r * 0.1, yy - r * 0.12); g.stroke(); }
+  g.fillStyle = col; g.beginPath(); D.star(g, x + r * 0.62, y - r * 0.62, r * 0.32, r * 0.13, 4); g.fill(); }
+addSide('myth', {name: 'Myth Realm', icon: '🦄', look: 'myth', accent: LILAC, emblem: hornEm, base: 'castle'});
+addLook('myth', {name: 'Myth Realm', walls: [MARBLE, '#F6EEF6', '#EEF4FA'], roofs: [ROOFL, ROOFB, '#E28AB8'], trim: '#6A5A8A', accent: LILAC, stilts: false, team: null, side: 'myth',
+  res: {coin: GOLD, coinDk: GOLDD, rock: '#3A3A44', brick: MARBLE, brickDk: MARBLED, leaf: IVY, bark: WOODD, gem: PEARL, gemDk: '#C8A8D8', gemHi: '#FFFFFF'}}, 'castle');
+/* ---------- 🖌️ myth painters ---------- */
+// marble veins on a face (decal paint)
+const veins = (h, seed) => (g, Q, k) => { const R = rnd(seed || 9); g.strokeStyle = VEIN; g.lineWidth = 0.8 * k; for(let i = 0; i < 3; i++){ let u = R(), z = R() * h; g.beginPath(); const a = Q(u, z); g.moveTo(a[0], a[1]);
+  for(let j = 0; j < 4; j++){ u = Math.max(0.02, Math.min(0.98, u + (R() - 0.3) * 0.16)); z = Math.max(1, Math.min(h - 1, z + (R() - 0.5) * h * 0.5)); const q = Q(u, z); g.lineTo(q[0], q[1]); } g.stroke(); } };
+// an arched window on a face (decal paint over the whole decal) — glows warm when lit
+const archWin = (h, c, fill) => (g, Q, k) => { const lv = lightOf(c), col = fill || (lv === 1 ? '#CFEFFF' : lv ? '#B8C8D0' : '#4A4A58'), a = Q(0.06, 0), b = Q(0.94, 0), sp = Q(0.06, h * 0.62), sq = Q(0.94, h * 0.62), tp = Q(0.5, h);
+  g.fillStyle = GOLD; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(sp[0], sp[1]); g.quadraticCurveTo(sp[0], tp[1] - 1 * k, tp[0], tp[1] - 1 * k); g.quadraticCurveTo(sq[0], tp[1] - 1 * k, sq[0], sq[1]); g.lineTo(b[0], b[1]); g.closePath(); g.fill();
+  const a2 = Q(0.2, 1.5), b2 = Q(0.8, 1.5), sp2 = Q(0.2, h * 0.6), sq2 = Q(0.8, h * 0.6), tp2 = Q(0.5, h - 2.4); g.fillStyle = col; g.beginPath(); g.moveTo(a2[0], a2[1]); g.lineTo(sp2[0], sp2[1]); g.quadraticCurveTo(sp2[0], tp2[1], tp2[0], tp2[1]); g.quadraticCurveTo(sq2[0], tp2[1], sq2[0], sq2[1]); g.lineTo(b2[0], b2[1]); g.closePath(); g.fill();
+  if(lv) { g.fillStyle = 'rgba(255,255,255,0.6)'; const s = Q(0.32, h * 0.55); g.beginPath(); D.ell(g, s[0], s[1], 0.8 * k, 2.4 * k); g.fill(); } };
+// an arched door (decal paint) — gold frame, lilac leaves
+const archDoorM = (h, fill) => (g, Q, k) => { const a = Q(0, 0), b = Q(1, 0), sp = Q(0, h * 0.6), sq = Q(1, h * 0.6), tp = Q(0.5, h);
+  g.fillStyle = GOLD; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(sp[0], sp[1]); g.quadraticCurveTo(sp[0], tp[1], tp[0], tp[1]); g.quadraticCurveTo(sq[0], tp[1], sq[0], sq[1]); g.lineTo(b[0], b[1]); g.closePath(); g.fill();
+  const a2 = Q(0.1, 0), b2 = Q(0.9, 0), sp2 = Q(0.1, h * 0.58), sq2 = Q(0.9, h * 0.58), tp2 = Q(0.5, h - 2); g.fillStyle = fill || LILACD; g.beginPath(); g.moveTo(a2[0], a2[1]); g.lineTo(sp2[0], sp2[1]); g.quadraticCurveTo(sp2[0], tp2[1], tp2[0], tp2[1]); g.quadraticCurveTo(sq2[0], tp2[1], sq2[0], sq2[1]); g.lineTo(b2[0], b2[1]); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,0.3)'; g.lineWidth = 0.9 * k; line(g, Q(0.5, 0.5), Q(0.5, h - 2.5)); g.fillStyle = GOLD; [0.42, 0.58].forEach(u => { const q = Q(u, h * 0.4); g.beginPath(); g.arc(q[0], q[1], 1.1 * k, 0, TAU); g.fill(); }); };
+// 💎 a crystal prism (screen space): n facets, rainbow or one colour, centre base x, y, half width w, height h
+function crystal(g, x, y, w, h, c, o){ o = o || {}; const br = c && c.broken, hh = br ? h * 0.42 : h, n = o.n || 5, cols = o.cols || RAIN, tip = [x, y - hh - w * 1.1];
+  for(let i = 0; i < n; i++){ const u0 = -1 + i * 2 / n, u1 = -1 + (i + 1) * 2 / n, x0 = x + u0 * w, x1 = x + u1 * w, y0 = y + Math.sqrt(1 - u0 * u0) * w * 0.35, y1 = y + Math.sqrt(1 - u1 * u1) * w * 0.35, col = br ? '#B8B4C0' : cols[i % cols.length];
+    g.fillStyle = D.lin(g, x0, y0 - hh, x1, y1, [[0, D.sh(col, 0.45)], [1, D.sh(col, (i - n / 2) * 0.06)]]); g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0, y0 - hh); if(!br) g.lineTo(tip[0], tip[1]); g.lineTo(x1, y1 - hh); g.lineTo(x1, y1); g.closePath(); g.fill(); }
+  if(br){ g.fillStyle = '#D8D4E0'; g.beginPath(); g.moveTo(x - w, y - hh); g.lineTo(x - w * 0.3, y - hh - w * 0.5); g.lineTo(x + w * 0.2, y - hh + w * 0.1); g.lineTo(x + w, y - hh - w * 0.3); g.lineTo(x + w, y - hh + w * 0.2); g.lineTo(x - w, y - hh + w * 0.2); g.closePath(); g.fill(); return; }
+  g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = Math.max(0.6, w * 0.08); g.beginPath(); g.moveTo(x - w * 0.55, y - hh * 0.15); g.lineTo(x - w * 0.55, y - hh * 0.85); g.stroke(); }
+// 🌸 a little flower (screen space)
+function flower(g, x, y, r, col, c){ const cl = c ? (c.broken ? '#9A9088' : D.sh(col, -0.25)) : col; g.fillStyle = cl; for(let i = 0; i < 5; i++){ const a = i / 5 * TAU; g.beginPath(); g.arc(x + Math.cos(a) * r * 0.6, y + Math.sin(a) * r * 0.36, r * 0.48, 0, TAU); g.fill(); } g.fillStyle = c && c.broken ? '#8A8070' : GOLD; g.beginPath(); g.arc(x, y, r * 0.34, 0, TAU); g.fill(); }
+// ✨ twinkles round a point (live: sin + cos)
+function twinkle(g, x, y, k, t, c, n, R, col){ if(c && (c.broken || c.still)) return; for(let i = 0; i < (n || 4); i++){ const a = i / (n || 4) * TAU + Math.sin(ph(t, 2.4)) * 0.4, rr = (R || 16) * k * (0.7 + 0.3 * Math.cos(ph(t, 2.4) + i)), s = (1.4 + 1.1 * Math.sin(ph(t, 2.4) + i * 1.9) + 0.6 * Math.cos(ph(t, 2.4) + i)) * k;
+  g.fillStyle = col || 'rgba(255,255,255,0.95)'; g.beginPath(); D.star(g, x + Math.cos(a) * rr, y + Math.sin(a) * rr * 0.6, Math.max(0.4, s * 1.6), Math.max(0.2, s * 0.5), 4); g.fill(); } }
+// 🦄 a unicorn head sign (screen space): white head, gold horn, rainbow mane
+function unicornHead(g, x, y, r, c){ const br = c && c.broken; RAIN.forEach((col, i) => { g.fillStyle = br ? '#B8B0A8' : col; g.beginPath(); g.arc(x + r * 0.5 + i * r * 0.05, y - r * 0.2 + i * r * 0.18, r * 0.36, 0, TAU); g.fill(); });
+  g.fillStyle = br ? '#D8D2C8' : '#FFFFFF'; g.beginPath(); g.moveTo(x + r * 0.4, y - r * 0.5); g.quadraticCurveTo(x - r * 0.1, y - r * 0.75, x - r * 0.65, y + r * 0.05); g.quadraticCurveTo(x - r * 0.75, y + r * 0.4, x - r * 0.45, y + r * 0.45); g.quadraticCurveTo(x, y + r * 0.2, x + r * 0.3, y + r * 0.75); g.quadraticCurveTo(x + r * 0.7, y + r * 0.2, x + r * 0.4, y - r * 0.5); g.fill();
+  g.fillStyle = br ? '#A8A090' : GOLD; g.beginPath(); g.moveTo(x - r * 0.05, y - r * 0.55); g.lineTo(x - r * 0.25, y - r * 1.25); g.lineTo(x + r * 0.15, y - r * 0.6); g.closePath(); g.fill();
+  g.fillStyle = '#2A2440'; g.beginPath(); g.arc(x - r * 0.15, y - r * 0.15, r * 0.08, 0, TAU); g.fill(); g.fillStyle = ROSE; g.beginPath(); g.arc(x - r * 0.42, y + r * 0.2, r * 0.07, 0, TAU); g.fill(); }
+// 🔥 a phoenix flame (screen space) — rises with sin + cos (live)
+function phoenixFlame(g, x, y, r, t, c){ if(c && c.broken) return; const f = c && c.still ? 0 : Math.sin(ph(t, 1.6)) * 0.12 + Math.cos(ph(t, 1.6)) * 0.08, lv = lightOf(c);
+  [[1, lv === 1 ? FLAMEO : '#C89A70', 1.0], [0.68, lv === 1 ? '#FFC23A' : '#D8B890', 0.82], [0.38, lv === 1 ? '#FFF2B0' : '#E8D8C0', 0.62]].forEach(([s, col, hh]) => { const R = r * s, H = r * 2.6 * hh * (1 + f);
+    g.fillStyle = col; g.beginPath(); g.moveTo(x - R, y); g.quadraticCurveTo(x - R * 1.15, y - H * 0.45, x - R * 0.35 + f * R, y - H * 0.7); g.quadraticCurveTo(x - R * 0.1, y - H * 0.55, x + f * R * 2, y - H); g.quadraticCurveTo(x + R * 0.3, y - H * 0.55, x + R * 0.55 + f * R, y - H * 0.75); g.quadraticCurveTo(x + R * 1.15, y - H * 0.4, x + R, y); g.quadraticCurveTo(x, y + R * 0.35, x - R, y); g.fill(); });
+  g.fillStyle = lv === 1 ? '#FFB347' : '#C8A890'; [-1, 1].forEach(sd => { g.beginPath(); g.moveTo(x + sd * r * 0.6, y - r * 0.9); g.quadraticCurveTo(x + sd * r * 2.2, y - r * (1.9 + f), x + sd * r * 2.4, y - r * 1.0); g.quadraticCurveTo(x + sd * r * 1.6, y - r * 0.6, x + sd * r * 0.6, y - r * 0.5); g.fill(); }); }
+// 🌫️ mist puffs (screen space, live: sin + cos)
+function mist(g, x, y, k, t, c, w){ if(c && c.broken) return; const s = c && c.still ? 0 : Math.sin(ph(t, 2.4)), cc = c && c.still ? 0 : Math.cos(ph(t, 2.4)); g.fillStyle = 'rgba(235,240,255,0.62)';
+  [[-0.7, 0, 0.4], [-0.2, -0.3, 0.5], [0.35, -0.1, 0.45], [0.75, 0.05, 0.32]].forEach(([fx, fy, fr], i) => { g.beginPath(); g.arc(x + fx * w * k + (i % 2 ? s : cc) * 3 * k, y + fy * w * 0.5 * k - (i % 2 ? cc : s) * 1.5 * k, fr * w * 0.5 * k, 0, TAU); g.fill(); }); }
+const MY = (slot, o, build) => building('myth', slot, o, build);
+// a marble box with veins on the seen faces
+function marble(B, x, y, z, w, d, h, col, seed){ const b = B.box(x, y, z, w, d, h, col || MARBLE); ['front', 'right', 'left', 'back'].forEach((s, i) => B.decal(b, s, ...F(b, s), 0, h, col || MARBLE, {paint: veins(h, (seed || 5) + i)})); return b; }
+// a gold-capped column (drum) with flutes
+function column(B, x, y, z, r, h, c){ B.drum(x, y, z, r * 1.25, 3, MARBLE2); B.drum(x, y, z + 3, r, h - 6, MARBLE, {rings: 0}); B.drum(x, y, z + h - 3, r * 1.3, 3, c && c.broken ? MARBLED : GOLD); }
+/* ============================ 🏠 HOUSE — 3 levels, each a new SHAPE ============================ */
+MY('house', {name: 'Crystal Palace', h: 140, names: {'1': 'Silk Tent', '2': 'Marble Hall', '3': 'Crystal Palace'}, live: {period: 2.4, frames: 6}}, (B, v, L) => { const c = L.cond, lv = L.state || '1';
+  if(lv === '1'){ // ⛺ a silk pavilion: lilac + white striped tent, a gold finial, a rug at the door, a golden lamp + cushions, a little rainbow ribbon pole
+    B.flat(0.1, 0.1, 2.8, 1.8, '#EFE6F4');
+    tent(B, 0.5, 0.36, 0, 2.0, 1.3, 58, LILAC, '#FFFFFF', 8, {ridge: 'x', cond: c});
+    B.custom(1.5, 1.1, (g, P, k) => { const q = P(1.5, 1.0, 58), br = c && c.broken; if(br) return; g.strokeStyle = GOLDD; g.lineWidth = 2 * k; line(g, q, [q[0], q[1] - 12 * k]); g.fillStyle = GOLD; g.beginPath(); g.arc(q[0], q[1] - 13 * k, 3 * k, 0, TAU); g.fill(); }, {layer: 3, zb: 58, top: 76});
+    B.custom(1.5, 1.85, (g, P, k) => { const a = P(1.1, 1.72, 0.6), b2 = P(1.9, 1.72, 0.6), d2 = P(1.9, 1.98, 0.6), e = P(1.1, 1.98, 0.6), col = c && c.broken ? '#8A8090' : teamOf(L); polyP(g, [a, b2, d2, e]); g.fillStyle = col; g.fill();
+      if(!(c && c.broken)){ g.save(); polyP(g, [a, b2, d2, e]); g.clip(); K.AR.patPaint(g, (s, vv) => P(1.1 + s / 22, 1.98 - vv / 22, 0.6), 17.6, 5.7, patOf(L), inkOf(col), k); g.restore(); }
+      g.strokeStyle = GOLD; g.lineWidth = 1.2 * k; polyP(g, [a, b2, d2, e]); g.stroke(); }, {layer: -6, zb: 0, top: 1});
+    [[2.62, 1.6, ROSE], [2.4, 1.78, MINT]].forEach(([x, y, col]) => B.custom(x, y, (g, P, k) => { const q = P(x, y, 0); g.fillStyle = c && c.broken ? '#A89A98' : col; g.beginPath(); D.rr(g, q[0] - 6 * k, q[1] - 7 * k, 12 * k, 7 * k, 3 * k); g.fill(); g.fillStyle = GOLD; g.beginPath(); g.arc(q[0], q[1] - 3.5 * k, 1.2 * k, 0, TAU); g.fill(); }, {layer: 2, zb: 0, top: 8}));
+    B.custom(0.3, 1.6, (g, P, k, t) => { const q = P(0.3, 1.62, 0); g.strokeStyle = GOLDD; g.lineWidth = 1.6 * k; line(g, q, [q[0], q[1] - 30 * k]); const lp = [q[0], q[1] - 33 * k]; g.fillStyle = GOLD; g.beginPath(); D.ell(g, lp[0], lp[1], 4 * k, 5 * k); g.fill();
+      if(lightOf(c)) D.glow(g, lp[0], lp[1], 10 * k, '#FFE58A', 0.5 * lightOf(c)); }, {layer: 3, zb: 0, top: 40});
+    B.custom(2.7, 0.3, (g, P, k, t) => { const q = P(2.7, 0.3, 0), sw = c && c.still ? 0 : Math.sin(ph(t, 2.4)) * 2 + Math.cos(ph(t, 2.4)) * 1; g.strokeStyle = WOODD; g.lineWidth = 1.6 * k; line(g, q, [q[0], q[1] - 44 * k]); if(c && c.broken) return;
+      RAIN.forEach((col, i) => { g.strokeStyle = col; g.lineWidth = 1.6 * k; g.beginPath(); g.moveTo(q[0], q[1] - 43 * k + i * 1.5 * k); g.quadraticCurveTo(q[0] + 8 * k, q[1] - 40 * k + i * 1.5 * k + sw * k, q[0] + 16 * k, q[1] - 34 * k + i * 1.6 * k - sw * k); g.stroke(); }); }, {layer: 3, zb: 0, top: 46, fx: true});
+    pennant(B, L, 0.3, 0.3, 0, 52, {emblem: hornEm, pole: GOLDD});
+    return; }
+  if(lv === '2'){ // 🏛️ marble hall: a marble box behind 4 gold-capped columns, a pediment with the horn, arched windows, a sky-blue dome on top
+    const w = marble(B, 0.3, 0.2, 0, 2.4, 1.3, 40, MARBLE, 11);
+    B.decal(w, 'front', 1.24, 0.52, 0, 32, LILACD, {k: 'door', paint: archDoorM(32)}); [0.5, 2.2].forEach(a => B.decal(w, 'front', a, 0.36, 12, 20, '#CFEFFF', {paint: archWin(20, c)})); [0.4, 0.92].forEach(a => B.decal(w, 'right', a, 0.28, 12, 20, '#CFEFFF', {paint: archWin(20, c)}));
+    trim(B, L, w, 36, 3.4);
+    B.box(0.22, 1.5, 0, 2.56, 0.4, 3, MARBLE2, {layer: 1}); [0.42, 0.98, 2.02, 2.58].forEach(x => column(B, x, 1.74, 3, 0.08, 40, c)); B.box(0.24, 1.54, 43, 2.52, 0.34, 4, MARBLE2, {layer: 1});
+    B.custom(1.5, 1.72, (g, P, k, t, T2) => { if(!vis(T2, 0, 1)) return; const a = P(0.24, 1.88, 47), b2 = P(2.76, 1.88, 47), m = P(1.5, 1.88, 60); g.fillStyle = c && c.broken ? MARBLED : MARBLE; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(m[0], m[1]); g.lineTo(b2[0], b2[1]); g.closePath(); g.fill(); g.strokeStyle = GOLD; g.lineWidth = 1.6 * k; g.stroke();
+      const q = P(1.5, 1.88, 52); hornEm(g, q[0], q[1], 4.6 * k, c && c.broken ? '#9A9088' : teamOf(L)); }, {layer: 2, zb: 47, top: 60});
+    B.box(0.26, 0.16, 40, 2.48, 1.38, 4, MARBLE2);
+    B.drum(1.5, 0.86, 44, 0.42, 8, MARBLE, {rings: 0}); B.custom(1.5, 0.86, (g, P, k) => { dome(g, P, k, 1.5, 0.86, 52, 0.44, c && c.broken ? 12 : 26, SKY); if(c && c.broken) return; const q = P(1.5, 0.86, 78); g.fillStyle = GOLD; g.beginPath(); g.arc(q[0], q[1], 3 * k, 0, TAU); g.fill(); g.strokeStyle = GOLD; g.lineWidth = 1.6 * k; line(g, q, [q[0], q[1] - 8 * k]); }, {layer: 2, zb: 52, top: 88});
+    banner(B, L, w, 'right', 0.66, 0.28, 6, 22, hornEm);
+    pennant(B, L, 0.42, 0.32, 44, 22, {emblem: hornEm, pole: GOLDD});
+    B.custom(0.2, 1.9, (g, P, k) => { const q = P(0.16, 1.94, 0); [[0, 0, ROSE], [7, 2, '#FFE66D'], [3, -4, LILAC]].forEach(([dx, dy, col]) => flower(g, q[0] + dx * k, q[1] + dy * k - 2 * k, 3 * k, col, c)); }, {layer: 3, zb: 0, top: 6});
+    halo(B, 1.5, 0.86, 70, 22, '#CFEFFF', lightOf(c) * 0.3, {pulse: t => 0.88 + Math.sin(ph(t, 2.4)) * 0.08 + Math.cos(ph(t, 2.4)) * 0.04});
+    return; }
+  // 💎 L3 Crystal Palace: a wide marble hall + 2 round lilac towers + a GIANT rainbow crystal spire in the middle, gold balcony, arched door, twinkles
+  const w = marble(B, 0.36, 0.3, 0, 2.28, 1.36, 42, MARBLE, 21);
+  B.decal(w, 'front', 1.22, 0.56, 0, 34, LILACD, {k: 'door', paint: archDoorM(34)}); [0.46, 0.84, 2.0, 2.38].forEach(a => B.decal(w, 'front', a, 0.26, 14, 20, '#CFEFFF', {paint: archWin(20, c)})); [0.5, 1.0].forEach(a => B.decal(w, 'right', a, 0.26, 14, 20, '#CFEFFF', {paint: archWin(20, c)}));
+  trim(B, L, w, 38, 4);
+  B.box(0.3, 0.24, 42, 2.4, 1.48, 4, MARBLE2);
+  B.custom(1.5, 1.7, (g, P, k, t, T2) => { if(!vis(T2, 0, 1)) return; g.strokeStyle = GOLD; g.lineWidth = 1.6 * k; for(let i = 0; i <= 12; i++){ const x = 0.46 + i * 0.172; line(g, P(x, 1.8, 46), P(x, 1.8, 54)); } line(g, P(0.42, 1.8, 54), P(2.58, 1.8, 54)); }, {layer: 2, zb: 46, top: 54});
+  [[0.36, 0.42], [2.64, 0.42]].forEach(([x, y]) => { B.drum(x, y, 0, 0.3, 66, LILAC, {rings: 0}); B.custom(x, y, (g, P, k) => { const r2 = P(x, y, 64), rx = 0.3 * HTW * k * S2, col2 = c && c.broken ? '#8A8090' : teamOf(L);
+      g.fillStyle = col2; g.beginPath(); g.ellipse(r2[0], r2[1], rx, rx / 2, 0, 0, Math.PI); g.lineTo(r2[0] - rx, r2[1] - 6 * k); g.ellipse(r2[0], r2[1] - 6 * k, rx, rx / 2, 0, Math.PI, 0, true); g.closePath(); g.fill();
+      if(!(c && c.broken)) K.AR.patPaint(g, (s, vv) => { const u = -1 + s / (rx * 2 / k) * 2; return [r2[0] + u * rx, r2[1] + Math.sqrt(Math.max(0, 1 - u * u)) * rx / 2 - vv * k]; }, rx * 2 / k, 6, patOf(L), inkOf(col2), k);
+      const wq = P(x, y + 0.3, 40); g.fillStyle = GOLD; g.beginPath(); D.ell(g, wq[0], wq[1], 3 * k, 6 * k); g.fill(); g.fillStyle = lightOf(c) ? '#CFEFFF' : '#4A4A58'; g.beginPath(); D.ell(g, wq[0], wq[1], 2 * k, 4.6 * k); g.fill(); }, {layer: 1, zb: 34, top: 70});
+    B.cone(x, y, 66, 0.38, c && c.broken ? 14 : 34, ROOFB);
+    if(!(c && c.broken)) B.custom(x, y, (g, P, k) => { const q = P(x, y, 100); g.fillStyle = GOLD; g.beginPath(); g.arc(q[0], q[1], 2.4 * k, 0, TAU); g.fill(); }, {layer: 3, zb: 98, top: 104}); });
+  B.custom(1.5, 0.96, (g, P, k) => { const q = P(1.5, 0.96, 46); crystal(g, q[0], q[1], 17 * k, 62 * k, c, {n: 6});
+    if(!(c && c.broken)){ const s1 = P(1.0, 0.7, 46), s2 = P(2.0, 0.7, 46); crystal(g, s1[0], s1[1], 7 * k, 22 * k, c, {n: 3, cols: [SKY, LILAC, '#FFFFFF']}); crystal(g, s2[0], s2[1], 7 * k, 26 * k, c, {n: 3, cols: [ROSE, LILAC, '#FFFFFF']}); } }, {layer: 2, zb: 46, top: 140});
+  B.custom(1.5, 0.96, (g, P, k, t) => { const q = P(1.5, 0.96, 112); twinkle(g, q[0], q[1], k, t, c, 5, 22); }, {layer: 4, zb: 90, top: 136, fx: true});
+  halo(B, 1.5, 0.96, 90, 34, '#E8D8FF', lightOf(c) * 0.35, {pulse: t => 0.86 + Math.sin(ph(t, 2.4)) * 0.1 + Math.cos(ph(t, 2.4)) * 0.05});
+  banner(B, L, w, 'right', 0.66, 0.3, 6, 22, hornEm);
+  [0.36, 2.64].forEach(x => { if(!(c && c.broken)) pennant(B, L, x, 0.42, 102, 14, {emblem: hornEm, pole: GOLDD, layer: 3, w: 15, hh: 9}); });
+});
+/* ============================ 🏕️ CAMP — Faun Grove (a ring of broken marble columns with ivy, a pan-flute stump, a laurel training shield) ============================ */
+MY('camp', {name: 'Faun Grove', h: 80}, (B, v, L) => { const c = L.cond;
+  B.flat(0.06, 0.06, 1.88, 1.88, '#CFE6B8');
+  B.custom(1, 1, (g, P, k) => { const q = P(1, 1, 0.5), rx = 0.8 * HTW * k * S2; g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 3 * k; g.beginPath(); g.ellipse(q[0], q[1], rx, rx / 2, 0, 0, TAU); g.stroke(); }, {layer: -7, zb: 0, top: 1});
+  [[1, 0.2, 44], [1.72, 0.6, 34], [1.72, 1.42, 40], [0.28, 0.6, 38], [0.28, 1.42, 28]].forEach(([x, y, h], i) => { const hh = c && c.broken ? h * 0.5 : h; column(B, x, y, 0, 0.1, hh, c);
+    B.custom(x, y, (g, P, k) => { const q = P(x, y + 0.1, 4); g.strokeStyle = c ? (c.broken ? '#8A8A6A' : '#9AA05A') : IVY; g.lineWidth = 1.4 * k; g.beginPath(); for(let j = 0; j <= 10; j++){ const z = j / 10 * hh * 0.8; const xx = q[0] + Math.sin(j * 1.3 + i) * 3 * k, yy = q[1] - z * k; j ? g.lineTo(xx, yy) : g.moveTo(xx, yy); } g.stroke();
+      g.fillStyle = c ? '#9AA05A' : IVY; for(let j = 1; j < 5; j++){ const z = j / 5 * hh * 0.8; g.beginPath(); D.ell(g, q[0] + Math.sin(j * 2.6 + i) * 3 * k + 2 * k, q[1] - z * k, 2 * k, 1.2 * k, 0.5); g.fill(); } }, {layer: 3, zb: 0, top: hh}); });
+  B.drum(0.9, 1.6, 0, 0.18, 10, WOOD, {rings: 2}); B.custom(0.9, 1.6, (g, P, k) => { const q = P(0.9, 1.6, 10); g.fillStyle = '#E8C890'; g.beginPath(); D.ell(g, q[0], q[1], 6 * k, 3 * k); g.fill();
+    for(let i = 0; i < 5; i++){ g.fillStyle = c && c.broken ? '#9A8A70' : '#D8A860'; g.fillRect(q[0] - 5 * k + i * 2.2 * k, q[1] - (12 - i * 1.6) * k, 1.8 * k, (12 - i * 1.6) * k); } g.fillStyle = teamOf(L); g.fillRect(q[0] - 5 * k, q[1] - 6 * k, 11 * k, 1.6 * k); }, {layer: 2, zb: 10, top: 24});
+  B.custom(1.1, 1.0, (g, P, k) => { const q = P(1.1, 1.0, 0), col = c && c.broken ? '#8A8090' : teamOf(L); g.strokeStyle = WOODD; g.lineWidth = 2 * k; line(g, q, [q[0], q[1] - 30 * k]); g.fillStyle = col; g.beginPath(); g.arc(q[0], q[1] - 30 * k, 9 * k, 0, TAU); g.fill();   // 🛡️ a round shield with a laurel ring on a post
+    g.strokeStyle = c && c.broken ? '#8A8A6A' : IVY; g.lineWidth = 1.6 * k; g.beginPath(); g.arc(q[0], q[1] - 30 * k, 6.4 * k, 0.6, Math.PI * 2 - 0.6); g.stroke(); g.fillStyle = GOLD; g.beginPath(); g.arc(q[0], q[1] - 30 * k, 2.4 * k, 0, TAU); g.fill(); }, {layer: 2, zb: 0, top: 42});
+  pennant(B, L, 1.0, 0.2, 44, 22, {emblem: hornEm, pole: GOLDD});
+  B.custom(1.5, 1.7, (g, P, k) => { const q = P(1.5, 1.74, 0); [[0, 0, ROSE], [6, 2, '#FFE66D'], [-5, 3, LILAC]].forEach(([dx, dy, col]) => flower(g, q[0] + dx * k, q[1] + dy * k - 2 * k, 2.8 * k, col, c)); }, {layer: 3, zb: 0, top: 6});
+});
+/* ============================ 🎠 RIDE — Unicorn Stable (a marble stable with a blue roof, arched stall doors, a unicorn-head sign, hay + a rainbow-mane brush) ============================ */
+MY('ride', {name: 'Unicorn Stable', h: 98}, (B, v, L) => { const c = L.cond;
+  B.flat(0.06, 0.06, 1.88, 2.88, '#EAE4DA');
+  const s = marble(B, 0.2, 0.3, 0, 1.6, 2.2, 36, MARBLE, 51);
+  B.decal(s, 'front', 0.6, 0.8, 0, 32, LILACD, {k: 'door', paint: archDoorM(32)});
+  [0.36, 1.04, 1.72].forEach(a => B.decal(s, 'right', a, 0.44, 14, 16, '#3A3044', {paint: (g, Q, k) => { const p0 = Q(0, 0), p1 = Q(1, 0), q0 = Q(0, 10), q1 = Q(1, 10), tp = Q(0.5, 16); g.fillStyle = GOLD; g.beginPath(); g.moveTo(p0[0], p0[1]); g.lineTo(q0[0], q0[1]); g.quadraticCurveTo(q0[0], tp[1], tp[0], tp[1]); g.quadraticCurveTo(q1[0], tp[1], q1[0], q1[1]); g.lineTo(p1[0], p1[1]); g.closePath(); g.fill();
+    g.fillStyle = '#3A3044'; const p2 = Q(0.12, 0), p3 = Q(0.88, 0), q2 = Q(0.12, 9), q3 = Q(0.88, 9), tp2 = Q(0.5, 14.5); g.beginPath(); g.moveTo(p2[0], p2[1]); g.lineTo(q2[0], q2[1]); g.quadraticCurveTo(q2[0], tp2[1], tp2[0], tp2[1]); g.quadraticCurveTo(q3[0], tp2[1], q3[0], q3[1]); g.lineTo(p3[0], p3[1]); g.closePath(); g.fill(); }}));
+  trim(B, L, s, 32, 3);
+  B.roof(0.12, 0.2, 36, 1.76, 2.4, 30, ROOFB, {ridge: 'y', ov: 0.12, kind: 'gable'});
+  B.custom(1, 2.62, (g, P, k, t, T2) => { if(!vis(T2, 0, 1)) return; const q = P(1, 2.62, 50); unicornHead(g, q[0], q[1], 9 * k, c); }, {layer: 3, zb: 40, top: 66});
+  B.custom(1, 1.4, (g, P, k) => { if(c && c.broken) return; const q = P(1, 1.4, 72); g.fillStyle = GOLD; g.beginPath(); g.moveTo(q[0] - 3 * k, q[1]); g.lineTo(q[0], q[1] - 16 * k); g.lineTo(q[0] + 3 * k, q[1]); g.closePath(); g.fill(); }, {layer: 3, zb: 66, top: 90});
+  B.custom(1.7, 2.68, (g, P, k) => { const q = P(1.62, 2.7, 0); g.fillStyle = c && c.broken ? '#B8A880' : '#F2D27A'; g.beginPath(); D.rr(g, q[0] - 9 * k, q[1] - 9 * k, 18 * k, 9 * k, 2 * k); g.fill(); g.strokeStyle = '#C8A050'; g.lineWidth = 0.9 * k; [-5, 0, 5].forEach(dx => line(g, [q[0] + dx * k, q[1] - 9 * k], [q[0] + dx * k, q[1]]));
+    g.fillStyle = '#F2D27A'; g.beginPath(); D.ell(g, q[0], q[1] - 9 * k, 9 * k, 3 * k); g.fill(); }, {layer: 3, zb: 0, top: 12});
+  B.custom(0.26, 2.7, (g, P, k) => { const q = P(0.24, 2.72, 0); g.fillStyle = WOOD; g.beginPath(); D.rr(g, q[0] - 6 * k, q[1] - 5 * k, 12 * k, 3 * k, 1.4 * k); g.fill(); if(c && c.broken) return; RAIN.forEach((col, i) => { g.fillStyle = col; g.fillRect(q[0] - 5.4 * k + i * 1.9 * k, q[1] - 9 * k, 1.7 * k, 4 * k); }); }, {layer: 3, zb: 0, top: 10});
+  banner(B, L, s, 'right', 0.1, 0.24, 6, 20, hornEm);
+  pennant(B, L, 1, 0.3, 66, 22, {emblem: hornEm, pole: GOLDD});
+});
+/* ============================ 🪽 NEST — Griffin Aerie (a tall rock pillar with ledges, a big twig nest on top with golden eggs + a griffin feather) ============================ */
+MY('nest', {name: 'Griffin Aerie', h: 122, live: {period: 2.4, frames: 6}}, (B, v, L) => { const c = L.cond;
+  B.flat(0.06, 0.06, 1.88, 1.88, '#CFE6B8');
+  B.custom(1, 1, (g, P, k) => { frustum(g, P, k, 1, 1, 0, 0.78, 0.5, 30, c && c.broken ? '#9A948C' : STONEM); frustum(g, P, k, 1, 1, 30, 0.5, 0.42, 34, c && c.broken ? '#9A948C' : '#C8C0B4'); frustum(g, P, k, 1, 1, 64, 0.42, 0.5, 16, c && c.broken ? '#9A948C' : '#D4CCC0');
+    const q = P(1.2, 1.4, 20); g.fillStyle = c ? '#9AA05A' : IVY; [[0, 0], [6, -10], [-4, -22], [3, -34]].forEach(([dx, dy]) => { g.beginPath(); D.ell(g, q[0] + dx * k, q[1] + dy * k, 4 * k, 2.4 * k, 0.4); g.fill(); });
+    const d = P(1, 1.5, 0); g.fillStyle = '#4A4050'; g.beginPath(); g.moveTo(d[0] - 7 * k, d[1]); g.quadraticCurveTo(d[0] - 7 * k, d[1] - 20 * k, d[0], d[1] - 20 * k); g.quadraticCurveTo(d[0] + 7 * k, d[1] - 20 * k, d[0] + 7 * k, d[1]); g.closePath(); g.fill(); }, {layer: 1, zb: 0, top: 80});
+  B.custom(1, 1, (g, P, k, t) => { const q = P(1, 1, 80), rx = 0.62 * HTW * k * S2, ry = rx / 2, br = c && c.broken; g.fillStyle = '#8A5A34'; g.beginPath(); D.ell(g, q[0], q[1] - 3 * k, rx, ry + 3 * k); g.fill();
+    g.strokeStyle = '#B98A56'; g.lineWidth = 1.6 * k; for(let i = 0; i < 18; i++){ const a = i / 18 * TAU; g.beginPath(); g.moveTo(q[0] + Math.cos(a) * rx * 0.6, q[1] - 3 * k + Math.sin(a) * ry * 0.6); g.lineTo(q[0] + Math.cos(a + 0.6) * rx * 1.05, q[1] - 3 * k + Math.sin(a + 0.6) * ry * 1.05); g.stroke(); }
+    g.fillStyle = '#5A3A20'; g.beginPath(); D.ell(g, q[0], q[1] - 7 * k, rx * 0.66, ry * 0.6); g.fill();
+    if(!br) [[-6, -10], [3, -9], [-1, -13]].forEach(([dx, dy], i) => { const ex = q[0] + dx * k, ey = q[1] + dy * k; g.fillStyle = D.rad(g, ex - 1.4 * k, ey - 2 * k, 0.4, 5 * k, [[0, '#FFF6C8'], [0.6, i === 2 ? teamOf(L) : GOLD], [1, GOLDD]]); g.beginPath(); D.ell(g, ex, ey, 3.4 * k, 4.4 * k); g.fill(); });
+    const fx = q[0] + rx * 0.7, fy = q[1] - 10 * k, sw = c && c.still ? 0 : Math.sin(ph(t, 2.4)) * 0.12 + Math.cos(ph(t, 2.4)) * 0.06; g.save(); g.translate(fx, fy); g.rotate(-0.5 + sw);   // 🪶 the griffin feather sways
+    g.fillStyle = br ? '#B8A890' : '#E8B04A'; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(-6 * k, -14 * k, 0, -26 * k); g.quadraticCurveTo(6 * k, -14 * k, 0, 0); g.fill(); g.strokeStyle = '#8A5A2A'; g.lineWidth = 0.9 * k; line(g, [0, 0], [0, -25 * k]); g.restore(); }, {layer: 3, zb: 76, top: 116, fx: true});
+  pennant(B, L, 0.3, 0.3, 0, 54, {emblem: hornEm, pole: GOLDD});
+  B.custom(1.66, 1.66, (g, P, k) => { const q = P(1.66, 1.7, 0); [[0, 0, ROSE], [6, 2, '#FFE66D']].forEach(([dx, dy, col]) => flower(g, q[0] + dx * k, q[1] + dy * k - 2 * k, 2.8 * k, col, c)); }, {layer: 3, zb: 0, top: 6});
+  B.custom(1, 1.6, (g, P, k) => { const q = P(1, 1.66, 0.4), col = c && c.broken ? '#8A8090' : teamOf(L); g.fillStyle = col; g.beginPath(); D.ell(g, q[0], q[1], 14 * k, 4 * k); g.fill(); }, {layer: -6, zb: 0, top: 1});
+});
+/* ============================ 🩹 CARE — Phoenix Fountain (a 2-tier marble fountain with blue water and a PHOENIX FLAME on top, a heart sign) ============================ */
+MY('care', {name: 'Phoenix Fountain', h: 104, live: {period: 1.6, frames: 6}}, (B, v, L) => { const c = L.cond;
+  B.flat(0.06, 0.06, 1.88, 1.88, '#EAE4DA');
+  B.custom(1, 1, (g, P, k, t) => { const br = c && c.broken; frustum(g, P, k, 1, 1, 0, 0.84, 0.82, 12, br ? MARBLED : MARBLE2, {top: false}); const q = P(1, 1, 12), rx = 0.82 * HTW * k * S2;
+    g.fillStyle = MARBLE; g.beginPath(); D.ell(g, q[0], q[1], rx, rx / 2); g.fill(); g.fillStyle = br ? '#9AA0A8' : D.rad(g, q[0] - rx * 0.3, q[1] - rx * 0.15, 1, rx, [[0, '#CFF2FF'], [1, '#6EC6FF']]); g.beginPath(); D.ell(g, q[0], q[1] + 1 * k, rx * 0.86, rx * 0.43); g.fill();
+    if(!(br || (c && c.still))) for(let i = 0; i < 3; i++){ const f = ((t / 1.6) + i / 3) % 1; g.strokeStyle = 'rgba(255,255,255,' + (0.7 * (1 - f)) + ')'; g.lineWidth = 1 * k; g.beginPath(); D.ell(g, q[0], q[1] + 1 * k, rx * 0.2 + f * rx * 0.6, (rx * 0.2 + f * rx * 0.6) / 2); g.stroke(); }
+    frustum(g, P, k, 1, 1, 12, 0.18, 0.12, 22, br ? MARBLED : MARBLE); frustum(g, P, k, 1, 1, 34, 0.42, 0.44, 6, br ? MARBLED : MARBLE2);
+    const q2 = P(1, 1, 40), rx2 = 0.44 * HTW * k * S2; g.fillStyle = br ? '#9AA0A8' : '#8ED8FF'; g.beginPath(); D.ell(g, q2[0], q2[1], rx2 * 0.84, rx2 * 0.42); g.fill();
+    if(!br) [-1, 1].forEach(sd => { g.strokeStyle = 'rgba(160,220,255,0.8)'; g.lineWidth = 1.4 * k; g.beginPath(); g.moveTo(q2[0] + sd * rx2 * 0.8, q2[1]); g.quadraticCurveTo(q2[0] + sd * rx2 * 1.1, q2[1] + 6 * k, q2[0] + sd * rx2 * 1.15, q2[1] + 26 * k); g.stroke(); });
+    frustum(g, P, k, 1, 1, 40, 0.1, 0.16, 10, br ? MARBLED : GOLD); }, {layer: 1, zb: 0, top: 52});
+  B.custom(1, 1, (g, P, k, t) => { const q = P(1, 1, 50); phoenixFlame(g, q[0], q[1], 7 * k, t, c); }, {layer: 3, zb: 50, top: 96, fx: true});
+  halo(B, 1, 1, 64, 26, '#FFB347', lightOf(c) * 0.4, {pulse: t => 0.85 + Math.sin(ph(t, 1.6)) * 0.12 + Math.cos(ph(t, 1.6)) * 0.05});
+  B.custom(1, 1.86, (g, P, k) => { const a = P(0.7, 1.86, 1), b2 = P(1.3, 1.86, 1), col = c && c.broken ? '#8A8090' : teamOf(L); g.strokeStyle = col; g.lineWidth = 4 * k; g.lineCap = 'round'; line(g, a, b2); }, {layer: -6, zb: 0, top: 1});
+  B.custom(1.8, 0.24, (g, P, k) => { const q = P(1.8, 0.26, 0); g.fillStyle = GOLDD; g.fillRect(q[0] - 1.2 * k, q[1] - 38 * k, 2.4 * k, 38 * k); const br = c && c.broken, hx = q[0], hy = q[1] - 46 * k, r = 7 * k;
+    g.fillStyle = br ? '#B8A0A8' : ROSE; g.beginPath(); g.moveTo(hx, hy + r * 1.1); g.bezierCurveTo(hx - r * 1.6, hy - r * 0.1, hx - r * 0.8, hy - r * 1.2, hx, hy - r * 0.4); g.bezierCurveTo(hx + r * 0.8, hy - r * 1.2, hx + r * 1.6, hy - r * 0.1, hx, hy + r * 1.1); g.fill();
+    g.fillStyle = '#FFFFFF'; g.fillRect(hx - 1.2 * k, hy - 3.6 * k, 2.4 * k, 6.4 * k); g.fillRect(hx - 3.2 * k, hy - 1.6 * k, 6.4 * k, 2.4 * k); }, {layer: 3, zb: 0, top: 56});
+  pennant(B, L, 0.24, 0.24, 0, 54, {emblem: hornEm, pole: GOLDD});
+  B.custom(0.3, 1.7, (g, P, k) => { const q = P(0.3, 1.72, 0); [[0, 0, ROSE], [6, 2, '#FFE66D'], [-4, 3, LILAC]].forEach(([dx, dy, col]) => flower(g, q[0] + dx * k, q[1] + dy * k - 2 * k, 2.8 * k, col, c)); }, {layer: 3, zb: 0, top: 6});
+});
+/* ============================ 🔧 WORKSHOP — Golem Forge (a stone forge with a glowing mouth + chimney, an anvil, a GIANT stone golem fist with glowing blue runes) ============================ */
+MY('workshop', {name: 'Golem Forge', h: 104, live: {period: 2.4, frames: 6}}, (B, v, L) => { const c = L.cond;
+  B.flat(0.06, 0.06, 1.88, 1.88, '#D8D0C4');
+  const f = B.box(0.2, 0.2, 0, 1.0, 1.0, 34, STONEM); ['front', 'right', 'left', 'back'].forEach(s => B.decal(f, s, ...F(f, s), 0, 34, STONEM, {paint: blocks(34, STONEM, 41, 7)}));
+  B.decal(f, 'front', 0.46, 0.48, 6, 18, '#2A1A10', {paint: (g, Q, k) => { const a = Q(0, 0), b2 = Q(1, 0), sp = Q(0, 10), sq = Q(1, 10), tp = Q(0.5, 18), lv = lightOf(c); g.fillStyle = lv === 1 ? '#FFB347' : lv ? '#C89A70' : '#2A1A10'; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(sp[0], sp[1]); g.quadraticCurveTo(sp[0], tp[1], tp[0], tp[1]); g.quadraticCurveTo(sq[0], tp[1], sq[0], sq[1]); g.lineTo(b2[0], b2[1]); g.closePath(); g.fill(); }});
+  trim(B, L, f, 28, 3); B.box(0.16, 0.16, 34, 1.08, 1.08, 4, '#D4CCC0'); B.box(0.36, 0.36, 38, 0.3, 0.3, 30, STONEM);
+  B.custom(0.51, 0.51, (g, P, k, t) => { const q = P(0.51, 0.51, 70); T.puffs(g, q[0], q[1], k, t, {col: 'rgba(230,230,240,0.7)', rise: 16, period: 2.4}); }, {layer: 4, zb: 70, top: 94, fx: true});
+  halo(B, 0.7, 1.22, 14, 18, '#FF9A3A', lightOf(c) * 0.5, {pulse: t => 0.85 + Math.sin(ph(t, 2.4)) * 0.1 + Math.cos(ph(t, 2.4)) * 0.06});
+  B.box(1.38, 1.38, 0, 0.32, 0.22, 9, WOODD, {layer: 1}); B.box(1.34, 1.36, 9, 0.4, 0.26, 6, '#7A7A84', {layer: 1});
+  B.custom(1.4, 0.7, (g, P, k, t) => { const q = P(1.42, 0.62, 0), br = c && c.broken, col = br ? '#9A948C' : '#B8B0A4', glow = lightOf(c);   // ✊ the golem fist, knuckles up, runes on the back
+    g.fillStyle = D.rad(g, q[0] - 6 * k, q[1] - 30 * k, 2, 30 * k, [[0, D.sh(col, 0.3)], [0.7, col], [1, D.sh(col, -0.25)]]); g.beginPath(); D.rr(g, q[0] - 15 * k, q[1] - (br ? 18 : 34) * k, 30 * k, (br ? 18 : 34) * k, 8 * k); g.fill();
+    if(!br){ g.fillStyle = D.sh(col, 0.12); for(let i = 0; i < 4; i++){ g.beginPath(); D.ell(g, q[0] - 11 * k + i * 7.4 * k, q[1] - 33 * k, 3.6 * k, 3 * k); g.fill(); } g.fillStyle = D.sh(col, -0.08); g.beginPath(); D.rr(g, q[0] - 18 * k, q[1] - 22 * k, 7 * k, 14 * k, 3 * k); g.fill(); }
+    g.strokeStyle = glow ? 'rgba(110,198,255,' + (0.6 + 0.3 * glow * (0.5 + 0.5 * Math.sin(ph(t, 2.4)))) + ')' : '#6A6470'; g.lineWidth = 1.6 * k; g.lineCap = 'round'; const r0 = [q[0] - 2 * k, q[1] - 18 * k];
+    [[[-5, 0], [0, -5], [5, 0]], [[-4, 5], [4, 5]], [[0, -2], [0, 8]]].forEach(seg => { g.beginPath(); seg.forEach(([dx, dy], j) => j ? g.lineTo(r0[0] + dx * k, r0[1] + dy * k) : g.moveTo(r0[0] + dx * k, r0[1] + dy * k)); g.stroke(); });
+    if(glow && !(c && c.still)) D.glow(g, r0[0], r0[1], 12 * k, '#6EC6FF', 0.3 + 0.15 * Math.cos(ph(t, 2.4))); }, {layer: 2, zb: 0, top: 40});
+  B.custom(1.5, 1.7, (g, P, k) => { const q = P(1.62, 1.72, 0); [0, 1, 2].forEach(i => { g.fillStyle = [MARBLE, '#D8D0C4', MARBLE][i]; g.beginPath(); D.rr(g, q[0] - 8 * k + (i % 2) * 3 * k, q[1] - 6 * k - i * 5 * k, 12 * k, 5 * k, 1 * k); g.fill(); }); }, {layer: 3, zb: 0, top: 16});
+  pennant(B, L, 1.78, 0.24, 0, 54, {emblem: hornEm, pole: GOLDD});
+});
+/* ============================ 🗼 TOWER — Elf Watch Spire (a slim white spire with a leafy gold balcony and a pointed blue roof · stand + aim) ============================ */
+MY('tower', {name: 'Elf Watch Spire', h: 136, stand: [0.5, 0.5, 80], aim: [0.5, 0.5, 98]}, (B, v, L) => { const c = L.cond;
+  B.drum(0.5, 0.5, 0, 0.36, 8, MARBLE2, {rings: 1});
+  B.custom(0.5, 0.5, (g, P, k) => { frustum(g, P, k, 0.5, 0.5, 8, 0.28, 0.2, 66, c && c.broken ? MARBLED : MARBLE);
+    g.strokeStyle = c ? '#9AA05A' : IVY; g.lineWidth = 1.4 * k; const a = P(0.5, 0.5, 10); g.beginPath(); for(let i = 0; i <= 24; i++){ const f2 = i / 24, x = a[0] + Math.sin(f2 * 10) * (8 - f2 * 3) * k, y = a[1] - f2 * 64 * k; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
+    g.fillStyle = c ? '#9AA05A' : IVY; for(let i = 1; i < 8; i++){ const f2 = i / 8; g.beginPath(); D.ell(g, a[0] + Math.sin(f2 * 10) * (8 - f2 * 3) * k + 2 * k, a[1] - f2 * 64 * k, 2 * k, 1.2 * k, 0.5); g.fill(); }
+    const w0 = P(0.5, 0.74, 44); g.fillStyle = GOLD; g.beginPath(); D.ell(g, w0[0], w0[1], 3 * k, 6 * k); g.fill(); g.fillStyle = lightOf(c) ? '#CFEFFF' : '#4A4A58'; g.beginPath(); D.ell(g, w0[0], w0[1], 2 * k, 4.6 * k); g.fill(); }, {layer: 1, zb: 8, top: 74});
+  B.drum(0.5, 0.5, 74, 0.46, 5, MARBLE2, {rings: 0});
+  B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 77), rx = 0.46 * HTW * k * S2, col = c && c.broken ? '#8A8090' : teamOf(L); g.strokeStyle = col; g.lineWidth = 3.4 * k; g.beginPath(); g.ellipse(q[0], q[1], rx, rx / 2, 0, 0, Math.PI); g.stroke();
+    if(c && c.broken) return; g.strokeStyle = GOLD; g.lineWidth = 1.3 * k; for(let i = 0; i <= 8; i++){ const a = i / 8 * Math.PI, x = q[0] + Math.cos(a) * rx * 0.96, y = q[1] - 3 * k + Math.sin(a) * rx * 0.48; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 3 * k, y - 6 * k, x, y - 11 * k); g.stroke(); }
+    g.beginPath(); g.ellipse(q[0], q[1] - 14 * k, rx * 0.96, rx * 0.48, 0, 0, Math.PI); g.stroke(); }, {layer: 3, zb: 74, top: 94});
+  [[0.3, 0.3], [0.7, 0.3], [0.3, 0.7], [0.7, 0.7]].forEach(([x, y]) => B.box(x - 0.02, y - 0.02, 79, 0.04, 0.04, 20, GOLDD));
+  B.cone(0.5, 0.5, 99, 0.4, c && c.broken ? 10 : 28, ROOFB);
+  B.custom(0.5, 0.5, (g, P, k) => { if(c && c.broken) return; const q = P(0.5, 0.5, 127); g.fillStyle = GOLD; g.beginPath(); D.star(g, q[0], q[1] - 3 * k, 4 * k, 1.8 * k, 4); g.fill(); }, {layer: 3, zb: 125, top: 134});
+  pennant(B, L, 0.5, 0.5, 106, 18, {emblem: hornEm, pole: GOLDD, layer: 4});
+});
+/* ============================ 🎨 WARDROBE — Silk Loom (a gold-and-wood loom weaving rainbow silk that flows to the ground, spools + a dress form) ============================ */
+MY('wardrobe', {name: 'Silk Loom', h: 82, live: {period: 2.4, frames: 6}}, (B, v, L) => { const c = L.cond;
+  B.flat(0.06, 0.06, 1.88, 0.88, '#EAE4DA');
+  [[0.3, 0.3], [1.2, 0.3], [0.3, 0.7], [1.2, 0.7]].forEach(([x, y]) => B.box(x, y, 0, 0.06, 0.06, 48, WOOD)); B.box(0.28, 0.28, 46, 1.0, 0.08, 4, GOLD); B.box(0.28, 0.68, 46, 1.0, 0.08, 4, GOLD); B.box(0.28, 0.68, 14, 1.0, 0.08, 4, WOOD);
+  B.custom(0.78, 0.5, (g, P, k, t) => { const br = c && c.broken, sw = c && c.still ? 0 : Math.sin(ph(t, 2.4)), cw = c && c.still ? 0 : Math.cos(ph(t, 2.4)), cols = RAIN.concat([teamOf(L)]);
+    cols.forEach((col, i) => { const x = 0.36 + i * 0.13, a = P(x, 0.32, 48), b2 = P(x, 0.7, 18), e = P(x + 0.18 + i * 0.03, 0.96, 0.5); if(br && i % 2) return;
+      g.strokeStyle = br ? '#B8B0A8' : col; g.lineWidth = 3.2 * k; g.lineCap = 'round'; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b2[0], b2[1]); g.quadraticCurveTo(b2[0] + (6 + sw * 3) * k, b2[1] + (8 + cw * 2) * k, e[0] + sw * 2 * k, e[1]); g.stroke(); });
+    if(!br){ g.fillStyle = 'rgba(255,255,255,0.35)'; const a = P(0.36, 0.5, 34), b2 = P(1.18, 0.5, 34); polyP(g, [a, b2, [b2[0], b2[1] - 10 * k], [a[0], a[1] - 10 * k]]); g.fill(); } }, {layer: 2, zb: 0, top: 50});
+  B.custom(1.6, 0.4, (g, P, k) => { const q = P(1.62, 0.42, 0), br = c && c.broken; g.strokeStyle = WOODD; g.lineWidth = 1.6 * k; line(g, q, [q[0], q[1] - 22 * k]); g.fillStyle = br ? '#B8B0A8' : LILAC; g.beginPath(); g.moveTo(q[0] - 7 * k, q[1] - 22 * k); g.quadraticCurveTo(q[0] - 9 * k, q[1] - 38 * k, q[0], q[1] - 40 * k); g.quadraticCurveTo(q[0] + 9 * k, q[1] - 38 * k, q[0] + 7 * k, q[1] - 22 * k); g.quadraticCurveTo(q[0], q[1] - 18 * k, q[0] - 7 * k, q[1] - 22 * k); g.fill();
+    if(!br){ g.fillStyle = GOLD; g.beginPath(); g.arc(q[0], q[1] - 30 * k, 1.6 * k, 0, TAU); g.fill(); } }, {layer: 3, zb: 0, top: 44});
+  B.custom(1.7, 0.74, (g, P, k) => { const q = P(1.62, 0.78, 0); [ROSE, SKY, '#FFE66D'].forEach((col, i) => { g.fillStyle = WOOD; g.fillRect(q[0] - 2 * k + i * 6 * k, q[1] - 9 * k, 4 * k, 9 * k); g.fillStyle = c && c.broken ? '#B8B0A8' : col; g.beginPath(); D.rr(g, q[0] - 2.6 * k + i * 6 * k, q[1] - 7.4 * k, 5.2 * k, 6 * k, 1.4 * k); g.fill(); }); }, {layer: 3, zb: 0, top: 10});
+  pennant(B, L, 0.24, 0.24, 0, 54, {emblem: hornEm, pole: GOLDD});
+});
+/* ============================ 🔮 SPELL — Star Observatory (a round marble tower under a deep-blue star dome with a gold telescope, twinkling stars) ============================ */
+MY('spell', {name: 'Star Observatory', h: 112, live: {period: 2.4, frames: 6}}, (B, v, L) => { const c = L.cond;
+  B.flat(0.06, 0.06, 1.88, 1.88, '#EAE4DA');
+  B.drum(1, 0.95, 0, 0.78, 44, MARBLE, {rings: 0});
+  B.custom(1, 0.95, (g, P, k) => { const q = P(1, 0.95, 0), rx = 0.78 * HTW * k * S2; const d = P(1, 0.95 + 0.78, 0); g.fillStyle = GOLD; g.beginPath(); g.moveTo(d[0] - 8 * k, d[1] - 2 * k); g.lineTo(d[0] - 8 * k, d[1] - 22 * k); g.quadraticCurveTo(d[0], d[1] - 32 * k, d[0] + 8 * k, d[1] - 22 * k); g.lineTo(d[0] + 8 * k, d[1] - 2 * k); g.closePath(); g.fill();
+    g.fillStyle = LILACD; g.beginPath(); g.moveTo(d[0] - 6 * k, d[1] - 2 * k); g.lineTo(d[0] - 6 * k, d[1] - 21 * k); g.quadraticCurveTo(d[0], d[1] - 29 * k, d[0] + 6 * k, d[1] - 21 * k); g.lineTo(d[0] + 6 * k, d[1] - 2 * k); g.closePath(); g.fill();
+    [-0.6, 0.6].forEach(u => { const w0 = [q[0] + u * rx, q[1] + Math.sqrt(1 - u * u) * rx / 2 - 28 * k]; g.fillStyle = GOLD; g.beginPath(); D.ell(g, w0[0], w0[1], 3 * k, 6 * k); g.fill(); g.fillStyle = lightOf(c) ? '#CFEFFF' : '#4A4A58'; g.beginPath(); D.ell(g, w0[0], w0[1], 2 * k, 4.6 * k); g.fill(); });
+    const col = c && c.broken ? '#8A8090' : teamOf(L), r2 = P(1, 0.95, 38); g.fillStyle = col; g.beginPath(); g.ellipse(r2[0], r2[1], rx, rx / 2, 0, 0, Math.PI); g.lineTo(r2[0] - rx, r2[1] - 6 * k); g.ellipse(r2[0], r2[1] - 6 * k, rx, rx / 2, 0, Math.PI, 0, true); g.closePath(); g.fill();
+    if(!(c && c.broken)) K.AR.patPaint(g, (s, vv) => { const u = -1 + s / (rx * 2 / k) * 2; return [r2[0] + u * rx, r2[1] + Math.sqrt(Math.max(0, 1 - u * u)) * rx / 2 - vv * k]; }, rx * 2 / k, 6, patOf(L), inkOf(col), k); }, {layer: 1, zb: 0, top: 46});
+  B.custom(1, 0.95, (g, P, k, t) => { const br = c && c.broken, dm = dome(g, P, k, 1, 0.95, 44, 0.8, br ? 18 : 40, '#2E3A7A', {hi: '#5A6AC8'});
+    if(!br){ const q = dm.c; [[-0.5, -0.4], [0.2, -0.7], [0.55, -0.3], [-0.1, -0.2], [-0.3, -0.75], [0.4, -0.55]].forEach(([fx, fy], i) => { const s = 1 + 0.5 * Math.sin(ph(t, 2.4) + i * 1.3) + 0.25 * Math.cos(ph(t, 2.4) + i); g.fillStyle = '#FFF6C8'; g.beginPath(); D.star(g, q[0] + fx * dm.rx, q[1] + fy * dm.hh, Math.max(0.5, 1.8 * s * k), Math.max(0.3, 0.7 * s * k), 4); g.fill(); });
+      g.save(); g.translate(q[0] + dm.rx * 0.28, q[1] - dm.hh * 0.62); g.rotate(-0.7); g.fillStyle = GOLD; g.beginPath(); D.rr(g, -3 * k, -3.4 * k, 30 * k, 6.8 * k, 2 * k); g.fill(); g.fillStyle = GOLDD; g.fillRect(24 * k, -4.2 * k, 4 * k, 8.4 * k); g.fillStyle = '#2E3A7A'; g.beginPath(); D.ell(g, 28 * k, 0, 1.6 * k, 3.4 * k); g.fill(); g.restore(); } }, {layer: 2, zb: 44, top: 108, fx: false});
+  B.custom(1, 0.95, (g, P, k, t) => { const q = P(1, 0.95, 98); twinkle(g, q[0], q[1], k, t, c, 4, 26, '#FFF6C8'); }, {layer: 4, zb: 80, top: 110, fx: true});
+  pennant(B, L, 1.84, 0.2, 0, 56, {emblem: hornEm, pole: GOLDD});
+  B.custom(1.7, 1.7, (g, P, k) => { const q = P(1.7, 1.72, 0); [[0, 0, LILAC], [6, 2, SKY]].forEach(([dx, dy, col]) => flower(g, q[0] + dx * k, q[1] + dy * k - 2 * k, 2.8 * k, col, c)); }, {layer: 3, zb: 0, top: 6});
+});
+/* ============================ 🕵️ HIDEOUT — Mist Grotto (a mossy rock with a dark cave arch, glowing crystals inside, mist rolling out) ============================ */
+MY('hideout', {name: 'Mist Grotto', h: 70, live: {period: 2.4, frames: 6}}, (B, v, L) => { const c = L.cond;
+  B.custom(1, 1, (g, P, k) => { const q = P(1, 0.9, 0), rx = 1.05 * HTW * k * S2, ry = rx / 2; g.fillStyle = c && c.broken ? '#8A8480' : '#A8A0A4'; g.beginPath(); g.moveTo(q[0] - rx, q[1]); g.quadraticCurveTo(q[0] - rx * 0.9, q[1] - 40 * k, q[0] - rx * 0.3, q[1] - 52 * k); g.quadraticCurveTo(q[0] + rx * 0.4, q[1] - 58 * k, q[0] + rx * 0.8, q[1] - 34 * k); g.quadraticCurveTo(q[0] + rx, q[1] - 14 * k, q[0] + rx, q[1]); g.ellipse(q[0], q[1], rx, ry, 0, 0, Math.PI); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.16)'; g.beginPath(); D.ell(g, q[0] - rx * 0.3, q[1] - 42 * k, rx * 0.25, 6 * k); g.fill(); g.fillStyle = 'rgba(40,30,50,0.18)'; g.beginPath(); D.ell(g, q[0] + rx * 0.55, q[1] - 14 * k, rx * 0.35, 12 * k); g.fill();
+    g.fillStyle = c ? '#9AA05A' : IVY; [[-0.6, -30, 10], [0.2, -50, 9], [0.7, -26, 7], [-0.85, -8, 6], [0.5, -40, 6]].forEach(([fx, dy, r]) => { g.beginPath(); D.ell(g, q[0] + fx * rx, q[1] + dy * k, r * k, r * 0.5 * k); g.fill(); }); }, {layer: 0, zb: 0, top: 58});
+  B.custom(1, 1.7, (g, P, k, t, T2) => { if(!vis(T2, 0, 1)) return; const a = P(0.62, 1.62, 0), b2 = P(1.38, 1.62, 0), tp = P(1.0, 1.62, 30); g.fillStyle = '#2A2440'; g.beginPath(); g.moveTo(a[0], a[1]); g.quadraticCurveTo(a[0] - 2 * k, tp[1], tp[0], tp[1]); g.quadraticCurveTo(b2[0] + 2 * k, tp[1], b2[0], b2[1]); g.closePath(); g.fill();
+    const m = P(1.0, 1.62, 6); [[-6, 0, SKY, 5], [3, -2, LILAC, 7], [8, 1, MINT, 4]].forEach(([dx, dy, col, h]) => crystal(g, m[0] + dx * k, m[1] + dy * k, 2.4 * k, h * k, c, {n: 3, cols: [col, '#FFFFFF', col]}));
+    if(lightOf(c)) D.glow(g, m[0], m[1] - 4 * k, 14 * k, '#B8E8FF', 0.4 * lightOf(c));
+    const col = c && c.broken ? '#8A8090' : teamOf(L), mq = [P(0.66, 1.72, 0.4), P(1.34, 1.72, 0.4), P(1.34, 1.9, 0.4), P(0.66, 1.9, 0.4)]; polyP(g, mq); g.fillStyle = col; g.fill();
+    if(!(c && c.broken)){ g.save(); polyP(g, mq); g.clip(); K.AR.patPaint(g, (s, vv) => P(0.66 + s / 22, 1.9 - vv / 22, 0.4), 15, 4, patOf(L), inkOf(col), k); g.restore(); } }, {layer: 2, zb: 0, top: 34});
+  B.custom(1, 1.8, (g, P, k, t) => { const q = P(1, 1.84, 4); mist(g, q[0], q[1], k, t, c, 30); }, {layer: 4, zb: 0, top: 20, fx: true});
+  pennant(B, L, 1.7, 0.4, 24, 24, {emblem: hornEm, pole: GOLDD});
+  B.custom(0.36, 1.62, (g, P, k) => { const q = P(0.36, 1.66, 0); [[0, 0, ROSE], [5, 2, '#FFE66D']].forEach(([dx, dy, col]) => flower(g, q[0] + dx * k, q[1] + dy * k - 2 * k, 2.6 * k, col, c)); }, {layer: 3, zb: 0, top: 6});
+});
+/* ============================ 🐾 DEN — Fairy-ring Glade (a ring of spotted mushrooms round a tiny mushroom cottage on a flower bed, sparkles) ============================ */
+MY('den', {name: 'Fairy-ring Glade', h: 80, live: {period: 2.4, frames: 6}}, (B, v, L) => { const c = L.cond;
+  B.flat(0.06, 0.06, 1.88, 1.88, '#CFE6B8');
+  B.custom(1, 1, (g, P, k) => { const q = P(1, 1, 0.5), rx = 0.62 * HTW * k * S2; g.fillStyle = c ? '#A8B890' : '#9CD87A'; g.beginPath(); D.ell(g, q[0], q[1], rx, rx / 2); g.fill();
+    for(let i = 0; i < 14; i++){ const a = i / 14 * TAU; flower(g, q[0] + Math.cos(a) * rx * 0.55, q[1] + Math.sin(a) * rx * 0.27, 2.4 * k, [ROSE, '#FFE66D', LILAC, SKY][i % 4], c); } }, {layer: -7, zb: 0, top: 1});
+  B.custom(1, 0.9, (g, P, k) => { const q = P(1, 0.9, 0), br = c && c.broken; g.fillStyle = '#F4EAD8'; g.beginPath(); D.rr(g, q[0] - 8 * k, q[1] - 20 * k, 16 * k, 20 * k, 4 * k); g.fill();   // 🍄 the tiny cottage: a cream stem house under a red cap
+    g.fillStyle = '#8A5A34'; g.beginPath(); g.moveTo(q[0] - 3 * k, q[1]); g.lineTo(q[0] - 3 * k, q[1] - 8 * k); g.quadraticCurveTo(q[0], q[1] - 12 * k, q[0] + 3 * k, q[1] - 8 * k); g.lineTo(q[0] + 3 * k, q[1]); g.fill();
+    g.fillStyle = lightOf(c) ? '#FFE58A' : '#5A5060'; g.beginPath(); g.arc(q[0] + 5 * k, q[1] - 13 * k, 2 * k, 0, TAU); g.fill();
+    const capH = br ? 10 : 20; g.fillStyle = br ? '#A88080' : '#E5484D'; g.beginPath(); g.moveTo(q[0] - 18 * k, q[1] - 18 * k); g.quadraticCurveTo(q[0] - 16 * k, q[1] - (18 + capH * 1.4) * k, q[0], q[1] - (18 + capH * 1.5) * k); g.quadraticCurveTo(q[0] + 16 * k, q[1] - (18 + capH * 1.4) * k, q[0] + 18 * k, q[1] - 18 * k); g.quadraticCurveTo(q[0], q[1] - 13 * k, q[0] - 18 * k, q[1] - 18 * k); g.fill();
+    g.fillStyle = '#FFFFFF'; [[-10, -24], [-2, -32], [8, -26], [12, -20]].forEach(([dx, dy]) => { if(br && dy < -28) return; g.beginPath(); D.ell(g, q[0] + dx * k, q[1] + dy * k, 2.4 * k, 1.8 * k); g.fill(); });
+    const col = br ? '#8A8090' : teamOf(L); g.strokeStyle = col; g.lineWidth = 2.4 * k; g.beginPath(); g.moveTo(q[0] - 17 * k, q[1] - 18.5 * k); g.quadraticCurveTo(q[0], q[1] - 13.5 * k, q[0] + 17 * k, q[1] - 18.5 * k); g.stroke(); }, {layer: 2, zb: 0, top: 50});
+  B.custom(1, 1, (g, P, k) => { const ring = 10; for(let i = 0; i < ring; i++){ const a = i / ring * TAU, x = 1 + Math.cos(a) * 0.78, y = 1 + Math.sin(a) * 0.78; if(y < 0.6 && Math.abs(x - 1) < 0.4) continue; const q = P(x, y, 0), s = 0.8 + (i % 3) * 0.2, br = c && c.broken;
+    g.fillStyle = '#F4EAD8'; g.fillRect(q[0] - 1.4 * s * k, q[1] - 7 * s * k, 2.8 * s * k, 7 * s * k); g.fillStyle = br ? '#B8A8A0' : (i % 2 ? '#E5484D' : LILAC); g.beginPath(); g.ellipse(q[0], q[1] - 7 * s * k, 5 * s * k, 4 * s * k, 0, Math.PI, TAU); g.fill(); g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(q[0] - 1.6 * s * k, q[1] - 9 * s * k, 0.9 * s * k, 0, TAU); g.fill(); } }, {layer: 3, zb: 0, top: 12});
+  B.custom(1, 0.9, (g, P, k, t) => { const q = P(1, 0.9, 44); twinkle(g, q[0], q[1], k, t, c, 5, 22, '#FFF6C8'); }, {layer: 4, zb: 30, top: 66, fx: true});
+  pennant(B, L, 1.78, 0.24, 0, 52, {emblem: hornEm, pole: GOLDD});
+});
+/* ---------- 🟩 territory floor: white marble tiles with soft grey-lilac veins + flower rings + a gold star inlay now and then ---------- */
+addFloor('myth', {name: 'Marble tiles + flower rings', top: '#F2EEE6', top2: '#ECE6DA', side: '#C9C0B0', paint: (g, q, s, i, j) => { const r = hash(i, j, 8), r2 = hash(j, i, 9);
+  tileBase(g, q, s, '#F2EEE6', '#EDE7DC', r);
+  [[0.04, 0.04, 0.5, 0.5], [0.5, 0.04, 0.96, 0.5], [0.04, 0.5, 0.5, 0.96], [0.5, 0.5, 0.96, 0.96]].forEach(([u0, v0, u1, v1], n) => { polyP(g, [q(u0, v0), q(u1, v0), q(u1, v1), q(u0, v1)]); g.fillStyle = (n + i + j) % 2 ? '#F6F2EC' : '#EAE4F2'; g.fill(); g.strokeStyle = 'rgba(160,150,180,0.35)'; g.lineWidth = 0.7 * s; g.stroke(); });
+  g.strokeStyle = 'rgba(150,140,170,0.32)'; g.lineWidth = 0.8 * s; g.beginPath(); const a = q(0.1 + r * 0.3, 0.2), b = q(0.4 + r2 * 0.2, 0.55), cc = q(0.7 + r * 0.2, 0.8); g.moveTo(a[0], a[1]); g.quadraticCurveTo(b[0], b[1], cc[0], cc[1]); g.stroke();
+  if(r2 > 0.62){ const p = q(0.5, 0.5); for(let n = 0; n < 7; n++){ const an = n / 7 * TAU; flower(g, p[0] + Math.cos(an) * 9 * s, p[1] + Math.sin(an) * 4.5 * s, 1.7 * s, [ROSE, '#FFE66D', LILAC, SKY][(n + i) % 4], null); } }
+  if(r < 0.1){ const p = q(0.5, 0.5); g.fillStyle = 'rgba(242,183,49,0.85)'; g.beginPath(); D.star(g, p[0], p[1], 5 * s, 2.2 * s, 4, 0); g.fill(); }
+  if(r > 0.9){ const p = q(0.28, 0.72); g.fillStyle = IVY; g.beginPath(); D.ell(g, p[0], p[1], 3 * s, 1.3 * s, 0.6); g.fill(); g.beginPath(); D.ell(g, p[0] + 3 * s, p[1] - 1 * s, 2.6 * s, 1.1 * s, -0.4); g.fill(); } }});
+/* ---------- ✨🏛️🐉 own resource shapes (1 × 1, states full · half · empty) — Props.AR.resKey('myth', 'coin' | 'brick' | 'gem') ---------- */
+// ✨ Fairy Gold: a black pot heaped with gold coins, a little rainbow arching into it (half = a few coins · empty = the pot on its side + one coin)
+function potPaint(g, x, y, k, t, v, L, c){ const st = L.state || 'full', br = c && c.broken, gold = br ? '#B8A880' : c ? '#D8B860' : GOLD; g.save(); g.translate(x, y); g.scale(k * (v % 3 === 1 ? -1 : 1), k);
+  g.fillStyle = 'rgba(40,24,30,0.22)'; g.beginPath(); D.ell(g, 0, 1, 16, 5); g.fill();
+  if(st === 'empty'){ g.save(); g.rotate(-1.2); g.fillStyle = '#2A2A34'; g.beginPath(); D.ell(g, 0, -8, 10, 9); g.fill(); g.fillStyle = '#14141C'; g.beginPath(); D.ell(g, -8, -8, 3, 7.4); g.fill(); g.restore(); g.fillStyle = gold; g.beginPath(); D.ell(g, 10, -1, 3, 1.6); g.fill(); g.restore(); return; }
+  if(!br && st === 'full'){ RAIN.forEach((col, i) => { g.strokeStyle = col; g.lineWidth = 1.6; g.beginPath(); g.arc(-14, -14, 16 - i * 1.6, -Math.PI * 0.5, 0.15); g.stroke(); }); }
+  g.fillStyle = D.rad(g, -4, -12, 1, 14, [[0, '#4A4A58'], [1, '#1E1E28']]); g.beginPath(); g.moveTo(-11, -14); g.quadraticCurveTo(-14, 0, 0, 0); g.quadraticCurveTo(14, 0, 11, -14); g.closePath(); g.fill(); g.fillStyle = '#2A2A34'; g.beginPath(); D.ell(g, 0, -14, 12, 3.6); g.fill();
+  const coins = st === 'full' ? [[-6, -17], [-1, -19], [5, -17], [-3, -22], [3, -22], [0, -26], [8, -15], [-9, -15]] : [[-4, -15], [3, -15], [0, -17]];
+  coins.forEach(([cx, cy]) => { g.fillStyle = D.sh(gold, -0.2); g.beginPath(); D.ell(g, cx, cy + 0.6, 3.2, 1.8); g.fill(); g.fillStyle = gold; g.beginPath(); D.ell(g, cx, cy, 3.2, 1.8); g.fill(); g.strokeStyle = 'rgba(140,90,20,0.5)'; g.lineWidth = 0.6; g.beginPath(); D.ell(g, cx, cy, 2, 1.1); g.stroke(); });
+  if(!br) { g.fillStyle = 'rgba(255,255,255,0.95)'; g.beginPath(); D.star(g, 9, -24, 2.4, 0.9, 4); g.fill(); if(!(c && c.still)){ const s = 1 + 0.4 * Math.sin(ph(t, 2.4)) + 0.2 * Math.cos(ph(t, 2.4)); g.beginPath(); D.star(g, -7, -28, 2 * s, 0.7 * s, 4); g.fill(); } }
+  g.restore(); }
+// 🏛️ Marble Blocks: veined white blocks stacked + a column drum lying in front (half = 2 blocks · empty = rubble + a chisel)
+function marblePaint(g, x, y, k, t, v, L, c){ const st = L.state || 'full', br = c && c.broken, col = br ? '#C8C0B4' : c ? '#E8E0D0' : MARBLE; g.save(); g.translate(x, y); g.scale(k * (v % 3 === 1 ? -1 : 1), k);
+  g.fillStyle = 'rgba(40,24,30,0.2)'; g.beginPath(); D.ell(g, 0, 1, 17, 6); g.fill();
+  const blk = (bx, by, w, h) => { g.fillStyle = D.sh(col, -0.14); g.beginPath(); g.moveTo(bx, by); g.lineTo(bx + w, by - w * 0.3); g.lineTo(bx + w, by - w * 0.3 - h); g.lineTo(bx, by - h); g.closePath(); g.fill(); g.fillStyle = D.sh(col, 0.02); g.beginPath(); g.moveTo(bx, by); g.lineTo(bx - w * 0.8, by - w * 0.4); g.lineTo(bx - w * 0.8, by - w * 0.4 - h); g.lineTo(bx, by - h); g.closePath(); g.fill();
+    g.fillStyle = '#FFFFFF'; g.beginPath(); g.moveTo(bx, by - h); g.lineTo(bx + w, by - w * 0.3 - h); g.lineTo(bx + w * 0.2, by - w * 0.7 - h); g.lineTo(bx - w * 0.8, by - w * 0.4 - h); g.closePath(); g.fill(); g.strokeStyle = VEIN; g.lineWidth = 0.7; g.beginPath(); g.moveTo(bx - w * 0.6, by - h * 0.3); g.lineTo(bx - w * 0.2, by - h * 0.7); g.lineTo(bx + w * 0.6, by - h * 0.5); g.stroke(); };
+  if(st === 'empty'){ [[-6, 0], [4, 2], [9, -2]].forEach(([dx, dy], i) => { g.fillStyle = D.sh(col, -0.08 * i); g.beginPath(); g.moveTo(dx - 3, dy); g.lineTo(dx, dy - 4); g.lineTo(dx + 3, dy - 1); g.lineTo(dx + 1, dy + 1); g.closePath(); g.fill(); }); g.strokeStyle = '#8A8A94'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(-12, -2); g.lineTo(-4, -8); g.stroke(); g.restore(); return; }
+  blk(-2, 0, 11, 9); blk(9, -3, 8, 8); if(st === 'full'){ blk(4, -12, 9, 8); }
+  if(st === 'full'){ g.fillStyle = D.sh(col, -0.08); g.beginPath(); D.rr(g, -16, -5, 9, 7, 3); g.fill(); g.fillStyle = '#FFFFFF'; g.beginPath(); D.ell(g, -16, -1.5, 2.4, 3.5); g.fill(); g.strokeStyle = VEIN; g.lineWidth = 0.6; [-1, 1].forEach(d => line(g, [-15, -1.5 + d * 1.6], [-8, -1.5 + d * 1.6])); g.fillStyle = br ? '#A89A80' : GOLD; g.fillRect(-14, -5, 1.2, 7); }
+  g.restore(); }
+// 🐉 Dragon Pearls: a gold dragon-claw stand holding a big glowing pearl, little pearls on a lotus leaf (half = smaller pearl, 2 little · empty = the claw holds nothing)
+function pearlPaint(g, x, y, k, t, v, L, c){ const st = L.state || 'full', br = c && c.broken, gold = br ? '#A89A80' : GOLD, pearl = br ? '#C8C0C8' : c ? '#E8DCE8' : ['#FFF6FA', '#F6EEFF', '#FFF2E8'][v % 3]; g.save(); g.translate(x, y); g.scale(k, k);
+  g.fillStyle = c ? '#9AB08A' : '#7CC88A'; g.beginPath(); D.ell(g, 0, -1, 16, 6); g.fill(); g.strokeStyle = 'rgba(40,90,50,0.45)'; g.lineWidth = 0.7; for(let i = 0; i < 6; i++){ const a = i / 6 * Math.PI + 0.2; line(g, [0, -1], [Math.cos(a) * 15, -1 + Math.sin(a) * 5.6]); }
+  g.fillStyle = D.sh(gold, -0.2); g.beginPath(); D.rr(g, -3, -14, 6, 13, 2); g.fill(); const R = st === 'full' ? 8.5 : st === 'half' ? 6 : 0, cy = -18 - R * 0.3;
+  g.strokeStyle = gold; g.lineWidth = 2; g.lineCap = 'round'; [-1, 1].forEach(sd => { g.beginPath(); g.moveTo(sd * 2, -13); g.quadraticCurveTo(sd * 8, -16 - (R ? R * 0.6 : 2), sd * (R ? R * 0.7 : 3), cy - (R ? R * 0.9 : 4)); g.stroke(); });
+  if(R){ g.fillStyle = D.rad(g, -R * 0.35, cy - R * 0.4, 0.5, R * 1.1, [[0, '#FFFFFF'], [0.55, pearl], [1, '#B890D0']]); g.beginPath(); g.arc(0, cy, R, 0, TAU); g.fill(); g.strokeStyle = 'rgba(140,100,170,0.6)'; g.lineWidth = 0.8; g.stroke(); }
+  g.strokeStyle = gold; g.lineWidth = 2; g.lineCap = 'round'; [-1, 1].forEach(sd => { g.beginPath(); g.moveTo(sd * R * 0.75, cy + R * 0.2); g.quadraticCurveTo(sd * R * 0.2, cy + R * 0.9, 0, cy + R * 0.95); g.stroke(); });
+  const small = st === 'full' ? [[-10, -3], [9, -2], [-6, 1]] : st === 'half' ? [[-10, -3], [9, -2]] : [];
+  small.forEach(([px, py]) => { g.fillStyle = D.rad(g, px - 0.8, py - 1, 0.3, 3, [[0, '#FFFFFF'], [1, '#D8C0E0']]); g.beginPath(); g.arc(px, py - 1.6, 2.2, 0, TAU); g.fill(); });
+  if(!br && R && !(c && c.still)){ const s = 1 + 0.4 * Math.sin(ph(t, 2.4)) + 0.2 * Math.cos(ph(t, 2.4)); g.fillStyle = 'rgba(255,255,255,0.95)'; g.beginPath(); D.star(g, R * 0.9, cy - R, 2.2 * s, 0.8 * s, 4); g.fill(); }
+  g.restore(); }
+const RES = (slot, name, h, tag, paint, live) => organic('myth', 'myth_' + slot, Object.assign({name, look: 'myth', side: 'myth', slot, kind: 'thing', foot: [1, 1], h, variants: 3, block: true, states: ['full', 'half', 'empty'], state: 'full', dead: 'keep',
+  tags: ['ar', 'ar-res', 'resource', tag, 'ar-myth'], conds: {'*': (g, x, y, k, t, v, c, L) => paint(g, x, y, k, t, v, L, c)}}, live ? {live, liveStates: ['full', 'half']} : {}), (g, x, y, k, t, v, L) => paint(g, x, y, k, t, v, L, null));
+RES('coin', 'Pot of fairy gold', 36, 'coin', potPaint, {period: 2.4, frames: 6}); RES('brick', 'Marble blocks', 32, 'brick', marblePaint); RES('gem', 'Dragon pearls', 34, 'gem', pearlPaint, {period: 2.4, frames: 6});
+/* ---------- 🧱 walls: 🏛️ a marble balustrade (a veined base, little round balusters, a gold-capped rail) · posts = slim columns with a crystal on top ·
+   gate = two crystal columns under a RAINBOW arch over lilac doors · 🏯 tall = a marble rampart + round towers with blue cone roofs + a gatehouse with a golden horn ---------- */
+(function(){ const {wallProp, gateProp, gateDoors, longFaces, WP, tallWallProp, tallGateProp} = K.AR;
+  const skin = {name: 'Marble balustrade', gateName: 'Rainbow gate', h: 46, gateH: 94,
+    seg(B, L, r, c, v){ const [x, y, w, d, ax] = r, H = 10, br = c && c.broken, b = marble(B, x, y, 0, w, d, H, MARBLE2, 13 + Math.round((x + y) * 10));
+      trim(B, L, b, 3, 2.6, longFaces(ax));
+      const len = ax === 'x' ? w : d, n = Math.max(1, Math.round(len / 0.14));
+      B.custom(x + w / 2, y + d / 2, (g, P, k) => { for(let i = 0; i < n; i++){ if(br && i % 3 === 1) continue; const f = (i + 0.5) / n, px = ax === 'x' ? x + w * f : x + w / 2, py = ax === 'x' ? y + d / 2 : y + d * f, a = P(px, py, H), b2 = P(px, py, H + 12);
+        g.fillStyle = MARBLE; g.beginPath(); g.moveTo(a[0] - 2 * k, a[1]); g.quadraticCurveTo(a[0] - 3.4 * k, (a[1] + b2[1]) / 2, b2[0] - 1.4 * k, b2[1]); g.lineTo(b2[0] + 1.4 * k, b2[1]); g.quadraticCurveTo(a[0] + 3.4 * k, (a[1] + b2[1]) / 2, a[0] + 2 * k, a[1]); g.closePath(); g.fill(); g.strokeStyle = 'rgba(120,110,130,0.35)'; g.lineWidth = 0.7 * k; g.stroke(); } }, {layer: 1, zb: H, top: H + 12});
+      if(!br){ const rl = B.box(x - (ax === 'x' ? 0 : 0.02), y - (ax === 'x' ? 0.02 : 0), H + 12, w + (ax === 'x' ? 0 : 0.04), d + (ax === 'x' ? 0.04 : 0), 3.4, MARBLE); B.box(rl.x, rl.y, H + 15.4, rl.w, rl.d, 1.2, GOLD); }
+      if(!br && (Math.round((x + y) * 10) % 3 === 0)) B.custom(x + w / 2, y + d / 2, (g, P, k) => { const q = P(x + w * 0.5, y + d * 0.5 + (ax === 'x' ? d / 2 : 0), H + 2); flower(g, q[0], q[1], 2.6 * k, ROSE, c); flower(g, q[0] + 5 * k, q[1] + 1 * k, 2.2 * k, '#FFE66D', c); g.fillStyle = IVY; g.beginPath(); D.ell(g, q[0] - 4 * k, q[1] + 2 * k, 2.6 * k, 1.2 * k, 0.4); g.fill(); }, {layer: 3, zb: H, top: H + 6}); },
+    post(B, L, kind, c){ const br = c && c.broken; B.drum(0.5, 0.5, 0, 0.2, 4, MARBLE2); B.drum(0.5, 0.5, 4, 0.14, br ? 12 : 26, MARBLE, {rings: 0}); B.drum(0.5, 0.5, br ? 16 : 30, 0.19, 3, br ? MARBLED : GOLD);
+      B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 4), rx = 0.14 * HTW * k * S2, col = br ? '#8A8090' : teamOf(L); g.fillStyle = col; g.beginPath(); g.ellipse(q[0], q[1] - 6 * k, rx, rx / 2, 0, 0, Math.PI); g.lineTo(q[0] - rx, q[1] - 11 * k); g.ellipse(q[0], q[1] - 11 * k, rx, rx / 2, 0, Math.PI, 0, true); g.closePath(); g.fill(); }, {layer: 1, zb: 4, top: 16});
+      if(!br) B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, 33); crystal(g, q[0], q[1], 3.6 * k, 6 * k, c, {n: 3, cols: kind === 'end' || kind === 'solo' ? [SKY, '#FFFFFF', LILAC] : [LILAC, '#FFFFFF', ROSE]}); }, {layer: 3, zb: 33, top: 46}); },
+    gate(B, L, open, c, v){ const t = 0.18, H = 50, br = c && c.broken;
+      [[0.02, 0.24], [0.74, 0.24]].forEach(([x0, w]) => { const pb = marble(B, x0, 0.5 - t, 0, w, 2 * t, H, MARBLE, 61 + x0 * 10); trim(B, L, pb, 38, 3); B.box(x0 - 0.02, 0.5 - t - 0.02, H, w + 0.04, 2 * t + 0.04, 3, GOLD);
+        if(!br) B.custom(x0 + w / 2, 0.5, (g, P, k) => { const q = P(x0 + w / 2, 0.5, H + 3); crystal(g, q[0], q[1], 4.4 * k, 9 * k, c, {n: 3, cols: [SKY, '#FFFFFF', LILAC]}); }, {layer: 3, zb: H + 3, top: H + 18}); });
+      gateDoors(B, open, c, 34, LILACD, GOLD, {paint: (g, Q, k) => { g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 0.9 * k; for(let u = 0.25; u < 1; u += 0.25) line(g, Q(u, 1), Q(u, 33)); g.fillStyle = GOLD; const q = Q(0.5, 22); g.beginPath(); D.star(g, q[0], q[1], 3 * k, 1.2 * k, 4); g.fill(); }});
+      B.custom(0.5, 0.5, (g, P, k) => { const n = br ? 3 : 6; for(let i = 0; i < n; i++){ const a0 = P(0.18, 0.5, 40), a1 = P(0.82, 0.5, 40), top = P(0.5, 0.5, 74 - i * 3.2); g.strokeStyle = br ? D.sh(RAIN[i], -0.45) : RAIN[i]; g.lineWidth = 3.2 * k; g.beginPath();
+        const off = i * 2.6 * k; if(br){ g.moveTo(a0[0] + off * 0.6, a0[1]); g.quadraticCurveTo(a0[0] + off * 0.6, top[1] - 8 * k + off, (a0[0] + top[0]) / 2, top[1] - 2 * k + off); }
+        else { g.moveTo(a0[0] + off * 0.6, a0[1]); g.bezierCurveTo(a0[0] + off * 0.6, top[1] - 8 * k + off, a1[0] - off * 0.6, top[1] - 8 * k + off, a1[0] - off * 0.6, a1[1]); } g.stroke(); } }, {layer: 2, zb: 40, top: 80});
+      if(!br) [[0.14], [0.86]].forEach(([x]) => pennant(B, L, x, 0.5, 68, 16, {w: 11, hh: 7, emblem: hornEm, pole: GOLDD})); } };
+  wallProp('myth', 'myth', skin); gateProp('myth', 'myth', skin);
+  const tall = {name: 'Marble rampart', gateName: 'Horn gatehouse', base: 30, h: 120, gateH: 126,
+    rampart(B, L, r, c, hb){ const [x, y, w, d, ax] = r, e = 0.08, b = ax === 'x' ? B.box(x, y - e, 0, w, d + 2 * e, hb, MARBLE2) : B.box(x - e, y, 0, w + 2 * e, d, hb, MARBLE2);
+      ['front', 'right', 'left', 'back'].forEach(s => B.decal(b, s, ...F(b, s), 0, hb, MARBLE2, {paint: blocks(hb, MARBLE2, 31 + Math.round((x + y) * 10), 10)})); },
+    tower(B, L, c, cx, cy, hb, kind, hw){ const br = c && c.broken, H = hb + (kind === 'gate' ? 30 : 38); B.drum(cx, cy, 0, hw * 1.05, br ? H - 14 : H, MARBLE, {rings: 0});
+      B.custom(cx, cy, (g, P, k) => { const rx = hw * 1.05 * HTW * k * S2, b0 = P(cx, cy, (br ? H - 14 : H) - 7), col = br ? '#8A8090' : teamOf(L); g.fillStyle = col; g.beginPath(); g.ellipse(b0[0], b0[1], rx, rx / 2, 0, 0, Math.PI); g.lineTo(b0[0] - rx, b0[1] - 5 * k); g.ellipse(b0[0], b0[1] - 5 * k, rx, rx / 2, 0, Math.PI, 0, true); g.closePath(); g.fill();
+        const w0 = P(cx, cy + hw * 1.05, hb + 8); g.fillStyle = GOLD; g.beginPath(); D.ell(g, w0[0], w0[1], 2.2 * k, 4.4 * k); g.fill(); g.fillStyle = lightOf(c) ? '#CFEFFF' : '#4A4A58'; g.beginPath(); D.ell(g, w0[0], w0[1], 1.4 * k, 3.2 * k); g.fill(); }, {layer: 2, zb: hb, top: H});
+      if(br) return; B.drum(cx, cy, H, hw * 1.2, 3, GOLD); B.cone(cx, cy, H + 3, hw * 1.25, kind === 'gate' ? 22 : 28, ROOFB);
+      pennant(B, L, cx, cy, H + (kind === 'gate' ? 24 : 30), kind === 'gate' ? 10 : 14, {w: 11, hh: 7, emblem: hornEm, pole: GOLDD}); },
+    gatehouse(B, L, open, c, hb){ const br = c && c.broken, z0 = 44, t = 0.18;
+      gateDoors(B, open, c, 40, LILACD, GOLD, {paint: (g, Q, k) => { g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 0.9 * k; for(let z = 4; z < 38; z += 5) line(g, Q(0.08, z), Q(0.92, z)); }});
+      const b = marble(B, 0.26, 0.5 - t, z0, 0.48, 2 * t, br ? 6 : 16, MARBLE, 91); if(br) return; trim(B, L, b, 8, 3, ['front', 'back']); B.box(0.24, 0.5 - t - 0.02, z0 + 16, 0.52, 2 * t + 0.04, 3, GOLD);
+      B.custom(0.5, 0.5, (g, P, k) => { const q = P(0.5, 0.5, z0 + 19); hornEm(g, q[0], q[1] - 12 * k, 11 * k, GOLD); g.fillStyle = 'rgba(255,255,255,0.5)'; g.beginPath(); g.moveTo(q[0] - 2 * k, q[1] - 6 * k); g.lineTo(q[0], q[1] - 22 * k); g.lineTo(q[0] + 0.6 * k, q[1] - 6 * k); g.closePath(); g.fill(); }, {layer: 3, zb: z0 + 19, top: z0 + 48}); } };
+  tallWallProp('myth', 'myth', skin, tall); tallGateProp('myth', 'myth', skin, tall);
+})();
+/* ---------- 🏺 ORIGIN RELIC (ip-4g, 🌳 IsoProps chat 2026-11-20, Aowu "go" on the 10 names) — 🦄 The Rainbow Horn:
+   a giant spiral unicorn horn (pearl-white, a gold star on its tip) standing on a lilac cloud-cushion with gold tassels, on a marble column-pedestal;
+   a RAINBOW CLIMBS ITS SPIRAL — the colour bands move up the twist every beat — while little stars orbit it. 2 × 2 landmark, states home · taken
+   (the cushion keeps a dent where the horn stood + its outline + a twinkle). Props.AR.ORIGIN.myth.icon(g, x, y, k, lit) = the carried / dropped / HUD form. ---------- */
+(function(){ const dead = c => !!(c && c.broken), still = c => !!(c && c.still), dim = (c, col, f) => c ? (c.broken ? D.sh(col, -0.42) : D.sh(col, f == null ? -0.18 : f)) : col,
+    tw = (t, i) => 0.55 + 0.3 * Math.sin(ph(t, 2.4) + i * 1.7) + 0.15 * Math.cos(ph(t, 2.4) + i * 0.9);
+  // 🦄 the horn: x, y = its base middle, Hh tall, W wide at the base. o.shift = rainbow climb (0..6, any real) · o.rain = false → plain pearl
+  function hornArt(g, x, y, s, c, o){ o = o || {}; const Hh = 88 * s, W = 11 * s, pe = dim(c, PEARL), pd = dim(c, '#D8C8E0'), shift = o.shift || 0, br = dead(c), N = 7;
+    const mid = f => x + 7 * s * f * f, half = f => W * (1 - f) * (1 - f * 0.1) * (1 + 0.12 * Math.sin(f * N * Math.PI * 2));   // a gentle curve + the twisted ridges on its edge
+    const edge = (f, sd) => [mid(f) + sd * half(f), y - f * Hh];
+    const outline = () => { g.beginPath(); for(let i = 0; i <= 40; i++){ const p = edge(i / 40, -1); i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); } for(let i = 40; i >= 0; i--){ const p = edge(i / 40, 1); g.lineTo(p[0], p[1]); } g.closePath(); };
+    outline(); g.fillStyle = D.lin(g, x - W, 0, x + W, 0, [[0, '#FFFFFF'], [0.45, pe], [1, pd]]); g.fill();
+    g.save(); outline(); g.clip();
+    for(let i = -1; i <= N; i++){ const f0 = (i + (shift % 1)) / N, col = RAIN[((i - Math.floor(shift)) % 6 + 6) % 6], bw = 0.55 / N;   // the spiral bands (curved like a twist) — the rainbow climbs
+      const pa = f => { const ff = Math.max(0, Math.min(1, f)); return [mid(ff) - half(ff) * 1.3, y - ff * Hh + 5 * s * (1 - ff)]; }, pb = f => { const ff = Math.max(0, Math.min(1, f)); return [mid(ff) + half(ff) * 1.3, y - ff * Hh - 5 * s * (1 - ff)]; };
+      const a0 = pa(f0), b0 = pb(f0 + 0.35 / N), a1 = pa(f0 + bw), b1 = pb(f0 + bw + 0.35 / N);
+      g.fillStyle = br || o.rain === false ? 'rgba(160,150,170,0.25)' : D.rgba(c ? D.sh(col, -0.2) : col, 0.66); g.beginPath(); g.moveTo(a0[0], a0[1]); g.quadraticCurveTo((a0[0] + b0[0]) / 2, (a0[1] + b0[1]) / 2 + 3 * s * (1 - f0), b0[0], b0[1]); g.lineTo(b1[0], b1[1]); g.quadraticCurveTo((a1[0] + b1[0]) / 2, (a1[1] + b1[1]) / 2 + 3 * s * (1 - f0), a1[0], a1[1]); g.closePath(); g.fill();
+      g.strokeStyle = 'rgba(140,110,170,0.4)'; g.lineWidth = 0.9 * s; g.beginPath(); g.moveTo(a0[0], a0[1]); g.quadraticCurveTo((a0[0] + b0[0]) / 2, (a0[1] + b0[1]) / 2 + 3 * s * (1 - f0), b0[0], b0[1]); g.stroke(); }
+    g.fillStyle = 'rgba(255,255,255,0.6)'; g.beginPath(); g.moveTo(x - W * 0.5, y); g.lineTo(x - W * 0.15, y); g.lineTo(mid(0.9) - 1 * s, y - Hh * 0.9); g.closePath(); g.fill(); g.restore();
+    if(!br){ const tx = mid(1), ty = y - Hh - 4 * s; g.fillStyle = dim(c, GOLD); g.beginPath(); D.star(g, tx, ty, 6.4 * s, 2.8 * s, 5); g.fill(); g.fillStyle = 'rgba(255,255,255,0.8)'; g.beginPath(); g.arc(tx - 1.4 * s, ty - 1.6 * s, 1.2 * s, 0, TAU); g.fill(); } }
+  // the cloud-cushion it stands on (puffy lilac, gold tassels at the 4 corners); dent = true → the empty dent of a taken horn
+  function cushion(g, x, y, s, c, dent){ const li = dim(c, LILAC), ld = D.sh(li, -0.2);
+    g.fillStyle = ld; g.beginPath(); D.ell(g, x, y + 3 * s, 26 * s, 11 * s); g.fill(); g.fillStyle = D.rad(g, x - 6 * s, y - 4 * s, 2 * s, 28 * s, [[0, D.sh(li, 0.3)], [0.7, li], [1, ld]]); g.beginPath(); D.ell(g, x, y, 26 * s, 11 * s); g.fill();
+    g.strokeStyle = 'rgba(110,80,160,0.35)'; g.lineWidth = 1 * s; g.beginPath(); g.moveTo(x - 20 * s, y - 2 * s); g.quadraticCurveTo(x, y + 4 * s, x + 20 * s, y - 2 * s); g.stroke();
+    if(dent){ g.fillStyle = 'rgba(90,60,140,0.35)'; g.beginPath(); D.ell(g, x, y - 1 * s, 10 * s, 4.4 * s); g.fill(); }
+    if(!dead(c)) [[-26, 0], [26, 0], [-14, 9], [14, 9]].forEach(([dx, dy]) => { g.fillStyle = dim(c, GOLD); g.beginPath(); g.arc(x + dx * s, y + dy * s, 2 * s, 0, TAU); g.fill(); g.beginPath(); g.moveTo(x + dx * s - 1.6 * s, y + dy * s + 1 * s); g.lineTo(x + dx * s + 1.6 * s, y + dy * s + 1 * s); g.lineTo(x + dx * s + 1 * s, y + dy * s + 6 * s); g.lineTo(x + dx * s - 1 * s, y + dy * s + 6 * s); g.closePath(); g.fill(); }); }
+  const def = add('myth', 'myth_relic', {name: 'The Rainbow Horn', look: 'myth', side: 'myth', slot: 'origin', kind: 'landmark', foot: [2, 2], door: null, h: 146, variants: 1, block: true,
+    states: ['home', 'taken'], state: 'home', tags: ['ar', 'ar-origin', 'ar-myth', 'relic', 'origin'], live: {period: 2.4, frames: 6},
+    diffs: [{by: 'state', a: 'home', b: 'taken', level: 'bold', name: 'the Rainbow Horn carried off (a dent in the cushion)'}]});
+  def.build = (B, v, L) => { const c = L.cond, br = dead(c), home = (L.state || 'home') === 'home' && !br, H = br ? 10 : 28; K.AR.kerb(B, L, 2, 2);
+    B.flat(0.06, 0.06, 1.88, 1.88, MARBLE2);
+    const b = marble(B, 0.36, 0.36, 0, 1.28, 1.28, 6, MARBLE2, 17); trim(B, L, b, 1, 3); column(B, 1, 1, 6, 0.42, H - 6, c);   // 🏛️ a marble step + a gold-capped column
+    if(!br) B.custom(1, 1, (g, P, k) => { const q = P(1, 1, H); cushion(g, q[0], q[1] - 6 * k, k, c, !home); }, {layer: 3, zb: H, top: H + 14});
+    if(home){ halo(B, 1, 1, H + 50, 50, '#F4D8FF', 0.3, {pulse: t => still(c) ? 1 : 0.9 + Math.sin(ph(t, 2.4)) * 0.07 + Math.cos(ph(t, 2.4)) * 0.03});
+      B.custom(1, 1, (g, P, k, t) => { const q = P(1, 1, H), th = ph(t, 2.4), bob = still(c) ? 0 : Math.sin(th) * 1.4 + Math.cos(th) * 0.5;   // 🌈 the rainbow climbs the spiral (one band a beat)
+        hornArt(g, q[0], q[1] - 10 * k - bob * k, k * 1.1, c, {shift: still(c) ? 0 : th / TAU * 6}); }, {layer: 6, zb: H, top: 138});
+      B.custom(1, 1, (g, P, k, t) => { if(still(c)) return; const q = P(1, 1, H), th = ph(t, 2.4);
+        for(let i = 0; i < 5; i++){ const a = th + i / 5 * TAU, y = q[1] - (24 + i * 12) * k, rx = (20 - i * 2) * k, x = q[0] + Math.cos(a) * rx, front = Math.sin(a) > 0; g.fillStyle = front ? 'rgba(255,255,255,0.98)' : 'rgba(255,230,250,0.6)'; g.beginPath(); D.star(g, x, y + Math.sin(a) * 4 * k, (front ? 2.8 : 1.8) * k, 1 * k, 4); g.fill(); }   // stars orbit it
+        D.glow(g, q[0] + 8 * k, q[1] - 112 * k, 12 * k, '#FFE680', 0.5 + 0.2 * Math.cos(th)); }, {layer: 7, zb: H, top: 138, fx: true});
+    } else if(!br) B.custom(1, 1, (g, P, k, t) => { const q = P(1, 1, H), s = k * 1.12, x = q[0], y = q[1] - 10 * k; g.strokeStyle = 'rgba(255,255,255,0.95)'; g.lineWidth = 1.6 * k; g.setLineDash([3 * k, 2.4 * k]);   // taken: the horn's outline + a twinkle
+      g.beginPath(); g.moveTo(x - 11 * s, y); g.quadraticCurveTo(x + 1 * s, y - 50 * s, x + 7 * s, y - 88 * s); g.quadraticCurveTo(x + 6 * s, y - 40 * s, x + 11 * s, y); g.stroke(); g.setLineDash([]); g.fillStyle = 'rgba(255,230,255,0.95)'; g.beginPath(); D.star(g, x + 2 * k, y - 40 * s, (2.6 + tw(t, 1)) * k, 1 * k, 4); g.fill(); }, {layer: 6, zb: H, top: H + 100});
+    [[0.2, 1.8], [1.8, 0.2]].forEach(([x, y]) => pennant(B, L, x, y, 0, 46, {emblem: hornEm, pole: GOLDD})); };
+  const AR = Props.AR; AR.ORIGIN = AR.ORIGIN || {}; AR.ORIGIN.myth = {key: 'myth_relic', name: 'The Rainbow Horn', icon: (g, x, y, k, lit) => { g.save(); g.translate(x, y); g.rotate(0.5); hornArt(g, 0, 20 * k, k * 0.5, lit === false ? {} : null, {shift: 1, rain: lit !== false}); g.restore(); }};
+})();
+/* 🏺 end ip-4g relic */
+})();
+K.loaded('myth', 'ip-7a');
+})(window.Props && window.Props._K);
