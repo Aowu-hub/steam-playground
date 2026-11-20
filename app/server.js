@@ -259,7 +259,7 @@ function doGet(e) {
     isotest: 'IsoTest',   // 🧱 IsoKit test page (iso-1, hidden — not in the Gameroom): diamond map, 40 walkers, minimap, speed meter — keep on its own line
     isoprops: 'IsoPropsLab',   // 🌳 IsoProps lab (ip-1, hidden — not in the Gameroom): the shared 2.5D props catalogue on a real map — keep on its own line
     avateer: 'Avateer',   // 🧳 Avateer (av-r0b: hidden 🧪 speed test ?page=avateer&proto=1 — no Games-tab row until R1) — keep on its own line
-    avatarealm: 'AvataRealm',   // 🏰⚔️ AvataRealm (ar-r0b: hidden 🧪 speed test ?page=avatarealm&proto=1 — no Games-tab row until R1) — keep on its own line
+    avatarealm: 'AvataRealm',   // 🏰⚔️ AvataRealm (ar-r0b speed page ?page=avatarealm&proto=1 · ar-r1c-b: a real Gameroom game now) — keep on its own line
     creatures: 'CreatureLab',   // 🐾 CreatureKit lab (av-r0c, hidden — not in the Gameroom): every creature, size ladder, battle zoom, map frames, pets — keep on its own line
     loot: 'LootLab',   // 🎁 LootKit lab (av-r0d3, hidden — not in the Gameroom): rarities, rolls + shows, bag, sticker book — keep on its own line
     wear: 'WearLab',   // 👕 AvatarWear lab (av-wear2, hidden — not in the Gameroom): every worn look on your avatar, island tiers, Sky God, Prime forms, my look, lying drops — keep on its own line
@@ -493,6 +493,31 @@ function saveMusic(name, on, v, at, fx, acc) {   // 🗣️ an-4: + acc = readin
   if (acc != null) rec.acc = /^en-(US|GB|AU)$/.test(String(acc)) ? String(acc) : ''; else if (old && old.acc != null) rec.acc = old.acc;   // 🗣️ an-4
   saveSetting('Music_' + name, JSON.stringify(rec));
   return { ok: true };
+}
+
+// 🏰⚔️ AvataRealm (ar-r1c-b): a player's setup picks + 🎖️ formation = Settings `AvaRealm_<Name>` (player-based, follows them to every
+// device). Checked here (only known keys, numbers clamped) and the NEWEST `at` wins, so a late answer or an offline replay never
+// overwrites a newer choice (✨ wd-1 save pattern). The page also keeps a copy on the device and reads whichever is newer.
+const AVAREALM_ROLES_ = ['foot', 'spear', 'hero', 'healer', 'saint', 'tamer', 'archer', 'mage', 'siege', 'rider', 'flyer', 'spy'];
+function cleanAvaRealm_(p) {
+  p = p && typeof p === 'object' ? p : {};
+  const n = (v, lo, hi, d) => { v = Math.floor(Number(v)); return isNaN(v) ? d : Math.max(lo, Math.min(hi, v)); };
+  const one = (v, list, d) => list.indexOf(v) >= 0 ? v : d;
+  const form = {};
+  AVAREALM_ROLES_.forEach(r => { const L = Number((p.form || {})[r]); if (L >= 1 && L <= 5) form[r] = Math.floor(L); });
+  return { mode: one(p.mode, ['skirmish'], 'skirmish'), size: one(p.size, ['lvl', 'S', 'M', 'L'], 'lvl'), lv: n(p.lv, 0, 5, 0),
+    side: one(p.side, ['raptor', 'bolt'], 'raptor'), bots: n(p.bots, 1, 5, 1), speed: n(p.speed, 0, 2, 1), zoom: one(p.zoom, ['near', 'far'], 'near'),
+    form: form, slot: n(p.slot, 1, 3, 1), at: Number(p.at) > 0 ? Number(p.at) : Date.now() };
+}
+function saveAvaRealm(name, json) {
+  name = String(name || '').slice(0, 40);
+  try { checkPlayer_(name); } catch (e) { return { ok: false }; }
+  let p = null; try { p = typeof json === 'string' ? JSON.parse(String(json).slice(0, 4000)) : json; } catch (e) { return { ok: false }; }
+  const rec = cleanAvaRealm_(p), key = 'AvaRealm_' + name;
+  let old = null; try { old = JSON.parse(getSettings()[key] || 'null'); } catch (e) {}
+  if (old && Number(old.at) > rec.at) return { ok: true, kept: 'newer', pick: old };
+  saveSetting(key, JSON.stringify(rec));
+  return { ok: true, pick: rec };
 }
 
 function saveFavorites(name, ids, stamp) {
@@ -736,7 +761,7 @@ function modesData_(players) {
 /* ============ 📣 DASHBOARD NEWS ============ */
 // New games (first 14 days), 🌋 Extreme / 💀 Hardcore family records set in the last 7 days, games nobody has tried yet,
 // 🏁 milestones, ⚔️ close calls / 🚦 jams at the top, 📬 mail waiting and 🎂 birthdays (Settings Birthday_<Name> = 'MM-DD').
-const NEW_GAMES_ = [['sciencetory', '2026-11-14', 'A science lab for the things you made!'], ['pokadif', '2026-11-14', 'Poke the difference — be a little detective!'], ['blasoff', '2026-11-14', 'Soccer with your avatar — blast it in!'], ['pyraspike', '2026-11-14', 'Drive · Dink · Dunk — volleyball with a flame!'], ['tdstories', '2026-11-14', 'Story books: defend the tower!'], ['artifactory', '2026-11-08', 'Make it yourself — real tools, real lessons!'], ['georead', '2026-11-08', 'Hear the letters, bump them into words!'], ['geoscout', '2026-11-08', 'Numbers you can touch!'], ['beat-piano', '2026-11-08', '🎹 Piano + 🥁 Drums + 🎸 Band — new ways to play!'], ['wisdeck', '2026-11-08', 'Learn, quiz, collect!'], ['eyes-brain', '2026-11-07', 'Remember the number!'], ['polyplot', '2026-11-07', 'Close shapes, catch creatures!'], ['soul-bopper', '2026-11-07', 'Bomber maze + ghosts!'], ['snakeast', '2026-11-07', 'Ride your snake!'], ['alignext', '2026-11-07', 'Line them up!'], ['brawl-buddies', '2026-11-07', 'Cartoon bonk battle!'], ['pose-party', '2026-11-07', 'Strike a pose!'], ['sla-brall', '2026-11-06', '5 racket sports!'], ['beat-corner', '2026-11-04', 'Hit the beat!'], ['sweet-swap', '2026-11-03', 'Swap to match 3'], ['word-board', '2026-11-03', 'Crossword words'], ['number-board', '2026-11-03', 'Crossword math']];
+const NEW_GAMES_ = [['avatarealm', '2026-11-20', 'Build a town, train Minivatars, win!'], ['sciencetory', '2026-11-14', 'A science lab for the things you made!'], ['pokadif', '2026-11-14', 'Poke the difference — be a little detective!'], ['blasoff', '2026-11-14', 'Soccer with your avatar — blast it in!'], ['pyraspike', '2026-11-14', 'Drive · Dink · Dunk — volleyball with a flame!'], ['tdstories', '2026-11-14', 'Story books: defend the tower!'], ['artifactory', '2026-11-08', 'Make it yourself — real tools, real lessons!'], ['georead', '2026-11-08', 'Hear the letters, bump them into words!'], ['geoscout', '2026-11-08', 'Numbers you can touch!'], ['beat-piano', '2026-11-08', '🎹 Piano + 🥁 Drums + 🎸 Band — new ways to play!'], ['wisdeck', '2026-11-08', 'Learn, quiz, collect!'], ['eyes-brain', '2026-11-07', 'Remember the number!'], ['polyplot', '2026-11-07', 'Close shapes, catch creatures!'], ['soul-bopper', '2026-11-07', 'Bomber maze + ghosts!'], ['snakeast', '2026-11-07', 'Ride your snake!'], ['alignext', '2026-11-07', 'Line them up!'], ['brawl-buddies', '2026-11-07', 'Cartoon bonk battle!'], ['pose-party', '2026-11-07', 'Strike a pose!'], ['sla-brall', '2026-11-06', '5 racket sports!'], ['beat-corner', '2026-11-04', 'Hit the beat!'], ['sweet-swap', '2026-11-03', 'Swap to match 3'], ['word-board', '2026-11-03', 'Crossword words'], ['number-board', '2026-11-03', 'Crossword math']];
 const NEWS_ALIAS_ = { 'beat-piano': { id: 'beat-corner', name: 'BeatCorner 🎹 Piano + 🥁 Drums', icon: '🎹', route: 'beatcorner&game=piano' } };   // news ids that are a new way to play inside an existing game (plan 11-bc)
 function gameNewOrder_() { const seen = {}, out = []; NEW_GAMES_.forEach(x => { if (NEWS_ALIAS_[x[0]] || seen[x[0]]) return; seen[x[0]] = 1; out.push(x[0]); }); return out; }   // 🆕 gro-1: Gameroom newest first
 function safeNews_(players) { try { return newsFor_(players, new Date()); } catch (e) { return []; } }
@@ -1430,7 +1455,7 @@ function recordsFor_(gameId, players) {
 }
 
 // Games shown on the Achievements records board.
-const RECORD_GAMES = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'brawenture', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'beat-piano', 'beat-drums', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'td-farmer', 'pyraspike', 'pokadif', 'sciencetory', 'pokadif-arcade', 'pokadif-case'];
+const RECORD_GAMES = ['avatarealm', 'maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'brawenture', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'beat-piano', 'beat-drums', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'td-farmer', 'pyraspike', 'pokadif', 'sciencetory', 'pokadif-arcade', 'pokadif-case'];
 // Per level: the fastest finish and the top score among active players.
 function gameRecords_(gameId, players) {
   const names = {};
@@ -1762,7 +1787,7 @@ function featBadges_(f) {
   return out;
 }
 function titleContext_(name, players) {
-  const cleared = {}, bigGames = ['maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'td-farmer', 'pyraspike', 'pokadif', 'sciencetory', 'pokadif-arcade', 'pokadif-case'];
+  const cleared = {}, bigGames = ['avatarealm', 'maze', 'stacking-sim', 'robot-adventure', 'checkers', 'chess', 'pinball', 'hopper', 'turbo', 'memory', 'math-quest', 'number-grid', 'pop-blocks', 'block-drop', 'double-up', 'number-board', 'word-board', 'sweet-swap', 'beat-corner', 'sla-brall', 'blasoff', 'pose-party', 'brawl-buddies', 'alignext', 'omnifile', 'snakeast', 'snakigate', 'snakastle', 'soul-bopper', 'polyplot', 'eyes-brain', 'wisdeck', 'wiscount', 'wisjack', 'geoscout', 'georead', 'artifactory', 'td-draprincess', 'td-farmer', 'pyraspike', 'pokadif', 'sciencetory', 'pokadif-arcade', 'pokadif-case'];
   let allRound = true;
   bigGames.forEach(g => {
     const p = g === 'maze' ? mazeProgressFor_(name) : levelProgressFor_(name, g);
@@ -3302,7 +3327,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d+gl-r24+av-r0e3+ip-4a+bo-10b+ar-r0b+b3b4+s1+s2a+s2b+s2c+ar-7+ip-4b+av-r0i+s3+mo-3+ip-4c+an-2+an-4+b4a+s4a+lk-pp1+av-wear2+ip-4d+b6a+s-brawl+lk-wd1+b6b) END OF Code.gs
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d+gl-r24+av-r0e3+ip-4a+bo-10b+ar-r0b+b3b4+s1+s2a+s2b+s2c+ar-7+ip-4b+av-r0i+s3+mo-3+ip-4c+an-2+an-4+b4a+s4a+lk-pp1+av-wear2+ip-4d+b6a+s-brawl+lk-wd1+b6b+ar-r1c-b) END OF Code.gs
 
 ;
 /* ===== GameData.gs ===== */
@@ -3327,6 +3352,7 @@ function saveSkillTree(name, game, json) {
 //           (+ always the ModesTried_<Name> ledger, written by the game the first time the mode starts — markModeTried).
 //   added = 'yyyy-mm-dd' when the mode came out → a 🆕 Dashboard card for 7 days.
 const MODES_ = [
+  { game: 'avatarealm', id: 'skirmish', icon: '⚔️', name: 'AvataRealm Skirmish', pitch: 'Build a town, train Minivatars, win!', route: 'avatarealm', added: '2026-11-20', tried: { board: 'avatarealm' } },   // 🏰⚔️ ar-r1c-b
   { game: 'tdstories', id: 'draprincess', icon: '🐉', name: 'Dra-Princess Diary', pitch: 'A dragon + princess vs every suitor!', route: 'tdstories', added: '2026-11-14', tried: { board: 'td-draprincess' } },
   { game: 'tdstories', id: 'farmer', icon: '👨‍🌾', name: 'Farmer Delusion', pitch: 'Plant a maze so long the bank gives up', route: 'tdstories', added: '2026-11-17', tried: { board: 'td-farmer' } },   // 👨‍🌾 fd-1b
   { game: 'artifactory', id: 'whittle', icon: '🔪', name: 'Artifactory Whittling', pitch: 'Carve a spoon — always away from you', route: 'artifactory', added: '2026-11-09', tried: { feat: [['artifactory', 'whittle']] } },
@@ -3590,6 +3616,8 @@ const BUILT_IN_GAMES = [
     Status: 'Live', PageRoute: 'soulbopper', Icon: '👻', Description: 'Bomber maze with your avatar — plant, pop in a + shape, grab power-ups and come back as a ghost. ⚔️ Battle, 💩 Classic Avatar, 🏳️ Hold the land and 🗺️ Stage, 1–4 players + bots' },
   { GameID: 'workshop', GameName: 'Furniture Workshop', SkillLevel: 'build · decorate · vote', STEAMFocus: 'Design / Making',
     Status: 'Live', PageRoute: 'workshop', Icon: '🔨', Description: 'Build your own beds, chairs, lamps and more — use them in My Room, give them, and win the Design Show' },
+  { GameID: 'avatarealm', GameName: 'AvataRealm', SkillLevel: 'beginner · intermediate · advanced', STEAMFocus: 'Strategy + Planning (economy, counters, formations, map reading)',
+    Status: 'Live', PageRoute: 'avatarealm', Icon: '🏰', Description: 'Avatar town battles on a floating island: 🪙 gather, 🏗️ build your town, 👥 train little Minivatars (🛡️ 🔱 🏹 🐴 … every role beats one and loses to another), group them into squads with 🎖️ formations and knock down the rival House. 🦖 Raptor Ridge or 🤖 Bolt Works vs 1–5 robot towns, 6 levels from guided 🌱 Basic to 💀 Hardcore.' },   // 🏰⚔️ ar-r1c-b
 ];
 
 /* ============ 📏 MAZE_LEVEL_NAMES (from Code.gs) ============ */
@@ -5028,9 +5056,10 @@ const DAILY_GOALS = [
   { id: 'snakepop', icon: '💥', how: 'Pop 2 snakes in Snakigate today', r: d => (d.room.snakePop || 0) >= 2 },
   { id: 'alignext', icon: '🔴', how: 'Win an Alignext game (Drop or Omnifile) today', r: d => d.rows.some(r => (r.game === 'alignext' || r.game === 'omnifile') && r.stars > 0) },
   { id: 'poseparty', icon: '📷', how: 'Pass a Pose Party level today', r: d => d.rows.some(r => r.game === 'pose-party' && r.stars > 0) },
+  { id: 'avarealm', icon: '🏰', how: 'Win an AvataRealm battle today', r: d => d.rows.some(r => r.game === 'avatarealm' && r.stars > 0) },   // 🏰⚔️ ar-r1c-b
 ];
 
-// (s1+ar-r1c) END OF GameData.gs
+// (s1+ar-r1c+ar-r1c-b) END OF GameData.gs
 
 ;
 /* ===== PosePartyCode.gs ===== */
@@ -6593,6 +6622,7 @@ return {"include": typeof include === 'function' ? include : undefined,
 "saveSetting": typeof saveSetting === 'function' ? saveSetting : undefined,
 "saveSettings": typeof saveSettings === 'function' ? saveSettings : undefined,
 "saveMusic": typeof saveMusic === 'function' ? saveMusic : undefined,
+"saveAvaRealm": typeof saveAvaRealm === 'function' ? saveAvaRealm : undefined,
 "saveFavorites": typeof saveFavorites === 'function' ? saveFavorites : undefined,
 "getScreenTimeMinutesForAge": typeof getScreenTimeMinutesForAge === 'function' ? getScreenTimeMinutesForAge : undefined,
 "verifyAdminPin": typeof verifyAdminPin === 'function' ? verifyAdminPin : undefined,
