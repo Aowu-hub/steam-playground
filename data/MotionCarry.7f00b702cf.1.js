@@ -1,0 +1,177 @@
+
+// ======================= 🗡️ MotionCarry (mo-13 on the 🧊 box turn, 🎬 Motion chat, 2026-11-20) — every weapon carries its OWN way, in 3D =======================
+// Rules: Motion rules §37 (carry · stances · Aowu 14:33 / 14:46 / 14:49) · §39 (wielding notes 15:21 · shoulder carry 15:38–15:50 · 3 layers 15:52) · §42 (this round, Aowu 17:46 "go").
+// BORN SPLIT: its own file MotionCarry.html, loads with AvatarKit after MotionWear. Needs MotionTurn ≥ mo-13 (Motion.turnHook · hold3.hide · P.hand3 · P.away).
+// Every carry is a TURNED pose: the weapon = a hold3 in 3D (chest frame: lat · y · fwd, R = −), so it turns with the body and lives in its hand's layer
+// (↘ in front · ↙ behind · ↗ over the back · ↖ behind). A put-away weapon sits in a 3D scabbard on the hips / back box and turns with THEM.
+//
+// ⭐ Motion.CARRY3[type]            — sheath (where it lives put away, 3D) + states relax · walk · run · ready (hold3 + a free hand) + a draw act + stances
+// ⭐ Motion.carry3(who, state, {view, dir, step, away}) → a turned pose for drawAvatar / Acting frames: {hipYaw, chestYaw, headYaw, hold3 | away, hand3, carry3, feet3, …}
+// ⭐ Motion.stance3(who, key, {view}) → the stance pose · Motion.STANCES3[type][key] = {lab, ref, yaw: [hips, chest, head] (° on top of the view), feet3, hold3, hand3, body}
+// ⭐ Motion.draw3(who, u, {view, sheathe}) → the draw (u 0…1 over Motion.CARRY3[type].draw.ms) — 5 beats: ready · reach · PULL (contact: ✨ glint) · flourish · settle;
+//      sheathe = the same beats backwards + a click · Motion.DRAW3_BEATS
+// The scabbards, the back strap, a dragged tip's sparks, the glint + the greatsword THUD are painted by ONE Motion.turnHook on the turned layers (nothing in AvatarKit).
+(function () {
+'use strict';
+const M = window.Motion; if (!M || !M.turnHook || M.CARRY3) return;
+const D = Math.PI / 180, cl = (v, a, b) => v < a ? a : v > b ? b : v, lerp = (a, b, q) => a + (b - a) * q, n3 = d => { const L = Math.hypot(d[0], d[1], d[2]) || 1; return [d[0] / L, d[1] / L, d[2] / L]; };
+const sio = u => { u = cl(u, 0, 1); return u * u * (3 - 2 * u); }, outC = u => 1 - Math.pow(1 - cl(u, 0, 1), 3), inC = u => Math.pow(cl(u, 0, 1), 3);
+const bo = u => { u = cl(u, 0, 1); const c = 1.7; return 1 + (c + 1) * Math.pow(u - 1, 3) + c * Math.pow(u - 1, 2); };   // overshoot
+const L3 = (a, b, q) => [lerp(a[0], b[0], q), lerp(a[1], b[1], q), lerp(a[2], b[2], q)];
+const WIDE = {R: [-6.5, -6], L: [6.5, 7]};   // a fighting stance: feet apart, the off (left) foot leads, knees give
+// ---------- 🗡️ the table: 3D, chest frame unless the sheath says 'hip' ----------
+const CARRY3 = {
+  sword: {sheath: {at: 'hip', mouth: [-8, -25, 3.5], into: n3([-0.12, 0.62, -0.78]), empty: n3([-0.1, 0.93, -0.35]), sheathIn: 7, sheathW: 9, col: '#7A4A2A'},   // empty = an empty scabbard hangs down from the belt (§38 ①: never two crossed sticks)
+    relax: {hold3: {g: [-11.5, -25, 2.5], d: [-0.14, 0.86, 0.49], hands: {R: 0}}},   // out-down at the side, the point a little forward (§37 front-facing ④)
+    walk:  {hold3: {g: [-11.5, -25, 2.5], d: [-0.14, 0.86, 0.49], hands: {R: 0}}, swing: 0.3},
+    run:   {hold3: {g: [-11, -28, -3], d: [-0.06, 0.25, -0.97], hands: {R: 0}}, lean: 0.06},
+    ready: {hold3: {g: [-6, -35, 10], d: [0.08, -0.42, 0.9], hands: {R: 0}}, hand3: {L: [16, -33, 6]}, feet3: WIDE, body: {dy: 2.2, bend: 0.04}, yaw: [-8, 6, -20]},
+    draw: {ms: 760}},
+  greatsword: {sheath: {at: 'back', mouth: [-10, -49, -8.5], into: n3([0.5, 0.86, 0]), sheathIn: 9, sheathW: 20, col: '#5B3A6B', strap: true}, two: true,
+    relax: {hold3: {g: [-12, -25, 2], d: [-0.05, 0.62, 0.78], hands: {R: 0}}},   // one hand, the point RESTS on the ground in front
+    walk:  {hold3: {hand: [-6, -40, 12], rest: [-9, -48, -1], hands: {R: 4}}},    // on the near shoulder (Aowu 15:38 refs)
+    run:   {hold3: {g: [-11, -25, -3], d: [-0.1, 0.56, -0.82], hands: {R: 0}}, drag: true, lean: 0.08},   // DRAGGED, the point scrapes
+    ready: {hold3: {g: [-2, -30, 9], d: [0, -0.62, 0.78], hands: {R: 0, L: 21}}, feet3: WIDE, body: {dy: 2.5, bend: 0.06, nod: 0.05}, yaw: [-10, 5, -25]},   // 🐂 Plow
+    draw: {ms: 1040}}};
+// layer 'shoulder' = a blade raised over / behind the head is painted UNDER the head (R4: the face stays readable) — MotionTurn's own shoulder layer
+// ---------- 🥋 stances in 3D (Aowu 14:49: "the stance gives away which weapon"; his two-handed sword sheet) — yaw = [hips, chest, head] on top of the view (head toward the camera = readable) ----------
+const ST3 = {
+  greatsword: {
+    fool: {lab: '🃏 Fool · Gedan', ref: 'low — point to the ground', yaw: [-12, -4, -22], hold3: {g: [-3, -27, 10], d: [0, 0.55, 0.83], hands: {R: 0, L: 20}}, feet3: WIDE, body: {dy: 2.4, bend: 0.07, nod: 0.09}},
+    plow: {lab: '🐂 Plow · Chūdan', ref: 'middle — READY', yaw: [-10, 5, -25], hold3: {g: [-2, -30, 9], d: [0, -0.62, 0.78], hands: {R: 0, L: 21}}, feet3: WIDE, body: {dy: 2.5, bend: 0.06, nod: 0.05}},
+    ox:   {lab: '🐃 Ox · Kasumi', ref: 'high — point forward', yaw: [-8, 14, -18], hold3: {g: [-10, -45, 5], d: [0.12, 0.2, 0.97], hands: {R: 0, L: 18}}, feet3: WIDE, body: {dy: 2.0, bend: 0.02, nod: -0.04}},
+    roof: {lab: '🏠 Roof · Jōdan', ref: 'overhead — the charge', yaw: [-6, 2, -22], hold3: {g: [-9, -55, 1], d: [-0.18, -0.8, -0.57], hands: {R: 0, L: 18}, layer: 'shoulder'}, feet3: WIDE, body: {dy: 1.8, nod: -0.06}},
+    side: {lab: '🌙 Side · Waki', ref: 'blade back + low — heavy wind-up', yaw: [-4, 18, -26], hold3: {g: [-9, -27, 1], d: [-0.1, 0.4, -0.91], hands: {R: 0, L: 18}}, feet3: WIDE, body: {dy: 2.8, bend: 0.09, nod: 0.05}}},
+  sword: {
+    fence:  {lab: '🤺 Point forward', ref: 'READY — off hand up behind', yaw: [-8, 6, -20], hold3: {g: [-6, -35, 10], d: [0.08, -0.42, 0.9], hands: {R: 0}}, hand3: {L: [16, -33, 6]}, feet3: WIDE, body: {dy: 2.2, bend: 0.04}},
+    knight: {lab: '🛡️ Shield up', ref: 'sword cocked high behind', yaw: [-12, -6, -22], hold3: {g: [-14, -50, -6], d: [0.12, -0.3, -0.95], hands: {R: 0}, layer: 'shoulder'}, hand3: {L: [5, -38, 11]}, feet3: WIDE, body: {dy: 2.0, bend: 0.03}},
+    low:    {lab: '🙇 Low guard', ref: 'one-hand Fool', yaw: [-10, 0, -20], hold3: {g: [-8, -25, 9], d: [0, 0.58, 0.81], hands: {R: 0}}, hand3: {L: [10, -33, 6]}, feet3: WIDE, body: {dy: 2.2, bend: 0.05, nod: 0.07}},
+    high:   {lab: '🏠 High guard', ref: 'one-hand Vom Tag', yaw: [-8, 4, -22], hold3: {g: [-14, -52, 2], d: [-0.32, -0.88, 0.34], hands: {R: 0}, layer: 'shoulder'}, hand3: {L: [10, -38, 8]}, feet3: WIDE, body: {dy: 1.8, nod: -0.05}},
+    hip:    {lab: '🔙 Hip guard', ref: 'one-hand Waki — blade back', yaw: [-4, 16, -24], hold3: {g: [-11, -27, 0], d: [-0.08, 0.38, -0.92], hands: {R: 0}}, hand3: {L: [9, -34, 9]}, feet3: WIDE, body: {dy: 2.6, bend: 0.08}}}};
+// ---------- helpers ----------
+const AWp = () => window.AvWeapons, heldOf = av => { const h = av && av.eq && av.eq.hand, AW = AWp(), I = h && h.id === 'weapon' && AW ? AW.info(h.v) : null; return I ? {v: h.v, o: h.o, I, C: CARRY3[I.type.id], id: I.type.id} : null; };
+const BOXW = new Map();
+function boxOf(v) {   // the drawn size of a look (blade tip above the grip · grip end below), at size 100 — every scabbard fits its own look
+  let b = BOXW.get(v); if (b) return b; const AW = AWp(), S = 360, c = document.createElement('canvas'); c.width = S; c.height = S; const q = c.getContext('2d', {willReadFrequently: true}); AW.draw(q, v, S / 2, S * 0.7, 100, {t: 0});
+  const px = q.getImageData(0, 0, S, S).data; let y0 = S, y1 = 0; for (let j = 0; j < S; j += 2) for (let i = 0; i < S; i += 2) if (px[(j * S + i) * 4 + 3] > 20) { if (j < y0) y0 = j; if (j > y1) y1 = j; }
+  b = {top: S * 0.7 - y0, bot: y1 - S * 0.7}; BOXW.set(v, b); return b;
+}
+const viewYaw = (view, dir) => { const T = M.turnView ? M.turnView(view || 'SE', 1) : {hipYaw: 45 * D, chestYaw: 45 * D, headYaw: 45 * D}; return T; };   // dir is applied by MotionTurn (dir −1 = the true turn the other way)
+const withYaw = (P, view, yaw) => { const T = viewYaw(view); yaw = yaw || [0, 0, 0]; const s = Math.cos(T.chestYaw) < 0 ? -1 : 1;   // back views: the head cheats toward the camera the other way round
+  P.hipYaw = T.hipYaw + yaw[0] * D; P.chestYaw = T.chestYaw + yaw[1] * D; P.headYaw = T.headYaw + yaw[2] * D * s; return P; };
+const copy3 = o => o ? JSON.parse(JSON.stringify(o)) : o;
+// a point in the HIP frame → the CHEST frame (the hand reaches a hip scabbard: they differ by hip − chest yaw)
+const hip2chest = (p, P) => { const a = (P.hipYaw || 0) - (P.chestYaw || 0), c = Math.cos(a), s = Math.sin(a); return [p[0] * c + p[2] * s, p[1], -p[0] * s + p[2] * c]; };
+// the grip spot of a sheathed weapon (where the hand takes it) — just out of the scabbard mouth, along the hilt
+function hiltAt(W, P) { const S = W.C.sheath, u = W.I.type.size / 100, b = boxOf(W.v), o = S.sheathIn * u + 0.35 * b.bot * u, p = [S.mouth[0] - S.into[0] * o, S.mouth[1] - S.into[1] * o, S.mouth[2] - S.into[2] * o]; return S.at === 'hip' ? hip2chest(p, P) : p; }
+
+// ⭐ carry3 — the turned pose of a state (+ the walk step) · away = put away (both hands free, the scabbard full)
+function carry3(who, state, o) {
+  o = o || {}; const W = heldOf(who && who.av); if (!W || !W.C) return null; const C = W.C, S = C[state] || C.relax, P = withYaw({}, o.view, S.yaw);
+  Object.assign(P, copy3(S.body) || {}); if (S.feet3) P.feet3 = copy3(S.feet3); if (S.lean) P.bend = (P.bend || 0) + S.lean;
+  if (o.away) { P.away = true; P.carry3 = {v: W.v, sheath: 'in', state}; return P; }
+  P.hold3 = copy3(S.hold3); if (S.hand3) P.hand3 = copy3(S.hand3);
+  const st = o.step || 0; if (S.swing && P.hold3.d) { const a = st * S.swing, d = P.hold3.d, c = Math.cos(a), s = Math.sin(a); P.hold3.d = [d[0], d[1] * c - d[2] * s, d[1] * s + d[2] * c]; P.hold3.g[2] += st * 2.2; }
+  P.carry3 = {v: W.v, sheath: 'empty', state, drag: !!S.drag, t: o.t || 0}; return P;
+}
+function stance3(who, key, o) {
+  o = o || {}; const W = heldOf(who && who.av); if (!W) return null; const S = (ST3[W.id] || {})[key]; if (!S) return null;
+  const P = withYaw(Object.assign({}, copy3(S.body)), o.view, S.yaw); P.feet3 = copy3(S.feet3); P.hold3 = copy3(S.hold3); if (S.hand3) P.hand3 = copy3(S.hand3);
+  P.carry3 = {v: W.v, sheath: 'empty', stance: key}; return P;
+}
+// ---------- 🗡️ the draw: 5 beats on the turned body ----------
+const DRAW3_BEATS = {sword: [['ready', 0, 0.1], ['reach', 0.1, 0.32], ['pull', 0.32, 0.5], ['flourish', 0.5, 0.78], ['settle', 0.78, 1]],
+  greatsword: [['ready', 0, 0.08], ['reach', 0.08, 0.3], ['pull', 0.3, 0.48], ['flourish', 0.48, 0.74], ['settle', 0.74, 1]]};
+function draw3(who, u, o) {
+  o = o || {}; const W = heldOf(who && who.av); if (!W || !W.C) return null; const C = W.C, id = W.id, B = DRAW3_BEATS[id]; if (!B) return null;
+  if (o.sheathe) u = 1 - u;   // sheathe = the draw backwards (the click comes at the mouth)
+  const sz = W.I.type.size / 100, b = boxOf(W.v), L = b.top * sz, S = C.sheath, rel = carry3(who, 'relax', {view: o.view, away: true}), rdy = carry3(who, 'ready', {view: o.view});
+  const ph = (n) => { const r = B.find(x => x[0] === n); return cl((u - r[1]) / (r[2] - r[1]), 0, 1); };
+  const P = withYaw({}, o.view, [0, 0, 0]), into = S.at === 'hip' ? hip2chest(S.into, P) : S.into.slice(), hilt = hiltAt(W, P), mouthC = S.at === 'hip' ? hip2chest(S.mouth, P) : S.mouth.slice();
+  const beat = B.find(x => u >= x[1] && u <= x[2])[0], out = {beat};
+  const yawK = (y0, y1, q) => [lerp(y0[0], y1[0], q), lerp(y0[1], y1[1], q), lerp(y0[2], y1[2], q)];
+  const ry = (C.ready.yaw || [0, 0, 0]);
+  if (beat === 'ready' || beat === 'reach') {
+    const q = beat === 'ready' ? 0 : outC(ph('reach')), body = {dy: 2.2 * q, bend: (id === 'sword' ? 0.06 : 0) * q, nod: (id === 'sword' ? 0.16 : -0.09) * q, shrugR: id === 'greatsword' ? 0.5 * q : 0};   // anticipation: knees give, eyes to the hilt
+    withYaw(Object.assign(out, body), o.view, yawK([0, 0, 0], id === 'sword' ? [-4, -12, -20] : [0, 8, 20], q)); out.away = true;
+    const H0 = [-11, -24, 2], hand = L3(H0, hilt, q); out.hand3 = {R: hand}; out.carry3 = {v: W.v, sheath: 'in'}; return Object.assign(out, {u});
+  }
+  if (beat === 'pull') {   // CONTACT at the end: the blade clears the mouth (✨ glint at the mouth)
+    const q = ph('pull'), p = (id === 'sword' ? 11 : 7) * inC(q), G = [hilt[0] - into[0] * p, hilt[1] - into[1] * p, hilt[2] - into[2] * p];
+    const hs0 = Math.hypot(hilt[0] - mouthC[0], hilt[1] - mouthC[1], hilt[2] - mouthC[2]);
+    withYaw(Object.assign(out, {dy: 2.2 - 1.2 * q, bend: id === 'sword' ? 0.06 * (1 - q) : 0, nod: id === 'sword' ? 0.16 - 0.12 * q : -0.09, shrugR: id === 'greatsword' ? 0.5 : 0}), o.view, id === 'sword' ? [-4, -12 + 6 * q, -20 + 12 * q] : [0, 8, 20 - 8 * q]);
+    out.hold3 = {g: G, d: into.slice(), hands: {R: 0}, hide: hs0 + p}; out.carry3 = {v: W.v, sheath: 'empty', hang: 0, glint: q > 0.85 ? (q - 0.85) / 0.15 : 0, glintAt: mouthC, mouthFrame: 'chest'}; return Object.assign(out, {u});
+  }
+  // flourish (follow-through, overshoot past the guard) → settle into the READY guard
+  const F = id === 'sword' ? {g: [-6, -43, 9], d: n3([0.06, -0.92, 0.38])} : {g: [-3, -26, 10], d: n3([0, 0.6, 0.8])};   // sword: up past the guard · greatsword: swings round, the point THUDS down in front
+  const G1 = rdy.hold3.g, D1 = rdy.hold3.d, two = !!C.two;
+  if (beat === 'flourish') {
+    const q = ph('flourish');
+    if (id === 'greatsword') {   // over the shoulder (up + back) → the weight carries it round → THUD
+      const A = {g: [-8, -54, 0], d: n3([0.05, -0.55, -0.83])}, mid = {g: [-6, -50, 8], d: n3([0.05, -0.85, 0.5])}, e = q < 0.45 ? sio(q / 0.45) : outC((q - 0.45) / 0.55);
+      const a0 = q < 0.45 ? A : mid, a1 = q < 0.45 ? mid : F; out.hold3 = {g: L3(a0.g, a1.g, e), d: n3(L3(a0.d, a1.d, e)), hands: q < 0.45 ? {R: 0} : {R: 0, L: 20}};
+      out.carry3 = {v: W.v, sheath: 'empty', thud: q > 0.82 ? (q - 0.82) / 0.18 : 0};
+      withYaw(Object.assign(out, {dy: lerp(0.8, 2.6, e), bend: 0.08 * e, feet3: q > 0.45 ? copy3(WIDE) : null}), o.view, yawK([0, 4, 10], [-12, -4, -22], e));
+    } else {
+      const S0 = {g: [hilt[0] - into[0] * 11, hilt[1] - into[1] * 11, hilt[2] - into[2] * 11], d: into}, e = bo(q);
+      out.hold3 = {g: L3(S0.g, F.g, cl(e, 0, 1.15)), d: n3(L3(S0.d, F.d, cl(e, 0, 1.1))), hands: {R: 0}}; out.carry3 = {v: W.v, sheath: 'empty', hang: bo(cl(q * 1.6, 0, 1))};   /* the scabbard swings down with a small overshoot */
+      out.hand3 = {L: L3([10, -30, 4], [16, -33, 6], sio(q))};
+      withYaw(Object.assign(out, {dy: lerp(0.8, 2.2, sio(q)), feet3: q > 0.3 ? copy3(WIDE) : null}), o.view, yawK([0, -4, -4], ry, sio(q)));
+    }
+    return Object.assign(out, {u});
+  }
+  const q = sio(ph('settle')); out.hold3 = {g: L3(F.g, G1, q), d: n3(L3(F.d, D1, q)), hands: Object.assign({}, rdy.hold3.hands)}; if (two && q < 0.5) out.hold3.hands = {R: 0, L: 20};
+  if (rdy.hand3) out.hand3 = copy3(rdy.hand3); out.carry3 = {v: W.v, sheath: 'empty'}; out.feet3 = copy3(WIDE);
+  withYaw(Object.assign(out, copy3(C.ready.body)), o.view, id === 'greatsword' ? yawK([-12, -4, -22], ry, q) : ry);
+  return Object.assign(out, {u});
+}
+
+// ---------- 🎨 the painter on the turned layers (ONE Motion.turnHook) ----------
+function scabbard(g, u, b, S, col) {   // along the blade (up = −y in weapon units), from just above the guard to past the tip — mo-13c's own shape
+  const w = S.sheathW * u * 0.5, y0 = -S.sheathIn * u, y1 = -(b.top + 4) * u;
+  g.save(); g.lineJoin = 'round';
+  g.beginPath(); g.moveTo(-w, y0); g.lineTo(-w * 0.92, y1 + w); g.quadraticCurveTo(0, y1 - w * 0.6, w * 0.92, y1 + w); g.lineTo(w, y0); g.closePath();
+  g.fillStyle = col || '#7A4A2A'; g.fill(); g.lineWidth = Math.max(1, 1.3 * u * 2.4); g.strokeStyle = '#3B2414'; g.stroke();
+  g.beginPath(); g.moveTo(-w * 0.35, y0 - 3 * u); g.lineTo(-w * 0.3, y1 + w * 2); g.lineWidth = Math.max(0.8, u * 2); g.strokeStyle = 'rgba(255,255,255,0.22)'; g.stroke();
+  g.fillStyle = '#E8B04B'; g.beginPath(); g.rect(-w * 1.08, y0 - 4.5 * u, w * 2.16, 4.5 * u); g.fill(); g.stroke();
+  g.beginPath(); g.moveTo(-w * 0.92, y1 + w * 2.2); g.lineTo(-w * 0.92, y1 + w); g.quadraticCurveTo(0, y1 - w * 0.6, w * 0.92, y1 + w); g.lineTo(w * 0.92, y1 + w * 2.2); g.closePath(); g.fill(); g.stroke();
+  g.restore();
+}
+// a weapon-shaped thing between two 3D points (O = the grip, the blade along dir), foreshortened like MotionTurn's own held weapon
+function along(g, X, O3, d3, len, fr, paint) {
+  const O = X.pt3(O3, fr), E = X.pt3([O3[0] + d3[0] * len, O3[1] + d3[1] * len, O3[2] + d3[2] * len], fr), dx = E[0] - O[0], dy = E[1] - O[1], fore = cl(Math.hypot(dx, dy) / Math.max(1e-6, len * X.k), 0.2, 1);
+  g.save(); g.translate(O[0], O[1]); g.rotate(Math.atan2(dx, -dy)); g.scale(1, fore); paint(); g.restore(); return {O, E};
+}
+const sheathStage = (S, X, M3) => S.at === 'hip' ? (M3[2] > 0.3 ? 'body' : 'back') : (X.chestBack ? 'body' : 'back');
+function paint(st, X) {
+  const c = X.P.carry3; if (!c) return; const AW = AWp(), I = AW && AW.info(c.v); if (!I) return; const C = CARRY3[I.type.id]; if (!C) return;
+  const g = X.g, k = X.k, b = boxOf(c.v), sz = I.type.size / 100, u = I.type.size * k / 100, S = C.sheath, fr = S.at === 'hip' ? 'hip' : 'chest', h = X.av.eq && X.av.eq.hand;
+  // 🎒 the back strap (greatsword): R shoulder → L hip, over the chest in front views / under the sheath in back views
+  if (S.strap && st === 'body') { const a = X.pt3(X.chestBack ? [-8, -47, -7] : [-8, -46, 5.5], 'chest'), e = X.pt3(X.chestBack ? [8, -22, -6.5] : [8, -23, 6.5], 'chest');
+    g.save(); g.lineCap = 'round'; g.strokeStyle = '#5A3418'; g.lineWidth = 2.4 * k; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(e[0], e[1]); g.stroke(); g.strokeStyle = '#E8B04B'; g.lineWidth = 0.7 * k; g.stroke(); g.restore(); }
+  // 🗡️ the scabbard (full when put away, empty while the weapon is out) — cut where it crosses the body's middle plane: the near half over the body,
+  // the far half (behind the hip, behind the legs) under them and a little darker (Aowu 15:52: things live at their own depth)
+  if (c.sheath) {
+    const hq = c.sheath === 'empty' && S.empty ? (c.hang != null ? c.hang : 1) : 0, dv = hq > 0 ? n3(L3(S.into, S.empty, hq)) : S.into, o = S.sheathIn * sz,   /* the empty scabbard swings down to hang once the blade is out */ O3 = [S.mouth[0] - dv[0] * o, S.mouth[1] - dv[1] * o, S.mouth[2] - dv[2] * o], len = b.top * sz;
+    const zO = X.pt3(O3, fr)[2], zE = X.pt3([O3[0] + dv[0] * len, O3[1] + dv[1] * len, O3[2] + dv[2] * len], fr)[2];
+    const pnt = q => { if (c.sheath === 'in') AW.draw(q, c.v, 0, 0, I.type.size * k, {t: X.t, design: h && h.o}); scabbard(q, u, b, S, S.col); };
+    const nearSt = S.at === 'hip' ? 'body' : (X.chestBack ? 'body' : 'back'), farSt = 'back';
+    const part = (q, from, to) => along(q, X, O3, dv, len, fr, () => { q.beginPath(); q.rect(-300 * k, -to * len * k, 600 * k, (to - from) * len * k + (from <= 0 ? 400 * k : 0)); q.clip(); pnt(q); });
+    const farPaint = (from, to) => { const L = M.TURN.layer.scratch(g.canvas.width, g.canvas.height); part(L.getContext('2d'), from, to); g.drawImage(X.tint(L, 0.86), 0, 0); };   // pooled
+    if (S.at === 'back') { if (st === nearSt) along(g, X, O3, dv, len, fr, () => pnt(g)); }
+    else if (zO > 0.3 && zE < -0.3) { const f = cl(zO / (zO - zE), 0.05, 0.95) + 0.12; if (st === nearSt) part(g, 0, f); if (st === farSt) farPaint(f, 1.2); }
+    else if (zO > 0.3) { if (st === nearSt) along(g, X, O3, dv, len, fr, () => pnt(g)); }
+    else if (st === farSt) farPaint(0, 1.2);
+  }
+  // ✨ the glint at the mouth when the blade clears (PULL = contact)
+  if (st === 'top' && c.glint > 0 && M.fx) { const p = X.pt3(c.glintAt, c.mouthFrame || 'chest'), E = M.fx('glint', {x: p[0], y: p[1], k, r: 13, t0: 0}); M.drawFx(g, E, 0.02 + c.glint * 0.12); }
+  // 🔥 a dragged point scrapes: sparks at the tip where it meets the ground (hard ground — the map's own effect comes in mo-15)
+  if (st === 'top' && c.drag && X.W) { const W = X.W, tipL = W.tipL * W.fore * k, tx = X.ox + W.Gs[0] * k + Math.sin(W.ang) * tipL, ty = X.oy + W.Gs[1] * k - Math.cos(W.ang) * tipL;
+    const seed = 1 + Math.floor(((c.t || 0) * 1000) / 140), E = M.fx('sparks', {x: tx, y: ty, k: k * 0.55, t0: 0, seed, dir: -(X.dir || 1)}); M.drawFx(g, E, 0.05 + (((c.t || 0) * 1000) % 140) / 1000); }
+  // 💥 THUD: the heavy point lands in front — a dust ring on the ground (behind the legs)
+  if (st === 'back' && c.thud > 0 && X.W && M.fx) { const W = X.W, tipL = W.tipL * W.fore * k, tx = X.ox + W.Gs[0] * k + Math.sin(W.ang) * tipL, ty = X.oy + W.Gs[1] * k - Math.cos(W.ang) * tipL;
+    const E = M.fx('ground', {x: tx, y: Math.min(ty, X.oy + 1 * k), k: k * 0.42, t0: 0, element: 'stone', calm: true}); M.drawFx(g, E, 0.08 + c.thud * 0.25); }
+}
+M.turnHook(paint);
+Object.assign(M, {CARRY3, STANCES3: ST3, DRAW3_BEATS, carry3, stance3, draw3, CARRY13: {VERSION: 'mo-13', boxOf, hiltAt, heldOf}});
+})();
