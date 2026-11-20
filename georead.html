@@ -698,6 +698,10 @@ sandal|🩴|An open shoe for warm days.|san-dal`
     const lv = Math.max(0, Math.min(5, cfg.level | 0)), L = LEVELS[lv], r = rnd(cfg.seed || 12345), mode = cfg.mode || 'phonics';
     const sounds = soundsUpTo(lv), words = pool(lv, mode), learned = cfg.learned || new Set(), rounds = [];
     let wl = shuffle(words, r), wi = 0;
+    // 🔁 gr-8a: words from the player's last games go to the back of the line (newest last), so a word waits before it comes back
+    const recent = (cfg.recent || []).map(String), rk = w => recent.indexOf(w);
+    if(recent.length){ wl = wl.filter(o => rk(o.w) < 0).concat(wl.filter(o => rk(o.w) >= 0).sort((a, b) => rk(b.w) - rk(a.w))); }
+    let pq = recent.length ? shuffle(PAIRS, r) : PAIRS; if(recent.length) pq = pq.filter(p => rk(p[1]) < 0).concat(pq.filter(p => rk(p[1]) >= 0).sort((a, b) => rk(b[1]) - rk(a[1]))); let pi = 0;
     const nextWord = filter => { for(let k = 0; k < wl.length; k++){ const o = wl[(wi + k) % wl.length]; if(!filter || filter(o)){ wi = (wi + k + 1) % wl.length; return o; } } return wl[wi++ % wl.length]; };
     const single = sounds.filter(s => s.indexOf('_') < 0);
     let fresh = shuffle(single.filter(s => !learned.has(s)), r).concat(shuffle(single.filter(s => learned.has(s)), r));
@@ -705,7 +709,7 @@ sandal|🩴|An open shoe for warm days.|san-dal`
     for(let i = 0; i < L.rounds; i++){
       if(mode === 'phonics'){
         if(L.soundEvery && i % L.soundEvery === 0){ const t = fresh.shift() || pickR(single, r); fresh.push(t); rounds.push({type: 'sound', target: t, choices: soundChoices(t, L.choices, single, r)}); continue; }
-        if(L.magicEvery && i % L.magicEvery === 1){ const p = PAIRS[Math.floor(r() * PAIRS.length)]; rounds.push({type: 'magic', from: p[0], word: p[1], pics: picChoices(p[1], L.choices, words.filter(o => o.w !== p[1]), r)}); continue; }
+        if(L.magicEvery && i % L.magicEvery === 1){ const p = recent.length ? pq[pi++ % pq.length] : PAIRS[Math.floor(r() * PAIRS.length)]; rounds.push({type: 'magic', from: p[0], word: p[1], pics: picChoices(p[1], L.choices, words.filter(o => o.w !== p[1]), r)}); continue; }
         const o = nextWord(L.syllables ? (x => !!x.syl || r() < 0.25) : null);
         rounds.push({type: 'blend', word: o.w, pics: picChoices(o.w, L.choices, words, r)});
       } else {
@@ -1210,9 +1214,15 @@ function openSheet(html){ $('sheet-card').innerHTML = html; $('sheet').classList
 function closeSheet(){ $('sheet').classList.add('hidden'); }
 
 /* ================= PLAY ================= */
+// 🔁 gr-8a: each player's last 3 games per mode + level (this device) — their words wait at the back of the line
+function recentKey(mode, lv){ return 'sp_georead_recent:' + (S.player || '') + ':' + mode + ':' + lv; }
+function recentWords(mode, lv){ try{ const a = JSON.parse(ls(recentKey(mode, lv)) || '[]'); return Array.isArray(a) ? [].concat.apply([], a.slice(0, 3)) : []; }catch(e){ return []; } }
+function saveRecent(mode, lv, game){ try{ const ws = (game.rounds || []).map(r => r.word || r.from).filter(Boolean); if(!ws.length) return;
+  let a = []; try{ a = JSON.parse(ls(recentKey(mode, lv)) || '[]'); if(!Array.isArray(a)) a = []; }catch(e){ a = []; } a.unshift(ws); ls(recentKey(mode, lv), JSON.stringify(a.slice(0, 3))); }catch(e){} }
 function startGame(){ setTimeout(cheerMount, 0); /* 📣 cs-4b */ if(ReadCover) ReadCover.hide();   /* 🧱 b3w3 */
   const seed = (Date.now() ^ (Math.random() * 1e9)) >>> 0, learned = learnedSet();
-  const game = GR.makeGame({mode: SET.mode, level: SET.level, seed, learned});
+  const recent = recentWords(SET.mode, SET.level), game = GR.makeGame({mode: SET.mode, level: SET.level, seed, learned, recent});
+  saveRecent(SET.mode, SET.level, game);   // 🔁 gr-8a
   G = {id: ++GID, mode: SET.mode, level: SET.level, house: SET.house, skin: SET.skin, faces: SET.faces, game, i: -1, score: 0, perfect: 0, misses: 0, t0: performance.now(), t: 0,
     st: {blends: 0, built: 0, found: 0, magic: 0, rhymes: 0, sight: 0, traced: 0, cases: 0, stories: 0, sorted: 0, said: 0}, words: [], learned, A: {name: S.player, av: myAvatar(S.player), dir: 1, walkT: 0, gest: null}, stack: [], stackT: 0, over: false, round: null, timer: 0};
   hideResult(); closeSheet(); showScreen('play'); layout(); startLoop();
@@ -2142,4 +2152,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (gr-7+mg-1+p1d+p3a+cs-4b+b3w3+24u-c+an-4+an-6+vp-3+vp-4+vp-4b) END OF GeoRead.html -->
+<!-- (gr-7+mg-1+p1d+p3a+cs-4b+b3w3+24u-c+an-4+an-6+vp-3+vp-4+vp-4b+gr-8a) END OF GeoRead.html -->
