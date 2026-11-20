@@ -731,17 +731,22 @@ function markPicks(){
 function startSetup(){ if(!canPlay(chosenLevel)){ UISound.play('error'); UI.toast('Pick a level that is open 🔓'); return; } startGame(chosenLevel); }
 // 🎬 the cover (GameFrame): who's here (you + up to 3 on this device → 👨‍👩‍👧 Play together · 📱 own devices → 📡) + champions + how to play
 let LcCover = null;
-const LC_VERSION = '2.0';   /* 🧱 b3w6b: shown on the cover footer — bump with each round */
+/* 📡 lk-6d: the room on the 🎬 cover — 🎮 Host and play (2–4) · 📺 Room hostess (1 = you vs 🤖) · 🔗 Join; the host's picks = 3 chips in the room card */
+const LC_ROOM = {game: 'Lettercraft', title: '🔤 Lettercraft', page: 'wordboard', kind: 'word-board', seats: 4, min: 2, url: WEBAPP_URL + '?page=wordboard', name: () => S.player, av: () => myAvatar(S.player), drawAvatar: (cv, p) => lxAv(cv, p),
+  label: tv => lxLabel() + (tv ? ' · 📺 on the TV' : ''), bot: () => 'Robot', how: 'Gameroom → 🔤 Lettercraft → 📱 Own devices → 🔗 Join · or scan · 1 on the 📺 = you vs 🤖 · 2–4 players', picks: el => lxCoverPicks(el),
+  onLink: () => { LX.viaCover = true; LX.botLvl = null; }, onStart: () => { LX.viaCover = true; lxHostGo(); }};
+const LC_VERSION = '2.1';   /* 🧱 b3w6b: shown on the cover footer — bump with each round */
 function coverOff(){ if(LcCover) LcCover.hide(); }
 function openCover(){
   if(!window.GF){ showScreen('menu'); return; }
   if(LcCover && LcCover.who !== S.player){ LcCover.destroy(); LcCover = null; }
   if(!LcCover){ LcCover = GF.cover(document.body, {game: GAME_ID, title: 'Lettercraft', icon: '🔤', version: LC_VERSION, me: S.player, players: S.players, avatarOf: myAvatar, seats: {min: 1, max: 4},
       acts: ['beat.bow', 'beat.cheer'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms',
-      own: () => { LcCover.hide(); showScreen('menu'); lxChoose(); },   /* 📡 the own-devices lobby (LinkKit) */
+      own: C => { if(!(window.Link && Link.cover)){ LcCover.hide(); showScreen('menu'); lxChoose(); return; } lxWire(); Link.cover(C, LC_ROOM); },   /* 📡 lk-6d: the room lives on the cover (LinkKit Link.cover) */
       onPlay: line => { LcCover.hide(); showScreen('menu');
         if(line.length > 1){ together.players = [S.player].concat(line.map(x => x.name).filter(n => n !== S.player && S.players.some(p => p.Name === n))).slice(0, 4); openTogether(); } } });
     LcCover.who = S.player; }
+  if(window.Link && Link.cover && Link.cover.active(LcCover)){ Link.cover.show(LcCover); return; }   /* 📡 lk-6d: the room is still open → back to its cover */
   if(LcCover.mode === 'own') LcCover.setMode('solo');
   LcCover.show();
 }
@@ -1745,6 +1750,14 @@ function lxHostPick(tv){   // 📺 lk-5c: tv = Room hostess
   };
   draw(); coverOff(); $('sheet').classList.remove('hidden');
 }
+function lxCoverPicks(el){   /* 📡 lk-6d: words / signs · board · rounds chips inside the cover's room card */
+  if(!TOGETHER[together.diff]) together.diff = 'easy'; if(together.size !== 15) together.size = 11; if([5, 8, 12].indexOf(together.rounds) < 0) together.rounds = 8;
+  const D = TOGETHER[together.diff];
+  el.innerHTML = '<button class="lkc-chip" data-k="diff" data-sound="none">' + '🔤 ' + UI.esc(D.name) + ' words' + '</button><button class="lkc-chip" data-k="size" data-sound="none">🔲 ' + together.size + ' × ' + together.size + '</button><button class="lkc-chip" data-k="rounds" data-sound="none">🔁 ' + together.rounds + ' rounds</button>';
+  el.querySelectorAll('.lkc-chip').forEach(b => b.onclick = e => { e.stopPropagation(); const nx = (ks, v) => ks[(ks.indexOf(v) + 1) % ks.length], k = b.dataset.k;
+    if(k === 'diff') together.diff = nx(Object.keys(TOGETHER), together.diff); else if(k === 'size') together.size = together.size === 15 ? 11 : 15; else together.rounds = nx([5, 8, 12], together.rounds);
+    savePrefs(); UISound.play('tap'); lxCoverPicks(el); try{ Link.setLabel(lxLabel() + (Link.hostess && Link.hostess() ? ' · 📺 on the TV' : '')); }catch(e2){} });
+}
 function lxLabel(){ const d = TOGETHER[together.diff] || {}; return '🔤 ' + (d.name || 'Words') + ' · ' + together.size + '×' + together.size + ' · ' + together.rounds + ' rounds'; }
 async function lxOpenHost(tv){
   lxWire(); lxCloseLobby();
@@ -1767,6 +1780,13 @@ function lxExit(){
   if(G && G.lx){ clearInterval(timerId); G = null; hideResult(); closeSheet(); }
   $('acts').classList.remove('lx-tvhide'); $('rack').classList.remove('lx-tvrack');   // 📺 lk-5c
   renderMenu(); showScreen('menu');
+  if(LX.viaCover){ LX.viaCover = false; openCover(); }   /* 📡 lk-6d: a cover room ends on the cover */
+}
+function lxToCover(){   /* 📡 lk-6d: ◀ Room — leave the finished game, keep the room: back to the cover, its line and ▶ Start */
+  clearTimeout(LX.autoT); LX.cfg = null; const o = document.querySelector('.lx-over'); if(o) o.remove();
+  if(G && G.lx){ if(window.Cheer) Cheer.unmount(); clearInterval(timerId); G = null; hideResult(); closeSheet(); }
+  $('acts').classList.remove('lx-tvhide'); $('rack').classList.remove('lx-tvrack');
+  renderMenu(); showScreen('menu'); openCover();
 }
 function lxLeavePlay(){
   if(G.over){ lxExit(); return; }
@@ -1802,6 +1822,8 @@ function lxBeginTurn(first){
   else if(P.bot) setMsg('<span class="ui-spin a-bounce think">' + THEMES[G.theme].bot + '</span> Robot is thinking…', 'bot');   /* 📺 st-2a */
   else if(tv){ setMsg('📺 ' + UI.esc(P.name) + ' is making a word on their own device…', ''); say(P.name + ', your turn!'); }   // 📺 lk-5c: the TV calls the next player
   else setMsg('✏️ ' + UI.esc(P.name) + ' is thinking — plan your next word!', '');
+  const fh = window.Link && Link.farHint && !mine && !P.bot ? Link.farHint(P.name, 'word') : '';   /* 🌍 lk-6d */
+  if(fh) $('msg').insertAdjacentHTML('beforeend', '<span class="lx-far"> · ' + UI.esc(fh) + '</span>');
   if(first) showBanner((G.players.some(P => P.bot) ? '🤖 ' + G.players[0].name + ' vs the Robot' : '📡 ' + G.players.length + ' devices') + ' — make the best words!', 'gold');
   clearTimeout(LX.autoT);
   if(G.lx.role === 'host' && !mine && P.away) LX.autoT = setTimeout(() => lxAuto(P), LX_AUTO_MS);
@@ -1877,11 +1899,12 @@ function lxBubble(g, x, w, h, tnow, P){
   g.fillStyle = '#2B1B5A'; g.textBaseline = 'middle'; g.fillText(text, bx + 7, by + 10.5); g.restore();
 }
 function lxResultBtns(g){
-  if(g.lx.role === 'host') return '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 End the room</button></div>';
-  if(g.lx.tv && Link.captain && Link.captain() === Link.seat()) return '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again</button><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 Leave</button></div>';   // 📺 the first player may start the next game
-  return '<div class="note lk-wait">⏳ ' + UI.esc(g.lx.tv ? 'The TV or the first player' : ((LX.cfg && LX.cfg.host) || 'The host')) + ' can start the next game<span class="lk-dots"></span></div><div class="res-btns"><button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 Leave</button></div>';
+  const room = LX.viaCover ? '<button class="btn soft sp-btn sp-secondary" id="b-room" data-sound="none">◀ Room</button>' : '';   /* 📡 lk-6d */
+  if(g.lx.role === 'host') return '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again</button>' + room + '<button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 End the room</button></div>';
+  if(g.lx.tv && Link.captain && Link.captain() === Link.seat()) return '<div class="res-btns"><button class="btn sp-btn sp-primary" id="b-again">🔁 Play again</button>' + room + '<button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 Leave</button></div>';   // 📺 the first player may start the next game
+  return '<div class="note lk-wait">⏳ ' + UI.esc(g.lx.tv ? 'The TV or the first player' : ((LX.cfg && LX.cfg.host) || 'The host')) + ' can start the next game<span class="lk-dots"></span></div><div class="res-btns">' + room + '<button class="btn soft sp-btn sp-secondary" id="b-menu">🚪 Leave</button></div>';
 }
-function lxResultWire(g){ const a = $('b-again'); if(a) a.onclick = () => { if(g.lx.role !== 'host'){ UI.busy(a, 'word-board', 'Asking the TV…'); Link.ask('again'); } else lxHostGo(); }; $('b-menu').onclick = () => lxExit(); }
+function lxResultWire(g){ const a = $('b-again'); if(a) a.onclick = () => { if(g.lx.role !== 'host'){ UI.busy(a, 'word-board', 'Asking the TV…'); Link.ask('again'); } else lxHostGo(); }; $('b-menu').onclick = () => lxExit(); const r = $('b-room'); if(r) r.onclick = () => lxToCover(); }   /* 📡 lk-6d: ◀ Room */
 function lxEnded(msg){
   if(G){ G.over = true; clearTimeout(LX.autoT); }
   const o = document.createElement('div'); o.className = 'lx-over';
@@ -2204,4 +2227,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (r31+emoji+r32+lc-2+back-1+modes-3+gr-6+p1a+p1a-3+p2+p4c+size-1+lk-3a+cs-3d+lc-fit+lk-5a+lk-5c+lk-5f+dg-2+dg-2b+gb-1+lc-logo+24h+st-2a+24s-b+24u-b+b3w6b+an-1b) END OF WordBoard.html -->
+<!-- (r31+emoji+r32+lc-2+back-1+modes-3+gr-6+p1a+p1a-3+p2+p4c+size-1+lk-3a+cs-3d+lc-fit+lk-5a+lk-5c+lk-5f+dg-2+dg-2b+gb-1+lc-logo+24h+st-2a+24s-b+24u-b+b3w6b+an-1b+lk-6d) END OF WordBoard.html -->
