@@ -1718,7 +1718,7 @@ function pkDetailed(g, it, r, P){
 }
 // paint picture 'A' or 'B' of a scene; k = CSS pixels per world unit, dpr = device pixels per CSS pixel
 function pkPaint(cv, sc, side, k, dpr){
-  if(sc && sc.iso && window.PKISO) return PKISO.paint(cv, sc, side, k, dpr);   // 🧱 pk-7b
+  if(sc && sc.iso && window.PKISO){ if(sc.loop) pkClock(); return PKISO.paint(cv, sc, side, k, dpr, pkFrameOf(sc)); }   // 🧱 pk-7b · 🎬 pk-7m1: the frame the clock is on
   const g = cv.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height);
   g.setTransform(k * dpr, 0, 0, k * dpr, 0, 0);
   pkBackground(g, sc);
@@ -1949,7 +1949,7 @@ function pkIsoGate(fn){
   if(!G || G.isoHold || SET.house !== 'iso' || !pkIsoMode() || G.isoFail) return false;
   const n = pkIsoN(); if(window.PKISO && PKISO.has(G.level, n)) return false;
   const G0 = G; G.isoHold = true; G.busy = true; pkIsoWaitCard(true);
-  pkIsoLoad().then(ok => ok ? PKISO.want(G0.level, n) : null).then(sc => (sc || !window.PKISO || !PKISO.ready()) ? sc : PKISO.want(G0.level, n)).then(sc => {   // an island that gave up → one more try
+  pkIsoLoad().then(ok => ok ? PKISO.want(G0.level, n, {still: true}) : null).then(sc => (sc || !window.PKISO || !PKISO.ready()) ? sc : PKISO.want(G0.level, n, {still: true})).then(sc => {   // an island that gave up → one more try · 🎬 pk-7m1: not ready → a quick STILL island (never a wait for a moving one)
     pkIsoWaitCard(false); if(G !== G0 || G.over) return;
     if(!sc && !(window.PKISO && PKISO.ready())){ G.isoFail = true; UISound.play('error'); UI.toast('🧱 The 2.5D world did not load — playing 🎲 Mix pictures instead', 'err'); }
     fn(); if(G === G0) G.isoHold = false; });
@@ -1957,6 +1957,20 @@ function pkIsoGate(fn){
 function pkIsoWaitCard(on){ let e = $('pkiso-wait'); if(!on){ if(e) e.remove(); return; } if(e) return; const bd = $('board') || document.body;
   e = document.createElement('div'); e.id = 'pkiso-wait'; e.className = 'pkiso-wait'; e.setAttribute('role', 'status');
   e.innerHTML = '<div class="pw-bricks"><i>🟥</i><i>🟨</i><i>🟦</i></div><b>🧱 Building a 2.5D island…</b><span>houses · trees · your family</span>'; bd.appendChild(e); }
+/* 🎬 pk-7m1 (plan §29): the FRAME CLOCK — a moving 🧱 island plays ONE loop (24 frames over 3 s, 8 a second) and A and B always paint the SAME
+   frame, so whatever moves the same is identical. ⏸ paused · the tab hidden · reduced motion (OS) → the loop stops on frame 0. The 🔍 lens and
+   👁️ Blink read the same frame (they draw from cv-a / cv-b); 👥 Race paints both halves from the same clock. Runs only while a moving scene is up. */
+const PKCLK = {f: 0, raf: 0, ms: 0, last: 0, sc: null, paints: 0};
+function pkCalm(){ try{ return !!(document.hidden || (G && (G.paused || G.held || G.over)) || window.PK_CALM || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)); }catch(e){ return false; } }
+function pkFrameOf(sc){ return sc && sc.loop && PKCLK.sc === sc ? PKCLK.f : 0; }
+function pkClock(){ if(PKCLK.raf) return; PKCLK.last = performance.now(); PKCLK.raf = requestAnimationFrame(pkTick); }
+function pkTick(ts){ PKCLK.raf = 0; const sc = G && G.scene;
+  if(!sc || !sc.loop || G.mode === 'odd'){ PKCLK.sc = null; PKCLK.f = 0; return; }
+  if(PKCLK.sc !== sc){ PKCLK.sc = sc; PKCLK.ms = 0; PKCLK.f = 0; }
+  const dt = Math.max(0, Math.min(250, ts - PKCLK.last)); PKCLK.last = ts; let f = 0;
+  if(pkCalm()) PKCLK.ms = 0; else { const L = sc.loop.L * 1000; PKCLK.ms = (PKCLK.ms + dt) % L; f = Math.floor(PKCLK.ms / L * sc.loop.F) % sc.loop.F; }
+  PKCLK.raf = requestAnimationFrame(pkTick);   // scheduled first: a paint that throws never stops the clock
+  if(f !== PKCLK.f){ PKCLK.f = f; PKCLK.paints++; try{ if(G.mode === 'race'){ if(typeof raceRepaint === 'function') raceRepaint(); } else paintPics(); if(G.lensDraw) G.lensDraw(); }catch(e){ try{ console.warn('🎬 frame', e && e.message); }catch(_){} } } }
 /* ================= 📏 END PARTS ================= */
 /* ================= PLAY ================= */
 /* 💬 24t-c: words during play (UiKit UI.callout) — never over the two pictures, the detective or the goal line */
@@ -2008,13 +2022,14 @@ function nextPicture(){
   const nN = sc.diffs.length;
   clearMarks(); if(G.mode === 'arcade') BAR.count('pic', '📸', G.pics + '/' + G.rounds, 'Pictures to the 🏁'); else BAR.count('pic', MODE_ICON[G.mode], (G.pic + 1) + '/' + G.rounds, 'Picture'); BAR.count('found', '🔎', '0/' + nN, 'Found');
   $('dots').innerHTML = sc.diffs.map(() => '<i></i>').join('');
-  updHint(); layout(true);
+  updHint(); layout(true); if(sc.loop) pkClock();   // 🎬 pk-7m1: a moving island starts the frame clock
   ['pic-a', 'pic-b'].forEach(id => { const e = $(id); e.classList.remove('in'); void e.offsetWidth; e.classList.add('in'); });
   if(G.mode === 'arcade') goal(G.pic === 0 ? (G.A.bonus ? '🏁 ' + G.rounds + ' pictures! Find ⏳+' + G.A.bonus + ' s · oops ⏱+' + G.A.oops + ' s' : '🏁 ' + G.rounds + ' pictures — go, go, go!' + (G.A.oops ? ' Oops = +' + G.A.oops + ' s' : '')) : '📸 ' + (G.pic + 1) + '/' + G.rounds + ' — find ' + nN + '!');
   else if(G.mode === 'blink') goal(G.pic === 0 && G.level === 0 ? '👁️ The picture flips A ↔ B. Poke what changes! (' + L.n + ' to find)' : '👁️ Watch it blink — find ' + L.n + ' changes!' + (G.level < 2 ? ' ' + typeTips() : ''));
   else if(sc.mix && G.pic === 0 && G.level > 0) goal('🔍 Find ' + L.n + ' — anywhere! 🏞️ 🧑 🎒 ✨ 🎲');   // 🎲 pk-5c: changes can be in any layer
   else goal(G.pic === 0 && G.level === 0 ? '👀 Look at A and B. Poke what\'s different! (' + L.n + ' to find)' : '🔍 Find ' + L.n + ' differences!' + (G.level < 2 ? ' ' + typeTips() : G.pic === 0 && L.sub && !G.scene.photo ? ' Some are tiny: ' + L.sub.slice(0, 4).map(t => PK.TYPE_INFO[t].icon).join(' ') : ''));   // pk-5a: warn about the subtle ones
-  if(sc.iso && G.mode !== 'arcade' && !(G.mode === 'blink' && G.pic === 0 && G.level === 0) && !(G.pic === 0 && G.level === 0)) goal('🧱 ' + sc.label + ' — find ' + nN + '!' + (G.pic === 0 ? ' Houses, trees, people, the ground…' : ''));   // 🧱 pk-7b
+  if(sc.iso && G.mode !== 'arcade' && !(G.mode === 'blink' && G.pic === 0 && G.level === 0) && !(G.pic === 0 && G.level === 0)) goal('🧱 ' + sc.label + ' — find ' + nN + '!' + (sc.moves && !G.moveTold ? ' 🎬 Some are in how things MOVE!' : G.pic === 0 ? ' Houses, trees, people, the ground…' : ''));   // 🧱 pk-7b · 🎬 pk-7m1
+  if(sc.iso && sc.moves) G.moveTold = true;
   G.busy = false;
   if(G.mode === 'blink') startBlink();
   if(L.guide && G.pic === 0) guideHand();
@@ -2147,10 +2162,11 @@ function showLens(d){
   const L = document.createElement('div'); L.className = 'lens'; L.style.width = L.style.height = size + 'px'; L.style.left = (d.x * k) + 'px'; L.style.top = (d.y * k) + 'px';
   const c = document.createElement('canvas'); c.width = c.height = Math.round(size * G.dpr); L.appendChild(c); pic.appendChild(L);
   const src = $(one ? 'cv-a' : 'cv-b'), half = size / 2 / zoom, s = k * G.dpr;
-  const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
-  g.drawImage(src, (d.x * k - half) * G.dpr, (d.y * k - half) * G.dpr, half * 2 * G.dpr, half * 2 * G.dpr, 0, 0, c.width, c.height);
-  g.strokeStyle = 'rgba(255,214,107,0.9)'; g.lineWidth = 3 * G.dpr; g.setLineDash([8 * G.dpr, 6 * G.dpr]); g.beginPath(); g.arc(c.width / 2, c.height / 2, Math.min(c.width / 2 - 6, d.hit * zoom * s * 0.85), 0, 7); g.stroke();
-  setTimeout(() => L.remove(), 2600);
+  const draw = () => { const g = c.getContext('2d'); g.setLineDash([]); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(src, (d.x * k - half) * G.dpr, (d.y * k - half) * G.dpr, half * 2 * G.dpr, half * 2 * G.dpr, 0, 0, c.width, c.height);
+    g.strokeStyle = 'rgba(255,214,107,0.9)'; g.lineWidth = 3 * G.dpr; g.setLineDash([8 * G.dpr, 6 * G.dpr]); g.beginPath(); g.arc(c.width / 2, c.height / 2, Math.min(c.width / 2 - 6, d.hit * zoom * s * 0.85), 0, 7); g.stroke(); };
+  draw(); const G0 = G; G.lensDraw = G.scene && G.scene.loop ? draw : null;   // 🎬 pk-7m1: a moving island → the lens follows the frame clock
+  setTimeout(() => { L.remove(); if(G0 && G0.lensDraw === draw) G0.lensDraw = null; }, 2600);
 }
 function glowOn(i){ if(G.marks.some(m => m.glow === i)) return; const d = G.scene.diffs[i]; ['A', 'B'].forEach(s => { const m = mark(s, 'glow', d.x, d.y, d.hit); m.glow = i; m.cls = 'glow'; }); moment('glow', {i}); }
 let HAND_T = 0;
@@ -2553,4 +2569,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d+pk-4a+pk-4b+pk-4c+pk-4d+pk-5a+pk-5b+pk-5c+pk-5d+pk-6a+pk-6b+pk-6c+pk-6d+24t-c+24u-d1+pk-7a+pk-7f+pk-7a2+pk-7b) END OF Pokadif.html -->
+<!-- (pk-2a+pk-2b+pk-3a+pk-3a2+pk-3b+pk-3c+pk-3d+pk-4a+pk-4b+pk-4c+pk-4d+pk-5a+pk-5b+pk-5c+pk-5d+pk-6a+pk-6b+pk-6c+pk-6d+24t-c+24u-d1+pk-7a+pk-7f+pk-7a2+pk-7b+pk-7m1) END OF Pokadif.html -->
