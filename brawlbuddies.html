@@ -385,6 +385,7 @@
 <script src="inc/CardArt.js"></script>
 <script src="inc/GameLogos.js"></script>
 <script src="inc/Motto.js"></script>   <!-- 🧱 b3w5b: 🎬 cover + 🏁 result card (GameFrame + GameCovers + CardArt) -->
+<script src="inc/LinkKit.js"></script>   <!-- 📡 lk-8d: own devices (LinkKit plan §55) — the link code is the part BrawlBuddies_link + LinkPads -->
 <script src="inc/ComicKit.js"></script>   <!-- 💥 ck-2b comics (wired by ComicKit through window.GameComic) -->
 </head>
 <body ontouchstart="">
@@ -1270,6 +1271,7 @@ function openCover(){
   if(BrawlCover && BrawlCover.who !== S.player){ BrawlCover.destroy(); BrawlCover = null; }
   if(!BrawlCover){ BrawlCover = GF.cover(document.body, {game: GAME_ID, title: 'Brawl Buddies', icon: '🥊', version: BRAWL_VERSION, me: S.player, players: S.players, avatarOf: myAvatar, seats: {min: 1, max: 2},
       acts: ['beat.punch', 'beat.cheer'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms',
+      own: C => bblOwn(C),   /* 📡 lk-8d: the room lives on the cover — the TV / tablet runs the arena, phones are 🕹️ controllers */
       onPlay: line => { BrawlCover.hide(); brawlLineup(line); renderMenu(); showScreen('menu'); } }); BrawlCover.who = S.player; }
   BrawlCover.show();
 }
@@ -2457,10 +2459,29 @@ msAfter('choosePlayer', name => {
   UI.alsoTry({game: MS_GAME, player: name, current: msNow, at: () => document.querySelector('#scr-menu .title'), open: msOpen});
 });
 /* ✨ END MODE SPOTLIGHT */
+/* 📡 lk-8d: 🥊 own devices — the TV / tablet runs the arena (+ 🗺️ Brawenture), phones are 🕹️ controllers (LinkKit plan §55). Born split: the link
+   code is the part BrawlBuddies_link + the shared LinkPads (GameParts), loaded on the first 📱 Own devices tap, a ?link=<room> QR or the 📺 Game Station. Here only the door. */
+function bblNeed(go){
+  if(!(window.Link && Link.cover)){ UI.toast('📡 Own devices need the internet'); return; }
+  if(typeof GameParts === 'undefined') return setTimeout(() => bblNeed(go), 40);   // the loader comes right after this script
+  if(GameParts.has('LinkPads') && GameParts.has('BrawlBuddies_link')) return go();
+  UI.loading(GAME_ID, '📡 Getting the room ready…');
+  GameParts.need(['LinkPads', 'BrawlBuddies_link'], ok => { UI.loaded(); if(ok) return go(); UISound.play('error'); UI.toast('📡 The room did not load — check the internet, then tap 📱 Own devices again'); });
+}
+function bblOwn(C){ bblNeed(() => bblOpen(C)); }
+function bblUrlCode(cb){
+  try{ if(window.google && google.script && google.script.url && google.script.url.getLocation){ google.script.url.getLocation(l => cb(((l && l.parameter) || {}).link || '')); return; } }catch(e){}
+  try{ cb(new URLSearchParams(location.search).get('link') || ''); }catch(e){ cb(''); }
+}
+msAfter('choosePlayer', () => bblUrlCode(c => { c = String(c || '').replace(/[^0-9]/g, '').slice(0, 4); if(c.length === 4) setTimeout(() => bblNeed(() => bblUrl(c)), 0); }));
+msAfter('choosePlayer', () => { if(window.Station) Station.params().then(p => { if(p.mode === 'ltv' && p.stv === '1' && /^\d{4}$/.test(String(p.st || ''))) setTimeout(() => bblNeed(() => bblStation()), 0); }); });   // 📺 from the TV Game Station
+/* 📡 END lk-8d */
 
 </script>
 <script src="inc/BrawlBuddiesParts.js"></script>
-<script src="inc/BrawlBuddies_adv.js"></script>   <!-- 📏 s-brawl: the part loader + (offline app / tests) 🗺️ Brawenture inline, after the main script -->
+<script src="inc/BrawlBuddies_adv.js"></script>
+<script src="inc/BrawlBuddies_link.js"></script>
+<script src="inc/LinkPads.js"></script>   <!-- 📏 s-brawl: the part loader + (offline app / tests) 🗺️ Brawenture inline, after the main script -->
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.themes', {rows: 2}); }</script>
 <script>
 /* 🎵 MOOD (24u-b) START — ✨ polish chat · UiKit ambient mood (UISound.mood, plan `Ambient Moods — full plan.md` §7). Don't edit by hand:
@@ -2608,4 +2629,4 @@ const ANN = (function(){
 </script>
 </body>
 </html>
-<!-- (11i-I+back-1+r35+modes-3+mg-1+ck-room+p1c+p2+p3a+ck-2b+cs-2c+ls-1b+pz-1+pz-2+b3w5b+24t-e+24u-d1+24z+24z-b+b3b9+an-1+an-2+s-brawl+mo-brawl-a) END OF BrawlBuddies.html -->
+<!-- (11i-I+back-1+r35+modes-3+mg-1+ck-room+p1c+p2+p3a+ck-2b+cs-2c+ls-1b+pz-1+pz-2+b3w5b+24t-e+24u-d1+24z+24z-b+b3b9+an-1+an-2+s-brawl+mo-brawl-a+lk-8d) END OF BrawlBuddies.html -->
