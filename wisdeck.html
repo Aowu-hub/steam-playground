@@ -414,6 +414,7 @@
 <script src="inc/Cover_starter.js"></script>
 <script src="inc/CardArt.js"></script>
 <script src="inc/GameLogos.js"></script>   <!-- 🧱 b3w4: 🎬 cover + 🏁 result card (GameFrame + GameCovers + CardArt) -->
+<script src="inc/LinkKit.js"></script>   <!-- 📡 lk-wd1: own devices (LinkKit plan §50) — the link code is the part WisDeck_link -->
 <script src="inc/FlagFont.js"></script>
 <script src="inc/WisCards.js"></script>
 <script src="inc/WisCards2.js"></script>
@@ -959,9 +960,11 @@ const WD_VERSION = '2.0';   /* shown on the cover footer — bump with each WisD
 function openCover(){
   if(!window.GF){ showScreen('menu'); return; }
   if(WdCover && WdCover.who !== S.player){ WdCover.destroy(); WdCover = null; }
-  if(!WdCover){ WdCover = GF.cover(document.body, {game: GAME_ID, title: 'WisDeck', icon: '🃏', version: WD_VERSION, me: S.player, players: S.players, avatarOf: myAvatar, seats: {min: 1, max: 1},
+  if(!WdCover){ WdCover = GF.cover(document.body, {game: GAME_ID, title: 'WisDeck', icon: '🃏', version: WD_VERSION, me: S.player, players: S.players, avatarOf: myAvatar, seats: {min: 1, max: 4},   /* 📡 lk-wd1: 👥 / 📱 for 🔔 WisBuzz (2–4) */
       acts: ['beat.wave', 'beat.cheer'], back: () => goGameroom(), backKind: 'rooms',
-      onPlay: () => { WdCover.hide(); renderMenu(); showScreen('menu'); if(WD_GUIDE){ const g = WD_GUIDE; WD_GUIDE = null; setTimeout(g, 350); } } }); WdCover.who = S.player; }
+      own: C => wdOwn(C),   /* 📡 lk-wd1: 🔔 WisBuzz room on the cover (the link part loads on the first tap) */
+      onPlay: line => { if(line && line.length > 1) BZ.players = line.slice(0, 4).map(x => x.name);   /* 📡 lk-wd1: 👥 Same device line → 🔔 WisBuzz players */
+        WdCover.hide(); renderMenu(); showScreen('menu'); if(WD_GUIDE){ const g = WD_GUIDE; WD_GUIDE = null; setTimeout(g, 350); } } }); WdCover.who = S.player; }
   WdCover.show();
 }
 function changePlayer(){ renderPlayers(); showScreen('player'); }
@@ -1756,7 +1759,27 @@ msAfter('choosePlayer', name => {
   UI.alsoTry({game: MS_GAME, player: name, current: msNow, at: () => document.querySelector('#scr-menu .title'), open: msOpen});
 });
 /* ✨ END MODE SPOTLIGHT */
+/* 📡 lk-wd1: 🔔 WisBuzz on own devices (LinkKit plan §50) — born split: the link code lives in the part WisDeck_link (GameParts),
+   loaded the first time a room is used (📱 Own devices on the cover, or a ?link=<room> QR). Here only the door to it. */
+function wdNeed(go){
+  if(!(window.Link && Link.cover)){ UI.toast('📡 Own devices need the internet'); return; }
+  if(typeof GameParts === 'undefined') return setTimeout(() => wdNeed(go), 40);   // the loader comes right after this script
+  if(GameParts.has('WisDeck_link')) return go();
+  UI.loading('wisdeck', '📡 Getting the room ready…');
+  GameParts.need('WisDeck_link', ok => { UI.loaded(); if(ok) return go(); UISound.play('error'); UI.toast('📡 The room did not load — check the internet, then tap 📱 Own devices again'); });
+}
+function wdOwn(C){ wdNeed(() => { wbWire(); Link.cover(C, WB_ROOM); }); }
+// 🔗 QR: ?page=wisdeck&link=<code> → the cover's 🔗 Join with the number filled in
+function wdUrlCode(cb){
+  try{ if(window.google && google.script && google.script.url && google.script.url.getLocation){ google.script.url.getLocation(l => cb(((l && l.parameter) || {}).link || '')); return; } }catch(e){}
+  try{ cb(new URLSearchParams(location.search).get('link') || ''); }catch(e){ cb(''); }
+}
+msAfter('choosePlayer', () => wdUrlCode(c => { c = String(c || '').replace(/[^0-9]/g, '').slice(0, 4); if(c.length !== 4) return;
+  setTimeout(() => { openCover(); if(WdCover) wdNeed(() => { wbWire(); Link.cover(WdCover, WB_ROOM); Link.cover.join(c); }); }, 0); }));
+/* 📡 END lk-wd1 */
 </script>
+<script src="inc/WisDeckParts.js"></script>
+<script src="inc/WisDeck_link.js"></script>   <!-- 📏 lk-wd1: the part loader (+ offline app / tests: the parts inline), after the main script -->
 <script>/* 📏 p2: rows that used to scroll sideways → wrap + pages with dots (UiKit UI.pageRows) */ if (window.UI && UI.pageRows) { UI.pageRows('.strip', {rows: 1, nav: false}); UI.pageRows('.qres .won', {rows: 2}); }</script>
 <script>
 /* 🎵 MOOD (24u-b) START — ✨ polish chat · UiKit ambient mood (UISound.mood, plan `Ambient Moods — full plan.md` §7). Don't edit by hand:
@@ -1803,4 +1826,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (back-1+modes-3+wd-13+p1d+p2+p3a+size-1+cs-3c+b3w4+24u-c+b3fx) END OF WisDeck.html -->
+<!-- (back-1+modes-3+wd-13+p1d+p2+p3a+size-1+cs-3c+b3w4+24u-c+b3fx+lk-wd1) END OF WisDeck.html -->
