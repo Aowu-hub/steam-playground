@@ -4,14 +4,14 @@
    cheerEnd() (result) or when the play screen goes away (◀ / 🎚️ Levels); every 0.4 s it reads the game's own state → tension /
    hush (🤖 thinking) / pause; the crowd's big moments → lift (max one every 3 s). Test hook: GMOOD (page global). */
 const GMOOD = (function(){
-  const ID = 'polyplot';
+  const ID = 'slabrall';
   let h = null, timer = 0, lastLift = 0;
   const vis = el => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
   function playing(){ try{ return !!(G && !G.over) && vis(document.getElementById('scr-play')) && !vis(document.getElementById('result')); }catch(e){ return false; } }
   function skip(){ return false; }
-  function tension(){ const M = G.M, F = M.owner.length; let c = 0; for(let f = 0; f < F; f++) if(M.owner[f] >= 0 || M.voidF[f]) c++; return F ? .85 * c / F : 0; }
-  function hush(){ const M = G.M, p = M.P[M.cur]; return !!(p && p.bot); }
-  function paused(){ return false; }
+  function tension(){ const M = G.M, sc = M.score, tg = Math.max(1, M.target || 1), lead = G.sp.scoring === 'tennis' ? Math.max(sc.games[0], sc.games[1]) / tg : Math.max(sc.pts[0], sc.pts[1]) / tg; let t = .15 + .55 * Math.min(1, lead) + Math.min(.2, (M.rally || 0) * .02); if(typeof cheerCloseSide === 'function' && cheerCloseSide() >= 0) t = Math.max(t, .9); return t; }
+  function hush(){ return false; }
+  function paused(){ return !!(G.paused || (window.Comic && Comic.busy && Comic.busy())); }
   function poll(){
     if(!h || !h.live || !playing()){ stop(); return; }
     let t = 0; try{ t = Number(tension()) || 0; }catch(e){} h.tension(Math.min(1, Math.max(0, t)));
@@ -32,7 +32,7 @@ const GMOOD = (function(){
   }
   wrap('cheerMount', start);
   wrap('cheerEnd', stop);
-  wrap('cheerEvents', function(){ if((function(list){ return (list || []).some(e => e.k === 'catch' || e.k === 'build' || (e.k === 'close' && e.chain >= 3)); }).apply(this, arguments)) lift(); });
+  wrap('cheerPoint', function(){ if((function(e){ const M = G && G.M; if(!M || !e) return false; const mine = M.players.some(p => p.human && !p.remote && p.side === e.side), anyHuman = M.players.some(p => p.human && !p.remote); return mine || !anyHuman; }).apply(this, arguments)) lift(); });
   return {id: ID, start: start, stop: stop, lift: lift, poll: poll, now: () => h, playing: playing, tension: tension, hush: hush, paused: paused};
 })();
 /* 🎵 MOOD (24u-b) END */
