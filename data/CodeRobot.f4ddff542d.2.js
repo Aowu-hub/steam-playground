@@ -1,0 +1,1112 @@
+
+const WEBAPP_URL = SP_TV[0];
+const CURRENT_PLAYER = SP_TV[1]; window.SP_PAGE = SP_TV[2];
+UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});   // loader + menus in the player's look before the server answers
+const SESSION_START = Number(SP_TV[3]) || null;
+const DURATION_MIN = Number(SP_TV[4]) || null;
+const GAME_ID = 'robot-adventure';
+// 🎛️ p1b: the shared top bar (UiKit UI.gameBar) — ◀ where you came from · 🎚️ Levels · 🏠 | 🤖 Code the Robot · level | scoreboard | game buttons ❓ ⚙️
+const BAR = UI.gameBar(document.getElementById('gbar'), {game: GAME_ID, icon: '🤖', name: 'Code the Robot', levelId: 'hud-level',
+  levels: () => leavePlay(), playing: () => !!(G && !G.over), onLeave: () => { try{ clearInterval(timerId); }catch(e){} try{ speechSynthesis.cancel(); }catch(e){} },
+  pause: {pause: () => { if(typeof pauseGame === 'function') pauseGame(); }, resume: () => { if(typeof resume === 'function') resume(); }},
+  onFit: () => { if(G && typeof layout === 'function') layout(); },
+  extras: [{id: 'new-board-btn', html: '🔄<span class="gt"> New board</span>', label: 'A brand-new board', onClick: () => newBoard(), keep: true}]});
+var NAV_INNER = {levels: ['◀ Code the Robot', () => openCover()]};   // 🧱 b3w1: the setup's top button goes back to the 🎬 cover   // 🧭 inner screens: their top button goes to the main screen
+UI.navBar(document.getElementById('back-btn'), {onclick: false});
+
+/* ================= LEVELS ================= */
+// Each level teaches one new idea. Everything is random, then a solver
+// proves the board can be done (and finds the shortest code).
+const LEVELS = [
+  {name:'Basic', emoji:'🌱', learn:'Arrows', n:5, abs:true, wait:false, loops:false, statics:[2,3], movers:0, stars:1,
+   minAct:3, maxAct:7, slack:99, blurb:'Each arrow moves the robot one square'},
+  {name:'Junior', emoji:'🐣', learn:'Planning', n:6, abs:true, wait:false, loops:false, statics:[5,7], movers:0, stars:2,
+   minAct:5, maxAct:10, slack:3, blurb:'Plan the whole trip, then press Run'},
+  {name:'Intermediate', emoji:'🚦', learn:'Repeat + wait + jump', n:7, abs:true, wait:true, loops:true, statics:[4,6], movers:1, stars:2, jump:true, lows:[2,3],
+   minAct:6, maxAct:14, slack:3, blurb:'Repeat, wait for traffic, and 🦘 jump over logs'},
+  {name:'Hard', emoji:'⚡', learn:'Turning, jump + slide', n:8, abs:false, wait:true, loops:true, statics:[4,6], movers:2, stars:2, jump:true, slide:true, lows:[2,3], bars:[2,3],
+   lava:[2,3], mud:2, tele:1, thunder:1, smoke:true, minAct:9, maxAct:20, slack:3, blurb:'Turn, jump over, slide under — past lava, mud and storms'},
+  {name:'Extreme', emoji:'🌪️', learn:'Everything!', n:9, abs:false, wait:true, loops:true, statics:[4,6], movers:2, stars:2, jump:true, slide:true, lows:[2,3], bars:[2,3],
+   lava:[2,3], mud:2, tele:1, ice:[3,5], thunder:2, smoke:true, flood:true, bridge:true, minAct:11, maxAct:26, slack:3, blurb:'Turning code with ice, floods and a falling bridge'},
+  {name:'Hardcore', emoji:'💀', learn:'No mistakes!', n:9, abs:false, wait:true, loops:true, statics:[5,7], movers:3, stars:2, jump:true, slide:true, lows:[2,3], bars:[2,3],
+   lava:[3,4], mud:2, tele:1, ice:[4,6], thunder:2, smoke:true, flood:true, bridge:true, minAct:12, maxAct:28, slack:2, hardcore:true, blurb:'One wrong Run ends it · no 💡 hints, no slow-mo · ×3 points'}
+];
+// What the robot is looking for (one per board), and the bonus things per world.
+const NEEDS = [{e:'🔋', n:'battery'}, {e:'🔧', n:'spanner'}, {e:'⚙️', n:'gear'}, {e:'💡', n:'light bulb'}, {e:'🔩', n:'bolt'}, {e:'🧲', n:'magnet'}];
+// Worlds: floor colours, still blockages, moving blockages, the goal.
+const WORLDS = {
+  park:  {name:'Park', icon:'🌳', floor:['#E3F4D7','#D3EBC4'], statics:['🌳','🌲','⛲','🏡'], lows:['🪵','🪨','🌷'], movers:['🦆','🐿️','🐕','🐇'], goal:'🔋', star:'⭐', starName:['star', 'stars']},
+  city:  {name:'City', icon:'🏙️', floor:['#E7E9EE','#DADDE5'], statics:['🏢','🏬','🚦','🌳'], lows:['🛞','📦','🧱'], movers:['🚗','🚕','🚌','🛵'], goal:'🔋', star:'🪙', starName:['coin', 'coins']},
+  farm:  {name:'Farm', icon:'🚜', floor:['#F6EBCF','#EEDDB5'], statics:['🏠','🌻','🌳','🛖'], lows:['🪵','🌾','🪣'], movers:['🐄','🐖','🐑','🚜'], goal:'🔋', star:'🥚', starName:['egg', 'eggs']},
+  moon:  {name:'Moon', icon:'🌙', floor:['#2C2F4A','#363A5B'], statics:['🛰️','🗿','🚀'], lows:['🪨','🌑'], movers:['👾','🛸','🐙','☄️'], goal:'🔋', star:'💎', starName:['gem', 'gems']},
+  beach: {name:'Beach', icon:'🏖️', floor:['#FFF2CC','#FBE6AE'], statics:['🌴','🏰','⛱️'], lows:['🪸','🧺','🪨'], movers:['🦀','🐢','🐬','🦭'], goal:'🔋', star:'🐚', starName:['shell', 'shells']},
+  snow:  {name:'Snow', icon:'⛄', floor:['#EEF6FF','#DFECFB'], statics:['⛄','🌲','🏔️'], lows:['🪵','🎁','🪨'], movers:['🐧','🦌','🐻‍❄️','🛷'], goal:'🔋', star:'❄️', starName:['snowflake', 'snowflakes']}
+};
+const DIRS = [{dx:0, dy:-1}, {dx:1, dy:0}, {dx:0, dy:1}, {dx:-1, dy:0}]; // up, right, down, left
+const ABS = {U:0, Ri:1, D:2, Le:3};
+function arrowSvg(deg){ return '<svg class="cmd-svg" viewBox="0 0 24 24" style="transform:rotate(' + deg + 'deg)"><path d="M12 2.5 21 12h-5.5v9.5h-7V12H3z" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>'; }
+const CMD_HOP = '<svg class="cmd-svg" viewBox="0 0 24 24"><path d="M3 19c2-9 7-13 9-13s7 4 9 13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="0.1 4.2"/><path d="M17.5 15.5 21 19.5l1-5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><rect x="9" y="16" width="6" height="5" rx="1.2" fill="currentColor"/></svg>';
+const CMD_SLIDE = '<svg class="cmd-svg" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="3.2" rx="1.4" fill="currentColor"/><path d="M3 18.5h15" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M15.5 14.5l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const CMD = {
+  F:{icon:'⬆', name:'Go'}, L:{icon:'↶', name:'Turn left'}, R:{icon:'↷', name:'Turn right'}, J:{icon:CMD_HOP, name:'Jump'}, S:{icon:CMD_SLIDE, name:'Slide'},
+  W:{icon:'<svg class="cmd-svg" viewBox="0 0 24 24"><rect x="5" y="4" width="5" height="16" rx="1.6" fill="currentColor"/><rect x="14" y="4" width="5" height="16" rx="1.6" fill="currentColor"/></svg>', name:'Wait'},
+  U:{icon:arrowSvg(0), name:'Up'}, Ri:{icon:arrowSvg(90), name:'Right'}, D:{icon:arrowSvg(180), name:'Down'}, Le:{icon:arrowSvg(270), name:'Left'}
+};
+const AGE_START = {'4-5':0, '6-7':1, '8-9':2, '10+':3};   // 💀 Hardcore (index 5) always needs Extreme cleared
+const AGE_RECOMMEND = {'4-5':0, '6-7':1, '8-9':2, '10+':3};
+const TMAX = 48;
+const PRAISE = ['Brilliant coding', 'Super programmer', 'Amazing', 'Bug fixer', 'Robot master', 'You did it'];
+
+/* ================= HELPERS ================= */
+const $ = id => document.getElementById(id);
+const pick = a => a[rnd(a.length)];
+const rint = (a, b) => a + rnd(b - a + 1);
+function shuffle(a){ for(let i = a.length - 1; i > 0; i--){ const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function fmt(ms){ const s = Math.max(0, Math.floor(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+
+/* ================= BOARD RULES (shared by the solver and the game) ================= */
+function stepCell(n, c, dir){ const x = c % n + DIRS[dir].dx, y = ((c / n) | 0) + DIRS[dir].dy; return (x < 0 || y < 0 || x >= n || y >= n) ? -1 : y * n + x; }
+function pingpong(t, len){ if(len <= 1) return 0; const per = len * 2 - 2, k = ((t % per) + per) % per; return k < len ? k : per - k; }
+function moverAt(m, t){ return m.path[pingpong(t + m.phase, m.path.length)]; }
+function moverHits(B, c, t){ return B.movers.some(m => moverAt(m, t) === c); }
+function solidAt(B, c, t){
+  const k = B.cell[c];
+  if(k === 'block' || k === 'water' || k === 'low' || k === 'bar') return k;
+  if(k === 'bridge' && t >= B.bridgeAt) return 'broken';
+  return '';
+}
+function floodRows(B, t){ return (!B.flood || t < B.flood.at) ? 0 : Math.min(B.flood.max, 1 + Math.floor((t - B.flood.at) / B.flood.every)); }
+function floodedAt(B, c, t){ const r = floodRows(B, t); return r > 0 && ((c / B.n) | 0) >= B.n - r; }
+function thunderAt(B, c, t){ return B.thunder.some(th => th.cell === c && th.at === t); }
+// What is deadly on cell c at tick t (robot standing there)?
+function dangerAt(B, c, t){
+  if(B.cell[c] === 'lava') return 'lava';
+  if(floodedAt(B, c, t)) return 'flood';
+  if(thunderAt(B, c, t)) return 'thunder';
+  if(moverHits(B, c, t)) return 'car';
+  return '';
+}
+// One command. Returns the new state plus the little events the game animates.
+// state = {c, dir, t}; events: move / slide / turn / wait / stuck / tele / win / fail
+function doAction(B, s, a){
+  let c = s.c, dir = s.dir, t = s.t;
+  const ev = [];
+  const fail = (why, at) => { ev.push({k:'fail', why, c, at: at == null ? c : at, dir, t}); return {s:{c, dir, t}, ev, fail: why}; };
+  if(a === 'L' || a === 'R'){
+    dir = (dir + (a === 'L' ? 3 : 1)) % 4; t++;
+    ev.push({k:'turn', c, dir, t});
+  } else if(a === 'W'){
+    t++; ev.push({k:'wait', c, dir, t});
+  } else if(a === 'J' || a === 'S'){
+    // Jump: hop 2 squares over a low thing. Slide: 2 squares under a bar. Both go the way the robot faces.
+    const mid = stepCell(B.n, c, dir); if(mid < 0) return fail('edge');
+    const mk = solidAt(B, mid, t + 1) || B.cell[mid];
+    if(a === 'J'){
+      if(mk === 'block') return fail('tall', mid);
+      if(mk === 'bar') return fail('barjump', mid);
+      if(mk === 'water' || mk === 'broken') return fail('water', mid);
+    } else {
+      if(mk !== '' && mk !== 'bar') return fail('noslide', mid);
+      if(moverHits(B, mid, t + 1)){ t++; return fail('car', mid); }
+    }
+    const land = stepCell(B.n, mid, dir); if(land < 0) return fail('edge', mid);
+    const solid = solidAt(B, land, t + 1); if(solid) return fail(solid, land);
+    if(moverHits(B, land, t + 1)){ t++; return fail('car', land); }
+    c = land; t++;
+    ev.push({k: a === 'J' ? 'jump' : 'slip', c, dir, t});
+    return landOn(B, c, dir, t, ev, fail);
+  } else {
+    if(ABS[a] !== undefined) dir = ABS[a];
+    const nc = stepCell(B.n, c, dir);
+    if(nc < 0) return fail('edge');
+    const solid = solidAt(B, nc, t + 1);
+    if(solid) return fail(solid, nc);
+    // a moving thing in the way (or swapping places with us)
+    if(moverHits(B, nc, t + 1) || B.movers.some(m => moverAt(m, t) === nc && moverAt(m, t + 1) === c)){ t++; return fail('car', nc); }
+    c = nc; t++;
+    ev.push({k:'move', c, dir, t});
+    return landOn(B, c, dir, t, ev, fail);
+  }
+  const d = dangerAt(B, c, t); if(d) return fail(d);
+  return {s:{c, dir, t}, ev};
+}
+// A bar runs across the way you would slide through it: horizontal when open left/right is blocked less.
+function barHoriz(B, c){ const n = B.n, x = c % n, y = (c / n) | 0, open = (dx, dy) => { const xx = x + dx, yy = y + dy; return xx >= 0 && yy >= 0 && xx < n && yy < n && !B.cell[yy * n + xx]; }; return (open(0, -1) + open(0, 1)) >= (open(-1, 0) + open(1, 0)); }
+// After arriving on a square: teleports, ice slides, mud, dangers, the goal.
+function landOn(B, c, dir, t, ev, fail0){
+  const fail = why => { ev.push({k:'fail', why, c, at: c, dir, t}); return {s:{c, dir, t}, ev, fail: why}; };
+  for(let guard = 0; guard < 12; guard++){
+    const d = dangerAt(B, c, t); if(d) return fail(d);
+    if(c === B.goal){ ev.push({k:'win', c, dir, t}); return {s:{c, dir, t}, ev, win: true}; }
+    if(B.cell[c] === 'tele' && !(ev.length && ev[ev.length - 1].k === 'tele')){ c = B.tele[c]; ev.push({k:'tele', c, dir, t}); continue; }
+    if(B.cell[c] === 'ice'){
+      const nn = stepCell(B.n, c, dir);
+      if(nn >= 0 && !solidAt(B, nn, t + 1) && !moverHits(B, nn, t + 1)){ c = nn; t++; ev.push({k:'slide', c, dir, t}); continue; }
+    }
+    if(B.cell[c] === 'mud'){ t++; ev.push({k:'stuck', c, dir, t}); const d2 = dangerAt(B, c, t); if(d2) return fail(d2); }
+    break;
+  }
+  return {s:{c, dir, t}, ev};
+}
+function cmdsFor(L){ const base = L.abs ? ['U', 'Ri', 'D', 'Le'] : ['F', 'L', 'R']; return base.concat(L.jump ? ['J'] : [], L.slide ? ['S'] : [], L.wait ? ['W'] : []); }
+// Shortest list of commands from the start to the goal (breadth-first over place, facing and time).
+function solve(B, L){
+  const n = B.n, acts = cmdsFor(L);
+  const seen = new Set(), key = s => s.c + ',' + s.dir + ',' + s.t;
+  let frontier = [{s:{c: B.start, dir: B.dir, t: 0}, path: []}];
+  seen.add(key(frontier[0].s));
+  for(let depth = 0; depth < L.maxAct + 4 && frontier.length; depth++){
+    const next = [];
+    for(const f of frontier){
+      for(const a of acts){
+        const r = doAction(B, f.s, a);
+        if(r.fail) continue;
+        if(r.win) return f.path.concat([a]);
+        if(r.s.t > TMAX) continue;
+        const k = key(r.s); if(seen.has(k)) continue; seen.add(k);
+        next.push({s: r.s, path: f.path.concat([a])});
+      }
+    }
+    frontier = next;
+  }
+  return null;
+}
+// How many blocks a list of commands needs (repeats of the same command fold into one ×N block).
+const MAX_REPEAT = 9;
+function blocksFor(path, loops){
+  if(!loops) return path.length;
+  let n = 0, run = 0;
+  for(let i = 0; i < path.length; i++){ run = (i && path[i] === path[i - 1]) ? run + 1 : 1; if(run === 1 || (run - 1) % MAX_REPEAT === 0) n++; }
+  return n;
+}
+
+/* ================= BOARD MAKER ================= */
+function buildBoard(lvlIdx, worldKey){
+  const L = LEVELS[lvlIdx], W = WORLDS[worldKey], n = L.n;
+  for(let attempt = 0; attempt < 600; attempt++){
+    const B = {n, cell: new Array(n * n).fill(''), icon: {}, tele: {}, movers: [], thunder: [], stars: [], fog: [], flood: null, bridgeAt: Infinity,
+      lvlIdx, worldKey, dir: rnd(4)};
+    const free = () => { const out = []; for(let c = 0; c < n * n; c++) if(!B.cell[c] && c !== B.start && c !== B.goal) out.push(c); return out; };
+    const xy = c => [c % n, (c / n) | 0];
+    // river + bridge (Extreme): a column of water with one bridge that falls down later
+    let riverX = -1;
+    if(L.bridge){ riverX = rint(2, n - 3); const by = rint(1, n - 3); for(let y = 0; y < n; y++) B.cell[y * n + riverX] = y === by ? 'bridge' : 'water'; B.bridgeAt = rint(9, 15); }
+    // start + goal far apart (across the river when there is one; away from the flood rows)
+    const rowsOk = c => !L.flood || xy(c)[1] < n - 3;
+    const cand = []; for(let c = 0; c < n * n; c++) if(!B.cell[c] && rowsOk(c)) cand.push(c);
+    B.start = pick(cand.filter(c => riverX < 0 || xy(c)[0] < riverX));
+    const far = cand.filter(c => c !== B.start && (riverX < 0 || xy(c)[0] > riverX) &&
+      Math.abs(xy(c)[0] - xy(B.start)[0]) + Math.abs(xy(c)[1] - xy(B.start)[1]) >= Math.max(3, Math.floor(n * 0.8)));
+    if(!far.length) continue;
+    B.goal = pick(far);
+    const put = (kind, count) => { const f = shuffle(free()); for(let i = 0; i < count && i < f.length; i++){ B.cell[f[i]] = kind; if(kind === 'block') B.icon[f[i]] = pick(W.statics); if(kind === 'low') B.icon[f[i]] = pick(W.lows); } };
+    put('block', rint(L.statics[0], L.statics[1]));
+    if(L.lows) put('low', rint(L.lows[0], L.lows[1]));
+    if(L.bars) put('bar', rint(L.bars[0], L.bars[1]));
+    if(L.lava) put('lava', rint(L.lava[0], L.lava[1]));
+    if(L.mud) put('mud', L.mud);
+    if(L.ice) put('ice', rint(L.ice[0], L.ice[1]));
+    if(L.tele){ const f = shuffle(free()); if(f.length >= 2){ B.cell[f[0]] = B.cell[f[1]] = 'tele'; B.tele[f[0]] = f[1]; B.tele[f[1]] = f[0]; } }
+    // movers: a straight lane of 3-5 empty cells, walking back and forth
+    for(let m = 0; m < L.movers; m++){
+      for(let tries = 0; tries < 30; tries++){
+        const horiz = Math.random() < 0.5, len = rint(3, 5), c0 = pick(free()); const [x0, y0] = xy(c0);
+        const path = [];
+        for(let k = 0; k < len; k++){ const x = horiz ? x0 + k : x0, y = horiz ? y0 : y0 + k; if(x >= n || y >= n) break; const c = y * n + x;
+          if(B.cell[c] || c === B.start || c === B.goal || B.movers.some(o => o.path.includes(c))) break; path.push(c); }
+        if(path.length >= 3){ B.movers.push({path, phase: rnd(path.length * 2), icon: pick(W.movers)}); break; }
+      }
+    }
+    // thunder strikes: a cloud warns for 4 ticks, then lightning hits
+    for(let k = 0; k < (L.thunder || 0); k++){ const c = pick(free()); if(c != null) B.thunder.push({cell: c, at: rint(4, 14)}); }
+    if(L.flood) B.flood = {at: rint(10, 16), every: 4, max: 2};
+    // pick-up stars (bonus points), then fog patches that hide part of the board
+    const f2 = shuffle(free().filter(c => !B.movers.some(m => m.path.includes(c)) && !B.thunder.some(th => th.cell === c)));
+    B.stars = f2.slice(0, L.stars);
+    if(L.smoke){ for(let k = 0; k < 2; k++){ const c = pick(free()); if(c != null){ const [x, y] = xy(c); B.fog.push({x: x + 0.5, y: y + 0.5, r: 1.6}); } } }
+    // the solver must find a way, with a length that fits the level
+    const sol = solve(B, L);
+    if(!sol || sol.length < L.minAct || sol.length > L.maxAct) continue;
+    // the new moves must be needed: the shortest code uses them
+    if(L.jump && !sol.includes('J')) continue;
+    if(L.slide && !sol.includes('S')) continue;
+    // fog must not hide the start or the goal
+    B.fog = B.fog.filter(f => [B.start, B.goal].every(c => Math.hypot(c % n + 0.5 - f.x, ((c / n) | 0) + 0.5 - f.y) > f.r + 0.6));
+    B.solution = sol;
+    B.need = pick(NEEDS);
+    B.best = blocksFor(sol, L.loops);
+    B.limit = L.slack >= 99 ? 99 : B.best + L.slack;
+    return B;
+  }
+  return null;
+}
+
+/* ================= STATE ================= */
+let S = {players: [], progress: {}, settings: {}, avatars: {}, player: '', age: ''};
+let G = null;          // the board being played
+let lockHandle = null;
+let speedFast = false, speedBeforeHC = null;   // Hardcore forces full speed, then gives your choice back
+
+/* ================= PROGRAM (the child's code) ================= */
+function expand(prog){ const out = []; prog.forEach((b, i) => { for(let k = 0; k < b.n; k++) out.push({a: b.cmd, chip: i}); }); return out; }
+function renderPalette(){
+  const box = $('palette'); box.innerHTML = '';
+  cmdsFor(G.L).forEach(cmd => {
+    const b = document.createElement('button');
+    b.className = 'pal c-' + cmd; b.setAttribute('data-sound', 'pop');
+    b.innerHTML = '<span class="i">' + CMD[cmd].icon + '</span><span class="t">' + CMD[cmd].name + '</span>';
+    b.onclick = () => addBlock(cmd);
+    box.appendChild(b);
+  });
+}
+function renderProgram(){
+  const box = $('chips'); box.innerHTML = '';
+  if(!G.prog.length) box.innerHTML = '<div class="placeholder">Tap the blocks below to write your code 👇</div>';
+  G.prog.forEach((b, i) => {
+    const el = document.createElement('button');
+    el.className = 'chip c-' + b.cmd + (G.sel === i ? ' sel' : '') + (G.runChip === i ? ' now' : '') + (G.badChip === i ? ' bad' : '') + (G.doneChips && G.doneChips.has(i) && G.runChip !== i ? ' done' : '');
+    el.setAttribute('data-sound', 'pop');
+    el.innerHTML = CMD[b.cmd].icon + (b.n > 1 ? '<span class="x">×' + b.n + '</span>' : '');
+    el.title = CMD[b.cmd].name + (b.n > 1 ? ' ×' + b.n : '');
+    el.onclick = () => { if(G.running) return; G.sel = G.sel === i ? -1 : i; renderProgram(); };
+    box.appendChild(el);
+  });
+  const cnt = $('count');
+  const moves = G.prog.reduce((a, b) => a + b.n, 0);
+  cnt.textContent = G.prog.length + (G.limit < 99 ? ' / ' + G.limit : '') + ' blocks' + (moves > G.prog.length ? ' · ' + moves + ' steps' : '');
+  cnt.classList.toggle('full', G.prog.length >= G.limit);
+  // tools for the selected block: remove, and (with loops) repeat ×N
+  const tools = $('seltools');
+  if(G.sel >= 0 && G.prog[G.sel] && !G.running){
+    const b = G.prog[G.sel];
+    tools.innerHTML = '<span class="lbl">' + CMD[b.cmd].icon + ' ' + CMD[b.cmd].name + '</span>' +
+      (G.L.loops ? '<button data-sound="pop" onclick="repeatSel(-1)">− </button><span class="lbl">Repeat ×' + b.n + '</span><button data-sound="pop" onclick="repeatSel(1)">+</button>' : '') +
+      '<button data-sound="pop" onclick="removeSel()">✕ Remove</button>';
+    tools.classList.remove('hidden');
+  } else tools.classList.add('hidden');
+  const sc = box.querySelector('.now') || box.lastElementChild; if(sc && sc.scrollIntoView) sc.scrollIntoView({block: 'nearest'});
+}
+function codeChanged(){ G.badChip = -1; G.doneChips = new Set(); resetRobot(true); renderProgram(); }
+function addBlock(cmd){
+  if(G.running) return;
+  // with loops: the same block again just repeats it (×2, ×3…)
+  const last = G.sel >= 0 ? G.prog[G.sel] : G.prog[G.prog.length - 1];
+  if(G.L.loops && last && last.cmd === cmd && last.n < MAX_REPEAT){ last.n++; codeChanged(); return; }
+  if(G.prog.length >= G.limit){
+    UISound.play('error'); const c = $('count'); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
+    showBanner(G.L.loops ? 'Out of blocks! Tap a block and use Repeat ×N' : 'Out of blocks!', true); return;
+  }
+  const at = G.sel >= 0 ? G.sel + 1 : G.prog.length;
+  G.prog.splice(at, 0, {cmd, n: 1});
+  if(G.sel >= 0) G.sel = at;
+  codeChanged();
+}
+function repeatSel(d){ const b = G.prog[G.sel]; if(!b) return; b.n = Math.max(1, Math.min(MAX_REPEAT, b.n + d)); codeChanged(); }
+function removeSel(){ if(G.sel < 0) return; G.prog.splice(G.sel, 1); G.sel = Math.min(G.sel, G.prog.length - 1); if(!G.prog.length) G.sel = -1; codeChanged(); }
+function deleteBlock(){ if(G.running || !G.prog.length) return; if(G.sel >= 0) return removeSel(); G.prog.pop(); codeChanged(); }
+function clearProgram(){
+  if(G.running || !G.prog.length) return;
+  UI.confirm({icon: '🗑', title: 'Clear all your code?', body: 'Every block will be removed.', okText: 'Clear', cancelText: 'Keep it', danger: true}).then(ok => { if(ok){ G.prog = []; G.sel = -1; codeChanged(); } });
+}
+
+/* ================= RUNNING THE CODE ================= */
+// The robot's whole journey is worked out first (same rules as the solver),
+// then played back one little event at a time.
+function simulate(){
+  const acts = expand(G.prog);
+  let s = {c: G.B.start, dir: G.B.dir, t: 0};
+  const steps = [];
+  for(let i = 0; i < acts.length; i++){
+    const r = doAction(G.B, s, acts[i].a);
+    r.ev.forEach(e => steps.push(Object.assign({chip: acts[i].chip, act: i}, e)));
+    s = r.s;
+    if(r.fail || r.win) return {steps, end: r.win ? 'win' : 'fail'};
+    if(s.t > TMAX) return {steps, end: 'fail'};
+  }
+  return {steps, end: 'short'};
+}
+function resetRobot(quiet){
+  if(!G) return;
+  G.running = false; G.paused = false; G.cursor = 0; G.plan = null; G.anim = null; G.over = false;
+  G.robot = {c: G.B.start, dir: G.B.dir, t: 0, from: G.B.start, fromDir: G.B.dir, fromT: 0};
+  G.got = new Set(); G.runChip = -1; G.failInfo = null;
+  updateRunBtn(); updateHud();
+  if(!quiet) renderProgram();
+}
+function runOrStop(){
+  if(!G || G.over) return;
+  if(G.running){ G.running = false; updateRunBtn(); return; }
+  if(!G.prog.length){ UISound.play('error'); showBanner('Add some blocks first 👇', true); return; }
+  if(G.plan && G.cursor < G.plan.steps.length && !G.failInfo){ G.running = true; updateRunBtn(); nextStep(); return; } // carry on after Step
+  startRun(true);
+}
+function startRun(auto){ cheerSay('start', 'run'); /* 📣 cs-4c */
+  resetRobot(true);
+  G.plan = simulate(); G.cursor = 0; G.runs = (G.runs || 0) + 1;
+  G.running = !!auto; G.sel = -1; G.badChip = -1; G.doneChips = new Set();
+  UISound.play('nav');
+  updateRunBtn(); renderProgram();
+  if(auto) nextStep();
+}
+function stepOnce(){
+  if(!G || G.over) return;
+  if(!G.prog.length){ UISound.play('error'); showBanner('Add some blocks first 👇', true); return; }
+  if(!G.plan || G.failInfo || G.cursor >= G.plan.steps.length) startRun(false);
+  if(G.anim) return;
+  G.running = false; updateRunBtn();
+  // one command = all the little events it makes
+  const act = G.plan.steps[G.cursor] ? G.plan.steps[G.cursor].act : -1;
+  G.stepAct = act; nextStep();
+}
+function stepDur(){ return (speedFast ? 170 : 380) * (REDUCED ? 0.6 : 1); }
+function nextStep(){
+  const P = G.plan;
+  if(G.cursor >= P.steps.length){ finishRun(); return; }
+  const e = P.steps[G.cursor];
+  G.runChip = e.chip; renderProgram();
+  const r = G.robot;
+  r.from = r.c; r.fromDir = r.dir; r.fromT = r.t;
+  G.anim = {e, t0: performance.now(), dur: e.k === 'fail' ? 900 : e.k === 'win' ? 300 : e.k === 'tele' ? 520 : (e.k === 'jump' || e.k === 'slip') ? stepDur() * 1.6 : stepDur()};
+  if(e.k === 'move' || e.k === 'slide') UISound.play(e.k === 'slide' ? 'whoosh' : 'tap');
+  if(e.k === 'turn') UISound.play('key');
+  if(e.k === 'jump') UISound.play('whoosh');
+  if(e.k === 'slip') UISound.play('drop');
+  if(e.k === 'stuck'){ UISound.play('bump'); showBanner('Stuck in the mud! 💦'); }
+  if(e.k === 'tele'){ UISound.play('unlock'); showBanner('🌀 Teleport!'); }
+  if(e.k === 'wait') UISound.play('pop');
+  if(e.k === 'fail') onFail(e);
+}
+// Called by the draw loop when the current little event has finished animating.
+function endStep(){
+  const e = G.anim.e; G.anim = null;
+  const r = G.robot; r.c = e.c; r.dir = e.dir; r.t = e.t;
+  G.doneChips.add(e.chip);
+  if(G.B.stars.includes(e.c) && !G.got.has(e.c)){ G.got.add(e.c); cheerSay('goal', 'star'); /* 📣 cs-4c */ UISound.play('success'); burst(e.c, ['✨', WORLDS[G.B.worldKey].star], 6); updateHud(); robotSay(gotLine()); }
+  G.cursor++;
+  if(e.k === 'fail'){ G.running = false; updateRunBtn(); return; }
+  if(e.k === 'win'){ win(); return; }
+  const nextE = G.plan.steps[G.cursor];
+  if(G.running) setTimeout(() => { if(G && G.running && !G.anim) nextStep(); }, 40);
+  else if(G.stepAct != null && nextE && nextE.act === G.stepAct) nextStep(); // finish this command's events
+  else { G.stepAct = null; if(!nextE) finishRun(); }
+}
+function finishRun(){
+  G.running = false; updateRunBtn();
+  if(G.plan && G.plan.end === 'short'){
+    UISound.play('error');
+    showBanner('The robot stopped before the ' + G.B.need.e + ' ' + G.B.need.n + '. Add more blocks!', true);
+    G.badChip = G.prog.length - 1; renderProgram();
+  }
+}
+const FAIL_TEXT = {
+  low: 'Bonk! Too high to walk over — try 🦘 Jump.',
+  bar: 'Bonk! Duck under the bar — try 🛝 Slide.',
+  tall: 'Ouch! That is too tall to jump over. Go around.',
+  barjump: 'Ouch! The bar is too high to jump — 🛝 Slide under it.',
+  noslide: 'Bump! Slide only goes under bars on clear ground.',
+  edge: 'Whoa! That is the edge of the board.',
+  block: 'Bonk! The robot bumped into something.',
+  water: 'Splash! Robots can\'t swim — use the bridge.',
+  broken: 'The bridge fell down! Get there quicker next time.',
+  lava: 'Too hot! The robot stepped in lava 🌋',
+  car: 'Watch out! Something moving got in the way. Try ⏸ Wait.',
+  thunder: 'Zap! ⚡ Lightning hit that spot. Wait or go round.',
+  flood: 'Splash! 🌊 The flood got there first.'
+};
+function onFail(e){
+  G.failInfo = e; G.badChip = e.chip; G.fails = (G.fails || 0) + 1; cheerSay('miss', 'fail'); /* 📣 cs-4c */
+  renderProgram();
+  UISound.play('error');
+  showBanner(FAIL_TEXT[e.why] || 'Oops! Try again.', true);
+  if(e.why === 'thunder'){ const st = $('stage'); st.classList.remove('flash'); void st.offsetWidth; st.classList.add('flash'); }
+  burst(e.at, e.why === 'lava' ? ['🔥', '💨'] : e.why === 'thunder' ? ['⚡', '💨'] : e.why === 'flood' ? ['🫧', '💦'] : ['💫', '💥'], 6);
+  if(G.L.hardcore){ hardcoreOver(e); return; }
+  setTimeout(() => { if(G && G.failInfo === e) showBanner('🛠️ Fix the red block, then press ▶ Run again'); }, 2300);
+}
+// 💀 Hardcore: the first failed Run ends the board — a kind card, try again with the same board or a new one.
+function hardcoreOver(e){
+  const g = G; G.over = true; cheerEnd(false); /* 📣 cs-4c */
+  setTimeout(() => {
+    if(G !== g) return;
+    GF.result({wrap: $('result'), card: $('result-card'), win: false, icon: '💀', title: FAIL_TEXT[e.why] || 'Oops!', sub: '💀 Hardcore ends on the first mistake — try again!',   /* 🧱 b3w1: the shared 🏁 card */
+      buddy: (window.Acting && typeof myAvatar === "function") ? {name: S.player, av: myAvatar(S.player)} : null,
+      levels: () => { hideResult(); leavePlay(); },
+      again: () => { hideResult(); G.over = false; G.failInfo = null; G.badChip = -1; G.fails = 0; G.doneChips = new Set(); resetRobot(true); renderProgram(); updateHud(); }, againText: '🔁 Same board',
+      extra: [{text: '🎲 New board', id: 'btn-hc-new', fn: () => newBoard()}]});
+    [['btn-levels', 'btn-hc-levels'], ['btn-again', 'btn-hc-same']].forEach(([a, b]) => { const x = $(a); if(x) x.id = b; });   // the old ids
+    cheerFaces();   /* 📣 cs-4c */
+  }, 1300);
+}
+function updateRunBtn(){
+  const b = $('btn-run');
+  b.textContent = G && G.running ? '⏹ Stop' : '▶ Run';
+  b.classList.toggle('stop', !!(G && G.running));
+  document.querySelectorAll('#palette .pal').forEach(p => { p.disabled = !!(G && G.running); });
+}
+function toggleSpeed(){ speedFast = !speedFast; $('btn-speed').textContent = speedFast ? '🐇' : '🐢'; }
+function showHint(){
+  if(!G || G.running || G.L.hardcore) return;
+  G.hintUntil = performance.now() + 3200; G.hintUsed = true;
+  showBanner('💡 The dotted path shows one way. Hints give 2 ⭐ at most.');
+}
+
+/* ================= DRAWING ================= */
+const cv = $('cv'), ctx = cv.getContext('2d');
+let CS = 40, DPR = 1, rafId = 0, staticLayer = null, staticKey = '';
+const WIDE_Q = window.matchMedia('(orientation:landscape) and (min-width:760px), (min-width:1000px)');
+const TALL_Q = window.matchMedia('(max-width:759px) and (orientation:portrait)');
+function resizeStage(){
+  if(!G) return;
+  const wrap = $('stage-wrap'), play = $('scr-play');
+  let side;
+  if(WIDE_Q.matches){
+    const cs = getComputedStyle(play), padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const codeW = document.querySelector('.code').offsetWidth || 380, gap = parseFloat(cs.columnGap) || 16;
+    side = Math.floor(Math.min(wrap.clientHeight, play.clientWidth - padX - codeW - gap - 4));
+    wrap.style.width = Math.max(140, side) + 'px';
+  } else if(TALL_Q.matches){ wrap.style.width = ''; side = Math.floor(wrap.clientWidth - 4); }   // phone upright: full width, the page scrolls if needed
+  else { wrap.style.width = ''; side = Math.floor(Math.min(wrap.clientWidth, wrap.clientHeight) - 4); }
+  side = Math.max(140, side);
+  const st = $('stage'); st.style.width = side + 'px'; st.style.height = side + 'px';
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = side * DPR; cv.height = side * DPR;
+  CS = side / G.B.n; staticKey = '';
+}
+window.addEventListener('resize', resizeStage);
+if(window.ResizeObserver) new ResizeObserver(resizeStage).observe($('stage-wrap'));
+function cxy(c){ const n = G.B.n; return [(c % n + 0.5) * CS, (((c / n) | 0) + 0.5) * CS]; }
+// Emoji come from a small picture cache (typing a colour emoji every frame lags, above all on iPhone / iPad) — same idea as AvatarKit g_emoSprite
+function g_emoSprite(ch, px){
+  const q = Math.min(256, Math.max(12, Math.ceil(px / 12) * 12)), key = ch + '|' + q; let c = EMO_CACHE.get(key);
+  if(!c){ if(EMO_CACHE.size > 600) EMO_CACHE.clear(); c = document.createElement('canvas'); c.width = c.height = Math.ceil(q * 1.4); const x = c.getContext('2d'); x.fillStyle = '#000'; x.font = q + 'px ' + EMOJI_FONT; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(ch, c.width / 2, c.height / 2 + q * 0.05); c.q = q; EMO_CACHE.set(key, c); }
+  return c;
+}
+function emoDraw(g, ch, x, y, size, alpha){ if(!ch || !(size > 0.5)) return; const m = g.getTransform ? g.getTransform() : null, sc = m ? Math.hypot(m.a, m.b) || 1 : 1, sp = g_emoSprite(ch, size * sc), d = sp.width * size / sp.q; const a0 = g.globalAlpha; g.globalAlpha = alpha == null ? 1 : alpha; g.drawImage(sp, x - d / 2, y - d / 2, d, d); g.globalAlpha = a0; }
+function g_emo(ch, x, y, size, alpha){ emoDraw(ctx, ch, x, y, size, alpha); }
+/* ---------- ART: one painter per thing, used by the board AND the picture key ---------- */
+function emoG(g, ch, x, y, size, alpha){ emoDraw(g, ch, x, y, size, alpha); }
+function numBadge(g, txt, x, y, S, bg, fg){
+  const r = S * 0.17; g.fillStyle = bg; g.strokeStyle = '#fff'; g.lineWidth = Math.max(1.5, S * 0.035);
+  g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.stroke();
+  g.fillStyle = fg; g.font = '700 ' + Math.floor(S * 0.24) + "px 'Fredoka',sans-serif"; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, x, y + S * 0.01);
+}
+const isDarkWorld = W => W === WORLDS.moon;
+// (x, y) = top-left of the square, S = its size. t = time in ms (for gentle motion).
+const ART = {
+  lava(g, x, y, S, t){
+    rrect(g, x + S * 0.06, y + S * 0.06, S * 0.88, S * 0.88, S * 0.26); g.fillStyle = '#7A1E12'; g.fill();
+    const gr = g.createRadialGradient(x + S / 2, y + S / 2, S * 0.05, x + S / 2, y + S / 2, S * 0.42);
+    gr.addColorStop(0, '#FFF0A0'); gr.addColorStop(0.35, '#FFB02E'); gr.addColorStop(0.75, '#FF5A1F'); gr.addColorStop(1, '#D0301A');
+    rrect(g, x + S * 0.12, y + S * 0.12, S * 0.76, S * 0.76, S * 0.22); g.fillStyle = gr; g.fill();
+    g.fillStyle = 'rgba(255,240,170,0.85)';
+    [[0.32, 0.36, 0.07], [0.64, 0.6, 0.055], [0.42, 0.7, 0.04]].forEach(([a, b, r], i) => { const k = 1 + 0.25 * Math.sin((t || 0) / 300 + i * 2); g.beginPath(); g.arc(x + S * a, y + S * b, S * r * k, 0, 7); g.fill(); });
+    g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = S * 0.035; g.beginPath(); g.arc(x + S / 2, y + S / 2, S * 0.3, Math.PI * 1.1, Math.PI * 1.45); g.stroke();
+  },
+  mud(g, x, y, S){
+    const cx = x + S / 2, cy = y + S * 0.54;
+    g.fillStyle = '#5E3A1E'; g.beginPath();
+    for(let k = 0; k <= 12; k++){ const a = k / 12 * Math.PI * 2, r = (k % 2 ? 0.36 : 0.42) * S; const px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r * 0.78; k ? g.lineTo(px, py) : g.moveTo(px, py); }
+    g.fill();
+    g.fillStyle = '#8B5A33'; g.beginPath(); g.ellipse(cx, cy - S * 0.02, S * 0.31, S * 0.23, 0, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(255,230,200,0.45)'; g.lineWidth = S * 0.03;
+    [[0.38, 0.5, 0.06], [0.6, 0.58, 0.045]].forEach(([a, b, r]) => { g.beginPath(); g.arc(x + S * a, y + S * b, S * r, 0, 7); g.stroke(); });
+    g.fillStyle = '#5E3A1E'; [[0.16, 0.3, 0.05], [0.84, 0.32, 0.04], [0.8, 0.82, 0.035]].forEach(([a, b, r]) => { g.beginPath(); g.arc(x + S * a, y + S * b, S * r, 0, 7); g.fill(); });
+  },
+  ice(g, x, y, S){
+    const gr = g.createLinearGradient(x, y, x + S, y + S); gr.addColorStop(0, '#F2FBFF'); gr.addColorStop(1, '#8FD0F5');
+    rrect(g, x + S * 0.05, y + S * 0.05, S * 0.9, S * 0.9, S * 0.16); g.fillStyle = gr; g.fill();
+    g.strokeStyle = 'rgba(255,255,255,0.95)'; g.lineWidth = S * 0.05; g.beginPath(); g.moveTo(x + S * 0.16, y + S * 0.6); g.lineTo(x + S * 0.16, y + S * 0.16); g.lineTo(x + S * 0.6, y + S * 0.16); g.stroke();
+    g.strokeStyle = 'rgba(70,150,210,0.55)'; g.lineWidth = S * 0.025; g.beginPath(); g.moveTo(x + S * 0.42, y + S * 0.86); g.lineTo(x + S * 0.55, y + S * 0.62); g.lineTo(x + S * 0.5, y + S * 0.48); g.moveTo(x + S * 0.55, y + S * 0.62); g.lineTo(x + S * 0.76, y + S * 0.56); g.stroke();
+    g.fillStyle = '#fff'; const sx = x + S * 0.72, sy = y + S * 0.3, r = S * 0.1;
+    g.beginPath(); g.moveTo(sx, sy - r); g.lineTo(sx + r * 0.25, sy - r * 0.25); g.lineTo(sx + r, sy); g.lineTo(sx + r * 0.25, sy + r * 0.25); g.lineTo(sx, sy + r); g.lineTo(sx - r * 0.25, sy + r * 0.25); g.lineTo(sx - r, sy); g.lineTo(sx - r * 0.25, sy - r * 0.25); g.closePath(); g.fill();
+  },
+  tele(g, x, y, S, t){
+    const cx = x + S / 2, cy = y + S / 2, spin = (t || 0) / 500;
+    const gr = g.createRadialGradient(cx, cy, 0, cx, cy, S * 0.44); gr.addColorStop(0, '#FFFFFF'); gr.addColorStop(0.35, '#C9A7FF'); gr.addColorStop(0.75, '#7B3FE4'); gr.addColorStop(1, 'rgba(123,63,228,0)');
+    g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, S * 0.44, 0, 7); g.fill();
+    g.strokeStyle = '#fff'; g.lineWidth = S * 0.045; g.lineCap = 'round';
+    for(let k = 0; k < 3; k++){ const a0 = spin + k * Math.PI * 2 / 3; g.beginPath(); g.arc(cx, cy, S * 0.27, a0, a0 + 1.3); g.stroke(); g.beginPath(); g.arc(cx, cy, S * 0.15, a0 + 1, a0 + 2); g.stroke(); }
+    g.lineCap = 'butt';
+  },
+  water(g, x, y, S, t){
+    const gr = g.createLinearGradient(x, y, x, y + S); gr.addColorStop(0, '#62BDF7'); gr.addColorStop(1, '#2F86E0');
+    g.fillStyle = gr; g.fillRect(x, y, S, S);
+    g.strokeStyle = 'rgba(255,255,255,0.6)'; g.lineWidth = Math.max(1.5, S * 0.04); g.lineCap = 'round';
+    const off = Math.sin((t || 0) / 600) * S * 0.04;
+    for(let w = 0; w < 2; w++){ const yy = y + S * (0.33 + w * 0.34); g.beginPath(); g.moveTo(x + S * 0.14 + off, yy); g.quadraticCurveTo(x + S * 0.32 + off, yy - S * 0.1, x + S * 0.5 + off, yy); g.quadraticCurveTo(x + S * 0.68 + off, yy + S * 0.1, x + S * 0.86 + off, yy); g.stroke(); }
+    g.lineCap = 'butt';
+  },
+  bridge(g, x, y, S, left){
+    ART.water(g, x, y, S);
+    g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(x + S * 0.12, y + S * 0.12, S * 0.8, S * 0.8);
+    for(let k = 0; k < 4; k++){ rrect(g, x + S * 0.08, y + S * (0.1 + k * 0.205), S * 0.84, S * 0.17, S * 0.04); g.fillStyle = k % 2 ? '#B07B45' : '#C08A52'; g.fill(); g.strokeStyle = '#7A4F26'; g.lineWidth = S * 0.02; g.stroke(); }
+    g.fillStyle = '#7A4F26'; g.fillRect(x + S * 0.06, y + S * 0.04, S * 0.05, S * 0.92); g.fillRect(x + S * 0.89, y + S * 0.04, S * 0.05, S * 0.92);
+    if(left != null && left <= 4) numBadge(g, Math.ceil(left), x + S * 0.78, y + S * 0.22, S, '#E5484D', '#fff');
+  },
+  brokenBridge(g, x, y, S){
+    ART.water(g, x, y, S);
+    g.fillStyle = '#9C6B3A'; g.save(); g.translate(x + S * 0.3, y + S * 0.72); g.rotate(-0.4); g.fillRect(-S * 0.14, -S * 0.05, S * 0.28, S * 0.1); g.restore();
+    g.save(); g.translate(x + S * 0.7, y + S * 0.3); g.rotate(0.5); g.fillRect(-S * 0.12, -S * 0.05, S * 0.24, S * 0.1); g.restore();
+  },
+  block(g, x, y, S, icon, dark){
+    g.fillStyle = dark ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.13)'; g.beginPath(); g.ellipse(x + S / 2, y + S * 0.84, S * 0.32, S * 0.08, 0, 0, 7); g.fill();
+    emoG(g, icon, x + S / 2, y + S * 0.5, S * 0.74);
+  },
+  goal(g, x, y, S, need, t){
+    const cx = x + S / 2, cy = y + S / 2, k = 1 + Math.sin((t || 0) / 250) * 0.06;
+    const gr = g.createRadialGradient(cx, cy, 0, cx, cy, S * 0.48); gr.addColorStop(0, 'rgba(255,214,70,0.75)'); gr.addColorStop(1, 'rgba(255,214,70,0)');
+    g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, S * 0.48, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(255,190,40,0.9)'; g.lineWidth = S * 0.04; g.setLineDash([S * 0.08, S * 0.06]); g.lineDashOffset = -(t || 0) / 60;
+    g.beginPath(); g.arc(cx, cy, S * 0.4, 0, 7); g.stroke(); g.setLineDash([]);
+    emoG(g, need, cx, cy, S * 0.62 * k);
+  },
+  bonus(g, x, y, S, ch, t, seed){
+    const cx = x + S / 2, cy = y + S / 2 + Math.sin((t || 0) / 300 + (seed || 0)) * S * 0.04;
+    g.fillStyle = 'rgba(255,255,255,0.55)'; g.beginPath(); g.arc(cx, cy, S * 0.3, 0, 7); g.fill();
+    emoG(g, ch, cx, cy, S * 0.5);
+    const tw = 0.5 + 0.5 * Math.sin((t || 0) / 200 + (seed || 0)); g.fillStyle = 'rgba(255,255,255,' + (0.4 + 0.6 * tw) + ')';
+    g.beginPath(); g.arc(x + S * 0.76, y + S * 0.26, S * 0.04 * (0.6 + tw), 0, 7); g.fill();
+  },
+  storm(g, x, y, S, left, t){
+    const p = 0.3 + 0.15 * Math.sin((t || 0) / 90);
+    rrect(g, x + S * 0.04, y + S * 0.04, S * 0.92, S * 0.92, S * 0.16); g.fillStyle = 'rgba(255,200,0,' + p + ')'; g.fill();
+    g.strokeStyle = 'rgba(200,140,0,0.8)'; g.lineWidth = S * 0.035; g.setLineDash([S * 0.09, S * 0.07]); g.stroke(); g.setLineDash([]);
+    emoG(g, '⛈️', x + S / 2, y + S * 0.45, S * 0.6);
+    if(left != null) numBadge(g, Math.ceil(left), x + S * 0.76, y + S * 0.76, S, '#FFC845', '#5A3600');
+  },
+  flood(g, x, y, S, left){
+    const gr = g.createLinearGradient(x, y, x, y + S); gr.addColorStop(0, 'rgba(90,170,255,0.35)'); gr.addColorStop(1, 'rgba(40,120,240,0.7)');
+    g.fillStyle = gr; g.fillRect(x, y + S * 0.35, S, S * 0.65);
+    g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = S * 0.045; g.beginPath(); g.moveTo(x, y + S * 0.4);
+    for(let k = 0; k < 4; k++) g.quadraticCurveTo(x + S * (k * 0.25 + 0.125), y + S * (k % 2 ? 0.48 : 0.3), x + S * (k + 1) * 0.25, y + S * 0.4);
+    g.stroke();
+    emoG(g, '🌊', x + S * 0.38, y + S * 0.3, S * 0.42);
+    if(left != null) numBadge(g, Math.ceil(left), x + S * 0.76, y + S * 0.26, S, '#1E5FD8', '#fff');
+  },
+  fog(g, x, y, S, a){
+    a = a == null ? 0.85 : a;
+    [[0.35, 0.55, 0.26], [0.6, 0.48, 0.3], [0.5, 0.68, 0.24]].forEach(([px, py, r]) => {
+      const gr = g.createRadialGradient(x + S * px, y + S * py, 0, x + S * px, y + S * py, S * r); gr.addColorStop(0, 'rgba(205,210,222,' + a + ')'); gr.addColorStop(1, 'rgba(205,210,222,0)');
+      g.fillStyle = gr; g.beginPath(); g.arc(x + S * px, y + S * py, S * r, 0, 7); g.fill(); });
+  },
+  low(g, x, y, S, icon, dark){
+    g.fillStyle = dark ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.13)'; g.beginPath(); g.ellipse(x + S / 2, y + S * 0.84, S * 0.28, S * 0.07, 0, 0, 7); g.fill();
+    emoG(g, icon, x + S / 2, y + S * 0.64, S * 0.5);
+    // a dotted hop arc: "you can jump this"
+    g.strokeStyle = dark ? 'rgba(160,255,170,0.85)' : 'rgba(34,160,90,0.8)'; g.lineWidth = Math.max(1.5, S * 0.04); g.lineCap = 'round'; g.setLineDash([S * 0.01, S * 0.09]);
+    g.beginPath(); g.moveTo(x + S * 0.12, y + S * 0.5); g.quadraticCurveTo(x + S / 2, y - S * 0.02, x + S * 0.88, y + S * 0.5); g.stroke(); g.setLineDash([]); g.lineCap = 'butt';
+  },
+  bar(g, x, y, S, horiz, dark){
+    // two posts and a striped beam across the square (the robot slides under it)
+    g.save(); g.translate(x + S / 2, y + S / 2); if(!horiz) g.rotate(Math.PI / 2); g.translate(-S / 2, -S / 2);
+    g.fillStyle = dark ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.12)'; g.fillRect(S * 0.08, S * 0.62, S * 0.84, S * 0.1);
+    g.fillStyle = '#5B6475'; rrect(g, S * 0.06, S * 0.2, S * 0.08, S * 0.56, S * 0.03); g.fill(); rrect(g, S * 0.86, S * 0.2, S * 0.08, S * 0.56, S * 0.03); g.fill();
+    rrect(g, S * 0.03, S * 0.24, S * 0.94, S * 0.16, S * 0.06); g.fillStyle = '#fff'; g.fill(); g.save(); g.clip();
+    g.fillStyle = '#E5484D'; for(let k = -1; k < 6; k++){ g.beginPath(); g.moveTo(S * (k * 0.2), S * 0.4); g.lineTo(S * (k * 0.2 + 0.1), S * 0.24); g.lineTo(S * (k * 0.2 + 0.2), S * 0.24); g.lineTo(S * (k * 0.2 + 0.1), S * 0.4); g.fill(); }
+    g.restore(); g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = S * 0.02; rrect(g, S * 0.03, S * 0.24, S * 0.94, S * 0.16, S * 0.06); g.stroke();
+    g.restore();
+  },
+  laneDot(g, cx, cy, S, dark){ g.fillStyle = dark ? 'rgba(255,255,255,0.22)' : 'rgba(30,42,85,0.16)'; g.beginPath(); g.arc(cx, cy, S * 0.07, 0, 7); g.fill(); },
+  mover(g, x, y, S, icon, flip, dark){
+    g.fillStyle = dark ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.14)'; g.beginPath(); g.ellipse(x + S / 2, y + S * 0.84, S * 0.26, S * 0.07, 0, 0, 7); g.fill();
+    g.save(); g.translate(x + S / 2, y + S / 2); if(flip) g.scale(-1, 1); emoG(g, icon, 0, 0, S * 0.7); g.restore();
+  },
+  robot(g, cx, cy, S, dirA, o){
+    o = o || {};
+    g.fillStyle = 'rgba(0,0,0,0.2)'; g.beginPath(); g.ellipse(cx, cy + S * 0.32, S * 0.26, S * 0.08, 0, 0, 7); g.fill();
+    g.save(); g.translate(cx, cy); g.rotate(dirA);
+    g.fillStyle = '#FFC845'; g.strokeStyle = '#fff'; g.lineWidth = Math.max(2, S * 0.05); g.lineJoin = 'round';
+    g.beginPath(); g.moveTo(0, -S * 0.52); g.lineTo(S * 0.18, -S * 0.31); g.lineTo(S * 0.07, -S * 0.31); g.lineTo(0, -S * 0.27); g.lineTo(-S * 0.07, -S * 0.31); g.lineTo(-S * 0.18, -S * 0.31); g.closePath(); g.stroke(); g.fill();
+    g.strokeStyle = '#1E2A55'; g.lineWidth = Math.max(1, S * 0.02); g.stroke();
+    g.restore();
+    g.save(); g.globalAlpha = o.alpha == null ? 1 : o.alpha; g.translate(cx, cy); g.rotate(o.rot || 0); g.scale(o.sx || 1, o.sy || 1);
+    emoG(g, '🤖', 0, 0, S * 0.72, o.alpha); g.restore(); g.globalAlpha = 1;
+  }
+};
+// A small picture of one thing for the key, drawn by the same painter on the world's floor.
+function keyIcon(paint){
+  const S = 40, dpr = 2, c = document.createElement('canvas'); c.width = c.height = S * dpr;
+  const g = c.getContext('2d'); g.scale(dpr, dpr);
+  const W = WORLDS[G.B.worldKey]; g.fillStyle = W.floor[0]; rrect(g, 0, 0, S, S, 9); g.fill(); g.save(); rrect(g, 0, 0, S, S, 9); g.clip();
+  paint(g, 0, 0, S, isDarkWorld(W)); g.restore();
+  return '<img class="kimg" alt="" src="' + c.toDataURL() + '">';
+}
+function drawStatic(){
+  const B = G.B, n = B.n, W = WORLDS[B.worldKey], key = cv.width + ':' + B.start + ':' + B.goal;
+  if(staticKey === key && staticLayer) return;
+  staticKey = key;
+  staticLayer = document.createElement('canvas'); staticLayer.width = cv.width; staticLayer.height = cv.height;
+  const g = staticLayer.getContext('2d'); g.scale(DPR, DPR);
+  for(let c = 0; c < n * n; c++){
+    const x = (c % n) * CS, y = ((c / n) | 0) * CS, k = B.cell[c];
+    g.fillStyle = ((c % n) + ((c / n) | 0)) % 2 ? W.floor[1] : W.floor[0]; g.fillRect(x, y, CS, CS);
+    if(k === 'lava') ART.lava(g, x, y, CS, 0);
+    if(k === 'mud') ART.mud(g, x, y, CS);
+    if(k === 'ice') ART.ice(g, x, y, CS);
+    if(k === 'water' || k === 'bridge') ART.water(g, x, y, CS);
+  }
+  // start pad
+  const [sx, sy] = [(B.start % n) * CS, ((B.start / n) | 0) * CS];
+  g.fillStyle = 'rgba(67,97,238,0.22)'; g.fillRect(sx + 2, sy + 2, CS - 4, CS - 4);
+  // grid lines
+  g.strokeStyle = 'rgba(0,0,0,0.06)'; g.lineWidth = 1;
+  for(let i = 1; i < n; i++){ g.beginPath(); g.moveTo(i * CS, 0); g.lineTo(i * CS, n * CS); g.moveTo(0, i * CS); g.lineTo(n * CS, i * CS); g.stroke(); }
+  // still blockages + the lanes the moving things walk along
+  Object.keys(B.icon).forEach(c => { c = +c; (B.cell[c] === 'low' ? ART.low : ART.block)(g, (c % n) * CS, ((c / n) | 0) * CS, CS, B.icon[c], isDarkWorld(W)); });
+  B.movers.forEach(m => m.path.forEach(c => ART.laneDot(g, (c % n + 0.5) * CS, (((c / n) | 0) + 0.82) * CS, CS, isDarkWorld(W))));
+}
+// Board time while animating (movers glide smoothly between ticks).
+function boardTime(now){
+  const r = G.robot;
+  if(G.anim){ const p = Math.min(1, (now - G.anim.t0) / G.anim.dur); return r.fromT + (G.anim.e.t - r.fromT) * Math.min(1, p * 1.2); }
+  return r.t;
+}
+function draw(now){
+  if(!G) return;
+  const B = G.B, n = B.n, W = WORLDS[B.worldKey];
+  drawStatic();
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(staticLayer, 0, 0);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const bt = boardTime(now), ti = Math.floor(bt);
+  const dark = isDarkWorld(W), tl = c => [(c % n) * CS, ((c / n) | 0) * CS];
+  // portals (spin), lava (bubbles)
+  for(let c = 0; c < n * n; c++){
+    if(B.cell[c] === 'tele'){ const [x, y] = tl(c); ART.tele(ctx, x, y, CS, now); }
+    else if(B.cell[c] === 'lava' && !REDUCED){ const [x, y] = tl(c); ART.lava(ctx, x, y, CS, now); }
+    else if(B.cell[c] === 'bridge'){ const [x, y] = tl(c); if(bt < B.bridgeAt) ART.bridge(ctx, x, y, CS, B.bridgeAt - bt); else ART.brokenBridge(ctx, x, y, CS); }
+  }
+  // flood: rising water from the bottom (with a countdown before it starts)
+  if(B.flood){
+    const rows = floodRows(B, ti);
+    if(rows){ const gr = ctx.createLinearGradient(0, (n - rows) * CS, 0, n * CS); gr.addColorStop(0, 'rgba(90,170,255,0.5)'); gr.addColorStop(1, 'rgba(40,120,240,0.72)'); ctx.fillStyle = gr; ctx.fillRect(0, (n - rows) * CS, n * CS, rows * CS); }
+    const left = B.flood.at - bt;
+    if(left > 0 && left <= 5){ ctx.fillStyle = 'rgba(40,140,255,0.18)'; ctx.fillRect(0, (n - 1) * CS, n * CS, CS); ART.flood(ctx, (n - 1) * CS, (n - 1) * CS, CS, left); }
+  }
+  // thunder: cloud + countdown, then a lightning flash
+  B.thunder.forEach(th => {
+    const [x, y] = tl(th.cell), left = th.at - bt;
+    if(left > 0 && left <= 4) ART.storm(ctx, x, y, CS, left, now);
+    else if(left <= 0 && left > -1){ emoG(ctx, '⚡', x + CS / 2, y + CS / 2, CS * 0.9); }
+  });
+  // bonus things, goal
+  B.stars.forEach(c => { if(!G.got.has(c)){ const [x, y] = tl(c); ART.bonus(ctx, x, y, CS, W.star, now, c); } });
+  { const [x, y] = tl(B.goal); ART.goal(ctx, x, y, CS, B.need.e, now); }
+  // movers
+  B.movers.forEach(m => {
+    const a = moverAt(m, Math.floor(bt)), b2 = moverAt(m, Math.floor(bt) + 1), f = bt - Math.floor(bt);
+    const [ax, ay] = tl(a), [bx, by] = tl(b2);
+    ART.mover(ctx, ax + (bx - ax) * f, ay + (by - ay) * f - Math.abs(Math.sin(f * Math.PI)) * CS * 0.08, CS, m.icon, bx > ax, dark);
+  });
+  // hint path
+  if(G.hintUntil && now < G.hintUntil) drawHint(now);
+  drawRobot(now);
+  for(let c = 0; c < n * n; c++) if(B.cell[c] === 'bar'){ const [x, y] = tl(c); ART.bar(ctx, x, y, CS, true, dark); }
+  drawFx(now);
+  // fog patches (the robot clears the fog near it)
+  B.fog.forEach(f => {
+    const [rx, ry] = cxy(G.robot.c), d = Math.hypot(rx / CS - f.x, ry / CS - f.y);
+    const a = Math.max(0, Math.min(0.92, (d - 1.2) / 1.2 * 0.92));
+    if(a <= 0) return;
+    const gr = ctx.createRadialGradient(f.x * CS, f.y * CS, 0, f.x * CS, f.y * CS, f.r * CS * 1.15);
+    gr.addColorStop(0, 'rgba(150,155,170,' + a + ')'); gr.addColorStop(0.75, 'rgba(150,155,170,' + a + ')'); gr.addColorStop(1, 'rgba(150,155,170,0)');
+    ctx.fillStyle = gr; ctx.fillRect((f.x - f.r * 1.2) * CS, (f.y - f.r * 1.2) * CS, f.r * 2.4 * CS, f.r * 2.4 * CS);
+    if(a > 0.5) ART.fog(ctx, f.x * CS - CS / 2, f.y * CS - CS / 2, CS, a * 0.6);
+  });
+  // finish the current little event
+  if(G.anim && now - G.anim.t0 >= G.anim.dur) endStep();
+}
+function drawHint(now){
+  let s = {c: G.B.start, dir: G.B.dir, t: 0}; const pts = [cxy(s.c)];
+  G.B.solution.forEach(a => { const r = doAction(G.B, s, a); r.ev.forEach(e => pts.push(cxy(e.c))); s = r.s; });
+  ctx.strokeStyle = 'rgba(123,92,250,0.85)'; ctx.lineWidth = Math.max(3, CS * 0.1); ctx.setLineDash([CS * 0.15, CS * 0.15]); ctx.lineDashOffset = -now / 40;
+  ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke(); ctx.setLineDash([]);
+}
+// The robot: 🤖 with an arrow showing which way it faces, plus a reaction per event.
+function drawRobot(now){
+  const r = G.robot, A = G.anim;
+  let [x, y] = cxy(r.c), dirA = r.dir * Math.PI / 2, sx = 1, sy = 1, rot = 0, alpha = 1, extra = '';
+  if(A){
+    const e = A.e, p = Math.min(1, (now - A.t0) / A.dur), [ax, ay] = cxy(r.from), [bx, by] = cxy(e.c);
+    const turnFrom = r.fromDir * Math.PI / 2; let turnTo = e.dir * Math.PI / 2;
+    if(turnTo - turnFrom > Math.PI) turnTo -= Math.PI * 2; if(turnFrom - turnTo > Math.PI) turnTo += Math.PI * 2;
+    if(e.k === 'move' || e.k === 'slide'){ x = ax + (bx - ax) * p; y = ay + (by - ay) * p - (e.k === 'move' ? Math.sin(p * Math.PI) * CS * 0.12 : 0); dirA = turnTo; if(e.k === 'slide') rot = Math.sin(p * Math.PI * 4) * 0.15; }
+    if(e.k === 'jump'){ x = ax + (bx - ax) * p; y = ay + (by - ay) * p - Math.sin(p * Math.PI) * CS * 0.75; dirA = turnTo; sy = 1 + Math.sin(p * Math.PI) * 0.08; sx = 1 - Math.sin(p * Math.PI) * 0.06; }
+    if(e.k === 'slip'){ x = ax + (bx - ax) * p; y = ay + (by - ay) * p + CS * 0.12 * Math.sin(p * Math.PI); dirA = turnTo; sy = 1 - 0.45 * Math.sin(p * Math.PI); sx = 1 + 0.2 * Math.sin(p * Math.PI); rot = (bx >= ax ? -1 : 1) * 0.5 * Math.sin(p * Math.PI); }
+    if(e.k === 'turn'){ dirA = turnFrom + (turnTo - turnFrom) * p; rot = Math.sin(p * Math.PI) * 0.25 * (turnTo > turnFrom ? 1 : -1); }
+    if(e.k === 'wait'){ sy = 1 + Math.sin(p * Math.PI * 2) * 0.05; extra = '⏳'; }
+    if(e.k === 'stuck'){ x += Math.sin(p * Math.PI * 8) * CS * 0.06; sy = 0.9; extra = '💦'; }
+    if(e.k === 'tele'){ const half = p < 0.5; const [tx, ty] = half ? [ax, ay] : [bx, by]; x = tx; y = ty; const k = half ? 1 - p * 2 : (p - 0.5) * 2; sx = sy = Math.max(0.05, k); rot = p * Math.PI * 4; }
+    if(e.k === 'win'){ y -= Math.abs(Math.sin(p * Math.PI)) * CS * 0.4; }
+    if(e.k === 'fail'){
+      const [fx, fy] = cxy(e.at); const q = Math.min(1, p * 3);
+      if(e.why === 'lava'){ sy = sx = 1 - p * 0.6; y += p * CS * 0.2; alpha = 1 - p * 0.6; extra = '🔥'; }
+      else if(e.why === 'thunder'){ rot = Math.sin(p * 40) * 0.2; extra = '😵'; }
+      else if(e.why === 'flood'){ y += Math.sin(p * 10) * CS * 0.05; extra = '🫧'; }
+      else { x += (fx - x) * 0.3 * Math.sin(q * Math.PI); y += (fy - y) * 0.3 * Math.sin(q * Math.PI); rot = Math.sin(p * Math.PI * 6) * 0.2 * (1 - p); extra = '💫'; }
+    }
+  } else if(G.failInfo){ extra = G.failInfo.why === 'lava' ? '🔥' : '💫'; alpha = G.failInfo.why === 'lava' ? 0.45 : 1; }
+  else if(!REDUCED){ sy = 1 + Math.sin(now / 300) * 0.03; }
+  ART.robot(ctx, x, y, CS, dirA, {rot, sx, sy, alpha});
+  if(extra) g_emo(extra, x + CS * 0.28, y - CS * 0.3, CS * 0.38);
+  // thought bubble: what the robot needs
+  if(G.thinkUntil && now < G.thinkUntil && !A){
+    const bx = x + CS * 0.42, by = y - CS * 0.62, r = CS * 0.34, k = Math.min(1, (G.thinkUntil - now) / 300);
+    ctx.globalAlpha = k; ctx.fillStyle = '#fff'; ctx.strokeStyle = 'rgba(30,42,85,0.25)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x + CS * 0.2, y - CS * 0.3, CS * 0.06, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(bx, by, r, 0, 7); ctx.fill(); ctx.stroke(); ctx.globalAlpha = 1;
+    g_emo(G.B.need.e, bx, by, r * 1.2, k);
+  }
+}
+// little effects
+function burst(c, list, count){
+  if(!G) return; if(!G.fx) G.fx = [];
+  const [x, y] = cxy(c), now = performance.now();
+  for(let k = 0; k < (REDUCED ? 1 : count); k++){ const a = Math.random() * 6.28, r = 0.5 + Math.random() * 0.6; G.fx.push({ch: pick(list), x, y, dx: Math.cos(a) * r, dy: Math.sin(a) * r - 0.2, t0: now, dur: 700 + Math.random() * 300}); }
+}
+function drawFx(now){
+  if(!G.fx || !G.fx.length) return;
+  G.fx = G.fx.filter(f => now - f.t0 < f.dur);
+  G.fx.forEach(f => { const p = (now - f.t0) / f.dur, e = 1 - Math.pow(1 - p, 2); g_emo(f.ch, f.x + f.dx * e * CS, f.y + f.dy * e * CS, CS * 0.36, 1 - p); });
+}
+function loop(now){
+  if(!G) return;
+  if(!G.pausedAt) draw(now);
+  const sec = G.pausedAt ? G.lastSec : Math.floor((now - G.t0 - G.pausedTotal) / 1000);
+  if(sec !== G.lastSec){ G.lastSec = sec; updateHud(); }
+  rafId = requestAnimationFrame(loop);
+}
+function pauseGame(){ if(G && !G.pausedAt){ G.pausedAt = performance.now(); G.running = false; updateRunBtn(); } }
+
+/* ================= HUD / BANNER ================= */
+function elapsed(){ return G ? (performance.now() - G.t0 - G.pausedTotal) : 0; }
+function updateHud(){
+  if(!G) return;
+  BAR.time(fmt(G.finishMs || elapsed()));
+  const W = WORLDS[G.B.worldKey];
+  BAR.count('stars', W.star, (G.got ? G.got.size : 0) + '/' + G.B.stars.length, 'Stars');
+  if($('mission').dataset.got !== String(G.got ? G.got.size : 0)){ $('mission').dataset.got = String(G.got ? G.got.size : 0); renderMission(); }
+  if(lockHandle){ const left = lockHandle.remainingMs(); BAR.left(left, left < 120000); }
+}
+let bannerTimer = 0;
+function showBanner(text, bad){
+  const b = $('banner'); b.textContent = text; b.classList.toggle('bad', !!bad); b.classList.add('on');
+  clearTimeout(bannerTimer); bannerTimer = setTimeout(() => b.classList.remove('on'), bad ? 3200 : 2400);
+}
+
+/* ================= MISSION (the robot says what it needs) ================= */
+function plural(n, W){ return n + ' ' + W.starName[n === 1 ? 0 : 1]; }
+function missionLine(){ const B = G.B, W = WORLDS[B.worldKey]; return 'Beep boop! I need the ' + B.need.n + '. Can you also pick up ' + (B.stars.length === 1 ? 'the ' + W.starName[0] : 'the ' + plural(B.stars.length, W)) + ' on the way?'; }
+function gotLine(){ const B = G.B, W = WORLDS[B.worldKey], left = B.stars.length - G.got.size; return left ? 'Got one! ' + plural(left, W) + ' to go.' : 'All the ' + W.starName[1] + '! Now the ' + B.need.n + '!'; }
+function robotSay(text, force){
+  try{ if(!UISound.get().enabled || !window.speechSynthesis) return; if(force) speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 0.95; u.pitch = 1.5; u.volume = Math.max(0.2, UISound.get().volume); speechSynthesis.speak(u); }catch(e){}
+}
+function renderMission(){
+  const B = G.B, W = WORLDS[B.worldKey], got = G.got ? G.got.size : 0, all = got >= B.stars.length;
+  $('mission').innerHTML = '<span class="bot">🤖</span><div class="say">“I need the <b>' + B.need.e + ' ' + B.need.n + '</b>!”' +
+    '<span class="bonus' + (all ? ' done' : '') + '">Bonus: pick up ' + W.star + ' ' + plural(B.stars.length, W) + ' on the way · ' + got + '/' + B.stars.length + (all ? ' ✓' : '') + '</span></div>' +
+    '<button data-sound="none" onclick="robotSay(missionLine(), true); G.thinkUntil = performance.now() + 3500;" title="Hear it again">🔊</button>';
+}
+// The key: only the things that are on this board, drawn by the same painters as the board.
+function renderLegend(){
+  const B = G.B, W = WORLDS[B.worldKey], has = k => B.cell.includes(k), rows = [];
+  const row = (icon, text) => rows.push('<div class="lg"><span class="ic">' + icon + '</span><span>' + text + '</span></div>');
+  const chip = (cmd, x) => '<span class="kchip c-' + cmd + '">' + (CMD[cmd].icon) + (x ? '<i>' + x + '</i>' : '') + '</span>';
+  const cap = w => w.charAt(0).toUpperCase() + w.slice(1);
+  row(keyIcon((g, x, y, S) => ART.robot(g, x + S / 2, y + S * 0.54, S * 0.9, G.L.abs ? Math.PI / 2 : 0)),
+    G.L.abs ? '<b>Your robot</b> — the yellow arrow shows the way it last moved' : '<b>Your robot</b> — the yellow arrow shows which way it is facing');
+  row(keyIcon((g, x, y, S) => ART.goal(g, x, y, S, B.need.e, 0)), '<b>' + cap(B.need.n) + '</b> — the robot needs this. Get here to win!');
+  row(keyIcon((g, x, y, S) => ART.bonus(g, x, y, S, W.star, 0, 0)), '<b>' + cap(W.starName[1]) + '</b> — bonus points. Walk over them to pick them up');
+  const st = [...new Set(Object.keys(B.icon).filter(c => B.cell[c] === 'block').map(c => B.icon[c]))];
+  const lo = [...new Set(Object.keys(B.icon).filter(c => B.cell[c] === 'low').map(c => B.icon[c]))];
+  if(st.length) row(st.slice(0, 3).map(ic => keyIcon((g, x, y, S, d) => ART.block(g, x, y, S, ic, d))).join(''), '<b>In the way</b> — the robot can’t go through. Go around');
+  if(lo.length) row(lo.slice(0, 3).map(ic => keyIcon((g, x, y, S, d) => ART.low(g, x, y, S, ic, d))).join(''), '<b>Low things</b> — too high to walk through. ' + chip('J') + ' <b>Jump</b> over them');
+  if(has('bar')) row(keyIcon((g, x, y, S, d) => ART.bar(g, x, y, S, true, d)), '<b>Bar</b> — can’t walk or jump through. ' + chip('S') + ' <b>Slide</b> under it');
+  const mv = [...new Set(B.movers.map(m => m.icon))];
+  if(mv.length) row(mv.map(ic => keyIcon((g, x, y, S, d) => { ART.laneDot(g, x + S * 0.2, y + S * 0.82, S, d); ART.laneDot(g, x + S * 0.8, y + S * 0.82, S, d); ART.mover(g, x, y - S * 0.04, S, ic, false, d); })).join(''),
+    '<b>Moving</b> — walks back and forth along the little dots. Use <b>Wait</b> to let it pass');
+  if(has('lava')) row(keyIcon((g, x, y, S) => ART.lava(g, x, y, S, 0)), '<b>Lava</b> — too hot! Never step on it');
+  if(has('mud')) row(keyIcon((g, x, y, S) => ART.mud(g, x, y, S)), '<b>Mud</b> — the robot gets stuck for one tick');
+  if(has('ice')) row(keyIcon((g, x, y, S) => ART.ice(g, x, y, S)), '<b>Ice</b> — the robot slides until something stops it');
+  if(has('tele')) row(keyIcon((g, x, y, S) => ART.tele(g, x, y, S, 0)), '<b>Portal</b> — step in, pop out of the other portal');
+  if(B.thunder.length) row(keyIcon((g, x, y, S) => ART.storm(g, x, y, S, 3, 0)), '<b>Storm cloud</b> — counts down, then lightning strikes that square');
+  if(has('water')){
+    row(keyIcon((g, x, y, S) => ART.water(g, x, y, S)), '<b>River</b> — robots can’t swim');
+    row(keyIcon((g, x, y, S) => ART.bridge(g, x, y, S, 3)), '<b>Bridge</b> — cross before its number runs out, then it falls');
+  }
+  if(B.flood) row(keyIcon((g, x, y, S) => ART.flood(g, x, y, S, 3)), '<b>Flood</b> — when the number runs out, water rises from the bottom');
+  if(B.fog.length) row(keyIcon((g, x, y, S) => ART.fog(g, x, y, S, 0.95)), '<b>Fog</b> — hides things until the robot comes close');
+  if(G.L.abs) row(chip('U') + chip('Ri'), '<b>Arrows</b> — move one square that way');
+  else {
+    row(chip('F'), '<b>Go</b> — one square forward, the way the yellow arrow points');
+    row(chip('L') + chip('R'), '<b>Turn left / Turn right</b> — the robot turns on the spot (it does not move)');
+  }
+  if(G.L.jump) row(chip('J'), '<b>Jump</b> — hop 2 squares the way the robot faces, over a low thing (not trees, walls or water)');
+  if(G.L.slide) row(chip('S'), '<b>Slide</b> — slide 2 squares the way the robot faces, under a bar');
+  if(G.L.wait) row(chip('W'), '<b>Wait</b> — stay still for one tick');
+  if(G.L.loops) row(chip(G.L.abs ? 'Ri' : 'F', '×3'), '<b>Repeat</b> — tap the same block again: one block that runs ×2, ×3… (still counts as 1 block)');
+  $('legend-list').innerHTML = rows.join('');
+  const wide = window.matchMedia('(orientation:landscape) and (min-width:760px) and (min-height:600px), (min-width:1000px) and (min-height:600px)').matches;
+  if(wide) $('legend').setAttribute('open', ''); else $('legend').removeAttribute('open');
+}
+
+/* ================= START / WIN ================= */
+function startGame(lvlIdx, worldKey){
+  if(RobotCover) RobotCover.hide();   /* 🧱 b3w1 */
+  if(worldKey === 'surprise') worldKey = pick(Object.keys(WORLDS));
+  const L = LEVELS[lvlIdx];
+  UI.loading('robot-adventure');
+  // building + solving can take a moment on old tablets: let the loader paint first
+  setTimeout(() => {
+    const B = buildBoard(lvlIdx, worldKey);
+    UI.loaded();
+    if(!B){ UI.toast('Could not build a board — try again', 'err'); return; }
+    hideResult(); $('praise').classList.add('hidden');
+    G = {B, L, lvlIdx, worldKey, prog: [], sel: -1, limit: B.limit, t0: performance.now(), pausedAt: 0, pausedTotal: 0, lastSec: -1,
+      runs: 0, fails: 0, hintUsed: false, fx: [], doneChips: new Set(), badChip: -1};
+    resetRobot(true);
+    BAR.level(L.emoji + ' ' + L.name);
+    // 💀 Hardcore: no hint and no slow-mo (the robot always runs at full speed)
+    $('btn-hint').classList.toggle('hidden', !!L.hardcore); $('btn-speed').classList.toggle('hidden', !!L.hardcore);
+    if(L.hardcore){ if(speedBeforeHC === null) speedBeforeHC = speedFast; speedFast = true; } else if(speedBeforeHC !== null){ speedFast = speedBeforeHC; speedBeforeHC = null; }
+    $('btn-speed').textContent = speedFast ? '🐇' : '🐢';
+    showScreen('play'); resizeStage();
+    cheerMount(); /* 📣 cs-4c */
+    renderPalette(); renderProgram(); updateHud();
+    renderMission(); renderLegend();
+    G.thinkUntil = performance.now() + 4500;
+    robotSay(missionLine(), true);
+    if(L.loops) setTimeout(() => { if(G && G.B === B) showBanner(L.abs ? 'Tip: tap the same arrow again — one block that repeats ×2, ×3…' : 'Tip: tap ⬆ Go again — one block that goes ×2, ×3…'); }, 4200);
+    cancelAnimationFrame(rafId); rafId = requestAnimationFrame(loop);
+  }, 30);
+}
+function newBoard(){ if(G) startGame(G.lvlIdx, G.worldKey); }
+function leavePlay(){ cancelAnimationFrame(rafId); G = null; showScreen('levels'); renderLevels(); }
+function win(){
+  G.over = true; G.running = false; G.finishMs = elapsed(); updateRunBtn(); updateHud(); cheerEnd(true); /* 📣 cs-4c */
+  const lvlIdx = G.lvlIdx, used = G.prog.length, best = G.B.best, secs = Math.max(1, Math.round(G.finishMs / 1000));
+  let stars = used <= best ? 3 : used <= best + 2 ? 2 : 1;
+  if(G.hintUsed) stars = Math.min(stars, 2);
+  const par = 30 + 8 * best;
+  const score0 = 100 * (lvlIdx + 1) + Math.max(0, G.limit < 99 ? (G.limit - used) * 25 : (best + 4 - used) * 15) + G.got.size * 50 + Math.max(0, Math.round((par - secs) * 5));
+  const score = G.L.hardcore ? score0 * 3 : score0;   // 💀 Hardcore ×3
+  UISound.play('success');
+  const praise = pick(PRAISE), who = S.player || '';
+  const pr = $('praise'); pr.textContent = '🎉 ' + praise + (who ? ', ' + who : '') + '!'; pr.classList.remove('hidden');
+  burst(G.B.goal, ['⭐', '🎉', '✨', G.B.need.e], 14);
+  confetti(['🤖', '⭐', '🎉', G.B.need.e, '✨'], 40);
+  try{ if(UISound.get().enabled && window.speechSynthesis){ speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(praise + (who ? ', ' + who : '') + '!'); u.pitch = 1.3; speechSynthesis.speak(u); } }catch(e){}
+  const W = WORLDS[G.B.worldKey], nextOk = lvlIdx < LEVELS.length - 1;
+  const starHtml = [0, 1, 2].map(k => '<span class="st' + (k < stars ? '' : ' off') + '" style="animation-delay:' + (0.25 + k * 0.25) + 's">⭐</span>').join('');
+  setTimeout(() => {
+    if(!G || !G.over) return;
+    pr.classList.add('hidden');
+    GF.result({wrap: $('result'), card: $('result-card'), win: true, icon: '🤖', title: praise + '!', stars,   /* 🧱 b3w1: the shared 🏁 result card */
+      sub: 'Your code used ' + used + ' block' + (used === 1 ? '' : 's') + (G.limit < 99 ? ' · best is ' + best : '') + (G.hintUsed ? ' · 💡 hint used (2 ⭐ at most)' : used > best && G.limit < 99 ? ' · can you do it in ' + best + ' for 3 ⭐?' : ''),
+      score, stats: [[G.L.emoji, G.L.name], ['⏱', fmt(G.finishMs)], [W.star, G.got.size + '/' + G.B.stars.length]].concat(G.fails ? [['🛠️', G.fails + ' fix' + (G.fails === 1 ? '' : 'es')]] : []),
+      save: 'Saving your progress…', buddy: (window.Acting && typeof myAvatar === "function") ? {name: S.player, av: myAvatar(S.player)} : null, confetti: false,
+      levels: () => { hideResult(); leavePlay(); },
+      again: () => { hideResult(); G.over = false; G.finishMs = 0; G.prog = []; G.sel = -1; G.hintUsed = false; G.fails = 0; G.t0 = performance.now(); G.pausedTotal = 0; codeChanged(); }, againText: '🔁 Same board',
+      extra: [{text: '🔄 New board', id: 'btn-new', fn: () => newBoard()}],
+      next: nextOk ? () => { if(!canPlay(lvlIdx + 1)){ UI.toast('Clear this level to unlock the next one', 'err'); return; } startGame(lvlIdx + 1, G.worldKey); } : null, nextText: 'Next level ▶'});
+    cheerFaces();   /* 📣 cs-4c: the crowd's faces on the card */
+  }, REDUCED ? 300 : 1500);
+  saveWin(lvlIdx, {timeSec: secs, stars, theme: G.B.worldKey, score});
+}
+// Wins that could not reach the sheet wait in this browser and are sent later.
+const PENDING_KEY = 'sp_robot_pending';
+function readPending(){ try{ return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); }catch(e){ return []; } }
+function writePending(list){ try{ localStorage.setItem(PENDING_KEY, JSON.stringify(list.slice(-20))); }catch(e){} }
+function flushPending(){
+  const list = readPending(); if(!list.length) return; writePending([]);
+  list.forEach(w => google.script.run.withFailureHandler(() => writePending(readPending().concat([w]))).saveLevelResult(GAME_ID, w.name, w.lvl, w.extra));
+}
+function saveWin(lvlIdx, extra, tries){
+  tries = tries || 0;
+  const name = S.player;
+  const p = S.progress[name] || (S.progress[name] = {unlocked: 0, tokens: [], best: []});
+  p.unlocked = Math.max(p.unlocked, lvlIdx + 1);
+  google.script.run
+    .withSuccessHandler(res => {
+      const best = (p.best || [null, null, null, null, null]).slice(); if(res.best) best[lvlIdx] = res.best;
+      S.progress[name] = {unlocked: res.unlocked, tokens: res.tokens, best};
+      flushPending();
+      const note = $('save-note'); if(!note) return setTimeout(() => { const n2 = $('save-note'); if(n2) n2.innerHTML = saveText(res); }, 1600);
+      note.innerHTML = saveText(res);
+    })
+    .withFailureHandler(err => {
+      if(tries < 1){ setTimeout(() => saveWin(lvlIdx, extra, tries + 1), 1200); return; }
+      writePending(readPending().concat([{name, lvl: lvlIdx, extra}]));
+      const note = $('save-note'); if(note) note.innerHTML = '⚠️ Could not save yet — it will be sent again next time.<br><small style="opacity:.7">' + UI.esc((err && err.message) || '') + '</small>';
+    })
+    .saveLevelResult(GAME_ID, name, lvlIdx, extra);
+}
+function saveText(res){
+  if(res.newBadge) return '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>';
+  if(res.newHighScore && !res.firstTime) return '🎉 New high score!';
+  return res.best && res.best.score ? 'Your best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Progress saved';
+}
+function countUp(el, to, ms){ if(!el) return; const t0 = performance.now(); (function tick(now){ const p = Math.max(0, Math.min(1, (now - t0) / ms)); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))).toLocaleString(); if(p < 1) requestAnimationFrame(tick); })(t0); }
+/* 📣 CHEERSQUAD (cs-4c) START — the crowd beside the play (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+// fans stand only where the bar, the play area and the controls leave room; 🙂 Calm by default
+function cheerTaken(){ return Array.from(document.querySelectorAll('#gbar, #stage-wrap, #banner, #scr-play .code > *, #scr-play .actions, #legend')); }
+function cheerMount(){
+  if(!window.Cheer) return; Cheer.unmount(); const box = $('scr-play'); if(!G || !box || box.classList.contains('hidden')) return;
+  Cheer.mount(box, {game: 'coderobot', players: [{name: S.player, side: 0, human: true}, {name: 'Rival', side: 1, human: false}], me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'overlay',
+    zones: () => Cheer.freeZones(box, cheerTaken, {minW: 100}), avoid: cheerTaken,
+    clear: b => { const B = box.getBoundingClientRect(); return !cheerTaken().some(e => { const r = e.getBoundingClientRect(); if(r.width < 2 || r.height < 2) return false; const l = r.left - B.left, t = r.top - B.top; return b.r > l - 3 && b.l < l + r.width + 3 && b.b > t - 3 && b.t < t + r.height + 3; }); }});
+  clearInterval(window.__cheerHushT); window.__cheerHushT = setInterval(() => { if(!window.Cheer || !Cheer.active()){ clearInterval(window.__cheerHushT); return; } Cheer.hush(false); }, 150);
+}
+// small wins / misses get a 1.2 s breather; big ones and the ends always play. side: whose moment (default you = 0)
+function cheerSay(kind, why, side){ if(!kind || !window.Cheer || !Cheer.active() || !G) return; const now = performance.now();
+  if((kind === 'goal' || kind === 'miss') && (G.cheerAt || 0) > now - 1200) return; if(kind === 'big' && (G.cheerBig || 0) > now - 900) return;
+  if(kind === 'goal' || kind === 'miss') G.cheerAt = now; if(kind === 'big') G.cheerBig = now; Cheer.react(kind, {side: side || 0}); }
+function cheerEnd(won){ if(window.Cheer && Cheer.active()){ Cheer.hush(false); Cheer.react(won ? 'win' : 'lose', {side: 0}); } }
+function cheerFaces(n){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces')) return;
+  const at = card.querySelector('.res-btns'); if($('result').classList.contains('hidden') || !at){ if((n || 0) < 12) cheerFaces((n || 0) + 1); return; }   /* the card can come late (Stack It!) */
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); }, n ? 350 : 900); }
+/* 📣 CHEERSQUAD END */
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-4c */ }
+function hideResult(){ $('result').classList.add('hidden'); }
+function confetti(list, count){
+  if(REDUCED) return;
+  for(let i = 0; i < (count || 24); i++){ const e = document.createElement('div'); e.className = 'confetti'; e.textContent = pick(list);
+    e.style.left = Math.random() * 100 + 'vw'; e.style.animationDuration = (1.6 + Math.random() * 1.6) + 's'; e.style.animationDelay = (Math.random() * .5) + 's';
+    document.body.appendChild(e); setTimeout(() => e.remove(), 3800); }
+}
+
+/* ================= MENUS ================= */
+function showScreen(name){
+  if(name !== 'play' && window.Cheer) Cheer.unmount(); /* 📣 cs-4c */
+  ['player', 'levels', 'play'].forEach(s => $('scr-' + s).classList.toggle('hidden', s !== name));
+  $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   // 🧭 p1b
+  window.scrollTo(0, 0);
+}
+function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
+function canPlay(i){ const p = progressOf(S.player); if(i === 5) return p.unlocked >= 5; if(i === 4) return p.unlocked >= 4; return i <= Math.max(p.unlocked, AGE_START[S.age] || 0); }
+function renderPlayers(){
+  const box = $('player-list'); box.innerHTML = '';
+  if(!S.players.length){ box.innerHTML = '<div class="empty">No players yet — add one on the Dashboard first.</div>'; return; }
+  S.players.forEach(p => { const b = document.createElement('button'); b.className = 'pick'; b.setAttribute('data-sound', 'pop');
+    if(HAS_AV){ const c = document.createElement('canvas'); c.width = 144; c.height = 168; b.appendChild(c); b.insertAdjacentHTML('beforeend', '<div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age || '') + '</div>'); drawPreviewCanvas(c, myAvatar(p.Name), {name: p.Name, t: 1}); }   /* 🧑 p6 */
+    else b.innerHTML = '<div class="big">' + UI.esc(p.Name.charAt(0).toUpperCase()) + '</div><div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age || '') + '</div>';
+    b.onclick = () => choosePlayer(p.Name); box.appendChild(b); });
+}
+function choosePlayer(name){
+  UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
+  const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
+  $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4c */ renderLevels(); showScreen('levels'); openCover();   /* 🧱 b3w1: the 🎬 cover first */
+}
+function changePlayer(){ renderPlayers(); showScreen('player'); }
+function bestHtml(p, i){
+  const b = (p.best || [])[i];
+  if(!b || !(b.score || b.timeSec)) return '<div class="best none">' + (p.unlocked > i ? 'Finished!' : 'No score yet') + '</div>';
+  return '<div class="best">' + (b.score ? '<span>🏆 ' + Number(b.score).toLocaleString() + '</span>' : '') + '<span>' + '⭐'.repeat(b.stars || 0) + '</span></div>';
+}
+function renderLevels(){
+  const box = $('level-list'); box.innerHTML = ''; if(window.UI && UI.leaders) UI.leaders($('leaders'), 'robot-adventure', S.player);
+  const p = progressOf(S.player), rec = AGE_RECOMMEND[S.age];
+  LEVELS.forEach((L, i) => {
+    const open = canPlay(i), done = p.unlocked > i;
+    const b = document.createElement('button');
+    b.dataset.i = i;   /* 🧱 b3w1 */
+    b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (L.hardcore ? ' hardcore' : '');
+    b.setAttribute('data-sound', open ? 'pop' : 'none');
+    b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">🏅</span>' : (open ? '' : '<span class="badge">🔒</span>')) +
+      '<div class="big">' + L.emoji + '</div><div class="nm">' + L.name + '</div><div class="learn">Learn: ' + L.learn + '</div><div class="sub">' + L.blurb + '</div>' + bestHtml(p, i);
+    b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Beat Extreme to open 💀 Hardcore!' : i === 4 ? 'Clear Hard to unlock Extreme!' : 'Clear the level before this one to unlock it'); return; } chooseLevel(i); };
+    box.appendChild(b);
+  });
+  { let i = -1; try{ i = Number(localStorage.getItem(pickKey('lv'))); }catch(e){} if(!(i >= 0 && canPlay(i))) i = canPlay(rec) ? rec : Math.max(0, [0, 1, 2, 3, 4, 5].filter(canPlay).pop() || 0);
+    chosenLevel = i; } renderWorlds(); markPicks();   /* 🧱 b3w1 */
+}
+/* 🧱 b3w1 (Game Baseline): ONE setup page — 🎚️ level → 🌍 world → ⚙️ options → ▶ Start; the picks are remembered per player */
+const gfPick = (el, on) => { if(window.GF && GF.pick) GF.pick(el, on); };   /* ✓ the ONE picked look (GameFrame) */
+let chosenLevel = 0, chosenWorld = 'surprise';
+const pickKey = k => 'sp_robot_' + k + ':' + (S.player || '');
+function chooseLevel(i, quiet){
+  chosenLevel = i; try{ localStorage.setItem(pickKey('lv'), String(i)); }catch(e){}
+  markPicks(); if(!quiet){ const w = $('world-head'); if(w && w.scrollIntoView) w.scrollIntoView({behavior: REDUCED ? 'auto' : 'smooth', block: 'start'}); }
+}
+function chooseWorld(k){ chosenWorld = k; try{ localStorage.setItem(pickKey('world'), k); }catch(e){} markPicks(); }
+function renderWorlds(){
+  const box = $('world-list'); box.innerHTML = '';
+  const mk = (k, big, nm, sub) => { const b = document.createElement('button'); b.className = 'pick' + (k === 'surprise' ? ' surprise' : ''); b.dataset.k = k; b.setAttribute('data-sound', 'pop');
+    b.innerHTML = '<div class="big">' + big + '</div><div class="nm">' + nm + '</div><div class="sub">' + sub + '</div>'; b.onclick = () => chooseWorld(k); box.appendChild(b); };
+  mk('surprise', '🎲', 'Surprise me!', 'Any world');
+  Object.keys(WORLDS).forEach(k => { const W = WORLDS[k]; mk(k, W.icon, W.name, W.movers.slice(0, 3).join('')); });
+  let w = 'surprise'; try{ w = localStorage.getItem(pickKey('world')) || 'surprise'; }catch(e){} chosenWorld = (w === 'surprise' || WORLDS[w]) ? w : 'surprise';
+}
+function markPicks(){
+  document.querySelectorAll('#level-list .lvl').forEach(b => { const on = Number(b.dataset.i) === chosenLevel; b.classList.toggle('sel', on); gfPick(b, on); });
+  document.querySelectorAll('#world-list .pick').forEach(b => { const on = b.dataset.k === chosenWorld; b.classList.toggle('sel', on); gfPick(b, on); });
+  const L = LEVELS[chosenLevel], W = WORLDS[chosenWorld], st = $('btn-start');
+  if(st && L) st.textContent = '▶ Start · ' + L.emoji + ' ' + L.name + ' · ' + (W ? W.icon + ' ' + W.name : '🎲 Surprise');
+}
+function startSetup(){ if(!canPlay(chosenLevel)){ UISound.play('error'); UI.toast('Pick a level that is open 🔓'); return; } startGame(chosenLevel, chosenWorld); }
+// 🎬 the cover (GameFrame): who's here + champions + how to play; ▶ Play opens the setup page
+let RobotCover = null;
+const ROBOT_VERSION = '2.1';   /* 🧱 b3w1: shown on the cover footer — bump with each Code Robot round */
+function openCover(){
+  if(!window.GF){ showScreen('levels'); return; }
+  if(RobotCover && RobotCover.who !== S.player){ RobotCover.destroy(); RobotCover = null; }
+  if(!RobotCover){ RobotCover = GF.cover(document.body, {game: 'robot-adventure', title: 'Code the Robot', icon: '🤖', version: ROBOT_VERSION, me: S.player, players: S.players, avatarOf: myAvatar, seats: {min: 1, max: 1},
+      acts: ['beat.wave', 'beat.cast'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms',
+      onPlay: () => { RobotCover.hide(); showScreen('levels'); } }); RobotCover.who = S.player; }
+  RobotCover.show();
+}
+function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
+function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }   // 🧭 p1b: ◀ = where you came from (Gameroom if we don't know)
+
+// Keyboard: arrows / G L R W add blocks, Enter runs, Backspace removes.
+document.addEventListener('keydown', e => {
+  if(!G || $('scr-play').classList.contains('hidden') || !$('result').classList.contains('hidden')) return;
+  const map = G.L.abs ? {ArrowUp:'U', ArrowRight:'Ri', ArrowDown:'D', ArrowLeft:'Le', KeyW:'W', Space:'W', KeyJ:'J', KeyS:'S'} : {ArrowUp:'F', KeyG:'F', ArrowLeft:'L', KeyL:'L', ArrowRight:'R', KeyR:'R', KeyW:'W', KeyJ:'J', KeyS:'S'};
+  if(map[e.code] && cmdsFor(G.L).includes(map[e.code])){ e.preventDefault(); addBlock(map[e.code]); UISound.play('pop'); }
+  else if(e.code === 'Enter'){ e.preventDefault(); runOrStop(); }
+  else if(e.code === 'Backspace'){ e.preventDefault(); deleteBlock(); }
+});
+
+/* ================= BOOT ================= */
+function boot(){
+  UI.loading('robot-wake');
+  google.script.run
+    .withSuccessHandler(d => {
+      UI.loaded();
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {};
+      UISound.applySettings(S.settings);
+      const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
+      lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
+      flushPending();
+      if(CURRENT_PLAYER && S.players.some(p => p.Name === CURRENT_PLAYER)) choosePlayer(CURRENT_PLAYER);
+      else { renderPlayers(); showScreen('player'); }
+    })
+    .withFailureHandler(() => { UI.loaded(); UI.toast('Could not load players — check the connection', 'err'); renderPlayers(); showScreen('player'); })
+    .getLevelGameData(GAME_ID, CURRENT_PLAYER);
+}
+const BD_CV = Object.assign(document.createElement('canvas'), {id: 'bd-lg', className: 'bd'}); BD_CV.setAttribute('aria-hidden', 'true');   // lives in the mission card
+/* ================= 🧑 YOUR AVATAR (p6b — ✨ P6 / 11w round 2) =================
+   The player's own avatar beside the game: UI.buddy pictures (cached AvatarActing frames, swapped by a small timer) —
+   nothing is painted in the game loop. It reacts to the game's own moments through the wrappers below (no game logic changes). */
+const HAS_AV = typeof drawAvatar === 'function' && typeof GESTURES !== 'undefined';
+function myAvatar(name){ const a = S.avatars && S.avatars[name || S.player]; return a ? fixAv(a) : defaultAvatar(name || S.player || 'player'); }
+const BD_SAY = {};
+const BD = {on: false, who: null, list: []};
+function bdStart(){
+  BD.list.forEach(b => b && b.stop()); BD.list = []; BD.on = false;
+  const els = ['bd-lg'].map(id => document.getElementById(id)).filter(Boolean);
+  if(!HAS_AV || !UI.buddy || !window.Acting){ els.forEach(e => e.classList.add('hidden')); return; }
+  BD.who = {name: S.player, av: myAvatar(S.player)}; BD.list = els.map((e, i) => UI.buddy(e, BD.who, i ? {fps: 6} : {})).filter(Boolean); BD.on = !!BD.list.length;
+}
+function bdReact(mood, ms){ if(!BD.on) return false; let a = false; BD.list.forEach(b => { const x = b.react(mood, ms); if(x) a = x; });  return a; }
+function bdResultBig(){ const big = document.querySelector('#result-card > .big'); if(!big || !BD.on) return; const won = !!document.querySelector('#result-card h2.cheer'); const c = document.createElement('canvas'); c.className = 'res-av'; c.id = 'res-av'; c.setAttribute('aria-hidden', 'true'); big.replaceWith(c); bdResult('res-av', won); }
+function bdResult(id, won){ if(BD.on && document.getElementById(id)) UI.buddy(document.getElementById(id), BD.who, {hold: won ? 'win' : 'lose'}); }
+const bdBase = {renderMission, runOrStop, onFail, win, showResult};
+renderMission = function(){ const args = arguments;  const r = bdBase.renderMission.apply(this, args); const ms = document.getElementById('mission'); if(ms && HAS_AV) ms.insertBefore(BD_CV, ms.firstChild); if(BD.g !== G){ BD.g = G; bdStart(); } return r; };
+runOrStop = function(){ const args = arguments;  const r = bdBase.runOrStop.apply(this, args); if(G && G.running) bdReact('joy', 1400); return r; };
+onFail = function(){ const args = arguments;  const r = bdBase.onFail.apply(this, args); bdReact('miss', 2200); return r; };
+win = function(){ const args = arguments;  const r = bdBase.win.apply(this, args); bdReact('win', 3200); return r; };
+showResult = function(){ const args = arguments;  const r = bdBase.showResult.apply(this, args); if(document.getElementById('res-av')) bdResult('res-av', /class="cheer"/.test(args[0])); return r; };
+/* ================= 🧑 YOUR AVATAR END (p6b) ================= */
+boot();
