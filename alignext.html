@@ -2117,9 +2117,10 @@ function lxIdle(){ try{ if(window.Link && Link.status() !== 'idle') Link.leave()
 // 🎲 ONE seeded dice for every random result in a linked game (same rolls in the same order on every device); outside a linked game = Math.random
 function lxRand(){ if(!(G && G.lx)) return Math.random(); const s = (Math.imul(G.lx.rs >>> 0, 1664525) + 1013904223) >>> 0; G.lx.rs = s; return s / 4294967296; }
 // ---- the host's picks (remembered per player) ----
-function lxMode(){ const m = lsGet('lx_mode', 'drop'); return LX_MODES[m] ? m : 'drop'; }
+// 📺 lk-ax3: from the 📺 Game Station the voted mode + board win (LX.st, held in memory — the TV's own picks stay as they were)
+function lxMode(){ if(LX.st && LX_MODES[LX.st.mode]) return LX.st.mode; const m = lsGet('lx_mode', 'drop'); return LX_MODES[m] ? m : 'drop'; }
 function lxSizes(m){ return DUO_SIZES[(m || lxMode()) === 'drop' ? 'drop' : 'omni']; }
-function lxBoardKey(m){ m = m || lxMode(); const key = m === 'drop' ? 'lx_board' : 'lx_board_omni', k = lsGet(key, 'm'); return lxSizes(m).some(z => z.k === k) ? k : 'm'; }
+function lxBoardKey(m){ m = m || lxMode(); if(LX.st) return LX.st.board; const key = m === 'drop' ? 'lx_board' : 'lx_board_omni', k = lsGet(key, 'm'); return lxSizes(m).some(z => z.k === k) ? k : 'm'; }
 function lxCardsOn(){ return lsGet('lx_cards', '0') === '1'; }
 // 📱 the room on the cover: the host's picks as chips — tap = the next one
 function lxCoverPicks(el){
@@ -2127,6 +2128,7 @@ function lxCoverPicks(el){
   el.innerHTML = '<button class="lkc-chip" data-k="mode" data-sound="none">' + LX_MODES[m] + '</button><button class="lkc-chip" data-k="board" data-sound="none">🗺️ ' + z.W + '×' + z.H + ' · ' + z.line + ' in a row</button>' +
     (m === 'stack' ? '' : '<button class="lkc-chip" data-k="cards" data-sound="none">🃏 Cards: ' + (lxCardsOn() ? 'on' : 'off') + '</button>') +
     '<button class="lkc-chip" data-k="look" data-sound="none">' + T.icon + ' ' + UI.esc(T.name) + '</button>';
+  if(LX.st){ el.querySelectorAll('.lkc-chip').forEach(b => { b.disabled = true; b.title = '📺 voted on the phones'; }); return; }   // 📺 lk-ax3: the station's picks — shown, not changed here
   el.querySelectorAll('.lkc-chip').forEach(b => b.onclick = e => { e.stopPropagation(); const k = b.dataset.k;
     if(k === 'mode'){ const ks = Object.keys(LX_MODES), n = ks[(ks.indexOf(m) + 1) % ks.length]; lsSet('lx_mode', n); if(n !== 'drop') UI.toast(LX_MODES[n] + ' is for 2 players (📺 1 player = you vs 🤖)'); }
     else if(k === 'board'){ const ks = lxSizes(m).map(x => x.k); lsSet(m === 'drop' ? 'lx_board' : 'lx_board_omni', ks[(ks.indexOf(lxBoardKey(m)) + 1) % ks.length]); }
@@ -2421,6 +2423,21 @@ function lxUrlCode(cb){
 }
 msAfter('choosePlayer', () => lxUrlCode(c => { c = String(c || '').replace(/[^0-9]/g, '').slice(0, 4); if(c.length !== 4 || !window.Link || !Link.cover) return;
   setTimeout(() => { openCover(); if(!AlignCover) return; lxWire(); Link.cover(AlignCover, AX_ROOM); Link.cover.join(c); }, 0); }));
+// ---- 📺 lk-ax3: the 📺 TV Game Station (LinkKit plan §52) ----
+// TV (?mode=ltv&st&stv=1&slv=<level>&ssp=drop|classic|stack): lxStation() opens the cover room as the 📺 Room hostess with the voted mode + board
+// (🌱 S · 🐣 M · 🔥 L · ⚡ XL; 3–4 players on 🔴 Drop = the party stand as always; 🃏 cards + 🎨 look = the TV's own) → Station starts it when the voted
+// players are in (1 = you vs 🤖 Robo) · phones join through the ?link door above and get the 🗳️ 🔁 / 🎮 bar on the result card.
+function lxStation(t){
+  if(!(window.Station && window.Link && Link.cover)) return false;
+  if(!Station.on){ if((t | 0) < 60) setTimeout(() => lxStation((t | 0) + 1), 50); return false; }   // Station.game reads the link a moment after the page starts
+  if(!Station.tv) return false;
+  const m = LX_MODES[Station.way] ? Station.way : 'drop', ks = lxSizes(m).map(z => z.k), lv = Station.lvl == null ? 1 : Station.lvl;
+  LX.st = {mode: m, board: ks[Math.max(0, Math.min(ks.length - 1, lv))] || 'm'};
+  openCover(); if(!AlignCover) return false;
+  lxWire(); Link.cover.tv(AlignCover, AX_ROOM); return true;
+}
+msAfter('choosePlayer', () => { if(window.Station) Station.params().then(p => { if(p.mode === 'ltv' && p.stv === '1' && /^\d{4}$/.test(String(p.st || ''))) setTimeout(() => lxStation(), 0); }); });
+if(window.Station) Station.game({url: WEBAPP_URL, page: 'alignext', player: () => S.player || CURRENT_PLAYER, start: () => Link.cover.start(), again: () => lxHostGo()});
 /* 📡 END LINK (lk-ax2) */
 </script>
 <script>
@@ -2464,4 +2481,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (11x-5+back-1+modes-3+mg-1+p1d+p3a+p3e+p4a+cs-3b+b3w2+24u-b+lk-ax1+lk-ax2) END OF Alignext.html -->
+<!-- (11x-5+back-1+modes-3+mg-1+p1d+p3a+p3e+p4a+cs-3b+b3w2+24u-b+lk-ax1+lk-ax2+lk-ax3) END OF Alignext.html -->
