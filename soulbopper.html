@@ -227,6 +227,14 @@
   .sidechips .pchip{width:100%;box-sizing:border-box;overflow:hidden;} .sidechips .pchip .por{width:34px;height:40px;} .sidechips .pchip .stt{display:none;}
   .sidechips.tight .pchip .pw .pt:nth-child(n+3){display:none;}
   .chipcol.mini{width:118px;gap:5px;} .chipcol.mini .pchip .por{width:34px;height:40px;} .chipcol.mini .pchip .pw .pt:nth-child(n+3){display:none;} .chipcol.mini .pchip{overflow:hidden;} .chipcol.mini .pchip .stt{display:none;}
+  /* 📱 24z-c SIDEWAYS TALL MAZE: phone on its side → the bar floats over the top, the maze takes the whole height (clock on the top wall row) */
+  #scr-play.side.sbtall #gbar{position:absolute;top:0;left:0;right:0;z-index:12;background:transparent !important;box-shadow:none !important;border-color:transparent !important;pointer-events:none;}
+  #scr-play.side.sbtall #gbar > *{pointer-events:auto;} #scr-play.side.sbtall #gbar .gb-stats{pointer-events:none;} #scr-play.side.sbtall #gbar .gb-stats > *{pointer-events:auto;}
+  #scr-play.side.sbtall #gbar .gb-board{transform:scale(var(--sbclk,1));transform-origin:50% 0;}
+  #scr-play.side.sbtall .ctl.panel{padding-top:calc(var(--sbbar,46px) + 4px);}
+  #scr-play.side.sbtall .banner{top:calc(var(--sbbar,46px) + 6px);}
+  /* 📱 24z-c: upright phones — the 🌸 ring's empty box never makes the page slide sideways */
+  #scr-play.port .ctl{overflow-x:clip;}
   .comics-slot:empty,.comic-strip-slot:empty{display:none;}
   /* corners (2–4 players on one tablet) */
   .corner{position:absolute;z-index:8;display:flex;align-items:center;gap:6px;touch-action:none;padding:6px;border-radius:20px;background:rgba(20,8,40,0.35);border:2px solid var(--pc,#FF7A1A);}
@@ -1715,11 +1723,11 @@ function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!car
 function layoutPlay(){
   const sp = $('scr-play'), arena = $('arena'), bottom = $('bottom'), W = window.innerWidth, H = window.innerHeight;
   arena.querySelectorAll('.ctl,.corner,.help-btn,.chelp').forEach(e => e.remove()); bottom.innerHTML = '';
-  sp.classList.remove('side', 'port', 'corners');
+  sp.classList.remove('side', 'port', 'corners', 'sbtall');
   const touch = isTouch() || window.FORCE_TOUCH, seats = humanSeats();
   G.inset = {l: 0, r: 0, t: 0, b: 0};
   if(touch && seats.length === 1){
-    if(W > H){ sp.classList.add('side'); const c1 = ctlEl(seats[0], 'pad'), c2 = ctlEl(seats[0], 'btns'); c1.classList.add('panel', 'l'); c2.classList.add('panel', 'r');   // sb-9a2: cards on top of each side panel
+    if(W > H){ sp.classList.add('side'); if(sbTall24zc()) sp.classList.add('sbtall'); const c1 = ctlEl(seats[0], 'pad'), c2 = ctlEl(seats[0], 'btns'); c1.classList.add('panel', 'l'); c2.classList.add('panel', 'r');   // sb-9a2: cards on top of each side panel
       c1.insertAdjacentHTML('afterbegin', '<div class="sidechips" id="sidechips-l"></div>'); c2.insertAdjacentHTML('afterbegin', '<div class="sidechips" id="sidechips-r"></div>'); arena.insertBefore(c1, arena.firstChild); arena.appendChild(c2); layoutSide(); }
     else { sp.classList.add('port'); bottom.appendChild(ctlEl(seats[0], 'both')); }
   } else if(touch && seats.length > 1){
@@ -1734,6 +1742,18 @@ function layoutPlay(){
   }
   if(window.UI && UI.pad) UI.pad.arcAll(sp);
   requestAnimationFrame(() => { resize(); placeChips(); layoutSide(); });
+}
+// 📱 24z-c SIDEWAYS TALL MAZE (✨ Polish chat, Aowu 2026-11-20 "ok A go"): one person on a touch phone held sideways → the bar floats over
+// the top and the maze takes the whole height. Off: window.SB_TALL = false. Tablets (≥ 560 px tall), desk and 2–4 player corners unchanged.
+function sbTall24zc(){ return window.SB_TALL !== false && window.innerHeight < 560; }
+function sbTallFit24zc(sp){
+  if(!sp.classList.contains('sbtall') || !G) return;
+  const bar = $('gbar'), bd = bar && bar.querySelector('.gb-board'); if(!bar) return;
+  sp.style.setProperty('--sbbar', Math.round(bar.getBoundingClientRect().height) + 'px');
+  if(!bd) return; sp.style.setProperty('--sbclk', '1');
+  const R = boardRect(), st = $('stage').getBoundingClientRect(), b = bd.getBoundingClientRect(); if(!b.height) return;
+  const wall = st.top + R.OY + R.CS - 3;   // the clock stays on the maze's top wall row (nobody walks there)
+  sp.style.setProperty('--sbclk', Math.max(0.7, Math.min(1, (wall - b.top) / b.height)).toFixed(3));
 }
 // sb-9a2: phone on its side — the map takes the full height between the bar and the bottom; the two side panels share what's left,
 // then the stick + buttons grow to fill their panel (≥ 72 px buttons, side by side when the panel is wide enough)
@@ -1751,6 +1771,7 @@ function layoutSide(){
   sp.style.setProperty('--pad', padSize + 'px'); sp.style.setProperty('--btn', b + 'px'); sp.style.setProperty('--bdir', dir); sp.style.setProperty('--sklift', lift + 'px');
   [L, Rr].forEach(x => x && x.classList.toggle('tight', inner < 150));
   if(window.UI && UI.pad){ sp.style.setProperty('--pad', Math.round(Math.max(120, Math.min(padSize, UI.pad.px('stick')))) + 'px'); UI.pad.arcAll(sp); }   // 🕹️ pz-1: the shared stick size, ring placed
+  sbTallFit24zc(sp);   // 📱 24z-c
 }
 /* 💥📣 sb-9a — ROOM FOR COMICS + THE CROWD (the 💥 Comics chat / 📣 Cheer chat wire their kits here; this game draws no comics itself)
    GameComic.mode()        → 'battle' | 'classic' | 'hold' | 'stage' | ''  (the live match's mode)
@@ -2894,4 +2915,4 @@ const ANN = (function(){
 </script>
 </body>
 </html>
-<!-- (sb-8+r33+back-1+modes-3+mg-1+p1c+sb-9a+sb-9a2+p2+p3a+p3c+ck-2a+cs-2b+sb-9+pz-1+b3w5+24t-d+24u-d1+b3b7+an-1+an-2) END OF SoulBopper.html -->
+<!-- (sb-8+r33+back-1+modes-3+mg-1+p1c+sb-9a+sb-9a2+p2+p3a+p3c+ck-2a+cs-2b+sb-9+pz-1+b3w5+24t-d+24u-d1+b3b7+an-1+an-2+24z-c) END OF SoulBopper.html -->
