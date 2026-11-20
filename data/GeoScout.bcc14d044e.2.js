@@ -1,0 +1,1701 @@
+
+// ENGINE START
+// 🔢 GeoScout engine — pure JS, no DOM: levels, puzzle makers (⚖️ Scale, 🧱 Count), number-block moves (snap = +, split = −, copy = ×, share = ÷), scoring, stars.
+const GS = (function(){
+  const LEVELS = [
+    {name: 'Basic',        max: 5,    rounds: 6,  mult: 1,   ops: '+',    hint: true,  range: [2, 5]},
+    {name: 'Junior',       max: 10,   rounds: 8,  mult: 1.5, ops: '+-',   hint: true,  range: [4, 10]},
+    {name: 'Intermediate', max: 20,   rounds: 8,  mult: 2,   ops: '+-',   hint: true,  range: [8, 20], shapes: true, tens: true},
+    {name: 'Hard',         max: 100,  rounds: 8,  mult: 3,   ops: '+-x/', hint: false, range: [12, 100], shapes: true, tens: true},
+    {name: 'Extreme',      max: 100,  rounds: 10, mult: 4,   ops: '+-x/', hint: false, range: [20, 100], shapes: true, tens: true, two: true},
+    {name: 'Hardcore',     max: 1000, rounds: 10, mult: 5,   ops: '+-x/', hint: false, range: [100, 1000], tens: true, two: true, time: 240, lives: 1}
+  ];
+  const MODES = {
+    scale: {icon: '⚖️', name: 'Scale', sub: 'More, less or the same? Balance it!'},
+    count: {icon: '🧱', name: 'Count', sub: 'Snap and split blocks to make the number'},
+    shape: {icon: '🔷', name: 'Shape builder', sub: 'Squares, rectangles, steps — corners and area'},
+    tens: {icon: '🔟', name: 'Tens tower', sub: 'Ten ones snap into a ten-tower'},
+    next: {icon: '🧩', name: 'What comes next', sub: 'Patterns, steps, odd and even'},
+    frac: {icon: '🍕', name: 'Fractions', sub: 'Halves, thirds, quarters — which is bigger?'},
+    wobble: {icon: '🏗️', name: 'Wobble tower', sub: 'Stack to the EXACT height'},
+    journey: {icon: '📖', name: 'Journey', sub: 'Meet the number friends — 6 story chapters'},
+    battle: {icon: '⚔️', name: 'Tower battle', sub: '2 players · higher or lower wins · best of 5', multi: true}
+  };
+  // a shape weighs as many blocks as it has corners (Geometric!)
+  const SHAPES = {tri: {name: 'triangle', w: 3, col: '#FF7A59'}, sq: {name: 'square', w: 4, col: '#4C9AFF'}, pent: {name: 'pentagon', w: 5, col: '#9B6BFF'}, hex: {name: 'hexagon', w: 6, col: '#22C3A1'}};
+  const SHAPE_KEYS = Object.keys(SHAPES);
+  const SYM = {'+': '+', '-': '−', 'x': '×', '/': '÷'};
+  const AVATAR_W = [[3, 5], [6, 10], [11, 20], [20, 60], [30, 90], [100, 400]];
+
+  function hashStr(s){ let h = 2166136261; for(const c of String(s)){ h ^= c.codePointAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function rng(seed){ let a = (seed >>> 0) || 1; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  const ri = (r, lo, hi) => lo + Math.floor(r() * (Math.max(lo, hi) - lo + 1));
+  const pick = (r, a) => a[Math.floor(r() * a.length)];
+  function shuffle(r, a){ a = a.slice(); for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(r() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function opv(a, op, b){ return op === '+' ? a + b : op === '-' ? a - b : op === 'x' ? a * b : a / b; }
+  function val(it){ if(!it) return 0; if(it.t === 'n') return it.n; if(it.t === 's') return SHAPES[it.k].w; if(it.t === 'av') return it.w; if(it.t === 'x') return opv(it.a, it.op, it.b); return 0; }
+  function total(list){ return (list || []).reduce((s, it) => s + val(it), 0); }
+  function text(it){ if(it.t === 'n') return String(it.n); if(it.t === 's') return SHAPES[it.k].name; if(it.t === 'av') return it.name; if(it.t === 'x') return it.a + ' ' + SYM[it.op] + ' ' + it.b; return ''; }
+  function sideText(list){ return list.map(text).join(' + '); }
+  function cmp(a, b){ return a < b ? '<' : a > b ? '>' : '='; }
+  const N = n => ({t: 'n', n});
+  function avatarWeight(name, level){ const R = AVATAR_W[level] || AVATAR_W[0]; return R[0] + hashStr(String(name || 'player') + '|w') % (R[1] - R[0] + 1); }
+
+  // k positive parts that add up to D (tens-friendly parts on the bigger levels)
+  function parts(r, D, k, tens){
+    k = Math.max(1, Math.min(k, D)); const out = []; let left = D;
+    for(let i = 0; i < k - 1; i++){
+      const room = left - (k - 1 - i);
+      let p = ri(r, 1, Math.max(1, Math.min(room, Math.ceil(left * 0.7))));
+      if(tens && p > 10 && r() < 0.6) p = Math.max(10, Math.round(p / 10) * 10);
+      p = Math.max(1, Math.min(p, room)); out.push(p); left -= p;
+    }
+    out.push(left); return out;
+  }
+  function distractors(r, avoid, hi, n){ const out = [], bad = new Set(avoid); let guard = 0; hi = Math.max(3, hi);
+    while(out.length < n && guard++ < 200){ const v = ri(r, 1, hi); if(!bad.has(v)){ out.push(v); bad.add(v); } } return out; }
+  function partCount(Li){ return Li <= 1 ? 2 : Li <= 3 ? 2 + (Li === 3 ? 0 : 1) : 3; }
+
+  /* ---------- ⚖️ SCALE ---------- */
+  function valRange(Li){ return [[1, 5], [2, 10], [2, 20], [4, 100], [6, 100], [50, 1000]][Li]; }
+  // an expression with value v (ops allowed by the level), never a plain number
+  function exprFor(v, Li, r, avoidOp){
+    const L = LEVELS[Li], max = Math.max(L.max, v), opts = [];
+    if(L.ops.indexOf('+') >= 0 && v >= 2){ const a = L.tens && v > 20 && r() < 0.6 ? Math.max(1, Math.min(v - 1, Math.round(ri(r, 1, v - 1) / 10) * 10)) : ri(r, 1, v - 1); opts.push({t: 'x', a, op: '+', b: v - a}); }
+    if(L.ops.indexOf('-') >= 0){ const b = ri(r, 1, Math.max(1, Math.min(max - v, Li >= 5 ? 300 : Li >= 3 ? 30 : 9))); if(v + b <= max) opts.push({t: 'x', a: v + b, op: '-', b}); }
+    if(L.ops.indexOf('x') >= 0){ const fs = []; for(let b = 2; b <= 9; b++) if(v % b === 0 && v / b >= 2) fs.push(b); if(fs.length){ const b = pick(r, fs); opts.push({t: 'x', a: v / b, op: 'x', b}); } }
+    if(L.ops.indexOf('/') >= 0){ const ms = []; for(let m = 2; m <= 5; m++) if(v * m <= (Li >= 5 ? 2000 : 200)) ms.push(m); if(ms.length){ const m = pick(r, ms); opts.push({t: 'x', a: v * m, op: '/', b: m}); } }
+    const o = opts.filter(x => x.op !== avoidOp), list = o.length ? o : opts;
+    return list.length ? pick(r, list) : N(v);
+  }
+  // items on one side of the scale that weigh v
+  function sideItems(v, Li, r, style){
+    const L = LEVELS[Li];
+    if(Li === 0 || style === 'plain') return [N(v)];
+    if(L.shapes && v <= 20 && r() < 0.35){ const sh = SHAPE_KEYS.filter(k => SHAPES[k].w <= v); if(sh.length){ const k = pick(r, sh), list = [{t: 's', k}]; let rest = v - SHAPES[k].w; const k2 = SHAPE_KEYS.filter(q => SHAPES[q].w <= rest);
+        if(k2.length && r() < 0.5){ const q = pick(r, k2); list.push({t: 's', k: q}); rest -= SHAPES[q].w; } if(rest > 0) list.push(N(rest)); return list; } }
+    if(Li <= 2 && (Li === 1 || r() < 0.5) && v >= 2) return parts(r, v, 2, L.tens).map(N);
+    return [exprFor(v, Li, r, style)];
+  }
+  function makeCompare(Li, r){
+    const [lo, hi] = valRange(Li), rel = r() < 0.3 ? '=' : r() < 0.5 ? '<' : '>';
+    let a, b; a = ri(r, lo, hi);
+    if(rel === '='){ b = a; }
+    else { const d = Math.max(1, Math.round((hi - lo) * (Li >= 3 ? 0.08 : 0.25))); b = rel === '<' ? a + ri(r, 1, d) : a - ri(r, 1, d); if(b > hi || b < lo){ b = rel === '<' ? a - ri(r, 1, d) : a + ri(r, 1, d); } if(b < 1) b = a + 1; if(b === a) b = a + 1; }
+    const left = sideItems(a, Li, r, 'expr'), avoid = left.length === 1 && left[0].t === 'x' ? left[0].op : '';
+    const right = Li >= 4 ? [exprFor(b, Li, r, avoid)] : (Li >= 2 && r() < 0.4 ? sideItems(b, Li, r, 'expr') : [N(b)]);
+    return {kind: 'compare', left, right, tray: [], answer: cmp(total(left), total(right)), par: 0};
+  }
+  function makeBalance(Li, r){
+    const L = LEVELS[Li], [lo, hi] = valRange(Li);
+    const V = ri(r, Math.max(lo, Li === 0 ? 2 : lo + 1), hi), left = sideItems(V, Li, r, 'expr');
+    let right = [];
+    if((Li >= 4 || (Li >= 2 && r() < 0.5)) && V >= 4){ const p = ri(r, 1, Math.max(1, Math.floor(V / 2))); right = [N(p)]; }
+    const D = V - total(right), k = Math.min(D, Li === 0 ? (D >= 2 && r() < 0.5 ? 2 : 1) : partCount(Li)), ps = parts(r, D, Math.max(1, k), L.tens);
+    const tray = shuffle(r, ps.map(N).concat(distractors(r, ps.concat([D]), Math.min(L.max, Math.max(5, D)), Li >= 3 ? 2 : 1).map(N)));
+    return {kind: 'balance', left, right, tray, need: V, par: ps.length, plan: ps};
+  }
+  function makeAvatar(Li, r, av){
+    const L = LEVELS[Li], w = av.w, ps = parts(r, w, Li === 0 ? 2 : Li <= 2 ? 2 : 3, L.tens);
+    const tray = shuffle(r, ps.map(N).concat(distractors(r, ps.concat([w]), Math.min(L.max, Math.max(5, w)), 1).map(N)));
+    return {kind: 'avatar', left: [{t: 'av', name: av.name, w}], right: [], tray, need: w, par: ps.length, plan: ps};
+  }
+  function makeScale(Li, r, round, opt){
+    opt = opt || {};
+    if(opt.avatar && round === 2) return makeAvatar(Li, r, opt.avatar);
+    return round % 2 === 0 ? makeCompare(Li, r) : makeBalance(Li, r);
+  }
+
+  /* ---------- 🧱 COUNT ---------- */
+  function capFor(Li){ return Li < 3 ? 0 : Li < 5 ? 200 : 2000; }
+  function makeCount(Li, r, round){
+    const L = LEVELS[Li], [lo, hi] = L.range;
+    const kinds = Li === 0 ? ['add'] : Li <= 2 ? ['add', 'take', 'add', 'take'] : Li === 3 ? ['add', 'copy', 'take', 'share'] : ['two', 'copy', 'share', 'take', 'two', 'add'];
+    const kind = kinds[round % kinds.length];
+    let T, tray, plan, par;
+    if(kind === 'add'){
+      const k = Li <= 1 ? 2 : (Li === 5 ? 2 : 3); T = ri(r, Math.max(lo, k + 1), hi);
+      const ps = parts(r, T, k, L.tens); tray = ps.slice(); plan = []; let acc = ps[0]; for(let i = 1; i < ps.length; i++){ plan.push(['snap', acc, ps[i]]); acc += ps[i]; } par = ps.length - 1;
+    } else if(kind === 'take'){
+      T = ri(r, lo, Math.max(lo, hi - 1)); const e = ri(r, 1, Math.max(1, Math.min(L.max - T, Math.ceil(T * 0.6)))), B = T + e;
+      tray = [B]; plan = [['split', B, e]]; par = 1;
+    } else if(kind === 'copy' || kind === 'share'){
+      const top = Li >= 5 ? 1000 : 100, m = ri(r, 2, Li >= 5 ? 9 : 5), bLo = Math.max(2, Math.ceil(lo / (kind === 'copy' ? m : 1))), bHi = Math.max(bLo, Math.floor(top / m));
+      const b = ri(r, bLo, bHi);
+      if(kind === 'copy'){ T = b * m; tray = [b]; plan = [['copy', b, m]]; } else { T = b; tray = [b * m]; plan = [['share', b * m, m]]; }
+      par = 1;
+    } else {   // two steps: copy then add
+      const top = Li >= 5 ? 1000 : 100, m = ri(r, 2, 5), b = ri(r, Li >= 5 ? 20 : 3, Math.max(Li >= 5 ? 20 : 3, Math.floor(top * 0.8 / m))), c = ri(r, 1, Math.max(1, Math.min(top - b * m, Li >= 5 ? 90 : 9)));
+      T = b * m + c; tray = [b, c]; plan = [['copy', b, m], ['snap', b * m, c]]; par = 2;
+    }
+    const extra = distractors(r, tray.concat([T]), Math.min(L.max, Math.max(5, Math.ceil(T * 0.6))), 1);
+    tray = shuffle(r, tray.concat(extra));
+    return {kind: 'count', ck: kind, target: T, tray, plan, par};
+  }
+
+  /* ---------- 🔷 SHAPE BUILDER (round 2) ---------- */
+  const GRID = [6, 8, 8, 10, 10, 12];
+  function stairCorners(n){ return 2 * n + 2; }
+  function makeShape(Li, r, round){
+    const Gn = GRID[Li], kinds = Li === 0 ? ['rect', 'rect', 'quiz'] : Li === 1 ? ['rect', 'quiz', 'steps', 'rect'] : Li === 2 ? ['area', 'steps', 'quiz', 'rect'] : Li === 3 ? ['perim', 'area', 'quiz', 'steps'] : ['both', 'perim', 'quiz', 'area', 'steps'];
+    const kind = kinds[round % kinds.length], sMax = [3, 5, 6, 7, 8, 10][Li], sMin = Li === 0 ? 2 : 2;
+    let w = ri(r, sMin, sMax), h = ri(r, sMin, sMax); if(Li === 0 && r() < 0.5) h = w;
+    if(kind === 'quiz'){
+      const steps = Li >= 1 && r() < 0.4, n = ri(r, 2, Math.min(5, Gn - 1)), ask = pick(r, steps ? ['corners', 'blocks'] : Li >= 3 ? ['blocks', 'perimeter', 'perimeter', 'corners'] : ['blocks', 'blocks', 'corners']);
+      const cells = steps ? stairCells(n) : rectCells(w, h), area = cells.length, per = steps ? 4 * n : 2 * (w + h);
+      const ans = ask === 'corners' ? (steps ? stairCorners(n) : 4) : ask === 'blocks' ? area : per;
+      const q = ask === 'corners' ? 'How many corners does this shape have?' : ask === 'blocks' ? 'How many blocks make this shape?' : 'How long is the way round (perimeter)?';
+      return {kind: 'choice', ck: 'shape', q, vis: {type: 'grid', cells, n: Gn}, options: numOptions(r, ans, 4), answer: ans, par: 0};
+    }
+    const it = {kind: 'grid', ck: kind, n: Gn, cells: [], slack: [0, 4]};
+    if(kind === 'rect'){ it.w = w; it.h = h; it.par = w * h; it.goal = w === h ? 'a ' + w + ' × ' + w + ' square' : 'a ' + w + ' × ' + h + ' rectangle'; }
+    else if(kind === 'area'){ it.area = w * h; it.par = w * h; it.goal = 'a rectangle of ' + it.area + ' blocks'; }
+    else if(kind === 'steps'){ const n = ri(r, 3, Math.min(Li + 3, Gn - 1)); it.steps = n; it.par = n * (n + 1) / 2; it.goal = 'steps ' + Array.from({length: n}, (_, i) => i + 1).join(' ') + ' (' + it.par + ' blocks)'; }
+    else if(kind === 'perim'){ it.perim = 2 * (w + h); let best = 1e9; for(let a = 1; a <= Gn; a++){ const b = it.perim / 2 - a; if(b >= 1 && b <= Gn) best = Math.min(best, a * b); } it.par = best; it.goal = 'a rectangle with a way round of ' + it.perim; }
+    else { it.area = w * h; it.perim = 2 * (w + h); it.par = w * h; it.goal = 'a rectangle: ' + it.area + ' blocks, way round ' + it.perim; }
+    return it;
+  }
+  function rectCells(w, h){ const out = []; for(let y = 0; y < h; y++) for(let x = 0; x < w; x++) out.push([x, y]); return out; }
+  function stairCells(n){ const out = []; for(let x = 0; x < n; x++) for(let y = 0; y <= x; y++) out.push([x, y]); return out; }   // y = up from the floor
+  // what the cells make: {rect: [w,h] | null, steps: n | 0, area, perim}
+  function shapeOf(cells){
+    if(!cells.length) return {rect: null, steps: 0, area: 0, perim: 0};
+    const xs = cells.map(c => c[0]), ys = cells.map(c => c[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), w = x1 - x0 + 1, h = y1 - y0 + 1, set = new Set(cells.map(c => c[0] + ',' + c[1]));
+    const rect = set.size === w * h ? [w, h] : null;
+    let steps = 0;
+    if(!rect && w === h && set.size === w * (w + 1) / 2){   // columns grow 1..n left→right or n..1, all standing on the bottom row (y = y1 is the floor in screen rows)
+      const colH = []; for(let x = x0; x <= x1; x++){ let k = 0; while(set.has(x + ',' + (y1 - k))) k++; colH.push(k); }
+      const up = colH.every((v, i) => v === i + 1), down = colH.every((v, i) => v === w - i); if(up || down) steps = w; }
+    let perim = 0; set.forEach(k => { const [x, y] = k.split(',').map(Number); [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(d => { if(!set.has((x + d[0]) + ',' + (y + d[1]))) perim++; }); });
+    return {rect, steps, area: set.size, perim};
+  }
+  function gridDone(it){
+    const s = shapeOf(it.cells);
+    if(it.ck === 'rect') return !!s.rect && ((s.rect[0] === it.w && s.rect[1] === it.h) || (s.rect[0] === it.h && s.rect[1] === it.w));
+    if(it.ck === 'area') return !!s.rect && s.area === it.area;
+    if(it.ck === 'steps') return s.steps === it.steps;
+    if(it.ck === 'perim') return !!s.rect && s.perim === it.perim;
+    return !!s.rect && s.area === it.area && s.perim === it.perim;
+  }
+  function gridToggle(M, x, y, on){
+    const it = M.item; if(!it || it.kind !== 'grid' || it.done || x < 0 || y < 0 || x >= it.n || y >= it.n) return null;
+    const i = it.cells.findIndex(c => c[0] === x && c[1] === y), has = i >= 0;
+    if(on === true && has) return {same: true}; if(on === false && !has) return {same: true};
+    if(has) it.cells.splice(i, 1); else it.cells.push([x, y]); it.moves++;
+    if(gridDone(it)){ it.done = it.ok = true; } return {on: !has, done: it.done};
+  }
+  // a solution for tests / hints: the cells of one right shape
+  function gridSolution(it){
+    if(it.ck === 'rect') return rectCells(it.w, it.h);
+    if(it.ck === 'steps') return stairCells(it.steps).map(c => [c[0], it.n - 1 - c[1]]);
+    if(it.ck === 'perim'){ for(let a = 1; a <= it.n; a++){ const b = it.perim / 2 - a; if(b >= 1 && b <= it.n && a * b === it.par) return rectCells(a, b); } }
+    for(let a = 1; a <= it.n; a++) if(it.area % a === 0 && it.area / a <= it.n && (it.ck !== 'both' || 2 * (a + it.area / a) === it.perim)) return rectCells(a, it.area / a);
+    return [];
+  }
+  function numOptions(r, ans, k, step){
+    const out = [ans], d = step || Math.max(1, Math.round(ans * 0.15)); let guard = 0;
+    while(out.length < k && guard++ < 80){ const v = ans + (ri(r, 1, 3) * d) * (r() < 0.5 ? -1 : 1) + (guard > 30 ? ri(r, -3, 3) : 0); if(v > 0 && out.indexOf(v) < 0) out.push(v); }
+    return shuffle(r, out);
+  }
+
+  /* ---------- 🔟 TENS TOWER ---------- */
+  const TENS_R = [[3, 10], [11, 20], [21, 59], [30, 100], [101, 999], [150, 1000]];
+  function tensUnits(Li){ return Li <= 1 ? [1] : Li <= 3 ? [1, 10] : [1, 10, 100]; }
+  function minPieces(T, units){ let n = 0; units.slice().sort((a, b) => b - a).forEach(u => { n += Math.floor(T / u); T %= u; }); return n; }
+  function makeTens(Li, r, round){
+    const [lo, hi] = TENS_R[Li], T = ri(r, lo, hi), units = tensUnits(Li);
+    if(Li >= 2 && round % 2 === 1){
+      const ask = r() < 0.5 ? 'value' : 'tens', ans = ask === 'value' ? T : Math.floor(T / 10) % 10;
+      return {kind: 'choice', ck: 'tens', q: ask === 'value' ? 'What number do these blocks make?' : 'How many TENS (towers of 10) are in ' + T + '?', vis: {type: 'value', v: T}, options: ask === 'value' ? numOptions(r, ans, 4, T >= 100 ? 10 : 1) : shuffle(r, [ans].concat(distractors(r, [ans], 9, 3).map(x => x % 10))).filter((v, i, a) => a.indexOf(v) === i).slice(0, 4), answer: ans, par: 0};
+    }
+    return {kind: 'tens', target: T, value: 0, units, par: minPieces(T, units), slack: [0, 2]};
+  }
+  function tensAdd(M, unit){
+    const it = M.item; if(!it || it.kind !== 'tens' || it.done || it.units.indexOf(Math.abs(unit)) < 0) return null;
+    const v = it.value + unit; if(v < 0 || v > 1999) return null; const before = it.value; it.value = v; it.moves++;
+    const snapped = unit > 0 && Math.floor(v / 10) > Math.floor(before / 10) && unit < 10;   // 10 ones → a ten-tower
+    if(v === it.target){ it.done = it.ok = true; } return {value: v, snapped, done: it.done};
+  }
+
+  /* ---------- 🧩 WHAT COMES NEXT ---------- */
+  function makeNext(Li, r, round){
+    const oddEven = Li >= 2 && round % 4 === 3;
+    if(oddEven){ const v = ri(r, Li >= 4 ? 21 : 3, Li >= 4 ? 199 : 30), ans = v % 2 ? 'odd' : 'even'; return {kind: 'choice', ck: 'next', q: 'Is ' + v + ' odd or even? (Can it pair up?)', vis: {type: 'pairs', v}, options: ['odd', 'even'], answer: ans, par: 0}; }
+    let seq, len = Li <= 1 ? 4 : 5;
+    const kinds = [['up1'], ['up1', 'up2', 'down1'], ['up2', 'up5', 'up10', 'down2'], ['upn', 'double', 'down5'], ['grow', 'square', 'triple', 'upn'], ['upbig', 'double', 'grow', 'down25']][Li], k = pick(r, kinds);
+    const s0 = ri(r, 1, [2, 3, 6, 12, 5, 50][Li]);
+    const gen = {up1: i => s0 + i, up2: i => s0 + 2 * i, down1: i => s0 + len - i, up5: i => 5 * (s0 + i), up10: i => 10 * (s0 + i), down2: i => 2 * (s0 + len) - 2 * i,
+      upn: (i, n) => s0 + n * i, double: i => Math.max(1, s0 % 4 + 1) * Math.pow(2, i), down5: i => 5 * (s0 + len + 2) - 5 * i, grow: i => s0 + i * (i + 1) / 2, square: i => (i + 1 + (s0 % 3)) * (i + 1 + (s0 % 3)), triple: i => Math.pow(3, i) * (s0 % 2 + 1), upbig: i => 25 * (s0 % 8 + 1) + 25 * i * (s0 % 3 + 1), down25: i => 1000 - 25 * (s0 % 10) - 75 * i};
+    const n = ri(r, 3, 9); seq = Array.from({length: len}, (_, i) => gen[k](i, n));
+    const miss = Li >= 1 && r() < 0.35 ? ri(r, 1, len - 2) : len - 1, ans = seq[miss]; const shown = seq.map((v, i) => i === miss ? null : v);
+    const step = Math.max(1, Math.abs(seq[1] - seq[0]));
+    return {kind: 'choice', ck: 'next', q: miss === len - 1 ? 'What comes next?' : 'Which number is missing?', vis: {type: 'seq', seq: shown}, options: numOptions(r, ans, Li === 0 ? 3 : 4, Math.max(1, Math.min(step, 10))), answer: ans, par: 0, rule: k};
+  }
+
+  /* ---------- 🍕 FRACTIONS ---------- */
+  function gcd(a, b){ return b ? gcd(b, a % b) : a; }
+  function fstr(f){ const g = gcd(f.n, f.d); return (f.n / g) + '/' + (f.d / g); }
+  const FR_D = [[2], [2, 4], [2, 3, 4], [2, 3, 4, 5, 6, 8], [3, 4, 5, 6, 8], [4, 5, 6, 8, 10, 12]];
+  function makeFrac(Li, r, round){
+    const ds = FR_D[Li], kinds = Li === 0 ? ['colour'] : Li === 1 ? ['colour', 'name', 'colour'] : ['colour', 'compare', 'name', 'compare'], kind = kinds[round % kinds.length];
+    const unit = Li <= 2, f = () => { const d = pick(r, ds), n = unit ? 1 : ri(r, 1, d - 1); return {n, d}; };
+    if(kind === 'compare'){
+      let a = f(), b = f(), guard = 0; while(a.n === b.n && a.d === b.d && guard++ < 20) b = f();
+      if(Li >= 4 && r() < 0.25){ const k = ri(r, 2, 3); b = {n: a.n * k, d: a.d * k}; }   // equivalent: 2/4 = 1/2
+      return {kind: 'choice', ck: 'frac', syms: true, q: 'Which is bigger?', vis: {type: 'bars', a, b}, options: ['<', '=', '>'], answer: cmp(a.n * b.d, b.n * a.d), par: 0};
+    }
+    const fr = f(), k = Li >= 3 ? ri(r, 1, 2) : (fr.d <= 3 ? 2 : 1), L = fr.d * k;
+    if(kind === 'name'){
+      const right = fstr(fr), opts = [right]; let guard = 0; while(opts.length < (Li <= 1 ? 3 : 4) && guard++ < 60){ const g = f(), s = fstr(g); if(opts.indexOf(s) < 0) opts.push(s); }
+      if(opts.length < 3) ['1/2', '1/3', '1/4', '3/4', '2/3'].forEach(s => { if(opts.length < 3 && opts.indexOf(s) < 0) opts.push(s); });
+      return {kind: 'choice', ck: 'frac', q: 'How much of the bar is coloured?', vis: {type: 'bar', len: L, on: fr.n * k}, options: shuffle(r, opts), answer: right, par: 0};
+    }
+    return {kind: 'colour', frac: fr, len: L, want: fr.n * k, on: [], par: fr.n * k, slack: [0, 2]};
+  }
+  function colourToggle(M, i){
+    const it = M.item; if(!it || it.kind !== 'colour' || it.done || i < 0 || i >= it.len) return null;
+    const j = it.on.indexOf(i); if(j >= 0) it.on.splice(j, 1); else it.on.push(i); it.moves++;
+    if(it.on.length === it.want){ it.done = it.ok = true; } return {count: it.on.length, done: it.done};
+  }
+
+  /* ---------- 🏗️ WOBBLE TOWER (a maths puzzle: exact height — not physics) ---------- */
+  const WOB = [{s: [1, 2], R: [3, 5]}, {s: [2, 3], R: [5, 10]}, {s: [3, 5], R: [11, 20]}, {s: [4, 7], R: [20, 60]}, {s: [5, 8, 13], R: [40, 100]}, {s: [7, 11, 17], R: [100, 200]}];
+  function minCount(T, sizes){ const dp = new Array(T + 1).fill(Infinity); dp[0] = 0; for(let v = 1; v <= T; v++) sizes.forEach(s => { if(s <= v && dp[v - s] + 1 < dp[v]) dp[v] = dp[v - s] + 1; }); return dp[T]; }
+  function wobblePlan(T, sizes){ const dp = new Array(T + 1).fill(Infinity), from = []; dp[0] = 0; for(let v = 1; v <= T; v++) sizes.forEach(s => { if(s <= v && dp[v - s] + 1 < dp[v]){ dp[v] = dp[v - s] + 1; from[v] = s; } }); if(!isFinite(dp[T])) return null; const out = []; let v = T; while(v > 0){ out.push(from[v]); v -= from[v]; } return out; }
+  function makeWobble(Li, r){
+    const W = WOB[Li]; let T, guard = 0;
+    do { T = ri(r, W.R[0], W.R[1]); } while((!isFinite(minCount(T, W.s)) || W.s.some(s => T % s === 0 && Li >= 2 && T / s <= 3)) && guard++ < 200);
+    return {kind: 'wobble', target: T, sizes: W.s.slice(), tower: [], par: minCount(T, W.s), plan: wobblePlan(T, W.s), slack: [0, 2]};
+  }
+  function wobAdd(M, s){ const it = M.item; if(!it || it.kind !== 'wobble' || it.done || it.sizes.indexOf(s) < 0) return null; it.tower.push(s); it.moves++; const h = it.tower.reduce((a, b) => a + b, 0); if(h === it.target){ it.done = it.ok = true; } return {height: h, over: h > it.target, done: it.done}; }
+  function wobPop(M){ const it = M.item; if(!it || it.kind !== 'wobble' || it.done || !it.tower.length) return null; it.tower.pop(); it.moves++; return {height: it.tower.reduce((a, b) => a + b, 0)}; }
+
+  /* ---------- generic one-try answer (🧩 🍕 🔟 🔷 quizzes) ---------- */
+  function answerChoice(M, v){ const it = M.item; if(!it || it.kind !== 'choice' || it.done) return null; const ok = String(v) === String(it.answer); it.done = true; it.ok = ok; it.picked = v; if(!ok) M.mistakes++; return {ok, answer: it.answer}; }
+
+  /* ---------- ⚔️ TOWER BATTLE (2 players, or you vs 🤖) ---------- */
+  const BAT = [{lo: 1, hi: 5, k: 3, miss: 0.5}, {lo: 1, hi: 9, k: 3, miss: 0.4}, {lo: 2, hi: 15, k: 4, miss: 0.3, near: true}, {lo: 5, hi: 40, k: 4, miss: 0.2, near: true, x2: true}, {lo: 5, hi: 60, k: 5, miss: 0.12, near: true, x2: true}, {lo: 20, hi: 300, k: 5, miss: 0.05, near: true, x2: true}];
+  function newBattle(cfg){ const seed = cfg.seed != null ? cfg.seed : ((Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0); return {cfg, level: cfg.level, r: rng(seed), names: cfg.names.slice(0, 2), robot: !!cfg.robot, wins: [0, 0], round: 0, log: [], need: 3, maxRounds: 7, over: false, winner: -1, deal: null}; }
+  function battleDeal(B){
+    const C = BAT[B.level], r = B.r, rules = ['high', 'low'].concat(C.near ? ['near'] : []), rule = pick(r, rules);
+    const hand = () => Array.from({length: C.k}, () => ri(r, C.lo, C.hi));
+    const target = rule === 'near' ? ri(r, C.lo * 2, C.hi * 2) : 0;
+    B.deal = {rule, target, hands: [hand(), hand()], picks: [null, null], x2: !!C.x2}; return B.deal;
+  }
+  // a build: {use: [indexes], x2: bool} → its value
+  function buildValue(hand, b){ const s = (b.use || []).reduce((a, i) => a + (hand[i] || 0), 0); return b.x2 ? s * 2 : s; }
+  function allBuilds(hand, x2){ const out = []; for(let m = 1; m < (1 << hand.length); m++){ const use = []; for(let i = 0; i < hand.length; i++) if(m & (1 << i)) use.push(i); out.push({use, x2: false}); if(x2) out.push({use, x2: true}); } return out; }
+  function scoreFor(rule, v, target){ return rule === 'high' ? v : rule === 'low' ? -v : -Math.abs(v - target); }
+  function robotBuild(B, seat){ const D = B.deal, C = BAT[B.level], list = allBuilds(D.hands[seat], D.x2); if(B.r() < C.miss) return pick(B.r, list); return list.reduce((b, x) => scoreFor(D.rule, buildValue(D.hands[seat], x), D.target) > scoreFor(D.rule, buildValue(D.hands[seat], b), D.target) ? x : b, list[0]); }
+  function battleLock(B, seat, build){ const D = B.deal; if(!D || D.picks[seat] || !build || !build.use || !build.use.length) return false; if(build.x2 && !D.x2) return false; D.picks[seat] = {use: build.use.slice(), x2: !!build.x2}; return true; }
+  function battleJudge(B){
+    const D = B.deal; if(!D || !D.picks[0] || !D.picks[1]) return null;
+    const v = [0, 1].map(s => buildValue(D.hands[s], D.picks[s])), sc = v.map(x => scoreFor(D.rule, x, D.target)), w = sc[0] === sc[1] ? -1 : sc[0] > sc[1] ? 0 : 1;
+    if(w >= 0) B.wins[w]++; B.round++; B.log.push({rule: D.rule, target: D.target, v, w});
+    if(B.wins[0] >= B.need || B.wins[1] >= B.need || B.round >= B.maxRounds){ B.over = true; B.winner = B.wins[0] === B.wins[1] ? -1 : B.wins[0] > B.wins[1] ? 0 : 1; }
+    B.deal = null; return {v, w, over: B.over, winner: B.winner};
+  }
+  /* ---------- 📖 JOURNEY (round 3): our own number characters + 6 chapters ---------- */
+  const CHARS = {1: {name: 'Pip', who: 'a brave little explorer', icon: '🧭'}, 2: {name: 'Tik & Tok', who: 'twins who finish each other\'s sentences', icon: '👯'}, 3: {name: 'Tri', who: 'a triangle-loving builder', icon: '🔺'},
+    4: {name: 'Quadra', who: 'square, tidy and loves rules', icon: '⬛'}, 5: {name: 'Hi-Five', who: 'the high-fiver', icon: '🖐️'}, 6: {name: 'Dicey', who: 'a dice-rolling gamer', icon: '🎲'}, 7: {name: 'Stella', who: 'a dreamer who loves the stars', icon: '🌟'},
+    8: {name: 'Ollie', who: 'an eight-armed juggler', icon: '🤹'}, 9: {name: 'Whisk', who: 'a cat with nine lives', icon: '🐱'}, 10: {name: 'Cap', who: 'the team captain', icon: '🧢'},
+    20: {name: 'Twin-Ten', who: 'two captains in one', icon: '🎽'}, 50: {name: 'Hal', who: 'Halfway Hal, half of a hundred', icon: '🌗'}, 100: {name: 'Centi', who: 'the hundred, wise and tall', icon: '💯'}};
+  function charName(n){ return CHARS[n] ? CHARS[n].name : String(n); }
+  const N2 = v => ({t: 'n', n: v});
+  const CHAPTERS = [
+    {id: 1, title: 'Two Takes a Trip', theme: 'dino', op: '+', level: 0, steps: [
+      {t: 'enter', id: 'a', n: 2, x: 0.38}, {t: 'say', id: 'a', text: 'Hi! We\'re Tik & Tok — we always go together! Today we take a trip down the dino road.'},
+      {t: 'enter', id: 'b', n: 1, x: 0.66}, {t: 'say', id: 'b', text: 'I\'m Pip! I\'m small but brave. Can I come too?'},
+      {t: 'join', a: 'b', b: 'a'}, {t: 'say', id: 'a', text: '2 + 1 = 3! Now I\'m Tri — I build things with triangles!'},
+      {t: 'puzzle', ask: 'Help Tri meet a friend: make 5!', p: {kind: 'count', tray: [3, 2], target: 5}},
+      {t: 'enter', id: 'c', n: 5, x: 0.55}, {t: 'say', id: 'c', text: 'High five! 3 + 2 = 5 — I\'m Hi-Five! Let\'s find someone even bigger.'},
+      {t: 'puzzle', ask: 'Snap the blocks to make 7 for Stella!', p: {kind: 'count', tray: [5, 2, 1], target: 7}},
+      {t: 'say', id: 'c', text: 'You did it! Adding = joining blocks together. What a trip!'}]},
+    {id: 2, title: 'The Sea of Take-Away', theme: 'sea', op: '−', level: 1, steps: [
+      {t: 'enter', id: 'a', n: 8, x: 0.45}, {t: 'say', id: 'a', text: 'I\'m Ollie! Eight arms, eight blocks, eight things to juggle!'},
+      {t: 'split', id: 'a', k: 3, out: 'w'}, {t: 'say', id: 'a', text: 'Whoosh! A wave took 3 blocks away. 8 − 3 = 5!'}, {t: 'exit', id: 'w'},
+      {t: 'puzzle', ask: 'The tide wants 3 blocks: split 9 to make 6.', p: {kind: 'count', tray: [9], target: 6, allow: ['split']}},
+      {t: 'say', id: 'a', text: 'Taking away makes a number smaller. Can you see what is left?'},
+      {t: 'puzzle', ask: 'Ollie had 10 shells and gave 4 away. How many are left?', p: {kind: 'choice', q: '10 − 4 = ?', options: [5, 6, 7], answer: 6, vis: {type: 'seq', seq: [10, null]}}},
+      {t: 'say', id: 'a', text: 'Six! Take-away champion of the sea!'}]},
+    {id: 3, title: 'Disco Doubles', theme: 'disco', op: '×', level: 3, steps: [
+      {t: 'enter', id: 'a', n: 4, x: 0.4}, {t: 'say', id: 'a', text: 'I\'m Quadra. Rule number one: dance in neat squares!'},
+      {t: 'copy', id: 'a', m: 2}, {t: 'say', id: 'a', text: 'Copies! Two of me: 4 × 2 = 8. Ollie, join the dance!'},
+      {t: 'puzzle', ask: 'Copy 3 three times to fill the dance floor: make 9!', p: {kind: 'count', tray: [3], target: 9, allow: ['copy']}},
+      {t: 'puzzle', ask: 'Five dancers, three copies each — make 15!', p: {kind: 'count', tray: [5, 2], target: 15, allow: ['copy']}},
+      {t: 'say', id: 'a', text: 'Times is quick adding of the same number. 5 + 5 + 5 = 5 × 3!'}]},
+    {id: 4, title: 'Robot Sharing Factory', theme: 'robot', op: '÷', level: 3, steps: [
+      {t: 'enter', id: 'a', n: 10, x: 0.42}, {t: 'say', id: 'a', text: 'Captain Cap reporting! In this factory, robots share FAIRLY.'},
+      {t: 'share', id: 'a', m: 2, out: ['b']}, {t: 'say', id: 'b', text: '10 ÷ 2 = 5 and 5 — two Hi-Fives, the same size!'},
+      {t: 'puzzle', ask: 'Share 12 bolts into 3 fair teams. How many in each? Make 4!', p: {kind: 'count', tray: [12], target: 4, allow: ['share']}},
+      {t: 'puzzle', ask: 'Share 20 into 4 teams — make 5!', p: {kind: 'count', tray: [20], target: 5, allow: ['share']}},
+      {t: 'say', id: 'a', text: 'Sharing = dividing. Every team gets the same. Beep boop, well done!'}]},
+    {id: 5, title: 'Space Number Line', theme: 'space', op: '↔', level: 2, steps: [
+      {t: 'line'}, {t: 'enter', id: 'a', n: 7, x: 0.5}, {t: 'say', id: 'a', text: 'I\'m Stella. I count stars along the number line — each step is one more!'},
+      {t: 'puzzle', ask: 'Stella hops by 2s. Where does she land next?', p: {kind: 'choice', q: '2, 4, 6, ?', options: [7, 8, 10], answer: 8, vis: {type: 'seq', seq: [2, 4, 6, null]}}},
+      {t: 'enter', id: 'b', n: 9, x: 0.75}, {t: 'say', id: 'b', text: 'Meow, I\'m Whisk! I have nine lives — and I always land between 8 and 10.'},
+      {t: 'puzzle', ask: 'Which number sits between 6 and 8?', p: {kind: 'choice', q: '6, ?, 8', options: [5, 7, 9], answer: 7, vis: {type: 'seq', seq: [6, null, 8]}}},
+      {t: 'say', id: 'a', text: 'Bigger numbers live further along the line. To the stars!'}]},
+    {id: 6, title: 'The Sky Scale of Olympus', theme: 'sky', op: '=', level: 2, steps: [
+      {t: 'enter', id: 'a', n: 100, x: 0.32}, {t: 'say', id: 'a', text: 'I am Centi, the hundred. Up here on the cloud temple, everything must BALANCE.'},
+      {t: 'enter', id: 'b', n: 50, x: 0.62}, {t: 'enter', id: 'c', n: 50, x: 0.8}, {t: 'say', id: 'b', text: 'We\'re Hal and Hal — halfway each! Are we as heavy as Centi?'},
+      {t: 'puzzle', ask: '50 + 50 … and 100. Which is heavier?', p: {kind: 'compare', left: [50, 50], right: [100]}},
+      {t: 'say', id: 'a', text: 'The same! 50 + 50 = 100. Now balance the temple scale for Cap and Twin-Ten.'},
+      {t: 'puzzle', ask: 'Put blocks on the right pan until it balances 20.', p: {kind: 'balance', left: [20], tray: [10, 5, 5, 7]}},
+      {t: 'say', id: 'a', text: '= means the same weight on both sides. You are a true GeoScout!'}]}
+  ];
+  // small solver for story puzzles (snap / split / copy / share), breadth-first, depth ≤ 3
+  function storyPlan(tray, target, level, allow){
+    const L = LEVELS[level], ops = allow ? (allow.indexOf('copy') >= 0 ? 'x' : '') + (allow.indexOf('share') >= 0 ? '/' : '') : L.ops, key = a => a.slice().sort((x, y) => x - y).join(','), seen = new Set([key(tray)]); let front = [{s: tray.slice(), plan: []}];
+    for(let d = 0; d < 3; d++){ const next = [];
+      for(const f of front){ const s = f.s, out = [];
+        for(let i = 0; i < s.length; i++){ for(let j = 0; j < s.length; j++) if(i !== j && i < j){ const t = s.filter((_, k) => k !== i && k !== j).concat([s[i] + s[j]]); out.push([t, ['snap', s[j], s[i]]]); }
+          if(allow ? allow.indexOf('split') >= 0 : level >= 1) for(let k = 1; k < s[i]; k++) out.push([s.filter((_, q) => q !== i).concat([s[i] - k, k]), ['split', s[i], k]]);
+          if(ops.indexOf('x') >= 0) for(let m = 2; m <= 5; m++) if(s[i] * m <= capFor(level)) out.push([s.filter((_, q) => q !== i).concat([s[i] * m]), ['copy', s[i], m]]);
+          if(ops.indexOf('/') >= 0) for(let m = 2; m <= 5; m++) if(s[i] % m === 0) out.push([s.filter((_, q) => q !== i).concat(Array(m).fill(s[i] / m)), ['share', s[i], m]]); }
+        for(const [t, step] of out){ const k = key(t); if(seen.has(k)) continue; seen.add(k); const plan = f.plan.concat([step]); if(t.indexOf(target) >= 0) return plan; next.push({s: t, plan}); } }
+      front = next; }
+    return null;
+  }
+  function subsetPlan(tray, need){ const n = tray.length; let best = null; for(let m = 1; m < (1 << n); m++){ let s = 0; const pick = []; for(let i = 0; i < n; i++) if(m & (1 << i)){ s += tray[i]; pick.push(tray[i]); } if(s === need && (!best || pick.length < best.length)) best = pick; } return best; }
+  // a story puzzle → an item in M (same item kinds as the other modes, so the same painters / bars / checks are used)
+  function journeyItem(M, p, ask){
+    let it;
+    if(p.kind === 'count'){ const plan = storyPlan(p.tray, p.target, M.level, p.allow); it = {kind: 'count', ck: 'story', allow: p.allow || null, target: p.target, tray: p.tray.slice(), plan: plan || [], par: plan ? plan.length : 1, stacks: p.tray.map(n => ({id: M.nid++, n}))}; }
+    else if(p.kind === 'balance'){ const need = p.left.reduce((a, b) => a + b, 0), plan = subsetPlan(p.tray, need); it = {kind: 'balance', left: p.left.map(n => ({id: M.nid++, fixed: true, t: 'n', n})), right: [], tray: p.tray.map(n => ({id: M.nid++, t: 'n', n})), need, plan: plan || [], par: plan ? plan.length : 1}; }
+    else if(p.kind === 'compare'){ const left = p.left.map(n => ({id: M.nid++, fixed: true, t: 'n', n})), right = p.right.map(n => ({id: M.nid++, fixed: true, t: 'n', n})); it = {kind: 'compare', left, right, tray: [], answer: cmp(total(left), total(right)), par: 0}; }
+    else it = {kind: 'choice', ck: 'story', q: p.q, options: p.options.slice(), answer: p.answer, vis: p.vis, par: 0};
+    it.moves = 0; it.done = false; it.ok = false; it.story = true; it.ask = ask || ''; M.item = it; return it;
+  }
+  // play a chapter's actions on a cast {id: n} (tests + the page use the same rules)
+  function castStep(cast, st){
+    if(st.t === 'enter') cast[st.id] = st.n;
+    else if(st.t === 'exit') delete cast[st.id];
+    else if(st.t === 'join'){ if(cast[st.a] == null || cast[st.b] == null) return false; cast[st.b] += cast[st.a]; delete cast[st.a]; }
+    else if(st.t === 'split'){ if(!(cast[st.id] > st.k)) return false; cast[st.id] -= st.k; cast[st.out] = st.k; }
+    else if(st.t === 'copy'){ if(cast[st.id] == null) return false; cast[st.id] *= st.m; }
+    else if(st.t === 'share'){ if(cast[st.id] == null || cast[st.id] % st.m) return false; cast[st.id] /= st.m; (st.out || []).forEach(o => cast[o] = cast[st.id]); }
+    else if(st.t === 'say' && cast[st.id] == null) return false;
+    return true;
+  }
+  /* ---------- game ---------- */
+  function newGame(cfg){
+    const L = LEVELS[cfg.level], seed = cfg.seed != null ? cfg.seed : ((Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0);
+    return {cfg, level: cfg.level, mode: cfg.mode, seed, r: rng(seed), round: 0, total: L.rounds, score: 0, quals: [], mistakes: 0, streak: 0, bestStreak: 0, failed: false, over: false, item: null, log: [], nid: 1,
+      stats: {snaps: 0, splits: 0, copies: 0, shares: 0, drops: 0, compares: 0, balances: 0, avatarWeighs: 0, counts: 0, perfect: 0, shapes: 0, tens: 0, patterns: 0, fractions: 0, wobble: 0}};
+  }
+  function deal(M){
+    const Li = M.level, r = M.r, k = M.round, md = M.mode;
+    const it = md === 'scale' ? makeScale(Li, r, k, {avatar: M.cfg.avatar}) : md === 'shape' ? makeShape(Li, r, k) : md === 'tens' ? makeTens(Li, r, k) : md === 'next' ? makeNext(Li, r, k) : md === 'frac' ? makeFrac(Li, r, k) : md === 'wobble' ? makeWobble(Li, r) : makeCount(Li, r, k);
+    it.moves = 0; it.done = false; it.ok = false;
+    if(it.kind === 'count') it.stacks = it.tray.map(n => ({id: M.nid++, n}));
+    else if(it.left){ it.left = it.left.map(x => Object.assign({id: M.nid++, fixed: true}, x)); it.right = it.right.map(x => Object.assign({id: M.nid++, fixed: true}, x)); it.tray = it.tray.map(x => Object.assign({id: M.nid++}, x)); }
+    M.item = it; return it;
+  }
+  function scaleAnswer(M, sym){
+    const it = M.item; if(!it || it.kind !== 'compare' || it.done) return null;
+    const ans = cmp(total(it.left), total(it.right)), ok = sym === ans;
+    it.done = true; it.ok = ok; it.picked = sym; if(!ok) M.mistakes++;
+    return {ok, answer: ans, L: total(it.left), R: total(it.right)};
+  }
+  function balanceState(M){ const it = M.item, L = total(it.left), R = total(it.right); if(L === R && !it.done){ it.done = true; it.ok = true; } return {L, R, rel: cmp(L, R), balanced: L === R}; }
+  function scalePut(M, id){
+    const it = M.item; if(!it || it.done || it.kind === 'compare') return null; const i = it.tray.findIndex(x => x.id === id); if(i < 0) return null;
+    it.right.push(it.tray.splice(i, 1)[0]); it.moves++; M.stats.drops++; return balanceState(M);
+  }
+  function scaleTake(M, id){
+    const it = M.item; if(!it || it.done || it.kind === 'compare') return null; const i = it.right.findIndex(x => x.id === id && !x.fixed); if(i < 0) return null;
+    it.tray.push(it.right.splice(i, 1)[0]); it.moves++; return balanceState(M);
+  }
+  function stackOf(it, id){ return it.stacks.find(s => s.id === id); }
+  function countCheck(M){ const it = M.item, hit = it.stacks.find(s => s.n === it.target); if(hit && !it.done){ it.done = true; it.ok = true; it.hit = hit.id; } return {done: it.done, hit: hit ? hit.id : 0}; }
+  function canOp(M, op){ const L = LEVELS[M.level]; if(M.item && M.item.allow) return op === 'snap' || M.item.allow.indexOf(op) >= 0; return op === 'snap' ? true : op === 'split' ? M.level >= 1 : L.ops.indexOf(op === 'copy' ? 'x' : '/') >= 0; }
+  function cSnap(M, aId, bId){   // a joins b (b keeps its place)
+    const it = M.item; if(!it || it.done || aId === bId) return null; const a = stackOf(it, aId), b = stackOf(it, bId); if(!a || !b) return null;
+    b.n += a.n; it.stacks.splice(it.stacks.indexOf(a), 1); it.moves++; M.stats.snaps++; return Object.assign({n: b.n, id: b.id}, countCheck(M));
+  }
+  function cSplit(M, id, k){   // take k off the top → a new stack of k
+    const it = M.item; if(!it || it.done || !canOp(M, 'split')) return null; const a = stackOf(it, id); k = Math.round(k); if(!a || k < 1 || k >= a.n) return null;
+    a.n -= k; const s = {id: M.nid++, n: k}; it.stacks.splice(it.stacks.indexOf(a) + 1, 0, s); it.moves++; M.stats.splits++; return Object.assign({n: a.n, id: a.id, newId: s.id}, countCheck(M));
+  }
+  function cCopy(M, id, m){   // n copies → n × m (one stack)
+    const it = M.item; if(!it || it.done || !canOp(M, 'copy')) return null; const a = stackOf(it, id); m = Math.round(m); if(!a || m < 2 || m > 9 || a.n * m > capFor(M.level)) return null;
+    a.n *= m; it.moves++; M.stats.copies++; return Object.assign({n: a.n, id: a.id}, countCheck(M));
+  }
+  function cShare(M, id, m){   // share fairly into m teams → m stacks of n ÷ m
+    const it = M.item; if(!it || it.done || !canOp(M, 'share')) return null; const a = stackOf(it, id); m = Math.round(m); if(!a || m < 2 || m > 9 || a.n % m || it.stacks.length + m - 1 > 10) return null;
+    a.n /= m; const ids = []; for(let i = 1; i < m; i++){ const s = {id: M.nid++, n: a.n}; it.stacks.splice(it.stacks.indexOf(a) + i, 0, s); ids.push(s.id); } it.moves++; M.stats.shares++; return Object.assign({n: a.n, id: a.id, newIds: ids}, countCheck(M));
+  }
+  function isQuiz(it){ return it.kind === 'compare' || it.kind === 'choice'; }
+  function starsOfRound(it){ if(isQuiz(it)) return it.ok ? 3 : 0; const sl = it.slack || [0, 2]; return it.moves <= it.par + sl[0] ? 3 : it.moves <= it.par + sl[1] ? 2 : 1; }
+  function speedPart(secs, it){ const fast = isQuiz(it) ? 5 : 5 + (it.kind === 'grid' ? 0.8 : 3) * (it.par || 1); if(secs == null) return 0; return Math.max(0, Math.min(1, (fast * 2 - secs) / fast)); }
+  function finishRound(M, secs){
+    const it = M.item, L = LEVELS[M.level]; if(!it || it.scored) return null; it.scored = true;
+    const stars = it.done || isQuiz(it) ? starsOfRound(it) : 0, q = isQuiz(it) ? (it.ok ? 1 : 0) : [0, 0.5, 0.8, 1][stars];
+    const sp = q > 0 ? speedPart(secs, it) : 0, pts = Math.round(100 * L.mult * q * (1 + 0.2 * sp));
+    M.score += pts; M.quals.push(q);
+    if(q === 1){ M.streak++; M.stats.perfect++; } else M.streak = 0; M.bestStreak = Math.max(M.bestStreak, M.streak);
+    if(it.kind === 'compare' && it.ok) M.stats.compares++;
+    if((it.kind === 'balance' || it.kind === 'avatar') && it.ok) M.stats.balances++;
+    if(it.kind === 'avatar' && it.ok) M.stats.avatarWeighs++;
+    if(it.kind === 'count' && it.ok) M.stats.counts++;
+    if(it.ok && (it.kind === 'grid' || it.ck === 'shape')) M.stats.shapes++;
+    if(it.ok && (it.kind === 'tens' || it.ck === 'tens')) M.stats.tens++;
+    if(it.ok && it.ck === 'next') M.stats.patterns++;
+    if(it.ok && (it.kind === 'colour' || it.ck === 'frac')) M.stats.fractions++;
+    if(it.ok && it.kind === 'wobble') M.stats.wobble++;
+    if(L.lives && ((isQuiz(it) && !it.ok) || (!isQuiz(it) && (!it.ok || it.moves > it.par + 3)))){ M.failed = true; }
+    const rec = {kind: it.kind, q, pts, stars, moves: it.moves, par: it.par, secs: secs || 0}; M.log.push(rec); return rec;
+  }
+  function advance(M){ M.round++; if(M.round >= M.total || M.failed) M.over = true; return M.over; }
+  function starsFor(quals, total){ if(!total) return 0; const a = quals.reduce((s, q) => s + q, 0) / total; return a >= 0.95 ? 3 : a >= 0.75 ? 2 : a >= 0.5 ? 1 : 0; }
+  function finish(M){ const stars = M.failed ? 0 : starsFor(M.quals, M.total); M.stars = stars; M.cleared = !M.failed && M.quals.length >= M.total && stars >= 1; M.over = true; return {stars, cleared: M.cleared, score: M.score}; }
+  // replay a count plan by values (tests + hints): returns the stacks after the plan
+  function playPlan(M, plan){
+    const it = M.item; for(const step of plan){ const [op, v, x] = step; const s = it.stacks.find(q => q.n === v); if(!s) return false;
+      if(op === 'snap'){ const o = it.stacks.find(q => q.n === x && q.id !== s.id); if(!o) return false; cSnap(M, o.id, s.id); }
+      else if(op === 'split') cSplit(M, s.id, x); else if(op === 'copy') cCopy(M, s.id, x); else if(op === 'share') cShare(M, s.id, x); }
+    return it.done;
+  }
+  function hintFor(M){
+    const it = M.item; if(!it || it.done) return '';
+    if(it.kind === 'compare') return 'Count the blocks on each side — which side is heavier?';
+    if(it.kind === 'choice') return it.ck === 'next' ? 'How much does it change each time?' : it.ck === 'frac' ? 'Count the pieces: how many are coloured, how many in all?' : 'Count slowly, one at a time.';
+    if(it.kind === 'grid') return 'Tap squares to fill them. ' + (it.ck === 'perim' ? 'The way round = all the outside edges.' : 'Fill rows of the same length.');
+    if(it.kind === 'tens') return it.target + ' = ' + (it.target >= 100 ? Math.floor(it.target / 100) + ' hundreds, ' : '') + Math.floor(it.target % 100 / 10) + ' tens and ' + it.target % 10 + ' ones.';
+    if(it.kind === 'colour') return 'Cut into ' + it.frac.d + ' teams of ' + (it.len / it.frac.d) + ' — colour ' + it.frac.n + ' team' + (it.frac.n > 1 ? 's' : '') + '.';
+    if(it.kind === 'wobble') return 'Try: ' + it.plan.join(' + ') + ' = ' + it.target;
+    if(it.kind !== 'count'){ const L = total(it.left), R = total(it.right); return R < L ? 'The right side needs ' + (L - R) + ' more.' : 'Too heavy! Take one back.'; }
+    const step = it.plan[0]; if(!step) return '';
+    return step[0] === 'snap' ? 'Snap ' + step[1] + ' and ' + step[2] + ' together.' : step[0] === 'split' ? 'Take ' + step[2] + ' away from ' + step[1] + '.' : step[0] === 'copy' ? 'Copy ' + step[1] + ' × ' + step[2] + '.' : 'Share ' + step[1] + ' into ' + step[2] + ' teams.';
+  }
+  return {LEVELS, MODES, SHAPES, SHAPE_KEYS, SYM, AVATAR_W, hashStr, rng, parts, val, total, text, sideText, cmp, opv, avatarWeight, capFor,
+    makeCompare, makeBalance, makeAvatar, makeScale, makeCount, newGame, deal, scaleAnswer, scalePut, scaleTake, balanceState, cSnap, cSplit, cCopy, cShare, canOp,
+    finishRound, advance, finish, starsFor, starsOfRound, speedPart, playPlan, hintFor, isQuiz,
+    GRID, makeShape, shapeOf, gridDone, gridToggle, gridSolution, rectCells, stairCells, stairCorners, TENS_R, tensUnits, minPieces, makeTens, tensAdd, makeNext, gcd, fstr, FR_D, makeFrac, colourToggle,
+    CHARS, charName, CHAPTERS, storyPlan, subsetPlan, journeyItem, castStep,
+    WOB, minCount, wobblePlan, makeWobble, wobAdd, wobPop, answerChoice, BAT, newBattle, battleDeal, buildValue, allBuilds, scoreFor, robotBuild, battleLock, battleJudge};
+})();
+// ENGINE END
+
+const WEBAPP_URL = SP_TV[0];
+const CURRENT_PLAYER = SP_TV[1]; window.SP_PAGE = SP_TV[2];
+const MODE_LINK = SP_TV[3];   // ✨ ?mode=<id> (Code.gs MODES_) — opened once, after the player pick
+UI.applyTheme(UI.cachedTheme(CURRENT_PLAYER), {kitOnly: true});
+const SESSION_START = Number(SP_TV[4]) || null;
+const DURATION_MIN = Number(SP_TV[5]) || null;
+const DEEP_GAME = SP_TV[6];
+const GAME_ID = 'geoscout';
+const $ = id => document.getElementById(id);
+let FX = 1;      // harness sets 0 (no particles)
+let SPEED = 1;   // harness sets 0 → every wait is instant
+
+/* ================= DATA ================= */
+const LEVEL_UI = [
+  {emoji: '🌱', blurb: 'Numbers 1–5 · count, compare, snap (+)'},
+  {emoji: '🐣', blurb: 'Numbers 1–10 · + and − · balance ='},
+  {emoji: '🔦', blurb: 'Numbers 1–20 · tens · shapes weigh their corners'},
+  {emoji: '⚡', blurb: 'Up to 100 · ✖️ copy and ➗ share'},
+  {emoji: '🌋', blurb: 'Up to 100 · two-step sums · both sides of the scale'},
+  {emoji: '💀', blurb: 'Up to 1000 · 4:00 clock · one mistake ends it', hardcore: true}
+];
+const AGE_START = {'4-5': 0, '6-7': 1, '8-9': 2, '10+': 2};
+const MODES_ON = ['journey', 'scale', 'count', 'shape', 'tens', 'next', 'frac', 'wobble', 'battle'];
+// 🎨 the 6 house themes as blocks: block material + room + scale look (looks only — never the rules)
+const THEMES = {
+  dino:  {name: 'Dino Quarry',  icon: '🦖', mat: 'stone',   top: '#2E5A2F', bot: '#7FB04A', ground: '#8B6A43', grass: '#5E8F33', deco: ['🌿', '🦴', '🌋', '🦕', '🌴'], beam: '#7A4E2A', pan: '#F4E6C2', panRim: '#C9A86A', post: '#6B4423', sw: '#7FB04A'},
+  sea:   {name: 'Coral Reef',   icon: '🐙', mat: 'bubble',  top: '#0A3D6B', bot: '#2A8FC2', ground: '#E2C58A', grass: '#D2B070', deco: ['🐠', '🫧', '🪸', '🐚', '🐡'], beam: '#D9895B', pan: '#FFD8C2', panRim: '#E89A7A', post: '#B5674A', sw: '#2A8FC2'},
+  disco: {name: 'Disco Hall',   icon: '🪩', mat: 'disco',   top: '#1B0533', bot: '#5A1A7E', ground: '#2A0B45', grass: '#3D1260', deco: ['🪩', '🎵', '✨', '💃', '🔊'], beam: '#C0C0D8', pan: '#3A2A55', panRim: '#FF5CF0', post: '#8A8AA8', sw: '#9B2BD1'},
+  robot: {name: 'Robot Lab',    icon: '🤖', mat: 'circuit', top: '#102534', bot: '#2D4E66', ground: '#3B4D60', grass: '#4A6075', deco: ['⚙️', '🔩', '💡', '📡', '🤖'], beam: '#9AA9B8', pan: '#C7D3DD', panRim: '#5C7084', post: '#6E7F90', sw: '#2D4E66'},
+  space: {name: 'Moon Base',    icon: '🪐', mat: 'crystal', top: '#05061F', bot: '#232070', ground: '#6B6F86', grass: '#80849C', deco: ['🪐', '⭐', '☄️', '🛰️', '🌙'], beam: '#B8BCD8', pan: '#D9DCE8', panRim: '#8E93AE', post: '#9095B0', sw: '#232070'},
+  sky:   {name: 'Cloud Temple', icon: '☁️', mat: 'cloud',   top: '#4FA3E0', bot: '#CDEBFF', ground: '#FFFFFF', grass: '#EAF4FF', deco: ['☁️', '🌈', '🕊️', '🏛️', '☀️'], beam: '#E8C25A', pan: '#FFE9A8', panRim: '#C99A2E', post: '#D8B04A', sw: '#4FA3E0'}
+};
+const THEME_KEYS = Object.keys(THEMES);
+const IDLE = ['cheer', 'shrug', 'think', 'clap', 'dance', 'jump'];
+
+/* ================= STATE ================= */
+let S = {players: [], progress: {}, settings: {}, avatars: {}, player: '', age: ''};
+let SET = {mode: 'scale', level: 0, theme: 'dino', skin: 'buddy'};
+let G = null, lockHandle = null, GID = 0;
+function ls(k, v){ try{ if(v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }catch(e){ return null; } }
+function store(k){ return 'sp_geoscout_' + k + ':' + (S.player || ''); }
+function loadPrefs(){ try{ const p = JSON.parse(ls(store('prefs')) || '{}'); if(MODES_ON.indexOf(p.mode) >= 0) SET.mode = p.mode; if(THEMES[p.theme]) SET.theme = p.theme; }catch(e){} SET.skin = NumberSkins.resolve(S.player, nskOwned(S.player), 'buddy'); }
+// 🎨 number looks owned (gs-4): extras unlocked = max(server: item line 'numberskin' in GeoScout + ➗ Algebros, Journey chapters) and the chapters done on this device
+function nskOwned(name){ return Math.max(Number((S.numberSkins || {})[name]) || 0, journeyDone(name)); }
+const NSK_LOCK = '🔒 Earn it: finish a 📖 Journey chapter, or the 🎨 Number looks steps (GeoScout + ➗ Algebros) in the Collection';
+function savePrefs(){ ls(store('prefs'), JSON.stringify({mode: SET.mode, theme: SET.theme})); }
+function myAvatar(name){ const a = S.avatars[name]; return a ? fixAv(a) : defaultAvatar(name || 'player'); }
+const wait = ms => new Promise(r => setTimeout(r, Math.max(0, ms * SPEED)));
+function modeLabel(m){ const M = GS.MODES[m]; return M.icon + ' ' + M.name; }
+function gestOf(k){ return GESTURES.find(g => g.k === k) || GESTURES[0]; }
+
+/* ================= 🔊 sounds (tiny synth) ================= */
+function tone(f, d, type, gain, slide, delay){ try{ if(!UISound.get().enabled) return; const c = UISound.wake(); if(!c) return; const t0 = c.currentTime + (delay || 0), o = c.createOscillator(), g = c.createGain();
+  o.type = type || 'sine'; o.frequency.setValueAtTime(f, t0); if(slide) o.frequency.exponentialRampToValueAtTime(slide, t0 + d);
+  const pk = Math.max(0.0001, (gain || 0.25) * UISound.get().volume); g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(pk, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+  o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + d + 0.03); }catch(e){} }
+const SND = {
+  snap: n => { const f = 260 * Math.pow(2, Math.min(24, Math.log2(Math.max(1, n)) * 3) / 12); tone(f, 0.12, 'triangle', 0.25); tone(f * 1.5, 0.12, 'triangle', 0.18, null, 0.07); },
+  split: () => { tone(700, 0.08, 'square', 0.1, 350); },
+  copy: () => [523, 659, 784].forEach((f, i) => tone(f, 0.1, 'triangle', 0.2, null, i * 0.05)),
+  share: () => [784, 659, 523].forEach((f, i) => tone(f, 0.1, 'triangle', 0.2, null, i * 0.05)),
+  drop: () => tone(330, 0.08, 'sine', 0.25, 260),
+  tilt: () => tone(180, 0.18, 'sine', 0.15, 140),
+  win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, 'triangle', 0.22, null, i * 0.08)),
+  bad: () => tone(200, 0.3, 'sine', 0.3, 120)
+};
+function toggleSound(){ const on = !UISound.get().enabled; UISound.set(on); $('h-snd').textContent = on ? '🔊' : '🔇'; }
+
+/* ================= MENUS ================= */
+// 🎛️ p1d: the game's own top bar becomes the shared bar in place (UiKit UI.gameBarFrom) — ◀ where you came from · 🎚️ Levels · 🏠 | numbers | buttons ❓
+const BAR = UI.gameBarFrom(document.querySelector('#scr-play .hud'), {game: GAME_ID, icon: '🔢', name: 'GeoScout', playing: () => !!(G && G.phase !== 'over'), onFit: () => window.dispatchEvent(new Event('resize'))});
+var NAV_INNER = {menu: ['◀ GeoScout', () => openCover()]};   // 🧱 b3w3: the setup's top button goes back to the 🎬 cover
+UI.navBar(document.getElementById('back-btn'), {onclick: false});
+function showScreen(name){
+  ['player', 'menu', 'play'].forEach(s => { const el = $('scr-' + s); if(el) el.classList.toggle('hidden', s !== name); });
+  $('back-btn').classList.toggle('hidden', name === 'play'); UI.navScreen($('back-btn'), name, NAV_INNER);   /* 🧭 p1d */ if(name !== 'play') window.scrollTo(0, 0);
+  if(name !== 'play') stopLoop(); drawLogos();
+}
+function drawLogos(){ ['logo1', 'logo2'].forEach(id => { const c = $(id); if(!c || c.offsetParent === null) return; const g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); const u = 26;
+  [1, 3, 2].forEach((n, i) => NumberSkins.draw(g, n, 40 + i * 42, c.height - 8, u, {skin: SET.skin, mat: THEMES[SET.theme].mat, t: 0.3})); }); }
+function progressOf(name){ return S.progress[name] || {unlocked: 0, tokens: [], best: []}; }
+function unlockedOf(name){ return Math.max(progressOf(name).unlocked || 0, Number(ls('sp_geoscout_won:' + name)) || 0); }
+function canPlay(i){ const u = unlockedOf(S.player); if(i === 5) return u >= 5; if(i === 4) return u >= 4; return i <= Math.max(u, AGE_START[S.age] || 0); }
+function renderPlayers(){
+  const box = $('player-list'); box.innerHTML = '';
+  if(!S.players.length){ box.innerHTML = '<div class="empty">No players yet — add one on the Dashboard first.</div>'; return; }
+  S.players.forEach(p => { const b = document.createElement('button'); b.className = 'pick'; b.setAttribute('data-sound', 'pop');
+    const c = document.createElement('canvas'); c.width = 144; c.height = 168; b.appendChild(c);
+    b.insertAdjacentHTML('beforeend', '<div class="nm">' + UI.esc(p.Name) + '</div><div class="sub">' + UI.esc(p.Age ? p.Age + ' yrs' : '') + '</div>');
+    drawPreviewCanvas(c, myAvatar(p.Name), {name: p.Name, t: 1});
+    b.onclick = () => choosePlayer(p.Name); box.appendChild(b); });
+}
+function choosePlayer(name){
+  UI.rememberTheme(name, UI.applyTheme(UI.themeFor(S.settings, name), {kitOnly: true}));
+  const p = S.players.find(x => x.Name === name); S.player = name; S.age = p ? p.Age : '';
+  loadPrefs(); $('who-name').textContent = name; if(window.Cheer){ Cheer.chip($('cheer-chip'), name); Cheer.langChip($('cheer-lang'), name); } /* 📣 cs-4b */ renderMenu(); showScreen('menu'); openCover();   /* 🧱 b3w3: the 🎬 cover first */
+}
+function changePlayer(){ renderPlayers(); showScreen('player'); }
+function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">' + (unlockedOf(S.player) > i ? '🏅 Done' : 'Not done yet') + '</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span><span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
+function renderMenu(){ renderWays(); renderOpts(); renderLevels(); renderHow(); drawLogos(); /* 🧱 b3w3: 🏆 leaders live on the cover */ }
+/* 🗂️ MODE GROUPS (p3a — Aowu F5: GeoScout gets mode boxes like every other game) */
+const MODE_GROUPS = [
+  {k: 'numbers', icon: '🧮', en: 'Number play', th: 'เล่นกับตัวเลข', c: '#3D6BFF'},
+  {k: 'shapes', icon: '🔷', en: 'Shapes + parts', th: 'รูปทรง · เศษส่วน', c: '#E07B12'},
+  {k: 'friends', icon: '⚔️', en: 'With friends', th: 'เล่นกับเพื่อน', c: '#D9480F'},
+  {k: 'story', icon: '📖', en: 'Story', th: 'เนื้อเรื่อง', c: '#8E5CF7'}
+];   // fixed order
+const MODE_GROUP_OF = {scale: 'numbers', count: 'numbers', tens: 'numbers', next: 'numbers', shape: 'shapes', frac: 'shapes', wobble: 'shapes', battle: 'friends', journey: 'story'};
+const MODE_ORDER = ['scale', 'count', 'tens', 'next', 'shape', 'frac', 'wobble', 'battle', 'journey'];
+window.MODE_TYPE = {scale: 'A balance-scale game', count: 'A number-block game', tens: 'A place-value game', next: 'A pattern game', shape: 'A shape-building game', frac: 'A fractions game', wobble: 'A tower-stacking game', battle: 'A 2-player tower duel', journey: 'A story adventure'};
+function renderWays(){
+  UI.modeGroups($('way-list'), MODE_GROUPS, MODE_ORDER.filter(k => MODES_ON.indexOf(k) >= 0).map(k => { const W = GS.MODES[k];
+    return {k, g: MODE_GROUP_OF[k], icon: W.icon, name: W.name, sub: W.sub, on: SET.mode === k, next: k === 'journey' ? '👇 then pick a chapter' : k === 'battle' ? '👇 then pick who + a level' : '👇 then pick a level'}; }), {
+    next: () => $('level-head'),
+    onPick: k => { SET.mode = k; savePrefs(); renderLevels(); renderHow(); renderOpp(); waySub(); }
+  });
+  waySub();
+}
+/* 🗂️ END MODE GROUPS (p3a) */
+function waySub(){ const W = GS.MODES[SET.mode]; $('way-sub').textContent = W.icon + ' ' + W.name + ' — ' + W.sub;
+}
+function renderOpts(){
+  const tb = $('theme-list');
+  tb.innerHTML = THEME_KEYS.map(k => '<button class="chip theme-chip' + (k === SET.theme ? ' on' : '') + '" data-k="' + k + '" data-sound="tap"><span class="sw" style="background:' + THEMES[k].sw + '"></span>' + THEMES[k].icon + ' ' + THEMES[k].name + '</button>').join('');
+  tb.querySelectorAll('.chip').forEach(b => b.onclick = () => { SET.theme = b.dataset.k; savePrefs(); tb.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b)); drawLogos(); });
+  NumberSkins.chips($('skin-list'), SET.skin, k => { SET.skin = k; NumberSkins.set(S.player, k); drawLogos(); }, {owned: nskOwned(S.player), lockText: NSK_LOCK});
+  renderOpp();
+}
+function renderOpp(){
+  const box = $('opp-box'); box.classList.toggle('hidden', SET.mode !== 'battle'); if(SET.mode !== 'battle') return;
+  const list = [{k: '🤖', label: '🤖 Robo-Scout'}].concat(S.players.filter(p => p.Name !== S.player).map(p => ({k: p.Name, label: '👤 ' + UI.esc(p.Name)}))); if(!list.some(o => o.k === SET.opp)) SET.opp = '🤖';
+  const ob = $('opp-list'); ob.innerHTML = list.map(o => '<button class="chip' + (o.k === SET.opp ? ' on' : '') + '" data-k="' + UI.esc(o.k) + '" data-sound="tap">' + o.label + '</button>').join('');
+  ob.querySelectorAll('.chip').forEach(b => b.onclick = () => { SET.opp = b.dataset.k; ob.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b)); });
+}
+function levelInfo(i){ const L = GS.LEVELS[i]; return '🔢 up to ' + L.max + ' · ' + L.rounds + ' rounds' + (L.time ? ' · ⏱️ ' + Math.round(L.time / 60) + ' min' : ''); }
+function renderLevels(){
+  const jr = SET.mode === 'journey'; $('chapter-list').classList.toggle('hidden', !jr); $('level-list').classList.toggle('hidden', jr);
+  if(jr){ $('level-head').textContent = '📖 Pick a chapter — meet the number friends'; renderChapters(); markPicks(); return; }
+  const box = $('level-list'); box.innerHTML = ''; const p = progressOf(S.player), rec = AGE_START[S.age], u = unlockedOf(S.player);
+  $('level-head').textContent = '🎚️ 3. Pick a level — ' + modeLabel(SET.mode);
+  GS.LEVELS.forEach((L, i) => {
+    const U = LEVEL_UI[i], open = canPlay(i), done = u > i, b = document.createElement('button');
+    b.className = 'pick lvl' + (open ? '' : ' locked') + (i === rec && open ? ' recommended' : '') + (U.hardcore ? ' hardcore' : ''); b.setAttribute('data-sound', open ? 'pop' : 'none'); b.dataset.lv = i;
+    b.innerHTML = '<span class="num">' + (i + 1) + '</span>' + (done ? '<span class="badge">🏅</span>' : open ? '' : '<span class="badge">🔒</span>') +
+      '<div class="big">' + U.emoji + '</div><div class="nm">' + L.name + '</div><div class="learn">' + levelInfo(i) + '</div><div class="sub">' + (U.hardcore && !open ? '🔒 Finish Extreme to open 💀 Hardcore' : U.blurb) + '</div>' + bestHtml(p, i);
+    b.onclick = () => { if(!open){ UISound.play('error'); UI.toast(i === 5 ? 'Finish Extreme to open 💀 Hardcore' : i === 4 ? 'Finish Hard (⭐) to unlock Extreme!' : 'Get ⭐ on the level before to unlock it'); return; } chooseLevel(i); };   /* 🧱 b3w3: a tap picks */
+    box.appendChild(b);
+  });
+  { let i = -1; try{ i = Number(localStorage.getItem(setupKey('lv'))); }catch(e){} if(!(i >= 0 && canPlay(i))) i = SET.level != null && canPlay(SET.level) ? SET.level : (canPlay(rec) ? rec : Math.max(0, [0, 1, 2, 3, 4, 5].filter(canPlay).pop() || 0)); chosenLevel = i; } markPicks();   /* 🧱 b3w3 */
+}
+/* 🧱 b3w3 (Game Baseline): ONE setup page — 🎮 way → 🎨 looks → 🎚️ level → ⚙️ options → ▶ Start; the level is remembered per player */
+let chosenLevel = 0;
+const setupKey = k => 'sp_' + GAME_ID.replace(/-/g, '') + '_' + k + ':' + (S.player || '');
+function chooseLevel(i, quiet){
+  chosenLevel = i; try{ localStorage.setItem(setupKey('lv'), String(i)); }catch(e){}
+  markPicks(); if(!quiet){ const w = $('opt-head'); if(w && w.scrollIntoView) w.scrollIntoView({behavior: 'smooth', block: 'center'}); }
+}
+function markPicks(){
+  const lv = $('level-list'), st = $('btn-start'), road = lv.classList.contains('hidden') || lv.classList.contains('road');   // 📖 story chapters start from their own cards
+  if(st) st.parentNode.classList.toggle('off', road);
+  lv.querySelectorAll('.lvl').forEach(b => { const on = String(b.dataset.lv) === String(chosenLevel); b.classList.toggle('sel', on); if(window.GF && GF.pick) GF.pick(b, on); });
+  const L = GS.LEVELS[chosenLevel], U = LEVEL_UI[chosenLevel];
+  if(st && L) st.textContent = '▶ Start · ' + U.emoji + ' ' + L.name + ' · ' + modeLabel(SET.mode);
+}
+function startSetup(){ if(!canPlay(chosenLevel)){ UISound.play('error'); UI.toast('Pick a level that is open 🔓'); return; } SET.level = chosenLevel; startGame(); }
+// 🏁 the shared result card + the game's own extra lines under it
+function b3Card(o, more){
+  GF.result(Object.assign({wrap: $('result'), card: $('result-card'), buddy: {name: S.player, av: myAvatar(S.player)}, confetti: false,
+    levels: () => backToMenu(), levelsText: '🎚️ Levels', again: () => startGame(), againText: '🔁 Again', extra: [{text: '🕹️ Gameroom', fn: () => goGameroom()}]}, o));
+  const row = $('result-card').querySelector('.gf-r-btns'); if(more && row){ const d = document.createElement('div'); d.className = 'b3-more'; d.innerHTML = more; row.parentNode.insertBefore(d, row); }
+  [['btn-levels', 'b-menu'], ['btn-again', 'b-again'], ['btn-next', 'b-next']].forEach(([x, y]) => { const e = $(x); if(e) e.id = y; });   // the old ids (tests, cheer)
+  cheerFaces();
+}
+function nextLevel(lvl){ return lvl < 4 ? () => { if(!canPlay(lvl + 1)){ UISound.play('error'); UI.toast('Get ⭐ to open the next level'); backToMenu(); return; } SET.level = lvl + 1; chosenLevel = lvl + 1; try{ localStorage.setItem(setupKey('lv'), String(lvl + 1)); }catch(e){} startGame(); } : null; }
+// 🎬 the cover (GameFrame): who's here + champions + how to play; ▶ Play opens the setup page
+let ScoutCover = null;
+const SCOUT_VERSION = '2.0';   /* 🧱 b3w3: shown on the cover footer — bump with each round */
+function openCover(){
+  if(!window.GF){ showScreen('menu'); return; }
+  if(ScoutCover && ScoutCover.who !== S.player){ ScoutCover.destroy(); ScoutCover = null; }
+  if(!ScoutCover){ ScoutCover = GF.cover(document.body, {game: GAME_ID, title: 'GeoScout', icon: '🔢', version: SCOUT_VERSION, me: S.player, players: S.players, avatarOf: myAvatar, seats: {min: 1, max: 1},
+      acts: ['beat.jump', 'beat.cheer'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms',
+      onPlay: line => { ScoutCover.hide();  showScreen('menu'); } }); ScoutCover.who = S.player; }
+  ScoutCover.show();
+}
+function howLines(mode){
+  const R2 = {
+    shape: ['🔷 Tap squares on the grid to fill them and build the shape at the top (drag to paint many).', '📏 Area = how many blocks. Way round (perimeter) = all the outside edges. A rectangle has 4 corners.', '🪜 Steps 1 2 3 = a staircase standing on the floor.', '⌨️ arrows move · Space fills / empties.'],
+    tens: ['🔟 Build the number with +1 (ones), +10 (ten-towers) and +100 (hundred slabs).', '✨ When you have 10 ones they snap into one ten-tower by themselves!', '🔢 Quiz rounds: what number do the blocks make? how many tens?', '⌨️ 1 = +1 · T = +10 · H = +100 · Backspace = −1.'],
+    next: ['🧩 Look at the pattern — how much does it grow (or shrink) each time? Pick the number for the ❓.', '🍪 Odd or even: can the blocks all pair up? Even = yes, odd = one is left over.', '⌨️ 1–4 pick an answer.'],
+    frac: ['🍕 Colour the right part of the bar: ½ = 1 of 2 equal teams, ¼ = 1 of 4 …', '⚖️ Which pizza piece is bigger? Tap &lt; = &gt; (the left one is less / the same / more).', '🔢 Name it: how much of the bar is coloured?', '⌨️ ← → + Space colour · &lt; = &gt; compare · 1–4 answer.'],
+    wobble: ['🏗️ Stack blocks to EXACTLY the 🎯 height. You only get some sizes (like 5s and 4s)!', '😬 Too tall? The tower wobbles — take the top block off (↩️).', '⭐⭐⭐ = the fewest blocks. It is a maths puzzle, not a balancing game.', '⌨️ 1 / 2 / 3 add a size · Backspace takes the top off.'],
+    battle: ['⚔️ Each player gets some number blocks and builds ONE tower from them (tap the blocks you want).', '🃏 The rule card says who wins the round: ⬆️ higher, ⬇️ lower or 🎯 closest to a number.', '✖️2 card (⚡ Hard+): doubles your tower.', '🙈 Pass the device — no peeking! First to 3 round wins.']
+  };
+  R2.journey = ['📖 Six story chapters: the number friends meet, add (+), take away (−), make copies (×), share (÷), hop the number line and balance (=).', '▶ Tap Next (or the picture) to read on. When there is a puzzle, solve it to continue the story.', '🏅 Each chapter gives a sticker, a new 🎨 number look (also for ➗ Algebros tiles) + Adventure miles the first time, and opens the next chapter.', '🧑 You walk the road with Pip, Tik & Tok, Tri, Quadra, Hi-Five, Dicey, Stella, Ollie, Whisk, Cap, Hal and Centi!'];
+  if(R2[mode]) return R2[mode];
+  if(mode === 'count') return ['🎯 Make the number at the top with the blocks you are given.', '🧲 Drag a number onto another one to <b>snap</b> them together (3 + 4 → 7).', '✂️ Tap a number, then tap one of its blocks (or use ✂️ Take away) to <b>split</b> it (7 − 2 → 5 and 2). From 🐣 Junior.',
+    '✖️ <b>Copy</b> makes copies and joins them (4 × 3 → 12) · ➗ <b>Share</b> splits fairly into teams (12 ÷ 3 → 4, 4, 4). From ⚡ Hard.', '⭐⭐⭐ = done in the fewest moves. ↩️ Undo takes the last move back (it still counts).', '⌨️ ← → pick · 1–9 pick a number · S split · C copy · D share · U undo.'];
+  return ['⚖️ Two pans: which side is <b>heavier</b>? Tap <b>&lt;</b> (left is less), <b>=</b> (the same) or <b>&gt;</b> (left is more). One try!', '🧱 Balance: drag blocks onto the right pan until the scale is level. Tap a block on the pan to take it back.',
+    '🔷 A shape weighs as many blocks as it has corners: 🔺 3 · ⬛ 4 · ⬟ 5 · ⬢ 6.', '🧑 Round 3: you sit on the scale — find out how many blocks you weigh!', '⭐⭐⭐ = balanced in the fewest moves, or the right answer first time.', '⌨️ &lt; = &gt; keys answer · ← → pick a block · Enter puts it on the pan · Backspace takes it back.'];
+}
+function renderHow(){ $('how-list').innerHTML = howLines(SET.mode).map(l => '<li>' + l + '</li>').join('') + '<li>💀 Hardcore: numbers up to 1000, a 4-minute clock, one mistake ends the game, ×5 points.</li>'; }
+function openHowSheet(){ openSheet('<h3>❓ How to play — ' + modeLabel(G ? G.M.mode : SET.mode) + '</h3><ul>' + howLines(G ? G.M.mode : SET.mode).map(l => '<li>' + l + '</li>').join('') + '</ul><div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="pop" onclick="closeSheet()">👍 Got it</button></div>'); }
+function openSheet(html){ $('sheet-card').innerHTML = html; $('sheet').classList.remove('hidden'); }
+function closeSheet(){ $('sheet').classList.add('hidden'); }
+
+/* ================= PLAY ================= */
+function startGame(){ setTimeout(cheerMount, 0); /* 📣 cs-4b */ if(ScoutCover) ScoutCover.hide();   /* 🧱 b3w3 */
+  if(SET.mode === 'battle'){ startBattle(); return; }
+  if(SET.mode === 'journey'){ startJourney(Math.min(6, journeyDone(S.player) + 1)); return; }
+  hideResult(); closeSheet();
+  const av = {name: S.player, w: GS.avatarWeight(S.player, SET.level)};
+  const M = GS.newGame({level: SET.level, mode: SET.mode, avatar: av});
+  G = {M, id: ++GID, theme: SET.theme, skin: SET.skin, t0: performance.now(), roundT0: 0, phase: 'play', fx: [], sel: 0, splitK: 1, hist: [], drag: null, pos: {}, tilt: 0, tiltLock: true, A: {gest: null, pose: null}, timeLeft: GS.LEVELS[SET.level].time || 0, hints: 0, lastTick: 0, msg: ''};
+  showScreen('play'); $('h-time').classList.toggle('hidden', !G.timeLeft); sizeCanvas(); nextRound(true); startLoop();
+}
+function nextRound(first){
+  if(!G) return; const M = G.M; GS.deal(M); G.phase = 'play'; G.roundT0 = performance.now(); G.sel = 0; G.splitK = 1; G.hist = []; G.drag = null; G.tiltLock = M.item.kind === 'compare'; G.tilt = 0; G.answerShown = false;
+  G.pos = {}; hud(); renderBar(); renderGoal(); hideBanner();
+  if(M.item.kind === 'avatar'){ banner('🧑 How many blocks do <b>you</b> weigh?', ''); setTimeout(hideBanner, 1600 * SPEED + 1); }
+}
+function hud(){ if(!G) return; if(G.J){ jHud(); return; } const M = G.M; $('h-round').textContent = 'Round ' + Math.min(M.round + 1, M.total) + ' / ' + M.total; $('h-score').textContent = '🏆 ' + M.score.toLocaleString();
+  const st = GS.starsFor(M.quals, Math.max(1, M.quals.length)); $('h-stars').textContent = M.quals.length ? '⭐'.repeat(st) + '☆'.repeat(3 - st) : '☆☆☆'; }
+function renderGoal(){
+  const it = G.M.item, gl = $('goal');
+  if(it && it.story){ gl.className = 'goal'; gl.innerHTML = '📖 <b>' + UI.esc(it.ask) + '</b><small>' + (it.kind === 'count' ? '🎯 make ' + it.target + (it.allow ? ' · use ' + it.allow.map(a => ({split: '✂️ split', copy: '✖️ copy', share: '➗ share'})[a]).join(' ') : ' · 🧲 drag to snap') : it.kind === 'balance' ? 'Drag blocks onto the right pan' : it.kind === 'compare' ? 'Tap < = >' : 'Tap the answer') + '</small>'; return; } gl.classList.toggle('side', isWide() && it.kind !== 'compare' && it.kind !== 'count'); gl.classList.toggle('sideL', isWide() && it.kind === 'count');
+  if(it.kind === 'count') gl.innerHTML = '🎯 Make <b>' + it.target + '</b><small>' + countSub(it) + '</small>';
+  else if(it.kind === 'compare') gl.innerHTML = '⚖️ Left is … <b>&lt; = &gt;</b> … right?<small>' + (GS.LEVELS[G.M.level].hint ? 'Count the blocks on each pan' : 'Work out each side') + '</small>';
+  else if(it.kind === 'avatar') gl.innerHTML = '🧑 Weigh <b>' + UI.esc(S.player) + '</b>!<small>Put blocks on the right pan until it balances</small>';
+  else if(it.kind === 'balance') gl.innerHTML = '⚖️ Make it <b>balance</b><small>Drag blocks onto the right pan</small>';
+  else if(it.kind === 'grid') gl.innerHTML = '🔷 Build <b>' + UI.esc(it.goal) + '</b><small>Tap or drag on the grid to fill squares</small>';
+  else if(it.kind === 'tens') gl.innerHTML = '🔟 Build <b>' + it.target + '</b><small>' + (it.units.length > 1 ? 'Use ones, tens' + (it.units.length > 2 ? ' and hundreds' : '') + ' — the fewest blocks' : '10 ones snap into a ten-tower') + '</small>';
+  else if(it.kind === 'colour') gl.innerHTML = '🍕 Colour <b>' + it.frac.n + '/' + it.frac.d + '</b> of the bar<small>Tap blocks to colour them</small>';
+  else if(it.kind === 'wobble') gl.innerHTML = '🏗️ Exactly <b>' + it.target + '</b> high<small>Only blocks of ' + it.sizes.join(', ') + ' — fewest blocks wins ⭐⭐⭐</small>';
+  else if(it.kind === 'choice') gl.innerHTML = '<b>' + UI.esc(it.q) + '</b><small>' + modeLabel(G.M.mode) + '</small>';
+}
+function countSub(it){ const L = G.M.level; return L >= 3 ? '🧲 snap · ✂️ split · ✖️ copy · ➗ share' : L >= 1 ? '🧲 drag to snap · ✂️ tap to split' : '🧲 drag one number onto another to snap'; }
+function selStack(){ const it = G.M.item; return it.kind === 'count' ? it.stacks.find(s => s.id === G.sel) : null; }
+function renderBar(){
+  const bar = $('bar'), it = G.M.item, M = G.M; if(!it) return;
+  if(G.phase !== 'play'){ bar.innerHTML = '<button class="tb act" data-sound="pop" onclick="goNext()">▶ Next</button>'; return; }
+  if(it.kind === 'choice' && !it.syms){ bar.innerHTML = it.options.map((o, i) => '<button class="tb big ' + ['lt', 'eq', 'gt', 'act'][i % 4] + '" style="--i:' + i + '" data-opt="' + UI.esc(o) + '" data-sound="none" onclick="pickOpt(this.dataset.opt)">' + UI.esc(o) + '<small>' + (i + 1) + '</small></button>').join(''); return; }
+  if(it.kind === 'choice'){ bar.innerHTML = '<button class="tb big lt" style="--i:0" data-sym="<" data-sound="none" onclick="pickOpt(\'<\')">&lt;<small>left is less</small></button><button class="tb big eq" style="--i:1" data-sym="=" data-sound="none" onclick="pickOpt(\'=\')">=<small>the same</small></button><button class="tb big gt" style="--i:2" data-sym=">" data-sound="none" onclick="pickOpt(\'>\')">&gt;<small>left is more</small></button>'; return; }
+  if(it.kind === 'grid'){ bar.innerHTML = '<div class="hint">👆 Tap or drag to fill squares · tap a filled one to empty it</div><button class="tb" data-sound="tap" onclick="gridClear()">🧽 Clear</button>' + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : ''); return; }
+  if(it.kind === 'tens'){ bar.innerHTML = it.units.map(u => '<button class="tb act" data-u="' + u + '" data-sound="none" onclick="tensBtn(' + u + ')">+' + u + '</button>').join('') + it.units.map(u => '<button class="tb" data-u="-' + u + '" data-sound="none" onclick="tensBtn(-' + u + ')">−' + u + '</button>').join('') + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : ''); return; }
+  if(it.kind === 'colour'){ bar.innerHTML = '<div class="hint">👆 Tap blocks to colour them (tap again to clear one)</div><button class="tb" data-sound="tap" onclick="colourClear()">🧽 Clear</button>' + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : ''); return; }
+  if(it.kind === 'wobble'){ bar.innerHTML = it.sizes.map((z, i) => '<button class="tb big" style="background:' + WOB_COLS[i] + ';color:#fff" data-s="' + z + '" data-sound="none" onclick="wobBtn(' + z + ')">+' + z + '<small>key ' + (i + 1) + '</small></button>').join('') + '<button class="tb" data-sound="tap" onclick="wobUndo()">↩️ Take top off</button>' + (M.level <= 2 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : ''); return; }
+  if(it.kind === 'compare'){ bar.innerHTML = '<button class="tb big lt" style="--i:0" data-sym="<" data-sound="none" onclick="answer(\'<\')">&lt;<small>left is less</small></button><button class="tb big eq" style="--i:1" data-sym="=" data-sound="none" onclick="answer(\'=\')">=<small>the same</small></button><button class="tb big gt" style="--i:2" data-sym=">" data-sound="none" onclick="answer(\'>\')">&gt;<small>left is more</small></button>'; return; }
+  if(it.kind !== 'count'){ bar.innerHTML = '<div class="hint">👆 Drag blocks onto the right pan (or tap them). Tap a block on the pan to take it back.</div><button class="tb" data-sound="tap" onclick="takeAll()">↩️ Take all back</button>' + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡 Hint</button>' : ''); return; }
+  const s = selStack(); let h = '';
+  if(!s) h = '<div class="hint">' + (M.level === 0 ? '🧲 Drag one number onto another to snap them together.' : '👆 Tap a number to split / copy / share it — or drag it onto another to snap.') + '</div>';
+  else {
+    h = '<span class="grp"><span class="lab">' + s.n + '</span>';
+    if(GS.canOp(M, 'split') && s.n > 1){ G.splitK = Math.max(1, Math.min(s.n - 1, G.splitK)); h += '<span class="lab">✂️ take away</span><button class="tb" data-sound="tap" onclick="bumpK(-1)">−</button><span class="val" id="split-k">' + G.splitK + '</span><button class="tb" data-sound="tap" onclick="bumpK(1)">+</button><button class="tb act" data-sound="none" onclick="doSplit()">✂️ Split</button>'; }
+    h += '</span>';
+    if(GS.canOp(M, 'copy')){ h += '<span class="grp"><span class="lab">✖️ copy</span>' + [2, 3, 4, 5].map(m => '<button class="tb cp" data-sound="none" ' + (s.n * m > GS.capFor(M.level) ? 'disabled ' : '') + 'onclick="doCopy(' + m + ')">×' + m + '</button>').join('') + '</span>'; }
+    if(GS.canOp(M, 'share')){ h += '<span class="grp"><span class="lab">➗ share</span>' + [2, 3, 4, 5].map(m => '<button class="tb sh" data-sound="none" ' + (s.n % m ? 'disabled ' : '') + 'onclick="doShare(' + m + ')">÷' + m + '</button>').join('') + '</span>'; }
+  }
+  h += '<button class="tb" data-sound="tap" onclick="undo()"' + (G.hist.length ? '' : ' disabled') + '>↩️ Undo</button>' + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '');
+  bar.innerHTML = h;
+}
+function bumpK(d){ const s = selStack(); if(!s) return; G.splitK = Math.max(1, Math.min(s.n - 1, G.splitK + d)); const el = $('split-k'); if(el) el.textContent = G.splitK; }
+function snapshot(){ G.hist.push(JSON.stringify(G.M.item.stacks)); if(G.hist.length > 30) G.hist.shift(); }
+function undo(){ if(G && GSStack.busy()){ GSStack.skip(); return; } if(!G || G.phase !== 'play' || !G.hist.length) return; G.M.item.stacks = JSON.parse(G.hist.pop()); G.sel = 0; renderBar(); }
+function showHint(){ if(GSStack.busy()){ GSStack.skip(); return; } G.hints++; banner('💡 ' + GS.hintFor(G.M), ''); setTimeout(hideBanner, 1800 * SPEED + 1); }
+/* 🧊 STACK START (gs-anim, Aowu 2026-11-20 21:59 "play the stacking first, THEN count" · ✨ Polish chat)
+   A join plays in beats (🎬 Action beats · Motion Bible M1 / M11 · FX Bible F2 / F11): ① ready → ② crouch → ③ jump (the number flies as ONE
+   character, stretch + small tilt, arc capped under the goal panel) → ④ contact × N (its blocks land one after another, bottom first:
+   clack + tower squash from Motion.landInfo, held 60 ms) → ⑤ sway (overshoot) → ⑥ settle → 🔟 make ten on the way (the column
+   splits in the air, the first part fills up to 10 = a ten-rod with a gold frame + Motion.fx('glint') + "10!", the rest hops down
+   next door) → 🔢 COUNT (each block lights + a number chip BESIDE the tower, never on a face; 🌱 Basic counts every block from 1,
+   🐣 Junior+ counts ON from the bottom number, ✖️ copies count by groups) → ✨ morph (the new colour runs up, the faces become one)
+   → sum words + the 🎯 check. Tap / any key = ×4 fast. The round clock (speed points, 💀 Hardcore timer) waits while it plays.
+   SPEED 0 = instant (harness) · FX 0 = calm (no dust / glint / sway, shorter).
+   GSStack.start({aN, bN, bId, from: {x, floor}, u, sum, after, groups?, by?}) · .tick(dt) · .draw(g, t, P, u, skin, mat) · .skip() · .busy()
+   · .pointing() · .morphDone() · GSStack.drop(kind, o) = the light landing beat for 🏗️ Wobble + 🔟 Tens. */
+const GSStack = (function(){
+  const cl = (v, a, b) => Math.max(a, Math.min(b, v));
+  const sineInOut = p => 0.5 - 0.5 * Math.cos(Math.PI * p), cubicOut = p => 1 - Math.pow(1 - p, 3);
+  const PITCH = 0.95, ROD = 0.9;                       // NumberSkins.layout: a rod is 0.9u wide, the next one starts 0.95u on
+  const onesX = T => T > 0 ? T * PITCH + 0.05 : 0;     // the ones column's x (in u) after T rods
+  const colN = n => n <= 10 ? n : (n % 10 || 10);
+  const STEP = [0.17, 0.13, 0.11, 0.08, 0.07, 0.06];   // count step (s) per level: Basic slow, Hardcore quick
+  const TRAIL = 0.07;                                   // each higher block lands this much later (overlap)
+  // never fly up behind the 🎯 goal panel: its real box (top on phones, top-left on wide screens) — only where the jump passes under it
+  const topY = (xa, xb) => { const base = (G && G.cl ? G.cl.top : 26) + 10, el = document.getElementById('goal'); if(!el || !el.offsetHeight) return base;
+    const r = el.getBoundingClientRect(), c = CV.getBoundingClientRect(), L = r.left - c.left, R = r.right - c.left, B = r.bottom - c.top + 8;
+    if(xa == null) return Math.max(base, B); return Math.min(xa, xb) <= R + 4 && Math.max(xa, xb) >= L - 4 ? Math.max(base, B) : base; };
+  function plan(o){
+    const n = o.bN + (o.groups || [o.aN]).reduce((a, b) => a + b, 0), Li = G.M ? G.M.level : 1, calm = !FX;
+    const S = {t: 0, real: 0, fast: false, bId: o.bId, jId: o.jId, aN: o.aN, bN: o.bN, n, after: o.after, sum: o.sum, u: o.u, dir: 1, calm,
+      countAll: Li === 0 && !o.by, by: o.by || 0, step: o.by ? 0.24 : STEP[Li] || 0.07};
+    S.bR = o.bN > 10 ? Math.floor(o.bN / 10) : 0; S.bO = o.bN > 10 ? o.bN % 10 : o.bN;
+    if(S.bO === 10 && n > 10){ S.bR = 1; S.bO = 0; }   // a 10 joined by more = it stands as a ten-rod
+    // groups: one jump each (a snap = 1 group; ✖️ copies = one group per copy, dropping in one after another)
+    const list = o.groups || [o.aN]; let rods = S.bR, col = S.bO, L0 = calm ? 0.12 : 0.26;
+    S.G = []; S.lands = [];
+    list.forEach((aN, gi) => {
+      const g = {aN, aR: aN > 10 ? Math.floor(aN / 10) : 0, aO: aN > 10 ? aN % 10 : aN, L: L0, F: calm ? 0.22 : (o.groups ? 0.3 : 0.36), from: gi === 0 ? o.from : null, pop: !!o.groups, lands: []};
+      let j = 0;
+      for(let r = 0; r < g.aR; r++){ const L = {g: gi, rod: true, src: r, slot: rods++, C: g.L + g.F + (j++) * TRAIL}; g.lands.push(L); }
+      g.onesSlot0 = rods;
+      for(let i = 0; i < g.aO; i++){ const L = {g: gi, rod: false, src: i, slot: rods, k: col, C: g.L + g.F + (j++) * (calm ? 0.04 : TRAIL)}; g.lands.push(L); col++;
+        if(col === 10 && n > 10){ L.click = rods; rods++; col = 0; } }
+      // 🔟 make ten: the blocks after the click split off in the air and hop down next door only AFTER it
+      const ck = g.lands.find(L => L.click != null); let q = 0;
+      if(ck) g.lands.forEach(L => { if(!L.rod && L.src > ck.src){ L.next = true; L.C = ck.C + (calm ? 0.1 : 0.2) + (q++) * (calm ? 0.04 : TRAIL); } });
+      g.click = ck || null; g.endC = Math.max(...g.lands.map(L => L.C));
+      S.G.push(g); S.lands.push(...g.lands); L0 = g.endC + (calm ? 0.12 : 0.3);   // the next copy pops in only after this one has landed
+    });
+    S.rodsEnd = rods; S.colEnd = col;
+    const lastC = Math.max(...S.lands.map(L => L.C), L0);
+    S.T_hold = lastC + 0.08; S.T_count = S.T_hold + (calm ? 0.06 : 0.5);
+    S.countN = S.by ? Math.round(n / S.by) : S.countAll ? n : 1 + (n - o.bN);
+    S.T_morph = S.T_count + S.countN * S.step + 0.2; S.T_end = S.T_morph + 0.4;
+    return S;
+  }
+  // the count step of block i in count order (B = bottom → top, rods first) and the number its chip shows (0 = no chip)
+  function stepOf(S, i, isB, bCount){ return S.by ? Math.floor(i / S.by) + 1 : S.countAll ? i + 1 : isB ? 1 : 1 + i - bCount + 1; }
+  function chipOf(S, i, isB, bCount){ if(S.by) return (i + 1) % S.by === 0 ? i + 1 : 0; if(S.countAll) return i + 1; if(isB) return i === bCount - 1 ? S.bN : 0; return S.bN + (i - bCount + 1); }
+  const API = {
+    start(o){ if(!SPEED){ G.st = null; o.after(); return; } G.st = plan(o); tone(260, 0.1, 'sine', 0.14, 520, 0.2); },   // a little whoosh as it jumps
+    skip(){ if(G && G.st) G.st.fast = true; },
+    busy(){ return !!(G && G.st); },
+    pointing(){ const S = G && G.st; return !!(S && S.lit && S.morphT == null); },
+    morphDone(){ const S = G && G.st; return !!(S && S.morphT != null && S.t - S.morphT >= 0.26); },
+    tick(dt){
+      const S = G && G.st; if(!S) return; const t0 = S.t; S.real += dt; S.t += dt * (S.fast ? 4 : 1); const t = S.t, X = x => t0 < x && t >= x;
+      S.lands.forEach((L, i) => { if(X(L.C)){
+        S.sq = {t: L.C, s: cl(Motion.landInfo({height: 0.3 + i * 0.04}).squash / 100 * 0.55, 0.025, 0.09)};
+        tone(300 * Math.pow(2, Math.min(16, S.bN + i) / 12), 0.06, 'triangle', 0.22); tone(140, 0.045, 'square', 0.05);
+        if(i === 0 && !S.calm) S.puff = {t: L.C, k: L.rod ? 0 : L.k};
+        if(L.click != null){ S.click = {t: L.C, slot: L.click}; tone(880, 0.09, 'triangle', 0.22); tone(1320, 0.14, 'triangle', 0.18, null, 0.06); }
+      } });
+      if(X(S.T_hold) && !S.calm) S.sway = {t: S.T_hold};
+      for(let k = 0; k < S.countN; k++) if(X(S.T_count + k * S.step)){ S.lit = k + 1; S.litT = S.T_count + k * S.step; tone(523 * Math.pow(2, Math.min(19, k) / 12), 0.08, 'sine', 0.2); }
+      if(X(S.T_morph)){ S.morphT = S.T_morph; SND.snap(S.n); avatarDo('cheer'); if(S.sum) floatText(S.sum, S.bId, '#FFE14D'); const P = G.pos && G.pos[S.bId]; if(P) P.pop = 1; if(S.onMorph) S.onMorph(); }
+      if(t >= S.T_end){ const a = S.after; G.st = null; if(G.roundT0) G.roundT0 += S.real * 1000; a && a(); }   // the round clock waited while it played
+    },
+    // paint the tower (b + arrivals) at P (x = left, y = floor) + the jumping numbers
+    draw(g, t, P, u, skin, mat){
+      const S = G.st, T = S.t, x0 = P.x;
+      const colB = NumberSkins.colour(skin, colN(S.bN)), colNew = NumberSkins.colour(skin, colN(S.n)), col10 = NumberSkins.colour(skin, 10);
+      const landed = S.lands.filter(L => T >= L.C), clicks = S.lands.filter(L => L.click != null && T >= L.C);
+      const rodsIn = S.bR + landed.filter(L => L.rod).length + clicks.length;
+      // ---- the standing tower, in COUNT order: rods (b's, arrived, clicked) left → right, then the ones column
+      const B = [];
+      const rodsAt = []; for(let r = 0; r < S.bR; r++) rodsAt.push({slot: r, b: true});
+      landed.filter(L => L.rod).forEach(L => rodsAt.push({slot: L.slot}));
+      // ones on the column (b's own + every one landed); a 🔟 click turns the first 10 of the column into a rod
+      let col = []; for(let k = 0; k < S.bO; k++) col.push({b: true, col: colB});
+      const order = S.lands.slice().sort((a, b) => a.C - b.C), clickAnims = [];
+      order.forEach(L => { if(T < L.C || L.rod) return; const ga = S.G[L.g]; col.push({col: NumberSkins.colour(skin, colN(ga.aN)), g: L.g});
+        if(L.click != null){ const e = cl((T - L.C) / 0.16, 0, 1); clickAnims.push({slot: L.click, e, blocks: col.slice(0, 10)}); col = col.slice(10); } });
+      rodsAt.sort((a, b) => a.slot - b.slot).forEach(r => { for(let k = 0; k < 10; k++) B.push({x: x0 + r.slot * PITCH * u, y: P.y - (k + 1) * ROD * u, s: ROD * u, col: col10, b: r.b}); });
+      clickAnims.forEach(c => { const sz = 1 - c.e * (1 - ROD); c.blocks.forEach((o, k) => B.push({x: x0 + c.slot * PITCH * u, y: P.y - (k + 1) * u * sz, s: u * sz, col: c.e >= 1 ? col10 : o.col, b: o.b && c.e < 1, g: o.g})); });
+      const cx1 = x0 + onesX(rodsIn) * u; col.forEach((o, k) => B.push({x: cx1, y: P.y - (k + 1) * u, s: u, col: o.col, b: o.b, g: o.g}));
+      // ---- squash (contact, held 60 ms → springs back with overshoot) + sway (follow-through)
+      let sy = 1, ang = 0;
+      if(S.sq){ const e = T - S.sq.t; sy = e < 0.06 ? 1 - S.sq.s : 1 - S.sq.s * Math.exp(-(e - 0.06) / 0.07) * Math.cos((e - 0.06) * Math.PI * 2 / 0.2); }
+      if(S.sway){ const e = T - S.sway.t, A = 0.045 * cl(S.n / 8, 0.35, 1); ang = A * Math.exp(-e / 0.16) * Math.sin(e * Math.PI * 2 / 0.3) * S.dir; }
+      const morphP = S.morphT != null ? cl((T - S.morphT) / 0.26, 0, 1) : 0, piv = x0 + u / 2;
+      g.save(); g.translate(piv, P.y); g.rotate(ang); g.scale(1 + (1 - sy) * 0.6, sy); g.translate(-piv, -P.y);
+      const bCount = B.filter(o => o.b).length, tens = S.n > 10 ? Math.floor(S.n / 10) * 10 : 0;
+      B.forEach((o, i) => {
+        const w = morphP * (B.length + 2) - i, changed = morphP > 0 && w > 0, pop = changed && w < 1 ? 1 + 0.12 * Math.sin(w * Math.PI) : 1;   // ✨ the new colour runs up
+        const c = changed ? (i < tens ? col10 : colNew) : o.col, top = !B[i + 1] || Math.abs(B[i + 1].x - o.x) > 2;
+        g.save(); if(pop !== 1){ g.translate(o.x + o.s / 2, o.y + o.s); g.scale(pop, pop); g.translate(-(o.x + o.s / 2), -(o.y + o.s)); }
+        NumberSkins.block(g, o.x, o.y, o.s, c, mat, t, i, {noTop: !top});
+        const st = stepOf(S, i, o.b, bCount);
+        if(S.lit && st <= S.lit && morphP < 1){ g.globalAlpha = st === S.lit ? 0.45 : 0.2; g.fillStyle = '#FFFFFF'; g.fillRect(o.x + o.s * 0.08, o.y + o.s * 0.08, o.s * 0.84, o.s * 0.84); g.globalAlpha = 1; }
+        g.restore();
+      });
+      // faces: b's face on b's own top block · the last number's face on its top block — at the morph they become ONE face
+      const bTop = B.filter(o => o.b).slice(-1)[0], aTop = B.filter(o => !o.b && o.g != null).slice(-1)[0], allIn = landed.length === S.lands.length;
+      if(morphP < 0.5){ if(bTop) NumberSkins.face(g, bTop.x + bTop.s / 2, bTop.y + bTop.s / 2, bTop.s, S.bN, skin, S.lit ? 'happy' : 'wow', t);
+        if(aTop && allIn) NumberSkins.face(g, aTop.x + aTop.s / 2, aTop.y + aTop.s / 2, aTop.s, S.G[aTop.g].aN, skin, S.lit ? 'happy' : 'wow', t); }
+      g.restore();
+      // 🔢 count chips BESIDE the tower (never on a face): the fresh one big + gold, the earlier ones small
+      if(S.lit && morphP < 1){ g.save(); g.globalAlpha = 1 - morphP;
+        B.forEach((o, i) => { const st = stepOf(S, i, o.b, bCount), num = chipOf(S, i, o.b, bCount); if(st > S.lit || !num) return;
+          const fresh = st === S.lit, popK = fresh ? 1 + 0.35 * Math.max(0, 1 - (T - S.litT) / 0.12) : 1;
+          const right = B.every(q => q.x <= o.x + 1), cx = right ? o.x + o.s + u * 0.42 : o.x - u * 0.42, cy = o.y + o.s / 2;
+          const fs = Math.max(9, u * (fresh ? 0.6 : 0.42) * popK), txt = String(num); g.font = '800 ' + Math.round(fs) + 'px Fredoka, sans-serif'; const tw = Math.max(fs * 1.15, g.measureText(txt).width + fs * 0.55);
+          g.fillStyle = fresh ? '#FFE14D' : 'rgba(20,14,40,0.78)'; g.beginPath(); g.roundRect(cx - tw / 2, cy - fs * 0.62, tw, fs * 1.24, fs * 0.5); g.fill();
+          if(fresh){ g.lineWidth = 2; g.strokeStyle = '#8A5A00'; g.stroke(); }
+          g.fillStyle = fresh ? '#1A1230' : '#FFFFFF'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, cx, cy + fs * 0.05); });
+        g.restore(); }
+      // ---- the jumping numbers: standing (crouch / pop in) or in the air as ONE character; higher blocks trail a little and land later
+      const colsBefore = gi => { let rods = S.bR, c = S.bO; for(let k = 0; k < gi; k++){ const ga = S.G[k]; rods += ga.aR; c += ga.aO; while(c >= 10 && S.n > 10){ c -= 10; rods++; } } return {rods, c}; };
+      S.G.forEach((ga, gi) => {
+        if(ga.lands.every(L => T >= L.C)) return;
+        const before = colsBefore(gi), rodsG = before.rods + ga.aR, topNow = P.y - (before.c + ga.aO) * u;
+        if(!ga.from) ga.from = {x: x0 + onesX(before.rods) * u, floor: Math.max(topY(x0, x0 + u * 2) + ga.aO * u + u * 0.4, P.y - before.c * u - u * 1.7)};   // ✖️ a copy pops in just above the tower
+        if(ga.pop && T < ga.L - 0.2) return;
+        const popK = ga.pop ? cubicOut(cl((T - (ga.L - 0.2)) / 0.18, 0, 1)) : 1;
+        const colA = NumberSkins.colour(skin, colN(ga.aN)), aX0 = ga.from.x, aOX = aX0 + onesX(ga.aR) * u;
+        const crouch = T < ga.L ? cubicOut(cl((T - (ga.L - 0.18)) / 0.16, 0, 1)) : 0, csy = 1 - crouch * 0.12;
+        const first = ga.lands[0], C0 = first.C, fsx = first.rod ? aX0 : aOX, fsy = first.rod ? ga.from.floor - 10 * ROD * u : ga.from.floor - u;
+        const fex = first.rod ? x0 + first.slot * PITCH * u : x0 + onesX(rodsG) * u, fe = first.rod ? P.y - 10 * ROD * u : P.y - (before.c + 1) * u;
+        const d = Math.hypot(fex - fsx, fe - fsy), roof = Math.min(fsy, fe) - (ga.aO - 1) * u - topY(Math.min(fsx, fex), Math.max(fsx, fex) + u * 1.5), H = Math.max(u * 0.35, Math.min(Math.max(u * 1.0, d * 0.3), roof));
+        const ride = (TT, L, ey2) => { const p = cl((TT - ga.L) / (C0 - ga.L), 0, 1), up = L.rod ? 0 : L.src - (first.rod ? 0 : first.src);
+          const bxp = fsx + (fex - fsx) * sineInOut(p), byp = fsy + (fe - fsy) * p - H * 4 * p * (1 - p);
+          const gap = 0.16 * Math.sin(p * Math.PI / 2) * (TT < C0 ? 1 : Math.max(0, 1 - Math.pow((TT - C0) / Math.max(0.01, L.C - C0), 2)));
+          return {p, up, x: bxp + (L.rod ? (L.src - (first.rod ? first.src : 0)) * PITCH * u : 0), y: byp - up * u * (1 + gap) + (ey2 - (fe - up * u)) * (TT < C0 ? p * p : 1)}; };
+        ga.lands.forEach((L, i) => { if(T >= L.C) return;
+          const s = L.rod ? ROD * u : u, sx = L.rod ? aX0 + L.src * PITCH * u : aOX, sy0 = L.rod ? ga.from.floor - 10 * ROD * u * csy : ga.from.floor - (L.src + 1) * u * csy;
+          const nextSlot = ga.click ? ga.click.click + 1 : rodsG;
+          const ex = L.rod ? x0 + L.slot * PITCH * u : x0 + onesX(L.next ? nextSlot : rodsG) * u, ey = L.rod ? P.y - 10 * ROD * u : P.y - (L.k + 1) * u;
+          let x = sx, y = sy0, rot = 0, st = 1;
+          if(T >= ga.L && !L.next){ const r = ride(T, L, ey); x = r.x + (ex - fex) * (T < C0 ? sineInOut(r.p) : 1); y = r.y; S.dir = fex >= fsx ? 1 : -1; st = 1 + 0.08 * Math.sin(r.p * Math.PI); rot = T < C0 ? Math.sin(r.p * Math.PI) * 0.12 * S.dir : 0; }
+          else if(T >= ga.L){ const Ts = ga.L + (C0 - ga.L) * 0.3, r0 = ride(Math.min(T, Ts), L, fe - (L.src - (first.rod ? 0 : first.src)) * u), hx = ex, hy = ey - u * 1.5, C1 = ga.click.C + 0.06;
+            if(T < Ts){ x = r0.x; y = r0.y; rot = Math.sin(r0.p * Math.PI) * 0.12 * S.dir; }
+            else if(T < C1){ const e = sineInOut(cl((T - Ts) / Math.max(0.01, C0 - Ts), 0, 1)); x = r0.x + (hx - r0.x) * e; y = r0.y + (hy - r0.y) * e - u * 0.8 * Math.sin(e * Math.PI) + (e >= 1 ? Math.sin(T * 9 + L.src) * u * 0.04 : 0); rot = 0.1 * Math.sin(e * Math.PI) * S.dir; }
+            else { const p = cl((T - C1) / Math.max(0.01, L.C - C1), 0, 1); x = hx; y = hy + (ey - hy) * p * p; st = 1 + 0.06 * Math.sin(p * Math.PI); } }
+          g.save(); const bx = x + s / 2, by = y + s, k2 = popK; g.translate(bx, by); g.rotate(rot); g.scale(k2 / Math.sqrt(st), k2 * st); g.translate(-bx, -by);
+          if(L.rod) for(let k = 0; k < 10; k++) NumberSkins.block(g, x, y + (9 - k) * s, s, col10, mat, t, k, {noTop: k < 9});
+          else { NumberSkins.block(g, x, y, s, colA, mat, t, i, {noTop: L.src < ga.aO - 1 && T < ga.L}); if(L.src === ga.aO - 1) NumberSkins.face(g, x + s / 2, y + s / 2, s, ga.aN, skin, 'wow', t); }
+          g.restore(); });
+      });
+      // ---- small dust at the first contact (🎬 Motion.fx 'puff', beside the seam — never on a face)
+      if(S.puff){ if(!S.puff.E) S.puff.E = [-1, 1].map(d => Motion.fx('puff', {x: cx1 + u / 2 + d * u * 0.78, y: P.y - S.puff.k * u, k: u / 40, r: 8, t0: S.puff.t})); S.puff.E.forEach(E => Motion.drawFx(g, E, T)); }
+      // ---- 🔟 ten click: a gold frame snaps round the new rod + a glint on top + a small "10!"
+      if(S.click && T - S.click.t < 0.4){ const e = (T - S.click.t) / 0.4, rx = x0 + S.click.slot * PITCH * u, ry = P.y - 10 * ROD * u;
+        g.save(); g.globalAlpha = 1 - e; g.strokeStyle = '#FFF2A0'; g.lineWidth = Math.max(2, u * 0.1); g.beginPath(); g.roundRect(rx - 4 - e * 6, ry - 4 - e * 6, ROD * u + 8 + e * 12, 10 * ROD * u + 8 + e * 6, u * 0.2); g.stroke(); g.restore();
+        if(!S.calm){ if(!S.glint || S.glint.t0 !== S.click.t){ S.glint = Motion.fx('glint', {x: rx + ROD * u / 2, y: ry - u * 0.3, k: u / 34, r: 15, t0: S.click.t}); S.glint.t0 = S.click.t; } Motion.drawFx(g, S.glint, T); }
+        if(T - S.click.t < 0.32){ g.save(); g.globalAlpha = 1 - (T - S.click.t) / 0.32; g.font = '800 ' + Math.round(Math.max(12, u * 0.55)) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,0.6)'; const ty = Math.max(topY(rx - u, rx + u * 2) + 6, ry - u * 0.9 - (T - S.click.t) * u * 2); g.strokeText('10!', rx + ROD * u / 2, ty); g.fillStyle = '#FFE14D'; g.fillText('10!', rx + ROD * u / 2, ty); g.restore(); } }
+      // the name badge under the tower: b's number until the morph, then the new one
+      if(S.jId == null){ const txt = String(S.morphT != null ? S.n : S.bN), fs = Math.max(11, u * 0.62), w0 = NumberSkins.measure(S.morphT != null ? S.n : S.bN, u).w;
+        g.save(); g.font = '800 ' + Math.round(fs) + 'px Fredoka, sans-serif'; const tw = g.measureText(txt).width + fs * 0.7, bx = x0 + w0 / 2 - tw / 2, by = P.y + u * 0.12;
+        g.fillStyle = 'rgba(20,14,40,0.82)'; g.beginPath(); g.roundRect(bx, by, tw, fs * 1.15, fs * 0.4); g.fill(); g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, x0 + w0 / 2, by + fs * 0.6); g.restore(); }
+    },
+    // 🏗️ Wobble + 🔟 Tens: the light landing beat (fall with gravity → contact squash + clack → small overshoot → the count chip pops) — then `after`
+    drop(o){ if(!G) return; const D = {t: 0, real: 0, fall: FX ? 0.28 : 0.16, after: o.after, kind: o.kind}; G.dropA = D; if(!SPEED){ G.dropA = null; o.after && o.after(); } },
+    dropTick(dt){ const D = G && G.dropA; if(!D) return; const t0 = D.t; D.real += dt; D.t += dt;
+      if(t0 < D.fall && D.t >= D.fall){ tone(330, 0.06, 'triangle', 0.22); tone(140, 0.045, 'square', 0.05); }
+      if(D.t >= D.fall + 0.42){ const a = D.after; G.dropA = null; if(G.roundT0) G.roundT0 += D.real * 1000; a && a(); } },
+    // dy = how far the new piece still is above its spot (px, give the fall height) · sy = the squash of the pile · chip = 0…1 pop of the count tag
+    dropState(Hpx){ const D = G && G.dropA; if(!D) return {dy: 0, sy: 1, chip: 0, on: false}; const p = cl(D.t / D.fall, 0, 1), e = D.t - D.fall;
+      return {on: true, dy: Hpx * (1 - p * p), sy: e < 0 ? 1 : e < 0.06 ? 0.93 : 1 - 0.07 * Math.exp(-(e - 0.06) / 0.07) * Math.cos((e - 0.06) * Math.PI * 2 / 0.2), chip: e < 0.1 ? 0 : cl((e - 0.1) / 0.12, 0, 1), landed: e >= 0}; }
+  };
+  return API;
+})();
+/* 🧊 STACK END */
+function doSnap(aId, bId, from){   // 🧊 gs-anim: jump → land one by one → sway → COUNT → morph, then the 🎯 check
+  if(GSStack.busy()) return; const it = G.M.item, a = it.stacks.find(s => s.id === aId), b = it.stacks.find(s => s.id === bId); if(!a || !b) return;
+  const Pa = G.pos[aId] || {}; from = from || {x: Pa.x != null ? Pa.x : W / 2, floor: Pa.y != null ? Pa.y : H * 0.8};
+  snapshot(); const an = a.n, bn = b.n, r = GS.cSnap(G.M, aId, bId); if(!r){ G.hist.pop(); return; }
+  const keep = {done: it.done, ok: it.ok, hit: it.hit}; it.done = false; G.sel = 0;
+  GSStack.start({aN: an, bN: bn, bId, from, u: G.cl ? G.cl.u : 30, sum: bn + ' + ' + an + ' = ' + r.n, after(){ Object.assign(it, keep); afterMove(r); }});
+  renderBar();
+}
+function doSplit(k){
+  if(GSStack.busy()){ GSStack.skip(); return; }   // 🧊 gs-anim
+  const s = selStack(); if(!s) return; k = k || G.splitK; const n0 = s.n; snapshot(); const r = GS.cSplit(G.M, s.id, k); if(!r){ G.hist.pop(); UISound.play('error'); return; }
+  SND.split(); floatText(n0 + ' − ' + k + ' = ' + r.n, s.id, '#9FE8FF'); const P0 = G.pos[s.id] || {}; G.pos[r.newId] = {x: P0.x, liftU: Math.min(10, r.n + 0.5), whole: true, pop: 0.6}; P0.pop = 0.5; helperGo(r.newId, k); G.sel = 0; afterMove(r);
+}
+function doCopy(m){ if(GSStack.busy()){ GSStack.skip(); return; } const s = selStack(); if(!s) return; const n0 = s.n; snapshot(); const r = GS.cCopy(G.M, s.id, m); if(!r){ G.hist.pop(); UISound.play('error'); UI.toast('Too big to copy'); return; } SND.copy();   // 🧊 gs-anim
+  const it = G.M.item, keep = {done: it.done, ok: it.ok, hit: it.hit}; it.done = false; G.sel = 0;
+  GSStack.start({aN: n0, bN: n0, bId: s.id, groups: Array(m - 1).fill(n0), by: n0, u: G.cl ? G.cl.u : 30, sum: n0 + ' × ' + m + ' = ' + r.n, after(){ Object.assign(it, keep); burst(s.id, m); afterMove(r); }}); renderBar(); }
+function doShare(m){ if(GSStack.busy()){ GSStack.skip(); return; } const s = selStack(); if(!s) return; const n0 = s.n; snapshot(); const r = GS.cShare(G.M, s.id, m); if(!r){ G.hist.pop(); UISound.play('error'); UI.toast(n0 + ' can\'t be shared fairly into ' + m); return; } SND.share(); floatText(n0 + ' ÷ ' + m + ' = ' + r.n, s.id, '#D8C2FF'); r.newIds.forEach((id, i) => G.pos[id] = {x: (G.pos[s.id] || {}).x, liftU: 1.5 + i * 0.6, whole: true, pop: 0.8}); (G.pos[s.id] || {}).pop = 0.8; helperGo(s.id, 0); G.sel = 0; afterMove(r); }
+function afterMove(r){ renderBar(); if(r.done) roundDone(true); }
+function markAnswers(picked, right){
+  document.querySelectorAll('#bar .tb').forEach(b => { b.disabled = true; const k = b.dataset.opt != null ? b.dataset.opt : b.dataset.sym; if(k == null) return;
+    const isRight = String(k) === String(right), isPicked = String(k) === String(picked); b.classList.toggle('picked', isPicked); b.classList.toggle('right', isRight); b.classList.toggle('wrong', isPicked && !isRight); b.classList.toggle('dim', !isRight && !isPicked); });
+}
+// 🎯 the avatar throws the picked answer as a big token → it arcs to the ❓ spot, lands, gets ✓ / ✗; a wrong pick → the right one flies in after it
+function startReveal(picked, ok, right){
+  if(!G) return; const to = G.revealTo || {x: W / 2, y: H * 0.45}, from = G.avHand || {x: W * 0.12, y: H * 0.6};
+  G.reveal = {t: 0, from, to, text: String(picked), ok, right: String(right)}; G.throwT = 0; SND.drop();
+  if(!FX || !SPEED){ G.reveal.t = 9; if(G.M.item && G.M.item.kind === 'compare'){ G.tiltLock = false; G.answerShown = true; } }
+}
+function answer(sym){
+  if(!G || G.phase !== 'play') return; const r = GS.scaleAnswer(G.M, sym); if(!r) return;
+  markAnswers(sym, r.answer); startReveal(sym, r.ok, r.answer); roundDone(r.ok, r);
+}
+function pickOpt(v){ if(!G || G.phase !== 'play') return; const r = GS.answerChoice(G.M, v); if(!r) return; markAnswers(v, r.answer); startReveal(v, r.ok, r.answer); roundDone(r.ok, r); }
+function revealTick(dt){ const R = G.reveal; if(!R) return; const before = R.t; R.t += dt;
+  if(before < 0.65 && R.t >= 0.65){ if(R.ok) SND.win(); else SND.bad(); if(G.M.item && G.M.item.kind === 'compare'){ G.tiltLock = false; G.answerShown = true; SND.tilt(); } }
+  if(!R.ok && before < 1.25 && R.t >= 1.25) SND.drop(); }
+function token(g, x, y, R, text, col, sc){ g.save(); g.translate(x, y); g.scale(sc, sc);
+  g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(0, R * 0.95, R * 0.8, R * 0.22, 0, 0, 7); g.fill();
+  const gr = g.createRadialGradient(-R * 0.3, -R * 0.4, R * 0.1, 0, 0, R); gr.addColorStop(0, '#FFFFFF'); gr.addColorStop(0.35, col[0]); gr.addColorStop(1, col[1]);
+  g.fillStyle = gr; g.beginPath(); g.arc(0, 0, R, 0, 7); g.fill(); g.lineWidth = Math.max(3, R * 0.1); g.strokeStyle = col[2]; g.stroke();
+  g.fillStyle = '#1A1230'; g.font = '800 ' + Math.round(R * (text.length > 3 ? 0.62 : text.length > 2 ? 0.8 : 1)) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 0, R * 0.06); g.restore(); }
+function drawReveal(g){
+  const R = G.reveal; if(!R) return; const t = R.t, rad = Math.max(26, Math.min(56, Math.min(W, H) * 0.075)), GOLD = ['#FFE58A', '#FFB020', '#8A5A00'], GREEN = ['#B9F7C9', '#1FA463', '#0E6B3C'], RED = ['#FFC2C5', '#E5484D', '#8E1F23'];
+  const fly = Math.min(1, t / 0.65), e = 1 - Math.pow(1 - fly, 3), x = R.from.x + (R.to.x - R.from.x) * e, y = R.from.y + (R.to.y - R.from.y) * e - Math.sin(fly * Math.PI) * Math.min(160, H * 0.25);
+  const land = t > 0.65 ? Math.min(1, (t - 0.65) / 0.3) : 0, bounce = t < 0.65 ? 0.55 + 0.45 * fly : 1 + Math.sin(land * Math.PI) * 0.25, gone = !R.ok && t > 1.25;
+  if(!gone || t < 1.5){ const out = gone ? Math.max(0, 1 - (t - 1.25) / 0.25) : 1; g.save(); g.globalAlpha = out; token(g, x + (!R.ok && t > 0.95 ? Math.sin(t * 40) * 4 * Math.max(0, 1.25 - t) * 3 : 0), y, rad, R.text, t > 0.65 ? (R.ok ? GREEN : RED) : GOLD, bounce * (gone ? 1 + (1 - out) * 0.4 : 1)); g.restore(); }
+  if(t > 0.75 && !gone){ const s2 = Math.min(1, (t - 0.75) / 0.2); g.save(); g.translate(x + rad * 0.85, y - rad * 0.85); g.scale(s2 * 1.1, s2 * 1.1); g.fillStyle = R.ok ? '#1FA463' : '#E5484D'; g.beginPath(); g.arc(0, 0, rad * 0.38, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 3; g.stroke();
+    g.fillStyle = '#fff'; g.font = '900 ' + Math.round(rad * 0.45) + 'px Nunito, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(R.ok ? '✓' : '✗', 0, 1); g.restore(); }
+  if(!R.ok && t > 1.25){ const p = Math.min(1, (t - 1.25) / 0.5), e2 = 1 - Math.pow(1 - p, 3), sx = R.to.x, sy = -rad * 2, yy = sy + (R.to.y - sy) * e2; token(g, sx, yy, rad, R.right, GREEN, p < 1 ? 0.8 + 0.2 * p : 1 + Math.sin(Math.min(1, (t - 1.75) / 0.3) * Math.PI) * 0.2); }
+}
+function gridTap(x, y, on){ const r = GS.gridToggle(G.M, x, y, on); if(!r || r.same) return r; SND.split(); if(r.done) roundDone(true); return r; }
+function gridClear(){ const it = G.M.item; if(G.phase !== 'play' || !it.cells.length) return; it.cells = []; it.moves++; }
+function tensBtn(u){ dropNow(); if(!G || G.phase !== 'play') return; const v0 = G.M.item.value, r = GS.tensAdd(G.M, u); if(!r){ UISound.play('error'); return; }   // 🧊 gs-anim
+  if(u < 0){ SND.split(); if(r.done) roundDone(true); return; }
+  G.tensFrom = {v0, unit: u, snapped: r.snapped}; GSStack.drop({kind: 'tens', after(){ G.tensFrom = null; SND.snap(Math.abs(u)); if(r.snapped){ G.fx.push({kind: 'txt', text: '10 ones → 1 ten! ✨', x: W / 2, y: H * 0.35, col: '#FFE14D', size: 22, t: 0, life: 1.4}); avatarDo('clap'); } if(r.done) roundDone(true); }}); }
+function colourTap(i){ const r = GS.colourToggle(G.M, i); if(!r) return; SND.drop(); if(r.done) roundDone(true); }
+function colourClear(){ const it = G.M.item; if(G.phase !== 'play' || !it.on.length) return; it.on = []; it.moves++; }
+function dropNow(){ const D = G && G.dropA; if(D){ G.dropA = null; D.after && D.after(); } }   // 🧊 a quick next tap finishes the last drop at once
+function wobBtn(z){ dropNow(); if(!G || G.phase !== 'play') return; const r = GS.wobAdd(G.M, z); if(!r) return; SND.drop();   // 🧊 gs-anim: fall → land → height pops → check
+  GSStack.drop({kind: 'wob', after(){ SND.snap(r.height); if(r.over){ UISound.play('error'); avatarDo('shrug'); } else avatarDo('clap'); if(r.done) roundDone(true); }}); }
+function wobUndo(){ dropNow(); if(!G || G.phase !== 'play') return; if(GS.wobPop(G.M)) SND.split(); }
+function putOnPan(id){ if(!G || G.phase !== 'play') return; const r = GS.scalePut(G.M, id); if(!r) return; SND.drop(); if(!r.balanced) SND.tilt(); renderBar(); if(r.balanced) roundDone(true); }
+function takeBack(id){ if(!G || G.phase !== 'play') return; const r = GS.scaleTake(G.M, id); if(!r) return; SND.drop(); renderBar(); }
+function takeAll(){ const it = G.M.item; it.right.filter(x => !x.fixed).map(x => x.id).forEach(takeBack); }
+async function roundDone(ok, r){
+  if(!G || G.phase !== 'play') return; const M = G.M, it = M.item, id = G.id; G.phase = 'done';
+  const secs = (performance.now() - G.roundT0) / 1000, rec = GS.finishRound(M, secs); hud();
+  let msg;
+  if(it.kind === 'compare') msg = ok ? '✅ Yes! ' + GS.sideText(it.left) + ' <b>' + r.answer + '</b> ' + GS.sideText(it.right) : '❌ It was <b>' + r.L + ' ' + r.answer + ' ' + r.R + '</b>';
+  else if(it.kind === 'avatar') msg = '⚖️ <b>' + UI.esc(S.player) + ' = ' + it.need + ' blocks!</b>';
+  else if(it.kind === 'balance') msg = '⚖️ Balanced! <b>' + GS.total(it.left) + ' = ' + GS.total(it.right) + '</b>';
+  else if(it.kind === 'choice') msg = ok ? '✅ Yes! <b>' + UI.esc(String(it.answer)) + '</b>' : '❌ It was <b>' + UI.esc(String(it.answer)) + '</b>';
+  else if(it.kind === 'grid') msg = '🔷 ' + UI.esc(it.goal) + '! ' + (rec.stars === 3 ? 'Perfect!' : rec.moves + ' taps (best ' + it.par + ')');
+  else if(it.kind === 'tens') msg = '🔟 <b>' + it.target + '</b>! ' + (rec.stars === 3 ? 'The fewest blocks!' : rec.moves + ' taps (best ' + it.par + ')');
+  else if(it.kind === 'colour') msg = '🍕 <b>' + it.want + ' of ' + it.len + ' = ' + it.frac.n + '/' + it.frac.d + '</b>!';
+  else if(it.kind === 'wobble') msg = '🏗️ Exactly <b>' + it.target + '</b>! ' + (rec.stars === 3 ? 'Fewest blocks!' : '');
+  else msg = '🎯 <b>' + it.target + '</b>! ' + (rec.stars === 3 ? 'In the fewest moves!' : rec.moves + ' moves (best ' + it.par + ')');
+  const quiz = it.kind === 'compare' || it.kind === 'choice';
+  if(quiz && FX && SPEED){ await wait(ok ? 950 : 1950); if(!G || G.id !== id) return; }
+  cheerSay(ok ? (rec.stars === 3 ? 'big' : 'goal') : 'miss', 'round'); /* 📣 cs-4b */
+  if(ok){ if(!quiz) SND.win(); avatarDo(rec.stars === 3 ? 'dance' : 'cheer'); confetti(); } else { if(!quiz) SND.bad(); avatarDo('shrug'); }
+  banner(msg + '<br>' + (rec.stars ? '⭐'.repeat(rec.stars) : '') + ' +' + rec.pts, (ok ? 'good' : 'bad') + (quiz ? ' low' : ''));
+  renderBar();
+  await wait(ok ? 1500 : 2200); if(!G || G.id !== id || G.phase !== 'done') return;
+  if(G.J){ hideBanner(); G.reveal = null; if(ok){ G.M.item = null; G.J.i++; jRun(); } else jRetry(); return; }
+  goNext();
+}
+function goNext(){ if(!G || G.phase !== 'done') return; G.phase = 'next'; hideBanner(); G.reveal = null; const over = GS.advance(G.M); if(over) endGame(); else nextRound(); }
+function banner(html, cls){ const b = $('banner'); b.className = 'banner on ' + (cls || ''); b.innerHTML = html; }
+function hideBanner(){ $('banner').className = 'banner'; }
+function avatarDo(k){ if(!G) return; G.A.gest = {g: gestOf(k), t: 0}; }
+// 🧑 the avatar runs over and helps: lifts the blocks it moved (count + wobble), then walks back to its corner
+function helperGo(id, carry){ if(!G || !FX) return; const H_ = G.helper || (G.helper = {x: null}); H_.id = id; H_.carry = carry; H_.state = 'go'; H_.t = 0; }
+function helperTick(dt){
+  const H_ = G.helper; if(!H_ || !H_.state) return;
+  H_.t += dt; const home = H_.home != null ? H_.home : 8; if(H_.x == null) H_.x = home;
+  const tx = H_.state === 'back' ? home : (H_.tx != null ? H_.tx : home), d = tx - H_.x, sp = Math.max(260, W * 0.9) * dt;
+  if(Math.abs(d) > 3){ H_.x += Math.sign(d) * Math.min(Math.abs(d), sp); H_.walkT = (H_.walkT || 0) + dt; H_.dir = d > 0 ? 1 : -1; }
+  else if(H_.state === 'go'){ H_.state = 'lift'; H_.t = 0; }
+  else if(H_.state === 'lift' && H_.t > 0.55){ H_.state = 'back'; H_.carry = 0; avatarDo('cheer'); }
+  else if(H_.state === 'back'){ H_.state = ''; H_.x = home; }
+}
+/* 🌱 Basic guide: a 👆 hand shows the first move of every round (until the player moves) */
+function guideOn(){ return G && !G.battle && G.M.level === 0 && G.phase === 'play' && G.M.item && G.M.item.moves === 0 && !G.M.item.done && !G.drag; }
+function guideTarget(){
+  const it = G.M.item, r = CV.getBoundingClientRect(), C = (x, y) => ({x: r.left + x, y: r.top + y}), btn = sel => { const b = document.querySelector(sel); if(!b) return null; const q = b.getBoundingClientRect(); return {x: q.left + q.width / 2, y: q.top + q.height / 2}; };
+  const hit = id => (G.hits || []).find(h => h.id === id);
+  if(it.kind === 'count'){ const p = it.plan[0]; if(!p) return null; const a = it.stacks.find(s => s.n === p[2]), b = a && it.stacks.find(s => s.n === p[1] && s.id !== a.id), ha = a && hit(a.id), hb = b && hit(b.id); if(!ha || !hb) return null;
+    return {from: C(ha.x + ha.w / 2, ha.y + ha.h * 0.45), to: C(hb.x + hb.w / 2, hb.y + hb.h * 0.45), text: '👆 Drag <b>' + p[2] + '</b> onto <b>' + p[1] + '</b> to snap them: ' + p[1] + ' + ' + p[2] + ' = ' + (p[1] + p[2])}; }
+  if(it.kind === 'balance' || it.kind === 'avatar'){ const v = it.plan[0], pc = it.tray.find(x => x.n === v), h = pc && hit(pc.id), pb = G.panBox; if(!h || !pb) return null; return {from: C(h.x + h.w / 2, h.y + h.h * 0.4), to: C(pb.x + pb.w / 2, pb.y + pb.h * 0.7), text: '👆 Drag a block onto the right pan — stop when the scale is level'}; }
+  if(it.kind === 'compare'){ const b = btn('#bar .tb[data-sym="=" ]') || btn('#bar .tb.eq'); return b ? {from: b, to: b, tap: true, text: '👀 Count both pans. Left smaller → <b>&lt;</b> · same → <b>=</b> · left bigger → <b>&gt;</b>'} : null; }
+  if(it.kind === 'grid'){ const GG = G.gridGeo, c = GS.gridSolution(it)[0]; if(!GG || !c) return null; const a = C(GG.x + (c[0] + 0.5) * GG.c, GG.y + (c[1] + 0.5) * GG.c), b = C(GG.x + (Math.min(it.n - 1, c[0] + 2) + 0.5) * GG.c, GG.y + (c[1] + 0.5) * GG.c); return {from: a, to: b, text: '👆 Tap (or drag across) squares to fill them'}; }
+  if(it.kind === 'tens'){ const b = btn('#bar .tb[data-u="1"]'); return b ? {from: b, to: b, tap: true, text: '👆 Tap <b>+1</b> to add a block — count up to ' + it.target} : null; }
+  if(it.kind === 'colour'){ const B = G.barGeo; if(!B) return null; const a = C(B.x + B.c / 2, B.y + B.c / 2); return {from: a, to: a, tap: true, text: '👆 Tap a block to colour it — colour <b>' + it.want + '</b> of ' + it.len}; }
+  if(it.kind === 'wobble'){ const b = btn('#bar .tb[data-s]'); return b ? {from: b, to: b, tap: true, text: '👆 Tap a block size to stack it — reach the 🎯 line exactly'} : null; }
+  if(it.kind === 'choice'){ const b = btn('#bar .tb'); return b ? {from: b, to: b, tap: true, text: it.ck === 'next' ? '🧩 What number goes in the ❓ box? Tap it' : '👆 Tap the right answer'} : null; }
+  return null;
+}
+function guideTick(){
+  const hand = $('ghand'), tip = $('gtip'); if(!guideOn()){ hand.classList.add('hidden'); tip.classList.add('hidden'); return; }
+  const T = guideTarget(); if(!T){ hand.classList.add('hidden'); tip.classList.add('hidden'); return; }
+  const ph = (performance.now() / 1600) % 1, k = T.tap ? 0 : Math.min(1, Math.max(0, (ph - 0.2) / 0.55)), e = k * k * (3 - 2 * k), x = T.from.x + (T.to.x - T.from.x) * e, y = T.from.y + (T.to.y - T.from.y) * e + (T.tap ? Math.abs(Math.sin(ph * Math.PI * 2)) * -14 : 0);
+  hand.classList.remove('hidden'); hand.style.transform = 'translate(' + Math.round(x - 10) + 'px,' + Math.round(y - 4) + 'px) scale(' + (T.tap ? 1 : ph < 0.2 || ph > 0.75 ? 1 : 0.88) + ')'; hand.style.opacity = ph > 0.9 ? (1 - ph) * 10 : 1;
+  if(tip.dataset.t !== T.text){ tip.innerHTML = T.text; tip.dataset.t = T.text; } tip.style.top = (goalBottom() + 8) + 'px'; tip.classList.remove('hidden');
+}
+
+/* ================= RESULT + SAVE ================= */
+function statsFor(M){ const s = M.stats; return {games: 1, snaps: s.snaps, splits: s.splits, copies: s.copies, shares: s.shares, compares: s.compares, balances: s.balances, avatarWeighs: s.avatarWeighs, counts: s.counts, perfect: s.perfect, bestStreak: M.bestStreak, shapes: s.shapes, tens: s.tens, patterns: s.patterns, fractions: s.fractions, wobble: s.wobble}; }
+async function endGame(timeUp){
+  if(!G) return; const M = G.M, id = G.id; if(timeUp) M.failed = true; const res = GS.finish(M); G.phase = 'over'; stopTimer();
+  if(FX && SPEED){ avatarDo(res.cleared ? 'dance' : 'shrug'); await wait(700); if(!G || G.id !== id) return; }
+  cheerEnd(res.cleared); /* 📣 cs-4b */
+  if(res.cleared){ UISound.play('success'); confetti(true); } else UISound.play('pop');
+  const lvl = M.level, timeSec = Math.round((performance.now() - G.t0) / 1000), themeTxt = modeLabel(M.mode) + ' · ' + THEMES[G.theme].icon + ' ' + THEMES[G.theme].name;
+  const L = M.log;
+  const tip = res.cleared ? '' : ({scale: 'Count each pan slowly — say the numbers out loud.', count: 'Look for two numbers that make the target together.', shape: 'Fill rows of the same length — a rectangle has straight sides.', tens: 'Use the big blocks first: hundreds, then tens, then ones.', next: 'Say how much it changes each time: +2, +2, +2 …', frac: 'Cut the bar into equal teams first.', wobble: 'Use the biggest blocks first, then fix the top.'}[M.mode] || '');
+  b3Card({win: res.cleared, icon: res.cleared ? '🏆' : timeUp ? '⏱️' : M.failed ? '💀' : '🔢', title: res.cleared ? 'Great scouting!' : timeUp ? 'Time is up!' : M.failed ? 'One mistake on 💀 Hardcore' : 'Nice try!',   /* 🧱 b3w3: the shared 🏁 card */
+    sub: tip ? '💡 ' + tip : '', stars: res.stars || 0, score: M.score, save: 'Saving…',
+    stats: [['🎮', modeLabel(M.mode)], ['✅', L.filter(x => x.q === 1).length + ' / ' + M.total + ' perfect']].concat(M.stats.snaps ? [['🧲', M.stats.snaps + ' snaps']] : [], M.stats.balances ? [['⚖️', M.stats.balances + ' balanced']] : [], M.stats.avatarWeighs ? [['🧑', S.player + ' = ' + GS.avatarWeight(S.player, lvl) + ' blocks']] : [], [['⏱️', fmtS(timeSec)]]),
+    next: res.cleared ? nextLevel(lvl) : null});
+  if(res.cleared) ls('sp_geoscout_won:' + S.player, Math.max(unlockedOf(S.player), lvl + 1));
+  saveRun(S.player, lvl, {timeSec, stars: res.stars, theme: themeTxt, score: M.score, cleared: res.cleared, stats: statsFor(M)});
+}
+function fmtS(s){ s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+const PENDING_KEY = 'sp_geoscout_pending';
+function readPending(){ try{ return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); }catch(e){ return []; } }
+function writePending(list){ try{ localStorage.setItem(PENDING_KEY, JSON.stringify(list.slice(-20))); }catch(e){} }
+function flushPending(){ const list = readPending(); if(!list.length) return; writePending([]); list.forEach(w => { const r = google.script.run.withFailureHandler(() => writePending(readPending().concat([w]))); if(w.feats) r.saveFeats(w.name, GAME_ID, w.stats); else r.saveLevelResult(GAME_ID, w.name, w.lvl, w.extra); }); }
+function putNote(html){ const n = $('save-note'); if(n) n.innerHTML = html; }
+function saveRun(name, lvlIdx, extra, tries){
+  tries = tries || 0; const p = S.progress[name] || (S.progress[name] = {unlocked: 0, tokens: [], best: []});
+  google.script.run.withSuccessHandler(res => {
+      const best = (p.best || []).slice(); if(res.best) best[lvlIdx] = res.best;
+      S.progress[name] = {unlocked: res.unlocked, tokens: res.tokens, best}; flushPending(); putNote(saveText(res, extra.cleared));
+    }).withFailureHandler(() => {
+      if(tries < 1){ setTimeout(() => saveRun(name, lvlIdx, extra, tries + 1), 1200); return; }
+      writePending(readPending().concat([{name, lvl: lvlIdx, extra}])); putNote('⚠️ Could not save yet — it will be sent again next time.');
+    }).saveLevelResult(GAME_ID, name, lvlIdx, extra);
+}
+function featText(fe, base){ let h = base || ''; if(fe){ (fe.newTitles || []).forEach(t => { h += '<br><span class="title-new">🏷️ New title: ' + t.icon + ' ' + UI.esc(t.name) + '</span>'; }); (fe.newBadges || []).forEach(b => { h += '<br><span class="feat-new">' + b.medal + ' ' + b.icon + ' ' + UI.esc(b.name) + ' · ' + b.tierName + '</span>'; }); } return h; }
+function saveText(res, cleared){
+  const h = res.newBadge ? '<span class="new-badge">🏅 New badge: ' + UI.esc(res.newBadge) + '</span>' : res.newHighScore && !res.firstTime ? '🎉 New high score!' : cleared ? (res.best && res.best.score ? 'Best: 🏆 ' + Number(res.best.score).toLocaleString() : '✅ Saved') : '✅ Saved';
+  return featText(res.feats, h);
+}
+/* 📣 CHEERSQUAD (cs-4b) START — the crowd beside the play (CheerSquad.html, 📣 Cheer chat). Don't remove: the Cheer chat re-applies it. */
+// solo: you = side 0, the 😈 rival = side 1. Fans stand only where the bar, the question / board and the controls leave room.
+function cheerTaken(){ return Array.from(document.querySelectorAll('#hud, #goal, #gtip:not(.hidden), #say:not(.hidden), #bar')).concat(cheerOcc(), cheerGround()); }
+function cheerHard(){ return Array.from(document.querySelectorAll('#hud, #goal, #gtip:not(.hidden), #say:not(.hidden), #bar')).concat(cheerOcc(true)); }
+// the game paints everything on ONE canvas: compare it with the bare room (drawRoom, same frame time) at 1/8 size — a column with
+// anything on it (blocks, the scale, your avatar, labels) is taken for the whole round (only grows), sampled while you play
+function cheerOcc(core){
+  if(!G || !G.M || !W || !H || !CV.width) return [];
+  const it = G.M.item, size = Math.round(W), now = performance.now(); let O = G.cheerOcc; if(O && (O.id !== G.id || O.size !== size)) O = null;
+  const same = !!O && O.item === it, calm = !!it && G.phase === 'play' && !G.reveal && !(G.fx && G.fx.length) && !(G.drag && G.drag.on) && now - (G.roundT0 || 0) > 500 && G.cheerT != null;
+  if(!calm || (same && now - O.t < 1000)) return O ? (core ? O.core : O.blocks) : [{getBoundingClientRect: () => CV.getBoundingClientRect()}];   /* not ready yet: nobody · reveal / next round: the stands stay put */
+  const cell = 8, cw = Math.max(1, Math.ceil(W / cell)), ch = Math.max(1, Math.ceil(H / cell));
+  const bg = G.cheerBg || (G.cheerBg = document.createElement('canvas')); if(bg.width !== CV.width || bg.height !== CV.height){ bg.width = CV.width; bg.height = CV.height; }
+  const bx = bg.getContext('2d'); bx.setTransform(CV.width / W, 0, 0, CV.height / H, 0, 0); drawRoom(bx, G.cheerT);
+  const sm = G.cheerSm || (G.cheerSm = document.createElement('canvas')); sm.width = cw; sm.height = ch * 2; const sx = sm.getContext('2d', {willReadFrequently: true});
+  sx.drawImage(CV, 0, 0, cw, ch); sx.drawImage(bg, 0, ch, cw, ch); const d = sx.getImageData(0, 0, cw, ch * 2).data, off = cw * ch * 4;
+  const raw = same ? O.raw.slice() : new Array(cw).fill(0); let hit = 0;
+  for(let x = 0; x < cw; x++){ let on = 0; for(let y = 0; y < ch && !on; y++){ const i = (y * cw + x) * 4; if(Math.abs(d[i] - d[i + off]) + Math.abs(d[i + 1] - d[i + off + 1]) + Math.abs(d[i + 2] - d[i + off + 2]) > 36) on = 1; }
+    if(on){ hit++; raw[x] = 1; } }
+  if(hit > cw * 0.97) return O ? (core ? O.core : O.blocks) : [{getBoundingClientRect: () => CV.getBoundingClientRect()}];   /* a blank / changing frame: try again */
+  const cols = raw.map((v, x) => raw.slice(Math.max(0, x - 5), x + 6).some(Boolean) ? 1 : 0);   /* + 40 px room so a fan's sign / bubble still fits */
+  const runs = c => { const out = []; let x0 = -1; for(let x = 0; x <= cw; x++){ if(x < cw && c[x]){ if(x0 < 0) x0 = x; } else if(x0 >= 0){ const l = x0 * cell, r = Math.min(W, x * cell);
+      out.push({getBoundingClientRect: () => { const R = CV.getBoundingClientRect(); return {left: R.left + l, right: R.left + r, top: R.top, bottom: R.bottom, width: r - l, height: R.height}; }}); x0 = -1; } } return out; };   /* the stage's height can change (the answer bar hides): read live */
+  const blocks = runs(cols), coreB = runs(raw);
+  G.cheerOcc = {id: G.id, size, item: it, t: now, raw, blocks, core: coreB}; return core ? coreB : blocks;
+}
+// the dirt under the grass line: the stands stand ON the grass (zones only — a fan's shadow may touch it)
+function cheerGround(){ return W && H ? [{getBoundingClientRect: () => { const R = CV.getBoundingClientRect(), gy = H - Math.max(26, H * 0.08) + 3; return {left: R.left, right: R.right, top: R.top + gy, bottom: R.bottom, width: R.width, height: R.height - gy}; }}] : []; }
+function cheerMount(){
+  if(!window.Cheer) return; Cheer.unmount(); if(!(G && G.M && !G.battle && !G.J)) return; const box = $('stage'); if(!box) return;
+  Cheer.mount(box, {game: 'geoscout', players: [{name: S.player, side: 0, human: true}, {name: 'Rival', side: 1, human: false}], me: {name: S.player}, family: (S.players || []).map(p => p.Name), avatars: S.avatars || {}, mode: 'overlay', floor: true,
+    zones: () => Cheer.freeZones(box, cheerTaken), avoid: cheerHard,
+    clear: b => { const B = box.getBoundingClientRect(); return !cheerHard().some(e => { const r = e.getBoundingClientRect(); if(r.width < 2 || r.height < 2) return false; const l = r.left - B.left, t = r.top - B.top; return b.r > l - 3 && b.l < l + r.width + 3 && b.b > t - 3 && b.t < t + r.height + 3; }); }});
+}
+// small wins / misses get a 1.2 s breather so quick answers aren't a wall of cheers; big ones and the ends always play
+function cheerSay(kind, why){ if(!kind || !window.Cheer || !Cheer.active() || !G) return; const now = performance.now();
+  if((kind === 'goal' || kind === 'miss') && (G.cheerAt || 0) > now - 1200) return; if(kind === 'big' && (G.cheerBig || 0) > now - 900) return;
+  if(kind === 'goal' || kind === 'miss') G.cheerAt = now; if(kind === 'big') G.cheerBig = now; Cheer.react(kind, {side: 0}); }
+function cheerEnd(won){ if(window.Cheer && Cheer.active()) Cheer.react(won ? 'win' : 'lose', {side: 0}); }
+function cheerFaces(){ setTimeout(() => { const card = $('result-card'); if(!card || !window.Cheer || !Cheer.active() || card.querySelector('.cs-faces') || $('result').classList.contains('hidden')) return;
+  const c = Cheer.faces(5, {h: 54}); if(!c) return; const cap = document.createElement('div'); cap.className = 'cs-faces-cap'; cap.textContent = '📣 Your cheer squad';
+  const at = card.querySelector('.res-btns'); if(!at) return; at.parentNode.insertBefore(c, at); at.parentNode.insertBefore(cap, at); }, 900); }
+/* 📣 CHEERSQUAD END */
+function showResult(html){ $('result-card').innerHTML = html; $('result').classList.remove('hidden'); cheerFaces(); /* 📣 cs-4b */ }
+function hideResult(){ $('result').classList.add('hidden'); }
+function leavePlay(){
+  if(!G) return; if(G.phase === 'over' || G.J || (G.battle && G.battle.B.round === 0 && G.battle.phase !== 'reveal')){ backToMenu(); return; }
+  UI.confirm ? UI.confirm('Leave this game?', 'Your points so far will be lost.', 'Leave', 'Keep playing').then(ok => { if(ok) backToMenu(); }) : backToMenu();
+}
+function pauseGame(){}
+function backToMenu(){ if(window.Cheer) Cheer.unmount(); stopLoop(); stopTimer(); $('say').classList.add('hidden'); G = null; GID++; hideResult(); closeSheet(); renderMenu(); showScreen('menu'); }
+function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
+function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
+window.feedbackContext = () => ({page: 'GeoScout', game: GAME_ID, level: G ? G.M.level : SET.level, mode: G ? G.M.mode : SET.mode});
+
+/* ================= CANVAS ================= */
+const CV = $('cv'); let CTX = CV.getContext('2d'), W = 0, H = 0, DPR = 1, RAF = 0, LAST = 0, TIMER = 0;
+function sizeCanvas(){ const r = CV.getBoundingClientRect(); DPR = Math.min(2, window.devicePixelRatio || 1); W = Math.max(1, r.width); H = Math.max(1, r.height); CV.width = Math.round(W * DPR); CV.height = Math.round(H * DPR); CTX.setTransform(DPR, 0, 0, DPR, 0, 0); if(G){ G.avFit = null; if(G.M.item) renderGoal(); } }
+let RO = null; try{ RO = new ResizeObserver(() => { const r = CV.getBoundingClientRect(); if(Math.abs(r.width - W) > 1 || Math.abs(r.height - H) > 1) sizeCanvas(); }); RO.observe(CV); }catch(e){}
+function startLoop(){ stopLoop(); LAST = performance.now(); const step = now => { RAF = requestAnimationFrame(step); const dt = Math.min(0.05, Math.max(0, (now - LAST) / 1000)); LAST = now; tick(dt, now); draw(now / 1000); }; RAF = requestAnimationFrame(step);
+  if(G && G.timeLeft){ stopTimer(); TIMER = setInterval(() => { if(!G || G.phase === 'over' || G.st || G.dropA) return; G.timeLeft -= 1; const el = $('h-time'); el.textContent = '⏱️ ' + fmtS(G.timeLeft); el.classList.toggle('low', G.timeLeft <= 30); if(G.timeLeft <= 0){ stopTimer(); endGame(true); } }, 1000); } }
+function stopLoop(){ if(RAF) cancelAnimationFrame(RAF); RAF = 0; }
+function stopTimer(){ if(TIMER) clearInterval(TIMER); TIMER = 0; }
+function tick(dt){
+  if(!G) return; helperTick(dt); revealTick(dt); GSStack.tick(dt); GSStack.dropTick(dt);   /* 🧊 gs-anim */ if(G.throwT != null) G.throwT += dt; try{ guideTick(); }catch(e){} const A = G.A;
+  const it0 = G.M && G.M.item; if(FX && it0 && G.phase === 'play' && (it0.kind === 'choice' || it0.kind === 'compare') && !A.gest){ G.idleT = (G.idleT || 0) + dt; if(G.idleT > 4.5){ G.idleT = 0; avatarDo('think'); } } if(A.gest){ A.gest.t += dt; if(A.gest.t > A.gest.g.d) A.gest = null; }
+  G.fx = G.fx.filter(f => (f.t += dt) < f.life);
+  if(G.B2 && G.B2.gest){ G.B2.gest.t += dt; if(G.B2.gest.t > G.B2.gest.g.d) G.B2.gest = null; }
+  const it = G.M.item; if(it && it.left){ const Lw = GS.total(it.left), Rw = GS.total(it.right), tgt = G.tiltLock ? 0 : Math.max(-1, Math.min(1, (Rw - Lw) / Math.max(1, Lw, Rw))) * TILT_MAX; G.tilt += (tgt - G.tilt) * Math.min(1, dt * 6); }
+}
+// ---- pieces: number blocks, shapes, the avatar, sums (expressions) ----
+function pieceSize(p, u){
+  if(p.t === 'n'){ const m = NumberSkins.measure(p.n, u); return {w: m.w, h: m.h}; }
+  if(p.t === 's') return {w: u * 1.9, h: u * 1.9};
+  if(p.t === 'av') return {w: u * 2.4, h: u * 3.6};
+  if(p.t === 'x'){ const v = exprVisual(p); if(v === 'minus') return pieceSize({t: 'n', n: p.a}, u); if(v === 'copies'){ const m = NumberSkins.measure(p.a, u); return {w: m.w * p.b + u * 0.3 * (p.b - 1), h: m.h}; } if(v === 'plus'){ const a = NumberSkins.measure(p.a, u), b = NumberSkins.measure(p.b, u); return {w: a.w + b.w + u * 0.9, h: Math.max(a.h, b.h)}; } return {w: Math.max(u * 3.2, crateW(p, u)), h: u * 2.2}; }
+  return {w: u, h: u};
+}
+function exprVisual(p){ const Li = G ? G.M.level : 0; if(Li >= 4) return 'crate'; if(p.op === '-' && p.a <= 20) return 'minus'; if(p.op === 'x' && p.b <= 5 && p.a <= 10) return 'copies'; if(p.op === '+' && p.a <= 20 && p.b <= 20) return 'plus'; return 'crate'; }
+function crateW(p, u){ CTX.font = '800 ' + Math.round(u * 0.9) + 'px Fredoka, sans-serif'; return CTX.measureText(GS.text(p)).width + u * 1.2; }
+function drawPiece(g, p, x, floor, u, opt){
+  opt = opt || {}; const sk = G.skin, mat = THEMES[G.theme].mat, t = opt.t || 0, label = opt.label;
+  if(p.t === 'n'){ NumberSkins.draw(g, p.n, x, floor, u, {skin: sk, mat, t, mood: opt.mood, label, sel: opt.sel, alpha: opt.alpha}); return; }
+  if(p.t === 's'){ const S2 = GS.SHAPES[p.k], s = u * 1.9, cx = x + s / 2, cy = floor - s / 2, rad = s * 0.46, k = S2.w; g.save(); if(opt.alpha != null) g.globalAlpha = opt.alpha;
+    g.beginPath(); for(let i = 0; i < k; i++){ const a = -Math.PI / 2 + i * Math.PI * 2 / k + (k === 4 ? Math.PI / 4 : 0), rr2 = k === 4 ? rad * 1.12 : rad; g.lineTo(cx + Math.cos(a) * rr2, cy + Math.sin(a) * rr2); } g.closePath();
+    const gr = g.createLinearGradient(0, cy - rad, 0, cy + rad); gr.addColorStop(0, NumberSkins.shade(S2.col, 0.3)); gr.addColorStop(1, NumberSkins.shade(S2.col, -0.2)); g.fillStyle = gr; g.fill(); g.lineWidth = Math.max(1.5, u * 0.08); g.strokeStyle = NumberSkins.shade(S2.col, -0.45); g.stroke();
+    g.fillStyle = '#fff'; for(let i = 0; i < k; i++){ const a = -Math.PI / 2 + i * Math.PI * 2 / k + (k === 4 ? Math.PI / 4 : 0), rr2 = (k === 4 ? rad * 1.12 : rad) * 0.86; g.beginPath(); g.arc(cx + Math.cos(a) * rr2, cy + Math.sin(a) * rr2, Math.max(2, u * 0.13), 0, 7); g.fill(); }
+    if(label){ g.fillStyle = '#fff'; g.font = '800 ' + Math.round(u * 0.8) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 3; g.strokeText(String(k), cx, cy + u * 0.05); g.fillText(String(k), cx, cy + u * 0.05); }
+    if(opt.sel) selRing(g, x, floor, s, s, u); g.restore(); return; }
+  if(p.t === 'av'){ const sz = pieceSize(p, u), k = sz.h / 112; try{ drawAvatar(g, {name: p.name, av: myAvatar(p.name), dir: 1, walkT: 0, gest: G.A.gest}, x + sz.w / 2, floor - 2, k, {t}); }catch(e){} return; }
+  if(p.t === 'x'){ const v = exprVisual(p);
+    if(v === 'minus'){ NumberSkins.draw(g, p.a - p.b, x, floor, u, {skin: sk, mat, t, label: false}); g.save(); g.globalAlpha = 0.28; for(let k = p.a - p.b; k < p.a; k++) NumberSkins.block(g, x, floor - (k + 1) * u, u, '#ffffff', 'smooth', t, k, {noTop: k < p.a - 1}); g.globalAlpha = 1; g.strokeStyle = '#FF4D6D'; g.lineWidth = Math.max(2, u * 0.12); g.beginPath(); g.moveTo(x - u * 0.1, floor - p.a * u); g.lineTo(x + u * 1.1, floor - (p.a - p.b) * u); g.stroke(); g.restore(); }
+    else if(v === 'copies'){ const m = NumberSkins.measure(p.a, u); for(let i = 0; i < p.b; i++) NumberSkins.draw(g, p.a, x + i * (m.w + u * 0.3), floor, u, {skin: sk, mat, t}); }
+    else if(v === 'plus'){ const a = NumberSkins.measure(p.a, u); NumberSkins.draw(g, p.a, x, floor, u, {skin: sk, mat, t}); NumberSkins.draw(g, p.b, x + a.w + u * 0.9, floor, u, {skin: sk, mat, t}); }
+    else { const sz = pieceSize(p, u); g.save(); const gr = g.createLinearGradient(0, floor - sz.h, 0, floor); gr.addColorStop(0, '#E2B57A'); gr.addColorStop(1, '#A9743F'); g.fillStyle = gr; roundRect(g, x, floor - sz.h, sz.w, sz.h, u * 0.3); g.fill(); g.strokeStyle = '#6B4423'; g.lineWidth = Math.max(1.5, u * 0.1); g.stroke();
+      g.strokeStyle = 'rgba(107,68,35,0.5)'; g.beginPath(); g.moveTo(x + u * 0.3, floor - sz.h * 0.5); g.lineTo(x + sz.w - u * 0.3, floor - sz.h * 0.5); g.stroke();
+      g.fillStyle = '#2B1A0A'; g.font = '800 ' + Math.round(u * 0.9) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#FFF6E0'; g.strokeStyle = '#3A2410'; g.lineWidth = Math.max(2, u * 0.12); g.strokeText(GS.text(p), x + sz.w / 2, floor - sz.h / 2); g.fillText(GS.text(p), x + sz.w / 2, floor - sz.h / 2); g.restore(); }
+    if(v !== 'crate' && label !== false){ const sz = pieceSize(p, u); textTag(g, GS.text(p), x + sz.w / 2, floor - sz.h - u * 0.55, u * 0.6); }
+  }
+}
+function selRing(g, x, floor, w, h, u){ g.save(); g.strokeStyle = '#FFE14D'; g.lineWidth = 3; g.setLineDash([6, 4]); roundRect(g, x - u * 0.2, floor - h - u * 0.25, w + u * 0.4, h + u * 0.4, u * 0.3); g.stroke(); g.restore(); }
+function roundRect(g, x, y, w, h, r){ r = Math.min(r, w / 2, h / 2); g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+function textTag(g, txt, cx, cy, fs){ fs = Math.max(11, fs); g.save(); g.font = '800 ' + Math.round(fs) + 'px Fredoka, sans-serif'; const w = g.measureText(txt).width + fs * 0.8; g.fillStyle = 'rgba(10,20,40,0.8)'; roundRect(g, cx - w / 2, cy - fs * 0.62, w, fs * 1.24, fs * 0.45); g.fill(); g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, cx, cy + 1); g.restore(); }
+
+// ---- background ----
+function drawRoom(g, t){
+  const T = THEMES[G.theme], gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, T.top); gr.addColorStop(1, T.bot); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  const gy = H - Math.max(26, H * 0.08); g.fillStyle = T.grass; g.fillRect(0, gy - 4, W, 6); g.fillStyle = T.ground; g.fillRect(0, gy, W, H - gy);
+  if(G.theme === 'disco'){ for(let i = 0; i < 6; i++){ g.fillStyle = 'hsla(' + ((t * 60 + i * 60) % 360) + ',90%,60%,0.10)'; g.beginPath(); g.moveTo(W * (0.1 + i * 0.16), 0); g.lineTo(W * (0.02 + i * 0.16), gy); g.lineTo(W * (0.2 + i * 0.16), gy); g.closePath(); g.fill(); } }
+  if(G.theme === 'space'){ g.fillStyle = 'rgba(255,255,255,0.8)'; for(let i = 0; i < 40; i++){ const x = (i * 97.3) % W, y = (i * 53.7) % (gy * 0.9), s = (i % 3) * 0.6 + 0.6; g.globalAlpha = 0.4 + 0.4 * Math.sin(t * 2 + i); g.fillRect(x, y, s, s); } g.globalAlpha = 1; }
+  if(G.theme === 'robot'){ g.strokeStyle = 'rgba(120,220,255,0.08)'; g.lineWidth = 1; for(let x = 0; x < W; x += 28){ g.beginPath(); g.moveTo(x, 0); g.lineTo(x, gy); g.stroke(); } for(let y = 0; y < gy; y += 28){ g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); } }
+  const sz = Math.max(18, Math.min(34, W * 0.045));
+  T.deco.forEach((d, i) => { const x = W * (0.06 + i * 0.22) % W, y = i % 2 ? gy - sz * 0.45 : H * (0.12 + (i % 3) * 0.08) + Math.sin(t * 1.3 + i) * 4; g.globalAlpha = 0.5; emo(g, d, x, y, sz); g.globalAlpha = 1; });
+  return gy;
+}
+
+// ---- the scale ----
+const TILT_MAX = 0.2;
+function isWide(){ return W / Math.max(1, H) > 2.0 && H < 430; }
+function goalBottom(){ const g = $('goal'); return g && g.offsetHeight ? g.offsetTop + g.offsetHeight : 60; }
+function scaleGeom(gy){
+  const it = G.M.item, compare = it.kind === 'compare';
+  if(isWide()){   // 📱 phone landscape: scale on the left, goal card + tray on the right
+    const sw = compare ? W : W * 0.62, bl = Math.min(sw * 0.36, 300), top = (compare ? goalBottom() : 8) + 10 + bl * TILT_MAX * 0.7;
+    return {px: sw / 2, py: top, bl, sl: Math.max(40, (gy - top) * 0.62), pw: Math.min(sw * 0.34, 260, 2 * (sw / 2 - bl) - 8), trayTop: gy, trayH: 0, side: !compare, tx0: sw + 6, tx1: W - 8 - W * 0.09, ttop: goalBottom() + 8};
+  }
+  const bl = Math.min(W * 0.34, 330), top = goalBottom() + 14 + bl * TILT_MAX;
+  const trayH = compare ? 0 : Math.max(60, Math.min(H * 0.36, 230)), sl = Math.max(50, (gy - trayH - top) * 0.72);
+  return {px: W / 2, py: top, bl, sl, pw: Math.min(W * 0.3, 300, 2 * (W / 2 - bl) - 8), trayTop: gy - trayH, trayH};
+}
+function layoutRow(list, u, maxW){ const gap = u * 0.6; let w = 0; const sizes = list.map(p => pieceSize(p, u)); sizes.forEach((s, i) => w += s.w + (i ? gap : 0)); return {w, h: Math.max(0, ...sizes.map(s => s.h)), sizes, gap}; }
+function fitU(list, maxW, maxH, uMax){ let u = uMax; for(let k = 0; k < 30; k++){ const L = layoutRow(list, u, maxW); if((L.w <= maxW && L.h <= maxH) || u < 5) break; u *= 0.9; } return u; }
+function drawScale(g, t, gy){
+  const it = G.M.item, Gm = scaleGeom(gy), a = G.tilt, cx = Gm.px, cy = Gm.py, T = THEMES[G.theme]; G.revealTo = {x: cx, y: cy + Gm.sl * 0.55};
+  const ex = Math.cos(a) * Gm.bl, ey = Math.sin(a) * Gm.bl, L = {x: cx - ex, y: cy - ey}, R = {x: cx + ex, y: cy + ey};
+  // post + base
+  g.fillStyle = T.post; roundRect(g, cx - 7, cy, 14, Gm.trayTop - cy - (it.kind === 'compare' ? 0 : 6) + (it.kind === 'compare' ? gy - Gm.trayTop : 0), 5); g.fill();
+  g.fillStyle = NumberSkins.shade(T.post, -0.2); roundRect(g, cx - 46, (it.kind === 'compare' ? gy : Gm.trayTop) - 12, 92, 14, 6); g.fill();
+  // beam
+  g.save(); g.translate(cx, cy); g.rotate(a); g.fillStyle = T.beam; roundRect(g, -Gm.bl - 10, -7, Gm.bl * 2 + 20, 14, 7); g.fill(); g.strokeStyle = NumberSkins.shade(T.beam, -0.35); g.lineWidth = 2; g.stroke();
+  // notch pointer
+  g.fillStyle = Math.abs(a) < 0.02 && !G.tiltLock ? '#1FA463' : '#FFC845'; g.beginPath(); g.moveTo(-8, -7); g.lineTo(8, -7); g.lineTo(0, -24); g.closePath(); g.fill(); g.restore();
+  g.fillStyle = '#FFC845'; g.beginPath(); g.arc(cx, cy, 9, 0, 7); g.fill(); g.strokeStyle = '#7A5A00'; g.lineWidth = 2; g.stroke();
+  if(G.tiltLock){ emo(g, '🔒', cx, cy + 26, 18); }
+  // pans + items
+  G.hits = [];
+  [[L, it.left, 'L'], [R, it.right, 'R']].forEach(([P, items, side]) => {
+    const surf = P.y + Gm.sl, pw = Gm.pw;
+    g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 2; g.beginPath(); g.moveTo(P.x, P.y); g.lineTo(P.x - pw * 0.46, surf); g.moveTo(P.x, P.y); g.lineTo(P.x + pw * 0.46, surf); g.stroke();
+    drawPan(g, P.x, surf, pw, T);
+    if(it.kind === 'compare' || side === 'R') textTag(g, side === 'L' ? '⬅ LEFT' : (it.kind === 'compare' ? 'RIGHT ➡' : 'RIGHT ➡ put blocks here'), P.x, P.y + 16, 12);
+    const maxH = Gm.sl - 26, u = fitU(items, pw * 0.92, maxH, Math.min(58, maxH / 3)), row = layoutRow(items, u);
+    let x = P.x - row.w / 2;
+    items.forEach((p, i) => { const sz = row.sizes[i], dragging = G.drag && G.drag.id === p.id && G.drag.on; if(!dragging){ drawPiece(g, p, x, surf - 2, u, {t, label: showLabels() || (side === 'R' && it.kind !== 'compare') }); }
+      if(side === 'R' && !p.fixed) G.hits.push({kind: 'pan', id: p.id, x, y: surf - sz.h - 4, w: sz.w, h: sz.h + 8, u, p});
+      x += sz.w + row.gap; });
+    if(side === 'R') G.panBox = {x: P.x - pw * 0.6, y: P.y, w: pw * 1.2, h: Gm.sl + 30};
+    if(G.answerShown || (it.kind !== 'compare' && (showLabels() || side === 'R')) || (it.kind === 'compare' && it.done)) { const v = GS.total(items); if(items.length > 1 || !showLabels() || it.kind === 'avatar' || !items.length) textTag(g, (side === 'L' && it.kind === 'avatar' && !it.done) ? '? blocks' : '= ' + v, P.x, surf + Math.max(12, pw * 0.12) * 1.5 + 14, 15); }
+  });
+  // tray
+  if(it.kind !== 'compare'){
+    const side = Gm.side, ty = gy - 4, maxW = side ? Gm.tx1 - Gm.tx0 - 20 : W - 24, maxH = side ? gy - Gm.ttop - 34 : Gm.trayH - 30, u = fitU(it.tray, maxW, maxH, Math.min(52, maxH / 3)), row = layoutRow(it.tray, u);
+    let x = (side ? (Gm.tx0 + Gm.tx1) / 2 : W / 2) - row.w / 2;
+    g.fillStyle = 'rgba(0,0,0,0.18)'; roundRect(g, x - 14, side ? ty - row.h - 14 : Gm.trayTop + 4, row.w + 28, side ? row.h + 30 : gy - Gm.trayTop - 2, 16); g.fill();
+    it.tray.forEach((p, i) => { const sz = row.sizes[i], dragging = G.drag && G.drag.id === p.id && G.drag.on, sel = G.kbd && G.kbdIdx === i;
+      if(!dragging) drawPiece(g, p, x, ty, u, {t, label: true, sel});
+      G.hits.push({kind: 'tray', id: p.id, x, y: ty - sz.h - 4, w: sz.w, h: sz.h + 26, u, p}); x += sz.w + row.gap; });
+    if(!it.tray.length && !it.done){ textTag(g, 'Tap a block on the pan to take it back', side ? (Gm.tx0 + Gm.tx1) / 2 : W / 2, side ? gy - 40 : Gm.trayTop + Gm.trayH / 2, 12); }
+  }
+  // shape legend
+  const shapes = [...it.left, ...it.right, ...(it.tray || [])].filter(p => p.t === 's').map(p => p.k).filter((k, i, a) => a.indexOf(k) === i);
+  if(shapes.length){ const lu = 12; let lx = 10, ly = goalBottom() + 26; g.fillStyle = 'rgba(10,20,40,0.6)'; roundRect(g, 6, ly - 18, 112, shapes.length * 28 + 12, 12); g.fill();
+    shapes.forEach((k, i) => { drawPiece(g, {t: 's', k}, lx, ly + i * 28 + 8, lu, {}); g.fillStyle = '#fff'; g.font = '800 13px Nunito, sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText('= ' + GS.SHAPES[k].w + ' blocks', lx + 28, ly + i * 28 - 3); }); }
+  return Gm;
+}
+function showLabels(){ return GS.LEVELS[G.M.level].hint; }
+function drawPan(g, x, y, pw, T){
+  g.save(); const h = Math.max(12, pw * 0.12);
+  if(G.theme === 'dino'){ g.fillStyle = T.pan; g.beginPath(); g.ellipse(x, y, pw / 2, h * 1.4, 0, 0, Math.PI); g.fill(); g.strokeStyle = '#B89A5A'; g.lineWidth = 2; g.beginPath(); for(let i = 0; i <= 8; i++){ const xx = x - pw / 2 + i * pw / 8; g.lineTo(xx, y + (i % 2 ? 6 : 0)); } g.stroke(); g.fillStyle = 'rgba(120,90,40,0.25)'; [0.3, 0.6].forEach(f => { g.beginPath(); g.arc(x - pw / 2 + pw * f, y + h * 0.6, 3, 0, 7); g.fill(); }); }
+  else if(G.theme === 'sea'){ g.fillStyle = T.pan; g.beginPath(); g.ellipse(x, y, pw / 2, h * 1.5, 0, 0, Math.PI); g.fill(); g.strokeStyle = T.panRim; g.lineWidth = 2; for(let i = 1; i < 6; i++){ g.beginPath(); g.moveTo(x, y + h * 1.4); g.lineTo(x - pw / 2 + i * pw / 6, y); g.stroke(); } }
+  else { g.fillStyle = T.pan; g.beginPath(); g.moveTo(x - pw / 2, y); g.lineTo(x + pw / 2, y); g.lineTo(x + pw * 0.38, y + h); g.lineTo(x - pw * 0.38, y + h); g.closePath(); g.fill();
+    if(G.theme === 'disco'){ for(let i = 0; i < 8; i++){ g.fillStyle = 'hsl(' + ((i * 45 + performance.now() / 8) % 360) + ',90%,60%)'; g.beginPath(); g.arc(x - pw * 0.4 + i * pw * 0.115, y + h * 0.45, 2.5, 0, 7); g.fill(); } }
+    if(G.theme === 'robot'){ g.fillStyle = '#5CFFB0'; g.fillRect(x - pw * 0.3, y + h * 0.35, pw * 0.6, 3); }
+    if(G.theme === 'space'){ g.fillStyle = 'rgba(0,0,0,0.15)'; [0.25, 0.55, 0.75].forEach(f => { g.beginPath(); g.ellipse(x - pw / 2 + pw * f, y + h * 0.5, 6, 3, 0, 0, 7); g.fill(); }); }
+    if(G.theme === 'sky'){ g.fillStyle = '#FFF6D0'; for(let i = 0; i < 5; i++) g.fillRect(x - pw * 0.34 + i * pw * 0.16, y + 2, 4, h - 3); } }
+  g.fillStyle = T.panRim; g.fillRect(x - pw / 2, y - 3, pw, 5); g.restore();
+}
+
+// ---- count floor ----
+function countLayout(gy){
+  const it = G.M.item, aw = Math.min(110, W * 0.18), goalW1 = NumberSkins.measure(it.target, 1).w + 1.6, top = isWide() ? 26 : 76;
+  const hU = Math.max(it.target > 10 ? 9 : it.target, ...it.stacks.map(s => NumberSkins.measure(s.n, 1).h)) + 1.3;
+  const wU = it.stacks.reduce((s, q) => s + NumberSkins.measure(q.n, 1).w, 0) + 1.0 * Math.max(0, it.stacks.length - 1) + goalW1 + 2.4;
+  const u = Math.max(6, Math.min(56, (gy - top - 14) / hU, (W - aw - 24) / wU));
+  return {u, aw, top, goalX: W - 12 - goalW1 * u, goalW: goalW1 * u};
+}
+function drawCount(g, t, gy){
+  const it = G.M.item, CL = countLayout(gy), u = CL.u; G.hits = []; G.cl = CL; G.stackX = G.stackX || {};
+  // goal pad + ghost
+  const gm = NumberSkins.measure(it.target, u), gx = CL.goalX + (CL.goalW - gm.w) / 2;
+  g.save(); g.fillStyle = 'rgba(255,225,77,0.16)'; roundRect(g, CL.goalX, gy - gm.h - u * 1.1, CL.goalW, gm.h + u * 1.1, u * 0.4); g.fill(); g.setLineDash([6, 5]); g.strokeStyle = '#FFE14D'; g.lineWidth = 2; g.stroke(); g.setLineDash([]);
+  NumberSkins.draw(g, it.target, gx, gy - 4, u, {skin: G.skin, mat: 'smooth', alpha: it.done ? 0 : 0.22, noFace: true}); g.restore();
+  textTag(g, '🎯 ' + it.target, CL.goalX + CL.goalW / 2, gy - gm.h - u * 1.1 - 12, Math.max(13, u * 0.5));
+  G.goalBox = {x: CL.goalX, y: gy - gm.h - u * 1.5, w: CL.goalW, h: gm.h + u * 1.5};
+  // stacks in a row
+  const widths = it.stacks.map(s => NumberSkins.measure(s.n, u).w), gap = u * 1.0, tot = widths.reduce((a, b) => a + b, 0) + gap * Math.max(0, widths.length - 1);
+  const x0 = CL.aw + Math.max(8, (CL.goalX - CL.aw - 16 - tot) / 2); let x = x0, later = null;
+  it.stacks.forEach((s, i) => {
+    const w = widths[i], m = NumberSkins.measure(s.n, u); let P = G.pos[s.id]; if(!P || P.x == null) P = G.pos[s.id] = {x, y: gy - 4};
+    const hitDone = it.done && it.hit === s.id, tx = hitDone ? gx : x; if(hitDone && P.hop0 == null) P.hop0 = P.x; P.x += (tx - P.x) * Math.min(1, 0.22);
+    const hopP = hitDone && P.hop0 != null && Math.abs(tx - P.hop0) > 2 ? Math.max(0, Math.min(1, 1 - Math.abs(tx - P.x) / Math.abs(tx - P.hop0))) : 1; P.y = gy - 4 - (FX ? Math.sin(hopP * Math.PI) * Math.min(u * 2.2, (gy - CL.top) * 0.25) : 0);   // 🧊 hop onto the 🎯 pad
+    const liftPx = (P.liftU || 0) * u; if(P.liftU){ P.liftU *= 0.84; if(P.liftU < 0.03) P.liftU = 0; } const pop = P.pop || 0; if(pop){ P.pop *= 0.9; if(P.pop < 0.02) P.pop = 0; }
+    const dragging = G.drag && G.drag.id === s.id && G.drag.on, sel = G.sel === s.id || (G.kbd && G.kbdIdx === i);
+    const paint = () => { if(!dragging && G.st && G.st.bId === s.id && G.st.jId == null && !GSStack.morphDone()){ GSStack.draw(g, t, P, u, G.skin, THEMES[G.theme].mat); return; }   // 🧊 gs-anim
+    if(!dragging){ g.save(); if(pop){ const sy = 1 + Math.sin(pop * Math.PI * 3) * 0.16 * pop, cx = P.x + w / 2; g.translate(cx, P.y); g.scale(1 / Math.sqrt(sy), sy); g.translate(-cx, -P.y); }
+      NumberSkins.draw(g, s.n, P.x, P.y, u, {skin: G.skin, mat: THEMES[G.theme].mat, t, label: true, sel, mood: hitDone || pop > 0.3 ? 'wow' : 'happy', lift: P.liftK && liftPx > 0.5 ? {k: Math.min(P.liftK, s.n), dy: liftPx} : (P.whole && liftPx > 0.5 ? {k: s.n, dy: liftPx / 1.4} : null)}); g.restore(); } };
+    if(hitDone) later = paint; else paint();   // 🧊 the finished tower is painted last (in front of the others)
+    G.stackX[s.id] = P.x + w / 2;
+    G.hits.push({kind: 'stack', id: s.id, x: P.x, y: P.y - m.h, w: m.w, h: m.h + u * 0.9, u, n: s.n, floor: P.y});
+    x += w + gap;
+  });
+  later && later();
+}
+function drawAvatarCorner(g, t, gy){
+  const it = G.M.item; if(it.kind === 'avatar' && !it.done) return;   // on the pan
+  const scaleKind = it.kind === 'compare' || it.kind === 'balance' || it.kind === 'avatar', wide = scaleKind && isWide();
+  if(G.avBox === null && !sideRoom()) return; const bx = G.avBox && G.avBox.w ? G.avBox : null; if(G.avBox && !G.avBox.w) return;
+  const quiz = it.kind === 'choice', aw = bx ? bx.w : Math.min(quiz ? 220 : 110, W * (wide ? 0.085 : quiz ? 0.21 : 0.18)), ah = bx ? bx.h : Math.min(gy - 70, aw * (quiz ? 1.7 : 1.5)); if(ah < 40) return;
+  const ax = bx ? bx.x : !wide ? 8 : it.kind === 'compare' ? W / 2 + 22 : W - aw - 4;
+  const key = aw + 'x' + ah; if(!G.avFit || G.avFit.key !== key){ const F = avatarFit(myAvatar(S.player), S.player, aw, ah, {gests: IDLE, pad: 2}); G.avFit = {key, k: F.k, cx: F.cx}; }
+  const Hh = G.helper; if(Hh){ Hh.home = ax + G.avFit.cx; if(Hh.id && G.stackX && G.stackX[Hh.id] != null) Hh.tx = G.stackX[Hh.id] - (G.stackX[Hh.id] > W * 0.6 ? 34 : -34); else if(it.kind === 'wobble') Hh.tx = W / 2 - 80; }
+  const moving = Hh && Hh.state && Hh.x != null, carrying = moving && Hh.carry && Hh.state !== 'back';
+  const cntBeat = GSStack.pointing() ? Math.max(0, 1 - (G.st.t - G.st.litT) / 0.12) : 0;   // 🧊 gs-anim: points at the tower, bobs on each count
+  const throwing = G.throwT != null && G.throwT < 0.45, pose = GSStack.pointing() ? {armL: 0.35, armR: 2.2 + cntBeat * 0.35, mouth: cntBeat > 0.3 ? 'open' : 'smile'} : throwing ? {armL: 0.5, armR: 2.9 - G.throwT * 3, mouth: 'open'} : (G.drag && G.drag.on) || carrying || (Hh && Hh.state === 'lift') ? {armL: 2.6, armR: 2.6, mouth: 'open'} : null, hx = moving ? Hh.x : ax + G.avFit.cx;
+  G.avHand = {x: hx + G.avFit.k * 30, y: gy - 2 - G.avFit.k * 118}; G.avHead = {x: hx, y: gy - 2 - G.avFit.k * 150};
+  try{ drawAvatar(g, {name: S.player, av: myAvatar(S.player), dir: moving && Hh.state !== 'lift' ? Hh.dir || 1 : 1, walkT: moving && Hh.state !== 'lift' ? Hh.walkT : 0, gest: pose ? null : G.A.gest}, hx, gy - 2, G.avFit.k, {t, pose}); }catch(e){}
+  const waiting = G.phase === 'play' && (it.kind === 'choice' || it.kind === 'compare') && !it.done && !moving;
+  if(waiting && FX){ const r2 = Math.max(12, Math.min(26, G.avFit.k * 22)), bx2 = Math.min(W - r2 - 4, G.avHead.x + G.avFit.k * 40), by2 = Math.max(r2 * 1.8 + 4, G.avHead.y - G.avFit.k * 14) + Math.sin(t * 2) * 3; g.save(); g.fillStyle = 'rgba(255,255,255,0.95)'; [[0.25, -0.2, 0.18], [0.5, -0.55, 0.28]].forEach(c => { g.beginPath(); g.arc(G.avHead.x + (bx2 - G.avHead.x) * c[0], G.avHead.y + (by2 - G.avHead.y) * (c[0]) + r2 * c[1] * 0, r2 * c[2], 0, 7); g.fill(); });
+    g.beginPath(); g.arc(bx2, by2 - r2 * 0.6, r2, 0, 7); g.fill(); g.restore(); emo(g, '🤔', bx2, by2 - r2 * 0.6, r2 * 1.3); }
+  if(carrying){ const bs = Math.max(10, G.avFit.k * 22), n = Math.min(3, Hh.carry); for(let i = 0; i < n; i++) NumberSkins.block(g, hx - bs / 2, gy - 2 - G.avFit.k * 128 - bs * (i + 1) + (Hh.state === 'lift' ? -Math.sin(Hh.t * 10) * 3 : 0), bs, NumberSkins.colour(G.skin, Hh.carry), THEMES[G.theme].mat, t, i, {noTop: i < n - 1}); }
+}
+function draw(t){
+  if(!G || !W) return; const g = CTX; g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, H);
+  const gy = drawRoom(g, t);
+  G.cheerT = t; /* 📣 cs-4b */
+  if(G.battle){ drawBattle(g, t, gy); drawFx(g); return; }
+  if(G.J && !G.M.item){ drawJourney(g, t, gy); drawFx(g); return; }
+  const it = G.M.item; if(!it) return; G.avBox = undefined;
+  if(it.kind === 'count') drawCount(g, t, gy); else if(it.kind === 'grid') drawGrid(g, t, gy); else if(it.kind === 'tens') drawTens(g, t, gy); else if(it.kind === 'choice') drawChoice(g, t, gy); else if(it.kind === 'colour') drawColour(g, t, gy); else if(it.kind === 'wobble') drawWobble(g, t, gy); else drawScale(g, t, gy);
+  drawAvatarCorner(g, t, gy);
+  // dragged piece on top
+  if(G.drag && G.drag.on){ const d = G.drag; if(d.n != null) NumberSkins.draw(g, d.n, d.px - d.ox, d.py - d.oy, d.u, {skin: G.skin, mat: THEMES[G.theme].mat, t, label: true, mood: 'wow'}); else if(d.p) drawPiece(g, d.p, d.px - d.ox, d.py - d.oy, d.u, {t, label: true}); }
+  drawReveal(g); drawFx(g);
+}
+function drawFx(g){ G.fx.forEach(f => { const p = f.t / f.life; g.save(); g.globalAlpha = Math.max(0, 1 - p * p);
+  if(f.kind === 'txt'){ g.font = '800 ' + Math.round(f.size) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,0.55)'; const y = f.y - p * 40; g.strokeText(f.text, f.x, y); g.fillStyle = f.col; g.fillText(f.text, f.x, y); }
+  else { const x = f.x + f.vx * f.t, y = f.y + f.vy * f.t + 300 * f.t * f.t; emo(g, f.ch, x, y, f.size); }
+  g.restore(); }); }
+function hitById(id){ return (G.hits || []).find(h => h.id === id); }
+function floatText(text, id, col){ const h = hitById(id); const x = h ? h.x + h.w / 2 : W / 2, y = h ? h.y - 10 : H / 2; G.fx.push({kind: 'txt', text, x, y, col: col || '#fff', size: Math.max(16, Math.min(30, W * 0.04)), t: 0, life: 1.4}); }
+function burst(id, m){ if(!FX) return; const h = hitById(id); if(!h) return; for(let i = 0; i < m * 3; i++) G.fx.push({kind: 'p', ch: '✨', x: h.x + h.w / 2, y: h.y + h.h / 2, vx: (Math.random() - 0.5) * 240, vy: -120 - Math.random() * 160, size: 16, t: 0, life: 0.9}); }
+function confetti(big){ if(!FX || !G) return; const set = ['🎉', '⭐', '🔢', THEMES[G.theme].icon]; for(let i = 0; i < (big ? 36 : 18); i++) G.fx.push({kind: 'p', ch: set[i % set.length], x: W * Math.random(), y: H * 0.3, vx: (Math.random() - 0.5) * 300, vy: -200 - Math.random() * 200, size: 18 + Math.random() * 10, t: 0, life: 1.4}); }
+
+/* ================= ROUND 2 PAINTERS (🔷 🔟 🧩 🍕 🏗️) ================= */
+function boardTop(){ return goalBottom() + 12; }
+function avatarBoxDefault(gy){ const aw = Math.min(110, W * 0.18); return {x: 8, w: aw, h: Math.min(gy - 70, aw * 1.5)}; }
+function sideRoom(){ const it = G && G.M && G.M.item, quiz = it && it.kind === 'choice'; return W > H * 1.1 ? Math.min(quiz ? 230 : 120, W * (quiz ? 0.22 : 0.18)) + 10 : 0; }   // keep the avatar's corner free on wide screens
+function gridGeom(gy, n){
+  const left = sideRoom(), top = boardTop(), S = Math.max(60, Math.min(W - left - 16, gy - top - 34)), c = S / n;
+  return {x: left + (W - left - S) / 2, y: top + 4, S, c};
+}
+function drawGrid(g, t, gy){
+  const it = G.M.item, GG = gridGeom(gy, it.n), set = new Set(it.cells.map(c => c[0] + ',' + c[1])), col = NumberSkins.colour(G.skin, (it.par % 9) + 1), mat = THEMES[G.theme].mat;
+  G.gridGeo = GG;
+  g.fillStyle = 'rgba(10,20,40,0.35)'; roundRect(g, GG.x - 6, GG.y - 6, GG.S + 12, GG.S + 12, 12); g.fill();
+  for(let y = 0; y < it.n; y++) for(let x = 0; x < it.n; x++){ const px = GG.x + x * GG.c, py = GG.y + y * GG.c;
+    if(set.has(x + ',' + y)) NumberSkins.block(g, px + 1, py + 1, GG.c - 2, col, mat, t, x + y * it.n, {noTop: true});
+    else { g.strokeStyle = 'rgba(255,255,255,0.28)'; g.lineWidth = 1; g.strokeRect(px + 2, py + 2, GG.c - 4, GG.c - 4); }
+    if(G.kbd && G.cur && G.cur[0] === x && G.cur[1] === y){ g.strokeStyle = '#FFE14D'; g.lineWidth = 3; g.strokeRect(px + 1, py + 1, GG.c - 2, GG.c - 2); } }
+  const sh = GS.shapeOf(it.cells), Li = G.M.level;
+  textTag(g, '🔷 ' + sh.area + ' blocks' + (Li >= 2 || it.ck === 'perim' ? ' · way round ' + sh.perim : '') + (sh.rect ? ' · ' + sh.rect[0] + ' × ' + sh.rect[1] : sh.steps ? ' · steps!' : ''), GG.x + GG.S / 2, GG.y + GG.S + 18, 14);
+  const below = gy - (GG.y + GG.S + 30); G.avBox = sideRoom() ? null : below > 60 ? {x: 8, w: Math.min(90, below / 1.5), h: below} : {x: 0, w: 0, h: 0};
+}
+function cellAt(x, y){ const GG = G.gridGeo, it = G.M.item; if(!GG) return null; const cx = Math.floor((x - GG.x) / GG.c), cy = Math.floor((y - GG.y) / GG.c); return cx >= 0 && cy >= 0 && cx < it.n && cy < it.n ? [cx, cy] : null; }
+function drawTens(g, t, gy){
+  const it = G.M.item, v = it.value, top = boardTop(), left = sideRoom(), maxH = gy - top - 40, maxW = W - left - 30;
+  const u = Math.max(6, Math.min(56, maxH / 10.5, maxW / Math.max(2, NumberSkins.measure(Math.max(v, 1), 1).w + 1)));
+  const m = NumberSkins.measure(Math.max(v, 1), u), x = left + (W - left - m.w) / 2;
+  const TF = G.tensFrom, DS = GSStack.dropState(Math.min(u * 6, gy - 26 - top)), mat = THEMES[G.theme].mat;   // 🧊 gs-anim: the new piece falls into its place, lands, then the number changes
+  if(TF && DS.on && !DS.landed){ const m0 = NumberSkins.measure(Math.max(TF.v0, 1), u); if(TF.v0 > 0) NumberSkins.draw(g, TF.v0, left + (W - left - m0.w) / 2, gy - 26, u, {skin: G.skin, mat, t, mood: 'wow'});
+    const L = NumberSkins.layout(v, u), cols = L.cols, fl = gy - 26, kind = TF.unit === 100 ? 'slab' : TF.unit === 10 || TF.snapped ? 'rod' : 'one', c = cols.filter(q => q.kind === kind).slice(-1)[0] || cols[cols.length - 1], cx = x + c.x;
+    if(kind === 'slab'){ const col = NumberSkins.colour(G.skin, 10), yy = fl - c.k * c.sh - DS.dy; g.fillStyle = col; roundRect(g, cx, yy + 1, c.w, c.sh - 2, c.sh * 0.3); g.fill(); g.strokeStyle = NumberSkins.shade(col, -0.4); g.lineWidth = 2; g.stroke(); }
+    else if(kind === 'rod' && !TF.snapped){ const s2 = c.w; for(let k = 0; k < 10; k++) NumberSkins.block(g, cx, fl - (k + 1) * s2 - DS.dy, s2, NumberSkins.colour(G.skin, 10), mat, t, k, {noTop: k < 9}); }
+    else { const s2 = kind === 'rod' ? c.w : u, k = kind === 'rod' ? 9 : c.k - 1; NumberSkins.block(g, cx, fl - (k + 1) * s2 - DS.dy, s2, NumberSkins.colour(G.skin, v <= 10 ? v : v % 10 || 10), mat, t, k, {}); } }
+  else if(v > 0){ g.save(); if(DS.on && DS.sy !== 1){ g.translate(W / 2, gy - 26); g.scale(1 + (1 - DS.sy) * 0.6, DS.sy); g.translate(-W / 2, -(gy - 26)); } NumberSkins.draw(g, v, x, gy - 26, u, {skin: G.skin, mat, t, mood: it.done || DS.on ? 'wow' : 'happy'}); g.restore();
+    if(TF && TF.snapped && DS.on && DS.chip < 1){ const c = NumberSkins.layout(v, u).cols.filter(q => q.kind === 'rod').slice(-1)[0]; if(c){ g.save(); g.globalAlpha = 1 - DS.chip; g.strokeStyle = '#FFF2A0'; g.lineWidth = Math.max(2, u * 0.1); g.beginPath(); g.roundRect(x + c.x - 4, gy - 26 - c.h - 4, c.w + 8, c.h + 8, u * 0.2); g.stroke(); g.restore(); } } }
+  else textTag(g, 'Tap +1 to add a block', W / 2, gy - 60, 15);
+  const H_ = Math.floor(v / 100), T_ = Math.floor(v % 100 / 10), O_ = v % 10;
+  textTag(g, (H_ ? H_ + ' hundred' + (H_ > 1 ? 's' : '') + ' + ' : '') + (T_ || H_ ? T_ + ' ten' + (T_ !== 1 ? 's' : '') + ' + ' : '') + O_ + ' one' + (O_ !== 1 ? 's' : '') + ' = ' + v, W / 2 + left / 2, gy - 10, 15);
+  G.avBox = null;
+}
+function drawSeq(g, t, gy, seq){
+  const top = boardTop(), left = sideRoom() || Math.min(80, W * 0.2) + 4, maxH = gy - top - 40, items = seq.map(v => v == null ? {t: 'q'} : {t: 'n', n: v});
+  const wOf = (p, u) => p.t === 'q' ? u * 1.4 : NumberSkins.measure(p.n, u).w, hU = Math.max(...seq.filter(v => v != null).map(v => NumberSkins.measure(v, 1).h)), gap = 1;
+  let u = Math.min(52, maxH / (hU + 1.5)); for(let k = 0; k < 30; k++){ const w = items.reduce((s, p) => s + wOf(p, u), 0) + gap * u * (items.length - 1); if(w <= W - left - 24 || u < 4) break; u *= 0.9; }
+  const tot = items.reduce((s, p) => s + wOf(p, u), 0) + gap * u * (items.length - 1); let x = left + (W - left - tot) / 2; const fl = gy - 26;
+  items.forEach(p => { if(p.t === 'q'){ const h = Math.min(maxH * 0.6, u * 4); G.revealTo = {x: x + u * 0.7, y: fl - h / 2}; g.save(); g.setLineDash([6, 5]); g.strokeStyle = '#FFE14D'; g.lineWidth = 3; roundRect(g, x, fl - h, u * 1.4, h, 8); g.stroke(); g.restore(); textTag(g, '?', x + u * 0.7, fl - h / 2, Math.max(16, u * 0.8)); }
+    else NumberSkins.draw(g, p.n, x, fl, u, {skin: G.skin, mat: THEMES[G.theme].mat, t, label: true}); x += wOf(p, u) + gap * u; });
+}
+function pie(g, cx, cy, R, f, on, t){   // 🍕 a pizza cut into f.d slices, f.n coloured
+  g.save(); g.fillStyle = '#E7B26A'; g.beginPath(); g.arc(cx, cy, R * 1.06, 0, 7); g.fill();
+  for(let i = 0; i < f.d; i++){ const a0 = -Math.PI / 2 + i * 2 * Math.PI / f.d, a1 = a0 + 2 * Math.PI / f.d; g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R, a0, a1); g.closePath();
+    g.fillStyle = i < (on == null ? f.n : on) ? '#FF6B4A' : '#FFE9B8'; g.fill(); g.strokeStyle = '#8A5A2B'; g.lineWidth = 2; g.stroke();
+    if(i < (on == null ? f.n : on)){ g.fillStyle = '#C0392B'; const am = (a0 + a1) / 2; g.beginPath(); g.arc(cx + Math.cos(am) * R * 0.6, cy + Math.sin(am) * R * 0.6, R * 0.08, 0, 7); g.fill(); } }
+  g.restore();
+}
+function barGeom(gy, len){ const left = sideRoom(), w = Math.min(W - left - 30, 640), c = w / len, x = left + (W - left - w) / 2, y = Math.max(boardTop() + 20, (boardTop() + gy) / 2 - c / 2); return {x, y, c: Math.min(c, (gy - boardTop()) * 0.5), w}; }
+function drawBar(g, t, gy, len, onSet, tappable){
+  const B = barGeom(gy, len), col = NumberSkins.colour(G.skin, len % 9 + 1), mat = THEMES[G.theme].mat; G.barGeo = B;
+  for(let i = 0; i < len; i++){ const on = onSet(i), x = B.x + i * B.c; NumberSkins.block(g, x + 1, B.y, B.c - 2, on ? col : 'rgba(255,255,255,0.18)', on ? mat : 'smooth', t, i, {noTop: false});
+    if(G.kbd && tappable && G.cur === i){ g.strokeStyle = '#FFE14D'; g.lineWidth = 3; g.strokeRect(x, B.y - 2, B.c, B.c + 4); } }
+}
+function drawChoice(g, t, gy){
+  const it = G.M.item, V = it.vis || {}; G.avBox = undefined; G.revealTo = {x: (sideRoom() + W) / 2, y: boardTop() + Math.min(70, H * 0.12)};
+  if(V.type === 'seq') drawSeq(g, t, gy, V.seq);
+  else if(V.type === 'value'){ const top = boardTop(), left = sideRoom(), u = Math.max(5, Math.min(48, (gy - top - 40) / 10.5, (W - left - 30) / (NumberSkins.measure(V.v, 1).w + 1))), m = NumberSkins.measure(V.v, u); NumberSkins.draw(g, V.v, left + (W - left - m.w) / 2, gy - 20, u, {skin: G.skin, mat: THEMES[G.theme].mat, t}); }
+  else if(V.type === 'pairs'){ const v = V.v, top = boardTop(), left = sideRoom();
+    if(v > 40){ textTag(g, String(v), W / 2, (top + gy) / 2, Math.min(70, H * 0.12)); return; }
+    const rows = Math.ceil(v / 2), u = Math.min(40, (gy - top - 20) / (rows + 1), (W - left) / 6), x0 = left + (W - left) / 2 - u; const col = NumberSkins.colour(G.skin, v % 10);
+    for(let i = 0; i < v; i++){ const row = Math.floor(i / 2), c = i % 2; NumberSkins.block(g, x0 + c * u * 1.05, gy - 14 - (row + 1) * u * 1.02, u, col, THEMES[G.theme].mat, t, i, {noTop: row < rows - 1}); } }
+  else if(V.type === 'bar') drawBar(g, t, gy, V.len, i => i < V.on, false);
+  else if(V.type === 'bars'){ const left = sideRoom(), R = Math.min((W - left) * 0.18, (gy - boardTop()) * 0.36), cy = (boardTop() + gy) / 2; const xa = left + (W - left) * 0.27, xb = left + (W - left) * 0.73;
+    G.revealTo = {x: (xa + xb) / 2, y: cy}; pie(g, xa, cy, R, V.a, null, t); pie(g, xb, cy, R, V.b, null, t); textTag(g, V.a.n + '/' + V.a.d, xa, cy + R + 22, 20); textTag(g, V.b.n + '/' + V.b.d, xb, cy + R + 22, 20);
+  }
+  else if(V.type === 'grid'){ const left = sideRoom(), cells = V.cells, w = Math.max(...cells.map(c => c[0])) + 1, h = Math.max(...cells.map(c => c[1])) + 1, top = boardTop(), c = Math.min(46, (W - left - 40) / w, (gy - top - 30) / h), x0 = left + (W - left - w * c) / 2, col = NumberSkins.colour(G.skin, cells.length % 9 + 1);
+    cells.forEach(([x, y]) => NumberSkins.block(g, x0 + x * c + 1, gy - 20 - (y + 1) * c + 1, c - 2, col, THEMES[G.theme].mat, t, x + y * 9, {noTop: true}));
+    if(it.done && it.ck === 'shape'){ textTag(g, '= ' + it.answer, W / 2 + left / 2, gy - 20 - h * c - 20, 20); } }
+}
+function drawColour(g, t, gy){ const it = G.M.item; const on = new Set(it.on); drawBar(g, t, gy, it.len, i => on.has(i), true);
+  const B = G.barGeo; textTag(g, it.on.length + ' of ' + it.len + ' coloured · want ' + it.frac.n + '/' + it.frac.d, B.x + B.w / 2, B.y + B.c + 26, 15);
+  for(let k = 1; k < it.frac.d; k++){ const x = B.x + k * it.len / it.frac.d * B.c; g.strokeStyle = 'rgba(255,255,255,0.75)'; g.setLineDash([4, 4]); g.lineWidth = 2; g.beginPath(); g.moveTo(x, B.y - 10); g.lineTo(x, B.y + B.c + 6); g.stroke(); g.setLineDash([]); }
+  pie(g, B.x + B.w / 2, Math.max(boardTop() + 34, B.y - 70), Math.min(40, (B.y - boardTop()) / 2 - 6), it.frac, null, t);
+}
+const WOB_COLS = ['#FF8A3D', '#3F7BFF', '#22C3A1'];
+function drawWobble(g, t, gy){
+  const it = G.M.item, h = it.tower.reduce((a, b) => a + b, 0), top = boardTop() + 10, left = sideRoom(), maxU = Math.max(h, it.target) + 3, u = Math.max(1.2, Math.min(40, (gy - top - 20) / maxU)), tw = Math.min(110, W * 0.18), x = left + (W - left) / 2 - tw / 2, fl = gy - 6, over = h > it.target;
+  const ty = fl - it.target * u; g.save(); g.setLineDash([8, 6]); g.strokeStyle = '#FFE14D'; g.lineWidth = 3; g.beginPath(); g.moveTo(x - 60, ty); g.lineTo(x + tw + 60, ty); g.stroke(); g.restore();
+  textTag(g, '🎯 ' + it.target, x + tw + 70, ty, 15);
+  g.save(); if(over){ g.translate(x + tw / 2, fl); g.rotate(Math.sin(t * 9) * 0.05); g.translate(-(x + tw / 2), -fl); }
+  const DS = GSStack.dropState(Math.min(Math.max(90, u * 6), (fl - h * u) - top)), dropPx = DS.on ? DS.dy : 0;   // 🧊 gs-anim: gravity fall + landing squash
+  if(DS.on && DS.sy !== 1){ g.translate(x + tw / 2, fl); g.scale(1 + (1 - DS.sy) * 0.6, DS.sy); g.translate(-(x + tw / 2), -fl); }
+  let y = fl; it.tower.forEach((s, i) => { const hh = s * u; if(i === it.tower.length - 1) y -= dropPx; const ci = it.sizes.indexOf(s), col = WOB_COLS[ci] || '#FF8A3D'; g.fillStyle = col; roundRect(g, x, y - hh + 1, tw, hh - 2, Math.min(8, hh / 3)); g.fill(); g.strokeStyle = NumberSkins.shade(col, -0.4); g.lineWidth = 2; g.stroke();
+    if(hh > 12){ g.fillStyle = '#fff'; g.font = '800 ' + Math.round(Math.min(18, hh * 0.6)) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(s), x + tw / 2, y - hh / 2); } y -= hh; });
+  g.restore();
+  const lastZ = it.tower.length ? it.tower[it.tower.length - 1] : 0, hShow = DS.on && !DS.landed ? h - lastZ : h, tagK = DS.on && DS.chip > 0 && DS.chip < 1 ? 1 + 0.3 * Math.sin(DS.chip * Math.PI) : 1;   // 🧊 the height counts up only when it lands
+  textTag(g, 'height ' + hShow + (DS.on && !DS.landed ? '' : over ? ' — too tall! 😬' : h === it.target ? ' ✅' : ''), x + tw / 2, fl - h * u - 18, Math.round(15 * tagK));
+}
+
+/* ================= ⚔️ TOWER BATTLE ================= */
+function oppName(){ return SET.opp && SET.opp !== '🤖' && S.players.some(p => p.Name === SET.opp) ? SET.opp : ''; }
+function startBattle(){
+  hideResult(); closeSheet(); const opp = oppName();
+  const B = GS.newBattle({level: SET.level, names: [S.player, opp || '🤖 Robo-Scout'], robot: !opp});
+  G = {M: {mode: 'battle', level: SET.level, item: null, log: [], quals: [], score: 0, total: 0, round: 0}, battle: {B, seat: 0, phase: 'build', sel: {use: [], x2: false}}, id: ++GID, theme: SET.theme, skin: SET.skin, t0: performance.now(), phase: 'battle', fx: [], hits: [], A: {gest: null}, B2: {gest: null}};
+  showScreen('play'); $('h-time').classList.add('hidden'); sizeCanvas(); GS.battleDeal(B); battleTurn(); startLoop();
+}
+function batHud(){ const b = G.battle.B; $('h-round').textContent = '⚔️ ' + Math.min(b.round + 1, b.maxRounds); $('h-score').textContent = '⭐ ' + b.wins[0] + ' : ' + b.wins[1]; $('h-stars').textContent = '🏁 3'; }
+function ruleText(D){ return D.rule === 'high' ? '⬆️ HIGHER wins' : D.rule === 'low' ? '⬇️ LOWER wins' : '🎯 CLOSEST to ' + D.target + ' wins'; }
+function battleTurn(){
+  const T = G.battle, B = T.B, D = B.deal; batHud(); T.sel = {use: [], x2: false};
+  $('goal').innerHTML = ruleText(D) + '<small>' + UI.esc(B.names[T.seat]) + ': tap blocks to build your tower, then 🔒 lock in</small>';
+  if(T.seat === 1 && B.robot){ GS.battleLock(B, 1, GS.robotBuild(B, 1)); battleReveal(); return; }
+  T.phase = 'build'; renderBatBar();
+}
+function renderBatBar(){
+  const T = G.battle, B = T.B, D = B.deal, bar = $('bar');
+  if(T.phase === 'pass'){ bar.innerHTML = '<div class="hint">📱 Pass to <b>' + UI.esc(B.names[1]) + '</b> — no peeking! 🙈</div><button class="tb act" data-sound="pop" onclick="batReady()">I\'m ' + UI.esc(B.names[1]) + ' ▶</button>'; return; }
+  if(T.phase === 'reveal'){ bar.innerHTML = '<button class="tb act" data-sound="pop" onclick="batNext()">' + (B.over ? '🏆 See who won' : '▶ Next round') + '</button>'; return; }
+  const v = T.sel.use.length ? GS.buildValue(D.hands[T.seat], T.sel) : 0;
+  bar.innerHTML = '<div class="hint">' + UI.esc(B.names[T.seat]) + ': your tower = <b>' + v + '</b></div>' + (D.x2 ? '<button class="tb cp' + (T.sel.x2 ? ' on' : '') + '" data-sound="tap" onclick="batX2()">✖️2 card ' + (T.sel.x2 ? '✅' : '') + '</button>' : '') +
+    '<button class="tb act" data-sound="none" onclick="batLock()"' + (T.sel.use.length ? '' : ' disabled') + '>🔒 Lock in</button>';
+}
+function batToggle(i){ const T = G.battle; if(T.phase !== 'build') return; const k = T.sel.use.indexOf(i); if(k >= 0) T.sel.use.splice(k, 1); else T.sel.use.push(i); UISound.play('tap'); renderBatBar(); }
+function batX2(){ const T = G.battle; T.sel.x2 = !T.sel.x2; renderBatBar(); }
+function batLock(){
+  const T = G.battle, B = T.B; if(T.phase !== 'build' || !GS.battleLock(B, T.seat, T.sel)) return; SND.snap(GS.buildValue(B.deal.hands[T.seat], T.sel));
+  if(T.seat === 0){ T.seat = 1; if(B.robot) battleTurn(); else { T.phase = 'pass'; renderBatBar(); } } else battleReveal();
+}
+function batReady(){ const T = G.battle; T.phase = 'build'; battleTurn(); }
+function battleReveal(){
+  const T = G.battle, B = T.B, D = B.deal; T.last = {hands: D.hands, picks: D.picks, rule: D.rule, target: D.target}; const r = GS.battleJudge(B); T.res = r; T.phase = 'reveal'; T.seat = 0; batHud();
+  const w = r.w; banner(w < 0 ? '🤝 Same score — nobody gets the point' : '⭐ <b>' + UI.esc(B.names[w]) + '</b> wins the round! (' + r.v[0] + ' vs ' + r.v[1] + ')', w === 0 || (w === 1 && !B.robot) ? 'good' : '');
+  if(w >= 0){ SND.win(); (w === 0 ? G.A : G.B2).gest = {g: gestOf('cheer'), t: 0}; (w === 0 ? G.B2 : G.A).gest = {g: gestOf('shrug'), t: 0}; } renderBatBar();
+}
+function batNext(){ const T = G.battle, B = T.B; hideBanner(); if(B.over){ battleEnd(); return; } GS.battleDeal(B); T.seat = 0; battleTurn(); }
+function battleEnd(){
+  const B = G.battle.B, w = B.winner; G.phase = 'over'; UISound.play('success'); confetti(true);
+  showResult('<div class="big">⚔️</div><h2>' + (w < 0 ? 'A draw — great battle!' : UI.esc(B.names[w]) + ' wins the battle!') + '</h2><div class="score-big">' + B.wins[0] + ' : ' + B.wins[1] + '</div>' +
+    '<div class="stats">' + B.log.map((l, i) => '<span>' + (l.rule === 'high' ? '⬆️' : l.rule === 'low' ? '⬇️' : '🎯' + l.target) + ' ' + l.v[0] + ' vs ' + l.v[1] + (l.w < 0 ? ' 🤝' : l.w === 0 ? ' ⭐' : ' ☆') + '</span>').join('') + '</div>' +
+    '<div class="save-note" id="save-note">💾 Saving…</div><div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="pop" onclick="startBattle()">🔁 Again</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="backToMenu()">🎚️ Levels</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button></div>');
+  const notes = []; [0, 1].forEach(s => { if(s === 1 && B.robot) return; const nm = B.names[s], st = {games: 1, battles: 1, battleWins: w === s ? 1 : 0, bestStreak: 0};
+    google.script.run.withSuccessHandler(res => { notes[s] = UI.esc(nm) + ': ' + featText(res, '✅ Saved'); putNote(notes.filter(Boolean).join('<br>')); }).withFailureHandler(() => { writePending(readPending().concat([{name: nm, feats: true, stats: st}])); notes[s] = UI.esc(nm) + ': ⚠️ will be sent next time'; putNote(notes.filter(Boolean).join('<br>')); }).saveFeats(nm, GAME_ID, st); });
+}
+function drawBattle(g, t, gy){
+  const T = G.battle, B = T.B, port = W < H * 0.95, top = boardTop(); G.hits = [];
+  const show = T.phase === 'reveal' ? T.last : B.deal; if(!show) return;
+  // zones: landscape = left | right · portrait = opponent on top, you at the bottom
+  const zone = s => port ? {x: 0, y: s === 0 ? top + (gy - top) / 2 : top, w: W, h: (gy - top) / 2} : {x: s === 0 ? 0 : W / 2, y: top, w: W / 2, h: gy - top};
+  g.fillStyle = 'rgba(255,255,255,0.1)'; if(port) g.fillRect(0, top + (gy - top) / 2 - 1, W, 2); else g.fillRect(W / 2 - 1, top, 2, gy - top);
+  [0, 1].forEach(s => {
+    const Z = zone(s), fl = Z.y + Z.h - 24, hand = show.hands[s], mine = T.phase === 'build' && T.seat === s, hidden = T.phase !== 'reveal' && !mine;
+    const av = s === 0 ? S.player : (B.robot ? '' : B.names[1]), A = s === 0 ? G.A : G.B2, ah = Math.min(Z.h - 30, 130), aw = Math.min(ah / 1.5, Z.w * 0.2);
+    const ax = s === 0 || port ? Z.x + 6 : Z.x + Z.w - aw - 6;
+    if(av){ try{ const F = avatarFit(myAvatar(av), av, aw, ah, {gests: IDLE, pad: 2}); drawAvatar(g, {name: av, av: myAvatar(av), dir: s === 0 || port ? 1 : -1, walkT: 0, gest: A.gest}, ax + F.cx, fl + 20, F.k, {t}); }catch(e){} }
+    else emo(g, '🤖', ax + aw / 2, fl - aw * 0.4, aw * 0.9);
+    textTag(g, B.names[s] + ' · ' + B.wins[s] + ' ⭐', Z.x + Z.w / 2, Z.y + 14, 14);
+    if(hidden){ textTag(g, '🙈 hidden', Z.x + Z.w / 2, Z.y + Z.h / 2, 18); return; }
+    const pick = T.phase === 'reveal' ? show.picks[s] : (mine ? T.sel : {use: []}), used = new Set(pick.use || []);
+    const x0 = s === 0 || port ? ax + aw + 14 : Z.x + 14, area = Z.w - aw - 34, wU = hand.reduce((a, n) => a + NumberSkins.measure(n, 1).w, 0) + hand.length, hU = Math.max(...hand.map(n => NumberSkins.measure(n, 1).h)) + 1.6;
+    const u = Math.max(4, Math.min(40, (Z.h - 70) / hU, area / wU)); let x = x0;
+    hand.forEach((n, i) => { const on = used.has(i), m = NumberSkins.measure(n, u); NumberSkins.draw(g, n, x, on ? fl - u * 0.6 : fl, u, {skin: G.skin, mat: THEMES[G.theme].mat, t, label: true, sel: on, alpha: T.phase === 'reveal' && !on ? 0.35 : 1});
+      if(mine) G.hits.push({kind: 'bat', i, x, y: fl - m.h - u, w: m.w, h: m.h + u * 1.6}); x += m.w + u; });
+    if(T.phase === 'reveal' || mine){ const v = pick.use && pick.use.length ? GS.buildValue(hand, pick) : 0; textTag(g, '= ' + v + (pick.x2 ? ' (×2)' : ''), Math.min(Z.x + Z.w - 40, x + 30), Z.y + 40, 22); }
+  });
+}
+/* ================= 📖 JOURNEY (round 3) ================= */
+function journeyDone(name){ return Math.max(Number((S.geoJourney || {})[name]) || 0, Number(ls('sp_geoscout_jr:' + name)) || 0); }
+function renderChapters(){
+  const box = $('chapter-list'), done = journeyDone(S.player);
+  box.innerHTML = GS.CHAPTERS.map(ch => { const T = THEMES[ch.theme], open = ch.id <= done + 1, ok = ch.id <= done;
+    return '<button class="pick lvl chap' + (open ? '' : ' locked') + (open && !ok ? ' recommended' : '') + '" data-ch="' + ch.id + '" data-sound="' + (open ? 'pop' : 'none') + '"><span class="num">Ch ' + ch.id + '</span>' + (ok ? '<span class="badge">🏅</span>' : open ? '' : '<span class="badge">🔒</span>') +
+      '<div class="big">' + T.icon + '</div><div class="nm">' + ch.title + '</div><div class="learn">' + ch.op + ' · ' + T.name + '</div><div class="sub">' + (ok ? '⭐ Sticker collected' : open ? '▶ Play this chapter' : 'Finish chapter ' + (ch.id - 1) + ' first') + '</div></button>'; }).join('');
+  box.querySelectorAll('.chap').forEach(b => b.onclick = () => { const id = Number(b.dataset.ch); if(id > done + 1){ UISound.play('error'); UI.toast('Finish chapter ' + (id - 1) + ' first'); return; } startJourney(id); });
+}
+function startJourney(chId){
+  hideResult(); closeSheet(); const ch = GS.CHAPTERS.find(c => c.id === chId);
+  const M = GS.newGame({level: ch.level, mode: 'journey', seed: chId}); M.total = 99;
+  G = {M, J: {ch, i: 0, cast: {}, say: null, line: false}, id: ++GID, theme: ch.theme, skin: SET.skin, t0: performance.now(), phase: 'story', fx: [], hits: [], sel: 0, splitK: 1, hist: [], pos: {}, tilt: 0, tiltLock: true, A: {gest: null}, timeLeft: 0};
+  showScreen('play'); $('h-time').classList.add('hidden'); sizeCanvas(); jHud(); hideBanner(); startLoop(); jRun();
+}
+function jHud(){ const J = G.J; $('h-round').textContent = '📖 Ch ' + J.ch.id + ' · ' + Math.min(J.i + 1, J.ch.steps.length) + '/' + J.ch.steps.length; $('h-score').textContent = GS.CHARS[5] ? THEMES[J.ch.theme].icon + ' ' + J.ch.op : ''; $('h-stars').textContent = '📖'; }
+async function jRun(){
+  if(!G || !G.J) return; const id = G.id, J = G.J, steps = J.ch.steps;
+  while(J.i < steps.length){
+    if(!G || G.id !== id) return; const st = steps[J.i]; jHud(); J.say = null; $('say').classList.add('hidden');
+    GS.castStep(J.counts || (J.counts = {}), st);
+    if(st.t === 'enter'){ J.cast[st.id] = {n: st.n, xf: st.x > 0.5 ? 1.15 : -0.15, tx: st.x}; if(st.id !== 'a') J.cast[st.id].xf = 1.15; SND.drop(); await wait(650); }
+    else if(st.t === 'exit'){ const c = J.cast[st.id]; if(c) c.tx = 1.25; await wait(600); delete J.cast[st.id]; }
+    else if(st.t === 'join'){ const a = J.cast[st.a], b = J.cast[st.b]; G.helper && (G.helper.state = '');   // 🧊 gs-anim: a jumps onto b, lands block by block, they count, then become one
+      const u = J.u || 20, ma = NumberSkins.measure(a.n, u, true), from = {x: a.xf * W - ma.w / 2, floor: (J.gy || H * 0.8) - 6}, an = a.n, bn = b.n; b.n += a.n; delete J.cast[st.a];
+      await new Promise(res => GSStack.start({aN: an, bN: bn, bId: 'j:' + st.b, jId: st.b, from, u, after: res})); if(!G || G.id !== id) return; b.pop = 1; jFloat(b, '+'); avatarDo('clap'); await wait(500); }
+    else if(st.t === 'split'){ const a = J.cast[st.id]; a.n -= st.k; J.cast[st.out] = {n: st.k, xf: a.tx, tx: Math.min(0.9, a.tx + 0.22), liftU: Math.min(10, a.n + 0.5), whole: true}; a.pop = 0.6; SND.split(); jFloat(a, '−'); await wait(800); }
+    else if(st.t === 'copy'){ const a = J.cast[st.id], n0 = a.n; a.n *= st.m; a.pop = 1; a.liftK = Math.min(10, a.n) - Math.min(10, n0); a.liftU = 4; SND.copy(); jFloat(a, '×'); await wait(800); }
+    else if(st.t === 'share'){ const a = J.cast[st.id]; a.n /= st.m; (st.out || []).forEach((o, k) => J.cast[o] = {n: a.n, xf: a.tx, tx: Math.min(0.9, a.tx + 0.24 * (k + 1)), liftU: 2, whole: true, pop: 0.8}); a.pop = 0.8; SND.share(); jFloat(a, '÷'); await wait(800); }
+    else if(st.t === 'line'){ J.line = true; }
+    else if(st.t === 'say'){ J.say = {id: st.id, text: st.text}; G.phase = 'story'; G.M.item = null; renderJBar(); jSay(); return; }
+    else if(st.t === 'puzzle'){ GS.journeyItem(G.M, st.p, st.ask); G.phase = 'play'; G.pos = {}; G.roundT0 = performance.now(); G.tiltLock = G.M.item.kind === 'compare'; G.answerShown = false; renderGoal(); renderBar(); return; }
+    J.i++;
+  }
+  jEnd();
+}
+function jFloat(c, op){ G.fx.push({kind: 'txt', text: op + ' → ' + c.n + ' · ' + GS.charName(c.n) + '!', x: c.tx * W, y: H * 0.3, col: '#FFE14D', size: Math.max(18, Math.min(30, W * 0.04)), t: 0, life: 1.6}); }
+function jSay(){ const J = G.J, c = J.cast[J.say.id], el = $('say'); el.innerHTML = '<b>' + (c ? (GS.CHARS[c.n] ? GS.CHARS[c.n].icon + ' ' : '') + UI.esc(GS.charName(c.n)) + ' (' + c.n + ')' : '') + '</b> ' + UI.esc(J.say.text); el.classList.remove('hidden');
+  $('goal').innerHTML = '📖 <b>' + UI.esc(J.ch.title) + '</b><small>Chapter ' + J.ch.id + ' · ' + THEMES[J.ch.theme].icon + ' ' + THEMES[J.ch.theme].name + '</small>'; }
+function renderJBar(){ $('bar').innerHTML = '<div class="hint">Tap ▶ Next (or the picture) to keep going</div><button class="tb act big" data-sound="pop" onclick="jNext()">▶ Next</button>'; }
+function jNext(){ if(!G || !G.J || G.phase !== 'story' || !G.J.say) return; G.J.say = null; $('say').classList.add('hidden'); G.J.i++; jRun(); }
+function jRetry(){ G.reveal = null; const J = G.J, st = J.ch.steps[J.i]; GS.journeyItem(G.M, st.p, st.ask); G.phase = 'play'; G.pos = {}; G.tiltLock = G.M.item.kind === 'compare'; G.answerShown = false; renderGoal(); renderBar(); }
+function jEnd(){
+  const J = G.J, ch = J.ch, T = THEMES[ch.theme], name = S.player; G.phase = 'over'; $('say').classList.add('hidden'); UISound.play('success'); confetti(true); avatarDo('dance');
+  const before = journeyDone(name), ownBefore = nskOwned(name); ls('sp_geoscout_jr:' + name, Math.max(before, ch.id)); S.geoJourney = S.geoJourney || {}; S.geoJourney[name] = Math.max(Number(S.geoJourney[name]) || 0, ch.id);
+  const next = GS.CHAPTERS.find(c => c.id === ch.id + 1), ownAfter = nskOwned(name), newSkin = ownAfter > ownBefore ? NumberSkins.EXTRAS[ownAfter - 1] : '';
+  if(newSkin){ NumberSkins.set(name, newSkin); SET.skin = newSkin; }   // put the new look on straight away (they can change it on the menu)
+  showResult('<div class="big">' + T.icon + '</div><h2>Chapter ' + ch.id + ' complete!</h2><div class="score-big">📖 ' + UI.esc(ch.title) + '</div>' +
+    '<div class="stats"><span>🏅 Sticker: ' + T.icon + ' ' + ch.op + '</span><span>🧑 friends met: ' + Object.values(J.counts || {}).filter((v, i, a) => a.indexOf(v) === i).map(n => UI.esc(GS.charName(n))).join(', ') + '</span></div>' +
+    (newSkin ? '<div class="nsk-new" id="nsk-new"><img alt="" src="' + NumberSkins.previewUrl(newSkin, 56) + '"><span>🎨 New number look: <b>' + UI.esc(NumberSkins.SKINS[newSkin].name) + '</b> — on in 🔢 GeoScout AND ➗ Algebros!</span></div>' : '') +
+    '<div class="save-note" id="save-note">💾 Saving…</div><div class="res-btns">' + (next ? '<button class="btn sp-btn sp-primary" data-sound="pop" onclick="startJourney(' + next.id + ')">▶ Chapter ' + next.id + '</button>' : '<button class="btn sp-btn sp-primary" data-sound="pop" onclick="startJourney(1)">🔁 Play again</button>') +
+    '<button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="backToMenu()">🎚️ Levels</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button></div>');
+  google.script.run.withSuccessHandler(res => { putNote((res.first ? '🎁 +' + res.miles + ' Adventure miles!' : '✅ Saved') + featText(res.feats, '')); })
+    .withFailureHandler(() => putNote('⚠️ Could not save yet — play the chapter again later to collect the miles.')).geoJourneyDone(name, ch.id);
+}
+function drawJourney(g, t, gy){
+  const J = G.J, top = boardTop() + 10, u = Math.max(8, Math.min(34, (gy - top - 60) / 11)); G.hits = []; J.u = u; J.gy = gy;   // 🧊 gs-anim reads these
+  if(J.line){ const x0 = W * 0.08, x1 = W * 0.92, y = gy + 12; g.strokeStyle = 'rgba(255,255,255,0.8)'; g.lineWidth = 3; g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke();
+    for(let k = 0; k <= 10; k++){ const x = x0 + (x1 - x0) * k / 10; g.beginPath(); g.moveTo(x, y - 6); g.lineTo(x, y + 6); g.stroke(); g.fillStyle = '#fff'; g.font = '800 12px Nunito, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'top'; g.fillText(String(k), x, y + 8); } }
+  let moving = false;
+  Object.keys(J.cast).forEach(id => { const c = J.cast[id]; const d = c.tx - c.xf; if(Math.abs(d) > 0.002){ c.xf += d * 0.12; moving = true; }
+    if(c.liftU){ c.liftU *= 0.84; if(c.liftU < 0.03) c.liftU = 0; } if(c.pop){ c.pop *= 0.9; if(c.pop < 0.02) c.pop = 0; }
+    const m = NumberSkins.measure(c.n, u, true), speaking = J.say && J.say.id === id, x = c.xf * W - m.w / 2, bob = speaking ? Math.abs(Math.sin(t * 5)) * 6 : 0, fl = gy - 6 - bob;
+    g.save(); if(c.pop){ const sy = 1 + Math.sin(c.pop * Math.PI * 3) * 0.16 * c.pop; g.translate(x + m.w / 2, fl); g.scale(1 / Math.sqrt(sy), sy); g.translate(-(x + m.w / 2), -fl); }
+    const jS = G.st && G.st.jId === id && !GSStack.morphDone() ? G.st : null;   // 🧊 gs-anim: this friend is mid-join
+    if(jS) GSStack.draw(g, t, {x: c.xf * W - NumberSkins.measure(jS.bN, u, true).w / 2, y: fl}, u, G.skin, THEMES[G.theme].mat); else
+    NumberSkins.draw(g, c.n, x, fl, u, {tens: true, skin: G.skin, mat: THEMES[G.theme].mat, t, sel: speaking, mood: speaking ? 'happy' : c.pop > 0.3 ? 'wow' : 'happy', lift: c.liftU > 0.05 ? (c.whole ? {k: Math.min(10, c.n), dy: c.liftU * u / 1.4} : {k: c.liftK || 1, dy: c.liftU * u}) : null}); g.restore();
+    const shownN = jS && jS.morphT == null ? jS.bN : c.n; textTag(g, GS.charName(shownN) + ' · ' + shownN, c.xf * W, gy + (J.line ? -m.h - 28 : 14) + (J.line ? 0 : 0), 13);
+    c.topY = fl - m.h; });
+  // 🧑 the avatar walks the road next to the number friends
+  const aw = Math.min(90, W * 0.14), ah = Math.min(gy - top - 20, aw * 1.5);
+  if(ah > 40){ const key = 'j' + aw + 'x' + ah; if(!G.avFit || G.avFit.key !== key){ const F = avatarFit(myAvatar(S.player), S.player, aw, ah, {gests: IDLE, pad: 2}); G.avFit = {key, k: F.k, cx: F.cx}; }
+    G.jWalk = (G.jWalk || 0) + (moving ? 0.016 : 0); try{ drawAvatar(g, {name: S.player, av: myAvatar(S.player), dir: 1, walkT: moving ? G.jWalk : 0, gest: G.A.gest}, W * 0.05 + G.avFit.cx, gy - 2, G.avFit.k, {t}); }catch(e){} }
+  // speech bubble follows the speaker
+  if(J.say){ const c = J.cast[J.say.id], el = $('say'); if(c && el){ const bw = el.offsetWidth || 260, bh = el.offsetHeight || 60, x = Math.max(8, Math.min(W - bw - 8, c.xf * W - bw / 2)), y = Math.max(goalBottom() + 6, (c.topY || gy / 2) - bh - 16);
+    const key = Math.round(x) + ',' + Math.round(y); if(el.dataset.pos !== key){ el.style.left = x + 'px'; el.style.top = y + 'px'; el.dataset.pos = key; } } }
+}
+
+/* ================= POINTER (drag & drop · tap) ================= */
+function ptPos(e){ const r = CV.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top}; }
+function hitAt(x, y){ const list = G.hits || []; for(let i = list.length - 1; i >= 0; i--){ const h = list[i]; if(x >= h.x - 6 && x <= h.x + h.w + 6 && y >= h.y - 6 && y <= h.y + h.h + 6) return h; } return null; }
+CV.addEventListener('pointerdown', e => {
+  if(G && G.st){ GSStack.skip(); e.preventDefault(); return; }   // 🧊 gs-anim: tap = ×4 fast
+  if(G && G.battle){ const p = ptPos(e), h = hitAt(p.x, p.y); if(h && h.kind === 'bat') batToggle(h.i); return; }
+  if(G && G.J && !G.M.item){ jNext(); return; }   /* (a tap during a 🧊 join = ×4 fast, above) */
+  if(!G || G.phase !== 'play') return; const p = ptPos(e); G.kbd = false; const it0 = G.M.item;
+  if(it0.kind === 'grid'){ const c = cellAt(p.x, p.y); if(c){ const has = it0.cells.some(q => q[0] === c[0] && q[1] === c[1]); G.paint = {on: !has}; gridTap(c[0], c[1], !has); try{ CV.setPointerCapture(e.pointerId); }catch(err){} e.preventDefault(); } return; }
+  if(it0.kind === 'colour'){ const B = G.barGeo; if(B && p.y >= B.y - 8 && p.y <= B.y + B.c + 8){ const i = Math.floor((p.x - B.x) / B.c); colourTap(i); } return; }
+  const h = hitAt(p.x, p.y);
+  if(!h){ if(G.M.item.kind === 'count' && G.sel){ G.sel = 0; renderBar(); } return; }
+  try{ CV.setPointerCapture(e.pointerId); }catch(err){}
+  G.drag = {id: h.id, kind: h.kind, sx: p.x, sy: p.y, px: p.x, py: p.y, ox: p.x - h.x, oy: p.y - (h.kind === 'stack' ? h.floor : h.y + h.h - (h.kind === 'tray' ? 22 : 4)), u: h.u, n: h.kind === 'stack' ? h.n : null, p: h.p || null, on: false, hit: h};
+  e.preventDefault();
+});
+CV.addEventListener('pointermove', e => { if(G && G.paint && G.phase === 'play' && G.M.item.kind === 'grid'){ const p = ptPos(e), c = cellAt(p.x, p.y); if(c) gridTap(c[0], c[1], G.paint.on); return; } if(!G || !G.drag) return; const p = ptPos(e), d = G.drag; d.px = p.x; d.py = p.y; if(!d.on && Math.hypot(p.x - d.sx, p.y - d.sy) > 8){ d.on = true; if(d.kind === 'stack' && G.sel !== d.id){ G.sel = 0; renderBar(); } } });
+function endDrag(e){
+  if(G) G.paint = null;
+  if(!G || !G.drag) return; const d = G.drag; G.drag = null; if(G.phase !== 'play') return; const p = e ? ptPos(e) : {x: d.px, y: d.py}, it = G.M.item;
+  if(!d.on){ tapOn(d.hit, p); return; }
+  if(d.kind === 'stack'){
+    const tgt = (G.hits || []).find(h => h.kind === 'stack' && h.id !== d.id && p.x >= h.x - h.u * 0.6 && p.x <= h.x + h.w + h.u * 0.6 && p.y >= h.y - h.u * 1.2 && p.y <= h.floor + h.u * 0.8);
+    if(tgt){ doSnap(d.id, tgt.id, {x: d.px - d.ox, floor: d.py - d.oy}); return; }   // 🧊 gs-anim: it jumps from where the finger let go
+    const gb = G.goalBox; if(gb && p.x >= gb.x && p.x <= gb.x + gb.w && p.y >= gb.y - 20){ const s = it.stacks.find(q => q.id === d.id); if(s && s.n !== it.target){ UISound.play('error'); banner('That\'s <b>' + s.n + '</b> — we need <b>' + it.target + '</b>', 'bad'); setTimeout(hideBanner, 1200 * SPEED + 1); avatarDo('think'); } }
+    return;
+  }
+  if(d.kind === 'tray'){ const b = G.panBox; if(b && p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h + 40) putOnPan(d.id); return; }
+  if(d.kind === 'pan'){ const b = G.panBox; if(!(b && p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h)) takeBack(d.id); }
+}
+CV.addEventListener('pointerup', endDrag); CV.addEventListener('pointercancel', () => { if(G) G.drag = null; });
+function tapOn(h, p){
+  const it = G.M.item;
+  if(h.kind === 'tray'){ putOnPan(h.id); return; }
+  if(h.kind === 'pan'){ takeBack(h.id); return; }
+  if(h.kind === 'stack'){
+    if(G.sel === h.id && h.n > 1 && h.n <= 10 && GS.canOp(G.M, 'split')){   // tap a block of the picked number → split there
+      const fromTop = Math.floor((p.y - (h.floor - h.n * h.u)) / h.u); const k = Math.max(1, Math.min(h.n - 1, fromTop + 1)); G.splitK = k; doSplit(k); return; }
+    G.sel = G.sel === h.id ? 0 : h.id; G.splitK = 1; UISound.play('tap'); renderBar();
+  }
+}
+
+/* ================= KEYBOARD ================= */
+document.addEventListener('keydown', e => {
+  if(!G || $('scr-play').classList.contains('hidden') || !$('sheet').classList.contains('hidden') || !$('result').classList.contains('hidden')) return;
+  if(G.st){ GSStack.skip(); e.preventDefault(); return; }   // 🧊 gs-anim: any key = ×4 fast
+  if(G.J && !G.M.item){ if(G.phase === 'story' && (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight')){ e.preventDefault(); jNext(); } return; }
+  if(G.battle){ const T = G.battle; if(T.phase === 'build' && /^[1-5]$/.test(e.key)) batToggle(Number(e.key) - 1); else if(e.key === 'Enter'){ e.preventDefault(); if(T.phase === 'build') batLock(); else if(T.phase === 'pass') batReady(); else if(T.phase === 'reveal') batNext(); } return; }
+  const it = G.M.item, k = e.key; if(!it) return;
+  if(G.J && G.phase === 'story' && (k === 'Enter' || k === ' ' || k === 'ArrowRight')){ e.preventDefault(); jNext(); return; }
+  if(G.phase === 'done' && (k === 'Enter' || k === ' ') && !G.J){ e.preventDefault(); goNext(); return; }
+  if(G.phase !== 'play') return;
+  if(it.kind === 'choice'){ if(it.syms){ const m = {'<': '<', ',': '<', '>': '>', '.': '>', '=': '=', '+': '='}[k]; if(m){ e.preventDefault(); pickOpt(m); } } else if(/^[1-4]$/.test(k) && it.options[Number(k) - 1] != null){ pickOpt(it.options[Number(k) - 1]); } return; }
+  if(it.kind === 'tens'){ const u = {'1': 1, 't': 10, 'T': 10, 'h': 100, 'H': 100}[k]; if(u && it.units.indexOf(u) >= 0) tensBtn(u); if(k === 'Backspace'){ e.preventDefault(); tensBtn(-1); } return; }
+  if(it.kind === 'wobble'){ if(/^[1-3]$/.test(k) && it.sizes[Number(k) - 1]) wobBtn(it.sizes[Number(k) - 1]); if(k === 'Backspace'){ e.preventDefault(); wobUndo(); } return; }
+  if(it.kind === 'grid' || it.kind === 'colour'){
+    const grid = it.kind === 'grid'; if(G.cur == null || grid !== Array.isArray(G.cur)) G.cur = grid ? [0, 0] : 0;
+    const d = {ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1]}[k];
+    if(d){ e.preventDefault(); G.kbd = true; if(grid) G.cur = [Math.max(0, Math.min(it.n - 1, G.cur[0] + d[0])), Math.max(0, Math.min(it.n - 1, G.cur[1] + d[1]))]; else G.cur = Math.max(0, Math.min(it.len - 1, G.cur + d[0])); return; }
+    if(k === ' ' || k === 'Enter'){ e.preventDefault(); G.kbd = true; if(grid) gridTap(G.cur[0], G.cur[1]); else colourTap(G.cur); }
+    return;
+  }
+  if(it.kind === 'compare'){ const m = {'<': '<', ',': '<', '>': '>', '.': '>', '=': '=', '+': '='}[k]; if(m){ e.preventDefault(); answer(m); } return; }
+  const list = it.kind === 'count' ? it.stacks : it.tray;
+  if(k === 'ArrowRight' || k === 'ArrowLeft'){ e.preventDefault(); if(!list.length) return; G.kbd = true; G.kbdIdx = ((G.kbdIdx || 0) + (k === 'ArrowRight' ? 1 : -1) + list.length) % list.length; if(it.kind === 'count'){ G.sel = list[G.kbdIdx].id; renderBar(); } return; }
+  if(/^[1-9]$/.test(k)){ const i = list.findIndex(s => (s.n != null ? s.n : GS.val(s)) === Number(k)); if(i >= 0){ G.kbd = true; G.kbdIdx = i; if(it.kind === 'count'){ G.sel = list[i].id; renderBar(); } } return; }
+  if(it.kind !== 'count'){
+    if(k === 'Enter' || k === ' '){ e.preventDefault(); const p = list[G.kbdIdx || 0]; if(p) putOnPan(p.id); G.kbdIdx = Math.min(G.kbdIdx || 0, Math.max(0, it.tray.length - 1)); return; }
+    if(k === 'Backspace'){ e.preventDefault(); const mine = it.right.filter(x => !x.fixed); if(mine.length) takeBack(mine[mine.length - 1].id); return; }
+    return;
+  }
+  const s = selStack();
+  if(k === 'ArrowUp' || k === 'ArrowDown'){ e.preventDefault(); bumpK(k === 'ArrowUp' ? 1 : -1); return; }
+  if(k === 'Enter'){ e.preventDefault(); if(s){ const others = it.stacks.filter(q => q.id !== s.id); if(others.length){ const nb = others[0]; doSnap(s.id, nb.id); } } return; }
+  if(k === 's' || k === 'S'){ doSplit(); return; }
+  if(k === 'c' || k === 'C'){ doCopy(2); return; }
+  if(k === 'd' || k === 'D'){ doShare(2); return; }
+  if(k === 'u' || k === 'U' || k === 'Backspace'){ e.preventDefault(); undo(); return; }
+});
+
+/* ================= BOOT ================= */
+function boot(){
+  UI.loading(GAME_ID);
+  google.script.run.withSuccessHandler(d => {
+      UI.loaded();
+      S.players = d.players || []; S.progress = d.progress || {}; S.settings = d.settings || {}; S.avatars = d.avatars || {}; S.geoJourney = d.geoJourney || {}; S.numberSkins = d.numberSkins || {};
+      UISound.applySettings(S.settings);
+      const lockOn = !(S.settings.ScreenTimeLockEnabled === 'FALSE' || S.settings.ScreenTimeLockEnabled === false);
+      lockHandle = UI.screenTimeLock({sessionStart: SESSION_START, durationMin: DURATION_MIN, enabled: lockOn, homeUrl: WEBAPP_URL + '?page=home', onLock: pauseGame});
+      flushPending();
+      if(CURRENT_PLAYER && S.players.some(p => p.Name === CURRENT_PLAYER)) choosePlayer(CURRENT_PLAYER); else { renderPlayers(); showScreen('player'); }
+    }).withFailureHandler(() => { UI.loaded(); UI.toast('Could not load players — check the connection', 'err'); renderPlayers(); showScreen('player'); })
+    .getLevelGameData(GAME_ID, CURRENT_PLAYER);
+}
+window.addEventListener('resize', () => { if(G) sizeCanvas(); });
+boot();
+
+/* ✨ MODE SPOTLIGHT: ?mode=<id> opens this game straight in that mode after the player pick · "✨ Also try" on the start page · started modes → UI.modeTried */
+const MS_GAME = 'geoscout';
+function msOpen(id){ if(MODES_ON.indexOf(id) < 0) return; SET.mode = id; savePrefs(); renderMenu(); }
+function msNow(){ return SET.mode; }
+function msWrap(fn, idOf){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ try{ const id = idOf.apply(this, arguments); if(id && UI.modeTried) UI.modeTried(S.player || CURRENT_PLAYER, MS_GAME, id); }catch(e){} return f.apply(this, arguments); }; }
+function msAfter(fn, after){ const f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ const r = f.apply(this, arguments); try{ after.apply(this, arguments); }catch(e){} return r; }; }
+msWrap('startGame', () => SET.mode);
+msAfter('choosePlayer', name => {
+  if(!window.UI || !UI.modeLink) return;
+  const id = UI.modeLink(MODE_LINK); if(id) msOpen(id);
+  if(UI.alsoTry) UI.alsoTry({game: MS_GAME, player: name, current: msNow, at: () => document.querySelector('#scr-menu .title'), open: msOpen});
+});
+/* ✨ END MODE SPOTLIGHT */
