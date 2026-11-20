@@ -595,6 +595,7 @@ var PK = (function () {
   // ---------- poking ----------
   // poke(sc, x, y, found) → the index of the closest difference not found yet within its poke circle, else -1
   function poke(sc, x, y, found, extra) {
+    if (sc.zone) return sc.zone.poke(x, y, found, extra);   // 🧱 pk-7b: 2.5D picture = poke zones
     var best = -1, bd = 1e9;
     sc.diffs.forEach(function (d, i) {
       if (found && found[i]) return;
@@ -605,6 +606,7 @@ var PK = (function () {
   }
   // a poke on something already found (so the page can say "you found that one")
   function pokeFound(sc, x, y, found) {
+    if (sc.zone) return sc.zone.found(x, y, found);   // 🧱 pk-7b
     for (var i = 0; i < sc.diffs.length; i++) { var d = sc.diffs[i]; if (found && found[i] && Math.sqrt((d.x - x) * (d.x - x) + (d.y - y) * (d.y - y)) <= d.hit) return i; }
     return -1;
   }
@@ -632,315 +634,26 @@ var PK = (function () {
   ];
   var BOOTS = [['#E63946', 'red'], ['#3A6FE8', 'blue'], ['#22B573', 'green'], ['#FFD23F', 'yellow'], ['#8E5BE8', 'purple'], ['#FF8C1A', 'orange']];
   var VERBS = { find: { icon: '🔍', name: 'Find' }, quiz: { icon: '📜', name: 'Read' }, walk: { icon: '🚶', name: 'Walk' }, spot: { icon: '🖼️', name: 'Spot' }, crack: { icon: '🔐', name: 'Crack' }, accuse: { icon: '👉', name: 'Accuse' } };
+  // ✂️ pk-7a2: the 14 case books' DATA lives in the Pokadif_cases part (PK.addCases, comes with 🕵️ Detective). Here only the shelf stubs
+  // (the case shelf + saved prefs read id · icon · name before the part is in); addCases fills the SAME objects, so every reference stays good.
   var CASES = [
-    { id: 'magnet', n: 1, icon: '🧲', name: 'The Missing Magnet', theme: 'robot', topic: 'Magnets', place: 'the Robot Lab', owner: 'Professor Volt', thing: 'super magnet', walkTo: 'storeroom', dropAt: 'by the shelf',
-      open: '🧲 Professor Volt\'s super magnet is GONE from the Robot Lab! Someone sneaked in last night…',
-      suspects: [['🤖', 'Bolt the Robot'], ['🐱', 'Whiskers the Cat'], ['🧑‍🔬', 'Dr. Nutty'], ['🦜', 'Pip the Parrot'], ['🧒', 'Tinker the Helper']],
-      drops: [['🍪', 'cookie crumbs'], ['🐟', 'a fish bone'], ['🍌', 'a banana peel'], ['🪶', 'a green feather'], ['🧦', 'a stripy sock'], ['🍬', 'a sweet wrapper']],
-      clutter: ['gear', 'dice', 'hexagon', 'crystal', 'square', 'rocket', 'clip', 'nail'],
-      count: '⚙️',
-      chapters: [
-        { title: 'The empty table', icon: '🧪', say: 'The magnet\'s table is empty — but the floor is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
-        { title: 'The trail', icon: '👣', say: 'The footprints lead out of the lab. Follow them to the storeroom — then check the camera!', steps: ['walk', 'spot'] },
-        { title: 'The locked box', icon: '🔐', say: 'A locked box in the storeroom… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
-      ],
-      lessons: [
-        { icon: '🧲', title: 'Magnets pull iron', text: 'A magnet pulls things made of iron or steel — paper clips, nails, pins. Wood, plastic, glass and paper? Nothing happens!' },
-        { icon: '🧭', title: 'Two poles: N and S', text: 'Every magnet has a North end and a South end. N + S pull together — N + N (or S + S) push apart!' },
-        { icon: '🌍', title: 'The Earth is a magnet', text: 'The whole Earth is a giant magnet. That\'s why a compass needle always points North!' }
-      ],
-      quiz: { ask: 'The thief\'s magnet pulled something along the floor. Which one can a magnet pull?', nope: 'Which one will a magnet NOT pull?',
-        yes: [['📎', 'paper clip'], ['🔩', 'steel bolt'], ['🧷', 'safety pin'], ['⛓️', 'iron chain'], ['🪛', 'screwdriver'], ['🪝', 'steel hook']],
-        no: [['🦆', 'rubber duck'], ['🧸', 'teddy bear'], ['✏️', 'pencil'], ['🍎', 'apple'], ['📄', 'paper'], ['🎈', 'balloon'], ['🪵', 'wood block'], ['🥤', 'plastic cup']],
-        trick: [['💍', 'gold ring'], ['🍪', 'cookie']], why: { yes: 'has iron in it — a magnet pulls it!', no: 'has no iron in it — a magnet can\'t pull it.' } },
-      solved: 'The super magnet is back on its table — and it pulls every paper clip in the lab! 📎📎📎' },
-    // 🦖 pk-3b
-    { id: 'dino', n: 2, icon: '🦖', name: 'The Dino Egg Thief', theme: 'dino', topic: 'Fossils', place: 'the Dino Museum', owner: 'Ranger Rocky', thing: 'golden dino egg', walkTo: 'dig tent', dropAt: 'by the bones',
-      open: '🦖 The golden dino egg is GONE from the Dino Museum! Ranger Rocky found muddy prints everywhere…',
-      suspects: [['🦕', 'Dotty the Dino'], ['🐒', 'Mango the Monkey'], ['🧑‍🌾', 'Farmer Fern'], ['🦉', 'Hoot the Owl'], ['🐢', 'Shelly the Turtle']],
-      drops: [['🍃', 'a big leaf'], ['🍌', 'a banana peel'], ['🌰', 'an acorn'], ['🪶', 'a brown feather'], ['🥕', 'a carrot top'], ['🍓', 'a strawberry']],
-      clutter: ['bone', 'leaf', 'tree', 'mushroom', 'crystal', 'triangle', 'snail', 'flower'],
-      count: '🥚',
-      chapters: [
-        { title: 'The empty nest', icon: '🪺', say: 'The golden egg\'s nest is empty — and the mud is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
-        { title: 'Into the jungle', icon: '🌴', say: 'The prints run into the jungle. Follow them to the dig tent — then check the dig camera!', steps: ['walk', 'spot'] },
-        { title: 'The locked crate', icon: '🔐', say: 'A locked crate in the dig tent… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
-      ],
-      lessons: [
-        { icon: '🦴', title: 'What is a fossil?', text: 'A fossil is a bone, shell or footprint from long, long ago that slowly turned into stone.' },
-        { icon: '🪨', title: 'Layers of rock', text: 'Rock is made in layers, like a cake. The deeper the layer, the older the fossils inside it!' },
-        { icon: '🦖', title: 'Dinosaurs were real', text: 'Dinosaurs lived millions of years ago. We know them from their fossils — bones, teeth, eggs and footprints!' }
-      ],
-      quiz: { ask: 'Ranger Rocky shows you some finds. Which one is a real fossil?', nope: 'Which one is NOT a fossil?',
-        yes: [['🦴', 'dinosaur bone'], ['🦷', 'old dino tooth'], ['🐚', 'stone shell'], ['🌿', 'leaf print in rock'], ['🐾', 'footprint in stone'], ['🥚', 'stone egg']],
-        no: [['🧸', 'teddy bear'], ['🍌', 'banana'], ['⚽', 'football'], ['🧦', 'sock'], ['🚗', 'toy car'], ['📱', 'phone'], ['🍕', 'pizza'], ['🎈', 'balloon']],
-        trick: [['🪨', 'plain rock'], ['🦕', 'toy dinosaur']], why: { yes: 'is part of a living thing from long ago, turned to stone — a fossil!', no: 'was never a living thing from long ago — not a fossil.' } },
-      solved: 'The golden egg is back in its nest — and it just started to wiggle! 🥚✨' },
-    // 🐙 pk-3b
-    { id: 'ship', n: 3, icon: '🐙', name: 'Secret of the Sunken Ship', theme: 'sea', topic: 'Floating + sinking', place: 'the Sunken Ship', owner: 'Captain Coral', thing: 'treasure map', walkTo: 'shipwreck', dropAt: 'by the treasure chest',
-      open: '🐙 Captain Coral\'s treasure map has vanished from the Sunken Ship! Someone swam in at high tide…',
-      suspects: [['🐙', 'Inky the Octopus'], ['🦀', 'Pinchy the Crab'], ['🐬', 'Splash the Dolphin'], ['🧜', 'Marina the Mermaid'], ['🐧', 'Waddles the Penguin']],
-      drops: [['🐟', 'a fish bone'], ['🫧', 'a trail of bubbles'], ['🪸', 'a bit of coral'], ['🦐', 'a shrimp shell'], ['🌊', 'sea foam'], ['🧽', 'a sponge']],
-      clutter: ['coin', 'shell', 'fish', 'star', 'boat', 'crystal', 'hexagon', 'snail'],
-      count: '🐚',
-      chapters: [
-        { title: 'The empty chest', icon: '🧰', say: 'The map\'s treasure chest is empty — and the wet sand is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
-        { title: 'Down to the wreck', icon: '🚢', say: 'The prints lead down to the old shipwreck. Swim the way there — then check the reef camera!', steps: ['walk', 'spot'] },
-        { title: 'The locked trunk', icon: '🔐', say: 'A locked trunk on the shipwreck… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
-      ],
-      lessons: [
-        { icon: '🛟', title: 'Why things float', text: 'Light, airy things float. Heavy, solid things sink. Water pushes up on everything — that push is called buoyancy!' },
-        { icon: '🚢', title: 'How ships float', text: 'A steel ship is heavy, but its shape is full of air — so the water can push it up. Shape matters!' },
-        { icon: '🌊', title: 'Salty water', text: 'Salty sea water pushes up harder than fresh water — that is why it is easier to float in the sea!' }
-      ],
-      quiz: { ask: 'Captain Coral drops things into the water. Which one will float?', nope: 'Which one will NOT float — it sinks?',
-        yes: [['🪵', 'wood log'], ['🦆', 'rubber duck'], ['🥥', 'coconut'], ['🏐', 'beach ball'], ['🧊', 'ice cube'], ['🍎', 'apple']],
-        no: [['🪨', 'rock'], ['⚓', 'anchor'], ['🔑', 'key'], ['🔩', 'steel bolt'], ['💍', 'ring'], ['🪙', 'coin'], ['🧱', 'brick'], ['🥄', 'metal spoon']],
-        trick: [['🥚', 'fresh egg'], ['🧲', 'magnet']], why: { yes: 'is light and full of air — it floats!', no: 'is heavy and solid — it sinks.' } },
-      solved: 'The treasure map is back in Captain Coral\'s chest — X marks the spot! 🗺️' },
-    // 🪩 pk-4b
-    { id: 'disco', n: 4, icon: '🪩', name: 'The Stolen Disco Ball', theme: 'disco', topic: 'Light + colour', place: 'the Disco Hall', owner: 'DJ Sparkle', thing: 'disco ball', walkTo: 'light booth', dropAt: 'by the speakers',
-      open: '🪩 The giant disco ball is GONE from the Disco Hall! DJ Sparkle found glittery footprints all over the dance floor…',
-      suspects: [['🦩', 'Flick the Flamingo'], ['🐈', 'Neon the Cat'], ['🤖', 'Beep-Bop the Robot'], ['🦜', 'Rio the Parrot'], ['🐼', 'Bamboo the Panda']],
-      drops: [['✨', 'some glitter'], ['🎧', 'a headphone pad'], ['🍭', 'a lollipop'], ['🎀', 'a ribbon'], ['🕶️', 'sunglasses'], ['🧃', 'a juice box']],
-      clutter: ['star', 'diamond', 'balloon', 'heart', 'circle', 'crystal', 'hexagon', 'dice'],
-      count: '💡',
-      chapters: [
-        { title: 'The empty stage', icon: '🎤', say: 'The disco ball is gone from the stage — and the dance floor is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
-        { title: 'Behind the lights', icon: '💡', say: 'The prints lead past the speakers. Find the way to the light booth — then check the stage camera!', steps: ['walk', 'spot'] },
-        { title: 'The locked case', icon: '🔐', say: 'A locked case in the light booth… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
-      ],
-      lessons: [
-        { icon: '🌈', title: 'White light is a rainbow', text: 'White light is really ALL the colours mixed. A raindrop or a prism splits it into a rainbow!' },
-        { icon: '🪞', title: 'Mirrors bounce light', text: 'Light goes in straight lines. A mirror bounces it back — a disco ball is hundreds of tiny mirrors!' },
-        { icon: '🎨', title: 'Mixing light', text: 'Red, green and blue light mix to make white. A TV screen makes every colour from just those three!' }
-      ],
-      quiz: { ask: 'DJ Sparkle turns off all the lights. Which one makes its OWN light?', nope: 'Which one does NOT make its own light?',
-        yes: [['☀️', 'the Sun'], ['💡', 'light bulb'], ['🔦', 'torch'], ['🕯️', 'candle'], ['🔥', 'campfire'], ['⚡', 'lightning']],
-        no: [['🧸', 'teddy bear'], ['🍎', 'apple'], ['📚', 'book'], ['⚽', 'football'], ['🥄', 'spoon'], ['🧦', 'sock'], ['🪨', 'rock'], ['🧢', 'cap']],
-        trick: [['🌙', 'the Moon'], ['🪞', 'mirror']], why: { yes: 'makes its own light!', no: 'makes no light — we only see it when light bounces off it.' } },
-      solved: 'The disco ball is spinning again — the whole hall sparkles! 🪩✨' },
-    // 🪐 pk-4b
-    { id: 'moon', n: 5, icon: '🪐', name: 'Moon Base Mystery', theme: 'space', topic: 'Gravity', place: 'Moon Base One', owner: 'Commander Luna', thing: 'shiny moon rock', walkTo: 'rocket dock', dropAt: 'by the airlock',
-      open: '🪐 The shiny moon rock is missing from Moon Base One! Commander Luna found bouncy boot prints in the moon dust…',
-      suspects: [['👽', 'Zib the Alien'], ['🐶', 'Laika the Space Dog'], ['🤖', 'Rover the Robot'], ['🧑‍🚀', 'Cadet Comet'], ['🐒', 'Astro the Monkey']],
-      drops: [['🧃', 'a space juice pouch'], ['🔩', 'a loose bolt'], ['🍦', 'freeze-dried ice cream'], ['🧤', 'a space glove'], ['📡', 'a tiny antenna'], ['⭐', 'a star sticker']],
-      clutter: ['planet', 'rocket', 'star', 'crystal', 'circle', 'gear', 'diamond', 'hexagon'],
-      count: '🌑',
-      chapters: [
-        { title: 'The empty glass case', icon: '🗄️', say: 'The moon rock\'s glass case is empty — and the moon dust is full of boot prints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
-        { title: 'Across the craters', icon: '🌑', say: 'The prints bounce away across the craters. Find the way to the rocket dock — then check the base camera!', steps: ['walk', 'spot'] },
-        { title: 'The locked locker', icon: '🔐', say: 'A locked locker at the rocket dock… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
-      ],
-      lessons: [
-        { icon: '🍎', title: 'What is gravity?', text: 'Gravity is a pull. The Earth pulls everything down to the ground — that is why a dropped apple falls.' },
-        { icon: '🪶', title: 'Feather and hammer', text: 'On the Moon there is no air. An astronaut dropped a hammer and a feather — they landed at the same time!' },
-        { icon: '🌙', title: 'Big jumps on the Moon', text: 'The Moon pulls 6 times weaker than the Earth. You could jump 6 times higher there!' }
-      ],
-      quiz: { ask: 'Here on Earth, Commander Luna lets go of some things. Which one falls down FAST?', nope: 'Which one does NOT fall fast — the air slows it down?',
-        yes: [['🪨', 'rock'], ['🍎', 'apple'], ['⚽', 'football'], ['🔑', 'key'], ['📚', 'book'], ['👟', 'shoe']],
-        no: [['🪶', 'feather'], ['🍃', 'leaf'], ['🎈', 'balloon'], ['🫧', 'bubble'], ['❄️', 'snowflake'], ['☁️', 'cloud'], ['🧻', 'tissue'], ['🌬️', 'puff of wind']],
-        trick: [['🪂', 'parachute'], ['🍂', 'big dry leaf']], why: { yes: 'is heavy and small — gravity pulls it down fast!', no: 'is light and catches the air — the air slows it down.' } },
-      solved: 'The moon rock is back in its glass case — Commander Luna does a giant moon jump! 🌙🦘' },
-    // ☁️ pk-4c
-    { id: 'cloud', n: 6, icon: '☁️', name: 'The Cloud Castle Code', theme: 'sky', topic: 'Codes + patterns', place: 'the Cloud Castle', owner: 'Queen Nimbus', thing: 'rainbow crown', walkTo: 'tower top', dropAt: 'by the rainbow bridge',
-      open: '☁️ Queen Nimbus\'s rainbow crown has vanished from the Cloud Castle! The thief left a secret code — and footprints in the fluffy clouds…',
-      suspects: [['🦄', 'Sparkle the Unicorn'], ['🕊️', 'Pip the Dove'], ['🐉', 'Puff the Dragon'], ['🧚', 'Twinkle the Fairy'], ['🦅', 'Swoop the Eagle']],
-      drops: [['🪶', 'a white feather'], ['🎀', 'a rainbow ribbon'], ['⭐', 'a star clip'], ['🍬', 'a sweet'], ['🎐', 'a wind chime'], ['🧁', 'a cupcake crumb']],
-      clutter: ['cloud', 'bird', 'balloon', 'star', 'heart', 'diamond', 'hexagon', 'circle'],
-      count: '🌈',
-      chapters: [
-        { title: 'The empty cushion', icon: '👑', say: 'The crown\'s cushion is empty — and the clouds are full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
-        { title: 'Up the rainbow', icon: '🌈', say: 'The prints climb the rainbow bridge. Find the way to the tower top — then check the castle camera!', steps: ['walk', 'spot'] },
-        { title: 'The code door', icon: '🔐', say: 'A door with a secret code at the tower top… crack it, then catch the thief!', steps: ['crack', 'accuse'] }
-      ],
-      lessons: [
-        { icon: '🔁', title: 'Patterns repeat', text: 'A pattern is something that repeats: red, blue, red, blue… If you know the rule, you can guess what comes next!' },
-        { icon: '🔐', title: 'Secret codes', text: 'A code swaps letters for numbers or pictures: A = 1, B = 2, C = 3… Spies and computers use codes to keep messages safe.' },
-        { icon: '🐝', title: 'Patterns in nature', text: 'Bees build honeycomb from the same 6-sided shape again and again — and every snowflake has 6 arms!' }
-      ],
-      quiz: { ask: 'Queen Nimbus shows you some things. Which one has a pattern that REPEATS?', nope: 'Which one has NO repeating pattern?',
-        yes: [['🦓', 'zebra stripes'], ['🐝', 'honeycomb'], ['❄️', 'snowflake'], ['🕸️', 'spider web'], ['🍍', 'pineapple'], ['🐯', 'tiger stripes']],
-        no: [['🪨', 'pebble'], ['💧', 'water drop'], ['☁️', 'cloud'], ['🥔', 'potato'], ['🍞', 'bread'], ['🥚', 'egg'], ['🧈', 'butter'], ['🍦', 'ice cream']],
-        trick: [['🧶', 'tangled wool'], ['🎨', 'paint splash']], why: { yes: 'has a pattern that repeats again and again!', no: 'has no repeating pattern — it is all mixed up.' } },
-      solved: 'The rainbow crown is back on Queen Nimbus — and a rainbow shines over the castle! 👑🌈' },
-    // 🌱 pk-4c
-    { id: 'garden', n: 7, icon: '🌱', name: 'The Wilting Garden', theme: 'garden', topic: 'What plants need', place: 'the Greenhouse', owner: 'Grandma Bloom', thing: 'golden watering can', walkTo: 'tool shed', dropAt: 'by the tomato plants',
-      open: '🌱 Grandma Bloom\'s golden watering can is gone — and her plants are drooping! Muddy footprints lead out of the Greenhouse…',
-      suspects: [['🐌', 'Slowy the Snail'], ['🐰', 'Bun the Rabbit'], ['🐛', 'Wiggles the Caterpillar'], ['🐦', 'Chirp the Sparrow'], ['🦔', 'Spike the Hedgehog']],
-      drops: [['🥕', 'a nibbled carrot'], ['🌰', 'a seed'], ['🍓', 'a strawberry'], ['🥬', 'a lettuce leaf'], ['🍄', 'a mushroom'], ['🌼', 'a petal']],
-      clutter: ['flower', 'leaf', 'tree', 'mushroom', 'ladybug', 'snail', 'circle', 'heart'],
-      count: '🌷',
-      chapters: [
-        { title: 'The dry pots', icon: '🪴', say: 'The watering can is gone and the pots are dry — the soil is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
-        { title: 'Through the veggie patch', icon: '🥕', say: 'The prints go through the veggie patch. Find the way to the tool shed — then check the garden camera!', steps: ['walk', 'spot'] },
-        { title: 'The locked shed', icon: '🔐', say: 'The tool shed is locked… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
-      ],
-      lessons: [
-        { icon: '💧', title: 'Plants need water', text: 'Roots drink water from the soil and carry it all the way up to the leaves.' },
-        { icon: '☀️', title: 'Food from light', text: 'Leaves use sunlight, air and water to make the plant\'s own food. That is why plants grow toward the light!' },
-        { icon: '🪱', title: 'Good soil', text: 'Soil gives plants food and something to hold on to. Worms help by mixing it and making it soft.' }
-      ],
-      quiz: { ask: 'Grandma Bloom asks: which one does a plant NEED to grow?', nope: 'Which one does a plant NOT need to grow?',
-        yes: [['💧', 'water'], ['☀️', 'sunlight'], ['🌬️', 'air'], ['🪱', 'good soil'], ['🌡️', 'warmth']],
-        no: [['🍬', 'sweets'], ['🧃', 'juice'], ['🎮', 'video games'], ['🧸', 'teddy bear'], ['📺', 'TV'], ['🍕', 'pizza'], ['🎵', 'loud music'], ['👟', 'shoes']],
-        trick: [['🥤', 'fizzy drink'], ['🧂', 'salt']], why: { yes: 'is something every plant needs to grow!', no: 'is not what a plant needs — water, light, air and soil are!' } },
-      solved: 'The golden watering can is back — Grandma Bloom\'s flowers stand up tall again! 🌷💧' },
-    // ⏰ pk-4c
-    { id: 'clock', n: 8, icon: '⏰', name: 'The Clock That Ran Backwards', theme: 'clock', topic: 'Time + gears', place: 'the Clock Tower', owner: 'Mr Tick-Tock', thing: 'golden winding key', walkTo: 'gear room', dropAt: 'by the big bell',
-      open: '⏰ The Clock Tower is ticking BACKWARDS! Someone took Mr Tick-Tock\'s golden winding key — dusty footprints climb the stairs…',
-      suspects: [['🦉', 'Hoot the Owl'], ['🐭', 'Squeak the Mouse'], ['🦇', 'Flap the Bat'], ['🐿️', 'Nutty the Squirrel'], ['🧙', 'Wizard Whiz']],
-      drops: [['🔩', 'a tiny screw'], ['⚙️', 'a little gear'], ['🧀', 'a cheese crumb'], ['🪶', 'a black feather'], ['🌰', 'an acorn'], ['🕯️', 'a candle stub']],
-      clutter: ['gear', 'circle', 'star', 'house', 'diamond', 'hexagon', 'square', 'bird'],
-      count: '🔔',
-      chapters: [
-        { title: 'The empty hook', icon: '🗝️', say: 'The golden key\'s hook is empty — and the dusty floor is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
-        { title: 'Up the stairs', icon: '🪜', say: 'The prints climb the winding stairs. Find the way to the gear room — then check the tower camera!', steps: ['walk', 'spot'] },
-        { title: 'The locked clock case', icon: '🔐', say: 'The clock case is locked… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
-      ],
-      lessons: [
-        { icon: '⚙️', title: 'Gears turn each other', text: 'When one gear turns, the gear touching it turns the OTHER way. A clock uses lots of gears!' },
-        { icon: '🕐', title: 'Hours and minutes', text: 'The short hand shows the hour, the long hand shows the minutes. One hour is 60 minutes.' },
-        { icon: '🌍', title: 'The Earth is a clock', text: 'One spin of the Earth is one day. One trip all the way around the Sun is one year!' }
-      ],
-      quiz: { ask: 'Mr Tick-Tock asks: which one helps us tell the TIME?', nope: 'Which one does NOT tell the time?',
-        yes: [['⏰', 'alarm clock'], ['⌚', 'watch'], ['⏳', 'sand timer'], ['🕰️', 'old clock'], ['📅', 'calendar'], ['⏱️', 'stopwatch']],
-        no: [['🥄', 'spoon'], ['🧸', 'teddy bear'], ['🍎', 'apple'], ['👟', 'shoe'], ['🎈', 'balloon'], ['📚', 'book'], ['🧦', 'sock'], ['🪨', 'rock']],
-        trick: [['🧭', 'compass'], ['🌡️', 'thermometer']], why: { yes: 'helps us tell the time!', no: 'does not tell the time.' } },
-      solved: 'The golden key is back — tick, tock, the Clock Tower runs forwards again! ⏰✨' },
-    // 🍰 pk-6b
-    { id: 'cake', n: 9, icon: '🍰', name: 'The Great Cake Caper', theme: 'bakery', topic: 'Measuring + fractions', place: 'the Bakery', owner: 'Baker Bella', thing: 'prize-winning cake', walkTo: 'pantry', dropAt: 'by the big oven',
-      open: '🍰 Baker Bella\'s prize-winning cake has vanished from the counter — just before the big contest! Floury footprints lead across the kitchen…',
-      suspects: [['🐭', 'Nibbles the Mouse'], ['🐻', 'Honey the Bear'], ['🦊', 'Rusty the Fox'], ['🐷', 'Pinky the Pig'], ['🐒', 'Cheeky the Monkey']],
-      drops: [['🍓', 'a strawberry'], ['🍫', 'a chocolate chip'], ['🧈', 'a pat of butter'], ['🥚', 'an eggshell'], ['🍒', 'a cherry'], ['🥄', 'a sticky spoon']],
-      clutter: ['cupcake', 'donut', 'cherry', 'apple', 'mug', 'teapot', 'circle', 'heart'],
-      count: '🧁',
-      chapters: [
-        { title: 'The empty cake stand', icon: '🎂', say: 'The cake stand is empty — and the floury floor is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
-        { title: 'Through the kitchen', icon: '🥐', say: 'The prints go past the ovens. Find the way to the pantry — then check the kitchen camera!', steps: ['walk', 'spot'] },
-        { title: 'The locked pantry', icon: '🔐', say: 'The pantry door is locked… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
-      ],
-      lessons: [
-        { icon: '⚖️', title: 'Measuring', text: 'Bakers measure with scales, cups and spoons. The right amount of each thing makes the cake come out just right!' },
-        { icon: '🍕', title: 'Halves and quarters', text: 'Cut a cake into 2 equal parts: each is a half. Cut it into 4 equal parts: each is a quarter. Equal means the same size!' },
-        { icon: '🔥', title: 'Heat changes food', text: 'In the oven, runny batter turns into soft, spongy cake. Heat changed it — and it can\'t change back!' }
-      ],
-      quiz: { ask: 'Baker Bella asks: which one helps us MEASURE?', nope: 'Which one can NOT measure anything?',
-        yes: [['⚖️', 'kitchen scale'], ['📏', 'ruler'], ['⏲️', 'timer'], ['🌡️', 'thermometer'], ['🥄', 'measuring spoon']],
-        no: [['🎈', 'balloon'], ['🧸', 'teddy bear'], ['🎨', 'paint'], ['🍭', 'lollipop'], ['🧦', 'sock'], ['🎵', 'song'], ['🌸', 'flower'], ['🪁', 'kite']],
-        trick: [['👀', 'just looking'], ['✋', 'a handful']], why: { yes: 'helps us measure, so the cake comes out right!', no: 'can\'t measure — a scale, a spoon, a ruler or a timer can!' } },
-      solved: 'The prize cake is back on its stand — and it wins first prize! 🍰🏆' },
-    // 🌋 pk-6b
-    { id: 'volcano', n: 10, icon: '🌋', name: 'The Rumbling Mountain', theme: 'volcano', topic: 'Volcanoes + Earth layers', place: 'Volcano Village', owner: 'Professor Magma', thing: 'golden rumble-meter', walkTo: 'lookout hut', dropAt: 'by the hot spring',
-      open: '🌋 The mountain is rumbling — and Professor Magma\'s golden rumble-meter is gone! Without it nobody knows if the volcano will wake up. Ashy footprints lead up the path…',
-      suspects: [['🦎', 'Lizzy the Lizard'], ['🐐', 'Billy the Goat'], ['🦅', 'Sky the Eagle'], ['🐗', 'Tusk the Boar'], ['🐢', 'Shelly the Tortoise']],
-      drops: [['🪨', 'a black pebble'], ['🌶️', 'a red chili'], ['🪶', 'a brown feather'], ['🍠', 'a sweet potato'], ['🧭', 'a little compass'], ['🥥', 'a coconut shell']],
-      clutter: ['crystal', 'house', 'tree', 'mushroom', 'star', 'diamond', 'hexagon', 'circle'],
-      count: '🔥',
-      chapters: [
-        { title: 'The empty desk', icon: '📟', say: 'The rumble-meter\'s desk is empty — and the ashy floor is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
-        { title: 'Up the mountain path', icon: '🥾', say: 'The prints climb the mountain path. Find the way to the lookout hut — then check the village camera!', steps: ['walk', 'spot'] },
-        { title: 'The locked hut', icon: '🔐', say: 'The lookout hut is locked… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
-      ],
-      lessons: [
-        { icon: '🌍', title: 'Layers of the Earth', text: 'The Earth has layers like a peach: a thin crust on the outside, a hot thick mantle under it, and a core in the middle.' },
-        { icon: '🌋', title: 'What is a volcano?', text: 'Deep down, rock is so hot it melts — that is magma. When it pushes up through a crack and comes out, we call it lava.' },
-        { icon: '🏝️', title: 'Volcanoes make land', text: 'Lava cools down and turns into new rock. Some islands were made by volcanoes, one eruption at a time!' }
-      ],
-      quiz: { ask: 'Professor Magma asks: which one comes OUT of a volcano?', nope: 'Which one does NOT come out of a volcano?',
-        yes: [['🔥', 'hot lava'], ['💨', 'ash and smoke'], ['🪨', 'rocks'], ['♨️', 'steam'], ['🌫️', 'gas']],
-        no: [['🍦', 'ice cream'], ['🧸', 'teddy bears'], ['🎈', 'balloons'], ['🍫', 'chocolate'], ['🐟', 'fish'], ['📚', 'books'], ['🌈', 'rainbows'], ['🎁', 'presents']],
-        trick: [['❄️', 'snow'], ['💧', 'rain']], why: { yes: 'can come out of a volcano when it erupts!', no: 'does not come out of a volcano — lava, ash, rocks and steam do!' } },
-      solved: 'The rumble-meter is back — it says the mountain is only snoring. Volcano Village can sleep again! 🌋😴' },
-    // 🐝 pk-6b
-    { id: 'bees', n: 11, icon: '🐝', name: 'Where Did the Bees Go?', theme: 'farm', topic: 'Pollination', place: 'Sunny Farm', owner: 'Farmer Fern', thing: 'golden honey pot', walkTo: 'big red barn', dropAt: 'by the beehives',
-      open: '🐝 The bees of Sunny Farm have flown away — someone took Farmer Fern\'s golden honey pot, and now the flowers have no visitors! Sticky footprints lead across the field…',
-      suspects: [['🐻', 'Bruno the Bear'], ['🦨', 'Stinky the Skunk'], ['🐦', 'Caw the Crow'], ['🦡', 'Bandit the Badger'], ['🐸', 'Hoppy the Frog']],
-      drops: [['🌻', 'a sunflower seed'], ['🍯', 'a drop of honey'], ['🌾', 'a wheat stalk'], ['🥚', 'an egg'], ['🍎', 'an apple core'], ['🌼', 'a yellow petal']],
-      clutter: ['flower', 'bee', 'butterfly', 'apple', 'tree', 'carrot', 'house', 'heart'],
-      count: '🌻',
-      chapters: [
-        { title: 'The silent hives', icon: '🍯', say: 'The honey pot is gone and the hives are quiet — the muddy yard is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
-        { title: 'Across the fields', icon: '🌾', say: 'The prints cross the wheat field. Find the way to the big red barn — then check the farm camera!', steps: ['walk', 'spot'] },
-        { title: 'The locked barn', icon: '🔐', say: 'The barn door is locked… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
-      ],
-      lessons: [
-        { icon: '🌸', title: 'Flowers make seeds', text: 'To make seeds and fruit, a flower needs pollen — a yellow dust — from another flower of the same kind.' },
-        { icon: '🐝', title: 'Bees carry pollen', text: 'When a fuzzy bee drinks nectar, pollen sticks to its body. At the next flower some of it rubs off. That is pollination!' },
-        { icon: '🍎', title: 'No bees, no apples', text: 'Apples, strawberries and many other fruits only grow because bees and other visitors carry pollen between their flowers.' }
-      ],
-      quiz: { ask: 'Farmer Fern asks: which one helps carry POLLEN?', nope: 'Which one does NOT carry pollen?',
-        yes: [['🐝', 'bee'], ['🦋', 'butterfly'], ['🐦', 'hummingbird'], ['🪲', 'beetle'], ['🦇', 'fruit bat']],
-        no: [['🐟', 'fish'], ['🚗', 'car'], ['🧸', 'teddy bear'], ['🪨', 'rock'], ['📺', 'TV'], ['🍕', 'pizza'], ['🎈', 'balloon'], ['🧦', 'sock']],
-        trick: [['🕷️', 'spider'], ['🐛', 'caterpillar']], why: { yes: 'visits flowers and carries pollen from one to the next!', no: 'does not carry pollen — bees, butterflies and hummingbirds do!' } },
-      solved: 'The golden honey pot is home — the bees come buzzing back and the orchard is full of blossom! 🐝🌸' },
-    // 🎵 pk-6c
-    { id: 'orchestra', n: 12, icon: '🎵', name: 'The Silent Orchestra', theme: 'concert', topic: 'Sound + vibration', place: 'the Concert Hall', owner: 'Maestro Melody', thing: 'golden tuning fork', walkTo: 'backstage', dropAt: 'by the big drum',
-      open: '🎵 The orchestra can\'t play a note — Maestro Melody\'s golden tuning fork is gone and every instrument is out of tune! Dusty footprints lead across the stage…',
-      suspects: [['🦜', 'Polly the Parrot'], ['🐺', 'Howl the Wolf'], ['🦗', 'Chirpy the Cricket'], ['🐘', 'Trumpet the Elephant'], ['🐧', 'Waddles the Penguin']],
-      drops: [['🎼', 'a page of music'], ['🪶', 'a feather'], ['🥁', 'a drumstick'], ['🎀', 'a ribbon'], ['🍬', 'a cough sweet'], ['🔔', 'a tiny bell']],
-      clutter: ['star', 'heart', 'circle', 'diamond', 'crown', 'trophy', 'bird', 'balloon'],
-      count: '🎵',
-      chapters: [
-        { title: 'The empty case', icon: '🎻', say: 'The tuning fork\'s velvet case is empty — and the stage is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
-        { title: 'Behind the curtain', icon: '🎭', say: 'The prints slip behind the curtain. Find the way backstage — then check the stage camera!', steps: ['walk', 'spot'] },
-        { title: 'The locked dressing room', icon: '🔐', say: 'The dressing room is locked… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
-      ],
-      lessons: [
-        { icon: '🔊', title: 'Sound is a wiggle', text: 'When something shakes back and forth very fast — vibrates — it pushes the air, and that wiggle is the sound we hear.' },
-        { icon: '🎸', title: 'High and low', text: 'Short or tight strings vibrate fast and sound HIGH. Long or loose strings vibrate slowly and sound LOW.' },
-        { icon: '👂', title: 'How we hear', text: 'The wiggling air reaches your ear and makes your eardrum wiggle too. Your brain turns that into music!' }
-      ],
-      quiz: { ask: 'Maestro Melody asks: which one makes a sound when it VIBRATES?', nope: 'Which one does NOT make a sound by vibrating?',
-        yes: [['🥁', 'drum'], ['🎸', 'guitar string'], ['🔔', 'bell'], ['🎺', 'trumpet'], ['🗣️', 'voice']],
-        no: [['🧽', 'sponge'], ['🧸', 'teddy bear'], ['🍞', 'bread'], ['🧦', 'sock'], ['🧶', 'wool'], ['☁️', 'cloud'], ['🍮', 'pudding'], ['🛏️', 'pillow']],
-        trick: [['📷', 'a photo of a drum'], ['🔇', 'a muted speaker']], why: { yes: 'makes a sound when it vibrates!', no: 'stays quiet — drums, strings, bells and voices vibrate to make sound!' } },
-      solved: 'The golden tuning fork is back — ting! Every instrument is in tune and the orchestra plays its best concert ever! 🎻🎶' },
-    // 🏮 pk-6c
-    { id: 'market', n: 13, icon: '🏮', name: 'Mystery at the Night Market', theme: 'market', topic: 'Money + counting change', place: 'the Night Market', owner: 'Auntie Malee', thing: 'golden coin box', walkTo: 'lantern stall', dropAt: 'by the mango sticky rice stall',
-      open: '🏮 Auntie Malee\'s golden coin box is gone from her stall at the Night Market! Sticky footprints weave between the lanterns…',
-      suspects: [['🐒', 'Mali the Monkey'], ['🐘', 'Chang the Elephant'], ['🐈', 'Maew the Cat'], ['🦎', 'Tukkae the Gecko'], ['🐓', 'Kai the Rooster']],
-      drops: [['🥭', 'a mango slice'], ['🍢', 'a grilled skewer'], ['🌶️', 'a chili'], ['🥥', 'a coconut chip'], ['🪙', 'a coin'], ['🍡', 'a sweet dumpling']],
-      clutter: ['donut', 'lollipop', 'balloon', 'apple', 'cherry', 'banana', 'mug', 'gift'],
-      count: '🏮',
-      chapters: [
-        { title: 'The empty stall', icon: '🧺', say: 'The coin box is gone and the stall is a mess — the ground is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
-        { title: 'Through the lanterns', icon: '🏮', say: 'The prints weave between the stalls. Find the way to the lantern stall — then check the market camera!', steps: ['walk', 'spot'] },
-        { title: 'The locked cart', icon: '🔐', say: 'The coin cart is locked… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
-      ],
-      lessons: [
-        { icon: '🪙', title: 'Coins and notes', text: 'Thai money is the baht: coins of 1, 2, 5 and 10 baht and notes of 20, 50, 100 and more. A bigger number means more money — not a bigger coin!' },
-        { icon: '➕', title: 'Adding it up', text: 'To find what to pay, add the prices: a mango for 20 baht and a skewer for 15 baht cost 20 + 15 = 35 baht.' },
-        { icon: '🔙', title: 'Counting change', text: 'Pay 50 baht for something that costs 35? Count up: 35 → 40 → 50. That is 5 + 10 = 15 baht change.' }
-      ],
-      quiz: { ask: 'Auntie Malee asks: which one can you PAY with?', nope: 'Which one can you NOT pay with?',
-        yes: [['🪙', 'coin'], ['💵', 'banknote'], ['💳', 'bank card'], ['📱', 'phone payment'], ['🎟️', 'gift voucher']],
-        no: [['🍃', 'leaf'], ['🪨', 'pebble'], ['🧸', 'teddy bear'], ['🍬', 'sweet'], ['🧦', 'sock'], ['🔑', 'key'], ['📚', 'book'], ['🎈', 'balloon']],
-        trick: [['🃏', 'a playing card'], ['🖼️', 'a picture of money']], why: { yes: 'can pay at the market!', no: 'can\'t pay — coins, notes, cards and phone payments can!' } },
-      solved: 'The golden coin box is back — Auntie Malee gives everyone mango sticky rice to say thank you! 🥭🏮' },
-    // 🧊 pk-6c
-    { id: 'ice', n: 14, icon: '🧊', name: 'The Melting Ice Palace', theme: 'ice', topic: 'States of matter', place: 'the Ice Palace', owner: 'Queen Frost', thing: 'Frost Crystal', walkTo: 'frozen tower', dropAt: 'by the ice fountain',
-      open: '🧊 The Ice Palace is MELTING! Queen Frost\'s Frost Crystal keeps it cold — and someone took it. Wet footprints lead down the icy hall…',
-      suspects: [['🐧', 'Pip the Penguin'], ['🦭', 'Sammy the Seal'], ['🐻‍❄️', 'Polo the Polar Bear'], ['🦊', 'Flurry the Fox'], ['🦉', 'Tundra the Owl']],
-      drops: [['🧤', 'a mitten'], ['🐟', 'a fish'], ['❄️', 'a snowflake'], ['🧣', 'a scarf thread'], ['🍫', 'a cocoa crumb'], ['🥕', 'a snowman\'s carrot']],
-      clutter: ['snowman', 'penguin', 'crystal', 'diamond', 'star', 'cloud', 'hexagon', 'circle'],
-      count: '❄️',
-      chapters: [
-        { title: 'The empty pedestal', icon: '💎', say: 'The Frost Crystal\'s pedestal is empty — and the wet floor is full of footprints. Which ones are the thief\'s?', steps: ['find', 'quiz'] },
-        { title: 'Down the icy hall', icon: '🛷', say: 'The prints slide down the icy hall. Find the way to the frozen tower — then check the palace camera!', steps: ['walk', 'spot'] },
-        { title: 'The locked tower', icon: '🔐', say: 'The frozen tower is locked… crack the code, then catch the thief!', steps: ['crack', 'accuse'] }
-      ],
-      lessons: [
-        { icon: '🧊', title: 'Solid, liquid, gas', text: 'Ice is solid water, water is liquid water, and steam is water as a gas. The same stuff — three different forms!' },
-        { icon: '🌡️', title: 'Heat melts, cold freezes', text: 'Add heat and ice melts into water. Take heat away and water freezes into ice again.' },
-        { icon: '☁️', title: 'Water goes round', text: 'Puddles slowly turn into water vapour in the air, make clouds, and come back down as rain or snow.' }
-      ],
-      quiz: { ask: 'Queen Frost asks: which one is a LIQUID?', nope: 'Which one is NOT a liquid?',
-        yes: [['💧', 'water'], ['🥛', 'milk'], ['🧃', 'juice'], ['🍯', 'honey'], ['🍵', 'tea']],
-        no: [['🪨', 'rock'], ['🧸', 'teddy bear'], ['🍪', 'cookie'], ['🔑', 'key'], ['📚', 'book'], ['🧱', 'brick'], ['🥄', 'spoon'], ['👟', 'shoe']],
-        trick: [['🧊', 'ice cube'], ['💨', 'steam']], why: { yes: 'is a liquid — it flows and takes the shape of its cup!', no: 'is not a liquid — a solid keeps its shape, a gas floats away!' } },
-      solved: 'The Frost Crystal is back — the Ice Palace sparkles and freezes solid again! ❄️👑' }
+    {id: 'magnet', n: 1, icon: '🧲', name: 'The Missing Magnet', theme: 'robot'},
+    {id: 'dino', n: 2, icon: '🦖', name: 'The Dino Egg Thief', theme: 'dino'},
+    {id: 'ship', n: 3, icon: '🐙', name: 'Secret of the Sunken Ship', theme: 'sea'},
+    {id: 'disco', n: 4, icon: '🪩', name: 'The Stolen Disco Ball', theme: 'disco'},
+    {id: 'moon', n: 5, icon: '🪐', name: 'Moon Base Mystery', theme: 'space'},
+    {id: 'cloud', n: 6, icon: '☁️', name: 'The Cloud Castle Code', theme: 'sky'},
+    {id: 'garden', n: 7, icon: '🌱', name: 'The Wilting Garden', theme: 'garden'},
+    {id: 'clock', n: 8, icon: '⏰', name: 'The Clock That Ran Backwards', theme: 'clock'},
+    {id: 'cake', n: 9, icon: '🍰', name: 'The Great Cake Caper', theme: 'bakery'},
+    {id: 'volcano', n: 10, icon: '🌋', name: 'The Rumbling Mountain', theme: 'volcano'},
+    {id: 'bees', n: 11, icon: '🐝', name: 'Where Did the Bees Go?', theme: 'farm'},
+    {id: 'orchestra', n: 12, icon: '🎵', name: 'The Silent Orchestra', theme: 'concert'},
+    {id: 'market', n: 13, icon: '🏮', name: 'Mystery at the Night Market', theme: 'market'},
+    {id: 'ice', n: 14, icon: '🧊', name: 'The Melting Ice Palace', theme: 'ice'}
   ];
+  function addCases(list) { (list || []).forEach(function (F) { var C = null; for (var i = 0; i < CASES.length; i++) if (CASES[i].id === F.id) C = CASES[i];
+    if (C) { for (var k in F) C[k] = F[k]; } else CASES.push(F); }); CASES.full = true; return CASES.length; }
   function caseById(id) { for (var i = 0; i < CASES.length; i++) if (CASES[i].id === id) return CASES[i]; return CASES[0]; }
   // 🔐 one code digit + where it hides
   function makeDigit(R, kind, icon) {
@@ -1281,7 +994,7 @@ var PK = (function () {
   function nextRank(cleared) { for (var i = 0; i < RANKS.length; i++) if (RANKS[i].at > cleared) return RANKS[i]; return null; }
 
   return { W: W, H: H, GROUND: GROUND, MIN_HIT: MIN_HIT, KINDS: KINDS, SHAPES: SHAPES, THEMES: THEMES, THEME_KEYS: THEME_KEYS, PAL: PAL, TYPES: TYPES, TYPE_INFO: TYPE_INFO, SUBTLE: SUBTLE, NEW_KINDS: NEW_KINDS, PIECES: PIECES, LAYOUTS: LAYOUTS, toneShift: toneShift, rgbSum: rgbSum,
-    LEVELS: LEVELS, RANKS: RANKS, TYPES6: TYPES6, WORD_SETS: WORD_SETS, RHYMES: RHYMES, ODD: ODD, ODD_ROUNDS: ODD_ROUNDS, makeOdd: makeOdd, oddPoints: oddPoints, makePattern: makePattern, sumText: sumText, ARCADE: ARCADE, CHECK_EVERY: CHECK_EVERY, arcadeScore: arcadeScore, arcadeStars: arcadeStars, mmss: mmss, TRIP_KEYS: TRIP_KEYS, PHOTO_ACTS: PHOTO_ACTS, PHOTO_FACES: PHOTO_FACES, SELFIE: SELFIE, photoAct: photoAct, makePhoto: makePhoto, makeMix: makeMix, CASE_SCENES: CASE_SCENES, hueShift: hueShift, LOOK_GROUPS: LOOK_GROUPS, lookMates: lookMates, POSE_NEAR: POSE_NEAR, MIX_SCENES: MIX_SCENES, MIX_LAYERS: MIX_LAYERS, MIX_LAYER_INFO: MIX_LAYER_INFO, PARTICLES: PARTICLES, SCENERY: SCENERY, visFrac: visFrac, isUnder: isUnder, STORY: STORY, BOOTS: BOOTS, VERBS: VERBS, CASES: CASES, caseById: caseById, makeCase: makeCase, makeWalk: makeWalk, makeDigit: makeDigit, bfs: bfs, clueMatch: clueMatch, storyPoints: storyPoints, caseBonus: caseBonus, rng: rng, newSeed: newSeed, makeScene: makeScene, signature: signature, poke: poke, pokeFound: pokeFound, radiusOf: radiusOf, hitOf: hitOf,
+    LEVELS: LEVELS, RANKS: RANKS, TYPES6: TYPES6, WORD_SETS: WORD_SETS, RHYMES: RHYMES, ODD: ODD, ODD_ROUNDS: ODD_ROUNDS, makeOdd: makeOdd, oddPoints: oddPoints, makePattern: makePattern, sumText: sumText, ARCADE: ARCADE, CHECK_EVERY: CHECK_EVERY, arcadeScore: arcadeScore, arcadeStars: arcadeStars, mmss: mmss, TRIP_KEYS: TRIP_KEYS, PHOTO_ACTS: PHOTO_ACTS, PHOTO_FACES: PHOTO_FACES, SELFIE: SELFIE, photoAct: photoAct, makePhoto: makePhoto, makeMix: makeMix, CASE_SCENES: CASE_SCENES, hueShift: hueShift, LOOK_GROUPS: LOOK_GROUPS, lookMates: lookMates, POSE_NEAR: POSE_NEAR, MIX_SCENES: MIX_SCENES, MIX_LAYERS: MIX_LAYERS, MIX_LAYER_INFO: MIX_LAYER_INFO, PARTICLES: PARTICLES, SCENERY: SCENERY, visFrac: visFrac, isUnder: isUnder, STORY: STORY, BOOTS: BOOTS, VERBS: VERBS, CASES: CASES, caseById: caseById, makeCase: makeCase, addCases: addCases, makeWalk: makeWalk, makeDigit: makeDigit, bfs: bfs, clueMatch: clueMatch, storyPoints: storyPoints, caseBonus: caseBonus, rng: rng, newSeed: newSeed, makeScene: makeScene, signature: signature, poke: poke, pokeFound: pokeFound, radiusOf: radiusOf, hitOf: hitOf,
     colDist: colDist, picturePoints: picturePoints, starsFor: starsFor, rankOf: rankOf, nextRank: nextRank, fits: fits };
 })();
 if (typeof module !== 'undefined') module.exports = PK;
