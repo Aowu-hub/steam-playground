@@ -1,0 +1,70 @@
+
+/* 🎬 Cover_stacking_sim — 📏 b6a: the "stacking-sim" cover block, moved word for word out of GameCovers.html (🧱 Baseline chat, 2026-11-20).
+   It runs after GameCovers on GameCovers._K (the kit's helpers) and keeps its own Z (the cover logo's spot, 🏷️ 24j-e):
+   the kit hands it over before every still / live / spots call, away() measures against it. */
+(function(K){
+  'use strict';
+  if(!K) return;
+  const {clamp, lerp, rng, hx, mix, shade, poly, sparkle, cloud, persp, pick3, root} = K;
+  let Z = null;
+  const away = (x, y, w, h, W, H, opt) => K.awayIn(Z, x, y, w, h, W, H, opt);
+  const add = (id, def) => K.add(id, def, z => { Z = z; });
+  // 🎬 COVER stacking-sim START — 📦 Stack It!: a tall wobbly tower of shaped boxes on a platform, a 🏁 line above it, a crane swings the next box in
+  (function(){
+    const COLS = ['#FF6B6B', '#FFB23F', '#4FD1A5', '#5AA9FF', '#B57CFF', '#FF7BA9'];
+    // the tower: [shape, w, h, dx] from the bottom up (units of the platform width ≈ 1)
+    const TOWER = [['box', 0.62, 0.22, 0], ['box', 0.48, 0.2, -0.04], ['box', 0.36, 0.26, 0.05], ['round', 0.42, 0.2, -0.02], ['tri', 0.3, 0.18, 0.02]];
+    const geo = (W, H) => { const gy = H * (W > H ? 0.8 : 0.78), u = Math.min(W * (W > H ? 0.24 : 0.46), H * 0.32), cx = W * (W > H ? 0.5 : 0.48); return {gy, u, cx}; };
+    function shape(g, kind, w, h, col){
+      g.fillStyle = col; g.strokeStyle = shade(col, -0.35); g.lineWidth = Math.max(1.5, w * 0.03); g.lineJoin = 'round'; g.beginPath();
+      if(kind === 'box') g.roundRect(-w / 2, -h, w, h, h * 0.15);
+      if(kind === 'tri'){ g.moveTo(-w / 2, 0); g.lineTo(w / 2, 0); g.lineTo(0, -h); g.closePath(); }
+      if(kind === 'round'){ g.moveTo(-w / 2, 0); g.lineTo(w / 2, 0); g.lineTo(w / 2, -h * 0.4); g.quadraticCurveTo(w / 2, -h, 0, -h); g.quadraticCurveTo(-w / 2, -h, -w / 2, -h * 0.4); g.closePath(); }
+      if(kind === 'star'){ for(let i = 0; i < 10; i++){ const a = i * Math.PI / 5 - Math.PI / 2, r = (i % 2 ? 0.22 : 0.5) * Math.min(w, h * 2); g.lineTo(Math.cos(a) * r, -h / 2 + Math.sin(a) * r); } g.closePath(); }
+      g.fill(); g.stroke();
+      // a happy face on each piece
+      const fy = kind === 'star' ? -h / 2 : kind === 'tri' ? -h * 0.32 : -h * 0.5, e = Math.max(1.5, Math.min(w, h) * 0.07);
+      g.fillStyle = '#2A1E3A'; [-1, 1].forEach(k => { g.beginPath(); g.arc(k * e * 2.2, fy - e * 0.6, e, 0, 7); g.fill(); });
+      g.strokeStyle = '#2A1E3A'; g.lineWidth = Math.max(1, e * 0.7); g.beginPath(); g.arc(0, fy + e * 0.2, e * 1.6, 0.2, Math.PI - 0.2); g.stroke();
+      g.fillStyle = 'rgba(255,255,255,.28)'; g.fillRect(-w / 2 + w * 0.1, -h + h * 0.12, w * 0.18, h * 0.12);
+    }
+    add('stacking-sim', {
+      still(g, W, H){
+        const {gy, u, cx} = geo(W, H);
+        let gr = g.createLinearGradient(0, 0, 0, gy); gr.addColorStop(0, '#FFB7A0'); gr.addColorStop(0.55, '#FFE1B8'); gr.addColorStop(1, '#FFF4DC'); g.fillStyle = gr; g.fillRect(0, 0, W, gy);
+        g.fillStyle = 'rgba(255,240,200,.8)'; g.beginPath(); g.arc(W * 0.16, gy * 0.42, Math.min(W, H) * 0.08, 0, 7); g.fill();
+        // far city blocks in a soft colour
+        const R = rng(23); for(let x = -10; x < W; ){ const w = 30 + R() * 60, h = gy * (0.12 + R() * 0.22); g.fillStyle = 'rgba(200,120,140,' + (0.18 + R() * 0.12) + ')'; g.fillRect(x, gy - h, w, h); x += w + 6; }
+        // ground + the platform
+        gr = g.createLinearGradient(0, gy, 0, H); gr.addColorStop(0, '#9ED36A'); gr.addColorStop(1, '#7FBF55'); g.fillStyle = gr; g.fillRect(0, gy, W, H - gy);
+        g.fillStyle = '#6E7B91'; g.beginPath(); g.roundRect(cx - u * 0.42, gy - u * 0.08, u * 0.84, u * 0.1, u * 0.02); g.fill(); g.fillStyle = '#4E596C'; g.fillRect(cx - u * 0.36, gy + u * 0.02, u * 0.72, u * 0.05);
+        // the crane (right side): mast + jib
+        const mx = cx + u * (W > H ? 1.25 : 0.82), top = gy - u * 2.15;
+        g.strokeStyle = '#E8A21E'; g.lineWidth = Math.max(3, u * 0.03); for(let y = gy; y > top; y -= u * 0.12){ g.beginPath(); g.moveTo(mx - u * 0.05, y); g.lineTo(mx + u * 0.05, y - u * 0.12); g.moveTo(mx + u * 0.05, y); g.lineTo(mx - u * 0.05, y - u * 0.12); g.stroke(); }
+        g.fillStyle = '#F2B632'; g.fillRect(mx - u * 0.06, top, u * 0.12, gy - top); g.fillRect(cx - u * 0.35, top - u * 0.06, mx - cx + u * 0.55, u * 0.08);
+        g.fillStyle = '#C27A12'; g.fillRect(mx + u * 0.08, top - u * 0.02, u * 0.16, u * 0.14); g.fillStyle = '#9FD8FF'; g.fillRect(mx - u * 0.04, top + u * 0.08, u * 0.1, u * 0.08);
+        // the 🏁 line high above the tower
+        const fy = gy - u * 1.72; g.setLineDash([u * 0.05, u * 0.04]); g.strokeStyle = 'rgba(42,30,58,.55)'; g.lineWidth = 2; g.beginPath(); g.moveTo(cx - u * 0.8, fy); g.lineTo(cx + u * 0.6, fy); g.stroke(); g.setLineDash([]);
+        for(let i = 0; i < 6; i++) for(let j = 0; j < 2; j++){ g.fillStyle = (i + j) % 2 ? '#2A1E3A' : '#FFFFFF'; g.fillRect(cx - u * 0.8 + i * u * 0.035, fy - u * 0.1 + j * u * 0.035, u * 0.035, u * 0.035); }
+        g.fillStyle = '#2A1E3A'; g.fillRect(cx - u * 0.8 - 2, fy - u * 0.1, 3, u * 0.12);
+      },
+      live(g, W, H, t){
+        const {gy, u, cx} = geo(W, H), sway = Math.sin(t * 1.3) * 0.022;
+        // the tower sways from its base (each piece a bit more)
+        g.save(); g.translate(cx, gy - u * 0.08); let y = 0;
+        TOWER.forEach(([k, w, h, dx], i) => { g.save(); g.rotate(sway * (i + 1) * 0.35); g.translate(dx * u + sway * u * i * 0.6, -y); shape(g, k, w * u, h * u, COLS[i % COLS.length]); g.restore(); y += h * u * 0.98; });
+        g.restore();
+        // the crane hook swings, lowers a box, then rises again (a 6 s loop)
+        const top = gy - u * 2.15, c = (t % 6) / 6, low = c < 0.5 ? c / 0.5 : 1 - (c - 0.5) / 0.5, e = low * low * (3 - 2 * low), hx = cx + u * 0.12 + Math.sin(t * 1.7) * u * 0.06, hy = top + u * 0.1 + e * u * 0.32;
+        g.strokeStyle = '#3A3A48'; g.lineWidth = Math.max(1.5, u * 0.012); g.beginPath(); g.moveTo(cx + u * 0.12, top + u * 0.02); g.lineTo(hx, hy); g.stroke();
+        g.save(); g.translate(hx, hy + u * 0.2); g.rotate(Math.sin(t * 1.7) * 0.12); shape(g, 'star', u * 0.3, u * 0.2, '#FFD84A'); g.restore();
+        for(let i = 0; i < 3; i++) sparkle(g, cx - u * 0.6 + i * u * 0.45, gy - u * 1.72 - u * 0.12 + Math.sin(t * 2 + i) * 4, u * 0.02 + 2, 0.5 + 0.4 * Math.sin(t * 3 + i));
+      },
+      spots(W, H){ const {gy, u, cx} = geo(W, H), k = clamp(Math.min(H, W * 1.15) / 560, 0.4, 0.95), fy = Math.min(H - 36 * k, gy + (H - gy) * 0.86), sy = gy + (H - gy) * 0.45;
+        const inX = x => clamp(x, 64 * k, W - 64 * k);   // the middle champion stands in front of the platform, the others either side of the tower
+        return [{x: inX(cx), y: fy, k}, {x: inX(cx - u * 0.82), y: sy, k: k * 0.95, from: -1}, {x: inX(cx + u * 0.82), y: sy, k: k * 0.95, from: 1, dir: -1}]; }
+    });
+  })();
+  // 🎬 COVER stacking-sim END
+  K.loaded('stacking-sim', 'b6a');
+})(window.GameCovers && window.GameCovers._K);

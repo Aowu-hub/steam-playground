@@ -1,0 +1,84 @@
+
+/* 🎬 Cover_soul_bopper — 📏 b6a: the "soul-bopper" cover block, moved word for word out of GameCovers.html (🧱 Baseline chat, 2026-11-20).
+   It runs after GameCovers on GameCovers._K (the kit's helpers) and keeps its own Z (the cover logo's spot, 🏷️ 24j-e):
+   the kit hands it over before every still / live / spots call, away() measures against it. */
+(function(K){
+  'use strict';
+  if(!K) return;
+  const {clamp, lerp, rng, hx, mix, shade, poly, sparkle, cloud, persp, pick3, root} = K;
+  let Z = null;
+  const away = (x, y, w, h, W, H, opt) => K.awayIn(Z, x, y, w, h, W, H, opt);
+  const add = (id, def) => K.add(id, def, z => { Z = z; });
+  // 🎬 COVER soul-bopper START — 👻💣 Soul Bopper: a stone maze in a moonlit garden at dusk, seen from above at a tilt — stone pillars, wooden crates, glowing
+  //    mushrooms; a bomb's fuse fizzes, it blinks, then a + of flame bursts down the lanes, crates crack, and a little ghost floats up out of the smoke; then the
+  //    crates are back and it starts again. 🏆 champions stand on the near edge of the maze.
+  (function(){
+    const N = 9, M = 7, PIL = (i, j) => i % 2 === 1 && j % 2 === 1, CR = [[2, 1], [4, 1], [6, 2], [1, 4], [3, 2], [5, 4], [7, 4], [4, 5], [2, 5], [6, 6], [0, 2], [8, 3]];
+    const BOMB = [4, 3], ARM = 2;   // bomb in the middle, flames 2 tiles each way
+    const geo = (W, H) => { const wide = W > H; let cell = wide ? Math.min(W * 0.56 / N, H * 0.5 / M) : Math.min(W * 0.92 / N, H * 0.5 / M);
+      let bw = cell * N, bh = cell * M * 0.78, bx = (W - bw) / 2, by = wide ? H * 0.22 : H * 0.42;
+      const F = away(bx, by - cell * 0.5, bw, bh + cell * 0.5, W, H, {min: 0.6}); cell *= F.s; bw = cell * N; bh = cell * M * 0.78; bx = F.x; by = F.y + cell * 0.5;   /* 🏷️ 24j-e */
+      const T = (i, j) => ({x: bx + i * cell, y: by + j * cell * 0.78}); return {wide, cell, bw, bh, bx, by, T}; };
+    function block(g, T, cell, i, j, top, side, lift){ const p = T(i, j), h = cell * (lift || 0.42), d = cell * 0.78;
+      g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(p.x + 2, p.y + d - 2, cell - 2, cell * 0.12);                 // shadow on the floor
+      g.fillStyle = side; g.fillRect(p.x + 1, p.y + d - h, cell - 2, h);                                         // front face
+      g.fillStyle = top; g.fillRect(p.x + 1, p.y - h, cell - 2, d);                                              // top face (lifted by h)
+      g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(p.x + 1, p.y - h, cell - 2, Math.max(1.5, cell * 0.06)); }
+    // phase of the loop (4.2 s): 0..1.6 fuse, 1.6..2.4 blink, 2.4..3.0 flames, 3.0..4.2 ghost floats + smoke
+    const phase = t => t % 4.2;
+    add('soul-bopper', {
+      still(g, W, H){
+        const {wide, cell, bw, bh, bx, by, T} = geo(W, H);
+        let gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#1C1446'); gr.addColorStop(0.45, '#4B2E78'); gr.addColorStop(1, '#2A1C44'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+        g.fillStyle = 'rgba(255,248,214,.95)'; g.beginPath(); g.arc(W * (wide ? 0.86 : 0.82), H * 0.11, Math.min(W, H) * 0.06, 0, 7); g.fill();
+        g.fillStyle = '#4B2E78'; g.beginPath(); g.arc(W * (wide ? 0.86 : 0.82) + Math.min(W, H) * 0.025, H * 0.1, Math.min(W, H) * 0.055, 0, 7); g.fill();
+        // far hills + crooked trees + tiny gravestones
+        g.fillStyle = '#2C1E52'; g.beginPath(); g.moveTo(0, by - cell * 0.6); for(let x = 0; x <= W; x += W / 24) g.lineTo(x, by - cell * (1.2 + 0.5 * Math.sin(x / W * 7))); g.lineTo(W, H); g.lineTo(0, H); g.fill();
+        const R = rng(31); for(let n = 0; n < 7; n++){ const x = R() * W, y = by - cell * (0.9 + R() * 0.5); g.strokeStyle = '#1A1233'; g.lineWidth = 3; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 4, y - cell * 0.9); g.lineTo(x - 8, y - cell * 1.3); g.moveTo(x + 3, y - cell * 0.7); g.lineTo(x + 14, y - cell * 1.0); g.stroke(); }
+        for(let n = 0; n < 6; n++){ const x = R() * W, y = by - cell * (0.55 + R() * 0.3); g.fillStyle = '#5A527A'; g.beginPath(); g.roundRect(x, y - cell * 0.3, cell * 0.22, cell * 0.3, [cell * 0.11, cell * 0.11, 0, 0]); g.fill(); }
+        // the maze floor (mossy tiles), with a dark rim
+        g.fillStyle = '#1B2A22'; g.beginPath(); g.roundRect(bx - cell * 0.25, by - cell * 0.35, bw + cell * 0.5, bh + cell * 0.55, cell * 0.2); g.fill();
+        for(let j = 0; j < M; j++) for(let i = 0; i < N; i++){ const p = T(i, j); g.fillStyle = (i + j) % 2 ? '#4E8A55' : '#5C9A60'; g.fillRect(p.x, p.y, cell, cell * 0.78 + 1); }
+        // glowing mushrooms on the rim
+        for(let n = 0; n < 8; n++){ const x = bx - cell * 0.15 + R() * (bw + cell * 0.3), y = n % 2 ? by - cell * 0.28 : by + bh + cell * 0.12; g.fillStyle = '#EDE6FF'; g.fillRect(x - 1.5, y - 6, 3, 6); g.fillStyle = ['#7CF2D0', '#FF9AE0', '#9AB8FF'][n % 3]; g.beginPath(); g.arc(x, y - 6, 5, Math.PI, 0); g.fill(); }
+        // pillars (stone) — drawn back to front so the near ones overlap
+        for(let j = 0; j < M; j++) for(let i = 0; i < N; i++) if(PIL(i, j)) block(g, T, cell, i, j, '#A9A4BF', '#6E6886', 0.55);
+      },
+      live(g, W, H, t){
+        const {cell, T, bx, by} = geo(W, H), ph = phase(t);
+        // crates (they break while the flames are out, then come back)
+        const lit = ph >= 2.4 && ph < 3.0, burnt = ph >= 2.4;
+        const inFlame = (i, j) => (j === BOMB[1] && Math.abs(i - BOMB[0]) <= ARM) || (i === BOMB[0] && Math.abs(j - BOMB[1]) <= ARM);
+        CR.forEach(([i, j]) => { if(burnt && inFlame(i, j)) return; const p = T(i, j); block(g, T, cell, i, j, '#C88A4A', '#8A5528', 0.42);
+          g.strokeStyle = '#6B3F1B'; g.lineWidth = Math.max(1, cell * 0.04); g.strokeRect(p.x + cell * 0.14, p.y - cell * 0.08, cell * 0.72, cell * 0.66); g.beginPath(); g.moveTo(p.x + cell * 0.14, p.y - cell * 0.08); g.lineTo(p.x + cell * 0.86, p.y + cell * 0.58); g.stroke(); });
+        // flames: a + down the lanes, stopped by pillars
+        if(lit){ const k = (ph - 2.4) / 0.6, a = k < 0.2 ? k / 0.2 : 1 - (k - 0.2) / 0.8;
+          const cells = [[BOMB[0], BOMB[1]]]; [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { for(let s = 1; s <= ARM; s++){ const i = BOMB[0] + dx * s, j = BOMB[1] + dy * s; if(i < 0 || j < 0 || i >= N || j >= M || PIL(i, j)) break; cells.push([i, j]); } });
+          g.save(); g.globalAlpha = Math.max(0, a); cells.forEach(([i, j]) => { const p = T(i, j), cxp = p.x + cell / 2, cyp = p.y + cell * 0.39;
+            const gr = g.createRadialGradient(cxp, cyp, 0, cxp, cyp, cell * 0.62); gr.addColorStop(0, '#FFFBD0'); gr.addColorStop(0.45, '#FFB13B'); gr.addColorStop(1, 'rgba(255,70,40,0)'); g.fillStyle = gr; g.fillRect(p.x - cell * 0.15, p.y - cell * 0.2, cell * 1.3, cell * 1.2); }); g.restore();
+          // crate splinters
+          CR.forEach(([i, j], n) => { if(!inFlame(i, j)) return; const p = T(i, j); for(let s = 0; s < 4; s++){ const ang = n + s * 1.7, d = k * cell * 0.8; g.fillStyle = '#B07A3E'; g.fillRect(p.x + cell / 2 + Math.cos(ang) * d, p.y + cell * 0.3 + Math.sin(ang) * d - k * cell * 0.4, cell * 0.12, cell * 0.06); } });
+        }
+        // the bomb: sits, fuse sparks, blinks red, gone during the flames
+        if(ph < 2.4){ const p = T(BOMB[0], BOMB[1]), cxp = p.x + cell / 2, cyp = p.y + cell * 0.28, blink = ph > 1.6 && Math.floor(ph * 8) % 2 === 0, sq = 1 + (ph > 1.6 ? Math.sin(ph * 30) * 0.06 : Math.sin(ph * 5) * 0.03);
+          g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.ellipse(cxp, cyp + cell * 0.32, cell * 0.32, cell * 0.1, 0, 0, 7); g.fill();
+          g.save(); g.translate(cxp, cyp); g.scale(sq, 1 / sq); g.fillStyle = blink ? '#E8343E' : '#2B2440'; g.beginPath(); g.arc(0, 0, cell * 0.33, 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(-cell * 0.11, -cell * 0.11, cell * 0.08, 0, 7); g.fill(); g.restore();
+          const fl = Math.max(0, 1 - ph / 2.4), fx = cxp + cell * 0.18, fy = cyp - cell * (0.32 + 0.22 * fl); g.strokeStyle = '#E9D9B0'; g.lineWidth = Math.max(1.5, cell * 0.05); g.beginPath(); g.moveTo(cxp + cell * 0.12, cyp - cell * 0.28); g.quadraticCurveTo(fx + cell * 0.1, fy + cell * 0.1, fx, fy); g.stroke();
+          sparkle(g, fx, fy, cell * (0.12 + 0.06 * Math.sin(t * 30)), 1, '#FFE17A'); }
+        // the ghost floats up out of the smoke, wobbling, then fades
+        if(ph >= 2.7){ const k = (ph - 2.7) / 1.5, p = T(BOMB[0], BOMB[1]), x = p.x + cell / 2 + Math.sin(k * 9) * cell * 0.25, y = p.y - k * cell * 2.1, a = k < 0.15 ? k / 0.15 : k > 0.75 ? (1 - k) / 0.25 : 1, s = cell * 0.5;
+          for(let n = 0; n < 5; n++){ g.globalAlpha = 0.25 * (1 - k); g.fillStyle = '#B9B2CF'; g.beginPath(); g.arc(p.x + cell / 2 + (n - 2) * cell * 0.25, p.y + cell * 0.2 - k * cell * 0.5 - n % 2 * cell * 0.15, cell * (0.25 + k * 0.3), 0, 7); g.fill(); }
+          g.globalAlpha = Math.max(0, a); g.fillStyle = '#F4F1FF'; g.beginPath(); g.arc(x, y, s, Math.PI, 0); g.lineTo(x + s, y + s * 0.9); for(let w = 0; w < 4; w++) g.quadraticCurveTo(x + s - (w + 0.5) * s / 2, y + s * (w % 2 ? 0.9 : 1.25), x + s - (w + 1) * s / 2, y + s * 0.9); g.closePath(); g.fill();
+          g.fillStyle = '#2B2440'; [-1, 1].forEach(d => { g.beginPath(); g.ellipse(x + d * s * 0.35, y - s * 0.05, s * 0.12, s * 0.18, 0, 0, 7); g.fill(); }); g.beginPath(); g.ellipse(x, y + s * 0.35, s * 0.12, s * 0.09, 0, 0, 7); g.fill(); g.globalAlpha = 1; }
+        // fireflies
+        for(let n = 0; n < 7; n++){ const x = ((n * 0.17 + t * 0.012 * (n % 2 ? 1 : -1)) % 1 + 1) % 1 * W, y = by - cell * (0.6 + (n % 3) * 0.5) + Math.sin(t * 1.3 + n) * cell * 0.3; sparkle(g, x, y, 3.5, 0.4 + 0.4 * Math.sin(t * 3 + n * 2), '#E6FF8A'); }
+      },
+      spots(W, H){ const z0 = Z; Z = null; try { return this._s(W, H); } finally { Z = z0; } },   /* champions stand where the plain art puts them (the logo zone is built from them) */
+      _s(W, H){ const {T, cell, wide} = geo(W, H), k = clamp(Math.min(H, W * 1.15) / 560, 0.4, 0.95), base = T(0, M).y + cell * 0.1, fy = Math.min(H - 34 * k, base + (H - base) * 0.55),
+          X = f => clamp(W * f, 64 * k, W - 64 * k), W3 = wide ? [0.5, 0.3, 0.7] : [0.5, 0.18, 0.82];
+        return [{x: X(W3[0]), y: fy, k}, {x: X(W3[1]), y: fy - 3 * k, k: k * 0.95, from: -1}, {x: X(W3[2]), y: fy - 3 * k, k: k * 0.95, from: 1, dir: -1}]; }
+    });
+  })();
+  // 🎬 COVER soul-bopper END
+  K.loaded('soul-bopper', 'b6a');
+})(window.GameCovers && window.GameCovers._K);

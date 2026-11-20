@@ -1,0 +1,79 @@
+
+/* 🎬 Cover_georead — 📏 b6a: the "georead" cover block, moved word for word out of GameCovers.html (🧱 Baseline chat, 2026-11-20).
+   It runs after GameCovers on GameCovers._K (the kit's helpers) and keeps its own Z (the cover logo's spot, 🏷️ 24j-e):
+   the kit hands it over before every still / live / spots call, away() measures against it. */
+(function(K){
+  'use strict';
+  if(!K) return;
+  const {clamp, lerp, rng, hx, mix, shade, poly, sparkle, cloud, persp, pick3, root} = K;
+  let Z = null;
+  const away = (x, y, w, h, W, H, opt) => K.awayIn(Z, x, y, w, h, W, H, opt);
+  const add = (id, def) => K.add(id, def, z => { Z = z; });
+  // 🎬 COVER georead START — 🔤 GeoRead: a cosy reading room (bookshelves, window, rug); three letter boxes c · a · t each glow and "say" their sound (c… a… t…), then bump together, a big "cat!" bubble pops and a cat jumps out of the box; then s · u · n → "sun!" ☀️
+  (function(){
+    const WORDS = [['c', 'a', 't', '🐱', 'cat!'], ['s', 'u', 'n', '☀️', 'sun!']];
+    const BOX = ['#FDE68A', '#BAE6FD', '#FBCFE8'];
+    const geo = (W, H) => { const wide = W > H, u = Math.min(W * (wide ? 0.095 : 0.16), H * (wide ? 0.15 : 0.1)), fy = H * (wide ? 0.66 : 0.62), cx = W * (wide ? 0.5 : 0.5);
+      return {wide, u, fy, cx}; };
+    function box(g, x, y, u, ch, col, glow, sq){
+      g.save(); g.translate(x, y); g.scale(1 + (1 - (sq || 1)) * 0.6, sq || 1);
+      if(glow){ g.shadowColor = '#FFE14D'; g.shadowBlur = u * 0.5; }
+      g.fillStyle = col; g.beginPath(); g.roundRect(-u / 2, -u, u, u, u * 0.12); g.fill(); g.shadowBlur = 0;
+      g.fillStyle = shade(col, -0.15); g.fillRect(-u / 2, -u * 0.62, u, u * 0.08);   // tape
+      g.strokeStyle = shade(col, -0.35); g.lineWidth = 2; g.beginPath(); g.roundRect(-u / 2, -u, u, u, u * 0.12); g.stroke();
+      g.fillStyle = '#1F2937'; g.font = '900 ' + Math.round(u * 0.62) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ch, 0, -u * 0.36);
+      g.restore();
+    }
+    add('georead', {
+      still(g, W, H){
+        const {fy, u, wide} = geo(W, H);
+        let gr = g.createLinearGradient(0, 0, 0, fy); gr.addColorStop(0, '#FFE8C7'); gr.addColorStop(1, '#F8D3A5'); g.fillStyle = gr; g.fillRect(0, 0, W, fy);
+        // window with sky
+        const wx = W * (wide ? 0.4 : 0.36), ww = W * (wide ? 0.2 : 0.28), wy = fy * 0.1, wh = fy * 0.34;
+        g.fillStyle = '#8B5A2B'; g.beginPath(); g.roundRect(wx - 6, wy - 6, ww + 12, wh + 12, 10); g.fill();
+        gr = g.createLinearGradient(0, wy, 0, wy + wh); gr.addColorStop(0, '#7CC6FF'); gr.addColorStop(1, '#D6F0FF'); g.fillStyle = gr; g.beginPath(); g.roundRect(wx, wy, ww, wh, 6); g.fill();
+        cloud(g, wx + ww * 0.15, wy + wh * 0.4, ww / 260, 0.9);
+        g.fillStyle = '#8B5A2B'; g.fillRect(wx + ww / 2 - 3, wy, 6, wh); g.fillRect(wx, wy + wh / 2 - 3, ww, 6);
+        // bookshelves left + right
+        const R = rng(3);
+        [[0, W * (wide ? 0.26 : 0.24)], [W - W * (wide ? 0.26 : 0.24), W * (wide ? 0.26 : 0.24)]].forEach(([x0, sw]) => {
+          g.fillStyle = '#9A6534'; g.fillRect(x0, fy * 0.08, sw, fy * 0.92);
+          for(let r = 0; r < 4; r++){ const sy = fy * (0.12 + r * 0.22), sh = fy * 0.18; g.fillStyle = '#6E4423'; g.fillRect(x0 + 6, sy, sw - 12, sh);
+            let bx = x0 + 9; while(bx < x0 + sw - 14){ const bw = 6 + R() * 9, bh = sh * (0.65 + R() * 0.3); g.fillStyle = ['#EF4444', '#3B82F6', '#22C55E', '#F59E0B', '#A855F7', '#14B8A6'][Math.floor(R() * 6)]; g.fillRect(bx, sy + sh - bh, bw, bh); bx += bw + 1.5; }
+            g.fillStyle = '#B87A44'; g.fillRect(x0 + 4, sy + sh, sw - 8, 4); } });
+        // floor + rug
+        gr = g.createLinearGradient(0, fy, 0, H); gr.addColorStop(0, '#C98B4A'); gr.addColorStop(1, '#A86F36'); g.fillStyle = gr; g.fillRect(0, fy, W, H - fy);
+        g.strokeStyle = 'rgba(0,0,0,.08)'; g.lineWidth = 1; for(let y = fy + 14; y < H; y += 16){ g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+        g.fillStyle = '#7C3AED'; g.beginPath(); g.ellipse(W / 2, fy + (H - fy) * 0.45, W * 0.42, (H - fy) * 0.32, 0, 0, 7); g.fill();
+        g.strokeStyle = '#FDE68A'; g.lineWidth = 3; g.setLineDash([8, 6]); g.beginPath(); g.ellipse(W / 2, fy + (H - fy) * 0.45, W * 0.38, (H - fy) * 0.26, 0, 0, 7); g.stroke(); g.setLineDash([]);
+      },
+      live(g, W, H, t){
+        const {fy, u, cx} = geo(W, H);
+        // 8 s loop per word: sounds (0–3) → bump (3–3.6) → word + picture (3.6–6.4) → apart (6.4–8)
+        const cyc = 8, n = Math.floor(t / cyc) % 2, ph = t % cyc, Wd = WORDS[n], gap = u * 0.45;
+        const apart = ph < 3 ? 1 : ph < 3.6 ? 1 - ((ph - 3) / 0.6) ** 2 : ph < 6.4 ? 0 : Math.min(1, (ph - 6.4) / 0.8), base = fy + u * 0.15;
+        const say = ph < 3 ? Math.floor(ph) : -1;
+        [0, 1, 2].forEach(i => { const x = cx + (i - 1) * (u + gap * apart + u * 0.04), on = say === i, hop = on ? Math.sin((ph % 1) * Math.PI) * u * 0.25 : 0,
+            sq = ph >= 3.5 && ph < 3.75 ? 1 - 0.12 * Math.sin((ph - 3.5) / 0.25 * Math.PI) : 1;
+          box(g, x, base - hop, u, Wd[i], BOX[i], on, sq);
+          if(on){ const q = ph % 1; g.save(); g.globalAlpha = 1 - q; g.strokeStyle = '#F59E0B'; g.lineWidth = 2.5; for(let k = 1; k <= 3; k++){ g.beginPath(); g.arc(x, base - u * 1.25 - hop, u * 0.18 * k * (0.6 + q), -2.4, -0.7); g.stroke(); }
+            g.globalAlpha = 1; g.font = '800 ' + Math.round(u * 0.34) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.fillStyle = '#B45309'; g.fillText(Wd[i] + Wd[i] + '…', x, base - u * 1.55 - hop - q * u * 0.2); g.restore(); } });
+        if(ph >= 3.5 && ph < 3.9){ const q = (ph - 3.5) / 0.4; for(let i = 0; i < 10; i++){ const a = i / 10 * 7; sparkle(g, cx + Math.cos(a) * u * (1 + q * 1.2), base - u * 0.5 + Math.sin(a) * u * (0.5 + q * 0.8), 5, 1 - q, '#FFE14D'); } }
+        if(ph >= 3.6 && ph < 6.4){ const q = Math.min(1, (ph - 3.6) / 0.35), s = 0.6 + 0.4 * q + Math.sin(Math.min(1, (ph - 3.6) / 0.5) * Math.PI) * 0.12;
+          // the picture jumps out of the middle box, the word bubble above
+          const py = base - u * 1.2 - q * u * 0.9; g.save(); g.font = Math.round(u * 0.9 * s) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(Wd[3], cx, py); g.restore();
+          const by = py - u * 1.05, bw = u * 2.2; g.save(); g.globalAlpha = q; g.fillStyle = '#FFFFFF'; g.beginPath(); g.roundRect(cx - bw / 2, by - u * 0.42, bw, u * 0.78, u * 0.3); g.fill();
+          g.beginPath(); g.moveTo(cx - u * 0.12, by + u * 0.34); g.lineTo(cx + u * 0.12, by + u * 0.34); g.lineTo(cx, by + u * 0.55); g.fill();
+          g.fillStyle = '#7C3AED'; g.font = '900 ' + Math.round(u * 0.56) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(Wd[4], cx, by); g.restore(); }
+        // floating letters drift past the window
+        const L = 'abcdefghijklmnop'; for(let i = 0; i < 6; i++){ const x = (W * (0.1 + i * 0.17) + t * 14 * (i % 2 ? 1 : -1) + W * 2) % W, y = fy * (0.55 + (i % 3) * 0.08) + Math.sin(t * 1.3 + i) * 6;
+          g.save(); g.globalAlpha = 0.35; g.font = '800 ' + Math.round(u * 0.3) + 'px Fredoka, sans-serif'; g.fillStyle = ['#7C3AED', '#0EA5E9', '#EF4444'][i % 3]; g.textAlign = 'center'; g.fillText(L[(i * 3 + Math.floor(t / 4)) % L.length], x, y); g.restore(); }
+      },
+      spots(W, H){ const {fy} = geo(W, H), k = clamp(Math.min(H, W * 1.15) / 560, 0.4, 0.95), y = Math.min(H - 38 * k, fy + (H - fy) * 0.86);
+        const W3 = W > H ? [0.5, 0.2, 0.8] : [0.5, 0.16, 0.84], X = f => clamp(W * f, 64 * k, W - 64 * k);
+        return [{x: X(W3[0]), y, k}, {x: X(W3[1]), y: y - 4 * k, k: k * 0.95, from: -1}, {x: X(W3[2]), y: y - 4 * k, k: k * 0.95, from: 1, dir: -1}]; }
+    });
+  })();
+  // 🎬 COVER georead END
+  K.loaded('georead', 'b6a');
+})(window.GameCovers && window.GameCovers._K);

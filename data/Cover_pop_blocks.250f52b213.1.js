@@ -1,0 +1,72 @@
+
+/* 🎬 Cover_pop_blocks — 📏 b6a: the "pop-blocks" cover block, moved word for word out of GameCovers.html (🧱 Baseline chat, 2026-11-20).
+   It runs after GameCovers on GameCovers._K (the kit's helpers) and keeps its own Z (the cover logo's spot, 🏷️ 24j-e):
+   the kit hands it over before every still / live / spots call, away() measures against it. */
+(function(K){
+  'use strict';
+  if(!K) return;
+  const {clamp, lerp, rng, hx, mix, shade, poly, sparkle, cloud, persp, pick3, root} = K;
+  let Z = null;
+  const away = (x, y, w, h, W, H, opt) => K.awayIn(Z, x, y, w, h, W, H, opt);
+  const add = (id, def) => K.add(id, def, z => { Z = z; });
+  // 🎬 COVER pop-blocks START — 🫧 Pop Blocks: a wall of squishy jelly blocks on a sunny hill; a group of four pink blocks glows, POPs into bubbles + confetti, the blocks above drop down
+  (function(){
+    const COL = ['#FF4D8D', '#FF9F1C', '#3D7DD8', '#22C55E', '#A855F7'];
+    const WALL = [[1, 2, 4, 2, 1, 3, 2], [3, 0, 0, 1, 4, 1, 4], [2, 0, 0, 3, 2, 4, 1], [4, 1, 3, 3, 1, 2, 3], [1, 2, 4, 2, 4, 3, 2]];   // top → bottom; the 0-group = cols 1–2, rows 1–2
+    const GROUP = [[1, 1], [2, 1], [1, 2], [2, 2]];
+    const geo = (W, H) => { const wide = W > H; let ww = Math.min(W * (wide ? 0.5 : 0.82), H * (wide ? 0.66 : 0.58)), wx = W / 2 - ww / 2 + (wide ? W * 0.06 : 0), wy = H * (wide ? 0.25 : 0.33);
+      { const F = away(wx, wy, ww, ww / 7 * 5.12, W, H); ww *= F.s; wx = F.x; wy = F.y; }   /* 🏷️ 24j-e */
+      const cell = ww / 7, wh = cell * 5, gy = wy + wh + cell * 0.12;
+      return {wide, ww, cell, wh, wx, wy, gy, at: (c, r) => ({x: wx + (c + 0.5) * cell, y: wy + (r + 0.5) * cell})}; };
+    function block(g, x, y, s, col, glow, sq){
+      g.save(); g.translate(x, y + s * 0.5); g.scale(1 + (1 - (sq || 1)) * 0.5, sq || 1); g.translate(0, -s * 0.5);
+      if(glow){ g.shadowColor = '#FFFFFF'; g.shadowBlur = s * 0.5; }
+      g.fillStyle = col; g.beginPath(); g.roundRect(-s * 0.46, -s * 0.46, s * 0.92, s * 0.92, s * 0.22); g.fill(); g.shadowBlur = 0;
+      g.fillStyle = shade(col, -0.18); g.beginPath(); g.roundRect(-s * 0.46, s * 0.12, s * 0.92, s * 0.34, [0, 0, s * 0.22, s * 0.22]); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.45)'; g.beginPath(); g.roundRect(-s * 0.32, -s * 0.36, s * 0.3, s * 0.12, s * 0.06); g.fill();
+      // a tiny face
+      g.fillStyle = '#2A1E3A'; [-1, 1].forEach(k => { g.beginPath(); g.arc(k * s * 0.13, -s * 0.04, s * 0.045, 0, 7); g.fill(); });
+      g.strokeStyle = '#2A1E3A'; g.lineWidth = Math.max(1, s * 0.035); g.beginPath(); g.arc(0, s * 0.04, s * 0.08, 0.3, Math.PI - 0.3); g.stroke();
+      g.restore();
+    }
+    add('pop-blocks', {
+      still(g, W, H){
+        const {ww, cell, wh, wx, wy, gy} = geo(W, H);
+        let gr = g.createLinearGradient(0, 0, 0, gy); gr.addColorStop(0, '#6EC6FF'); gr.addColorStop(1, '#D9F2FF'); g.fillStyle = gr; g.fillRect(0, 0, W, gy);
+        g.fillStyle = 'rgba(255,240,180,.9)'; g.beginPath(); g.arc(W * 0.85, H * 0.12, Math.min(W, H) * 0.07, 0, 7); g.fill();
+        cloud(g, W * 0.08, H * 0.2, Math.min(W, H) / 480, 0.85); cloud(g, W * 0.55, H * 0.1, Math.min(W, H) / 560, 0.7);
+        // rolling hills
+        [['#9BDB7A', 0.35, 0], ['#7CCB62', 0.18, 1.3]].forEach(([c, a, ph]) => { g.fillStyle = c; g.beginPath(); g.moveTo(0, gy); for(let x = 0; x <= W; x += 8) g.lineTo(x, gy - H * a * (0.5 + 0.5 * Math.sin(x / W * 4 + ph)) * 0.55); g.lineTo(W, H); g.lineTo(0, H); g.fill(); });
+        gr = g.createLinearGradient(0, gy, 0, H); gr.addColorStop(0, '#6BC25A'); gr.addColorStop(1, '#4FA946'); g.fillStyle = gr; g.fillRect(0, gy, W, H - gy);
+        const R = rng(5); for(let i = 0; i < 18; i++){ const x = R() * W, y = gy + 8 + R() * (H - gy - 10); g.fillStyle = ['#FFFFFF', '#FFE066', '#FF9FC6'][i % 3]; for(let p = 0; p < 5; p++){ g.beginPath(); g.arc(x + Math.cos(p * 1.26) * 3, y + Math.sin(p * 1.26) * 3, 2.2, 0, 7); g.fill(); } }
+        // the wall's frame (a toy crate)
+        g.fillStyle = '#C98B4A'; g.beginPath(); g.roundRect(wx - cell * 0.18, wy - cell * 0.18, ww + cell * 0.36, wh + cell * 0.3, cell * 0.2); g.fill();
+        g.fillStyle = '#FFF4E0'; g.beginPath(); g.roundRect(wx - cell * 0.06, wy - cell * 0.06, ww + cell * 0.12, wh + cell * 0.08, cell * 0.14); g.fill();
+      },
+      live(g, W, H, t){
+        const {cell, wh, ww, wx, wy, at} = geo(W, H), S = cell * 0.98;
+        // 5 s loop: the pink group glows (tap!) → squash → POP → blocks above fall 2 rows → new ones drop in
+        const cyc = 5, ph = (t % cyc) / cyc, glow = ph > 0.12 && ph < 0.36, popped = ph >= 0.36, fallQ = ph < 0.42 ? 0 : Math.min(1, (ph - 0.42) / 0.16), e = fallQ * fallQ;
+        WALL.forEach((row, r) => row.forEach((k, c) => {
+          const inG = GROUP.some(([gc, gr]) => gc === c && gr === r);
+          if(inG){ if(!popped){ const p = at(c, r), sq = glow ? 1 - 0.08 * Math.max(0, Math.sin((ph - 0.12) / 0.24 * Math.PI * 3)) : 1; block(g, p.x, p.y, S, COL[k], glow && Math.sin(t * 14) > 0, sq); } return; }
+          let p = at(c, r); if(popped && (c === 1 || c === 2) && r === 0){ const a = at(c, 0), b = at(c, 2); p = {x: a.x, y: lerp(a.y, b.y, e)}; }
+          block(g, p.x, p.y, S, COL[k], false, (popped && fallQ >= 1 && ph < 0.66 && (c === 1 || c === 2) && r === 0) ? 1 - 0.14 * Math.sin((ph - 0.58) / 0.08 * Math.PI) : 1);
+        }));
+        if(popped && fallQ > 0){ g.save(); g.beginPath(); g.rect(wx - cell * 0.1, wy - cell * 0.06, ww + cell * 0.2, wh + cell); g.clip(); [[1, 0], [2, 0], [1, 1], [2, 1]].forEach(([c, r], i) => { const a = at(c, r - 2.6), b = at(c, r); block(g, b.x, lerp(a.y, b.y, e), S, COL[(c + r * 2 + 1) % 5], false); }); g.restore(); }
+        // 🫧 the pop: bubbles fly up + confetti
+        if(popped && ph < 0.8){ const q = (ph - 0.36) / 0.44, mid = at(1.5, 1.5);
+          for(let i = 0; i < 9; i++){ const a = i * 0.7, x = mid.x + Math.cos(a * 2.3) * cell * (0.4 + q * 1.4), y = mid.y - q * cell * 2.6 - (i % 3) * cell * 0.3, r = cell * (0.12 + (i % 3) * 0.06);
+            g.save(); g.globalAlpha = 1 - q; g.fillStyle = 'rgba(224,242,254,.55)'; g.strokeStyle = 'rgba(61,125,216,.8)'; g.lineWidth = 1.5; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.stroke(); g.fillStyle = '#FFFFFF'; g.beginPath(); g.arc(x - r * 0.35, y - r * 0.35, r * 0.25, 0, 7); g.fill(); g.restore(); }
+          for(let i = 0; i < 14; i++){ const a = i / 14 * 7, x = mid.x + Math.cos(a) * cell * 2 * q, y = mid.y + Math.sin(a) * cell * 1.4 * q + q * q * cell; g.save(); g.globalAlpha = 1 - q; g.translate(x, y); g.rotate(a + t * 5); g.fillStyle = COL[i % 5]; g.fillRect(-cell * 0.07, -cell * 0.035, cell * 0.14, cell * 0.07); g.restore(); }
+          if(ph < 0.62){ g.save(); g.globalAlpha = 1 - (ph - 0.36) / 0.26; g.font = '900 ' + Math.round(cell * 0.6) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.lineWidth = 5; g.strokeStyle = '#FFFFFF'; g.fillStyle = '#FF4D8D'; g.strokeText('POP!', mid.x, mid.y - cell * 0.3); g.fillText('POP!', mid.x, mid.y - cell * 0.3); g.restore(); } }
+        for(let i = 0; i < 4; i++){ const x = W * (0.1 + i * 0.27), y = H * 0.9 - ((t * 22 + i * 90) % (H * 0.7)), r = 5 + i * 2; g.save(); g.globalAlpha = 0.5; g.strokeStyle = 'rgba(61,125,216,.7)'; g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(x + Math.sin(t + i) * 8, y, r, 0, 7); g.fill(); g.stroke(); g.restore(); }
+      },
+      spots(W, H){ const {gy} = geo(W, H), k = clamp(Math.min(H, W * 1.15) / 560, 0.4, 0.95), y = Math.min(H - 36 * k, gy + (H - gy) * 0.84);
+        const W3 = W > H ? [0.5, 0.2, 0.8] : [0.5, 0.18, 0.82], X = f => clamp(W * f, 64 * k, W - 64 * k);
+        return [{x: X(W3[0]), y, k}, {x: X(W3[1]), y: y - 4 * k, k: k * 0.95, from: -1}, {x: X(W3[2]), y: y - 4 * k, k: k * 0.95, from: 1, dir: -1}]; }
+    });
+  })();
+  // 🎬 COVER pop-blocks END
+  K.loaded('pop-blocks', 'b6a');
+})(window.GameCovers && window.GameCovers._K);

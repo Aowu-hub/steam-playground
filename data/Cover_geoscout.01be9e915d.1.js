@@ -1,0 +1,79 @@
+
+/* 🎬 Cover_geoscout — 📏 b6a: the "geoscout" cover block, moved word for word out of GameCovers.html (🧱 Baseline chat, 2026-11-20).
+   It runs after GameCovers on GameCovers._K (the kit's helpers) and keeps its own Z (the cover logo's spot, 🏷️ 24j-e):
+   the kit hands it over before every still / live / spots call, away() measures against it. */
+(function(K){
+  'use strict';
+  if(!K) return;
+  const {clamp, lerp, rng, hx, mix, shade, poly, sparkle, cloud, persp, pick3, root} = K;
+  let Z = null;
+  const away = (x, y, w, h, W, H, opt) => K.awayIn(Z, x, y, w, h, W, H, opt);
+  const add = (id, def) => K.add(id, def, z => { Z = z; });
+  // 🎬 COVER geoscout START — 🔢 GeoScout: Dino Quarry at sunset; two number-block towers (2 and 3, faces on top) slide together and SNAP into a 5 tower, "2 + 3 = 5" floats up; a wooden balance scale beside tips and levels; a little 🦕 peeks over the hill
+  (function(){
+    const COL = {2: '#FF7A59', 3: '#4C9AFF', 5: '#22C3A1'};
+    const geo = (W, H) => { const wide = W > H, gy = H * (wide ? 0.66 : 0.6); let u = Math.min(W * (wide ? 0.07 : 0.115), H * (wide ? 0.1 : 0.075)), cx = W * (wide ? 0.42 : 0.34), sx = W * (wide ? 0.72 : 0.8);
+      { const F = away(cx - u * 2.8, gy - u * 6.9, u * 5.6, u * 7.3, W, H, {only: 'x'}); u *= F.s; cx = F.x + u * 2.8;
+        const S = away(sx - u * 2.3, gy - u * 3.1, u * 4.6, u * 3.5, W, H, {only: 'x', min: 0.9}); sx = S.x + u * 2.3 * S.s; }   /* 🏷️ 24j-e: towers + scale slide along the ground */
+      return {wide, u, gy, cx, sx}; };
+    function cube(g, x, y, u, col, face, num){   // one cube: front + top + side, optional face / number sign
+      const d = u * 0.22;
+      g.fillStyle = shade(col, 0.18); g.beginPath(); g.moveTo(x, y); g.lineTo(x + d, y - d); g.lineTo(x + u + d, y - d); g.lineTo(x + u, y); g.fill();
+      g.fillStyle = shade(col, -0.22); g.beginPath(); g.moveTo(x + u, y); g.lineTo(x + u + d, y - d); g.lineTo(x + u + d, y + u - d); g.lineTo(x + u, y + u); g.fill();
+      g.fillStyle = col; g.fillRect(x, y, u, u); g.strokeStyle = 'rgba(0,0,0,.18)'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, u - 1, u - 1);
+      if(face){ g.fillStyle = '#FFFFFF'; [0.32, 0.68].forEach(f => { g.beginPath(); g.arc(x + u * f, y + u * 0.42, u * 0.11, 0, 7); g.fill(); });
+        g.fillStyle = '#1F2937'; [0.32, 0.68].forEach(f => { g.beginPath(); g.arc(x + u * f + u * 0.02, y + u * 0.44, u * 0.055, 0, 7); g.fill(); });
+        g.strokeStyle = '#1F2937'; g.lineWidth = Math.max(1.2, u * 0.05); g.beginPath(); g.arc(x + u / 2, y + u * 0.58, u * 0.14, 0.25, Math.PI - 0.25); g.stroke(); }
+      if(num){ const r = u * 0.26; g.fillStyle = '#FFFFFF'; g.beginPath(); g.roundRect(x + u / 2 - r, y - u * 0.62, r * 2, r * 1.7, r * 0.4); g.fill(); g.strokeStyle = col; g.lineWidth = 2; g.stroke();
+        g.fillStyle = shade(col, -0.35); g.font = '900 ' + Math.round(r * 1.35) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(num, x + u / 2, y - u * 0.62 + r * 0.88); }
+    }
+    function tower(g, x, base, u, n, col, sq){ for(let i = 0; i < n; i++){ const y = base - (i + 1) * u * (sq || 1); cube(g, x, y, u, col, i === n - 1, i === n - 1 ? String(n) : ''); } }
+    add('geoscout', {
+      still(g, W, H){
+        const {gy, u, sx} = geo(W, H);
+        let gr = g.createLinearGradient(0, 0, 0, gy); gr.addColorStop(0, '#FFB46B'); gr.addColorStop(0.55, '#FFD9A0'); gr.addColorStop(1, '#BFE3A0'); g.fillStyle = gr; g.fillRect(0, 0, W, gy);
+        g.fillStyle = 'rgba(255,236,170,.95)'; g.beginPath(); g.arc(W * 0.8, gy * 0.32, Math.min(W, H) * 0.08, 0, 7); g.fill();
+        // volcano far away + hills
+        g.fillStyle = '#9C7AA8'; g.beginPath(); g.moveTo(W * 0.02, gy); g.lineTo(W * 0.16, gy * 0.42); g.lineTo(W * 0.22, gy * 0.42); g.lineTo(W * 0.38, gy); g.fill();
+        g.fillStyle = '#FF7A59'; g.beginPath(); g.ellipse(W * 0.19, gy * 0.42, W * 0.03, gy * 0.02, 0, 0, 7); g.fill();
+        [['#7FB04A', 0.22, 0.4], ['#5E8F33', 0.12, 2.1]].forEach(([c, a, ph]) => { g.fillStyle = c; g.beginPath(); g.moveTo(0, gy); for(let x = 0; x <= W; x += 8) g.lineTo(x, gy - H * a * (0.5 + 0.5 * Math.sin(x / W * 5 + ph)) * 0.5); g.lineTo(W, H); g.lineTo(0, H); g.fill(); });
+        gr = g.createLinearGradient(0, gy, 0, H); gr.addColorStop(0, '#A9814F'); gr.addColorStop(1, '#8B6A43'); g.fillStyle = gr; g.fillRect(0, gy, W, H - gy);
+        const R = rng(7); for(let i = 0; i < 22; i++){ g.fillStyle = 'rgba(60,40,20,' + (0.15 + R() * 0.2) + ')'; g.beginPath(); g.ellipse(R() * W, gy + 6 + R() * (H - gy - 8), 3 + R() * 6, 2 + R() * 3, 0, 0, 7); g.fill(); }
+        // palm + fern
+        g.strokeStyle = '#7A4E2A'; g.lineWidth = Math.max(3, u * 0.14); g.beginPath(); g.moveTo(W * 0.06, gy + 4); g.quadraticCurveTo(W * 0.04, gy - u * 2, W * 0.08, gy - u * 3.4); g.stroke();
+        g.fillStyle = '#3F8F3A'; for(let i = 0; i < 5; i++){ const a = -Math.PI / 2 + (i - 2) * 0.6; g.beginPath(); g.ellipse(W * 0.08 + Math.cos(a) * u * 0.8, gy - u * 3.4 + Math.sin(a) * u * 0.5 + u * 0.3, u * 0.9, u * 0.22, a, 0, 7); g.fill(); }
+        // scale post
+        g.fillStyle = '#7A4E2A'; g.fillRect(sx - u * 0.12, gy - u * 2.6, u * 0.24, u * 2.6); g.beginPath(); g.ellipse(sx, gy, u * 0.8, u * 0.18, 0, 0, 7); g.fill();
+      },
+      live(g, W, H, t){
+        const {gy, u, cx, sx} = geo(W, H);
+        // 🦕 peeks over the far hill
+        const peek = Math.max(0, Math.sin(t * 0.8)) * u * 0.9; g.save(); g.beginPath(); g.rect(0, 0, W, gy - H * 0.05); g.clip();
+        g.fillStyle = '#6FBF73'; g.beginPath(); g.ellipse(W * 0.55, gy - H * 0.05 - peek + u * 0.6, u * 0.55, u * 0.4, 0, 0, 7); g.fill(); g.fillStyle = '#1F2937'; g.beginPath(); g.arc(W * 0.55 + u * 0.2, gy - H * 0.05 - peek + u * 0.45, u * 0.07, 0, 7); g.fill(); g.restore();
+        // 6 s loop: 2 and 3 slide together (0.8–2) → SNAP (2–2.3) → 5 tower + "2 + 3 = 5" (2.3–4.6) → split back (4.6–6)
+        const cyc = 6, ph = t % cyc, far = u * 1.6;
+        let off = ph < 0.8 ? far : ph < 2 ? lerp(far, 0, ((ph - 0.8) / 1.2) ** 2) : ph < 4.6 ? 0 : ph < 5.4 ? lerp(0, far, (ph - 4.6) / 0.8) : far;
+        const joined = ph >= 2 && ph < 4.6, base = gy + u * 0.4, sq = ph >= 2 && ph < 2.3 ? 1 - 0.12 * Math.sin((ph - 2) / 0.3 * Math.PI) : 1;
+        if(joined){ tower(g, cx - u / 2, base, u, 5, COL[5], sq); }
+        else { tower(g, cx - u - off / 2 - u * 0.05, base, u, 2, COL[2]); tower(g, cx + off / 2 + u * 0.05, base, u, 3, COL[3]); }
+        if(ph >= 2 && ph < 2.5){ const q = (ph - 2) / 0.5; for(let i = 0; i < 10; i++){ const a = i / 10 * 7; sparkle(g, cx + Math.cos(a) * u * (0.6 + q * 1.2), base - u * 2.5 + Math.sin(a) * u * (0.6 + q * 1.2), 5, 1 - q, '#FFE14D'); } }
+        if(ph >= 2.2 && ph < 4.6){ const q = Math.min(1, (ph - 2.2) / 0.4); g.save(); g.globalAlpha = q; g.font = '900 ' + Math.round(u * 0.75) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.lineWidth = 5; g.strokeStyle = '#FFFFFF'; g.fillStyle = '#E07B12';
+          const y = base - u * 6.15 - (1 - q) * u * 0.5; g.strokeText('2 + 3 = 5', cx, y); g.fillText('2 + 3 = 5', cx, y); g.restore(); }
+        // ⚖️ the balance: tips toward the heavier pan, levels when both are 4
+        const tip = Math.sin(t * 1.1) * 0.18 * (Math.sin(t * 0.37) > 0 ? 1 : 0.15), bw = Math.min(u * 1.9, (W - sx) - u * 0.7), top = gy - u * 2.6;
+        g.save(); g.translate(sx, top); g.rotate(tip); g.fillStyle = '#C08A4A'; g.beginPath(); g.roundRect(-bw, -u * 0.1, bw * 2, u * 0.2, u * 0.1); g.fill(); g.restore();
+        g.fillStyle = '#E8C25A'; g.beginPath(); g.arc(sx, top, u * 0.16, 0, 7); g.fill();
+        [-1, 1].forEach(k => { const px = sx + Math.cos(tip) * bw * k, py = top + Math.sin(tip) * bw * k, pd = u * 1.1;
+          g.strokeStyle = '#7A4E2A'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(px, py); g.lineTo(px - u * 0.5, py + pd); g.moveTo(px, py); g.lineTo(px + u * 0.5, py + pd); g.stroke();
+          g.fillStyle = '#F4E6C2'; g.beginPath(); g.ellipse(px, py + pd, u * 0.62, u * 0.16, 0, 0, 7); g.fill(); g.strokeStyle = '#C9A86A'; g.lineWidth = 2; g.stroke();
+          const n = k < 0 ? 1 : 2, uu = u * 0.42; for(let i = 0; i < n; i++) cube(g, px - uu / 2 + (i - (n - 1) / 2) * uu * 1.05, py + pd - uu - u * 0.05, uu, k < 0 ? '#9B6BFF' : '#FF7A59', true, ''); });
+        for(let i = 0; i < 3; i++){ const x = W * (0.2 + i * 0.3) + Math.sin(t * 0.6 + i) * 10, y = H * 0.05 + i * 6; cloud(g, x, y, Math.min(W, H) / 700, 0.45); }
+      },
+      spots(W, H){ const {gy} = geo(W, H), k = clamp(Math.min(H, W * 1.15) / 560, 0.4, 0.95), y = Math.min(H - 38 * k, gy + (H - gy) * 0.86);
+        const W3 = W > H ? [0.5, 0.18, 0.84] : [0.55, 0.16, 0.86], X = f => clamp(W * f, 64 * k, W - 64 * k);
+        return [{x: X(W3[0]), y, k}, {x: X(W3[1]), y: y - 4 * k, k: k * 0.95, from: -1}, {x: X(W3[2]), y: y - 4 * k, k: k * 0.95, from: 1, dir: -1}]; }
+    });
+  })();
+  // 🎬 COVER geoscout END
+  K.loaded('geoscout', 'b6a');
+})(window.GameCovers && window.GameCovers._K);
