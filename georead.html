@@ -1263,12 +1263,19 @@ function nextRound(){
   prefetchRound(R); prefetchRound(G.game.rounds[G.i + 1]);   // 🎧 vp-4
 }
 // 🎧 vp-4: fetch + decode this round's natural-voice clips while the boxes fly in (sounds · the word · its blend), so the first tap is instant
+// 🎧 vp-4b: the finger going DOWN on a word / picture / box / 🔁 Hear starts its clip (the click comes ~100 ms later)
+document.addEventListener('pointerdown', e => { try{ const VP = window.UI && UI.voicePack; if(!VP || !VP.prefetch || !e.target || !e.target.closest) return;
+  const sw = e.target.closest('.sw'), pic = e.target.closest('.pic[data-w]'), hear = e.target.closest('.hear'), box = e.target.closest('.lbox'); let t = null;
+  if(sw) t = sw.textContent.replace(/[^A-Za-z]/g, ''); else if(pic) t = pic.dataset.w; else if(box && G && G.round){ const R = G.round, s = (R.segs || [])[Number(box.dataset.k)]; t = s ? (GR.SAY[s.snd || s.g] || s.say) : (R.choices && GR.SAY[R.choices[Number(box.dataset.k)]]); }
+  else if(hear && G && G.round){ prefetchRound(G.round); return; }
+  if(t) VP.prefetch(t); }catch(err){} }, {capture: true, passive: true});
 function prefetchRound(R){
   try{ const VP = window.UI && UI.voicePack; if(!R || !VP || !VP.prefetch) return; const t = [];
     [R.word, R.from].forEach(w => { if(w && GR.BY[w]) GR.blendScript(w, {syllables: G && G.game && G.game.syllables}).forEach(x => t.push(x.t)); });
     [R.target].concat(R.choices || []).forEach(s => { if(s && GR.SAY[s]) t.push(GR.SAY[s]); });
     if(R.target && GR.KEY[R.target]) t.push('like ' + GR.KEY[R.target][0]);
     (R.pics || []).forEach(w => t.push(w));
+    if(R.story){ (R.story.lines || []).forEach(l => { t.push(l); String(l).split(/\s+/).forEach(w => t.push(w.replace(/[^A-Za-z']/g, ''))); }); if(R.story.q) t.push(R.story.q); }   // 🎧 vp-4b: story words + lines
     VP.prefetch(t); }catch(e){}
 }
 // boxes start in the avatar's arms, then fly down to where they belong
@@ -2135,4 +2142,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (gr-7+mg-1+p1d+p3a+cs-4b+b3w3+24u-c+an-4+an-6+vp-3+vp-4) END OF GeoRead.html -->
+<!-- (gr-7+mg-1+p1d+p3a+cs-4b+b3w3+24u-c+an-4+an-6+vp-3+vp-4+vp-4b) END OF GeoRead.html -->
