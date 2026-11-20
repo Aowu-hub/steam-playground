@@ -1,6 +1,7 @@
 <!-- MoodLab.html — 🎵 Mood Lab (24u-a, ✨ polish chat, hidden: ?page=moodlab). Not in the Gameroom. Listen to every game's ambient mood on the
      REAL engine (UiKit UISound.mood): drag 😌→😬 Tension, try 🤫 robot thinks · 💥 game sound (ducks the music) · 🎉 big win · ⏸ · ⏱️ run out the clock.
      🎊 24y-c: the day row plays any special day over any mood (📅 Today = what the app plays today).
+     🎵 24y-d: 👤 picks row (this player's 🎶 / 🎨 picks on / off) · each card shows the pick · tap 🎵 while a card plays to pick.
      The 🎵 button = this player's music on / off + volume (same pop-over as the 🎵 chip in every game bar). Plan: Drive `Ambient Moods — full plan.md`. -->
 <!DOCTYPE html>
 <html>
@@ -49,6 +50,10 @@
   .days{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:0 0 10px;}   /* 🎊 24y-c */
   .day{min-height:40px;padding:0 11px;border:0;border-radius:20px;font-family:'Fredoka',sans-serif;font-weight:600;font-size:.88rem;cursor:pointer;background:#FFF7E6;color:var(--ink);box-shadow:0 2px 0 rgba(43,36,64,.12);}
   .day.on{background:linear-gradient(135deg,#F2B640,#E8724A);color:#fff;}
+  .pkrow{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:center;margin:0 0 10px;font-weight:800;font-size:.82rem;color:var(--ink-soft);}   /* 🎵 24y-d */
+  .pkrow button{min-height:40px;padding:0 12px;border:0;border-radius:20px;font-family:'Fredoka',sans-serif;font-weight:600;font-size:.88rem;cursor:pointer;background:#EFE9FF;color:var(--ink);box-shadow:0 2px 0 rgba(43,36,64,.12);}
+  .pkrow button.on{background:linear-gradient(135deg,var(--game-a),var(--game-b));color:#fff;}
+  .card .pk{font-weight:800;font-size:.72rem;color:#5B3FD6;background:#EFE9FF;border-radius:8px;padding:1px 6px;}
   .own{margin:0 0 12px;text-align:center;font-weight:700;font-size:.82rem;color:var(--ink-soft);}
   .panel{position:sticky;bottom:0;z-index:6;width:100%;background:rgba(255,255,255,.95);backdrop-filter:blur(6px);box-shadow:0 -4px 18px rgba(60,40,90,.14);padding:8px 10px var(--safe-b,18px);}
   .pin{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:6px;}
@@ -81,6 +86,7 @@
 <main>
   <div class="fams" id="fams"></div>
   <div class="days" id="days" aria-label="Special day"></div>
+  <div class="pkrow" id="pkrow"></div>
   <div class="grid" id="grid"></div>
   <p class="own">🎵 BeatCorner and 📷 Pose Party play their own music, so they have no mood.</p>
 </main>
@@ -139,6 +145,7 @@ function renderGrid(){
     b.querySelector('.ic').textContent = R.icon; b.querySelector('.nm').textContent = R.name; b.querySelector('.gm').textContent = GAME_OF[k] || k;
     b.querySelector('.tg').textContent = R.key + ' ' + (SCALE_NAME[R.scale] || R.scale) + ' · ' + R.bpm + ' bpm · ' + R.lead;
     b.querySelector('.fb').textContent = (UISound.MOOD_FAMILIES[R.fam] || {}).icon || '';
+    const pk = pickTag(k); if(pk){ const t = document.createElement('span'); t.className = 'pk'; t.textContent = pk; b.appendChild(t); }   // 🎵 24y-d: this player's pick
     b.onclick = () => toggle(k);
     g.appendChild(b);
   });
@@ -183,9 +190,24 @@ function renderDays(){   // 🎊 24y-c: hear any special day over any mood
     box.appendChild(b);
   });
 }
-renderFams(); renderGrid(); renderDays();
+function pickTag(k){   // 🎵 24y-d: '🎶 2 · 🎨 🌊' when this player picked something for that game
+  const P = UISound.picks; if(!P || !P.on) return '';
+  const p = P.get(k), W = UISound.WORLDS[p.s], t = p.t === 'own' ? '' : p.t === 'shuffle' ? '🎶 🔀' : '🎶 ' + (p.t + 1);
+  return [t, W ? '🎨 ' + W.icon : ''].filter(Boolean).join(' · ');
+}
+function renderPicks(){   // 🎵 24y-d: the player's own picks on / off (for testing — tap 🎵 while a card plays to pick)
+  const box = $('pkrow'); if(!box || !UISound.picks) return;
+  const who = UISound.music.state().who || CURRENT_PLAYER || '';
+  box.innerHTML = '<span></span><button type="button" data-sound="tap"></button>';
+  box.querySelector('span').textContent = '👤 ' + (who || 'Guest') + "'s picks:";
+  const b = box.querySelector('button'); const paint = () => { b.textContent = UISound.picks.on ? '🎵 On' : '🔕 Off — every game as it comes'; b.classList.toggle('on', !!UISound.picks.on); };
+  b.onclick = () => { UISound.picks.on = !UISound.picks.on; paint(); renderGrid(); const id = CUR_ID; if(id){ stop(); toggle(id); } };
+  paint();
+}
+renderFams(); renderGrid(); renderDays(); renderPicks();
+try{ let tg = ''; UISound.music.watch(() => { const n = JSON.stringify(Object.keys(UISound.MOODS).map(pickTag)); if(n !== tg){ tg = n; renderGrid(); } }); }catch(e){}   // 🎵 24y-d: a pick in the 🎵 sheet shows on its card
 window.MoodLab = {toggle: toggle, stop: stop, cur: () => CUR};
 </script>
 </body>
 </html>
-<!-- (24u-a+24y-c) END OF MoodLab.html -->
+<!-- (24u-a+24y-c+24y-d) END OF MoodLab.html -->
