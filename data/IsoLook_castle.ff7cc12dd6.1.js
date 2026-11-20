@@ -1,0 +1,169 @@
+
+/* 🌍 IsoLook_castle — 🏰 castle → Kingdom — a LOOK file of 🌳 IsoProps (ip-4a: the engine + one file per look).
+   Load it with Props.need(['castle'], start) (the 📲 offline app + tests have it inline already). Runs after IsoProps with Props._K (the kit's insides).
+   Built from Test Harness/isoprops/kit/looks/castle.js by build_isoprops.py — never edit by hand. Same 14 rules as IsoProps (see the top of IsoProps.html). */
+(function(K){
+'use strict';
+if(!K){ console.warn('IsoLook_castle: include IsoProps first'); return; }
+const {HTW, LOOKS, DEFS, MAT, PD, add, lit, sideOf, sh, rnd, addLook, addSet, organic, bareTree, FONT, T} = K;
+/* 🌍 IsoProps LOOK file — 🏰 castle · Kingdom (ip-4a). Runs after the engine with Props._K (kit insides) + T (tools). */
+(function(){
+'use strict';
+const {vis, F, line, polyP, ph, lightOf, dome, frustum, puffs, bubbles, bang, innBoard, glowAt, halo, anvil, porthole, archDoor, ports} = T;
+const D = PD, M = MAT, TAU = Math.PI * 2, S2 = Math.SQRT2;
+const own = (set) => (key, o) => add(set, key, Object.assign({look: set}, o));
+const org = (set) => (key, o, fn) => organic(set, key, Object.assign({look: set}, o), fn);
+addSet('castle', {name: 'Castle', icon: '🏰', accent: '#3A5AA8'});
+/* ============================ 🏰 CASTLE — Kingdom (a storybook medieval town) ============================ */
+addLook('castle', {name: 'Castle', walls: ['#F7F1E3', '#EFE3C8', '#F4ECDC', '#E8DCC4'], roofs: ['#3A5AA8', '#B8321F', '#3E7A4A', '#6A4A8A'], trim: '#5A3418', accent: '#F2B731', stilts: false, ground: 'storybook'}, 'jungle');
+const KA = own('castle'), KO = org('castle'), TIMBER = '#6A4026', STONE = '#C9C2B2', ROYAL = '#3A5AA8';
+// half-timbering on a plaster face: posts, a mid rail and X braces in each bay
+const timber = (bays, hgt) => (g, Q, k) => { g.strokeStyle = TIMBER; g.lineCap = 'square'; g.lineWidth = 2.2 * k; for(let i = 0; i <= bays; i++){ const u = Math.min(0.985, Math.max(0.015, i / bays)); line(g, Q(u, 0), Q(u, hgt)); }
+  line(g, Q(0, 1), Q(1, 1)); line(g, Q(0, hgt - 1), Q(1, hgt - 1)); g.lineWidth = 1.6 * k; for(let i = 0; i < bays; i++){ const a = i / bays, b = (i + 1) / bays; if(i % 2){ line(g, Q(a, 1), Q(b, hgt - 1)); line(g, Q(b, 1), Q(a, hgt - 1)); } } };
+const stones = (rows, hgt) => (g, Q, k) => { g.strokeStyle = 'rgba(70,60,50,0.28)'; g.lineWidth = 0.9 * k; for(let r = 1; r < rows; r++){ const z = r * hgt / rows; line(g, Q(0, z), Q(1, z)); for(let i = 0; i < 6; i++){ const u = (i + (r % 2) * 0.5) / 6; if(u > 0.02 && u < 0.98) line(g, Q(u, z), Q(u, z - hgt / rows)); } } };
+function flag(g, x, y, k, t, col, period){ const w = Math.sin(ph(t, period || 1.6)) + 0.4 * Math.cos(ph(t, period || 1.6)); g.strokeStyle = '#5A3418'; g.lineWidth = 1.2 * k; line(g, [x, y], [x, y - 16 * k]);
+  g.fillStyle = col; g.beginPath(); g.moveTo(x, y - 16 * k); g.quadraticCurveTo(x + 6 * k, y - (17 + w) * k, x + 12 * k, y - (14 + w * 1.5) * k); g.lineTo(x + 9 * k, y - 11.5 * k); g.quadraticCurveTo(x + 5 * k, y - (10 - w) * k, x, y - 10 * k); g.closePath(); g.fill(); }
+function crenels(g, P, k, x0, y0, x1, y1, z, h, col){ const C = lit(col), n = Math.max(2, Math.round((Math.abs(x1 - x0) + Math.abs(y1 - y0)) * 4)); for(let i = 0; i < n; i += 2){ const f0 = i / n, f1 = (i + 1) / n, a = [x0 + (x1 - x0) * f0, y0 + (y1 - y0) * f0], b = [x0 + (x1 - x0) * f1, y0 + (y1 - y0) * f1];
+  polyP(g, [P(a[0], a[1], z), P(b[0], b[1], z), P(b[0], b[1], z + h), P(a[0], a[1], z + h)]); g.fillStyle = y0 === y1 ? C.L : C.R; g.fill(); g.strokeStyle = 'rgba(42,28,20,0.26)'; g.lineWidth = k; g.stroke(); } }
+// 🏠 half-timbered cottage: a stone ground floor, a jettied plaster + timber upper floor, a steep roof, a chimney + a flower box
+(function(){ const def = KA('tudor', {name: 'Timber cottage', foot: [2, 2], h: 104, variants: 4, door: [1, 2], tags: ['house', 'home']});
+  def.build = (B, v, L) => { const c = L.cond, wall = L.walls[v % L.walls.length], roof = L.roofs[v % L.roofs.length];
+    const b = B.box(0.2, 0.2, 0, 1.6, 1.6, 24, STONE); B.decal(b, 'front', ...F(b, 'front'), 0, 24, STONE, {paint: stones(3, 24)}); B.decal(b, 'right', ...F(b, 'right'), 0, 24, STONE, {paint: stones(3, 24)});
+    B.door(b, 'front', 0.82, 0.42, 22, {fill: TIMBER}); B.win(b, 'right', 0.6, 0.34, 8, 11);
+    const u = B.box(0.12, 0.12, 24, 1.76, 1.76, 26, wall, {layer: 1}); B.decal(u, 'front', ...F(u, 'front'), 0, 26, wall, {paint: timber(5, 26)}); B.decal(u, 'right', ...F(u, 'right'), 0, 26, wall, {paint: timber(5, 26)});
+    B.win(u, 'front', 0.42, 0.26, 8, 11); B.win(u, 'front', 1.3, 0.26, 8, 11); B.win(u, 'right', 0.85, 0.26, 8, 11);
+    B.box(0.38, 1.86, 20, 0.4, 0.12, 5, '#8A5A2B', {layer: 2, topFill: c ? '#8A7A5A' : '#5DA84A'});
+    B.custom(0.58, 1.92, (g, P, k) => { if(c) return; const q = P(0.58, 1.92, 25); [['#FF5A7A', -5], ['#FFD23F', 0], ['#FF8FB0', 5]].forEach(([col, dx]) => { g.fillStyle = col; g.beginPath(); g.arc(q[0] + dx * k, q[1] - 2 * k, 2 * k, 0, TAU); g.fill(); }); }, {layer: 3});
+    B.roof(0.12, 0.12, 50, 1.76, 1.76, 44, roof, {ridge: v % 2 ? 'y' : 'x', ov: 0.16, stripes: 8, gable: wall});
+    B.box(1.36, 0.36, 66, 0.28, 0.28, 34, STONE, {trim: 7, layer: 2}); B.box(1.32, 0.32, 100, 0.36, 0.36, 3, '#8E8A82', {layer: 2});
+  }; })();
+// 🏰 round tower house: a stone tower with arched windows, a tall pointed roof + a little flag, an arched porch
+(function(){ const def = KA('towerhouse', {name: 'Tower house', foot: [2, 2], h: 110, variants: 3, door: [1, 2], tags: ['house', 'home', 'tower'], live: {period: 1.6, frames: 6}});
+  def.build = (B, v, L) => { const c = L.cond, roof = L.roofs[v % L.roofs.length];
+    B.drum(1, 0.95, 0, 0.72, 60, STONE, {rings: 5});
+    B.custom(1, 0.95, (g, P, k) => { const q = P(1, 0.95, 0), r = 0.72 * HTW * k * S2, lv = lightOf(c); [[-0.45, 32], [0.4, 32], [-0.1, 48]].forEach(([u, z]) => { const x = q[0] + u * r, y = q[1] - z * k + Math.sqrt(1 - u * u) * r * 0.5;
+      g.fillStyle = '#5A4A3A'; g.beginPath(); g.moveTo(x - 3.6 * k, y + 5 * k); g.lineTo(x - 3.6 * k, y - 2 * k); g.arc(x, y - 2 * k, 3.6 * k, Math.PI, 0); g.lineTo(x + 3.6 * k, y + 5 * k); g.closePath(); g.fill();
+      g.fillStyle = lv ? '#FFE58A' : '#3A3036'; g.beginPath(); g.moveTo(x - 2.4 * k, y + 4 * k); g.lineTo(x - 2.4 * k, y - 2 * k); g.arc(x, y - 2 * k, 2.4 * k, Math.PI, 0); g.lineTo(x + 2.4 * k, y + 4 * k); g.closePath(); g.fill(); }); }, {layer: 1});
+    B.drum(1, 0.95, 60, 0.8, 4, '#8E8A82', {layer: 2});
+    B.cone(1, 0.95, 64, 0.82, 40, roof, {stripes: 9, layer: 2});
+    B.custom(1, 0.95, (g, P, k, t) => { const q = P(1, 0.95, 104); flag(g, q[0], q[1], k, t, L.accent || '#F2B731'); }, {layer: 3});
+    const p = B.box(0.72, 1.56, 0, 0.56, 0.36, 26, STONE, {layer: 2}); B.decal(p, 'front', 0.77, 0.46, 0, 24, TIMBER, {paint: archDoor(TIMBER, '#8E8A82')});
+    B.roof(0.72, 1.56, 26, 0.56, 0.36, 9, roof, {ridge: 'y', ov: 0.06, layer: 2});
+  }; })();
+// 🍺 tavern: a big half-timbered inn with a stone ground floor, two dormers, a shield INN sign, barrels by the door
+(function(){ const def = KA('inn_tavern', {name: 'Tavern', foot: [3, 2], door: [1, 2], h: 126, variants: 2, tags: ['house', 'big', 'rest', 'inn']});
+  def.build = (B, v, L) => { const c = L.cond, wall = ['#F7F1E3', '#EFE3C8'][v % 2], roof = ['#B8321F', '#3A5AA8'][v % 2];
+    const b = B.box(0.14, 0.14, 0, 2.72, 1.6, 28, STONE); B.decal(b, 'front', ...F(b, 'front'), 0, 28, STONE, {paint: stones(3, 28)}); B.decal(b, 'right', ...F(b, 'right'), 0, 28, STONE, {paint: stones(3, 28)});
+    B.door(b, 'front', 1.08, 0.48, 26, {fill: TIMBER}); B.win(b, 'front', 0.36, 0.42, 9, 12); B.win(b, 'front', 1.86, 0.42, 9, 12); B.win(b, 'right', 0.6, 0.42, 9, 12);
+    const u = B.box(0.08, 0.08, 28, 2.84, 1.72, 30, wall, {layer: 1}); B.decal(u, 'front', ...F(u, 'front'), 0, 30, wall, {paint: timber(8, 30)}); B.decal(u, 'right', ...F(u, 'right'), 0, 30, wall, {paint: timber(5, 30)});
+    [0.42, 1.3, 2.18].forEach(x => B.win(u, 'front', x, 0.3, 10, 12)); B.win(u, 'right', 0.7, 0.3, 10, 12);
+    B.roof(0.08, 0.08, 58, 2.84, 1.72, 46, roof, {ridge: 'x', ov: 0.16, stripes: 12, gable: wall});
+    [0.6, 1.9].forEach(x => { const d = B.box(x, 1.18, 64, 0.42, 0.36, 18, wall, {layer: 2}); B.win(d, 'front', x + 0.1, 0.22, 4, 10); B.roof(x, 1.18, 82, 0.42, 0.36, 10, roof, {ridge: 'y', ov: 0.05, layer: 2}); });
+    B.box(2.3, 0.4, 74, 0.3, 0.3, 36, STONE, {trim: 7, layer: 2});
+    innBoard(B, 0.62, 1.88, 30, {shape: 'shield', fill: ROYAL, ink: '#FFE58A', edge: '#F2B731', w: 26, h: 16, rope: '#3A2A20'});
+    B.custom(2.5, 1.86, (g, P, k) => { [[2.35, 1.86], [2.62, 1.86]].forEach(([x, y]) => { const q = P(x, y, 0); g.fillStyle = '#9A6234'; g.beginPath(); D.rr(g, q[0] - 4.4 * k, q[1] - 13 * k, 8.8 * k, 13 * k, 3 * k); g.fill(); g.strokeStyle = '#4A4A50'; g.lineWidth = 1 * k; [-10, -3].forEach(dy => line(g, [q[0] - 4.4 * k, q[1] + dy * k], [q[0] + 4.4 * k, q[1] + dy * k])); }); }, {layer: 3});
+  }; })();
+// ⚒️ armory forge: a stone smithy open at the front, a big stone chimney, shields on the back wall, an armour stand + anvil
+(function(){ const def = KA('smithy_armory', {name: 'Armory forge', foot: [2, 2], door: [0.86, 2], h: 108, tags: ['shop', 'forge', 'smithy'], live: {period: 1.1, frames: 6}});
+  def.build = (B, v, L) => { const c = L.cond;
+    B.box(0.04, 0.04, 0, 1.92, 1.92, 3, '#A8A292', {layer: -1});
+    const back = B.box(0.12, 0.12, 3, 1.76, 0.36, 46, STONE); B.decal(back, 'right', ...F(back, 'right'), 0, 46, STONE, {paint: stones(5, 46)});
+    const side = B.box(1.5, 0.48, 3, 0.38, 1.24, 46, STONE); B.decal(side, 'right', ...F(side, 'right'), 0, 46, STONE, {paint: stones(5, 46)}); B.decal(side, 'front', ...F(side, 'front'), 0, 46, STONE, {paint: stones(5, 46)}); B.win(side, 'right', 0.95, 0.3, 18, 12);
+    B.box(0.12, 1.6, 3, 0.14, 0.14, 46, TIMBER);
+    B.roof(0.06, 0.06, 49, 1.86, 1.0, 22, L.roofs[1], {ridge: 'x', ov: 0.1, stripes: 7});
+    B.box(0.32, 0.18, 3, 0.56, 0.4, 22, '#8E8A82');
+    if(lightOf(c)) halo(B, 0.6, 0.58, 16, 16, '#FF7A2E', 0.7 * lightOf(c));
+    B.custom(0.6, 0.38, (g, P, k, t) => { const q = P(0.6, 0.58, 14), lv = lightOf(c); g.fillStyle = lv ? '#FF9A3E' : '#4A3A3A'; g.beginPath(); D.ell(g, q[0], q[1], 7 * k, 3 * k); g.fill();
+      if(!c){ for(let i = 0; i < 5; i++){ const f = ((t || 0) / 1.1 + i / 5) % 1; g.fillStyle = i % 2 ? '#FFE58A' : '#FFFFFF'; g.beginPath(); g.arc(q[0] + (i - 2) * 3 * k + f * 5 * k, q[1] - 4 * k - f * 14 * k, 0.9 * k, 0, TAU); g.fill(); } } }, {layer: 3});
+    B.box(0.42, 0.22, 25, 0.36, 0.3, 84, STONE, {trim: 8, layer: 3});
+    B.custom(0.6, 0.37, (g, P, k, t) => { if(c && c.broken) return; const q = P(0.6, 0.37, 109); puffs(g, q[0], q[1], k, t, {period: 1.1, col: 'rgba(200,200,206,0.7)', rise: 14}); }, {layer: 6});
+    B.custom(1.1, 0.5, (g, P, k) => { [[1.05, '#B8321F'], [1.32, ROYAL]].forEach(([x, col]) => { const q = P(x, 0.49, 32); g.fillStyle = col; g.beginPath(); g.moveTo(q[0] - 5 * k, q[1] - 6 * k); g.lineTo(q[0] + 5 * k, q[1] - 6 * k); g.lineTo(q[0] + 5 * k, q[1]); g.quadraticCurveTo(q[0] + 5 * k, q[1] + 5 * k, q[0], q[1] + 8 * k); g.quadraticCurveTo(q[0] - 5 * k, q[1] + 5 * k, q[0] - 5 * k, q[1]); g.closePath(); g.fill();
+      g.fillStyle = '#F2B731'; g.fillRect(q[0] - 1 * k, q[1] - 5 * k, 2 * k, 11 * k); g.fillRect(q[0] - 4 * k, q[1] - 1 * k, 8 * k, 2 * k); }); }, {layer: 2});
+    B.custom(0.9, 1.3, (g, P, k) => { const q = P(1.05, 1.3, 0); g.strokeStyle = '#6A4026'; g.lineWidth = 1.6 * k; line(g, q, [q[0], q[1] - 26 * k]); g.fillStyle = '#B8BCC8'; g.beginPath(); D.rr(g, q[0] - 6 * k, q[1] - 26 * k, 12 * k, 14 * k, 4 * k); g.fill(); g.beginPath(); g.arc(q[0], q[1] - 30 * k, 5 * k, 0, TAU); g.fill();
+      g.fillStyle = '#4A4A55'; g.fillRect(q[0] - 3.4 * k, q[1] - 31 * k, 6.8 * k, 1.4 * k); g.fillStyle = '#E2453A'; g.beginPath(); g.moveTo(q[0], q[1] - 35 * k); g.quadraticCurveTo(q[0] + 6 * k, q[1] - 40 * k, q[0] + 4 * k, q[1] - 33 * k); g.fill(); }, {layer: 3});   // armour stand
+    anvil(B, 0.3, 1.38, '#5A4A3A'); B.box(1.0, 1.62, 0, 0.42, 0.22, 7, TIMBER, {topFill: c ? '#7A7A6A' : '#5AA0C8', layer: 1});
+  }; })();
+// ⛲ royal fountain: three stone tiers, water spilling round, a gold crown finial
+(function(){ const def = KA('fountain_royal', {name: 'Royal fountain', foot: [1, 1], h: 62, tags: ['water', 'well'], live: {period: 1.4, frames: 6}});
+  def.build = (B, v, L) => { const c = L.cond, water = !c ? '#6CC8E8' : c.broken ? '#6E6458' : '#9AA88A';
+    B.drum(0.5, 0.5, 0, 0.44, 10, STONE, {rings: 2, topFill: water});
+    B.custom(0.5, 0.5, (g, P, k, t) => { frustum(g, P, k, 0.5, 0.5, 10, 0.1, 0.1, 18, STONE, {top: false}); frustum(g, P, k, 0.5, 0.5, 26, 0.28, 0.3, 4, STONE, {topFill: water}); frustum(g, P, k, 0.5, 0.5, 30, 0.06, 0.06, 12, STONE, {top: false}); frustum(g, P, k, 0.5, 0.5, 40, 0.16, 0.17, 3, STONE, {topFill: water});
+      const top = P(0.5, 0.5, 46); g.fillStyle = '#F2B731'; g.beginPath(); g.moveTo(top[0] - 4 * k, top[1]); g.lineTo(top[0] - 4 * k, top[1] - 5 * k); g.lineTo(top[0] - 2 * k, top[1] - 2.6 * k); g.lineTo(top[0], top[1] - 6 * k); g.lineTo(top[0] + 2 * k, top[1] - 2.6 * k); g.lineTo(top[0] + 4 * k, top[1] - 5 * k); g.lineTo(top[0] + 4 * k, top[1]); g.closePath(); g.fill();
+      if(c) return; const p = (t || 0) / 1.4 % 1; g.strokeStyle = 'rgba(190,235,255,0.9)'; g.lineWidth = 1.4 * k; [-1, 1].forEach(s => { [[43, 0.17, 27], [29, 0.3, 10]].forEach(([z0, r0, z1]) => { const a = P(0.5, 0.5, z0), rx = r0 * HTW * k * S2; g.beginPath(); g.moveTo(a[0] + s * rx, a[1]); g.quadraticCurveTo(a[0] + s * rx * 1.35, a[1] - 2 * k, a[0] + s * rx * 1.25, a[1] + (z0 - z1) * k); g.stroke(); }); });
+      g.fillStyle = 'rgba(255,255,255,0.85)'; for(let i = 0; i < 3; i++){ const f = (p + i / 3) % 1, a = P(0.5, 0.5, 12); g.beginPath(); g.arc(a[0] + (i - 1) * 9 * k, a[1] - f * 3 * k, 1 * k, 0, TAU); g.fill(); } }, {layer: 1});
+  }; })();
+// 🛒 fair pavilion: a striped pointed awning with a scalloped edge + pennants — apples, bread loaves, pies
+(function(){ const def = KA('stall_fair', {name: 'Fair pavilion', foot: [2, 1], door: [1, 1], h: 70, variants: 3, tags: ['shop', 'stall'], live: {period: 1.8, frames: 6}});
+  def.build = (B, v, L) => { const c = L.cond, can = ['#B8321F', ROYAL, '#3E7A4A'][v % 3];
+    [[0.12, 0.18], [1.78, 0.18], [0.12, 0.76], [1.78, 0.76]].forEach(p => B.box(p[0], p[1], 0, 0.1, 0.1, 40, TIMBER));
+    const ct = B.box(0.22, 0.4, 0, 1.56, 0.42, 16, '#A87A4A', {topFill: '#F4EFE4'}); B.decal(ct, 'front', ...F(ct, 'front'), 0, 16, '#A87A4A', {paint: (g, Q, k) => { g.strokeStyle = 'rgba(70,40,20,0.35)'; g.lineWidth = 0.8 * k; for(let i = 1; i < 8; i++) line(g, Q(i / 8, 0), Q(i / 8, 16)); }});
+    B.custom(1, 0.6, (g, P, k) => { const q1 = P(0.5, 0.6, 16), q2 = P(1.0, 0.6, 16), q3 = P(1.5, 0.6, 16);
+      for(let n = 0; n < 6; n++){ g.fillStyle = c ? '#8A6A4A' : (n % 2 ? '#E2453A' : '#7AC043'); g.beginPath(); g.arc(q1[0] + (n % 3 - 1) * 4 * k, q1[1] - 2.4 * k - Math.floor(n / 3) * 3 * k, 2.2 * k, 0, TAU); g.fill(); }
+      [-4, 3].forEach(dx => { g.fillStyle = c ? '#9A7A5A' : '#D9A050'; g.beginPath(); D.ell(g, q2[0] + dx * k, q2[1] - 3 * k, 4.4 * k, 2.6 * k, 0.2); g.fill(); g.strokeStyle = 'rgba(120,70,20,0.5)'; g.lineWidth = 0.7 * k; [-1.5, 0, 1.5].forEach(o => line(g, [q2[0] + (dx + o) * k, q2[1] - 5 * k], [q2[0] + (dx + o + 1) * k, q2[1] - 1.4 * k])); });
+      g.fillStyle = c ? '#8A6A4A' : '#E8B86A'; g.beginPath(); D.ell(g, q3[0], q3[1] - 2 * k, 6 * k, 2.6 * k); g.fill(); g.fillStyle = c ? '#6A4A4A' : '#9C2A4A'; g.beginPath(); D.ell(g, q3[0], q3[1] - 3 * k, 4.4 * k, 1.6 * k); g.fill(); }, {layer: 2});
+    B.roof(0.04, 0.08, 40, 1.92, 0.84, 22, c ? '#9A8A7A' : '#F4EFE4', {kind: 'hip', ov: 0.1, layer: 3});
+    B.custom(1, 0.5, (g, P, k, t) => { const A = [P(-0.06, 0.92, 40), P(1.98, 0.92, 40)], top = P(1, 0.5, 62); g.fillStyle = can; for(let i = 0; i < 8; i += 2){ const f0 = i / 8, f1 = (i + 1) / 8; polyP(g, [[A[0][0] + (A[1][0] - A[0][0]) * f0, A[0][1] + (A[1][1] - A[0][1]) * f0], [A[0][0] + (A[1][0] - A[0][0]) * f1, A[0][1] + (A[1][1] - A[0][1]) * f1], top]); g.fill(); }
+      g.fillStyle = can; for(let i = 0; i < 8; i++){ const f = (i + 0.5) / 8, x = A[0][0] + (A[1][0] - A[0][0]) * f, y = A[0][1] + (A[1][1] - A[0][1]) * f; g.beginPath(); g.arc(x, y, 3.4 * k, 0, Math.PI); g.fill(); }
+      flag(g, top[0], top[1], k, t, L.accent || '#F2B731', 1.8); }, {layer: 4});
+  }; })();
+// 📜 herald board: a notice board on two posts under a little roof, a royal scroll + notes, the "!" on a gold crown badge
+(function(){ const def = KA('qboard_herald', {name: 'Herald board', foot: [1, 1], h: 60, tags: ['quest', 'board']});
+  def.build = (B, v, L) => { const c = L.cond;
+    [0.2, 0.72].forEach(x => B.box(x, 0.46, 0, 0.08, 0.08, 48, TIMBER));
+    const bd = B.box(0.16, 0.52, 14, 0.68, 0.06, 28, '#B8864E');
+    B.decal(bd, 'front', ...F(bd, 'front'), 0, 28, '#B8864E', {paint: (g, Q, k) => { g.fillStyle = c ? '#C9B89A' : '#FFF2D6'; polyP(g, [Q(0.1, 3), Q(0.5, 3), Q(0.5, 24), Q(0.1, 24)]); g.fill(); g.fillStyle = '#B8321F'; const sl = Q(0.3, 6); g.beginPath(); g.arc(sl[0], sl[1], 2 * k, 0, TAU); g.fill();
+      g.strokeStyle = 'rgba(42,28,20,0.4)'; g.lineWidth = 0.7 * k; for(let r = 0; r < 4; r++) line(g, Q(0.14, 11 + r * 3.4), Q(0.46, 11 + r * 3.4)); if(!(c && c.broken)){ g.fillStyle = '#E8F0FF'; polyP(g, [Q(0.58, 8), Q(0.88, 8), Q(0.88, 20), Q(0.58, 20)]); g.fill(); } }});
+    B.roof(0.1, 0.4, 44, 0.8, 0.24, 9, ROYAL, {ridge: 'x', ov: 0.06});
+    B.custom(0.5, 0.6, (g, P, k) => { const q = P(0.5, 0.58, 56); g.fillStyle = c ? '#9A8A5A' : '#F2B731'; g.beginPath(); g.moveTo(q[0] - 7 * k, q[1] + 5 * k); g.lineTo(q[0] - 7 * k, q[1] - 5 * k); g.lineTo(q[0] - 3.5 * k, q[1] - 1 * k); g.lineTo(q[0], q[1] - 7 * k); g.lineTo(q[0] + 3.5 * k, q[1] - 1 * k); g.lineTo(q[0] + 7 * k, q[1] - 5 * k); g.lineTo(q[0] + 7 * k, q[1] + 5 * k); g.closePath(); g.fill();
+      bang(g, q[0], q[1] + 1.5 * k, k, {size: 9, col: ROYAL}); }, {layer: 3});
+  }; })();
+// 🏮 torch post: an iron post with a brazier cup and a flickering flame
+(function(){ const def = KA('lantern_torch', {name: 'Torch post', foot: [1, 1], h: 50, kind: 'post', block: false, tags: ['light', 'night', 'lantern'], live: {period: 1, frames: 6}});
+  def.build = (B, v, L) => { const c = L.cond;
+    B.box(0.36, 0.36, 0, 0.28, 0.28, 5, STONE); B.box(0.45, 0.45, 5, 0.1, 0.1, 30, '#4A4A50');
+    if(lightOf(c)) halo(B, 0.5, 0.5, 40, 15, '#FFB03A', 0.6 * lightOf(c), {pulse: t => 0.88 + 0.08 * Math.sin(ph(t, 1)) + 0.06 * Math.cos(ph(t, 1))});
+    B.custom(0.5, 0.5, (g, P, k, t) => { const q = P(0.5, 0.5, 35), lv = lightOf(c), f = 0.85 + 0.12 * Math.sin(ph(t, 1)) + 0.08 * Math.cos(ph(t, 1)); g.fillStyle = '#4A4A50'; g.beginPath(); g.moveTo(q[0] - 6 * k, q[1] - 4 * k); g.lineTo(q[0] + 6 * k, q[1] - 4 * k); g.lineTo(q[0] + 3 * k, q[1] + 1 * k); g.lineTo(q[0] - 3 * k, q[1] + 1 * k); g.closePath(); g.fill();
+      if(!lv){ g.fillStyle = '#3A3036'; g.beginPath(); D.ell(g, q[0], q[1] - 4 * k, 5 * k, 1.6 * k); g.fill(); return; }
+      g.fillStyle = '#FF7A2E'; g.beginPath(); g.moveTo(q[0] - 5 * k, q[1] - 4 * k); g.quadraticCurveTo(q[0] - 5 * k, q[1] - 10 * k * f, q[0] + 1 * k, q[1] - 15 * k * f); g.quadraticCurveTo(q[0] + 1.5 * k, q[1] - 9 * k, q[0] + 5 * k, q[1] - 4 * k); g.closePath(); g.fill();
+      g.fillStyle = '#FFE58A'; g.beginPath(); g.moveTo(q[0] - 2.4 * k, q[1] - 4 * k); g.quadraticCurveTo(q[0] - 2 * k, q[1] - 8 * k * f, q[0] + 0.6 * k, q[1] - 10 * k * f); g.quadraticCurveTo(q[0] + 1 * k, q[1] - 6 * k, q[0] + 2.4 * k, q[1] - 4 * k); g.closePath(); g.fill(); }, {layer: 2});
+  }; })();
+// 🌳 oak: a round, cloudy green crown on a sturdy trunk (an acorn or two)
+const OAK = [['#6CC060', '#3F8A3A', '#A8E07A'], ['#5DB04E', '#2E7A30', '#9AD86A'], ['#8AC850', '#5A9A2E', '#C8EA7A']];
+KO('oak', {name: 'Oak', h: 76, variants: 3, tags: ['tree']}, (g, x, y, k, t, v) => { const c = OAK[v % 3]; g.save(); g.translate(x, y); g.scale(k, k);
+  D.piece(g, [{path: g => { g.moveTo(-7, 0); g.quadraticCurveTo(-4, -16, -6, -30); g.lineTo(6, -30); g.quadraticCurveTo(4, -16, 7, 0); g.lineTo(11, 2); g.lineTo(-11, 2); g.closePath(); }, fill: g => D.lin(g, -7, 0, 7, 0, ['#8A5A36', '#5A3820'])}], '#000', 0);
+  D.piece(g, [{path: g => { [[-16, -42, 15], [15, -44, 15], [0, -58, 17], [-6, -36, 13], [9, -34, 12], [-24, -32, 9], [24, -34, 9]].forEach(p => { g.moveTo(p[0] + p[2], p[1]); g.arc(p[0], p[1], p[2], 0, TAU); }); }, fill: g => D.rad(g, -8, -62, 4, 48, [c[2], c[0], c[1]])}], '#000', 0);
+  g.fillStyle = 'rgba(255,255,255,0.22)'; [[-12, -50, 6], [6, -62, 6]].forEach(p => { g.beginPath(); g.arc(p[0], p[1], p[2], 0, TAU); g.fill(); });
+  g.fillStyle = '#9A6A3A'; [[-14, -28], [17, -30]].forEach(p => { g.beginPath(); D.ell(g, p[0], p[1], 1.8, 2.2); g.fill(); }); g.restore(); });
+// 🌲 topiary: a clipped hedge (ball or cone) in a terracotta pot
+function topiaryDraw(g, x, y, k, v, leaf, cracked){ g.save(); g.translate(x, y); g.scale(k, k);
+  g.fillStyle = D.lin(g, -7, 0, 7, 0, ['#E2763A', '#B8502A']); g.beginPath(); g.moveTo(-7, -9); g.lineTo(7, -9); g.lineTo(5, 0); g.lineTo(-5, 0); g.closePath(); g.fill(); g.fillStyle = '#C8602E'; g.fillRect(-8, -11, 16, 3);
+  if(cracked){ g.strokeStyle = '#5A2A14'; g.lineWidth = 1; g.beginPath(); g.moveTo(-2, -11); g.lineTo(-4, -6); g.lineTo(-1, -3); g.stroke(); }
+  if(leaf){ g.fillStyle = D.rad(g, -4, -26, 2, 16, leaf); g.beginPath(); if(v % 2){ g.moveTo(-10, -11); g.quadraticCurveTo(-8, -26, 0, -34); g.quadraticCurveTo(8, -26, 10, -11); g.closePath(); } else g.arc(0, -21, 10, 0, TAU); g.fill(); }
+  else { g.strokeStyle = '#8A6A44'; g.lineCap = 'round'; g.lineWidth = 1.4; [-0.6, -0.2, 0.25, 0.6].forEach(a => { g.beginPath(); g.moveTo(0, -11); g.lineTo(Math.sin(a) * 9, -11 - Math.cos(a) * 12); g.stroke(); }); }
+  g.restore(); }
+// 🌲 topiary: a clipped hedge (ball or cone) in a terracotta pot — 🍂 dry = brown hedge · 🏚️ ruined = bare twigs in a cracked pot
+KO('topiary', {name: 'Topiary', h: 34, kind: 'bush', variants: 2, tags: ['plant', 'garden'], conds: {'*': (g, x, y, k, t, v, c) => topiaryDraw(g, x, y, k, v, c.broken ? null : ['#D8B86A', '#A88A4A', '#7A6234'], !!c.broken)}},
+  (g, x, y, k, t, v) => topiaryDraw(g, x, y, k, v, ['#8AD86A', '#4CA03E', '#2E7A30'], false));
+// 🌹 rose bush: a round bush with red / pink roses
+KO('rosebush', {name: 'Rose bush', h: 26, kind: 'bush', variants: 2, tags: ['plant', 'flower']}, (g, x, y, k, t, v) => { g.save(); g.translate(x, y); g.scale(k, k);
+  D.piece(g, [{path: g => { [[-10, -8, 9], [10, -9, 9], [0, -14, 11]].forEach(p => { g.moveTo(p[0] + p[2], p[1]); g.arc(p[0], p[1], p[2], 0, TAU); }); g.rect(-18, -8, 36, 8); }, fill: g => D.rad(g, -4, -20, 2, 22, ['#5DB04E', '#3F8A3A', '#2E6A2E'])}], '#000', 0);
+  const R = D.rnd(31 + v), col = v % 2 ? '#FF8FB0' : '#E2334A'; for(let i = 0; i < 7; i++){ const fx = (R() - 0.5) * 28, fy = -5 - R() * 16; g.fillStyle = col; g.beginPath(); g.arc(fx, fy, 2.6, 0, TAU); g.fill(); g.strokeStyle = sh(col, -0.3); g.lineWidth = 0.7; g.beginPath(); g.arc(fx, fy, 1.2, 0, Math.PI * 1.5); g.stroke(); }
+  g.restore(); });
+// 🏰 castle keep (landmark 3 × 3): a square stone keep with battlements, four round corner towers with blue cone roofs + flags, a gate with a portcullis
+(function(){ const def = KA('castlekeep', {name: 'Castle keep', foot: [3, 3], h: 190, kind: 'landmark', tags: ['landmark', 'castle'], live: {period: 1.6, frames: 6}});
+  def.build = (B, v, L) => { const c = L.cond, roof = L.roofs[0];
+    const w = B.box(0.3, 0.3, 0, 2.4, 2.4, 52, STONE); B.decal(w, 'front', ...F(w, 'front'), 0, 52, STONE, {paint: stones(6, 52)}); B.decal(w, 'right', ...F(w, 'right'), 0, 52, STONE, {paint: stones(6, 52)});
+    B.decal(w, 'front', 1.2, 0.6, 0, 34, '#3A2A20', {paint: (g, Q, k) => { archDoor('#3A2A20', '#8E8A82')(g, Q, k); g.strokeStyle = '#4A4A50'; g.lineWidth = 1.2 * k; for(let i = 1; i < 5; i++) line(g, Q(i / 5, 0), Q(i / 5, 22)); for(let z = 5; z < 22; z += 5) line(g, Q(0.05, z), Q(0.95, z)); }});
+    B.custom(1.5, 1.5, (g, P, k) => { crenels(g, P, k, 0.3, 2.7, 2.7, 2.7, 52, 7, STONE); crenels(g, P, k, 2.7, 2.7, 2.7, 0.3, 52, 7, STONE); }, {layer: 1});
+    const kp = B.box(0.9, 0.9, 52, 1.2, 1.2, 46, sh(STONE, 0.05), {layer: 1}); B.win(kp, 'front', 1.3, 0.3, 18, 14); B.win(kp, 'right', 1.3, 0.3, 18, 14);
+    B.custom(1.5, 1.5, (g, P, k) => { crenels(g, P, k, 0.9, 2.1, 2.1, 2.1, 98, 6, STONE); crenels(g, P, k, 2.1, 2.1, 2.1, 0.9, 98, 6, STONE); }, {layer: 2});
+    [[0.45, 0.45], [2.55, 0.45], [0.45, 2.55], [2.55, 2.55]].forEach(([x, y], i) => { B.drum(x, y, 0, 0.42, 82, STONE, {rings: 6, layer: i === 3 ? 2 : 0}); B.cone(x, y, 82, 0.48, 40, roof, {stripes: 7, layer: i === 3 ? 2 : i === 0 ? 0 : 1});
+      B.custom(x, y, (g, P, k, t) => { const q = P(x, y, 122); flag(g, q[0], q[1], k, (t || 0) + i * 0.4, i % 2 ? '#F2B731' : '#E2453A'); }, {layer: 3}); });
+  }; })();
+// 🗺️ castle look: its own trees + town; plaza things + inn + smithy by swap
+Object.assign(LOOKS.castle, {swap: {palm: 'oak', jtree: 'oak', mango: 'oak', bamboo: 'topiary', banana: 'rosebush', bush: 'rosebush', flowers: 'rosebush',
+    inn: 'inn_tavern', smithy: 'smithy_armory', well: 'fountain_royal', stall: 'stall_fair', qboard: 'qboard_herald', lantern: 'lantern_torch'},
+  roles: {home: ['tudor', 'towerhouse', 'tudor'], tall: ['oak', 'oak', 'topiary', 'oak'], small: ['rosebush', 'topiary', 'rock', 'rosebush']}});
+})();
+K.loaded('castle', 'ip-4f');
+})(window.Props && window.Props._K);
