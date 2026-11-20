@@ -437,7 +437,7 @@ const TD_MOVES = {
   dragon: {_basic: 'spit', a_cone: 'breath', a_bounce: 'spit', a_tornado: 'wing', a_meteor: 'sky', b_minion: 'roar', b_gold: 'tail', b_haste: 'wing',
     c_lava: 'breath', c_mine: 'tail', c_pit: 'tail', d_armor: 'roar', d_shield: 'wing', e_push: 'wing', e_sleep: 'breath', e_fear: 'roar', e_pull: 'roar',
     u_meteor: 'sky', u_army: 'roar', u_field: 'tail', u_fort: 'wing', u_charm: 'breath', x_burst: 'breath', x_guard: 'wing', x_wall: 'tail'},
-  princess: {_basic: 'move.slash.across', a_whip: 'act.whip', a_swarm: 'move.cast.wide', a_storm: 'move.cast.rain', a_shot: 'move.punch.palm',
+  princess: {_basic: 'motion.slash.light', a_whip: 'act.whip', a_swarm: 'move.cast.wide', a_storm: 'move.cast.rain', a_shot: 'move.punch.palm',
     b_tower: 'move.cast.raise', b_minion: 'act.summon', b_flyer: 'move.cast.skycall', b_wall: 'move.defend.brace', b_decoy: 'move.cast.snap',
     c_spikes: 'move.cast.slam', c_net: 'move.cast.spin', c_splash: 'move.cast.orbthrow', d_reflect: 'move.defend.parry', d_shield: 'act.shield', d_heal: 'act.heal',
     d_dome: 'move.defend.bubble', e_daze: 'move.cast.blast', e_push: 'move.cast.sweep', e_sleep: 'move.cast.orb', e_ew: 'move.kick.front', e_charm: 'move.cast.beam',
@@ -578,7 +578,7 @@ function hit(M, e, dmg, src){
   if(e.shine > 0){ e.shine--; fx(M, 'ting', {x: e.x, y: e.y, dur: 0.4}); return; }
   dmg *= 1 - Math.min(0.6, M.mods.suitors.enArmor || 0);
   if(e.shield > 0){ const a = Math.min(e.shield, dmg); e.shield -= a; dmg -= a; }
-  e.hp -= dmg; if(dmg >= 2) e.hitT = 0.14; if(e.sleepT > 0) e.sleepT = 0;
+  e.hp -= dmg; if(dmg >= 2){ e.hitT = 0.14; e.hitBy = M._src || src || null; } if(e.sleepT > 0) e.sleepT = 0;   // 🎬 mo-td: hitBy
   if(src && src.hero){ if(hm.burnHit){ e.burnT = Math.max(e.burnT, 2); e.burnD = Math.max(e.burnD, hm.burnHit); } if(hm.slowHit){ e.slowT = Math.max(e.slowT, 1); e.slowF = Math.max(e.slowF, hm.slowHit); }
     if(hm.fearHit && !e.boss && M.rng() < hm.fearHit) e.fearT = Math.max(e.fearT, 0.8); }
   if(e.hp <= 0) bonk(M, e, src);
@@ -1330,7 +1330,7 @@ function front(M){ let b = null, bd = 1e9; live(M).forEach(e => { const d = cell
 function hit(M, e, dmg, src){
   if(!e || e.gone || dmg <= 0) return; const m = M.mods.foes; dmg *= 1 - Math.min(0.6, m.enArmor || 0);
   if(e.shield > 0){ const s = Math.min(e.shield, dmg); e.shield -= s; dmg -= s; }
-  e.will -= dmg; e.hit = 0.25; if(e.will <= 0) quit(M, e, src);
+  e.will -= dmg; e.hit = 0.25; e.hitBy = src || null; if(e.will <= 0) quit(M, e, src);   // 🎬 mo-td: hitBy
 }
 function quit(M, e, src){
   if(e.gone) return; e.gone = 1; e.quitT = M.t; const gm = 1 + ((M.mods.farmer.goldMul || 0) + (M.mods.goat.goldMul || 0)) * 0.5, seeds = Math.max(1, Math.round(e.S.seeds * gm));
@@ -2645,7 +2645,7 @@ const TRICK_ACT = {cu: 'act.shoot', pr: 'move.throw.lob', wz: 'move.cast.orbthro
 const EL_OF = {fire: 'fire', lava: 'fire', ice: 'ice', storm: 'zap', nature: 'nature', thorn: 'nature', blossom: 'nature', honey: 'light', holy: 'light', sun: 'light', gold: 'light', star: 'light',
   shadow: 'shadow', ghost: 'shadow', dream: 'shadow', cosmic: 'shadow', moon: 'shadow', love: 'candy', candy: 'candy', rose: 'candy', paper: 'light', water: 'water', bubble: 'water', crystal: 'ice', music: 'candy', goo: 'nature', rainbow: 'candy', wind: 'water', rock: 'fire', steel: 'light'};
 const HACT = {dragon: null, princess: null}, SACT = {}, DM = {}, PZ = {x: 0, y: 0, k: 1};
-function act2Reset(){ HACT.dragon = HACT.princess = null; Object.keys(SACT).forEach(k => delete SACT[k]); if(window.ActionFX) ActionFX.clear(); }
+function act2Reset(){ motReset(); HACT.dragon = HACT.princess = null; Object.keys(SACT).forEach(k => delete SACT[k]); if(window.ActionFX) ActionFX.clear(); }
 const actNow = () => G ? G.t : 0;
 // the dragon's pose at a moment: Acting.play keeps the beat clock (contactAt, hit-stop) → we blend TDDragon's own fields with the beat's ease
 function dPoseAt(A, t){ const f = A.run.at(t), B = DMOVES[A.move], i = f.i, cur = B[i].pose, prev = i ? B[i - 1].pose : (A.from || {}),
@@ -2662,13 +2662,13 @@ function act2Event(e){
     const mv = e.basic ? TD.TD_MOVES.princess._basic : (SkillKit.actionOf(G.trees.princess.pack.get(e.key)) || 'move.cast.bolt'), st = heroStage('princess'), col = heroCol('princess');
     const dir = e.aim && IX(e.aim.x, e.aim.y) < IX(TD.CX, TD.CY) - 1 ? -1 : 1, who = {name: 'Princess', av: TDPrincess.av(st, col), dir};
     const L = skillLook(e.basic ? null : {hero: 'princess', key: e.key}, 'swat'), el = EL_OF[L.key] || 'candy';
-    const run = Acting.play(who, mv, {t0: actNow(), contactAt: e.at, onContact: r => fxAt(mv, PZ.x, PZ.y, PZ.k, dir, el, r.contactT, !e.basic)});
+    const run = Acting.play(who, mv, {t0: actNow(), contactAt: e.at, side: 'player', calm: motCalm(), fx: !e.basic && !motCalm(), element: el, onContact: r => fxAt(mv, PZ.x, PZ.y, PZ.k, dir, el, r.contactT, !e.basic)});
     HACT.princess = {run, mv, key: e.key, basic: !!e.basic, dir, at: e.at}; return; }
   if((e.k === 'trickWind' || e.k === 'suitorSkill') && e.id != null){
     const x = G.enemies.find(q => q.id === e.id); if(!x || x.gone) return; const mv = TRICK_ACT[x.type]; if(!mv || !window.Acting) return;
     if(e.k === 'suitorSkill' && SACT[e.id] && !SACT[e.id].done) return;   // it wound up already → this is its contact
     const at = e.k === 'trickWind' ? e.at : actNow();   // a trick that answers the world plays from its contact
-    SACT[e.id] = {run: Acting.play({name: 'suitor'}, mv, {t0: actNow(), contactAt: at, onContact: r => { const A = SACT[e.id]; if(A && A.at) fxAt(mv, A.at[0], A.at[1], A.at[2], A.at[3], 'candy', r.contactT, false); }}), mv, done: false}; return; }
+    SACT[e.id] = {run: Acting.play({name: 'suitor'}, mv, {t0: actNow(), contactAt: at, side: 'enemy', calm: motCalm(), onContact: r => { const A = SACT[e.id]; if(A && A.at) fxAt(mv, A.at[0], A.at[1], A.at[2], A.at[3], 'candy', r.contactT, false); }}), mv, done: false}; return; }
   if(e.k === 'fizzle') floatText(e.hero === 'dragon' ? G.heroes.dragon.x : TD.CX, (e.hero === 'dragon' ? G.heroes.dragon.y : TD.CY) - 1, '💨', '#7A5C88', 0.7);
 }
 // 🎬 an ActionFX contact effect at the act's hit point (the move's own feeling), quiet for auto attacks
@@ -2693,6 +2693,47 @@ function act2Suitor(g, e, set, x, fy, w, flip, alpha, t){ const A = SACT[e.id]; 
   const f = A.run.at(actNow()); if(f.done){ A.done = true; delete SACT[e.id]; return false; } const sc = w / set.w, k = set.k * sc, dir = flip ? -1 : 1;
   A.at = [x, fy, k, dir]; if(f.prop) f.prop = Object.assign({}, f.prop, {ch: e.S.prop || f.prop.ch});
   g.save(); g.globalAlpha = alpha; Acting.draw(g, Object.assign({}, set.who, {dir}), x, fy, k, f, {t, dir}); g.restore(); return true; }
+/* ================= 🎬 mo-td — the shared 🎬 Motion engine in BOTH books (🏰 TD-Stories chat, 2026-11-20, plan §16r) =================
+   Page only (AvatarMotion comes with include('AvatarKit')): 🫁 Motion.idle on the tower / porch · ⚔️ motion.slash.light auto attacks
+   💥 Motion.hit on the cached suitor / collector pictures (kind + element from what hit it, only on hits the game already shows: 📖 1 dmg ≥ 2)
+   🤕 Motion.knock on a push: the picture slides from the old spot to the new one + hops + dust (the ENGINE still decides where)
+   ⚡ suitor tricks {side:'enemy'} = wind-up glow (same 360 ms) · 🐉 hatchling hop squash (Motion.landInfo) · 🌱 Basic = {calm:true} · FX off = today */
+const MOT = {g: null, hit: {}, kn: {}, last: {}, farmer: null, atkT: null, fw: null, pw: null, land: null};
+const motOn = () => !!(window.Motion && Motion.hit && Motion.knock && FX);
+const motCalm = () => !!(G && G.lvl === 0);
+function motReset(){ MOT.hit = {}; MOT.kn = {}; MOT.last = {}; MOT.farmer = null; MOT.atkT = null; MOT.g = G; }
+// 💥 what hit it → the hit's kind + element (📖 1: M._src {hero, key} / {hero} · 📖 2: 'plant' · 'skill' · 'hero')
+function motHitOf(by){ const h = by && typeof by === 'object' ? by.hero : null; let el = null;
+  if(h && by.key){ try{ el = EL_OF[skillLook({hero: h, key: by.key}, 'swat').key] || null; }catch(err){ el = null; } }
+  return h === 'dragon' ? {kind: 'blunt', element: el || 'fire'} : h === 'princess' ? {kind: 'slash', element: el} : {kind: 'blunt', element: el}; }
+// every frame, per foe: start a hit / a knock when the engine shows one happened (x, y = where it stands, before any slide)
+function motWatch(e, x, y, fd){ if(!motOn() || !G) return; if(MOT.g !== G) motReset();
+  const L = MOT.last[e.id] || (MOT.last[e.id] = {}), calm = motCalm(), hv = (fd ? e.hit : e.hitT) || 0;
+  if(L.hv != null && hv > L.hv + 1e-6 && !e.gone){ const o = motHitOf(e.hitBy);
+    MOT.hit[e.id] = {H: Motion.hit({kind: o.kind, weight: e.boss ? 'medium' : 'light', element: o.element || undefined, fx: !!o.element && !calm, calm, seed: e.id}), t0: G.t}; }
+  const pushed = fd ? (e.backN || 0) > (L.bn || 0) : L.d != null && e.d < L.d - 0.12;
+  if(pushed && !e.gone && !e.boss){ const big = fd ? e.backN >= 3 : L.d - e.d > 0.9;
+    MOT.kn[e.id] = {K: Motion.knock({weight: big ? 'medium' : 'light', calm}), t0: G.t, fx: fd ? null : L.x, fy: fd ? null : L.y}; }
+  L.hv = hv; L.bn = e.backN || 0; L.d = e.d; L.x = x; L.y = y; }
+// 🤕 a pushed foe: {dx, dy} = slide left to go · lift (px) · rot · its dust (ms, K) — null when none
+function motKnock(e, x, y, k){ const N = MOT.kn[e.id]; if(!N) return null; const ms = (G.t - N.t0) * 1000, s = N.K.at(ms);
+  if(s.done || ms > 1600){ delete MOT.kn[e.id]; return null; }
+  if(N.end == null) N.end = Math.max(1, Math.abs(N.K.at(99999).dx || 0));
+  const p = N.fx == null ? 1 : Math.min(1, Math.abs(s.dx || 0) / N.end), lift = Math.max(0, s.lift || 0) * k;
+  return {dx: N.fx == null ? 0 : (N.fx - x) * (1 - p), dy: N.fx == null ? 0 : (N.fy - y) * (1 - p), lift, rot: lift > 2 * k ? 0.26 : 0, ms, K: N.K}; }
+// 💥 paint a foe through its hit (flash + freeze + FX) — false when it has none
+function motHitDraw(g, e, paint, x, y, k, dir){ const A = MOT.hit[e.id]; if(!A) return false; const ms = (G.t - A.t0) * 1000;
+  if(ms > 1000 || A.H.at(ms).done){ delete MOT.hit[e.id]; return false; } Motion.drawHit(g, A.H, ms, paint, {x, y, k, dir}); return true; }
+// 🫁 the princess standing on the tower (no move playing) = an alive idle frame
+function motPrincessIdle(st, col, t){ if(!window.Motion || !Motion.idle) return null; const key = st + ':' + col;
+  if(!MOT.pw || MOT.pw.key !== key) MOT.pw = {key, who: {name: 'Princess', av: TDPrincess.av(st, col), dir: 1}}; return Motion.idle(MOT.pw.who, t, {seed: 3}); }
+// 👨‍🌾 the farmer on the porch: a real swing on each auto attack (contact 80 ms after it starts = the tomato leaves), else alive idle
+function motFarmerOpt(H, st, col, x, t){ const dir = H.ax != null && IX(H.ax, H.ay) < x ? -1 : 1;
+  if(!window.Motion || !Motion.idle || !window.Acting) return {dir, pose: H.atkT && G.t - H.atkT < 0.3 ? {armR: -2.2} : {}};
+  const key = st + ':' + col; if(!MOT.fw || MOT.fw.key !== key) MOT.fw = {key, who: {name: 'Farmer', av: TDFarmer.av(st, col), dir: 1}};
+  if(H.atkT && H.atkT !== MOT.atkT){ MOT.atkT = H.atkT; MOT.farmer = Acting.play(MOT.fw.who, 'motion.slash.light', {t0: G.t, contactAt: G.t + 0.08, side: 'player', calm: motCalm()}); }
+  const A = MOT.farmer; if(A){ const f = A.at(G.t); if(f && !f.done) return {dir, act: f}; MOT.farmer = null; }
+  return {dir, act: Motion.idle(MOT.fw.who, t, {seed: 7})}; }
 // ✨ the dragon's move effects in the air: 🔥 fire from the mouth · 🦁 roar rings · 💨 wing gust · 💫 tail trail — and the ActionFX layer
 function act2Air(g, s, t){
   const now = actNow(), A = HACT.dragon;
@@ -2887,11 +2928,12 @@ function drawTower(g, t){
   shadow(g, TD.CX + 0.35, TD.CY + 0.25, 1.2, 0.25); g.drawImage(T.c, ox, oy, T.w, T.h);
   // 👸 the princess centre stage + 🧑 the reader at the side, then the front railing
   const fx = ox + T.cx, fy = oy + T.top, pz = G.heroes.princess, st = heroStage('princess'), k = s / 52, q = morphQ('princess');
-  const swat = pz.atk > HEROES_RATE_P - 0.3, act = G.jail ? 'shy' : performance.now() < AV_T && AV_ACT === 'cheer' ? 'cheer' : null, o = {act: act && window.Acting && Acting.has && Acting.has('acts', act) ? act : null, pose: swat ? {armR: 2.2} : null, dir: 1};
+  const swat = pz.atk > HEROES_RATE_P - 0.3, act = G.jail ? 'shy' : performance.now() < AV_T && AV_ACT === 'cheer' ? 'cheer' : null, o = {act: act && window.Acting && Acting.has && Acting.has('acts', act) ? act : null, pose: swat && !window.Motion ? {armR: 2.2} : null, dir: 1};
   const rs = readerSet(), ract = performance.now() < AV_T ? rs.act(AV_ACT === 'facepalm' ? 'dizzy' : 'cheer') : null, rpic = ract ? ract[Math.floor(t * 7) % ract.length] : rs.still;
   drawPic(g, rpic, fx + T.SR * 0.62, fy + T.sry * 0.35, rs.w, rs.h, true, 0, 1, rs);
   act2Princess(o, fx - s * 0.12, fy + T.sry * 0.1, k, st);   // 🎬 act-2: her move
-  if(q >= 0) princessMorph(g, MORPH.princess, col, fx - s * 0.12, fy + T.sry * 0.1, k, q, t, o); else TDPrincess.draw(g, st, col, fx - s * 0.12, fy + T.sry * 0.1 - Math.abs(Math.sin(t * 2)) * s * 0.02, k, t, o);
+  if(q >= 0) princessMorph(g, MORPH.princess, col, fx - s * 0.12, fy + T.sry * 0.1, k, q, t, o); else { const idle = !o.act && !o.pose ? motPrincessIdle(st, col, t) : null; if(idle) o.act = idle;   // 🎬 mo-td: 🫁 alive idle
+    TDPrincess.draw(g, st, col, fx - s * 0.12, fy + T.sry * 0.1 - (idle ? 0 : Math.abs(Math.sin(t * 2)) * s * 0.02), k, t, o); }
   if(pz.dazeT > 0) emo(g, '✨', fx, fy - s * 1.5, s * 0.45);
   g.drawImage(T.front, ox, oy, T.w, T.h);
   if(G.domeT > 0){ const r = 2.3 + 0.05 * Math.sin(t * 5); g.fillStyle = 'rgba(150,220,255,.18)'; g.strokeStyle = 'rgba(130,205,255,.85)'; g.lineWidth = s * 0.07;
@@ -2907,6 +2949,8 @@ function drawDragonHero(g, t){
   shadow(g, hd.x, hd.y, 0.3 + 0.12 * st, 0.18);
   const x = IX(hd.x, hd.y), feet = IY(hd.x, hd.y, lift), q = morphQ('dragon'), o = {dir: hd.face || 1, noShadow: true, out: {}};
   act2Dragon(o, x);   // 🎬 act-2: the move's pose + it faces its target
+  if(!o.pose && st < 3 && FX && window.Motion && Motion.landInfo){ const ph = (t * 6) % Math.PI / Math.PI, w = Math.max(0, 1 - Math.min(ph, 1 - ph) * 9);   // 🎬 mo-td: 🦘 squash on landing
+    if(w > 0){ if(!MOT.land) MOT.land = Motion.landInfo({height: motCalm() ? 0.3 : 0.6}); o.pose = {sy: -MOT.land.squash / 100 * w}; } }
   if(q >= 0){ g.save(); if(o.dir < 0){ g.translate(x, 0); g.scale(-1, 1); g.translate(-x, 0); } TDDragon.morph(g, MORPH.dragon.from, MORPH.dragon.to, col, x, feet, k, q, t); g.restore(); }
   else { g.globalAlpha = hd.dazeT > 0 ? 0.75 : 1; TDDragon.draw(g, st, col, x, feet, k, t, o); g.globalAlpha = 1; act2DragonOut(g, o); }
   if(hd.sleepy) emo(g, '💤', x + s * 0.5, feet - s * 1.2, s * 0.45); if(hd.dazeT > 0) emo(g, '💐', x - s * 0.45, feet - s * 1.1, s * 0.45);
@@ -3062,16 +3106,18 @@ function drawSuitor(g, e, t, s){
   const back = e.charmT > 0 || e.fearT > 0, flip = Math.cos(e.ang || 0) < 0 ? !back : back;
   const fr = e.charmT > 0 ? set.act('love') : (e.stunT > 0 || e.sleepT > 0 || e.rootT > 0 || e.confT > 0) ? set.act('dizzy') : null;
   const pic = fr ? fr[Math.floor(t * 6 + e.id) % fr.length] : still ? set.still : set.walk[Math.floor((t * 1.9 + e.id * 0.37) * WALK_N) % WALK_N];
-  const alpha = e.hitT > 0 && FX ? 0.55 + 0.45 * Math.cos(e.hitT * 70) : 1, fy = IY(e.x, e.y, hop);
-  if(!act2Suitor(g, e, set, IX(e.x, e.y), fy, w, flip, alpha, t)) drawPic(g, pic, IX(e.x, e.y), fy, w, h, flip, 0, alpha, set);   // 🎬 act-2: a trick is drawn live
-  if(S.prop && e.type !== 'bd') emo(g, S.prop, IX(e.x, e.y) + (flip ? -1 : 1) * set.head * 0.34, fy - set.head * 0.42, set.head * 0.34, alpha, flip);
-  if(S.front) emo(g, S.front, IX(e.x, e.y) + (flip ? -1 : 1) * w * 0.42, fy - s * 0.28, s * 0.62, alpha, flip);   // 🛒 the gift cart rolls in front
-  if(e.shine > 0 || e.shield > 0){ g.strokeStyle = e.shine > 0 ? 'rgba(255,240,140,.95)' : 'rgba(150,200,255,.9)'; g.lineWidth = s * 0.07; g.beginPath(); g.ellipse(IX(e.x, e.y), fy - set.head * 0.5, set.head * 0.42, set.head * 0.58, 0, 0, Math.PI * 2); g.stroke(); }
+  const MO = motOn(), alpha = e.hitT > 0 && FX && !MO ? 0.55 + 0.45 * Math.cos(e.hitT * 70) : 1; let fy = IY(e.x, e.y, hop), sx0 = IX(e.x, e.y), kn = null;   // 🎬 mo-td
+  if(MO){ const kk = set.k * w / set.w; motWatch(e, sx0, fy, false); kn = motKnock(e, sx0, fy, kk); if(kn){ sx0 += kn.dx; fy += kn.dy; Motion.drawKnockFx(g, kn.K, kn.ms, sx0, fy, kk, flip ? 1 : -1); fy -= kn.lift; } }
+  const rot = kn ? kn.rot * (flip ? 1 : -1) : 0, paint = gg => drawPic(gg, pic, sx0, fy, w, h, flip, rot, alpha, set);
+  if(!act2Suitor(g, e, set, sx0, fy, w, flip, alpha, t) && !(MO && motHitDraw(g, e, paint, sx0, fy, set.k * w / set.w, flip ? -1 : 1))) paint(g);   // 🎬 act-2: a trick is drawn live · mo-td: 💥 hit
+  if(S.prop && e.type !== 'bd') emo(g, S.prop, sx0 + (flip ? -1 : 1) * set.head * 0.34, fy - set.head * 0.42, set.head * 0.34, alpha, flip);
+  if(S.front) emo(g, S.front, sx0 + (flip ? -1 : 1) * w * 0.42, fy - s * 0.28, s * 0.62, alpha, flip);   // 🛒 the gift cart rolls in front
+  if(e.shine > 0 || e.shield > 0){ g.strokeStyle = e.shine > 0 ? 'rgba(255,240,140,.95)' : 'rgba(150,200,255,.9)'; g.lineWidth = s * 0.07; g.beginPath(); g.ellipse(sx0, fy - set.head * 0.5, set.head * 0.42, set.head * 0.58, 0, 0, Math.PI * 2); g.stroke(); }
   const top = fy - set.head - s * 0.12;
-  bar(g, IX(e.x, e.y), top, Math.min(w * 0.8, s * 0.9), e.hp / e.hpMax, e.boss ? '#E5484D' : '#FF5C9A');
+  bar(g, sx0, top, Math.min(w * 0.8, s * 0.9), e.hp / e.hpMax, e.boss ? '#E5484D' : '#FF5C9A');
   const st = e.charmT > 0 ? '😍' : e.sleepT > 0 ? '💤' : e.stunT > 0 ? '💞' : e.rootT > 0 ? '🕸️' : e.fearT > 0 ? '😱' : e.confT > 0 ? '❓' : e.tea ? '☕' : e.slowT > 0 ? '🐌' : e.burnT > 0 ? '🔥' : '';
-  if(st) emo(g, st, IX(e.x, e.y) + w * 0.36, top - s * 0.22, s * 0.4);
-  if(e.boss) emo(g, '👑', IX(e.x, e.y), top - s * 0.3, s * 0.45);
+  if(st) emo(g, st, sx0 + w * 0.36, top - s * 0.22, s * 0.4);
+  if(e.boss) emo(g, '👑', sx0, top - s * 0.3, s * 0.45);
 }
 // effects that lie on the ground (drawn with the ground transform, world units)
 function drawGroundFx(g, f, t){
@@ -4257,7 +4303,7 @@ function fdMorphDraw(g, h, x, feet, k, t, drawFn){
 }
 function fdFarmer(g, t, sx, sy){ const H = G.heroes.farmer, hk = VIEW.s / 40, it = fdHasProps() ? fdHouseIt() : null, st = it && it.stand, p = st ? fdV().toScreen(st.x, st.y, st.z) : null;   // 👨‍🌾 on the porch roof (fd-1b: IsoProps it.stand)
   const x = p ? p.x : IX(FD.CX + 1, FD.CY + 1) - 24 * hk, feet = p ? p.y : IY(FD.CX + 1, FD.CY + 1, 0) - 57 * hk, k = VIEW.s / (p ? 46 : 36);   // on the porch: collector-sized, so the house still reads as a house
-  fdMorphDraw(g, 'farmer', x, feet, k, t, (st, col) => TDFarmer.draw(g, st, col, x, feet, k, t, {dir: H.ax != null && IX(H.ax, H.ay) < x ? -1 : 1, pose: H.atkT && G.t - H.atkT < 0.3 ? {armR: -2.2} : {}})); }
+  fdMorphDraw(g, 'farmer', x, feet, k, t, (st, col) => TDFarmer.draw(g, st, col, x, feet, k, t, motFarmerOpt(H, st, col, x, t))); }   // 🎬 mo-td: swing + idle
 function fdGoat(g, t){ const H = G.heroes.goat, x = IX(H.x, H.y), feet = IY(H.x, H.y, 0) + (H.mv ? -Math.abs(Math.sin(t * 12)) * VIEW.s * 0.12 : 0), k = VIEW.s / 30;
   shadow(g, H.x, H.y, 0.38); fdMorphDraw(g, 'goat', x, feet, k, t, (st, col) => TDGoat.draw(g, st, col, x, feet, k, t, {dir: ISO.rq ? (fdFaceL(H, x) ? -1 : 1) : H.tx < H.x ? -1 : 1})); }
 const FD_COL_KEY = {c: 'co', k: 'ck', u: 'um', boss1: 'co', boss2: 'um', tr: 'tr', boss3: 'mt', bk: 'bk', boss4: 'sb'};   // ✦ fd-2b: 🚲 Bike Clerk + 🚴 Speedy Bike Bill   // ✦ fd-2a: 🦴 Treats Lady + 👜 Mrs. Treats
@@ -4267,7 +4313,9 @@ function fdCollector(g, e, t, s){
   const x = IX(e.x, e.y), y = IY(e.x, e.y, 0) - (e.gone ? (G.t - e.quitT) * s * 0.6 : 0), flip = ISO.rq ? fdFaceL(e, x) : (e.face || 1) < 0, moving = !e.gone && !(e.stunT > 0 || e.sleepT > 0 || e.stopT > 0);
   shadow(g, e.x, e.y, 0.3 * sz, 0.18 * quitA);
   const fr = moving ? set.walk[Math.floor((e.steps + e.prog) * 4) % WALK_N] : set.still, bike = e.S.bike ? fdBike(g, e, x, y, s * sz, flip, t, quitA, moving) : 0;   // 🚲 fd-2b: on the saddle
-  drawPic(g, bike ? set.still : fr, x, y - bike, set.w, set.h, flip, e.gone ? Math.sin(G.t * 20) * 0.2 : e.hit > 0 ? Math.sin(t * 50) * 0.05 : 0, quitA, set);
+  const MO = motOn(); let kn = null; if(MO && !e.gone){ motWatch(e, x, y, true); kn = motKnock(e, x, y, set.k); if(kn) Motion.drawKnockFx(g, kn.K, kn.ms, x, y, set.k, flip ? 1 : -1); }   // 🎬 mo-td
+  const lf = kn ? kn.lift : 0, paint = gg => drawPic(gg, bike ? set.still : fr, x, y - bike - lf, set.w, set.h, flip, e.gone ? Math.sin(G.t * 20) * 0.2 : kn ? kn.rot * (flip ? 1 : -1) : e.hit > 0 && !MO ? Math.sin(t * 50) * 0.05 : 0, quitA, set);
+  if(!(MO && !e.gone && motHitDraw(g, e, paint, x, y - bike - lf, set.k, flip ? -1 : 1))) paint(g);   // 💥 hit
   if(e.boss) emo(g, {um: '☂️', mt: '👜', sb: '🔔'}[key] || '📋', x + s * 0.45 * (flip ? -1 : 1), y - set.h * 0.55, s * 0.55, quitA);
   if(e.throwT && G.t - e.throwT < 0.4 && !e.gone) emo(g, '🦴', x + s * 0.4 * (flip ? -1 : 1), y - set.h * (0.6 + (G.t - e.throwT)), s * 0.3, quitA);
   if(e.gone) return;
@@ -5040,4 +5088,4 @@ function tdResultBadge(){
 /* 🏷️ TD LOGO END */</script>
 </body>
 </html>
-<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a+fd-1a2+fd-1b+fd-1c+fd-1d+fd-1e+fd-2a+wr-1+fd-2b+td-wear) END OF TDStories.html -->
+<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a+fd-1a2+fd-1b+fd-1c+fd-1d+fd-1e+fd-2a+wr-1+fd-2b+td-wear+mo-td) END OF TDStories.html -->
