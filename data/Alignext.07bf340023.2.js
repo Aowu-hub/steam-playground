@@ -1707,10 +1707,12 @@ msAfter('choosePlayer', name => {
    🎲 Random results (new card draws, 🌀 Shake's random drop, the 🤖's starting cards) come from ONE seeded dice (G.lx.rs) that every device rolls in the same order, so they match;
    the dice position travels in axgo (the whole state) when a phone is out of step (fingerprint / count differ → axask → axgo).
    📺 TV games: phones are controllers — 🔴 big column buttons · ❌⭕ ♟️ (and card aiming) a small copy of the board · 🃏 your hand · ♟️ your piece sizes. ⚡ Stack powers stay one-device only.
-   Saves: the host saves feats for everyone (no level result). 🔜 🌍 Anywhere (other houses). */
+   Saves: the host saves feats for everyone (no level result). 🌍 Anywhere (lk-aw): a phone in another house links through the family server (a move ≈ 2–5 s, ⏳ said on the turn bar). */
 const LX = {wired: false, pending: null, cfg: null, games: 0, viaCover: false, keep: null};
 const LX_AUTO_MS = window.LX_AUTO_MS || 20000;   // a dropped player's turn (or start-card pick): 🤖 acts for them after this
 const LX_MODES = {drop: '🔴 Drop', classic: '❌⭕ Classic', stack: '♟️ Stack'};
+/* 🌍 lk-aw: a far move (other house, the family server) takes 2–5 s — the words the turn bar adds while it waits */
+function lxFarSay(name){ try{ const t = window.Link && Link.farHint ? Link.farHint(name, 'move') : ''; return t ? ' ' + t : ''; }catch(e){ return ''; } }
 (function(){ const s = document.createElement('style'); s.textContent =
   '#ax-ctl{position:fixed;inset:0;z-index:45;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(8px,1.8vh,18px);padding:calc(12px + env(safe-area-inset-top,0px)) 14px calc(var(--safe-b,18px) + 8px);background:radial-gradient(circle at 50% 20%,#3a2a6a,#160f2c);color:#fff;font-family:var(--font-display,"Fredoka",sans-serif);text-align:center;overflow:hidden}' +
   '#ax-ctl.hidden{display:none}#ax-ctl .axc-me{display:flex;align-items:center;gap:10px;font-size:clamp(18px,4.4vw,26px);font-weight:700}#ax-ctl .axc-dot{width:30px;height:30px;border-radius:50%;box-shadow:inset 0 -4px 0 rgba(0,0,0,.25),0 0 0 3px #fff6}' +
@@ -1738,16 +1740,18 @@ const LX_MODES = {drop: '🔴 Drop', classic: '❌⭕ Classic', stack: '♟️ S
   '#ax-ctl .axc-leave{position:absolute;left:12px;top:calc(10px + env(safe-area-inset-top,0px));min-height:40px;padding:6px 14px;border:0;border-radius:99px;background:#fff;color:#2A1E3A;font:700 15px/1 var(--font-display,"Fredoka",sans-serif);z-index:1}' +
   '#cardpick .lx-wait .lx-who{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:8px}#cardpick .lx-wait .lx-who span{padding:6px 12px;border-radius:99px;background:#F1ECFA;font-weight:700}' +
   '#cardpick .lx-note{font-size:.8rem;font-weight:700;color:#7A5BD0;margin:-4px 0 10px}' +
-  '#players .pl.lx-you .nm::after{content:" (you)";font-weight:600;opacity:.8}';
+  '#players .pl.lx-you .nm::after{content:" (you)";font-weight:600;opacity:.8}' +
+  '#players .pl.lx-far .nm::after{content:" 🌍";font-weight:600}#players .pl.lx-you.lx-far .nm::after{content:" (you) 🌍"}';   /* 🌍 lk-aw: plays from another house */
   document.head.appendChild(s); })();
 function lxAv(cv, p){ const g = cv.getContext('2d'); g.clearRect(0, 0, cv.width, cv.height); if(typeof drawPreviewCanvas === 'function') drawPreviewCanvas(cv, myAvatar(p.name), {name: p.name, t: 1}); }
 function lxIdle(){ try{ if(window.Link && Link.status() !== 'idle') Link.leave(); }catch(e){} }
 // 🎲 ONE seeded dice for every random result in a linked game (same rolls in the same order on every device); outside a linked game = Math.random
 function lxRand(){ if(!(G && G.lx)) return Math.random(); const s = (Math.imul(G.lx.rs >>> 0, 1664525) + 1013904223) >>> 0; G.lx.rs = s; return s / 4294967296; }
 // ---- the host's picks (remembered per player) ----
-function lxMode(){ const m = lsGet('lx_mode', 'drop'); return LX_MODES[m] ? m : 'drop'; }
+// 📺 lk-ax3: from the 📺 Game Station the voted mode + board win (LX.st, held in memory — the TV's own picks stay as they were)
+function lxMode(){ if(LX.st && LX_MODES[LX.st.mode]) return LX.st.mode; const m = lsGet('lx_mode', 'drop'); return LX_MODES[m] ? m : 'drop'; }
 function lxSizes(m){ return DUO_SIZES[(m || lxMode()) === 'drop' ? 'drop' : 'omni']; }
-function lxBoardKey(m){ m = m || lxMode(); const key = m === 'drop' ? 'lx_board' : 'lx_board_omni', k = lsGet(key, 'm'); return lxSizes(m).some(z => z.k === k) ? k : 'm'; }
+function lxBoardKey(m){ m = m || lxMode(); if(LX.st) return LX.st.board; const key = m === 'drop' ? 'lx_board' : 'lx_board_omni', k = lsGet(key, 'm'); return lxSizes(m).some(z => z.k === k) ? k : 'm'; }
 function lxCardsOn(){ return lsGet('lx_cards', '0') === '1'; }
 // 📱 the room on the cover: the host's picks as chips — tap = the next one
 function lxCoverPicks(el){
@@ -1755,6 +1759,7 @@ function lxCoverPicks(el){
   el.innerHTML = '<button class="lkc-chip" data-k="mode" data-sound="none">' + LX_MODES[m] + '</button><button class="lkc-chip" data-k="board" data-sound="none">🗺️ ' + z.W + '×' + z.H + ' · ' + z.line + ' in a row</button>' +
     (m === 'stack' ? '' : '<button class="lkc-chip" data-k="cards" data-sound="none">🃏 Cards: ' + (lxCardsOn() ? 'on' : 'off') + '</button>') +
     '<button class="lkc-chip" data-k="look" data-sound="none">' + T.icon + ' ' + UI.esc(T.name) + '</button>';
+  if(LX.st){ el.querySelectorAll('.lkc-chip').forEach(b => { b.disabled = true; b.title = '📺 voted on the phones'; }); return; }   // 📺 lk-ax3: the station's picks — shown, not changed here
   el.querySelectorAll('.lkc-chip').forEach(b => b.onclick = e => { e.stopPropagation(); const k = b.dataset.k;
     if(k === 'mode'){ const ks = Object.keys(LX_MODES), n = ks[(ks.indexOf(m) + 1) % ks.length]; lsSet('lx_mode', n); if(n !== 'drop') UI.toast(LX_MODES[n] + ' is for 2 players (📺 1 player = you vs 🤖)'); }
     else if(k === 'board'){ const ks = lxSizes(m).map(x => x.k); lsSet(m === 'drop' ? 'lx_board' : 'lx_board_omni', ks[(ks.indexOf(lxBoardKey(m)) + 1) % ks.length]); }
@@ -1920,7 +1925,7 @@ function lxCtlTick(){
   const say = $('axc-say'); say.classList.toggle('go', mine && !G.over);
   const aim = G.cardMode ? cardAims() : null, colsAim = aim && drop && aim.cols.length;
   say.textContent = G.over ? '🏁 Game over — look at the TV!' : G.picking ? '🃏 Picking starting cards…' : mine ? (G.cardMode ? '🎯 ' + AX.CARDS[G.cardMode.key].icon + ' Aim your card!' : G.stack ? '👉 Your turn — pick a size, tap a square!' : drop ? '👉 Your turn — pick a column!' : '👉 Your turn — tap a square!') :
-    (s.bot || /^Robo \d$/.test(s.name) ? '🤖 Robo is thinking…' : '⏳ ' + s.name + ' is thinking…');
+    (s.bot || /^Robo \d$/.test(s.name) ? '🤖 Robo is thinking…' : '⏳ ' + s.name + ' is thinking…' + lxFarSay(s.name));   /* 🌍 lk-aw */
   // the main pad: 🔴 column buttons, or a small copy of the board (❌⭕ ♟️, and 🔴 when a card aims at a disc)
   const pad = $('axc-pad'), bd = $('axc-board');
   if(drop && (!aim || colsAim)){
@@ -1972,10 +1977,11 @@ startTurn = (function(f){ return function(){
   lxCtlTick(); return r; }; })(startTurn);
 updateSeats = (function(f){ return function(){
   const r = f.apply(this, arguments);
-  if(G && G.lx){ G.seats.forEach((s, i) => { const d = $('pl-' + i); if(d) d.classList.toggle('lx-you', i === G.lx.me); const st = $('st-' + i);
-      if(st && !G.over && i === G.cur && i !== G.lx.me) st.textContent = s.bot ? '🤔 thinking…' : '⏳ thinking…'; if(st && G.lx.away && G.lx.away[i]) st.textContent = '📶 away · 🤖'; });
+  if(G && G.lx){ const far = new Set((window.Link && Link.farNames && Link.farNames()) || []);   /* 🌍 lk-aw: + lx-far · ⏳🌍 on a far mover's seat */
+    G.seats.forEach((s, i) => { const d = $('pl-' + i); if(d){ d.classList.toggle('lx-you', i === G.lx.me); d.classList.toggle('lx-far', !s.bot && far.has(s.name)); } const st = $('st-' + i);
+      if(st && !G.over && i === G.cur && i !== G.lx.me) st.textContent = s.bot ? '🤔 thinking…' : (lxFarSay(s.name) ? '⏳🌍 2–5 s' : '⏳ thinking…'); if(st && G.lx.away && G.lx.away[i]) st.textContent = '📶 away · 🤖'; });
     const tb = $('turnbar'), s = G.seats[G.cur];
-    if(tb && !G.over) tb.textContent = (G.picking ? '🃏 Picking starting cards…' : G.cur === G.lx.me ? '👉 Your turn' : s.bot ? '🤖 Robo is thinking…' : '⏳ ' + s.name + ' is thinking…') + ' · ' + G.L.line + ' in a row'; }
+    if(tb && !G.over) tb.textContent = (G.picking ? '🃏 Picking starting cards…' : G.cur === G.lx.me ? '👉 Your turn' : s.bot ? '🤖 Robo is thinking…' : '⏳ ' + s.name + ' is thinking…' + lxFarSay(s.name)) + ' · ' + G.L.line + ' in a row'; }   /* 🌍 lk-aw */
   return r; }; })(updateSeats);
 leavePlay = (function(f){ return function(){ if(G && G.lx) return lxLeavePlay(); return f.apply(this, arguments); }; })(leavePlay);
 resign = (function(f){ return function(){ if(G && G.lx) return lxLeavePlay(); return f.apply(this, arguments); }; })(resign);
@@ -2049,4 +2055,19 @@ function lxUrlCode(cb){
 }
 msAfter('choosePlayer', () => lxUrlCode(c => { c = String(c || '').replace(/[^0-9]/g, '').slice(0, 4); if(c.length !== 4 || !window.Link || !Link.cover) return;
   setTimeout(() => { openCover(); if(!AlignCover) return; lxWire(); Link.cover(AlignCover, AX_ROOM); Link.cover.join(c); }, 0); }));
+// ---- 📺 lk-ax3: the 📺 TV Game Station (LinkKit plan §52) ----
+// TV (?mode=ltv&st&stv=1&slv=<level>&ssp=drop|classic|stack): lxStation() opens the cover room as the 📺 Room hostess with the voted mode + board
+// (🌱 S · 🐣 M · 🔥 L · ⚡ XL; 3–4 players on 🔴 Drop = the party stand as always; 🃏 cards + 🎨 look = the TV's own) → Station starts it when the voted
+// players are in (1 = you vs 🤖 Robo) · phones join through the ?link door above and get the 🗳️ 🔁 / 🎮 bar on the result card.
+function lxStation(t){
+  if(!(window.Station && window.Link && Link.cover)) return false;
+  if(!Station.on){ if((t | 0) < 60) setTimeout(() => lxStation((t | 0) + 1), 50); return false; }   // Station.game reads the link a moment after the page starts
+  if(!Station.tv) return false;
+  const m = LX_MODES[Station.way] ? Station.way : 'drop', ks = lxSizes(m).map(z => z.k), lv = Station.lvl == null ? 1 : Station.lvl;
+  LX.st = {mode: m, board: ks[Math.max(0, Math.min(ks.length - 1, lv))] || 'm'};
+  openCover(); if(!AlignCover) return false;
+  lxWire(); Link.cover.tv(AlignCover, AX_ROOM); return true;
+}
+msAfter('choosePlayer', () => { if(window.Station) Station.params().then(p => { if(p.mode === 'ltv' && p.stv === '1' && /^\d{4}$/.test(String(p.st || ''))) setTimeout(() => lxStation(), 0); }); });
+if(window.Station) Station.game({url: WEBAPP_URL, page: 'alignext', player: () => S.player || CURRENT_PLAYER, start: () => Link.cover.start(), again: () => lxHostGo()});
 /* 📡 END LINK (lk-ax2) */

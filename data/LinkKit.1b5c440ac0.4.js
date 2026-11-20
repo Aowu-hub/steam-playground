@@ -4,10 +4,11 @@
    One call per game, after its LINK block:  Station.game({url: WEBAPP_URL, player: () => S.player, start: go => lxHostGo(true), again: () => lxHostGo(true), setup: go => {…}})
    TV:     the game's 📺 hostess room opens as usual (mode=ltv) → its number goes to the station → ▶ starts by itself when every voted player is in (30 s: whoever is in)
    result: the players vote 🔁 Again / 🎮 Another game on their phones (one player one vote, a tie = 🎲) → again on the same TV, or everyone back to the station
-   Station.on · Station.lvl (the level vote, or null) · Station.map · Station.code · Station.tv · Station.params() · Station.run(fn, …args) · Station.back() */
+   Station.on · Station.lvl (the level vote, or null) · Station.map · Station.way (lk-pp1b: the ✋ way vote) · Station.code · Station.tv · Station.params() · Station.run(fn, …args) · Station.back()
+   lk-pp1b: opt.result() → the game's own result card while one shows (default #result / #result-card) · opt.hide = its button row selector (default .res-btns) */
 (function () {
   try { if (window.UI && UI.KINDS && !UI.KINDS.station) UI.KINDS.station = ['📺', 'Opening the TV Game Station', 'bob']; } catch (e) { /* */ }   // its own loader (UiKit kinds list)
-  const ST = {on: false, code: '', tv: false, tok: '', lvl: null, map: '', p: null, opt: null, state: null, timer: null, decided: '', voteAt: 0, mine: ''};
+  const ST = {on: false, code: '', tv: false, tok: '', lvl: null, map: '', way: '', p: null, opt: null, state: null, timer: null, decided: '', voteAt: 0, mine: ''};
   function run(fn, ...args) {
     return new Promise((res, rej) => {
       if (!(window.google && google.script && google.script.run)) return rej(new Error('no server'));
@@ -38,15 +39,16 @@
     if (window.UI && UI.go) UI.go(url, 'station', text || '📺 Back to the TV Game Station'); else location.href = url;
   }
   // ---- the vote bar on the result card (phones) / the tally (TV) ----
-  function card() { return document.getElementById('result-card'); }
-  function resultShown() { const r = document.getElementById('result'); return !!(r && !r.classList.contains('hidden') && card()); }
+  // 📺 lk-pp1b: a game may name its OWN result card (opt.result() → the card element while a result shows, else null) + the buttons to hide (opt.hide)
+  function card() { const o = ST.opt || {}; if (o.result) { try { return o.result() || null; } catch (e) { return null; } } return document.getElementById('result-card'); }
+  function resultShown() { if ((ST.opt || {}).result) return !!card(); const r = document.getElementById('result'); return !!(r && !r.classList.contains('hidden') && card()); }
   function paintVote() {
     const c = card(); if (!c) return;
     const s = ST.state || {}, go = s.go || {}, votes = (s.votes && s.votes.after) || {}, players = go.players || [];
     const n = k => players.filter(p => votes[p] === k).length;
     let box = c.querySelector('.st-vote');
     if (!box) {
-      c.querySelectorAll('.res-btns, .lk-wait').forEach(e => { e.style.display = 'none'; });
+      c.querySelectorAll('.res-btns, .lk-wait' + ((ST.opt || {}).hide ? ', ' + ST.opt.hide : '')).forEach(e => { e.style.display = 'none'; });   /* lk-pp1b: + opt.hide */
       box = document.createElement('div'); box.className = 'st-vote'; c.appendChild(box);
     }
     const ready = s.phase === 'after';
@@ -110,7 +112,7 @@
     ST.timer = setInterval(async () => {
       if (ST.leaving) return;
       const shown = resultShown();
-      if (!shown) { const v = document.querySelector('#result-card .st-vote'); if (v) v.remove(); ST.mine = ''; if (ST.tv || !document.querySelector('.lx-over')) return; }
+      if (!shown) { const v = document.querySelector('.st-vote'); if (v) v.remove(); ST.mine = ''; if (ST.tv || !document.querySelector('.lx-over')) return; }
       if (ST.tv && shown && ST.state && ST.state.phase === 'play' && !ST.decided) {
         const r = await run('stationSet', ST.code, me(), {phase: 'after'}).catch(() => null); if (r && r.state) ST.state = r.state; ST.voteAt = 0;
       } else {
@@ -145,7 +147,7 @@
     return params().then(p => {
       ST.p = p; if (!/^\d{4}$/.test(String(p.st || ''))) return false;
       ST.on = true; ST.code = p.st; ST.tv = p.stv === '1'; ST.tok = p.stk || '';
-      ST.lvl = p.slv != null && p.slv !== '' && !isNaN(+p.slv) ? Math.max(0, Math.min(5, +p.slv)) : null; ST.map = String(p.smap || '');
+      ST.lvl = p.slv != null && p.slv !== '' && !isNaN(+p.slv) ? Math.max(0, Math.min(5, +p.slv)) : null; ST.map = String(p.smap || ''); ST.way = String(p.ssp || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 20);   /* lk-pp1b: the ✋ way the players voted (🏓 a sport · ⬛ a mode · 🃏 a game) */
       document.documentElement.classList.add('st-on' + (ST.tv ? '-tv' : ''));
       css();
       if (ST.tv) tv(); else phone();
@@ -153,6 +155,6 @@
     });
   }
   window.Station = {game, params, run, back: goStation,
-    get on() { return ST.on; }, get tv() { return ST.tv; }, get code() { return ST.code; }, get lvl() { return ST.lvl; }, get map() { return ST.map; }, get state() { return ST.state; },
+    get on() { return ST.on; }, get tv() { return ST.tv; }, get code() { return ST.code; }, get lvl() { return ST.lvl; }, get map() { return ST.map; }, get way() { return ST.way; }, get state() { return ST.state; },
     _test: () => ST};
 })();

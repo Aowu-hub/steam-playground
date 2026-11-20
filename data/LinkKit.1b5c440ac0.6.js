@@ -6,7 +6,7 @@
      ② TV: cover.room({code, hostess: true}) (tv-1) + the big number + QR on the art; 1 player → "▶ Start vs 🤖 …"
      ③ guest: the host's line (host 👑 seat 0), ▶ = "⏳ <host> starts the game" (the captain of a 📺 room: ▶ Start → asks the TV)
    ▶ on the cover → Link.start() + opt.onStart() (host) · the room stays open after a match: the game calls Link.cover.show(C) to come back.
-   Link.cover.active(C) · Link.cover.close() · Link.cover.state() (tests). Uses GameFrame's own hooks; when GameFrame offers cover.card(node) /
+   Link.cover.active(C) · Link.cover.close() · Link.cover.state() (tests) · lk-pp1b: Link.cover.tv(C, o) (📺 station: straight to the hostess room) · Link.cover.start(). Uses GameFrame's own hooks; when GameFrame offers cover.card(node) /
    cover.playText(text, {disabled}) (asked of the 🧱 chat) they are used, else the card goes into .gf-panel and the ▶ text is set here. */
 (function () {
   const L = window.Link; if (!L) return;
@@ -121,17 +121,34 @@
   function need() { return K.mode === 'tv' ? 1 : (K.o.min || 2); }
   function players() { return seatsNow().filter(p => !(K.mode === 'tv' && p.seat === 0)).length; }
   function hostName() { const h = (L.players() || []).find(p => p.seat === 0); return h && h.name ? h.name : 'the host'; }
+  // 🌍 lk-aw: far players on the cover — a line in the room card + 🌍 on their spot (GameFrame paints 📱; we swap the mark)
+  function farText() {
+    const f = (L.farNames && L.farNames()) || []; if (!f.length) return '';
+    const meFar = L.road && L.road() === 'server' && !L.isHost();
+    if (meFar) { const o = f.filter(n => n !== nm()); return '🌍 You play from another house' + (o.length ? ' · ' + o.join(', ') + ' too' : '') + ' · a move takes 2–5 s'; }
+    return '🌍 ' + (f.length > 2 ? f.length + ' players play' : f.join(' + ') + (f.length > 1 ? ' play' : ' plays')) + ' from another house';
+  }
+  function markFar() {
+    if (!K || !K.C || !K.C.el || !live()) return;
+    const f = new Set((L.farNames && L.farNames()) || []);
+    K.C.el.querySelectorAll('.gf-spot:not(.gf-add):not(.gf-tv)').forEach(b => {
+      const s = (K.C.lineup || []).find(x => String(x.seat) === b.dataset.seat), far = !!(s && f.has(s.name));
+      let mk = b.querySelector('.gf-mk'); b.classList.toggle('lkc-farspot', far);
+      if (far) { if (!mk) { mk = document.createElement('span'); mk.className = 'gf-mk'; b.appendChild(mk); } if (!mk.dataset.lkcWas) mk.dataset.lkcWas = mk.textContent; mk.textContent = (s.host ? '👑' : '') + '🌍'; b.title = s.name + ' plays from another house'; }
+      else if (mk && mk.dataset.lkcWas != null) { mk.textContent = mk.dataset.lkcWas; delete mk.dataset.lkcWas; b.removeAttribute('title'); }
+    });
+  }
   function paintCard() {
     if (!live()) return; const c = mountCard();
     const st = L.status(), linking = (L._test && L._test.state && Object.values(L._test.state().peers || {}).filter(q => !q.linked).length) || 0;
     if (K.mode === 'guest') {
       c.className = 'lkc-card';
       c.innerHTML = '<div class="lkc-l"><div>🔗 Linked to <b>' + esc(hostName()) + '</b>\'s room</div>' + tiles() +
-        '<div class="lkc-st">' + (st === 'reconnecting' ? '🔁 Linking again<span class="lk-dots"></span>' : L.hostess() ? '📺 The game shows on the TV' : '') + '</div></div><button class="lkc-x" data-sound="tap">🚪 Leave</button>';
+        '<div class="lkc-st">' + (st === 'reconnecting' ? '🔁 Linking again<span class="lk-dots"></span>' : L.hostess() ? '📺 The game shows on the TV' : '') + '</div>' + (farText() ? '<div class="lkc-far">' + esc(farText()) + '</div>' : '') + '</div><button class="lkc-x" data-sound="tap">🚪 Leave</button>';   /* 🌍 lk-aw */
     } else {
       c.className = 'lkc-card';
       c.innerHTML = '<div class="lkc-l"><div class="lkc-lb">' + (K.mode === 'tv' ? '📺 Room hostess — join on your own phone' : '📱 Room — type it on the other phones') + '</div>' + tiles() +
-        '<div class="lkc-st">' + (linking ? '📨 ' + linking + ' device' + (linking > 1 ? 's' : '') + ' linking<span class="lk-dots"></span>' : players() < need() ? '📲 Waiting for ' + (need() - players()) + ' more player' + (need() - players() > 1 ? 's' : '') : '✅ Ready!') + '</div></div>' +
+        '<div class="lkc-st">' + (linking ? '📨 ' + linking + ' device' + (linking > 1 ? 's' : '') + ' linking<span class="lk-dots"></span>' : players() < need() ? '📲 Waiting for ' + (need() - players()) + ' more player' + (need() - players() > 1 ? 's' : '') : '✅ Ready!') + '</div>' + (farText() ? '<div class="lkc-far">' + esc(farText()) + '</div>' : '') + '</div>' +   /* 🌍 lk-aw */
         (K.mode === 'host' ? '<canvas class="lkc-qr"></canvas>' : '') + '<button class="lkc-x" data-sound="tap">✕ close</button>';
       qr(c.querySelector('.lkc-qr'));
       if (K.mode === 'tv') {
@@ -162,7 +179,7 @@
     if (!K || !K.mode) return;
     const st = L.status();
     if (live() && (st === 'idle' || st === 'closed')) { gone(st === 'closed' && K.mode === 'guest' ? '👋 ' + (K.hostName || 'The host') + ' closed the room' : ''); return; }
-    if (live()) { if (K.mode === 'guest') K.hostName = hostName(); syncLine(force); paintCard(); }
+    if (live()) { if (K.mode === 'guest') K.hostName = hostName(); syncLine(force); paintCard(); markFar(); }   // 🌍 lk-aw: markFar
     paintPlay();
   }
   function gone(msg) {   // the room is gone (closed here, by the host, or the link is lost) → back to playing on this device
@@ -186,9 +203,10 @@
       return;
     }
     if (players() < need()) { snd('error'); return; }
-    snd('pop'); go();
+    if (!why()) snd('pop'); go();   // 🌍 lk-aw: a refused start only buzzes
   }
-  function go() { L.start(); try { if (K.o.onStart) K.o.onStart(); } catch (e) { console.error('Link.cover onStart', e); } }
+  function why() { try { return K.o.canStart ? K.o.canStart() || '' : ''; } catch (e) { return ''; } }   // 🌍 lk-aw
+  function go() { const no = why(); if (no) { snd('error'); if (window.UI && UI.toast) UI.toast(no); return false; } L.start(); try { if (K.o.onStart) K.o.onStart(); } catch (e) { console.error('Link.cover onStart', e); } return true; }   // 🌍 lk-aw: canStart
   // ---------- once ----------
   ['players', 'status', 'start', 'join', 'leave', 'rejoin', 'hostleft'].forEach(ev => L.on(ev, () => { if (K && K.mode) sync(); }));
   L.on('lk:ask', (d, seat) => {   // 📺 the first player's ▶ Start on their phone reaches the TV
@@ -205,6 +223,7 @@
       }, true);
       C.onChange((line, mode) => {
         if (!K || K.C !== C || !K.mode) return;
+        markFar();   // 🌍 lk-aw: GameFrame just painted the line again
         if (mode !== 'own' && live()) { close(false); return; }   // 👥 Same device while a room is open = close the room
         if (mode !== 'own' && K.mode === 'pick') { closeSheet(); K.mode = null; return; }
         paintPlay();
@@ -218,6 +237,9 @@
   L.cover.active = C => !!(K && (!C || K.C === C) && live() && L.status() !== 'idle' && L.status() !== 'closed');
   L.cover.show = C => { if (!K || K.C !== C) return false; K.C.show(); if (live()) { if ((K.mode === 'tv' || (K.mode === 'guest' && L.hostess())) && !K.C.isHostess) K.C.room({code: digits().join(''), hostess: true}); else if (K.mode !== 'tv' && !L.hostess() && K.C.mode !== 'own') K.C.setMode('own'); sync(true); } return true; };
   L.cover.close = () => close(false);
+  // 📺 lk-pp1b: from the 📺 Game Station — open the cover room straight as the Room hostess (no pick sheet) · start it (Station's start / again)
+  L.cover.tv = (C, o) => { try { if (C.mode !== 'own' && C.setMode) C.setMode('own'); } catch (e) { /* */ } cover(C, o); if (K.mode === 'tv' && live()) return K; openRoom(true); return K; };
+  L.cover.start = () => { if (!K || !live() || (K.mode !== 'tv' && K.mode !== 'host') || players() < need()) return false; if (why()) return go(); snd('pop'); return go(); };   // 🌍 lk-aw: go() can refuse
   L.cover.join = code => { if (K) join(code); };
   L.cover.state = () => K ? {mode: K.mode, sig: K.sig, card: !!(K.card && K.card.isConnected), big: !!(K.big && K.big.isConnected), sheet: !!(K.sheet && K.sheet.isConnected)} : null;
 })();

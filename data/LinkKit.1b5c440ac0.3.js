@@ -10,7 +10,8 @@
   const REJOIN_FOR = T.rejoinFor || 60000, DROP_GRACE = T.dropGrace || 4000;
   // 🌍 lk-4a Anywhere mode: the server road for turn games
   const RELAY_POLL = T.relayPoll || 900, RELAY_DROP = T.relayDrop || 25000, RELAY_QUIET = T.relayQuiet || 20000, RELAY_WAIT = T.relayWait || 40000;
-  const TURN_GAMES = {Chess: 1, Checkers: 1, Lettercraft: 1, Algebros: 1};
+  // 🌍 lk-aw: + Polyplot · Alignext · WisDeck (their moves are turns too — a far phone goes through the family server)
+  const TURN_GAMES = {Chess: 1, Checkers: 1, Lettercraft: 1, Algebros: 1, Polyplot: 1, Alignext: 1, WisDeck: 1};
 
   let S;                                           // the whole state
   const handlers = {};
@@ -805,6 +806,13 @@
   }
   function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c])); }
 
+  // 🌍 lk-aw: the seats that come by the server road (+ this guest when it does)
+  function farList() {
+    if (!S.role) return [];
+    const list = (S.role === 'host' ? seatList() : S.seats).filter(p => p && p.name && p.on && !p.screen && (p.road === 'server' || (p.me && S.role === 'guest' && S.road === 'server')));
+    if (S.role === 'guest' && S.road === 'server' && !list.some(p => p.seat === S.mySeat)) { const me = S.seats.find(p => p.seat === S.mySeat); if (me && me.name) list.push(me); }
+    return list;
+  }
   function on(ev, fn) { (handlers[ev] = handlers[ev] || []).push(fn); return fn; }
   function off(ev, fn) { handlers[ev] = (handlers[ev] || []).filter(f => f !== fn); }
 
@@ -818,6 +826,12 @@
     started: () => S.started, relay: () => !!(S.ice && S.ice.relay),
     hostess: () => !!S.hostess, captain, ask,   // 📺 lk-5a
     road: () => S.role === 'guest' ? (S.road || (S.host ? 'direct' : '')) : (Object.values(S.peers).some(p => p.relay && p.linked) ? 'server' : 'direct'),   // 🌍 lk-4a
+    // 🌍 lk-aw: players on the server road (other houses) — every device sees the same list (the roster carries road)
+    farNames: () => farList().map(p => p.name), far: () => farList().length,
+    // ⏳ the words a game adds while it waits for <name>'s move (word = 'line' / 'move' / 'card'): '' when everyone is near
+    farHint: (name, word) => { const f = farList(); if (!f.length || !name) return ''; const w = word || 'move', meFar = S.role === 'guest' && S.road === 'server';
+      if (f.some(p => p.name === name) && !(meFar && S.seats.some(p => p.me && p.name === name))) return '🌍 from another house · the ' + w + ' takes 2–5 s';
+      return meFar ? '🌍 the ' + w + ' comes by the family server · 2–5 s' : ''; },
     toCode, toEmoji, diag: () => S.diag || null, warm,
     log: () => S.log.slice(), _test: {pairInfo, diagOf, diagMsg, diagLine, state: () => S, cut() { if (S.role === 'guest' && S.host) { const h = S.host; try { h.pc.close(); } catch (e) { /* */ } hostLost('cut'); } }}
   };

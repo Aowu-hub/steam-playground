@@ -24,8 +24,12 @@ function wbOn(){ return !!(B && B.lx); }
 function wbIdle(){ try{ if(window.Link && Link.status() !== 'idle') Link.leave(); }catch(e){} }
 // ---- the host's room picks (BZ = the same picks as the one-device 🔔 menu) ----
 const WB_GAMES = {buzz: '🔔 WisBuzz', count: '🔢 WisCount', jack: '🂡 WisJack'};   // 📡 lk-wd2: the 🎮 chip cycles 🔔 → 🔢 → 🂡
+// 🌍 lk-aw: 🔔 WisBuzz is a buzzer RACE — over the family server (2–5 s a message) it isn't fair, so it needs everyone on the same Wi-Fi
+const WB_FAR_NO = '🔔 WisBuzz needs everyone on the same Wi-Fi — pick 🔢 WisCount or 🂡 WisJack to play with someone far away';
+function wbFar(){ try{ return !!(window.Link && Link.far && Link.far()); }catch(e){ return false; } }
 function wbPicks(el){
-  const g = WBL.game || 'buzz', gChip = '<button class="lkc-chip" data-k="game" data-sound="none">' + WB_GAMES[g] + '</button>';
+  if(WBL.st) return wbPicksShown(el);   // 📺 lk-pp1b: the station's picks — shown, not changed here
+  const g = WBL.game || 'buzz', gChip = '<button class="lkc-chip" data-k="game" data-sound="none">' + WB_GAMES[g] + (g === 'buzz' && wbFar() ? ' · 📶 same Wi-Fi only' : '') + '</button>';   // 🌍 lk-aw
   if(g !== 'buzz'){ const L = WD.LEVELS[TM.lv] || WD.LEVELS[0];
     el.innerHTML = gChip + '<button class="lkc-chip" data-k="tlevel" data-sound="none">' + L.icon + ' ' + UI.esc(L.name) + '</button>' + (g === 'jack' ? '<button class="lkc-chip" data-k="target" data-sound="none">🎯 ' + TM.target + '</button>' : '');
   } else {
@@ -37,7 +41,7 @@ function wbPicks(el){
     '<button class="lkc-chip" data-k="level" data-sound="none">' + L.icon + ' ' + UI.esc(L.name) + '</button>';
   }
   el.querySelectorAll('.lkc-chip').forEach(b => b.onclick = e => { e.stopPropagation(); const k = b.dataset.k;
-    if(k === 'game'){ const order = ['buzz', 'count', 'jack']; WBL.game = order[(order.indexOf(WBL.game || 'buzz') + 1) % 3]; }
+    if(k === 'game'){ const order = ['buzz', 'count', 'jack']; WBL.game = order[(order.indexOf(WBL.game || 'buzz') + 1) % 3]; if(WBL.game === 'buzz' && wbFar()){ WBL.game = 'count'; UI.toast('🔔 WisBuzz skipped — someone plays from another house (same Wi-Fi only)'); } }   // 🌍 lk-aw
     else if(k === 'tlevel') TM.lv = (TM.lv + 1) % WD.LEVELS.length;
     else if(k === 'target') TM.target = TM.target === 20 ? 21 : 20;
     else { const shelf = WC.SHELVES.find(s => s.k === BZ.shelf) || WC.SHELVES[0], cats = WC.catsOf(shelf.k), cat = WC.CAT[BZ.cat] || cats[0];
@@ -46,12 +50,14 @@ function wbPicks(el){
       else BZ.lv = (Math.min(2, BZ.lv) + 1) % 3; }
     UISound.play('tap'); wbPicks(el); if(k === 'game' || k === 'tlevel') try{ if(WdCover) Link.cover(WdCover, WB_ROOM); }catch(er){} });   // lk-wd2: the ▶ text follows the game (📺 + 1 = vs 🤖 for 🔢 🂡 only)
 }
+function wbPicksShown(el){ const f = WBL.st; el.innerHTML = '<button class="lkc-chip" disabled data-sound="none">' + WB_GAMES[f.game] + '</button><button class="lkc-chip" disabled data-sound="none">' + f.lvText + '</button>'; }
 function wbAv(cv, p){ if(typeof drawPreviewCanvas === 'function') drawPreviewCanvas(cv, myAvatar(p.name), {name: p.name, t: 1}); }
 const WB_ROOM = {game: 'WisDeck', title: '🃏 WisDeck', page: 'wisdeck', kind: 'wisdeck', seats: 4, min: 2, url: WEBAPP_URL + '?page=wisdeck', name: () => S.player, av: () => myAvatar(S.player), drawAvatar: (cv, p) => wbAv(cv, p),
   label: tv => '🃏 WisDeck · ' + WB_GAMES[WBL.game || 'buzz'] + ((WBL.game || 'buzz') === 'buzz' ? ' · 2–4 players' : ' · 2 players') + (tv ? ' · 📺 on the TV' : ''),
   how: 'Gameroom → 🃏 WisDeck → 📱 Own devices → 🔗 Join · or scan · 🔔 2–4 players (every phone a buzzer) · 🔢 🂡 2 players, your cards on your own phone', picks: el => wbPicks(el),
   get bot(){ return (WBL.game || 'buzz') === 'buzz' ? false : () => { const L = WD.LEVELS[TM.lv] || WD.LEVELS[0]; return L.icon + ' ' + L.name; }; },   // 📡 lk-wd2: 📺 TV + 1 phone = you vs 🤖 (🔢 🂡 only)
-  onLink: () => { WBL.viaCover = true; }, onStart: () => { WBL.viaCover = true; if((WBL.game || 'buzz') === 'buzz') wbHostGo(); else wtHostGo(); }};
+  onLink: () => { WBL.viaCover = true; }, onStart: () => { WBL.viaCover = true; if((WBL.game || 'buzz') === 'buzz') wbHostGo(); else wtHostGo(); },
+  canStart: () => (WBL.st ? WBL.st.game : (WBL.game || 'buzz')) === 'buzz' && wbFar() ? WB_FAR_NO : ''};   // 🌍 lk-aw: ▶ refuses 🔔 with a far player
 // ---- host: start a match for everyone ----
 function wbHostGo(){
   const tv = !!(Link.hostess && Link.hostess());
@@ -534,4 +540,24 @@ function wtWire(){
     wtSendGo(e.seat); };
   Link.on('rejoin', back); Link.on('join', back);
 }
-GameParts.loaded('WisDeck_link', 'lk-wd2');
+// ---- 📺 lk-pp1b: the 📺 TV Game Station (LinkKit plan §51) ----
+// TV (?mode=ltv&st&stv=1&slv=<level>&ssp=buzz|count|jack): the main file loads this part, then wdStation() sets the voted game + level (held in
+// memory: 🔢 🂡 table level = the station level, 🎯 21 for 🂡 · 🔔 🌱🐣 Easy · 🔥⚡ Medium · 🌋 Hard on the TV's shelf / category) and opens the cover room as
+// the 📺 Room hostess → Station starts it when the voted players are in (🔢 🂡 alone = you vs 🤖) · phones join through the ?link door as today.
+function wdStation(t){
+  if(!window.Station) return false;
+  if(!Station.on){ if((t | 0) < 60) setTimeout(() => wdStation((t | 0) + 1), 50); return false; }   // Station.game reads the link a moment after the part loads
+  if(!Station.tv) return false;
+  const game = WB_GAMES[Station.way] ? Station.way : 'buzz', lv = Station.lvl == null ? 0 : Math.max(0, Math.min(4, Station.lvl));
+  WBL.game = game;
+  if(game === 'buzz'){ BZ.lv = [0, 0, 1, 1, 2][lv]; } else { TM.lv = lv; TM.target = game === 'jack' ? 21 : 20; }
+  const L = WD.LEVELS[game === 'buzz' ? BZ.lv : TM.lv] || WD.LEVELS[0];
+  WBL.st = {game, lvText: L.icon + ' ' + L.name};
+  openCover(); if(!WdCover) return false;
+  wbWire(); Link.cover.tv(WdCover, WB_ROOM); return true;
+}
+// the result card the 🗳️ bar sits on: 🔔 #b-res · 🔢 🂡 #t-res (their own .btns row is hidden while the station runs)
+function wdStResult(){ for(const id of ['b-res', 't-res']){ const w = document.getElementById(id); if(w && !w.classList.contains('hidden')){ const c = w.querySelector('.card'); if(c) return c; } } return null; }
+if(window.Station) Station.game({url: WEBAPP_URL, page: 'wisdeck', player: () => S.player || CURRENT_PLAYER, start: () => Link.cover.start(),
+  again: () => { if((WBL.game || 'buzz') === 'buzz') wbHostGo(); else wtHostGo(); }, result: wdStResult, hide: '.btns'});
+GameParts.loaded('WisDeck_link', 'lk-aw');

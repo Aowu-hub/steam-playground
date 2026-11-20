@@ -21,11 +21,12 @@ function plIdle(){ try{ if(window.Link && Link.status() !== 'idle') Link.leave()
 // ---- the host's room picks (remembered per player) ----
 function plGet(k, d){ const v = ls(store('lx_' + k)); return v == null ? d : v; }
 function plSet(k, v){ ls(store('lx_' + k), String(v)); }
-function plMode(){ const m = plGet('mode', SET.mode || 'classic'); return MODES[m] ? m : 'classic'; }
-function plLevel(){ const n = Number(plGet('level', '0')); return n >= 0 && n <= 4 ? n : 0; }
-function plShape(){ const s = plGet('shape', SET.shape || 'square'); return PP.SHAPES.indexOf(s) >= 0 ? s : 'square'; }
+// 📺 lk-pp1b: from the 📺 Game Station the voted mode + level win (PPL.st, held in memory — the TV's own picks stay as they were)
+function plMode(){ if(PPL.st && MODES[PPL.st.mode]) return PPL.st.mode; const m = plGet('mode', SET.mode || 'classic'); return MODES[m] ? m : 'classic'; }
+function plLevel(){ if(PPL.st) return PPL.st.level; const n = Number(plGet('level', '0')); return n >= 0 && n <= 4 ? n : 0; }
+function plShape(){ if(PPL.st) return 'square'; const s = plGet('shape', SET.shape || 'square'); return PP.SHAPES.indexOf(s) >= 0 ? s : 'square'; }
 function plTheme(){ const t = plGet('theme', SET.theme || 'dino'); return THEMES[t] ? t : 'dino'; }
-function plTeams(){ return plGet('teams', '0') === '1'; }
+function plTeams(){ return !PPL.st && plGet('teams', '0') === '1'; }
 function plTiling(lv){ const T = PP.LEVELS[lv].tilings; return T.indexOf(SET.tiling) >= 0 ? SET.tiling : T[0]; }
 function plPicks(el){
   const m = plMode(), lv = plLevel(), T = THEMES[plTheme()], L = LEVEL_UI[lv], fort = m === 'fort' || m === 'coop', sh = PP.SHAPE_INFO[plShape()];
@@ -34,6 +35,7 @@ function plPicks(el){
     (fort ? '' : '<button class="lkc-chip" data-k="shape" data-sound="none">🗺️ ' + sh[0] + ' ' + UI.esc(sh[1]) + '</button>') +
     '<button class="lkc-chip" data-k="theme" data-sound="none">' + T.icon + ' ' + UI.esc(T.name) + '</button>' +
     (m === 'coop' ? '' : '<button class="lkc-chip" data-k="teams" data-sound="none">' + (plTeams() ? '🤝 2 vs 2 (4 players)' : '👤 Everyone for themselves') + '</button>');
+  if(PPL.st){ el.querySelectorAll('.lkc-chip').forEach(b => { b.disabled = true; b.title = '📺 voted on the phones'; }); return; }   // 📺 lk-pp1b: the station's picks — shown, not changed here
   el.querySelectorAll('.lkc-chip').forEach(b => b.onclick = e => { e.stopPropagation(); const k = b.dataset.k;
     if(k === 'mode'){ plSet('mode', MODE_KEYS[(MODE_KEYS.indexOf(m) + 1) % MODE_KEYS.length]); if(plMode() === 'coop') UI.toast('🛡️ Co-op: everyone defends one base together'); }
     else if(k === 'level') plSet('level', (lv + 1) % 5);
@@ -179,13 +181,21 @@ nextTurn = (function(f){ return function(){
   const r = f.apply(this, arguments);
   if(G && G.lx && !G.over && !G.M.over){
     const M = G.M, i = M.cur, p = M.P[i], mine = i === G.lx.me;
-    if(!p.bot) banner(mine ? '✏️ Your turn!' : '⏳ ' + p.name + ' is drawing…', mine ? 'good' : '');
+    if(!p.bot){ const fh = mine ? '' : plFarHint(p.name);   // 🌍 lk-aw: a far line takes 2–5 s → say so, and hold the banner 5 s
+      banner(mine ? '✏️ Your turn!' + (G.lx.plus ? ' · ⏱️ +' + G.lx.plus + ' s (🌍 someone plays from far)' : '') : '⏳ ' + p.name + ' is drawing…' + (fh ? ' ' + fh : ''), mine ? 'good' : '');
+      G.lx.hint = fh; if(fh){ clearTimeout(banner.t); banner.t = setTimeout(() => { const b = $('banner'); if(b) b.classList.remove('on'); }, 5200); } }
     if(G.lx.role === 'host' && G.lx.away[i] && !mine && !p.bot){ const id = G.id;
       G.lxBot = setTimeout(() => { if(G && G.id === id && G.lx && G.M.cur === i && G.lx.away[i] && !G.busy && !G.over){ G.busy = true; G.timerEnd = 0; botMove(); } }, PL_AUTO_MS); }
   }
   plMarkCards(); return r; }; })(nextTurn);
 buildCards = (function(f){ return function(){ const r = f.apply(this, arguments); plMarkCards(); return r; }; })(buildCards);
-function plMarkCards(){ if(!plOn()) return; G.M.P.forEach((p, i) => { const c = $('pc-' + i); if(c){ c.classList.toggle('lx-you', i === G.lx.me); c.classList.toggle('lx-away', !!G.lx.away[i]); } }); }
+// 🌍 lk-aw: ⏱️ +5 s a turn while someone plays from another house (their line needs 2–5 s to travel) · the far words for a turn
+const PL_FAR_PLUS = 5;
+startTimer = (function(f){ return function(){ const r = f.apply(this, arguments);
+  if(plOn()){ G.lx.plus = 0; if(G.timerEnd && window.Link && Link.far && Link.far()){ G.timerEnd += PL_FAR_PLUS * 1000; G.lx.plus = PL_FAR_PLUS; } } return r; }; })(startTimer);
+function plFarHint(name){ try{ return window.Link && Link.farHint ? Link.farHint(name, 'line') : ''; }catch(e){ return ''; } }
+function plMarkCards(){ if(!plOn()) return; const far = new Set((window.Link && Link.farNames && Link.farNames()) || []);   // 🌍 lk-aw: + lx-far
+  G.M.P.forEach((p, i) => { const c = $('pc-' + i); if(c){ c.classList.toggle('lx-you', i === G.lx.me); c.classList.toggle('lx-away', !!G.lx.away[i]); c.classList.toggle('lx-far', !p.bot && far.has(p.name)); } }); }
 // 💾 only the host saves (for everyone)
 saveWin = (function(f){ return function(name, lvl, extra, seat){ if(plOn() && G.lx.role !== 'host'){ putNote(seat, UI.esc(name) + ': 💾 saved by the host'); return; } return f.apply(this, arguments); }; })(saveWin);
 saveFeatsOnly = (function(f){ return function(name, stats, seat){ if(plOn() && G.lx.role !== 'host'){ putNote(seat, UI.esc(name) + ': 💾 saved by the host'); return; } return f.apply(this, arguments); }; })(saveFeatsOnly);
@@ -223,7 +233,8 @@ function plEnded(msg){
 }
 // "(you)" on your own player card · 📶 🤖 on a seat whose phone dropped out — put in the first time a room is used (so a page that never links stays as it was)
 function plCss(){ if(document.getElementById('pl-css')) return; const st = document.createElement('style'); st.id = 'pl-css';
-  st.textContent = '#scr-play .pcard.lx-you .n::after{content:" (you)";font-weight:600;opacity:.85}#scr-play .pcard.lx-away .n::after{content:" · 📶 🤖";font-weight:600;opacity:.85}';
+  st.textContent = '#scr-play .pcard.lx-you .n::after{content:" (you)";font-weight:600;opacity:.85}#scr-play .pcard.lx-away .n::after{content:" · 📶 🤖";font-weight:600;opacity:.85}' +
+    '#scr-play .pcard.lx-far .n::before{content:"🌍 "}';   // 🌍 lk-aw: before the name, so a narrow card never cuts it off
   document.head.appendChild(st); }
 function plWire(){
   if(PPL.wired || !window.Link) return; PPL.wired = true; plCss();
@@ -240,6 +251,20 @@ function plWire(){
     if(G.lx.away[i]){ G.lx.away[i] = false; if(G.M.cur === i) clearTimeout(G.lxBot); banner('👋 ' + G.M.P[i].name + ' is back!', 'good'); UISound.play('success'); plMarkCards(); }
     plSendGo(e.seat); };
   Link.on('rejoin', back); Link.on('join', back);
+  Link.on('players', () => plMarkCards());   // 🌍 lk-aw: a far player's 🌍 follows the room
   addEventListener('pagehide', () => { try{ if(Link.status() !== 'idle') Link.leave(); }catch(e){} });
 }
-GameParts.loaded('Polyplot_link', 'lk-pp1');
+// ---- 📺 lk-pp1b: the 📺 TV Game Station (LinkKit plan §51) ----
+// TV (?mode=ltv&st&stv=1&slv=<level>&ssp=<mode>): the main file loads this part, then plStation() opens the cover room as the 📺 Room hostess with the
+// voted mode + level (🌱–🌋, the level's own square map) → Station starts it when the voted players are in · phones (?link=<room>&st=…) join as today
+// (the main file's ?link door) and get the 🗳️ 🔁 Again / 🎮 Another game bar on the result card.
+function plStation(t){
+  if(!window.Station) return false;
+  if(!Station.on){ if((t | 0) < 60) setTimeout(() => plStation((t | 0) + 1), 50); return false; }   // Station.game reads the link a moment after the part loads
+  if(!Station.tv) return false;
+  PPL.st = {mode: MODES[Station.way] ? Station.way : 'classic', level: Station.lvl == null ? 0 : Math.max(0, Math.min(4, Station.lvl))};
+  openCover(); if(!PolyCover) return false;
+  plWire(); Link.cover.tv(PolyCover, PP_ROOM); return true;
+}
+if(window.Station) Station.game({url: WEBAPP_URL, page: 'polyplot', player: () => S.player || CURRENT_PLAYER, start: () => Link.cover.start(), again: () => plHostGo()});
+GameParts.loaded('Polyplot_link', 'lk-aw');
