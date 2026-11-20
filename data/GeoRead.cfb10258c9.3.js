@@ -4,14 +4,14 @@
    cheerEnd() (result) or when the play screen goes away (◀ / 🎚️ Levels); every 0.4 s it reads the game's own state → tension /
    hush (🤖 thinking) / pause; the crowd's big moments → lift (max one every 3 s). Test hook: GMOOD (page global). */
 const GMOOD = (function(){
-  const ID = 'pokadif';
+  const ID = 'georead';
   let h = null, timer = 0, lastLift = 0;
   const vis = el => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
-  function playing(){ try{ if(vis(document.getElementById('result'))) return false; if(RC && vis(document.getElementById('scr-race'))) return true; return !!(G && !G.over) && vis(document.getElementById('scr-play')); }catch(e){ return false; } }
+  function playing(){ try{ return !!(G && !G.over) && vis(document.getElementById('scr-play')) && !vis(document.getElementById('result')); }catch(e){ return false; } }
   function skip(){ return false; }
-  function tension(){ if(RC && vis(document.getElementById('scr-race'))){ const o = RC.owner || [], n = o.filter(x => x >= 0).length; return .3 + .6 * n / Math.max(1, RC.rounds || o.length || 1); } if(G.mode === 'arcade') return Math.min(1, Math.max(0, 1 - G.timeLeft / Math.max(1, G.A.limit + (G.extra || 0)))); const f = G.found || [], p = f.length ? f.filter(Boolean).length / f.length : 0; let t = .15 + .35 * p + .3 * Math.min(1, (G.pics || 0) / Math.max(1, G.rounds || 1)); if(G.lives === 1) t = Math.max(t, .7); return t; }
-  function hush(){ const c = document.getElementById('scard'); return !!(c && !c.classList.contains('hidden'));   /* 📖 a case card is open */ }
-  function paused(){ return !!(G && G.paused); }
+  function tension(){ return .7 * Math.max(0, G.i) / Math.max(1, G.game.rounds.length); }
+  function hush(){ return !!(window.speechSynthesis && speechSynthesis.speaking);   /* 🗣️ the voice reads: music steps back */ }
+  function paused(){ return false; }
   function poll(){
     if(!h || !h.live || !playing()){ stop(); return; }
     let t = 0; try{ t = Number(tension()) || 0; }catch(e){} h.tension(Math.min(1, Math.max(0, t)));
@@ -30,17 +30,9 @@ const GMOOD = (function(){
     const f = window[name]; if(typeof f !== 'function' || f.__gmood) return;
     const w = function(){ try{ before.apply(this, arguments); }catch(e){} return f.apply(this, arguments); }; w.__gmood = 1; window[name] = w;
   }
-  function wrapAfter(name, after){
-    const f = window[name]; if(typeof f !== 'function' || f.__gmoodA) return;
-    const w = function(){ const r = f.apply(this, arguments); try{ after.apply(this, arguments); }catch(e){} return r; }; w.__gmoodA = 1; window[name] = w;
-  }
-  wrapAfter('startCase', start);
-  wrapAfter('raceGo', start);
-  wrap('finishCase', stop);
-  wrap('arcFinish', stop);
-  wrap('finishStory', stop);
-  wrap('raceEnd', stop);
-  wrap('bigWord', function(){ if((function(txt, small, rank){ return rank === 'big'; }).apply(this, arguments)) lift(); });
+  wrap('cheerMount', start);
+  wrap('cheerEnd', stop);
+  wrap('cheerSay', function(){ if((function(kind){ return kind === 'big'; }).apply(this, arguments)) lift(); });
   return {id: ID, start: start, stop: stop, lift: lift, poll: poll, now: () => h, playing: playing, tension: tension, hush: hush, paused: paused};
 })();
 /* 🎵 MOOD (24u-b) END */
