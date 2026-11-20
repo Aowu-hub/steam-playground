@@ -4,13 +4,13 @@
    cheerEnd() (result) or when the play screen goes away (◀ / 🎚️ Levels); every 0.4 s it reads the game's own state → tension /
    hush (🤖 thinking) / pause; the crowd's big moments → lift (max one every 3 s). Test hook: GMOOD (page global). */
 const GMOOD = (function(){
-  const ID = 'doubleup';
+  const ID = 'numberboard';
   let h = null, timer = 0, lastLift = 0;
   const vis = el => !!(el && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
   function playing(){ try{ return !!(G && !G.over) && vis(document.getElementById('scr-play')) && !vis(document.getElementById('result')); }catch(e){ return false; } }
   function skip(){ return false; }
-  function tension(){ const c = G.B.c, n = c.length; let full = 0; c.forEach(x => { if(x) full++; }); return Math.max(0, (full / n - .35) / .65); }
-  function hush(){ return false; }
+  function tension(){ const r = G.L.rounds ? Math.min(1, (G.round - 1) / G.L.rounds) : 0, sc = G.players.map(p => p.score).sort((a, b) => b - a), gap = sc.length > 1 ? (sc[0] - sc[1]) / Math.max(30, sc[0]) : 1; return r * (1 - .5 * Math.min(1, gap)); }
+  function hush(){ const P = G.players[G.cur]; return !!(P && P.bot); }
   function paused(){ return !!G.paused; }
   function poll(){
     if(!h || !h.live || !playing()){ stop(); return; }
@@ -32,7 +32,7 @@ const GMOOD = (function(){
   }
   wrap('cheerMount', start);
   wrap('cheerEnd', stop);
-  wrap('cheerSay', function(){ if((function(kind){ return kind === 'big' || kind === 'goal'; }).apply(this, arguments)) lift(); });
+  wrap('cheerPlay', function(){ if((function(P, j){ return !!(j && (j.bingo || j.score >= BIG_PLAY)); }).apply(this, arguments)) lift(); });
   return {id: ID, start: start, stop: stop, lift: lift, poll: poll, now: () => h, playing: playing, tension: tension, hush: hush, paused: paused};
 })();
 /* 🎵 MOOD (24u-b) END */
