@@ -159,6 +159,8 @@
   @keyframes fall{to{transform:translateY(110vh) rotate(540deg);}}
   @media (prefers-reduced-motion: reduce){ .title .logo{animation:none;} }
 
+  /* 🧑‍🤝‍🧑 24r-b family faces */ #theme-list .chip img.famp{width:22px;height:22px;border-radius:5px;vertical-align:-5px;margin-right:1px;} #theme-list .chip .hd{font-size:.78em;opacity:.85;margin-left:4px;white-space:nowrap;}
+  #fam-who{margin-top:6px;} #fam-who .fw-lab{width:100%;text-align:center;font-weight:800;font-size:.85em;opacity:.8;} #fam-who .chip.off{opacity:.6;} #missions .mis .ic img.famp{width:1.55em;height:1.55em;border-radius:6px;vertical-align:middle;}
 </style>
 </head>
 <body ontouchstart="">
@@ -178,6 +180,7 @@
 <script src="inc/MotionPillar.js"></script>
 <script src="inc/AvatarActs.js"></script>
 <script src="inc/AvatarWeapons.js"></script>
+<script src="inc/FamFaces.js"></script>   <!-- 🧑‍🤝‍🧑 24r-b: the family's faces as blocks (FamFaces.html) -->
 <script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-4a: the cheering crowd (CheerSquad.html) -->
 <script src="inc/GameFrame.js"></script>
 <script src="inc/GameCovers.js"></script>
@@ -230,6 +233,7 @@
     <div class="who">👤 <span id="who-name"></span> <button data-sound="none" onclick="changePlayer()">change</button></div></div>
   <div class="section-head">🎨 1. Pick your blocks</div>   <!-- 🧱 b3w2: ONE setup page -->
   <div class="chips" id="theme-list"></div>
+  <div class="chips hidden" id="fam-who"></div>   <!-- 🧑‍🤝‍🧑 24r-b -->
   <div class="section-head" id="level-head">🎚️ 2. Pick a level</div>
   <div class="levels" id="level-list"></div>
   <div class="section-head" id="opt-head">⚙️ 3. Options</div>
@@ -292,9 +296,57 @@ const THEMES = {
   dino:     {name: 'Dino', icon: '🦖', syms: ['🦖', '🦕', '🦎', '🐊', '🐢', '🥚'], col: ['#7BC67E', '#5FB3B3', '#E8C547', '#E07A5F', '#B39DDB', '#F2E3C6'], bg: ['#3E2A14', '#B5651D'], fx: 'roar', say: 'Rawr!'},
   monsters: {name: 'Alien × Monster', icon: '👽', syms: ['👽', '👾', '🤖', '👻', '👹', '🐙'], col: ['#7CF29A', '#C58CFF', '#9FB6CD', '#E8F1FF', '#FF7B7B', '#FF9ED2'], bg: ['#120C2E', '#3B1F7A'], fx: 'beam', say: 'Beam me up!'},
   vehicles: {name: 'Vehicles', icon: '🚗', syms: ['🚗', '🚌', '🚒', '🚜', '🚑', '🚲'], col: ['#FF6B6B', '#FFD24C', '#FF8F5A', '#8BCB5E', '#9EC9FF', '#C9B6FF'], bg: ['#2C3E50', '#5D6D7E'], fx: 'zoom', say: 'Beep beep!'},
-  space:    {name: 'Spacecraft', icon: '🚀', syms: ['🚀', '🛸', '🛰️', '🪐', '🌙', '☄️'], col: ['#9EC9FF', '#B9F3C9', '#D7D2FF', '#FFC48C', '#FFF2A8', '#FF9EB5'], bg: ['#05061A', '#1E2A78'], fx: 'launch', say: 'Blast off!'}
+  space:    {name: 'Spacecraft', icon: '🚀', syms: ['🚀', '🛸', '🛰️', '🪐', '🌙', '☄️'], col: ['#9EC9FF', '#B9F3C9', '#D7D2FF', '#FFC48C', '#FFF2A8', '#FF9EB5'], bg: ['#05061A', '#1E2A78'], fx: 'launch', say: 'Blast off!'},
+  family:   {name: 'Family', icon: '👨‍👩‍👧', syms: ['😀', '😄', '😎', '🤩', '😊', '🥳'], col: ['#FF5A5F', '#F5A300', '#9B5CF6', '#22A86A', '#3B82F6', '#F2711C'], bg: ['#5A1F4C', '#C04E8E'], fx: 'burst', fam: 1, hard: '★ ×1.25', say: 'Yay, family!'},   // 🧑‍🤝‍🧑 24r-b
+  faces:    {name: 'Faces only', icon: '🙂', syms: ['😀', '😄', '😎', '🤩', '😊', '🥳'], col: ['#CFC6DE', '#CFC6DE', '#CFC6DE', '#CFC6DE', '#CFC6DE', '#CFC6DE'], bg: ['#2A2240', '#5B4B6B'], fx: 'burst', fam: 2, hard: '★★ ×1.5'}   // 🧑‍🤝‍🧑 24r-b: no colour help
 };
 const THEME_KEYS = Object.keys(THEMES);
+
+/* 🧑‍🤝‍🧑 24r-b FAMILY FACES (✨ Polish chat, Aowu 2026-11-21 23:40 "go", plan `24r Family Faces — plan.md` §2): the 👨‍👩‍👧 Family / 🙂 Faces only
+   sets show the family's own avatars (FamFaces.html, like 🍬 Sweet Swap). Popped faces cheer · a 🚀 / 💣 made = one face pops out (🌈 = that
+   person's own 🎭 Signature act) · a power fired = 🙌 high-five · combos ×1.5 wow · ×2 a wave · ×2.5+ party · 💤 one face now and then ·
+   🏆 cleared = faces cheer. 🌱 Basic = calm (no idle, no combo ripple). Points ×1.25 / ×1.5 (FamFaces.MULT). */
+let FAMF = null, famIdleT = 0;
+function famTheme(T){ return !!(T && T.fam && window.FamFaces); }
+function famIcons(k){ const T = THEMES[k]; if(!famTheme(T)) return T.syms.slice(0, 4).join('');
+  const u = FamFaces.chips(3, {fo: T.fam === 2, me: S.player, players: S.players, avatarOf: myAvatar}); return u.length ? u.map(x => '<img class="famp" alt="" src="' + x + '">').join('') : T.syms.slice(0, 3).join(''); }
+function renderFamWho(){
+  const box = $('fam-who'); if(!box) return; const T = THEMES[theme];
+  if(!famTheme(T)){ box.innerHTML = ''; box.classList.add('hidden'); return; }
+  const h = FamFaces.hidden(), names = (S.players || []).map(p => p.Name).filter(Boolean); box.classList.remove('hidden');
+  box.innerHTML = '<span class="fw-lab">👁️ Faces in the game · tap to hide</span>' + names.map(n => '<button class="chip fw' + (h.indexOf(n) < 0 ? ' on' : ' off') + '" data-sound="pop" data-fam-name="' + UI.esc(n) + '">' + (h.indexOf(n) < 0 ? '🙂 ' : '🙈 ') + UI.esc(n) + '</button>').join('');
+  box.querySelectorAll('[data-fam-name]').forEach(b => b.onclick = () => { FamFaces.toggle(b.dataset.famName); renderMenu(); });
+}
+function famStop(){ clearInterval(famIdleT); famIdleT = 0; if(FAMF) FAMF.stop(); FAMF = null; }
+function famStart(){
+  famStop(); const T = THEMES[G.theme]; if(!famTheme(T)) return;
+  try{ FAMF = FamFaces.make(G.L.K, {fo: T.fam === 2, me: S.player, players: S.players, avatarOf: myAvatar, calm: G.lvl === 0}); FAMF.url = []; }catch(e){ FAMF = null; return; }
+  FAMF.bake();
+  if(G.lvl > 0) famIdleT = setInterval(() => { if(!G || !FAMF || G.over || G.paused || FAMF.live.length || $('scr-play').classList.contains('hidden')) return; const cells = famCells(); if(!cells.length) return; const i = cells[Math.floor(Math.random() * cells.length)]; FAMF.play(i % G.B.w, (i / G.B.w) | 0, G.B.c[i].k, 'idle', {ms: 900}); }, 4200);
+}
+function famCells(){ const out = []; G.B.c.forEach((c, i) => { if(c && c.t === 'n' && !c.sp && !c.ice && !c.lock) out.push(i); }); return out; }
+function famURL(k){ if(!FAMF || !FAMF.img[k]) return ''; return FAMF.url[k] || (FAMF.url[k] = FAMF.img[k].toDataURL('image/png')); }
+function famCell(g, c, s, lit){   // one face block (g already moved to the cell)
+  const pad = s * 0.04; g.drawImage(FAMF.img[c.k], pad, pad, s - pad * 2, s - pad * 2);
+  if(lit){ g.strokeStyle = '#FFFFFF'; g.lineWidth = Math.max(2, s * 0.1); rr(g, pad, pad, s - pad * 2, s - pad * 2, s * 0.2); g.stroke(); }
+  if(c.coin) g.drawImage(sprite('⭐', Math.round(s * 0.26)), s * 0.02, s * 0.62, s * 0.34, s * 0.34);
+  if(c.ice){ g.fillStyle = c.ice > 1 ? 'rgba(200,235,255,0.78)' : 'rgba(210,240,255,0.55)'; rr(g, pad, pad, s - pad * 2, s - pad * 2, s * 0.2); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,0.95)'; g.lineWidth = Math.max(1.5, s * 0.05); g.beginPath(); g.moveTo(s * 0.25, s * 0.3); g.lineTo(s * 0.45, s * 0.5); g.lineTo(s * 0.4, s * 0.7); if(c.ice > 1){ g.moveTo(s * 0.6, s * 0.25); g.lineTo(s * 0.72, s * 0.55); } g.stroke(); }
+  if(c.lock){ g.fillStyle = 'rgba(30,20,50,0.35)'; rr(g, pad, pad, s - pad * 2, s - pad * 2, s * 0.2); g.fill(); g.drawImage(sprite('🔒', Math.round(s * 0.36)), s * 0.52, s * 0.5, s * 0.46, s * 0.46); }
+}
+function famPop(ev, before){
+  if(!FAMF) return; const w = G.B.w, at = i => [i % w, (i / w) | 0], calm = G.lvl === 0;
+  ev.popped.filter(p => p.c.t === 'n').slice(0, calm ? 3 : 5).forEach((p, j) => { const from = before[p.c.id]; if(from == null) return; const [x, y] = at(from); FAMF.play(x, y, p.c.k, 'small', {ms: 650, delay: j * 35, rise: 0.5}); });
+  const [tx, ty] = at(ev.tapped), k = ev.popped.length ? ev.popped[0].c.k : -1;
+  if(ev.fired.length) FAMF.play(tx, ty, k >= 0 ? k : 0, 'bomb', {pop: true, ms: 950});
+  else if(ev.made === 'rain' && k >= 0) FAMF.play(tx, ty, k, [Acting.sig(FAMF.who[k].av)], {pop: true, ms: 1200});
+  else if(ev.made && k >= 0) FAMF.play(tx, ty, k, 'big', {pop: true, ms: 900});
+  if(G.combo >= 1 && !calm){ const pk = m => shuffle(famCells()).slice(0, m);
+    if(G.combo === 1) pk(5).forEach((i, j) => { const [x, y] = at(i); FAMF.play(x, y, G.B.c[i].k, 'amazed', {ms: 650, delay: 120 + j * 40}); });
+    else if(G.combo === 2) pk(14).sort((a, b) => a % w - b % w).forEach(i => { const [x, y] = at(i); FAMF.play(x, y, G.B.c[i].k, 'wave', {ms: 650, delay: 120 + x * 70}); });
+    else pk(20).forEach((i, j) => { const [x, y] = at(i); FAMF.play(x, y, G.B.c[i].k, 'party', {ms: 1000, delay: 120 + (j % 6) * 50, loops: 3}); }); }
+}
+function famWin(){ if(!FAMF) return; const w = G.B.w; shuffle(famCells()).slice(0, G.lvl === 0 ? 4 : 12).forEach((i, j) => FAMF.play(i % w, (i / w) | 0, G.B.c[i].k, 'win', {ms: 1100, delay: j * 60, pop: j < 2})); }
 const AGE_START = {'4-5': 0, '6-7': 1, '8-9': 2, '10+': 3};
 const PRAISE = ['Pop star', 'Block buster', 'Super popper', 'Brilliant', 'Amazing'];
 const TIPS = [
@@ -494,9 +546,9 @@ function changePlayer(){ renderPlayers(); showScreen('player'); }
 
 // Theme row: built once per menu visit, a tap only moves the highlight (no page jump).
 function renderMenu(){
-  $('theme-list').innerHTML = THEME_KEYS.map(k => '<button class="chip' + (k === theme ? ' on' : '') + '" data-sound="pop" data-theme-key="' + k + '"><span class="ic">' + THEMES[k].syms.slice(0, 4).join('') + '</span>' + THEMES[k].name + '</button>').join('');
-  $('theme-list').querySelectorAll('[data-theme-key]').forEach(b => b.onclick = () => { theme = b.dataset.themeKey; savePrefs(); $('theme-list').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); });
-  renderLevels();
+  $('theme-list').innerHTML = THEME_KEYS.map(k => '<button class="chip' + (k === theme ? ' on' : '') + '" data-sound="pop" data-theme-key="' + k + '"><span class="ic">' + famIcons(k) + '</span>' + THEMES[k].name + (THEMES[k].hard ? ' <span class="hd">' + THEMES[k].hard + '</span>' : '') + '</button>').join('');
+  $('theme-list').querySelectorAll('[data-theme-key]').forEach(b => b.onclick = () => { theme = b.dataset.themeKey; savePrefs(); $('theme-list').querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c === b)); renderFamWho(); markPicks(); });
+  renderFamWho(); renderLevels();
 }
 
 function bestHtml(p, i){ const b = (p.best || [])[i]; if(!b || !b.score) return '<div class="best none">No score yet</div>'; return '<div class="best"><span>🏆 ' + Number(b.score).toLocaleString() + '</span>' + (b.timeSec ? '<span>⏱ ' + fmt(b.timeSec * 1000) + '</span>' : '') + '<span>' + '⭐'.repeat(b.stars || 0) + '</span></div>'; }
@@ -566,6 +618,7 @@ function startGame(lvl, round){ setTimeout(cheerMount, 0); /* 📣 cs-4a */
   BAR.level(L.emoji + ' ' + L.name + ' · ' + T.icon, L.hardcore ? 'hc' : '');
   $('undo-btn').classList.toggle('hidden', !L.undo); BAR.hide('moves', !G.limit); $('done-btn').classList.add('hidden');
   paintVoice();
+  famStart();   /* 🧑‍🤝‍🧑 24r-b */
   renderMissions(); showScreen('play'); layout(); hud();
   G.B.c.forEach((c, i) => { if(c) G.pos[c.id] = {x: i % G.B.w, y: ((i / G.B.w) | 0) - G.B.h - 1 - Math.random() * 2, s: 1}; });   // blocks drop in
   raf = requestAnimationFrame(loop);
@@ -574,10 +627,10 @@ function startGame(lvl, round){ setTimeout(cheerMount, 0); /* 📣 cs-4a */
   showBanner(L.hardcore ? '💀 Hardcore: groups of 3+, ' + G.limit + ' taps!' : '🎯 ' + G.target.toLocaleString() + ' points · ' + first, L.hardcore ? 'bad' : 'gold');
   say(L.hardcore ? 'Hardcore! Groups of three or more.' : 'Pop the blocks! ' + first);
 }
-function missionText(m){ const T = THEMES[G.theme]; if(m.type === 'pop') return 'pop ' + m.need + ' ' + (T.plain ? T.syms[m.k] : T.syms[m.k]); return MISSION_INFO[m.type]().text.toLowerCase() + ' ×' + m.need; }
+function missionText(m){ const T = THEMES[G.theme]; if(m.type === 'pop') return 'pop ' + m.need + ' ' + (famTheme(T) && FAMF && FAMF.who[m.k] ? FAMF.who[m.k].name : T.syms[m.k]); return MISSION_INFO[m.type]().text.toLowerCase() + ' ×' + m.need; }
 function renderMissions(){
   const T = THEMES[G.theme];
-  $('missions').innerHTML = G.missions.map((m, k) => { const inf = m.type === 'pop' ? {icon: T.plain ? '<b style="color:' + T.col[m.k] + '">' + T.syms[m.k] + '</b>' : T.syms[m.k]} : MISSION_INFO[m.type]();
+  $('missions').innerHTML = G.missions.map((m, k) => { const inf = m.type === 'pop' ? {icon: famTheme(T) && FAMF && FAMF.img[m.k] ? '<img class="famp" alt="' + UI.esc(FAMF.who[m.k].name) + '" src="' + famURL(m.k) + '">' : T.plain ? '<b style="color:' + T.col[m.k] + '">' + T.syms[m.k] + '</b>' : T.syms[m.k]} : MISSION_INFO[m.type]();
     return '<span class="mis' + (m.got >= m.need ? ' done' : '') + '" id="mis-' + k + '" title="' + (inf.text || 'Pop') + '"><span class="ic">' + inf.icon + '</span>' + Math.min(m.got, m.need) + '/' + m.need + '</span>'; }).join('');
 }
 function layout(){
@@ -616,7 +669,7 @@ function applyEvent(ev, before){
   // combo: another pop within 2.5 s
   G.combo = now - G.lastPop < 2500 ? G.combo + 1 : 0; G.lastPop = now; G.bestCombo = Math.max(G.bestCombo, G.combo);
   const mult = 1 + Math.min(G.combo, 3) * 0.5;
-  const gained = Math.round(ev.pts * mult);
+  const gained = Math.round(ev.pts * mult * (famTheme(T) ? FamFaces.MULT[G.theme] || 1 : 1));   // 🧑‍🤝‍🧑 24r-b ★ ×1.25 / ×1.5
   G.score += gained;
   const n = ev.popped.length + ev.blasted.filter(b => b.c.t === 'n').length; G.popped += n; G.bigGroup = Math.max(G.bigGroup, ev.group); cheerSay(G.combo >= 2 ? 'big' : ev.group >= 6 ? 'goal' : '', G.combo >= 2 ? 'combo' : 'pop'); /* 📣 cs-4a */
   if(ev.fired.length) G.powers++; if(ev.made) G.made++;
@@ -636,6 +689,7 @@ function applyEvent(ev, before){
   if(T.fx === 'zoom' && ev.group >= 4) G.fx.push({type: 'text', x: tx, y: ty - 1, text: 'BEEP!', t0: now + 100, big: true});
   if(ev.chicks) G.fx.push({type: 'text', x: G.B.w / 2, y: G.B.h - 1, text: '🐣 Saved! +' + ev.chicks * 100, t0: now + 300, big: true});
   G.busyUntil = now + 260;
+  famPop(ev, before);   // 🧑‍🤝‍🧑 24r-b
   // sounds + words
   if(ev.fired.length){ UISound.play('success'); const f = ev.fired[0]; say(f.includes('+') ? 'Super blast!' : f === 'rain' ? 'Rainbow!' : f === 'bomb' ? 'Boom!' : 'Whoosh!'); showBanner(f.includes('+') ? '💥 SUPER BLAST!' : f === 'rain' ? '🌈 Rainbow pop!' : f === 'bomb' ? '💣 BOOM!' : '🚀 Whoosh!', 'gold'); }
   else if(ev.made){ UISound.play('success'); const nm = ev.made === 'rain' ? '🌈 Rainbow' : ev.made === 'bomb' ? '💣 Bomb' : '🚀 Rocket'; showBanner(nm + ' block made! Tap it to fire', 'gold'); say(nm.slice(3) + '!'); }
@@ -681,6 +735,7 @@ function loop(now){
   }
   Object.keys(G.pos).forEach(id => { if(!live.has(Number(id))) delete G.pos[id]; });
   drawFx(g, now, T);
+  if(FAMF) FAMF.paint(g, s, now);   // 🧑‍🤝‍🧑 24r-b
 }
 function drawCell(g, c, x, y, s, sc, lit, now, T){
   const pad = s * 0.06, m = s * (1 - sc) / 2;
@@ -688,6 +743,7 @@ function drawCell(g, c, x, y, s, sc, lit, now, T){
   if(c.t === 'chick'){ const bob = Math.sin(now / 260 + c.id) * s * 0.05; g.drawImage(sprite('🐣', Math.round(s * 0.72)), s * 0.5 - s * 0.47, s * 0.5 - s * 0.47 + bob, s * 0.94, s * 0.94); g.restore(); return; }
   if(c.t === 'crate'){ g.fillStyle = '#B07A3E'; rr(g, pad, pad, s - pad * 2, s - pad * 2, s * 0.12); g.fill(); g.strokeStyle = '#7A4F22'; g.lineWidth = Math.max(2, s * 0.07); g.stroke();
     g.beginPath(); g.moveTo(pad * 2, pad * 2); g.lineTo(s - pad * 2, s - pad * 2); g.moveTo(s - pad * 2, pad * 2); g.lineTo(pad * 2, s - pad * 2); g.stroke(); g.restore(); return; }
+  if(FAMF && T.fam && !c.sp && FAMF.img[c.k]){ famCell(g, c, s, lit); g.restore(); return; }   // 🧑‍🤝‍🧑 24r-b
   const col = c.sp === 'rain' ? null : T.col[c.k];
   if(col){ const gr = g.createLinearGradient(0, 0, 0, s); gr.addColorStop(0, shade(col, 1.12)); gr.addColorStop(1, shade(col, 0.86)); g.fillStyle = gr; }
   else { const gr = g.createLinearGradient(0, 0, s, s); ['#FF5A5F', '#FFC845', '#4CB963', '#3D8BFD', '#A06CF5'].forEach((k, n) => gr.addColorStop(n / 4, k)); g.fillStyle = gr; }
@@ -696,6 +752,7 @@ function drawCell(g, c, x, y, s, sc, lit, now, T){
   if(lit){ g.strokeStyle = '#FFFFFF'; g.lineWidth = Math.max(2, s * 0.09); rr(g, pad, pad, s - pad * 2, s - pad * 2, s * 0.2); g.stroke(); }
   if(c.sp === 'rain'){ g.drawImage(sprite('🌈', Math.round(s * 0.6)), s * 0.12, s * 0.12, s * 0.76, s * 0.76); }
   else if(T.plain){ g.fillStyle = 'rgba(255,255,255,0.85)'; g.font = '700 ' + Math.round(s * 0.42) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(T.syms[c.k], s / 2, s * 0.54); }
+  else if(FAMF && T.fam && FAMF.img[c.k]) g.drawImage(FAMF.img[c.k], s * 0.18, s * 0.18, s * 0.64, s * 0.64);   // 🧑‍🤝‍🧑 24r-b: a power block keeps its face
   else g.drawImage(sprite(T.syms[c.k], Math.round(s * 0.56)), s * 0.14, s * 0.14, s * 0.72, s * 0.72);
   if(c.sp === 'rh' || c.sp === 'rv'){   // rocket stripes + arrows
     const pulse = 0.6 + 0.4 * Math.sin(now / 160);
@@ -755,7 +812,7 @@ function leavePlay(){
   pauseGame();
   UI.confirm({icon: '◀', title: 'Leave this round?', body: 'This round will not be saved.', okText: 'Leave', cancelText: 'Keep playing'}).then(ok => { if(ok) backToMenu(); else resume(); });
 }
-function backToMenu(){ if(window.Cheer) Cheer.unmount(); cancelAnimationFrame(raf); clearInterval(timerId); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); renderMenu(); showScreen('menu'); }
+function backToMenu(){ famStop(); /* 🧑‍🤝‍🧑 24r-b */ if(window.Cheer) Cheer.unmount(); cancelAnimationFrame(raf); clearInterval(timerId); try{ speechSynthesis.cancel(); }catch(e){} G = null; hideResult(); renderMenu(); showScreen('menu'); }
 document.addEventListener('keydown', e => {
   if(!G || G.over || $('scr-play').classList.contains('hidden')) return;
   if(e.key === 'u' || e.key === 'U' || ((e.ctrlKey || e.metaKey) && e.key === 'z')){ undo(); e.preventDefault(); }
@@ -776,6 +833,7 @@ function finishGame(why){
   if(g.score > 0) saveWin(S.player, g.lvl, {timeSec: secs, stars, score: g.score, theme: g.theme, cleared, stats});
   const T = THEMES[g.theme];
   cheerEnd(cleared); /* 📣 cs-4a */
+  if(cleared) famWin();   /* 🧑‍🤝‍🧑 24r-b */
   if(cleared){ const pr = pick(PRAISE); party('🎉 ' + pr + ', ' + S.player + '!'); say(pr + ', ' + S.player + '!'); confetti(['🫧', '⭐', '🎉', T.syms[0], T.syms[1], T.syms[2]], 40); UISound.play('success'); }
   else { UISound.play('pop'); say(why === 'moves' ? 'Out of taps! Good try!' : 'No more groups! Good try!'); }
   setTimeout(() => {
@@ -928,4 +986,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (r9+back-1+p1b+p2+p6e+cs-4a+b3w2+24u-b+24y-b) END OF PopBlocks.html -->
+<!-- (r9+back-1+p1b+p2+p6e+cs-4a+b3w2+24u-b+24y-b+24r-b) END OF PopBlocks.html -->
