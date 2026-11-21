@@ -354,6 +354,10 @@
 <script src="inc/IsoLook_wonder.js"></script>
 <script src="inc/IsoLook_wonder2.js"></script>
 <script src="inc/IsoLook_wonder3.js"></script>
+<script src="inc/CreatureKit.js"></script>
+<script src="inc/CreatureSea.js"></script>
+<script src="inc/MotionCreature.js"></script>
+<script src="inc/CreatureCast.js"></script>   <!-- 🐾 ar-r2-7: the 🥚 Hatch Stone's wild friend -->
 <script src="inc/SkillKit.js"></script>   <!-- 👑 ar-r2-3: hero skills (engines · looks · SkillKit.fx painters) -->
 </head>
 <body ontouchstart="">
@@ -386,6 +390,7 @@
 <script src="inc/AvataRealmSkills.js"></script>
 <script src="inc/AvataRealmWalls.js"></script>
 <script src="inc/AvataRealmTurns.js"></script>
+<script src="inc/AvataRealmWonders.js"></script>
 <script src="inc/AvataRealmEngine.js"></script>
 <script>
 const CURRENT_PLAYER = ''+__SP("player")+''; window.SP_PAGE = 'avatarealm';
@@ -479,8 +484,9 @@ function build(){ const C = S.cfg, L = AR.land({size: C.size, teams: C.teams, se
     [[-3, 2], [3, -2]].forEach(([a, b], q) => { const c = AR.freeNear(map, ctr.i + a + 0.5, ctr.j + b + 0.5, ctr); if(!c) return; const it = addItem(Props.place(map, 'gemore', c.i, c.j, {look: 'realm', v: q + 1, state: 'full'})); if(it) rich.push({kind: 'g', i: c.i, j: c.j, n: AR.GEM_N, it}); }); }
   const shrines = (C.level | 0) >= 2 ? AR.shrineSpots(map, L, teams).map(s => { const it = addItem(Props.place(map, 'realm_shrine', s.i, s.j, {look: 'realm'})); return it ? {i: it.x, j: it.y, great: !!s.great, it} : null; }).filter(Boolean) : [];
   S.shrineCells = new Set(); shrines.forEach(q => { for(let b = -1; b < 3; b++) for(let a = -1; a < 3; a++) S.shrineCells.add((q.i + a) + ',' + (q.j + b)); });
+  const WP = wonderPlan(map, L, teams, shrines);   // 🌌 R2.7: fair wonder spots + the pool (their cells stay free of decor)
   decor(map, L, teams);
-  S.M = AR.newMatch({map, teams, level: C.level, seed: C.seed, placer: PLACER, rich, shrines});
+  S.M = AR.newMatch({map, teams, level: C.level, seed: C.seed, placer: PLACER, rich, shrines, wspots: WP.wspots, wpool: WP.wpool, wlean: WP.wlean, size: WP.size});
   S.M.teams.forEach((T, t) => { T.res.forEach((r, q) => { r.it = teams[t].res[q].it; }); }); S.M.rich.forEach((r, q) => { r.it = rich[q] && rich[q].it; });
   S.M.blds.forEach(b => { if(b.slot === 'house') b.it = teams[b.team].houseIt; });
   S.terr = null; syncUnits(1); }
@@ -493,7 +499,7 @@ function decor(map, L, teams){ const keys = ['palm', 'bush', 'fern', 'rock', 'fl
 /* ---------- 🔁 engine units → IsoKit items (one stable item per unit; dead ones leave) ---------- */
 function syncUnits(alpha){ const M = S.M, seen = S._seen || (S._seen = new Set()); seen.clear();
   for(const u of M.units){ if(u.dead) continue; seen.add(u.id); let it = S.uit.get(u.id);
-    if(!it){ it = {x: u.x, y: u.y, z: 0, pic: null, u, unit: true}; S.uit.set(u.id, it); S.items.push(it); it.frames = picsFor(u.team, u.role, null, varOf(u)); }
+    if(!it){ it = {x: u.x, y: u.y, z: 0, pic: null, u, unit: true}; S.uit.set(u.id, it); S.items.push(it); it.frames = (u.wild && wildPics(u)) || picsFor(u.team, u.role, null, varOf(u)); }   /* 🐾 R2.7 the wild friend */
     let x = u.px + (u.x - u.px) * alpha, y = u.py + (u.y - u.py) * alpha;
     const ak = u.swing >= 0 && !u.fly ? actOf(u.role) : null;
     if(ak && (it.sw == null || it.sw < 0 || u.swing < it.sw)){ const h = u.hit || {}, B = h.b != null ? M.blds.find(b => b.id === h.b) : null, o = h.id != null ? M.byId.get(h.id) : null, tg = B ? {x: B.i + B.w / 2, y: B.j + B.d / 2} : o ? {x: o.x, y: o.y} : null, sp = S.speed || 1;
@@ -506,7 +512,7 @@ function syncUnits(alpha){ const M = S.M, seen = S._seen || (S._seen = new Set()
   if(S.uit.size !== seen.size){ for(const [id, it] of S.uit) if(!seen.has(id)){ S.uit.delete(id); S.sel.delete(id); const k = S.items.indexOf(it); if(k >= 0) S.items.splice(k, 1); } } }
 
 /* ---------- ⏱️ engine events → the AR-1 props (🏗️ 33 · 66 · 100 · 🏠 levels · 🪙🧱 states · 🏚️ ruins) ---------- */
-function events(){ const M = S.M; for(const e of AR.takeEvents(M)){ skillEvent(e); wallEvent(e); turnEvent(e);   /* 🐢 R2.5 */   // 👑 R2.3
+function events(){ const M = S.M; for(const e of AR.takeEvents(M)){ skillEvent(e); wallEvent(e); turnEvent(e); wonderEvent(e);   /* 🌌 R2.7 */   /* 🐢 R2.5 */   // 👑 R2.3
     if(e.k === 'build.step' || e.k === 'build.done'){ const b = M.blds.find(x => x.id === e.b); if(b && b.it) Props.AR.set(b.it, {build: e.k === 'build.done' ? 100 : e.pct}, M.map); if(e.k === 'build.done') S.terr = null; }
     else if(e.k === 'house.up'){ const b = M.blds.find(x => x.id === e.b); if(b && b.it){ b.it.state = String(e.lv); Props.AR.set(b.it, {}, M.map); } }
     else if(e.k === 'res.state'){ const r = M.teams.flatMap(T => T.res).concat(M.rich).find(q => q.i === e.i && q.j === e.j); if(r && r.it){ r.it.state = e.state; Props.AR.set(r.it, {}, M.map); } }
@@ -533,7 +539,7 @@ function step(dt){ if(S.paused || !S.M) return; const M = S.M; AR.step(M, dt * (
 function render(alpha, t){ S.t = t; S.frame++; syncUnits(alpha);
   Props.tick(S.props, t); if(S.frame % 6 === 0) Props.seeThrough(S.V, S.props, unitItems());
   wallTick(); const items0 = S.ghost && S.ghost.it ? S.items.concat([S.ghost.it]) : S.items, items = S.wall && S.wall.items && S.wall.items.length ? items0.concat(S.wall.items) : items0;   // 🧱 ar-r2-4a ghost pieces
-  Iso.frame(S.V, {items, t, groundFx: (g, V) => { groundFx(g, V); wallGround(g, V); skillGround(g, V); }, airFx: sparks, overlay: (g, V) => { overlay(g, V); wallOver(g, V); skillOver(g, V); turnOver(g, V); }});   // 🐢 R2.5 dashed 👣 arrows
+  Iso.frame(S.V, {items, t, groundFx: (g, V) => { groundFx(g, V); wonderGround(g, V); wallGround(g, V); skillGround(g, V); }, airFx: (g, V, t2) => { sparks(g, V, t2); wonderAir(g, V); },   /* 🌌 R2.7 */ overlay: (g, V) => { overlay(g, V); wallOver(g, V); skillOver(g, V); turnOver(g, V); }});   // 🐢 R2.5 dashed 👣 arrows
   if(S.mm && S.frame % 10 === 0) S.mm.draw();
   if(t - S.lastUI > 0.25){ S.lastUI = t; hud(); } placeDom(); }
 const unitItems = () => { const a = []; S.uit.forEach(it => a.push(it)); return a; };
@@ -602,7 +608,7 @@ function buildCards(){ const box = $('cards'), side = sideOf(0), T = S.M.teams[0
     const q = document.createElement('span'); q.className = 'q hidden'; q.innerHTML = '<i></i><span></span>'; b.appendChild(q); b.onclick = () => train(role); box.appendChild(b); });
   $('tab-build').classList.toggle('on', S.tab === 'build'); $('tab-train').classList.toggle('on', S.tab === 'train'); S.cardsFor = S.tab + ':' + T.house.lv; hud(true); }
 function costHtml(c){ const side = sideOf(0), E = S.M.teams[0].eco; return '<span' + (E.c < c[0] ? ' class="no"' : '') + '>' + side.res.c[0] + c[0] + '</span>' + (c[1] ? '<span' + (E.b < c[1] ? ' class="no"' : '') + '>' + side.res.b[0] + c[1] + '</span>' : ''); }
-function hud(force){ const M = S.M, T = M.teams[0], side = sideOf(0); if(!M) return; if(!$('skdock') || S.skDockFor !== M){ S.skDockFor = M; skillDockBuild(); } else skillHud(force);   // 👑 R2.3
+function hud(force){ const M = S.M, T = M.teams[0], side = sideOf(0); if(!M) return; wonderHud(force);   /* 🌌 R2.7 power pills */ if(!$('skdock') || S.skDockFor !== M){ S.skDockFor = M; skillDockBuild(); } else skillHud(force);   // 👑 R2.3
   const army = AR.count(M, 0), workers = M.units.filter(u => u.team === 0 && !u.dead && u.role === 'worker').length;
   BAR.count('c', side.res.c[0], Math.floor(T.eco.c), side.res.c[1]); BAR.count('b', side.res.b[0], Math.floor(T.eco.b), side.res.b[1]); if(M.kinds.indexOf('s') >= 0) BAR.count('s', side.res.s[0], Math.floor(T.eco.s || 0), side.res.s[1]); if(M.kinds.indexOf('g') >= 0) BAR.count('g', side.res.g[0], Math.floor(T.eco.g || 0), side.res.g[1]); BAR.count('army', '👥', army + '/' + T.cap, 'Army / cap', army >= T.cap); BAR.time(Math.floor(M.t));
   $('army-who').innerHTML = side.icon + ' <b>' + army + ' / ' + T.cap + '</b> · ⛑️ ' + workers;
@@ -629,6 +635,7 @@ function bldAt(cell){ if(!cell) return null; return S.M.blds.find(b => !b.gone &
 function onTap(cell, px, py){ const M = S.M; if(!M || S.paused || (S.wall && S.wall.on) || turnBusy()) return;   /* 🐢 R2.5: taps wait while the map plays */ hideInfo(); $('bmenu').classList.add('hidden');
   if(S.ghost){ if(cell){ const f0 = AR.foot(S.ghost.slot, 0, 0, S.ghost.turn); moveGhost(cell.i - Math.floor(f0.w / 2), cell.j - Math.floor(f0.d / 2)); } return; }
   if(S.arm === 'rally'){ if(cell){ AR.order(M, 0, {go: {x: cell.i + 0.5, y: cell.j + 0.5}}); tip('🚩 New units walk to the flag'); } arm(null); return; }
+  if(wonderTap(cell, px, py)) return;   // 🌌 R2.7: ☄️ aim · ℹ️ wonder card
   const mine = unitAt(px, py, 0); if(mine){ S.inspect = null; pickNear(mine); return; }
   const foe = unitAt(px, py, 1), fb = bldAt(cell), ids = [...S.sel];
   if(ids.length){   // units picked: enemy = attack · ground = walk there (✅ Aowu pick 1)
@@ -663,7 +670,7 @@ function refreshGhost(){ const G = S.ghost, M = S.M; if(!G) return; G.ok = AR.ca
   $('gc-name').textContent = SLOT_ICON[G.slot] + ' ' + sideOf(0).bld[G.slot]; const mk = AR.SLOTS[G.slot].makes; $('gc-more').textContent = (mk.length ? 'makes ' + mk.map(r => ROLE[r][0]).join(' ') : G.slot === 'tower' ? 'shoots rivals near it' : G.slot === 'wardrobe' ? 'role stages 🗡️ 🎽' : '') + ' · ' + sideOf(0).res.c[0] + c[0] + ' ' + sideOf(0).res.b[0] + c[1]; $('gc-why').textContent = G.ok === true ? '' : (WHY[G.ok] || ''); $('gc-ok').disabled = G.ok !== true; $('ghost-card').classList.remove('hidden'); }
 function cancelPlace(){ S.ghost = null; $('ghost-card').classList.add('hidden'); hud(true); }
 function confirmPlace(){ const G = S.ghost; if(!G || G.ok !== true) return; const b = AR.place(S.M, 0, G.slot, G.i, G.j, G.turn); if(b && b.id){ window.UISound && UISound.play && UISound.play('pop'); cancelPlace(); tip('🔨 Bricklets are on their way'); } else { G.ok = b; refreshGhost(); } }
-function placeDom(){ const V = S.V; if(!V) return; wallCardPlace(); if(S.frame % 10 === 0) infoNudge();   // 🐞 R2.4b
+function placeDom(){ const V = S.V; if(!V) return; wallCardPlace(); wonderDom();   /* 🌌 R2.7 */ if(S.frame % 10 === 0) infoNudge();   // 🐞 R2.4b
   if(S.ghost){ const f = AR.foot(S.ghost.slot, S.ghost.i, S.ghost.j, S.ghost.turn), p = V.toScreen(f.i + f.w / 2, f.j + f.d / 2, 0), card = $('ghost-card'), top = p.y - (S.ghost.slot === 'tower' ? 96 : 86) * V.zoom - 10;
     const w = card.offsetWidth, x = Math.max(w / 2 + 6, Math.min(innerWidth - w / 2 - 6, p.x)), gl = $('goal'), gb = gl.classList.contains('hidden') ? S.top : gl.getBoundingClientRect().bottom + 6, y = Math.max(gb + card.offsetHeight + 4, Math.min(S.dockTop - 8, top)); card.style.left = x + 'px'; card.style.top = y + 'px'; } else $('ghost-card').classList.add('hidden');
   const gd = S.guide, hand = $('hand'); let hp = null;
@@ -671,7 +678,7 @@ function placeDom(){ const V = S.V; if(!V) return; wallCardPlace(); if(S.frame %
     else { const el = gd.k === 'group' && S.sel.size ? document.querySelector('#cmd [data-k="group"]') : gd.k === 'attack' && sqList().length ? document.querySelector('#sqbs .sqb') : document.querySelector('#cards .tcard.glow, #tabs .glow, #army-all.glow'); if(el){ const r = el.getBoundingClientRect(); hp = {x: r.right - 6, y: r.top + r.height * 0.5}; } } }   // 👆 at the button's right edge — its word stays readable
   hp = turnHand(hp); turnTick();   // 🐢 R2.5: 👆 on ▶ Go! once the ⚡ are planned
   hand.classList.toggle('hidden', !hp); if(hp){ hand.style.left = hp.x + 'px'; hand.style.top = hp.y + 'px'; }
-  placeBanners(); placeSquad(); if(S.infoAt && !$('info').classList.contains('hidden')){ const a = S.infoAt, w = a.k === 'unit' ? {x: a.u.x, y: a.u.y, z: 1.2} : a.k === 'bld' ? {x: a.b.i + a.b.w / 2, y: a.b.j + a.b.d / 2, z: 3} : a.k === 'res' ? {x: a.r.i + 0.5, y: a.r.j + 0.5, z: 1.5} : a.k === 'shrine' ? {x: a.q.i + 1, y: a.q.j + 1, z: 2} : {x: a.cell.i + 0.5, y: a.cell.j + 0.5, z: 0}; const p = V.toScreen(w.x, w.y, w.z);
+  placeBanners(); placeSquad(); if(S.infoAt && !$('info').classList.contains('hidden')){ const a = S.infoAt, w = a.k === 'unit' ? {x: a.u.x, y: a.u.y, z: 1.2} : a.k === 'bld' ? {x: a.b.i + a.b.w / 2, y: a.b.j + a.b.d / 2, z: 3} : a.k === 'res' ? {x: a.r.i + 0.5, y: a.r.j + 0.5, z: 1.5} : a.k === 'shrine' ? {x: a.q.i + 1, y: a.q.j + 1, z: 2} : a.k === 'wonder' ? {x: a.W.i + a.W.w / 2, y: a.W.j + a.W.d / 2, z: 3} : {x: a.cell.i + 0.5, y: a.cell.j + 0.5, z: 0}; const p = V.toScreen(w.x, w.y, w.z);
     if(a.k === 'shrine'){ const k = a.q.owner + ':' + a.q.by + ':' + Math.round(a.q.cap / 10) + ':' + !!a.q.contest; if(a._k !== k){ a._k = k; showInfo(a, p.x, p.y); } }   /* ⭐ the card follows the capture */ placeInfo(p.x, p.y); }
   const T0 = S.M.teams[0], fl = $('flag'); fl.classList.toggle('hidden', !T0.rally); if(T0.rally){ const p = V.toScreen(T0.rally.x, T0.rally.y, 0); fl.style.left = p.x + 'px'; fl.style.top = p.y + 'px'; } }
 
@@ -818,6 +825,7 @@ function showInfo(it, px, py){ const M = S.M, el = $('info'), side0 = sideOf(0);
     h = head(q.great ? '🌟' : '⭐', q.great ? 'Great Star Shrine' : 'Star Shrine', ow ? (q.owner === 0 ? '✓ Yours · ' : '') + ow.icon + ' ' + ow.name : 'Nobody holds it yet')
       + (by && q.cap > 0 ? hp(q.cap / 100, teamHex(q.by)) + by.icon + ' taking it · ' + Math.round(q.cap) + '%' : '') + (q.contest ? '<div class="tipl" style="background:#FFF0F2;color:#C92C4A">⚔️ Both sides inside — nobody gains</div>' : '')
       + '<div class="tipl">' + st[0] + ' +' + (q.great ? 2 : 1) + ' ' + st[1] + ' every 4 s · 💚 heals your fighters on it</div><div class="sub">Walk fighters in to take it (8 s, more = faster) · Bricklets can\'t</div>'; }
+  else if(it.k === 'wonder') h = wonderInfoHtml(it, head, hp);   // 🌌 R2.7
   else if(it.k === 'res' && it.r.kind === 'g'){ const r = it.r, g = side0.res.g;
     h = head('💎', r.rich ? '💎 Middle gem ore' : 'Gem ore', 'Bricklets dig it slowly · ' + g[0] + ' ' + g[1]) + hp(r.n / r.max, '#9B6BFF') + g[0] + ' ' + Math.round(r.n) + ' / ' + r.max + ' left' + '<div class="sub">grows back 120 s after it is empty · 🏠 House → 💎 hero gems</div>'; }
   else if(it.k === 'res'){ const r = it.r, coin = r.kind === 'c', ic = coin ? side0.res.c[0] : side0.res.b[0];
@@ -891,7 +899,7 @@ function makeBar(){ if(!BAR) BAR = UI.gameBar($('gbar'), {game: GAME_ID, icon: '
 /* ---------- 🔧 boot ---------- */
 async function start(){ S.ready = false; if(S.loop){ S.loop.stop(); S.loop = null; } S.over = false; S.speed = S.cfg.turn ? 1 : [0.7, 1, 1.5][S.cfg.speed == null ? 1 : S.cfg.speed]; const lb = p => { $('load-bar').style.width = Math.round(p * 100) + '%'; };
   $('loading').classList.remove('hidden'); $('loading').style.opacity = 1; lb(0.05); await new Promise(r => setTimeout(r, 30));
-  await new Promise(res => Props.need(sidesInPlay(S.cfg).concat(['jungle']), () => res())); lb(0.15);
+  wonderReset(); await new Promise(res => Props.need(sidesInPlay(S.cfg).concat(['jungle'], (S.cfg.level | 0) >= AR.WONDER.from ? ['wonder'] : []), () => res())); lb(0.15);   /* 🌌 R2.7: the wonders' looks from 🐣 Junior */
   build(); if(S.loadData){ restoreMatch(S.loadData); S.loadData = null; } if(S.cfg.turn && !S.M.turn) AR.turnOn(S.M); lb(0.25);   /* 🐢 R2.5 Turn mode (a reload keeps its own turn) */   /* 💾 ar-r1c: ⏩ continue a saved match */
   // ⚠️ UiKit tx-1 UI.fitScan() runs once at DOMContentLoaded on every [data-fit] — and UI.gameBar writes data-fit (its stage) on the bar: a bar made BEFORE that scan gets its insides re-written
   //    (stale numbers forever). Make the bar after the scan (📨 note to the ✨ UiKit lane, Lessons Learned 2026-11-18).
@@ -899,7 +907,7 @@ async function start(){ S.ready = false; if(S.loop){ S.loop.stop(); S.loop = nul
   S.V = Iso.view(freshCanvas(), S.map, {bg: 'none', shadow: true, min: 0.3, max: 2.4}); S.V.resize(); S.V.onTap = (c, px, py) => onTap(c, px, py); bindPointer(S.V.cv);
   makeBar(); layout(); const small = Math.min(innerWidth, innerHeight) < 600, d = S.V.dpr || 1; S.V.zoom = Iso.stepFor((small ? 0.75 : 1) * d) / d;
   const H = S.M.teams[0].house; S.V.centerOn(H.i + H.w / 2 + 3, H.j + H.d / 2 + 1);
-  S.mm = Iso.minimap($('mini-cv'), S.map, S.V, {dots: () => { const a = []; (S.M.shrines || []).forEach(q => a.push({x: q.i + 1, y: q.j + 1, c: q.owner >= 0 ? teamHex(q.owner) : '#FFE27A', r: q.great ? 4 : 3})); S.uit.forEach(it => a.push({x: it.x, y: it.y, c: teamHex(it.u.team)})); return a; }});
+  S.mm = Iso.minimap($('mini-cv'), S.map, S.V, {dots: () => { const a = []; (S.M.shrines || []).forEach(q => a.push({x: q.i + 1, y: q.j + 1, c: q.owner >= 0 ? teamHex(q.owner) : '#FFE27A', r: q.great ? 4 : 3})); S.uit.forEach(it => a.push({x: it.x, y: it.y, c: teamHex(it.u.team)})); return a; }}); wonderMini();   /* 🌌 R2.7 power badges on the mini map */
   buildFaces(); buildCards(); UI.pageRow($('cards'), {rows: innerWidth / innerHeight < 0.8 ? 2 : 1, edge: true}); layout();
   const pics = []; for(let t = 0; t < S.M.teams.length; t++){ TRAIN.forEach(r => { for(let v = 0; v < SKIN_NV; v++) pics.push(...picsFor(t, r, null, v)); }); pics.push(...picsFor(t, 'hero', null, -1)); }
   lb(0.3); await Props.warm(S.props, S.V, {onProgress: f => lb(0.3 + f * 0.3)}); await Iso.warm(pics, S.V, {onProgress: f => lb(0.6 + f * 0.4)});
@@ -926,6 +934,8 @@ const {wallEvent, wallTick, wallTrayCard, wallCardHud, wallMode, wallDrag, wallC
 Object.assign(window.AVATAREALM, {wallMode, wallDrag, wallConfirm, wallTapCell, showWallCard, hideInfo, manDo, lookDo, wallManCan});
 const {turnBoot, turnGo, turnUndo, turnHud, turnTick, turnLayout, turnHand, turnEvent, turnOver, turnKey, turnBusy, tipLocked} = window.ARTurns.init({S, AR, $, sideOf, tip, hud, cmdBar, events, cancelPlace, hideInfo, teamHex, ROLE, wallMode, SKSKIN});   // 🐢 ar-r2-5: the Turn mode part gets the page's pieces
 Object.assign(window.AVATAREALM, {turnGo, turnUndo, turnHud, turnBusy});
+const {wonderPlan, wonderEvent, wonderGround, wonderAir, wonderDom, wonderHud, wonderTap, wonderInfoHtml, wonderMini, wildPics, wonderReset} = window.ARWonders.init({S, AR, $, sideOf, tip, hud, teamHex, addItem, dropItem, sqTag, showInfo, PLACER});   // 🌌 ar-r2-7: the Wonders part gets the page's pieces
+Object.assign(window.AVATAREALM, {wonderTap, wonderHud, wonderReset});
 /* ================= 🎬 ar-r1c — the game's frame: 🎬 cover B · 🧾 one setup page (+ 🎖️ My formation) · 🏁 result · 💾 saves (plan §16r) =================
    The page opens on the cover (GameFrame GF.cover, btns: 'centre'); ▶ Play → the setup page; ▶ Start builds the match from the picks; the match end → GF.result.
    The hidden test route `?lv=<n>` still drops straight into a match (avatarealm.js). Picks + formation = PLAYER-based (Settings AvaRealm_<Name>, newest wins). */
@@ -1074,6 +1084,7 @@ function continueFrom(slot, file){ if(!file || !file.data || !file.data.cfg || !
 // 💾 put a saved match back on a freshly built island of the same seed (build() already placed the Houses + resources)
 function restoreMatch(sv){ const old = S.M, houses = old.teams.map((T, t) => { const b = old.blds.find(x => x.team === t && x.slot === 'house'); return b && b.it; }), its = new Map();
   old.teams.forEach(T => T.res.forEach(r => r.it && its.set(r.i + ',' + r.j, r.it))); old.rich.forEach(r => r.it && its.set(r.i + ',' + r.j, r.it));
+  (old.wonders || []).forEach(W => PLACER.wonderOff && PLACER.wonderOff(S.map, W));   // 🌌 R2.7: the fresh match's wonders go — the save puts its own back
   const M = AR.load(sv, {map: S.map, placer: PLACER, houseIt: t => houses[t], shrineIt: n => old.shrines && old.shrines[n] ? old.shrines[n].it : null});
   M.teams.forEach(T => T.res.forEach(r => { r.it = its.get(r.i + ',' + r.j); })); M.rich.forEach(r => { r.it = its.get(r.i + ',' + r.j); });
   M.teams.flatMap(T => T.res).concat(M.rich).forEach(r => { if(r.it){ r.it.state = AR.resState(r); Props.AR.set(r.it, {}, S.map); } });
@@ -1112,4 +1123,4 @@ controls(); boot();
 </script>
 </body>
 </html>
-<!-- (ar-r2-5) END OF AvataRealm.html -->
+<!-- (ar-r2-7) END OF AvataRealm.html -->
