@@ -242,6 +242,16 @@ const AR_CAP = [[{team: null, by: null, cap: null}, '⚪ neutral'], [{by: 'red',
   [{by: 'blue', cap: 50}, '🔵 taking it 50 %'], [{team: 'blue', by: null, cap: null}, '🔵 owns it']];
 function arCapStep(it){ const pal = it.pal || {}, k = AR_CAP.findIndex(([q]) => ['team', 'by', 'cap'].every(f => (q[f] == null ? null : q[f]) === (pal[f] == null ? null : pal[f]))), nx = AR_CAP[(k + 1) % AR_CAP.length];
   Props.AR.set(it, nx[0], S.M); pop(it); return nx[1]; }
+// 🗼 ip-8 ⬆️ Lookout: a placed watch tower walks watch → 🏗️ 0 → 33 → 66 → ⬆️ lookout (✨ morph) → watch (Props.AR.lookout keeps team · turn · cells)
+const lookPct = it => it.state !== 'lookout' ? -1 : it.pal && it.pal.build != null ? +it.pal.build : 100;
+function lookStep(it, d){ const p = lookPct(it), nx = p < 0 ? 0 : p < 33 ? 33 : p < 66 ? 66 : p < 100 ? true : false;
+  Props.AR.lookout(it, nx, S.M); if(nx === true){ it.morphT = S.lastT || 0; sound('success'); } else sound('tap'); pop(it); showBar();
+  tip(nx === false ? '🗼 ' + d.name + ' · watch' : nx === true ? '✨ ⬆️ ' + ((d.names && d.names.lookout) || 'Lookout') + ' — 👀 it spots far now' : '🏗️ building the lookout · ' + nx + ' %'); }
+function lookBar(def, it){ const b = $('s-state'), up = !!(def.upState && it && Props.AR && Props.AR.lookout), p = up ? lookPct(it) : 0;
+  b.querySelector('.bi').textContent = !up ? '🔀' : p < 0 ? '⬆️' : p < 100 ? '🏗️' : '🗼'; b.querySelector('.bl').textContent = !up ? 'State' : p < 0 ? 'Upgrade' : p < 100 ? 'Build' : 'Watch';
+  if(up && def.names && def.names[it.state]) $('sel-name').textContent = def.names[it.state] + ' · ' + def.foot.join('×') + (p >= 0 && p < 100 ? ' · 🏗️ ' + p + ' %' : '');   /* the name of what stands there now (Pepper-mill Tower → Colander Nest) */ }
+// 👀 a picked, finished lookout shows its spot range (AvataRealm: 6 tiles) — the shared sweep in groundFx
+function lookSweep(g, V, t){ const it = S.sel; if(!it || lookPct(it) < 100 || !Props.AR || !Props.AR.watchSweep) return; Props.AR.watchSweep(g, V, it, 6, t); }
 // ✋ holding a wall card: press on the map and drag → every cell you pass gets a piece (the map doesn't pan while you draw)
 (function(){ let line = null; const cellAt = e => { const r = $('iso').getBoundingClientRect(), g = S.V && Iso.place(S.V, e.clientX - r.left, e.clientY - r.top, {w: 1, d: 1}); return g ? [g.i, g.j] : null; };
   const lay = e => { const c = cellAt(e); if(!c) return; const k = c[0] + ',' + c[1]; if(line.done[k]) return; line.done[k] = 1;
@@ -256,6 +266,7 @@ function select(it){ S.sel = it; showBar(); }
 function showBar(){ const it = S.sel, h = S.hold, bar = $('selbar'); if(!it && !h){ bar.classList.add('hidden'); return; }
   const key = it ? it.prop : h.key, def = Props.DEFS[key]; $('sel-name').textContent = (h ? '✋ ' : '') + def.name + ' · ' + def.foot.join('×');
   const stNow = it ? it.state : h.state != null ? h.state : def.states ? Props.stateOf(key) : null; const plainWall = def.wall && !def.gate, shrine = key === 'realm_shrine' && !!it; $('s-state').classList.toggle('hidden', !(def.states && !plainWall) && !shrine); if(def.states && !plainWall) $('sel-name').textContent += ' · ' + stNow;   /* 🧱 ar-4: a wall's state = its joins (made by the helper) · ⭐ shrine = capture steps */
+  lookBar(def, it);   /* 🗼 ip-8 */
   growBar(def, stNow); touchBar(def, it);   /* 🌍 ip-6a */ wonderBar(def, it);   /* 🌌 ip-7a */
   $('s-move').classList.toggle('hidden', !it); $('s-del').classList.toggle('hidden', !it); $('s-var').classList.toggle('hidden', def.variants < 2); bar.classList.remove('hidden'); placeUi(); }
 // re-place a prop with new settings (turn / variant); it stays put when the new shape doesn't fit
@@ -267,6 +278,7 @@ $('s-var').onclick = () => { const d = Props.DEFS[S.hold ? S.hold.key : S.sel &&
 $('s-move').onclick = () => { const it = S.sel; if(!it) return; const o = {v: it.v, turn: it.turn, state: it.state, text: it.text}; del(it); holdKey(it.prop, o); tip('👆 tap where it should go'); sound('tap'); };
 // 🔀 ip-3b a prop with states (gate open · closed · new, bridge down · lifted, hay bale whole · flat, pumpkin pile 1–12): flip it in place — the map follows (Props.setState)
 $('s-state').onclick = () => { const key = S.hold ? S.hold.key : S.sel && S.sel.prop, d = Props.DEFS[key];
+  if(!S.hold && S.sel && d && d.upState && Props.AR && Props.AR.lookout){ lookStep(S.sel, d); return; }   /* 🗼 ip-8 ⬆️ Lookout ladder */
   if(!S.hold && S.sel && d && d.gate){ const open = S.sel.state !== 'ready'; Props.setGate(S.sel, open, S.M); if(open) S.sel.touchT = S.lastT || 0; showBar(); sound(open ? 'success' : 'tap'); tip((open ? '✨ ' : '🔒 ') + d.name + ' · ' + S.sel.state); return; }   /* 🧭 ip-6a gates */ if(!S.hold && S.sel && key === 'realm_shrine'){ tip('⭐ ' + arCapStep(S.sel)); sound('tap'); return; } if(!d || !d.states) return; const cur = S.hold ? (S.hold.state != null ? S.hold.state : Props.stateOf(key)) : S.sel.state, nx = d.states[(d.states.indexOf(cur) + 1) % d.states.length];
   if(S.hold){ S.hold.state = nx; } else { Props.setState(S.sel, nx, S.M); pop(S.sel); } showBar(); sound('tap'); tip('🔀 ' + d.name + ' · ' + nx); };
 // 🌱 ip-3c growing props: ◀ Shrink · 🌱 Grow (at the young stage: ① / ② = the two branches, in their SkillKit colours) — Props.grow + the ✨ morph moment
@@ -344,7 +356,7 @@ function render(alpha, t){ S.lastT = t;
   for(const w of S.walkers){ const it = w.it; it.x = w.px + (w.x - w.px) * alpha; it.y = w.py + (w.y - w.py) * alpha; it.pic = w.frames[w.path ? Math.floor(w.dist * 3.2) % Iso.WALK_N : 0]; it.flip = w.flip; }
   Props.tick(S.props, t);
   if(t - seeT > 0.1){ seeT = t; Props.seeThrough(S.V, S.props, S.walkers.map(w => w.it)); }
-  const st = Iso.frame(S.V, {items: S.items, t, groundFx: (g, V) => { touchHints(g, V, t); wondersGround(g, V, t); }, overlay: (g, V) => { burst(g, V, t); morphs(g, V, t); touches(g, V, t); wondersAir(g, V, t); ringSel(g, V, t); ghostDraw(g, V, t); }});
+  const st = Iso.frame(S.V, {items: S.items, t, groundFx: (g, V) => { touchHints(g, V, t); wondersGround(g, V, t); lookSweep(g, V, t); }, overlay: (g, V) => { burst(g, V, t); morphs(g, V, t); touches(g, V, t); wondersAir(g, V, t); ringSel(g, V, t); ghostDraw(g, V, t); }});
   if(performance.now() - lastInfo > 400){ lastInfo = performance.now(); S.ms = st.ms; info(); }
 }
 function diamond(g, V, x, y, w, d, z){ const p = (a, b) => { const s = V.toScreen(a, b, z || 0); return [s.x - V._sx(), s.y - V._sy()]; }; g.beginPath(); [p(x, y), p(x + w, y), p(x + w, y + d), p(x, y + d)].forEach((q, k) => k ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.closePath(); }
@@ -429,4 +441,4 @@ start();
 </script>
 </body>
 </html>
-<!-- (ip-2+ip-3b+ip-3c+ip-4a+ar-1+ar-4+ar-7+ip-4b+ip-4c+ip-4d+ip-4d2+ip-4e+ip-5+ip-4f+ip-6a+ip-7a+ip-7c) END OF IsoPropsLab.html -->
+<!-- (ip-2+ip-3b+ip-3c+ip-4a+ar-1+ar-4+ar-7+ip-4b+ip-4c+ip-4d+ip-4d2+ip-4e+ip-5+ip-4f+ip-6a+ip-7a+ip-7c+ip-8) END OF IsoPropsLab.html -->
