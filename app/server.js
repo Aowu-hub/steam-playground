@@ -6653,52 +6653,68 @@ var EVENT_TABLES = {   // lunar / moon days, checked against 2+ outside calendar
 var EVENT_DAYS = [
   {id: 'newyear', icon: '🎆', md: '12-31', to: '01-01', art: 'newyear', flag: '', en: 'Happy New Year! 🎆', th: 'สวัสดีปีใหม่! 🎆',
     feel: ['A fresh start: pick ONE thing you want to get better at this year — tiny steps count.', 'เริ่มต้นใหม่: เลือกหนึ่งอย่างที่อยากเก่งขึ้นปีนี้ ก้าวเล็ก ๆ ก็นับนะ'],
-    fact: 'Thailand counts down at midnight with fireworks over the Chao Phraya river.'},
+    fact: 'Thailand counts down at midnight with fireworks over the Chao Phraya river.',
+    factTh: 'คืนข้ามปี คนไทยนับถอยหลังพร้อมพลุเหนือแม่น้ำเจ้าพระยา'},
   {id: 'childrenth', icon: '🧒', nth: {month: 1, dow: 6, n: 2}, art: null, flag: 'th', en: 'Happy Children\'s Day! 🧒', th: 'สุขสันต์วันเด็ก! 🧒',
     feel: ['You matter! What is one thing you are proud of today?', 'หนูสำคัญนะ! วันนี้ภูมิใจเรื่องอะไรบ้าง?'],
-    fact: 'Thailand\'s Children\'s Day is the second Saturday of January.'},
+    fact: 'Thailand\'s Children\'s Day is the second Saturday of January.',
+    factTh: 'วันเด็กไทยตรงกับวันเสาร์ที่สองของเดือนมกราคม'},
   {id: 'lunarny', icon: '🧧', table: 'lunarny', span: 1, art: 'newyear', flag: 'tw', en: 'Happy Lunar New Year! 🧧', th: 'สุขสันต์วันตรุษจีน! 🧧', zh: '新年快樂！🧧',
     feel: ['Say sorry for one thing that went wrong, then start fresh — a hug is lucky too.', 'ขอโทษเรื่องที่พลาดไป แล้วเริ่มต้นใหม่ — กอดกันก็โชคดีนะ'],
-    fact: 'Red envelopes (hongbao) carry wishes for a happy, healthy year.'},
+    fact: 'Red envelopes (hongbao) carry wishes for a happy, healthy year.',
+    factTh: 'อั่งเปาซองแดงส่งคำอวยพรให้มีความสุขและแข็งแรงตลอดปี'},
   {id: 'piday', small: true, icon: '🥧', md: '03-14', art: null, flag: 'steam', en: 'Happy Pi Day! 🥧', th: 'สุขสันต์วันพาย! 🥧',
     feel: ['Stuck on a hard sum? Take a big breath, then try a new way.', 'เจอโจทย์ยาก? หายใจลึก ๆ แล้วลองวิธีใหม่'],
-    fact: 'π ≈ 3.14 — every circle\'s way round is a bit more than 3 times its width.'},
+    fact: 'π ≈ 3.14 — every circle\'s way round is a bit more than 3 times its width.',
+    factTh: 'π ≈ 3.14 — เส้นรอบวงของวงกลมยาวกว่าความกว้างของมัน 3 เท่านิดหน่อย'},
   {id: 'childrentw', icon: '🧒', md: '04-04', art: null, flag: 'tw', en: 'Happy Children\'s Day! 🧒', th: 'สุขสันต์วันเด็กไต้หวัน! 🧒', zh: '兒童節快樂！🧒',
     feel: ['Tell someone what made you smile today.', 'เล่าให้ใครสักคนฟังว่าวันนี้อะไรทำให้ยิ้ม'],
-    fact: 'Taiwan celebrates Children\'s Day on 4 April.'},
+    fact: 'Taiwan celebrates Children\'s Day on 4 April.',
+    factTh: 'ไต้หวันฉลองวันเด็กในวันที่ 4 เมษายน'},
   {id: 'songkran', icon: '💦', md: '04-13', to: '04-15', art: 'songkran', flag: 'th', en: 'Happy Songkran! 💦', th: 'สุขสันต์วันสงกรานต์! 💦',
     feel: ['Pour water gently on an elder\'s hands and say thank you.', 'รดน้ำดำหัวผู้ใหญ่ แล้วบอกขอบคุณนะ'],
-    fact: 'Songkran is the Thai New Year — water washes the old year away.'},
+    fact: 'Songkran is the Thai New Year — water washes the old year away.',
+    factTh: 'สงกรานต์คือปีใหม่ไทย — น้ำช่วยล้างสิ่งเก่า ๆ ของปีที่ผ่านมา'},
   {id: 'earthday', small: true, icon: '🌍', md: '04-22', art: null, flag: 'steam', en: 'Happy Earth Day! 🌍', th: 'สุขสันต์วันคุ้มครองโลก! 🌍',
     feel: ['Worried about the planet? That feeling is OK — one kind act helps.', 'กังวลเรื่องโลกก็ไม่เป็นไรนะ — ทำดีหนึ่งอย่างก็ช่วยได้'],
-    fact: 'Trees breathe in the air we breathe out.'},
+    fact: 'Trees breathe in the air we breathe out.',
+    factTh: 'ต้นไม้หายใจเอาอากาศที่เราหายใจออกเข้าไป'},
   {id: 'dragonboat', icon: '🐉', table: 'dragonboat', span: 0, art: null, flag: 'tw', en: 'Happy Dragon Boat Festival! 🐉', th: 'สุขสันต์เทศกาลไหว้บ๊ะจ่าง! 🐉', zh: '端午節快樂！🐉',
     feel: ['A boat goes fast when everyone paddles together — help a teammate today.', 'เรือแล่นเร็วเมื่อทุกคนพายพร้อมกัน — วันนี้ช่วยเพื่อนสักคนนะ'],
-    fact: 'Families eat zongzi — sticky rice wrapped in leaves.'},
+    fact: 'Families eat zongzi — sticky rice wrapped in leaves.',
+    factTh: 'ครอบครัวกินบ๊ะจ่าง — ข้าวเหนียวห่อด้วยใบไผ่'},
   {id: 'moonday', small: true, icon: '🌙', md: '07-20', art: null, flag: 'steam', en: 'Happy Moon Day! 🌙', th: 'สุขสันต์วันมนุษย์เหยียบดวงจันทร์! 🌙',
     feel: ['Big dreams can feel scary — brave means trying anyway.', 'ความฝันใหญ่ ๆ อาจน่ากลัว — กล้าหาญคือการลองทำต่อไป'],
-    fact: 'People first walked on the Moon on 20 July 1969.'},
+    fact: 'People first walked on the Moon on 20 July 1969.',
+    factTh: 'มนุษย์เดินบนดวงจันทร์ครั้งแรกเมื่อ 20 กรกฎาคม 1969'},
   {id: 'mothersth', icon: '💙', md: '08-12', art: null, flag: 'th', en: 'Happy Mother\'s Day! 💙', th: 'สุขสันต์วันแม่! 💙',
     feel: ['Give mum a hug and tell her one thing you love about her.', 'กอดแม่ แล้วบอกแม่ว่ารักอะไรในตัวแม่'],
-    fact: 'Thai Mother\'s Day flowers are white jasmine.'},
+    fact: 'Thai Mother\'s Day flowers are white jasmine.',
+    factTh: 'ดอกไม้วันแม่ของไทยคือดอกมะลิสีขาว'},
   {id: 'midautumn', icon: '🥮', table: 'midautumn', span: 0, art: 'loykrathong', flag: 'tw', en: 'Happy Mid-Autumn Festival! 🥮', th: 'สุขสันต์เทศกาลไหว้พระจันทร์! 🥮', zh: '中秋節快樂！🥮',
     feel: ['Missing someone far away? Look at the moon — they can see it too.', 'คิดถึงใครที่อยู่ไกล? มองพระจันทร์สิ — เขาก็เห็นดวงเดียวกัน'],
-    fact: 'Mooncakes are round like the full moon — round means together.'},
+    fact: 'Mooncakes are round like the full moon — round means together.',
+    factTh: 'ขนมไหว้พระจันทร์กลมเหมือนพระจันทร์เต็มดวง — กลมหมายถึงได้อยู่พร้อมหน้ากัน'},
   {id: 'spaceweek', small: true, icon: '🚀', md: '10-04', to: '10-10', art: null, flag: 'steam', en: 'Happy World Space Week! 🚀', th: 'สัปดาห์อวกาศโลก! 🚀',
     feel: ['Curious about the stars? Asking questions is how every scientist starts.', 'สงสัยเรื่องดวงดาว? นักวิทยาศาสตร์ทุกคนเริ่มจากการตั้งคำถาม'],
-    fact: 'The first satellite, Sputnik, went up on 4 October 1957.'},
+    fact: 'The first satellite, Sputnik, went up on 4 October 1957.',
+    factTh: 'ดาวเทียมดวงแรกชื่อสปุตนิก ขึ้นสู่อวกาศเมื่อ 4 ตุลาคม 1957'},
   {id: 'halloween', icon: '🎃', md: '10-31', art: 'halloween', flag: '', en: 'Happy Halloween! 🎃', th: 'สุขสันต์วันฮาโลวีน! 🎃',
     feel: ['Feeling a bit scared is OK — be brave together and hold a hand.', 'กลัวนิดหน่อยก็ไม่เป็นไร — จับมือกันแล้วกล้าไปด้วยกัน'],
-    fact: 'The first jack-o\'-lanterns were carved from turnips.'},
+    fact: 'The first jack-o\'-lanterns were carved from turnips.',
+    factTh: 'ตะเกียงฟักทองยุคแรกแกะสลักจากหัวผักกาดเทอร์นิป'},
   {id: 'scienceday', small: true, icon: '🔬', md: '11-10', art: null, flag: 'steam', en: 'Happy World Science Day! 🔬', th: 'สุขสันต์วันวิทยาศาสตร์โลก! 🔬',
     feel: ['A mistake is an experiment — what did you find out?', 'ทำพลาดก็คือการทดลอง — ได้เรียนรู้อะไรบ้าง?'],
-    fact: 'Scientists test an idea many times before they trust it.'},
+    fact: 'Scientists test an idea many times before they trust it.',
+    factTh: 'นักวิทยาศาสตร์ทดลองความคิดหลายครั้งก่อนจะเชื่อ'},
   {id: 'loykrathong', icon: '🪷', table: 'loykrathong', span: 1, art: 'loykrathong', flag: 'th', en: 'Happy Loy Krathong! 🪷', th: 'สุขสันต์วันลอยกระทง! 🪷',
     feel: ['Float a worry away: think of one thing that made you sad or cross — let the river take it, then say thank you to the water.', 'ลอยความกังวลไปกับสายน้ำ: นึกถึงเรื่องที่ทำให้เศร้าหรือโกรธ แล้วปล่อยให้แม่น้ำพาไป ขอบคุณแม่น้ำด้วยนะ'],
-    fact: 'Krathongs are made from banana leaves, flowers and a candle.'},
+    fact: 'Krathongs are made from banana leaves, flowers and a candle.',
+    factTh: 'กระทงทำจากใบตอง ดอกไม้ และเทียน'},
   {id: 'christmas', icon: '🎄', md: '12-24', to: '12-25', art: 'christmas', flag: '', en: 'Merry Christmas! 🎄', th: 'สุขสันต์วันคริสต์มาส! 🎄',
     feel: ['The best gift is kindness — share something today.', 'ของขวัญที่ดีที่สุดคือความใจดี — วันนี้แบ่งปันอะไรสักอย่างนะ'],
-    fact: 'Some Christmas trees are lit with thousands of tiny lights.'}
+    fact: 'Some Christmas trees are lit with thousands of tiny lights.',
+    factTh: 'ต้นคริสต์มาสบางต้นประดับไฟดวงเล็ก ๆ นับพันดวง'}
 ];
 var EVENT_DAY_GOAL = {k: 'games', n: 3, en: 'Play 3 different games', th: 'เล่น 3 เกมไม่ซ้ำกัน'};   // every day (Loy Krathong: 3 krathongs = 3 games)
 var EVENT_APP_BDAY = '09-01';   // 🎮 STEAM Playground's birthday (Settings AppBirthday 'MM-DD' wins; ❓ Aowu P9 — first app files ≈ 2026-09-01)
@@ -6773,7 +6789,7 @@ function evWindow_(day, d){
 }
 function evOut_(day, w, extra){
   var o = {id: day.id, k: day.id, kind: 'day', icon: day.icon, art: day.art || null, flag: day.flag || '', title: day.en, en: day.en, th: day.th, zh: day.zh || '',
-    feel: day.feel ? {en: day.feel[0], th: day.feel[1]} : null, fact: day.fact || '', goal: EVENT_DAY_GOAL,
+    feel: day.feel ? {en: day.feel[0], th: day.feel[1]} : null, fact: day.fact || '', factTh: day.factTh || '', goal: EVENT_DAY_GOAL,
     from: evYmd_(w.from), to: evYmd_(w.to), days: evDayNum_(w.to) - evDayNum_(w.from) + 1};
   for(var x in (extra || {})) o[x] = extra[x];
   return o;
@@ -6854,12 +6870,19 @@ function eventsFor_(players, now, st) {
   const names = (players || []).map(p => p.Name), rows = scoreRows_();
   const day = eventDayFor(now, eventBirthdays_(players, st), eventFamilyDays_(st), eventAppBday_(st));
   const week = steamWeekFor(now);
+  eventGameInfo_(week);
   week.family = eventWeekGoal_(week, rows, names);
   if (day) day.family = eventDayGoal_(day, rows, names);
   return { v: 1, today: evYmd_(now), on: st.EventsOff !== 'yes', day: day, week: week, next: eventNextDays(now, 3) };
 }
+// 🎮 the featured game's name · icon · page (BUILT_IN_GAMES, no read) — the Dashboard chip / sheet / news show it (b5b)
+var EVENT_GAME_EXTRA_ = {'stacking-sim': {GameName: 'Stack It!', Icon: '🏗️', PageRoute: 'stacking'}};
+function eventGameInfo_(week) {
+  const g = (typeof BUILT_IN_GAMES !== 'undefined' ? BUILT_IN_GAMES : []).filter(x => x.GameID === week.game)[0] || EVENT_GAME_EXTRA_[week.game] || {};
+  week.gname = g.GameName || week.game; week.gicon = g.Icon || '🎮'; week.route = g.PageRoute || week.game; return week;
+}
 function safeEvents_(players, st) { try { return eventsFor_(players, null, st); } catch (e) { return { v: 1, err: String(e && e.message || e) }; } }
-// (b5a) END OF Events.gs
+// (b5b) END OF Events.gs
 
 ;
 /* ===== on the device only: the grown-up PIN arrives hashed from the family Sheet (OfflineSync.gs) ===== */

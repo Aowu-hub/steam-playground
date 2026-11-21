@@ -84,8 +84,11 @@
   .motto-chip .mc-n{font-family:var(--font-display,'Fredoka',sans-serif);font-weight:700;color:var(--mc-ink,var(--ink));}
   .motto-chip .mc-l{flex:none;font-weight:700;color:var(--ink-soft);}   /* whole line or none (fit1) — never a stray "—…" */
   .motto-chip.th .mc-n,.motto-chip.th .mc-l{font-family:'Mitr',var(--font-body,'Nunito'),sans-serif;font-weight:500;}
-  .sub.fit1 .mc-l,.sub.fit3 .mc-n{display:none;}
+  .sub.fit1 .mc-l,.sub.fit6 .mc-n{display:none;}
   .sub.fit2 .sub-who{display:none;}
+  /* 🎪 b5b: the event chip shrinks BEFORE the step name goes: week words → day words (icons stay) */
+  .sub.fit3 .ec-w{display:none;} .sub.fit4 .ec-d,.sub.fit4 .ec-sep{display:none;} .sub.fit5 .ev-chip:not(.solo) .ec-wi{display:none;}
+  .brand .sub::before{content:'\200b';flex:none;width:0;margin-right:-8px;}   /* 🎪 b5b strut: the line keeps its text height when "Who's playing today?" folds away */
   @media (max-height:560px){ .brand .sub{display:none;} }   /* phone sideways: no .sub line → no chip (one-screen Dashboard) */
   @media (prefers-reduced-motion: reduce){ .motto-chip .mc-star{animation:none;} }
   .look-btn{
@@ -436,6 +439,7 @@
 <script src="inc/GameLogos.js"></script>   <!-- 🎮 ap-1: the code-drawn app logo (🏷️ logo chat's kit) for the header + 🎉 Welcome Show -->
 <script src="inc/Motto.js"></script>   <!-- 🌟 b6c: the 11 Steps of Creation → ⭐ step-of-the-day chip in the header + 🪜 ladder sheet -->
 <script src="inc/EventKit.js"></script>   <!-- 🎪 b5a: ONE family calendar (special days · STEAM weeks) — before the Welcome Show, which reads it -->
+<script src="inc/EventUi.js"></script>   <!-- 🎪 b5b: the 🎪 chip · event sheet · pinned 📣 event cards -->
 <script src="inc/WelcomeShow.js"></script>
 <script src="inc/WelcomeScene.js"></script>
 <script src="inc/IsoKit.js"></script>
@@ -469,7 +473,7 @@
       <div class="brand-col">
         <div class="app-logo" id="app-logo" aria-hidden="true"></div>   <!-- 🎮 ap-1 -->
         <h1 class="t-head">STEAM Playground</h1>
-        <p class="sub"><span class="sub-who">Who's playing today?</span><button class="motto-chip hidden" id="motto-chip" data-sound="pop" onclick="openMottoLadder()"></button></p>   <!-- 🌟 b6c -->
+        <p class="sub"><span class="sub-who">Who's playing today?</span><button class="motto-chip hidden" id="motto-chip" data-sound="pop" onclick="openMottoLadder()"></button><button class="ev-chip hidden" id="ev-chip" data-sound="pop" onclick="openEventSheet()"></button></p>   <!-- 🌟 b6c -->
       </div>
     </div>
     <div class="head-btns">
@@ -811,7 +815,8 @@ function paintMottoChip(){
 function fitMottoChip(){   // drop pieces until the .sub line fits on ONE line (no extra height, no "…" on the step name)
   const c = document.getElementById('motto-chip'), sub = c && c.parentNode; if(!sub || c.classList.contains('hidden')) return;
   sub.classList.remove('fit1', 'fit2', 'fit3'); if(!sub.clientWidth) return;
-  for(const f of ['fit1', 'fit2', 'fit3']){ if(sub.scrollWidth <= sub.clientWidth + 1) break; sub.classList.add(f); }
+  sub.classList.remove('fit4', 'fit5', 'fit6');
+  for(const f of ['fit1', 'fit2', 'fit3', 'fit4', 'fit5', 'fit6']){ if(sub.scrollWidth <= sub.clientWidth + 1) break; sub.classList.add(f); }   // 🎪 b5b: 6 steps
 }
 function openMottoLadder(){
   if(!window.Motto) return; const me = selectedPlayer || 'Guest';
@@ -827,6 +832,23 @@ function openMottoLadder(){
   setInterval(() => { if(window.Motto && MOTTO_SIG.split('|')[0] !== Motto.today()) paintMottoChip(); }, 60000);   // past midnight → tomorrow's step
 })();
 
+/* ---------- 🎪 b5b FAMILY EVENTS (EventUi kit): 🎪 chip beside ⭐ · event sheet · pinned 📣 cards — everything from the boot payload d.events ---------- */
+let EVENTS = null;
+function eventLang(){ return selectedPlayer && window.Motto ? Motto.lang(selectedPlayer) : 'en'; }
+function paintEventChip(){
+  const c = document.getElementById('ev-chip'); if(!c) return;
+  if(!window.Events || !Events.ui){ c.classList.add('hidden'); return; }
+  try { Events.ui.chip(c, EVENTS, eventLang()); } catch(e){ c.classList.add('hidden'); }
+  fitMottoChip();
+}
+function eventCards(){ try { return window.Events && Events.ui ? Events.ui.newsCards(EVENTS, eventLang()) : []; } catch(e){ return []; } }
+function openEventSheet(){
+  if(!window.Events || !Events.ui || !EVENTS) return;
+  Events.ui.sheet({ev: EVENTS, me: selectedPlayer || 'Guest', players: allPlayers.map(p => p.Name), avatarOf,
+    go: (route, id) => route === 'gameroom' ? goNav('gameroom') : UI.go(WEBAPP_URL + '?page=' + route + (selectedPlayer ? '&player=' + encodeURIComponent(selectedPlayer) : ''), id),
+    onClose: () => { MOTTO_SIG = ''; paintMottoChip(); paintEventChip(); if(LAST_NEWS) renderNews(LAST_NEWS); }});   // EN ⇄ ไทย is per player → chip + cards follow
+}
+
 /* ---------- BOOT: one server call + instant paint from the last visit ---------- */
 const DASH_CACHE_KEY = 'sp_dash_v2';
 let MAIL = {};   // 📬 unopened gifts per player (from the news) → badge on the player tile
@@ -840,6 +862,7 @@ function applyDashboard(d){
   SEEN = d.seen || {};
   MODES = d.modes || null;   // ✨ modes-2
   LAST_NEWS = d.news || [];
+  EVENTS = d.events || null;   // 🎪 b5b
   onPlayers(d.players || []);
   welcomeStep('players'); try { WelcomeShow.cast(allPlayers, avatarOf, CACHED_SETTINGS); } catch(e){}   // 🚀 ws-1: family parade (last player first)
   renderPodium(d.leaderboard || []);
@@ -941,6 +964,7 @@ function renderPlayers(){
   });
   startTileActs();   // as-2 🎭
   try { paintMottoChip(); } catch(e){}   // 🌟 b6c: the picked player's language
+  try { paintEventChip(); } catch(e){}   // 🎪 b5b
   const add = document.createElement('button');
   add.className = 'add-player-tile t-chip';
   add.setAttribute('data-sound', 'pop');
@@ -1109,9 +1133,10 @@ function actCards(){
   const names = L.slice(0, 4).map(o => (Acting.SIG.names || {})[o.k] || o.k.replace(/^[a-z0-9]+\./, '').replace(/-/g, ' '));
   return [{kind: 'acts', id: 'collection', at: L[0].added, count: L.length, names, icon: '🎭', route: 'collection'}];
 }
-function newsTag(k){ if(k === 'trophy') return '🏆 FAMILY CUP'; /* trophy: '🏆 FAMILY CUP' bo-10b */ if(k === 'acts') return '🎭 NEW ACTS'; if(k === 'comic') return '🏅 COMIC OF THE DAY'; return {mode: '🎯 TRY A MODE', modenew: '🆕 NEW MODE', new: '🆕 NEW', record: '🏆 RECORD', try: '💡 TRY IT', milestone: '🏁 MILESTONE', close: '⚔️ CLOSE CALL', jam: '🚦 JAM', mail: '📬 MAIL', birthday: '🎂 BIRTHDAY'}[k] || '📣'; }
+function newsTag(k){ if(k === 'event') return '🎪 FAMILY EVENT';   /* 🎪 b5b */ if(k === 'trophy') return '🏆 FAMILY CUP'; /* trophy: '🏆 FAMILY CUP' bo-10b */ if(k === 'acts') return '🎭 NEW ACTS'; if(k === 'comic') return '🏅 COMIC OF THE DAY'; return {mode: '🎯 TRY A MODE', modenew: '🆕 NEW MODE', new: '🆕 NEW', record: '🏆 RECORD', try: '💡 TRY IT', milestone: '🏁 MILESTONE', close: '⚔️ CLOSE CALL', jam: '🚦 JAM', mail: '📬 MAIL', birthday: '🎂 BIRTHDAY'}[k] || '📣'; }
 function newsRes(n, v){ return n.byScore ? Number(v).toLocaleString() + ' pts' : '⏱ ' + fmtSec(v || 0); }
 function newsBody(n){
+  if(n.kind === 'event') return n.html;   // 🎪 b5b (EventUi builds it, escaped)
   if(n.kind === 'comic') return '<b>' + UI.esc(n.player) + '\'s comic #' + n.issue + ': ' + UI.esc(n.title || 'Untitled') + (n.votes ? ' — ' + n.votes + ' 👍' : '') + '</b><small>📚 Comic of the day · tap to read it in the Comic Book' + (n.votes ? '' : ' and give it your 👍') + '</small>';   // ck-1b 🏅
   if(n.kind === 'acts') return '<b>' + n.count + ' new avatar act' + (n.count > 1 ? 's' : '') + ' to try!</b><small>' + UI.esc(n.names.join(' · ')) + (n.count > n.names.length ? ' …' : '') + ' — see them in 📖 Collection → 🎭 Acts shelf, pick one as your 🎭 signature act in 🎒 Wardrobe</small>';   // as-2 🎭
   const lv = n.level === 5 ? '💀 Hardcore' : '🌋 Extreme', res = n.byScore ? Number(n.score).toLocaleString() + ' pts' : n.timeSec ? '⏱ ' + fmtSec(n.timeSec) : '⭐'.repeat(n.stars || 0);
@@ -1161,8 +1186,8 @@ function refreshModeNews(){
 }
 function renderNews(list){
   const panel = document.getElementById('news-panel'), box = document.getElementById('news-list');
-  const order = {birthday: 0, trophy: 0.5, mail: 1, record: 2, milestone: 3, close: 4, jam: 5, new: 6, modenew: 6.5, acts: 6.8, comic: 2.5, try: 7, mode: 7.5};   // ck-1b 🏅 Comic of the day
-  list = list.concat(modeCards(list)).concat(actCards());   // as-2 🎭 new shared acts (7 days)   // ✨ modes-2: 🎯 Try a mode (2 a day) + 🆕 new modes
+  const order = {event: -1, birthday: 0, trophy: 0.5, mail: 1, record: 2, milestone: 3, close: 4, jam: 5, new: 6, modenew: 6.5, acts: 6.8, comic: 2.5, try: 7, mode: 7.5};   // ck-1b 🏅 Comic of the day
+  list = list.concat(modeCards(list)).concat(actCards()).concat(eventCards());   // 🎪 b5b: pinned family event cards (day + week)   // as-2 🎭 new shared acts (7 days)   // ✨ modes-2: 🎯 Try a mode (2 a day) + 🆕 new modes
   list = list.filter(n => order[n.kind] != null).sort((a, b) => (order[a.kind] - order[b.kind]) || ((a.days || 0) - (b.days || 0)));
   const today = list.filter(n => n.kind === 'birthday' && n.days === 0);
   renderBirthday(today);
@@ -1173,6 +1198,7 @@ function renderNews(list){
   box.innerHTML = list.map(n => '<button class="news ' + n.kind + (n.done ? ' done' : '') + (unseen.indexOf(n) >= 0 ? ' unseen' : '') + '" data-sound="nav"><span class="tag">' + newsTag(n.kind) + '</span><span class="ni">' + UI.esc(newsIcon(n)) + '</span><span class="nt">' + newsBody(n) + '</span>' + (n.kind === 'milestone' ? '<canvas class="track" aria-hidden="true"></canvas>' : '') + (n.kind === 'comic' ? '<canvas class="comicthumb" aria-hidden="true"></canvas>' : '') + (n.kind === 'trophy' ? '<canvas class="trophycv" aria-hidden="true"></canvas>' : '') + '</button>').join('');
   box.querySelectorAll('.news').forEach((b, k) => b.onclick = () => {
     const n = list[k];
+    if(n.kind === 'event'){ openEventSheet(); return; }   // 🎪 b5b
     if(n.kind === 'mail'){ selectedPlayer = n.player; UI.go(WEBAPP_URL + '?page=room&game=my&player=' + encodeURIComponent(n.player), 'myroom'); return; }
     if(n.kind === 'birthday'){ UI.toast('🎂 ' + n.player + (n.days ? "'s birthday is on " + bdayText(n.date) : ' — happy birthday!') + ' 🎈'); return; }
     if(n.kind === 'comic'){ UI.go(WEBAPP_URL + '?page=collection&game=' + encodeURIComponent('comic:' + n.id) + (selectedPlayer ? '&player=' + encodeURIComponent(selectedPlayer) : ''), 'collection'); return; }   // ck-1b 🏅 opens the reader
@@ -1180,6 +1206,7 @@ function renderNews(list){
   });
   box.querySelectorAll('.news').forEach((b, k) => { const n = list[k], cv = b.querySelector('canvas.comicthumb'); if(!cv || !window.Comic || !Comic.render || !n.page) return;   // ck-1b 🏅 a small picture of the comic
     try { Comic.render(cv, Comic.cover(Comic.expand(n.page, avatarOf)), {w: 84, h: 64, t: 0.5, still: true}); } catch(e){} });
+  try { if(window.Events && Events.ui) Events.ui.paintNews(box, list); } catch(e){}   // 🎪 b5b
   document.getElementById('news-sub').textContent = unseen.length ? unseen.length + ' new for you' : '';
   panel.classList.remove('hidden');
   box.style.minHeight = list.some(n => n.kind === 'milestone') ? '150px' : '';   // same height every turn (no page jump)
@@ -1300,4 +1327,4 @@ loadDashboard();
 </script>
 </body>
 </html>
-<!-- (r24+emoji+news-1+ebr-4+wd-5+modes-2+af-4+ws-5+as-2+ck-1b+lk-2a+lk-2c+st-1+ap-1+bo-10b+an-5+st-3+b6c+24g-3+24g-3b+24g-3c+b5a) END OF Landing.html -->
+<!-- (r24+emoji+news-1+ebr-4+wd-5+modes-2+af-4+ws-5+as-2+ck-1b+lk-2a+lk-2c+st-1+ap-1+bo-10b+an-5+st-3+b6c+24g-3+24g-3b+24g-3c+b5a+b5b) END OF Landing.html -->
