@@ -257,6 +257,7 @@
 <script src="inc/CardArt.js"></script>
 <script src="inc/GameLogos.js"></script>
 <script src="inc/Motto.js"></script>   <!-- 🧱 b3w1: 🎬 cover + 🏁 result card (GameFrame + GameCovers + CardArt) -->
+<script src="inc/LinkKit.js"></script>   <!-- 📡 lk-8e: own devices (LinkKit plan §55) — the link code is the part Turbo_link + LinkPads -->
 </head>
 <body ontouchstart="">
 <button class="top-btn" id="back-btn" data-sound="none" onclick="goGameroom()">◀ Back</button>
@@ -513,6 +514,7 @@ function openCover(){
   if(TurboCover && TurboCover.who !== S.player){ TurboCover.destroy(); TurboCover = null; }
   if(!TurboCover){ TurboCover = GF.cover(document.body, {game: 'turbo', title: 'Turbo Trail', icon: '🏎️', version: TURBO_VERSION, me: S.player, players: S.players, avatarOf: myAvatar, seats: {min: 1, max: 2},
       acts: ['beat.run-start', 'beat.skid'], backTo: WEBAPP_URL + '?page=gameroom' + sessionQuery(), backKind: 'rooms',
+      own: C => tblOwn(C),   /* 📡 lk-8e: the room lives on the cover — the TV / tablet runs the race (👥 two roads), phones are 🕹️ controllers */
       onPlay: lineup => { TurboCover.hide(); showScreen('menu'); const two = (lineup || []).filter(x => x && x.name && x.name !== S.player);
         if(two.length && S.players.some(p => p.Name === two[0].name)){ DUO.mate = two[0].name; chooseMode('duo', true); } markPicks(); } }); TurboCover.who = S.player; }
   TurboCover.show();
@@ -1642,7 +1644,27 @@ msAfter('choosePlayer', name => {
   UI.alsoTry({game: MS_GAME, player: name, current: msNow, at: () => document.querySelector('#scr-menu .title'), open: msOpen});
 });
 /* ✨ END MODE SPOTLIGHT */
+/* 📡 lk-8e: 🏎️ own devices — the TV / tablet runs the race in the 👥 duo view, phones are 🕹️ controllers (LinkKit plan §55). Born split: the link
+   code is the part Turbo_link + the shared LinkPads (GameParts), loaded on the first 📱 Own devices tap, a ?link=<room> QR or the 📺 Game Station. Here only the door. */
+function tblNeed(go){
+  if(!(window.Link && Link.cover)){ UI.toast('📡 Own devices need the internet'); return; }
+  if(typeof GameParts === 'undefined') return setTimeout(() => tblNeed(go), 40);   // the loader comes right after this script
+  if(GameParts.has('LinkPads') && GameParts.has('Turbo_link')) return go();
+  UI.loading(GAME_ID, '📡 Getting the room ready…');
+  GameParts.need(['LinkPads', 'Turbo_link'], ok => { UI.loaded(); if(ok) return go(); UISound.play('error'); UI.toast('📡 The room did not load — check the internet, then tap 📱 Own devices again'); });
+}
+function tblOwn(C){ tblNeed(() => tblOpen(C)); }
+function tblUrlCode(cb){
+  try{ if(window.google && google.script && google.script.url && google.script.url.getLocation){ google.script.url.getLocation(l => cb(((l && l.parameter) || {}).link || '')); return; } }catch(e){}
+  try{ cb(new URLSearchParams(location.search).get('link') || ''); }catch(e){ cb(''); }
+}
+msAfter('choosePlayer', () => tblUrlCode(c => { c = String(c || '').replace(/[^0-9]/g, '').slice(0, 4); if(c.length === 4) setTimeout(() => tblNeed(() => tblUrl(c)), 0); }));
+msAfter('choosePlayer', () => { if(window.Station) Station.params().then(p => { if(p.mode === 'ltv' && p.stv === '1' && /^\d{4}$/.test(String(p.st || ''))) setTimeout(() => tblNeed(() => tblStation()), 0); }); });   // 📺 from the TV Game Station
+/* 📡 END lk-8e */
 </script>
+<script src="inc/TurboParts.js"></script>
+<script src="inc/Turbo_link.js"></script>
+<script src="inc/LinkPads.js"></script>   <!-- 📡 lk-8e: the part loader + (offline app / tests) Turbo_link + LinkPads inline, after the main script -->
 <script>
 /* 🎵 MOOD (24u-b) START — ✨ polish chat · UiKit ambient mood (UISound.mood, plan `Ambient Moods — full plan.md` §7). Don't edit by hand:
    Test Harness/patch_24ub_moods.py re-applies it. Starts with the game's cheerMount() (= play starts, also 🔄 Again), stops with
@@ -1783,4 +1805,4 @@ const ANN = (function(){
 </script>
 </body>
 </html>
-<!-- (11o+r33+modes-3+p1c+cs-2a+p6f+b3w1+pz-1+24m+24u-c+b3b3+an-1+an-2+24y-b) END OF Turbo.html -->
+<!-- (11o+r33+modes-3+p1c+cs-2a+p6f+b3w1+pz-1+24m+24u-c+b3b3+an-1+an-2+24y-b+lk-8e) END OF Turbo.html -->
