@@ -41,6 +41,14 @@
     font-weight:700;font-size:clamp(.78rem,1.6vw,.95rem);line-height:1.2;border-radius:999px;pointer-events:none;animation:goalIn .5s cubic-bezier(.34,1.56,.64,1);}
   #goal .gn{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:26px;border-radius:999px;background:linear-gradient(180deg,#5EE0A0,#22A867);color:#fff;font-size:.78rem;box-shadow:0 2px 0 #157A49;}
   #goal .gt{text-wrap:balance;}
+  /* 💬 ar-r2-6a ONE coach line */
+  #goal{pointer-events:auto;cursor:pointer;max-width:min(calc(100% - var(--mm-w,150px) - 34px),max(44vw,330px),560px);transition:background .25s,padding .3s;}
+  #goal .gt{max-width:40em;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;transition:max-width .35s ease,opacity .25s;}
+  #goal.mini{padding:4px;gap:0;} #goal.mini .gt{display:none;}
+  #goal.tip{background:#FFF8DC;} #goal.tip .gn{background:linear-gradient(180deg,#FFE27A,#F2B100);box-shadow:0 2px 0 #B98500;font-size:.95rem;}
+  #goal.sk{background:#E8FFF1;} #goal.sk .gn{font-size:.95rem;}
+  #goal.pop{animation:goalIn .4s cubic-bezier(.34,1.56,.64,1);}
+  #tipbox,#skgoal{display:none!important;}
   @keyframes goalIn{from{transform:translateY(-10px) scale(.92);opacity:0;}to{transform:none;opacity:1;}}
   /* 🗺️ minimap — top-right under the bar */
   #mini{position:absolute;z-index:24;right:calc(10px + env(safe-area-inset-right));top:var(--top,56px);width:var(--mm-w,150px);height:calc(var(--mm-w,150px) * .64);padding:4px;border-radius:14px;}
@@ -512,7 +520,53 @@ function syncUnits(alpha){ const M = S.M, seen = S._seen || (S._seen = new Set()
   if(S.uit.size !== seen.size){ for(const [id, it] of S.uit) if(!seen.has(id)){ S.uit.delete(id); S.sel.delete(id); const k = S.items.indexOf(it); if(k >= 0) S.items.splice(k, 1); } } }
 
 /* ---------- ⏱️ engine events → the AR-1 props (🏗️ 33 · 66 · 100 · 🏠 levels · 🪙🧱 states · 🏚️ ruins) ---------- */
-function events(){ const M = S.M; for(const e of AR.takeEvents(M)){ skillEvent(e); wallEvent(e); turnEvent(e); wonderEvent(e);   /* 🌌 R2.7 */   /* 🐢 R2.5 */   // 👑 R2.3
+/* 🔊 ar-r2-6a ARSound — battle sounds from UiKit's shared tone maker (UISound.tone / .noise, 24s), no sound files.
+   Fired on CONTACT (engine events). Kid-friendly: short, soft, never more than ~6 a second; only what is on screen; louder near the screen middle. */
+const ARSound = (function(){
+  const U = () => typeof UISound !== 'undefined' && UISound.isOn && UISound.isOn() ? UISound : null;
+  const R = {
+    // ⚔️ sword · shield · club (front-liners + 👑 hero): a bright double clink
+    clink(v, d){ const s = U(); if(!s) return; d = d || 0; s.tone(2350 + Math.random() * 300, 0.07, {type: 'square', gain: 0.1 * v, slide: 1750, delay: d}); s.tone(3500, 0.05, {type: 'triangle', gain: 0.06 * v, delay: d + 0.006}); s.noise(0.05, {gain: 0.13 * v, from: 2600, to: 7000, delay: d}); },
+    // 🔱 spear: a quick stab
+    stab(v, d){ const s = U(); if(!s) return; d = d || 0; s.noise(0.08, {gain: 0.14 * v, from: 700, to: 2200, delay: d}); s.tone(900, 0.06, {type: 'triangle', gain: 0.08 * v, slide: 560, delay: d}); },
+    // 🏹 bow: twang + arrow whoosh (+ a soft thunk when it lands)
+    twang(v, d){ const s = U(); if(!s) return; d = d || 0; s.tone(230, 0.2, {type: 'triangle', gain: 0.14 * v, slide: 190, delay: d}); s.noise(0.13, {gain: 0.06 * v, from: 3000, to: 8000, delay: d + 0.03}); s.tone(170, 0.05, {type: 'sine', gain: 0.12 * v, slide: 90, delay: d + 0.2}); },
+    // 🐴 rider · 🛞 siege: a deep thud
+    thud(v, d){ const s = U(); if(!s) return; d = d || 0; s.tone(115, 0.14, {type: 'sine', gain: 0.28 * v, slide: 60, delay: d}); s.noise(0.06, {gain: 0.14 * v, from: 200, to: 800, delay: d}); },
+    // 🔮 mage · 😇 saint: a little sparkle
+    sparkle(v, d){ const s = U(); if(!s) return; d = d || 0; [1320, 1760, 2640].forEach((f, i) => s.tone(f, 0.07, {type: 'sine', gain: 0.07 * v, delay: d + i * 0.045})); },
+    // ⚡ counter-wheel hit: the extra "zing!" on top
+    zing(v, d){ const s = U(); if(!s) return; d = d || 0; s.tone(1100, 0.13, {type: 'sawtooth', gain: 0.05 * v, slide: 2500, delay: d}); },
+    // 🏚️ hitting a building: wood / stone knock
+    knock(v, d){ const s = U(); if(!s) return; d = d || 0; s.tone(190, 0.09, {type: 'square', gain: 0.08 * v, slide: 120, delay: d}); s.noise(0.07, {gain: 0.14 * v, from: 300, to: 1200, delay: d}); },
+    // 🧱 a building falls: crumble + low thump
+    crumble(v, d){ const s = U(); if(!s) return; d = d || 0; s.noise(0.7, {gain: 0.22 * v, from: 150, to: 900, delay: d}); s.tone(90, 0.5, {type: 'sine', gain: 0.24 * v, slide: 40, delay: d}); [0.12, 0.27, 0.4].forEach(t => s.noise(0.05, {gain: 0.1 * v, from: 900, to: 2500, delay: d + t})); },
+    // 🏠 the House is hit: a big drum
+    drum(v, d){ const s = U(); if(!s) return; d = d || 0; s.tone(72, 0.35, {type: 'sine', gain: 0.4 * v, slide: 45, delay: d}); s.noise(0.08, {gain: 0.16 * v, from: 100, to: 420, delay: d}); },
+    // 💥 two squads meet: ONE big CLASH (swoosh + 3 clinks + boom)
+    clash(v, d){ const s = U(); if(!s) return; d = d || 0; s.noise(0.32, {gain: 0.22 * v, from: 1400, to: 6000, delay: d}); [0, 0.035, 0.08].forEach((t, i) => R.clink(v * 0.9, d + t + i * 0.01)); s.tone(140, 0.32, {type: 'sine', gain: 0.32 * v, slide: 65, delay: d}); }
+  };
+  const ROLE = {foot: 'clink', hero: 'clink', spear: 'stab', archer: 'twang', rider: 'thud', siege: 'thud', mage: 'sparkle', saint: 'sparkle', healer: null, flyer: 'stab', spy: 'clink', tamer: 'thud', worker: null};
+  const LAST = [];   // when the last sounds played (a sliding 1-second window)
+  // v = loudness from where it is on screen (1 middle → 0.25 edge, 0 off screen)
+  function play(kind, v){ const now = performance.now(); while(LAST.length && now - LAST[0] > 1000) LAST.shift(); if(LAST.length >= 6 || !(v > 0.05) || !R[kind]) return false; LAST.push(now); R[kind](Math.min(1, v)); return true; }
+  return {R, ROLE, play};
+})();
+
+/* 🔊 ar-r2-6a: battle sounds — volume from where it happens on screen (middle 1 → edge 0.3, off screen 0) */
+const SND = {recent: [], clashT: -9, house: -9, fell: new Set()};
+function sndVol(x, y){ const V = S.V; if(!V) return 0; const p = V.toScreen(x, y, 0); if(p.x < -40 || p.y < -60 || p.x > V.W + 40 || p.y > V.H + 40) return 0;
+  const d = Math.min(1, Math.hypot(p.x - V.W / 2, p.y - V.H / 2) / (Math.hypot(V.W, V.H) / 2)); return 1 - d * 0.7; }
+function soundTick(M){ if(!M.hits){ M.hits = []; return; } const now = M.t;
+  for(const h of M.hits){ const v = sndVol(h[2], h[3]); SND.recent.push([now, h[0], h[2], h[3]]); const k = ARSound.ROLE[h[1]]; if(k && v > 0) ARSound.play(k, v * 0.9); }
+  M.hits.length = 0; SND.recent = SND.recent.filter(r => now - r[0] < 0.6);
+  if(SND.recent.length >= 6 && now - SND.clashT > 5){ const teams = new Set(SND.recent.map(r => r[1])); if(teams.size >= 2){ const cx = SND.recent.reduce((a, r) => a + r[2], 0) / SND.recent.length, cy = SND.recent.reduce((a, r) => a + r[3], 0) / SND.recent.length;
+    if(SND.recent.every(r => Math.hypot(r[2] - cx, r[3] - cy) < 3.5)){ const v = sndVol(cx, cy); if(v > 0){ SND.clashT = now; ARSound.R.clash(Math.min(1, v)); } } } } }
+function soundEvent(e){ const M = S.M; if(e.k === 'counter.hit'){ ARSound.play('zing', sndVol(e.x, e.y) * 0.8); return; }
+  if(e.k === 'bld.hit' || e.k === 'house.hit'){ const B = M.blds.find(x => x.id === e.b); if(!B) return; if(e.by === 0){ S.hitB = S.hitB || {}; S.hitB[B.id] = M.t; } const v = sndVol(B.i + B.w / 2, B.j + B.d / 2);
+    if(B.hp <= 0 && !SND.fell.has(B.id)){ SND.fell.add(B.id); if(v > 0) ARSound.R.crumble(Math.min(1, v + 0.2)); return; }
+    if(e.k === 'house.hit'){ if(M.t - SND.house > 0.8 && v > 0){ SND.house = M.t; ARSound.play('drum', v); } } else ARSound.play('knock', v * 0.8); } }
+function events(){ const M = S.M; soundTick(M); for(const e of AR.takeEvents(M)){ soundEvent(e); skillEvent(e); wallEvent(e); turnEvent(e); wonderEvent(e);   /* 🌌 R2.7 */   /* 🐢 R2.5 */   // 👑 R2.3
     if(e.k === 'build.step' || e.k === 'build.done'){ const b = M.blds.find(x => x.id === e.b); if(b && b.it) Props.AR.set(b.it, {build: e.k === 'build.done' ? 100 : e.pct}, M.map); if(e.k === 'build.done') S.terr = null; }
     else if(e.k === 'house.up'){ const b = M.blds.find(x => x.id === e.b); if(b && b.it){ b.it.state = String(e.lv); Props.AR.set(b.it, {}, M.map); } }
     else if(e.k === 'res.state'){ const r = M.teams.flatMap(T => T.res).concat(M.rich).find(q => q.i === e.i && q.j === e.j); if(r && r.it){ r.it.state = e.state; Props.AR.set(r.it, {}, M.map); } }
@@ -571,7 +625,23 @@ function sparks(g, V, t){ for(let q = S.sparks.length - 1; q >= 0; q--){ const s
     for(let k = 0; k < 6; k++){ const an = k * 1.047 + s.x; g.moveTo(p.x + Math.cos(an) * r * 0.4, y + Math.sin(an) * r * 0.4); g.lineTo(p.x + Math.cos(an) * r, y + Math.sin(an) * r); } g.stroke(); }
   g.globalAlpha = 1; }
 // ❤️ HP bars (hurt units + buildings) · 🏗️ build % chips · 🏠 House pins
-function overlay(g, V){ const M = S.M, s = V.zoom; ghostLine(g, V); g.lineWidth = 1;
+/* ⚔️ ar-r2-6a Charge marks: where a charge walks + what it is hitting now */
+function chargeMarks(g, V){ const M = S.M, s = V.zoom, T0 = M.teams[0], groups = new Map(), hits = new Set();
+  for(const u of M.units){ if(u.team !== 0 || u.dead || u.wild || u.role === 'worker') continue;
+    if(!(u.state === 'charge' || (u.own && u.own.attack) || T0.mode === 'attack') || u.goalT == null) continue;
+    const k = (u.sq || 0) + ':' + u.goalT; let G = groups.get(k); if(!G){ G = {x: 0, y: 0, n: 0, gt: u.goalT}; groups.set(k, G); } G.x += u.x; G.y += u.y; G.n++; }
+  for(const id in (S.hitB || {})) if(M.t - S.hitB[id] < 2.6) hits.add(+id);   /* 🔊 fed by bld.hit / house.hit (by: you) */
+  g.save(); const col = teamHex(0);
+  groups.forEach(G => { const R = M.teams[G.gt]; if(!R || !R.alive || G.n < 1) return; const H = R.house, a = V.toScreen(G.x / G.n, G.y / G.n, 0), b = V.toScreen(H.i + H.w / 2, H.j + H.d / 2, 0), L = Math.hypot(b.x - a.x, b.y - a.y); if(L < 40 * s) return;
+    const ux = (b.x - a.x) / L, uy = (b.y - a.y) / L, e = {x: b.x - ux * 34 * s, y: b.y - uy * 34 * s};
+    g.lineCap = 'round'; g.setLineDash([2 * s, 11 * s]); g.lineDashOffset = -S.t * 26; g.lineWidth = 7 * s; g.strokeStyle = 'rgba(255,255,255,.85)'; g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(e.x, e.y); g.stroke();
+    g.lineWidth = 4 * s; g.strokeStyle = col; g.stroke(); g.setLineDash([]);
+    g.fillStyle = col; g.strokeStyle = '#fff'; g.lineWidth = 2.5 * s; g.beginPath(); g.moveTo(e.x + ux * 12 * s, e.y + uy * 12 * s); g.lineTo(e.x - uy * 8 * s - ux * 4 * s, e.y + ux * 8 * s - uy * 4 * s); g.lineTo(e.x + uy * 8 * s - ux * 4 * s, e.y - ux * 8 * s - uy * 4 * s); g.closePath(); g.stroke(); g.fill(); });
+  hits.forEach(id => { const B = M.blds.find(x => x.id === id); if(!B || B.hp <= 0) return; const c = V.toScreen(B.i + B.w / 2, B.j + B.d / 2, 0), lf = V.toScreen(B.i, B.j + B.d, 0), rt = V.toScreen(B.i + B.w, B.j, 0), rx = Math.max(20 * s, (rt.x - lf.x) / 2 + 8 * s), ry = rx * 0.5, isH = M.teams[B.team] && M.teams[B.team].house === B, pul = 1 + Math.sin(S.t * 6) * 0.06;
+    g.setLineDash([9 * s, 6 * s]); g.lineDashOffset = S.t * 20; g.lineWidth = 3.2 * s; g.strokeStyle = '#E5303A'; g.beginPath(); g.ellipse(c.x, c.y, rx * pul, ry * pul, 0, 0, 6.2832); g.stroke(); g.setLineDash([]);
+    const ty = c.y - (isH ? 120 : 84) * s, r = 12 * s; g.fillStyle = '#fff'; g.strokeStyle = '#E5303A'; g.lineWidth = 3 * s; g.beginPath(); g.arc(c.x, ty, r, 0, 6.2832); g.fill(); g.stroke(); if(typeof emo === 'function') emo(g, '🎯', c.x, ty, r * 1.4); });
+  g.restore(); }
+function overlay(g, V){ const M = S.M, s = V.zoom; ghostLine(g, V); chargeMarks(g, V); g.lineWidth = 1;
   for(const q of M.shrines || []){ if(!q.great) continue; const p = V.toScreen(q.i + 1, q.j + 1, 0), r = Math.max(9, 12 * s), y = p.y - 104 * s - r; if(p.x < -30 || p.y < -60 || p.x > V.W + 30 || p.y > V.H + 60) continue;   /* 🌟 the Great Shrine badge (×2 stars) */
     g.fillStyle = '#FFF8D6'; g.strokeStyle = q.owner >= 0 ? teamHex(q.owner) : '#E2B53A'; g.lineWidth = 3; g.beginPath(); g.arc(p.x, y, r, 0, 6.2832); g.fill(); g.stroke(); if(typeof emo === 'function') emo(g, '🌟', p.x, y, r * 1.3); g.lineWidth = 1; }
   S.uit.forEach(it => { const u = it.u; if(M.t - u.hurtT > 2 || u.hp >= u.max || (u.hid && u.team !== 0)) return; const p = V.toScreen(it.x, it.y, it.z), w = 22 * s, y = p.y - (u.role === 'hero' ? 52 : 42) * s - (u.role === 'rider' ? 12 * s : 0);
@@ -623,8 +693,18 @@ function hud(force){ const M = S.M, T = M.teams[0], side = sideOf(0); if(!M) ret
   $('tab-train').classList.toggle('glow', !!(S.guide && S.guide.role && S.tab !== 'train')); $('tab-build').classList.toggle('glow', !!(S.guide && S.guide.slot && S.tab !== 'build'));
   buildChips(); $('army-all').classList.toggle('glow', !!(S.guide && ((S.guide.k === 'attack' && !sqList().length) || (S.guide.k === 'group' && !S.sel.size))));
   guideLine(); cmdBar(); turnHud(); }   // 🐢 R2.5
-function guideLine(){ const lv = S.cfg.level, el = $('goal'); if(lv > 1 || !S.M){ el.classList.add('hidden'); S.guide = null; return; } const G = AR.guide(S.M, 0); S.guide = lv === 0 || G.slot ? G : null; S.turnGoal = S.M.turn && lv === 0 ? G : null;   /* 🐢 R2.5: Basic's line moves under the turn chips */
-  if(lv === 1){ el.classList.add('hidden'); return; } el.classList.remove('hidden'); $('goal-n').textContent = G.n + '/' + G.of; $('goal-t').textContent = G.text; }
+/* 💬 ar-r2-6a ONE coach line: the guide step, a "why not" tip and the 🌱 skill tip share #goal — newest wins, a tip lives ~2.6 s, the guide folds to its badge after 6 s */
+const COACH = {tip: null, until: 0, key: '', seen: 0, open: false};
+function coach(t, o){ o = o || {}; if(o.k === 'sk' && COACH.tip && COACH.tip.k === 'tip' && performance.now() < COACH.until) return;   /* a tip you just caused stays its 2.6 s */ const was = COACH.tip && COACH.tip.t; COACH.tip = {t: t, ic: o.ic || '💡', k: o.k || 'tip'}; COACH.until = performance.now() + (o.ms || 2600); coachDraw(was !== t); }
+function coachDraw(pop){ const el = $('goal'), now = performance.now(); if(!el) return; if(COACH.tip && now > COACH.until) COACH.tip = null;
+  if(COACH.tip){ el.classList.remove('hidden', 'mini'); el.classList.toggle('tip', COACH.tip.k === 'tip'); el.classList.toggle('sk', COACH.tip.k === 'sk'); $('goal-n').textContent = COACH.tip.ic; $('goal-t').textContent = COACH.tip.t; if(pop){ el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); } return; }
+  el.classList.remove('tip', 'sk'); const G = S.guideShow; if(!G){ el.classList.add('hidden'); return; }
+  el.classList.remove('hidden'); const key = G.n + '|' + G.text; if(key !== COACH.key){ COACH.key = key; COACH.seen = now; COACH.open = false; }
+  el.classList.toggle('mini', now - COACH.seen > 6000); $('goal-n').textContent = G.n + '/' + G.of; $('goal-t').textContent = G.text; }
+window.ARCoach = coach;
+document.addEventListener('pointerdown', e => { const g = e.target && e.target.closest && e.target.closest('#goal'); if(!g) return; e.stopPropagation(); COACH.seen = performance.now(); coachDraw(true); }, true);
+function guideLine(){ const lv = S.cfg.level, el = $('goal'); if(lv > 1 || !S.M){ S.guideShow = null; S.guide = null; coachDraw(); return; } const G = AR.guide(S.M, 0); S.guide = lv === 0 || G.slot ? G : null; S.turnGoal = S.M.turn && lv === 0 ? G : null;   /* 🐢 R2.5: Basic's line moves under the turn chips */
+  S.guideShow = lv === 1 ? null : G; coachDraw(); }   // 💬 ar-r2-6a
 
 /* ---------- 🕹️ orders: pick (tap · role face · ⚔️ ALL · 🔲 box) → go / attack · 🚩 rally · 🛡️ defend · ⚔️ charge ---------- */
 function pickRole(r){ const I = selInfo(); if(I.n && (I.kind === 'squad' || I.kind === 'sub')){ const mem = sqMem(I.n).filter(u => u.role === r).map(u => u.id); if(mem.length){ if(I.kind === 'squad') S.sel.clear(); const all = mem.every(id => S.sel.has(id)); mem.forEach(id => all ? S.sel.delete(id) : S.sel.add(id)); if(!S.sel.size) pickSquad(I.n); hud(); cmdBar(true); return; } }
@@ -654,7 +734,7 @@ function resAt(cell){ for(const r of S.M.teams.flatMap(T => T.res).concat(S.M.ri
 function nameOfBld(b){ const sd = sideOf(b.team); return b.slot === 'house' ? sd.house[(b.lv || 1) - 1] : sd.bld[b.slot]; }
 function arm(k){ S.arm = S.arm === k ? null : k; cmdBar(true);
   if(S.arm === 'lasso') tip('🪢 Drag around your Minivatars to pick them'); else if(S.arm === 'rally') tip('🚩 Tap where new units should walk'); }
-let tipT = 0; function tip(t){ if(S.tipLockT && performance.now() < S.tipLockT) return; const b = $('tipbox'); b.textContent = t; b.classList.remove('hidden'); clearTimeout(tipT); tipT = setTimeout(() => b.classList.add('hidden'), 2200); }
+let tipT = 0; function tip(t){ if(S.tipLockT && performance.now() < S.tipLockT) return; const m = /^(\p{Extended_Pictographic}\uFE0F?)\s*([\s\S]*)$/u.exec(String(t)); coach(m ? m[2] : String(t), {ic: m ? m[1] : '💡', ms: 2600}); }   // 💬 ar-r2-6a: tips go to the ONE coach line
 function train(role){ const r = AR.train(S.M, 0, role); if(r === true){ window.UISound && UISound.play && UISound.play('pop'); hud(); return; }
   tip(r === 'need' ? '🔒 Build ' + SLOT_ICON[AR.ROLES[role].from] + ' ' + sideOf(0).bld[AR.ROLES[role].from] + ' first' : r === 'cap' ? '👥 Your army is full — ⬆️ the House for more' : r === 'cost' ? '🪙 Not enough yet' : r === 'full' ? '⏳ Queue is full' : '–'); }
 function houseUp(){ const r = AR.houseUp(S.M, 0); if(r === true){ tip('🏠 Bricklets are building Level ' + (S.M.teams[0].house.lv + 1)); hud(); } else tip(r === 'max' ? '🏠 Top level!' : r === 'busy' ? '🔨 Already building' : '🪙 Not enough yet'); }
@@ -927,7 +1007,7 @@ function controls(){
 
 /* ---------- 🧪 test + picture hooks ---------- */
 function ff(sec){ const M = S.M, dt = 1 / 30; for(let k = 0; k < sec * 30 && !M.over; k++){ AR.step(M, dt); events(); } syncUnits(1); hud(true); }
-window.AVATAREALM = {SIDE_KEYS, RIVAL, sideFor, sidesInPlay, syncShrines, selInfo, pickSquad, doGroup, doSplit, openForm, closeForm, moveRole, chipTap, placeBanners, bar: () => BAR, showInfo, cmdDo, cmdBar, dragTo, dropAt, squadMenu, pickNear, S, AR, SIDE, ff, start, onTap, startPlace, moveGhost, cancelPlace, confirmPlace, pickRole, pickAll, arm, boxPick, train, houseUp, layout, hud, buildCards, territory};
+window.AVATAREALM = {ARSound, soundTick, coach, SIDE_KEYS, RIVAL, sideFor, sidesInPlay, syncShrines, selInfo, pickSquad, doGroup, doSplit, openForm, closeForm, moveRole, chipTap, placeBanners, bar: () => BAR, showInfo, cmdDo, cmdBar, dragTo, dropAt, squadMenu, pickNear, S, AR, SIDE, ff, start, onTap, startPlace, moveGhost, cancelPlace, confirmPlace, pickRole, pickAll, arm, boxPick, train, houseUp, layout, hud, buildCards, territory};
 const {skillEvent, skillGround, skillOver, skillDockBuild, skillHud, skillLayout, skillCardHtml, skillCardBind, skillPress, skAimStart, skAimMove, skAimEnd, skAimClear, SKIN: SKSKIN} = window.ARSkills.init({S, AR, $, sideOf, tip, showInfo, events, whoOf, varOf});   // 👑 ar-r2-3: the skills part gets the page's pieces
 Object.assign(window.AVATAREALM, {skillPress, skillHud, skillDockBuild, skillLayout, skAimStart, skAimMove, skAimEnd, skAimClear, skillCardHtml});
 const {wallEvent, wallTick, wallTrayCard, wallCardHud, wallMode, wallDrag, wallConfirm, wallTapCell, wallGateBtn, wallDown, wallMoveP, wallUp, wallGround, wallOver, showWallCard, wallCardPlace, wallUnitZ, wallManCan, wallCmd, wallInfoHtml, wallInfoBind, manDo, lookDo} = window.ARWalls.init({S, AR, $, sideOf, tip, hud, cmdBar, events, cancelPlace, hideInfo, placeInfo, sqTag, chip, bar, cardPic, teamHex, addItem, dropItem, PLACER, costHtml, showInfo, ROLE});   // 🧱 ar-r2-4a + 🏯 ar-r2-4b: the walls part gets the page's pieces
@@ -1123,4 +1203,4 @@ controls(); boot();
 </script>
 </body>
 </html>
-<!-- (ar-r2-7b) END OF AvataRealm.html -->
+<!-- (ar-r2-6a) END OF AvataRealm.html -->
