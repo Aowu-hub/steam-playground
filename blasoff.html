@@ -160,6 +160,7 @@
   .stick.on .tip{opacity:0;}
   .btnpad{position:absolute;display:grid;grid-template-columns:var(--btn) var(--btn-main);grid-template-rows:var(--btn) var(--btn-main);grid-template-areas:"trick jump" "pass shoot";gap:var(--gap);align-items:center;justify-items:center;pointer-events:none;}
   .btnpad .b-trick{grid-area:trick;} .btnpad .b-jump{grid-area:jump;} .btnpad .b-pass{grid-area:pass;} .btnpad .b-shoot{grid-area:shoot;--btn:var(--btn-main);}   /* 💥 the main button: the biggest, bottom-right under the thumb */
+  .btnpad:not(.pz-ring) .b-thru{display:none;} .btnpad .b-thru.dim{opacity:.42;filter:saturate(.4);}   /* 🏃 bo-pass: pass ahead = petal slot 5 → in the solo ring; the 👥 2×2 grid pads keep 4 (keys U / Num 5) */
   .btnpad.lside{grid-template-areas:"jump trick" "shoot pass";grid-template-columns:var(--btn-main) var(--btn);grid-template-rows:var(--btn-main) var(--btn);}
   .bbtn{pointer-events:auto;width:var(--btn);height:var(--btn);border-radius:50%;border:none;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;
     touch-action:none;user-select:none;-webkit-user-select:none;color:#fff;font-family:'Fredoka',sans-serif;--rim:#FFFFFF;
@@ -376,6 +377,7 @@
   <details class="rules"><summary>📖 How to play</summary><ul>
     <li><b>Run:</b> W A S D (or the arrows when you play alone) · <b>Shift</b> = sprint. On a tablet: the 🕹️ stick — push it all the way to sprint.</li>
     <li><b>With the ball:</b> <b>J</b> pass (hold = longer) · <b>K</b> shoot (hold = harder) · <b>L</b> trick · <b>J + L</b> trick pass · <b>K + L</b> trick shot.</li>
+    <li><b>🏃 Pass ahead:</b> <b>U</b> (or the 🏃 button) plays the ball into the space in front of a running friend — he runs onto it · hold = over the top. Your friends make runs for it while you have the ball.</li>
     <li><b>Space</b> jump · <b>Space, Space</b> flick the ball up → then <b>K</b> = volley shot · <b>J</b> = volley pass.</li>
     <li><b>Without the ball:</b> <b>J</b> tackle · <b>K</b> slide tackle (Intermediate and up) · <b>L</b> call a teammate to help · <b>C</b> switch player · <b>Space</b> jump over a slide or head a high ball.</li>
     <li><b>📣 Shout to your keeper:</b> when they shoot at your goal, press <b>Q</b> or <b>E</b> for the side the ball is going — your robot keeper dives that way!</li>
@@ -637,6 +639,7 @@ var BO = (function () {
       if (c.K) { c.kTrick = true; return; }
       c.trickPend = t; return;
     }
+    if (k === 'T') { if (down && !mine && !restart) return; if (down) c.jThru = true; k = 'J'; }   // 🏃 bo-pass: T = pass ahead (the J path, hold = over the top) — no tackle without the ball
     if (k === 'J' || k === 'K') {
       var J = k === 'J';
       if (down) {
@@ -666,7 +669,7 @@ var BO = (function () {
       if (!mine) return;
       if (winding(p)) return;
       var held = t - at, rest = Math.max(0, (J ? KICK_MIN.pass : KICK_MIN.shot) - held); if (M.drill || M.fast) rest = 0;   /* 🎬 a short tap still swings: contact ≤ 0.15 s after the release */
-      if (J) { var oJ = {power: power, ax: c.ax, ay: c.ay, aimHelp: M.L.aim, trick: trick, human: true}; if (rest) kickAct(M, p, 'pass', function () { oJ.ax = c.ax; oJ.ay = c.ay; pass(M, p, oJ); }, rest); else pass(M, p, oJ); }
+      if (J) { var oJ = {power: power, ax: c.ax, ay: c.ay, aimHelp: M.L.aim, trick: trick, human: true, through: !!c.jThru}; c.jThru = false; if (rest) kickAct(M, p, 'pass', function () { oJ.ax = c.ax; oJ.ay = c.ay; pass(M, p, oJ); }, rest); else pass(M, p, oJ); }
       else {
         var perf = c.mo && c.mo.kind === 'oneone'; if (perf) perfect(M, c, p);
         var blast = c.star >= 1 && !trick; if (blast) { c.star = 0; c.blasts++; }   // 🔥 a full star meter = the next shot is a BLAST
@@ -708,7 +711,7 @@ var BO = (function () {
     var b = M.ball, S = M.S; b.owner = -1; b.x = p.x + p.fx * 0.35; b.y = p.y + p.fy * 0.35; b.z = Math.max(b.z, 0.05);
     b.y = clamp(b.y, -S.Wh + 0.3, S.Wh - 0.3); if (Math.abs(b.y) > S.goalW) b.x = clamp(b.x, -S.Lh + 0.3, S.Lh - 0.3);   /* a set piece on the line never starts outside */
     b.vx = vx; b.vy = vy; b.vz = vz; b.spin = spin || 0;
-    b.last = p.i; b.lastSide = p.side; b.lock = p.i; b.lockT = 0.22; b.held = 0; p.kickT = 0.3; b.offside = null; b.fk = null; if (!p.kickAs) p.kickAs = vz > 2.5 ? 'loft' : 'pass';
+    b.last = p.i; b.lastSide = p.side; b.lock = p.i; b.lockT = 0.22; b.thru = null; b.held = 0; p.kickT = 0.3; b.offside = null; b.fk = null; if (!p.kickAs) p.kickAs = vz > 2.5 ? 'loft' : 'pass';
     if (M.twist === 'neon') powerKick(M, p);
   }
   // 🎯 bo-8: fly the ball forward (same rules as stepBall in the air) → where it is at chest height on the way down + where it lands
@@ -743,6 +746,54 @@ var BO = (function () {
     if (p.z <= 0.02 && !p.act && p.st === 'ok' && tIn < 0.42 && zIn > 1.55 && zIn < 2.5) { startAct(M, p, 'hop'); jumpNow(M, p); ev(M, 'chestjump', {by: p.i}); }
     return true;
   }
+  // 🤝 bo-pass: a rolling ball slows by S.fric m/s² → where it is after t s · the first spot on that path a player can reach in time
+  function fricOf(M) { return (M.S.fric || 3.6) * (M.twist === 'moon' ? 0.5 : 1) * (M.party ? PARTY.fric : 1); }
+  function rollAt(M, t) { var b = M.ball, v = hyp(b.vx, b.vy), a = fricOf(M); if (v < 0.05) return {x: b.x, y: b.y}; var tt = Math.min(t, v / a), s = v * tt - a * tt * tt / 2; return {x: clamp(b.x + b.vx / v * s, -M.S.Lh, M.S.Lh), y: clamp(b.y + b.vy / v * s, -M.S.Wh, M.S.Wh)}; }
+  function runSpeed(M, q) { var o = q.sprint; q.sprint = true; var v = speedOf(M, q); q.sprint = o; return Math.max(1, v); }
+  function meetPoint(M, q) { var v = runSpeed(M, q), P; for (var t = 0.05; t < 4; t += 0.05) { P = rollAt(M, t); if (Math.max(0, hyp(P.x - q.x, P.y - q.y) - 0.6) / v + 0.12 <= t) { P.t = t; return P; } } P = rollAt(M, 9); P.t = 4 + hyp(P.x - q.x, P.y - q.y) / v; return P; }
+  function passIsFor(M, q) { var b = M.ball; return b.owner < 0 && b.passTo === q.i && b.lastSide === q.side && !b.shot && M.t - b.passT < 6 && b.z < 0.6; }
+  function goMeet(M, q, dt) { var b = M.ball, h = b.thru, P = h && h.i === q.i && M.t - h.t < 3 && hyp(h.x - q.x, h.y - q.y) > 1.2 && hyp(b.x - q.x, b.y - q.y) > 2.5 ? h : meetPoint(M, q);   // 🏃 a pass ahead: run onto the spot, then take it
+    q.sprint = hyp(P.x - q.x, P.y - q.y) > 2.5; moveTo(M, q, P.x, P.y, dt); }
+  // H1: a pass into space → the friend who gets there first is told it's his
+  function firstTo(M, p, c) {
+    var b = M.ball, best = null, bt = 1e9, L = b.land;
+    M.players.forEach(function (q) { if (q.side !== p.side || q === p || q.gk || q.st === 'down' || (q.ctrl >= 0 && (!c || q.ctrl !== c.ci))) return;
+      var t = L ? Math.max(L.chest.t - M.t, hyp(L.chest.x - q.x, L.chest.y - q.y) / runSpeed(M, q)) : meetPoint(M, q).t; if (t < bt) { bt = t; best = q; } });
+    return best;
+  }
+  // 🎯 a lofted ball that comes down at chest height ON the spot (the same flight rules as stepBall / landOf)
+  function flyReach(h, vz, z) { var x = 0, dt = 1 / 60, top = z; for (var i = 0; i < 400; i++) { vz -= GRAV * dt; h *= Math.pow(0.93, dt); x += h * dt; z += vz * dt; top = Math.max(top, z); if (vz < 0 && (z <= 1.3 && top > 1.3 || z <= 0)) return x; } return x; }
+  function loftTo(M, p, tx, ty, tt) { var sx = p.x + p.fx * 0.35, sy = p.y + p.fy * 0.35, dx = tx - sx, dy = ty - sy, D = hyp(dx, dy) || 1, vz = GRAV * tt * 0.5 + 0.6, h = D / tt, z = Math.max(M.ball.z, 0.05);
+    for (var i = 0; i < 5; i++) { var r = flyReach(h, vz, z); if (r > 0.1) h *= D / r; } return {vx: dx / D * h, vy: dy / D * h, vz: vz}; }
+  // 🏃 pass ahead: the friend (level or ahead, onside) with the most room for a run toward the other goal, in the stick's direction
+  function runSpot(M, q) { var d = dirOf(q.side, M), S = M.S, rx = d, ry = clamp(-q.y / (S.Wh || 10), -0.6, 0.6) * 0.8, rm = hyp(rx, ry), len = clamp(S.Lh * 0.32, 4, 10);
+    return {x: clamp(q.x + rx / rm * len, -S.Lh + 1.5, S.Lh - 1.5), y: clamp(q.y + ry / rm * len, -S.Wh + 1.2, S.Wh - 1.2)}; }
+  function bestRunner(M, p, ax, ay, aim) {
+    var d = dirOf(p.side, M), best = null, bs = -1e9, am = hyp(ax, ay), cone = [0.5, 0.7, 0.9, 1.25][aim == null ? 3 : aim];
+    if (am < 0.2) { ax = d; ay = 0; am = 1; } ax /= am; ay /= am;
+    M.players.forEach(function (q) {
+      if (q.side !== p.side || q === p || q.gk || q.st === 'down' || (q.x - p.x) * d < -3) return;
+      var dist = hyp(q.x - p.x, q.y - p.y); if (dist < 3 || dist > 32) return;
+      if (M.L.offside && !M.noOffside && isOffside(M, q, p)) return;   // a run must START onside (beyond the line after the pass is fine)
+      var R = q.runT > 0 ? {x: q.runX, y: q.runY} : runSpot(M, q); if (q.runT > 0) { var R2 = runSpot(M, q); if ((R2.x - R.x) * d > 0) R = R2; }
+      var vx = R.x - p.x, vy = R.y - p.y, vd = hyp(vx, vy) || 1, ang = Math.acos(clamp((vx * ax + vy * ay) / vd, -1, 1)); if (ang > cone) return;
+      var room = 9, lane = 9; M.players.forEach(function (o) { if (o.side === p.side || o.gk) return; room = Math.min(room, hyp(o.x - R.x, o.y - R.y)); var t = clamp(((o.x - p.x) * vx + (o.y - p.y) * vy) / (vd * vd), 0, 1); lane = Math.min(lane, hyp(p.x + vx * t - o.x, p.y + vy * t - o.y)); });
+      var s = Math.min(room, 6) * 0.8 + Math.min(lane, 4) * 0.5 + (R.x - p.x) * d * 0.1 - ang * 1.5 + (q.runT > 0 ? 1.5 : 0) + (q.callT > 0 ? 1 : 0);
+      if (s > bs) { bs = s; best = {q: q, x: R.x, y: R.y, t: hyp(R.x - q.x, R.y - q.y) / runSpeed(M, q) + 0.25}; }
+    });
+    return best;
+  }
+  // H4: while a PERSON has the ball, now and then the friend with the most room makes a forward run (the pass-ahead target)
+  function supportRuns(M) {
+    var b = M.ball, own = b.owner >= 0 ? M.players[b.owner] : null; if (!own || M.phase !== 'play' || !ctrlOf(M, own) || (M.runCd || 0) > M.t) return;
+    var d = dirOf(own.side, M), best = null, bs = -1e9;
+    M.players.forEach(function (q) { if (q.side !== own.side || q === own || q.gk || q.ctrl >= 0 || q.st !== 'ok' || (q.x - own.x) * d < -4) return;
+      var R = runSpot(M, q); if (M.L.offside && !M.noOffside) R.x = Math.min(R.x * d, offsideLine(M, q.side) - 0.6) * d;
+      var room = 9; M.players.forEach(function (o) { if (o.side !== q.side && !o.gk) room = Math.min(room, hyp(o.x - R.x, o.y - R.y)); });
+      var s = room + (R.x - q.x) * d * 0.3 + M.rnd(); if (s > bs && (R.x - q.x) * d > 1.5) { bs = s; best = {q: q, R: R}; } });
+    M.runCd = M.t + 3.5 + M.rnd() * 2; if (!best) return;
+    best.q.runT = 1.9; best.q.runX = best.R.x; best.q.runY = best.R.y; ev(M, 'run', {by: best.q.i, side: own.side});
+  }
   function pass(M, p, o) {
     var b = M.ball; if (b.owner !== p.i) return null;
     if (o.safe) { b.z = 0; b.held = 0; }   // 🧤 a goal kick is played off the ground (not from the keeper's hands)
@@ -751,7 +802,18 @@ var BO = (function () {
     var power = o.power || 0, speed, tx, ty, loft = o.loft || (power > 0.78 && !o.trick);
     /* 🙈 bo-8 (Aowu 12:53): a no-look pass finds the best friend in ANY direction (it used to need one in front) · 🎯 a long ball gets a little aim help up to ⚡ Hard (🌋 💀 stay pure aim) */
     var cone = o.trick ? 1.6 : Math.max(aimHalf(o.aimHelp == null ? 3 : o.aimHelp), loft && o.human && M.level < 4 ? 0.45 : 0), tgt = o.to && o.to.side === p.side ? o.to : cone > 0 || o.trick ? bestPass(M, p, ax, ay, cone, !!o.trick) : null;
-    if (tgt) {
+    var fine = sideHuman(M, p.side) && !o.safe, run = null;   // 🤝 bo-pass: a team with a person passes the solved way (robot-only teams: as before)
+    if (o.through && !o.trick && fine) { run = bestRunner(M, p, ax, ay, o.human ? (o.aimHelp == null ? 3 : o.aimHelp) : 3); if (run) tgt = run.q; }
+    if (tgt && fine) {
+      var fa = fricOf(M), T, tl = 0.5, fD = 0, arr = 0;
+      if (run) T = {x: run.x, y: run.y};
+      else { for (var it = 0; it < 3; it++) { T = {x: tgt.x + tgt.vx * Math.min(tl, 1.6), y: tgt.y + tgt.vy * Math.min(tl, 1.6)}; fD = hyp(T.x - p.x, T.y - p.y); arr = 3.5 + fD * 0.3 + power * 4; tl = loft ? clamp(fD / 16, 0.6, 1.4) : (Math.sqrt(arr * arr + 2 * fa * fD) - arr) / fa; } }
+      tx = T.x; ty = T.y; fD = hyp(tx - p.x, ty - p.y); arr = 3.5 + fD * 0.3 + power * 4;
+      speed = run ? Math.max((fD + fa * run.t * run.t / 2) / Math.max(0.3, run.t), Math.sqrt(2 * fa * fD) * 1.06) : Math.sqrt(arr * arr + 2 * fa * fD);
+      speed = clamp(speed, 7, 26) * (o.trick ? 1.12 : 1);
+      if (o.human && (o.aimHelp == null ? 3 : o.aimHelp) < 2) { var em = (o.aimHelp ? 0.35 : 0.7) * (0.6 + fD / 20); tx += (M.rnd() - 0.5) * 2 * em; ty += (M.rnd() - 0.5) * 2 * em; }   // 🌿 🔥 a little off · 🌋 💀 more (your own aim + power)
+      if (!o.human) { var err2 = (1 - (o.acc == null ? 0.8 : o.acc)) * 0.5 * (M.rnd() - 0.5); var a2 = Math.atan2(ty - p.y, tx - p.x) + err2; tx = p.x + Math.cos(a2) * fD; ty = p.y + Math.sin(a2) * fD; }
+    } else if (tgt) {
       var dist = hyp(tgt.x - p.x, tgt.y - p.y), lead = clamp(dist / 14, 0.2, 0.9);
       tx = tgt.x + tgt.vx * lead; ty = tgt.y + tgt.vy * lead; dist = hyp(tx - p.x, ty - p.y);
       speed = clamp(5 + dist * 0.75 + power * 4, 7, 24) * (o.trick ? 1.12 : 1);
@@ -763,17 +825,20 @@ var BO = (function () {
         room = Math.max(4, room - 2); speed = Math.min(speed, Math.sqrt(2 * (M.S.fric || 3.6) * room)); } }   /* 🧤 a goal kick never flies out */
     var dx = tx - p.x, dy = ty - p.y, dm = hyp(dx, dy) || 1;
     p.kickAs = o.as || (o.trick ? (heel ? 'heel' : 'nolook') : loft ? 'loft' : 'pass');
-    if (loft) { var dd = dm, tt = clamp(dd / 16, 0.6, 1.4); kickBall(M, p, dx / tt * 0.82, dy / tt * 0.82, GRAV * tt * 0.5, o.spin || 0); }
+    if (loft && fine && tgt) { var lv = loftTo(M, p, tx, ty, run ? clamp(run.t, 0.7, 1.6) : clamp(dm / 16, 0.6, 1.4)); kickBall(M, p, lv.vx, lv.vy, lv.vz, 0); }   /* 🎯 bo-pass: comes down ON the spot */
+    else if (loft) { var dd = dm, tt = clamp(dd / 16, 0.6, 1.4); kickBall(M, p, dx / tt * 0.82, dy / tt * 0.82, GRAV * tt * 0.5, o.spin || 0); }
     else kickBall(M, p, dx / dm * speed, dy / dm * speed, 0, o.spin || 0);
     kickShow(M, p);
     b.passer = p.i; b.passT = M.t; b.passTo = tgt ? tgt.i : -1; M.stats[p.side].passes++; p.g.passes++;
     b.land = loft ? landOf(M) : null;   // 🎯 bo-8: where a long ball comes down (the page draws a ring there, the receiver runs to it)
+    var pc = ctrlOf(M, p); b.thru = run ? {i: tgt.i, x: tx, y: ty, t: M.t} : null;
+    if (!tgt && fine && !o.trick) { var rc = firstTo(M, p, pc); if (rc) b.passTo = rc.i; }   // 🤝 H1: a pass into space gets its man
     // offside: who is the pass meant for, and were they off when it was played?
     if (tgt && M.L.offside && !M.noOffside && isOffside(M, tgt, p)) b.offside = {i: tgt.i, x: tgt.x, y: tgt.y, side: p.side};
-    var kind = heel ? 'heel' : o.trick ? 'nolook' : loft ? 'long' : 'ground';
+    var kind = heel ? 'heel' : o.trick ? 'nolook' : run ? (loft ? 'overtop' : 'through') : loft ? 'long' : 'ground';
     ev(M, 'pass', {by: p.i, to: tgt ? tgt.i : -1, kind: kind, side: p.side});
     if (o.trick) trickDone(M, p, heel ? 'heel' : 'nolook');
-    var c = ctrlOf(M, p); if (c && tgt && tgt.ctrl < 0) { setCtrl(M, c, tgt); c.passes++; }
+    var c = pc, rq = tgt || (b.passTo >= 0 ? M.players[b.passTo] : null); if (c && rq && rq.ctrl < 0) { setCtrl(M, c, rq); if (tgt) c.passes++; }   // 🤝 bo-pass: you follow a pass into space too
     return tgt;
   }
   function isOffside(M, q, passer) {
@@ -796,7 +861,8 @@ var BO = (function () {
     if (help >= 1) ty = clamp(ty, -S.goalW + 0.45, S.goalW - 0.45);
     if (!o.human) { var acc = o.acc == null ? 0.6 : o.acc; ty += (M.rnd() - 0.5) * (1 - acc) * S.goalW * 2.4; }
     else ty += (M.rnd() - 0.5) * [1.8, 0.9, 0.5, 0.25][help] * (0.5 + power);
-    if (help === 0 && Math.abs(ay) > 0.2 && o.human) ty = p.y + ay / Math.max(0.2, Math.abs(ax)) * dist * 0.8;   // no aim help = the stick decides
+    if (help === 0 && Math.abs(ay) > 0.2 && o.human) ty = Math.abs(ay) > Math.abs(ax) ? Math.sign(ay) * S.goalW * 0.95 : p.y + ay / Math.max(0.2, Math.abs(ax)) * dist * 0.8;   // no aim help = the stick decides · a stick more sideways than forward = the post on that side
+    if (o.human) ty = clamp(ty, -S.goalW - 1.4, S.goalW + 1.4);   // ⚽ bo-pass (Aowu 08:46): a shot always goes at the goal — running sideways never sends it to the corner flag
     var speed = 13 + power * 15, vz;
     if (kind === 'chip') { speed = 11; }
     if (o.volley) speed = Math.max(speed, 24);
@@ -1486,10 +1552,13 @@ var BO = (function () {
     }
     var c = ctrlOf(M, p);
     if (c && M.phase !== 'goal' && M.phase !== 'half' && M.phase !== 'end' && !(p.gk)) {
-      var m = hyp(c.ix, c.iy); p.sprint = c.sprint;   /* keys: Shift · touch: the page sends sprint when the stick is pushed far */
+      var m = hyp(c.ix, c.iy); p.sprint = c.sprint;
+      var bl = M.ball, bdx = bl.x - p.x, bdy = bl.y - p.y, bdd = hyp(bdx, bdy) || 1; c.awayT = M.phase === 'play' && bl.owner < 0 && (m < 0.2 || (c.ix * bdx + c.iy * bdy) / (m * bdd) < 0.3) ? (c.awayT || 0) + dt : 0; c.assist = false;   // 🤝 bo-pass: are you going for the ball?   /* keys: Shift · touch: the page sends sprint when the stick is pushed far */
       if (M.phase === 'restart' && M.rs && M.rs.taker === p.i) { var rs = M.rs; moveTo(M, p, rs.x - dirOf(p.side, M) * 0.3, rs.y, dt); if (hyp(c.ix, c.iy) > 0.2) { p.fx = c.ix / m; p.fy = c.iy / m; } }
       else if (M.phase === 'kickoff' && M.rs == null) steer(p, 0, 0, dt);
       else if (m < 0.2 && M.phase === 'play' && meetLongBall(M, p, dt)) { /* 🎯 bo-8 */ }
+      else if (m < 0.2 && M.phase === 'play' && passIsFor(M, p)) { goMeet(M, p, dt); c.assist = true; }   /* 🤝 bo-pass H2: run to where the slowing ball can be met */
+      else if (m < 0.2 && M.phase === 'play' && M.level <= 2 && c.awayT > 0.4 && bl.owner < 0 && !bl.shot && bl.z < 1 && bdd < 8 && closestToBall(M, p.side, true) === p && !(bl.passTo >= 0 && bl.passTo !== p.i && bl.lastSide === p.side)) { goMeet(M, p, dt); c.assist = true; }   /* 🌱🐣🌿 a loose ball right by you */
       else if (m < 0.2 && M.phase === 'play' && M.ball.owner < 0 && M.ball.passTo === p.i && M.t - M.ball.passT < 3) { var bb = M.ball, v2 = bb.vx * bb.vx + bb.vy * bb.vy || 1, tt2 = clamp(((p.x - bb.x) * bb.vx + (p.y - bb.y) * bb.vy) / v2, 0, 1.5); moveTo(M, p, bb.x + bb.vx * tt2, bb.y + bb.vy * tt2, dt); }   /* the pass is for you: step onto its line */
       else { var sp = speedOf(M, p); steer(p, c.ix * sp, c.iy * sp, dt); }
     } else ai(M, p, dt);
@@ -1522,6 +1591,8 @@ var BO = (function () {
       moveTo(M, p, hx, hy, dt, 0.8); return;
     }
     if (human && meetLongBall(M, p, dt)) return;   // 🎯 bo-8: only on a team with a person (robot-vs-robot balance unchanged)
+    if (human && M.phase === 'play' && passIsFor(M, p)) { goMeet(M, p, dt); return; }   // 🤝 bo-pass H1: the pass is mine
+    if (p.runT > 0) p.runT -= dt;
     p.aiT -= dt;
     var owner = b.owner >= 0 ? M.players[b.owner] : null, mine = owner === p, ours = owner && owner.side === p.side;
     // with the ball
@@ -1531,9 +1602,9 @@ var BO = (function () {
       var role = 'shape';
       if (!owner) {
         // loose ball: the closest of each team goes for it (a teammate of the human only if the human is far)
-        var chaser = closestToBall(M, p.side, true);
+        var chaser = human ? helperFor(M, p.side) : closestToBall(M, p.side, true);   // 🤝 bo-pass H3: a person standing still doesn't block the robots
         if (chaser === p) role = 'chase';
-        if (human && chaser === p) { var me = M.ctrls.filter(function (c) { return c.side === p.side; }).map(function (c) { return M.players[c.pi]; }); if (me.some(function (q) { return q && hyp(q.x - b.x, q.y - b.y) < hyp(p.x - b.x, p.y - b.y) + 5; })) role = 'shape'; }
+        if (human && chaser === p) { var me = M.ctrls.filter(function (c) { return c.side === p.side; }).map(function (c) { return M.players[c.pi]; }); if (me.some(function (q) { var qc = ctrlOf(M, q); return q && (!qc || !(qc.awayT > 0.4) || qc.assist) && hyp(q.x - b.x, q.y - b.y) < hyp(p.x - b.x, p.y - b.y) + 5; })) role = 'shape'; }
       } else if (!ours) {
         var pressers = pressersOf(M, p.side);
         if (pressers.indexOf(p) >= 0 || p.pressT > 0) role = 'press';
@@ -1543,6 +1614,7 @@ var BO = (function () {
     }
     var r = p.role || 'shape';
     if ((r === 'support' && !ours) || ((r === 'press' || r === 'mark') && (!owner || ours)) || (r === 'chase' && owner)) r = 'shape';
+    if (r === 'chase' && human) { goMeet(M, p, dt); return; }   // 🤝 bo-pass: a friend runs to where the slowing ball can be met
     if (r === 'chase') { var lead = hyp(b.vx, b.vy) > 2 ? 0.35 : 0; moveTo(M, p, b.x + b.vx * lead, b.y + b.vy * lead, dt); p.sprint = hyp(b.x - p.x, b.y - p.y) > 6; return; }
     if (r === 'press' && owner) {
       var gx = -d * S.Lh, ax = owner.x + (gx - owner.x) * 0.06, ay = owner.y - owner.y * 0.06;
@@ -1559,6 +1631,7 @@ var BO = (function () {
       var opp = nearestOpp(M, p, owner);
       if (opp) { var gx2 = -d * S.Lh, mx = opp.x + (gx2 - opp.x) * 0.12, my = opp.y + (b.y - opp.y) * 0.2; moveTo(M, p, mx, my, dt, 0.9); return; }
     }
+    if (r === 'support' && p.runT > 0 && human) { moveTo(M, p, p.runX, p.runY, dt); p.sprint = true; return; }   // 🏃 bo-pass H4: a forward run
     var hm = homeOf(M, p, r === 'support');
     if (r === 'support') {
       // runs: forwards go ahead of the ball (but stay onside on offside levels), everyone keeps a passing lane
@@ -1576,6 +1649,11 @@ var BO = (function () {
     else { p.st = 'stumble'; p.stT = 0.35; ev(M, 'tackle', {by: p.i, from: o.i, ok: false}); }
   }
   function offsideLine(M, side) { var d = dirOf(side, M), xs = M.players.filter(function (o) { return o.side !== side; }).map(function (o) { return o.x * d; }).sort(function (a, b) { return b - a; }); return Math.max(0, xs[1] == null ? M.S.Lh : xs[1]); }
+  function helperFor(M, side) {   // 🤝 bo-pass H3: the closest (by time) of a person's team — a person's player only counts while they go for it
+    var b = M.ball, best = null, bd = 1e9;
+    M.players.forEach(function (q) { if (q.side !== side || q.gk || q.st === 'down') return; var qc = ctrlOf(M, q); if (qc && qc.awayT > 0.4 && !qc.assist) return; var dd = hyp(q.x - b.x, q.y - b.y) / (speedOf(M, q) || 1); if (dd < bd) { bd = dd; best = q; } });
+    return best;
+  }
   function closestToBall(M, side, outfield) {
     var b = M.ball, best = null, bd = 1e9;
     M.players.forEach(function (q) { if (q.side !== side || (outfield && q.gk) || q.st === 'down') return; var dd = hyp(q.x - b.x, q.y - b.y) / (speedOf(M, q) || 1); if (dd < bd) { bd = dd; best = q; } });
@@ -1832,7 +1910,7 @@ var BO = (function () {
     else if (M.phase === 'kickoff' || M.phase === 'restart') { var bb = M.ball; if (bb.owner >= 0) stepBall(M, dt); }
     if (M.phase === 'play') {
       pickup(M); moments(M); if (M.drill) { drillStep(M, dt); return; }
-      callOuts(M);
+      callOuts(M); supportRuns(M);
       if (M.twist) twistTick(M, dt);
       if (M.ball.owner >= 0) M.stats[M.players[M.ball.owner].side].poss += dt;
       autoSwitch(M);
@@ -1874,202 +1952,6 @@ var BO = (function () {
     _: {landOf: landOf, callOuts: callOuts, goal: goal, foul: foul, showAct: showAct, runUp: runUp, pensRun: pensRun, kickAct: kickAct, winding: winding, kickShow: kickShow, startAct: startAct, actTick: actTick, jumpNow: jumpNow, jumpV: jumpV, airTime: airTime, threatened: threatened, askBall: askBall, kickBall: kickBall, pass: pass, shoot: shoot, trick: trick, nutmeg: nutmeg, nutTarget: nutTarget, momentOf: momentOf, moments: moments, starAdd: starAdd, lift: lift, standTackle: standTackle, slide: slide, isOffside: isOffside, foul: foul, endMatch: endMatch}};
 })();
 // ENGINE END
-/* 🏷️ BlasLogo (bo-6, Aowu 2026-11-15 12:33 OK): the BlasOff logo + mode badges drawn in code — plan claude/blasoff-logo-plan.md */
-const BlasLogo = (() => {
-  const MODE = {
-    match:  {key: 'match',  name: 'Match',  ac: '#FFB020', scene: 'goal',  pose: 'bicycle'},   // ⚽ Matches (4v4 · 7v7 · 11v11 · 🎉 Party)
-    futsal: {key: 'futsal', name: 'Futsal', ac: '#38C8FF', scene: 'court', pose: 'kick'},      // 🏙️ Small games box + 🥅 Futsal card
-    street: {key: 'street', name: 'Street', ac: '#7CF7A0', scene: 'cage',  pose: 'volley'},    // 🏙️ Street 1v1 card (Aowu 09:44)
-    trick:  {key: 'trick',  name: 'Trick',  ac: '#FF5AD2', scene: 'swirl', pose: 'flick'},     // 🕺 Tricks + skills (🎤 battle · 🎯 skills · 🥅 shootout)
-    cup:    {key: 'cup',    name: 'Cup',    ac: '#FFD23F', scene: 'cup',   pose: null}         // 🏆 R4 (Cup · League · 👑 Family cup)
-  };
-  const THEME = {   // glow · rim (2 metal stops) · back (centre, edge) · fire (tip, mid, base) · space (star fill)
-    classic:    {glow: '#FF7A1A', rim: ['#FFFFFF', '#8A93A6'], back: ['#2A1A10', '#08060A'], fire: ['#FFF3A0', '#FF8A1E', '#D2280A'], space: ['#1C2A5A', '#070A18']},
-    jungle:     {glow: '#9BE15D', rim: ['#F6E7A0', '#7A6A2A'], back: ['#1E2A10', '#070A04'], fire: ['#FFF3A0', '#FF9A2A', '#C2380A'], space: ['#22401C', '#060E05']},
-    underwater: {glow: '#3BE0D0', rim: ['#E8FBFF', '#3A8AA0'], back: ['#06324A', '#020C14'], fire: ['#E8FFFF', '#3BE0D0', '#1C8FB0'], space: ['#0A4A6A', '#020C14']},
-    neon:       {glow: '#FF2BD6', rim: ['#B8F3FF', '#3C5CFF'], back: ['#1A0A3C', '#05020E'], fire: ['#FFFFFF', '#3CF2FF', '#FF2BD6'], space: ['#2A0E5A', '#05020E']},
-    robot:      {glow: '#5CC8FF', rim: ['#E6ECF2', '#5A6676'], back: ['#232B36', '#0A0D12'], fire: ['#FFF7C0', '#FFD23F', '#E0601A'], space: ['#2E3A4E', '#0A0D12']},
-    moon:       {glow: '#B8C6FF', rim: ['#FFFFFF', '#7A7C90'], back: ['#151933', '#010208'], fire: ['#FFFFFF', '#B8C6FF', '#5B4EFF'], space: ['#151933', '#010208']},
-    olympus:    {glow: '#FFC94A', rim: ['#FFF4C8', '#C9962A'], back: ['#2C5A8C', '#0E2440'], fire: ['#FFFFFF', '#FFD86A', '#E08A1A'], space: ['#3A72B0', '#0E2440']}
-  };
-  const FONT = (w, px) => w + ' ' + px + 'px Fredoka, Nunito, "Arial Rounded MT Bold", sans-serif';
-  const cache = {}; let SC = 1;   // SC = current scale (shadow blur is not scaled by the canvas transform)
-  const lin = (g, x0, y0, x1, y1, st) => { const q = g.createLinearGradient(x0, y0, x1, y1); st.forEach((c, i) => q.addColorStop(i / (st.length - 1), c)); return q; };
-  const rad = (g, x, y, r, st) => { const q = g.createRadialGradient(x, y - r * 0.35, r * 0.05, x, y, r); st.forEach((c, i) => q.addColorStop(i / (st.length - 1), c)); return q; };
-
-  function shield(g){   // unit shield: 200 wide, 240 tall, centre (0,0) — flat top with two notches like the sheet
-    g.beginPath(); g.moveTo(-100, -108); g.lineTo(-40, -108); g.lineTo(-30, -96); g.lineTo(30, -96); g.lineTo(40, -108); g.lineTo(100, -108);
-    g.lineTo(100, 10); g.quadraticCurveTo(94, 82, 0, 120); g.quadraticCurveTo(-94, 82, -100, 10); g.closePath();
-  }
-  function star(g, R, r){ g.beginPath(); for(let i = 0; i < 12; i++){ const a = -Math.PI / 2 + i * Math.PI / 6, q = i % 2 ? r : R; g.lineTo(Math.cos(a) * q, Math.sin(a) * q); } g.closePath(); }   // 6-point star
-  function sparks(g, T, n, R, seed){ g.save(); g.fillStyle = T.fire[1]; for(let i = 0; i < n; i++){ const a = i * 2.39996 + seed, d = R * (0.55 + 0.45 * ((i * 37 % 11) / 11)), s = 1.4 + (i % 3); g.globalAlpha = 0.5 + 0.5 * ((i * 13 % 7) / 7); g.beginPath(); g.arc(Math.cos(a) * d, Math.sin(a) * d * 0.8, s, 0, 7); g.fill(); } g.restore(); }
-  function rays(g, T, r, n){ g.save(); g.globalAlpha = 0.13; g.fillStyle = T.glow; for(let i = 0; i < n; i++){ const a = i * Math.PI * 2 / n; g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, r, a, a + Math.PI / n * 0.5); g.closePath(); g.fill(); } g.restore(); }
-  function trail(g, T, x, y, r, ang){   // fire trail behind a flying ball (ang = direction the trail points to)
-    g.save(); g.translate(x, y); g.rotate(ang);
-    [[2.8, 1, T.fire[2]], [2.2, 0.78, T.fire[1]], [1.5, 0.5, T.fire[0]]].forEach(([L, W, c]) => {
-      g.fillStyle = c; g.beginPath(); g.moveTo(0, -r * W);
-      g.quadraticCurveTo(r * L * 0.5, -r * W * 1.2, r * L, -r * 0.2); g.quadraticCurveTo(r * L * 0.7, 0, r * L * 1.05, r * 0.35);
-      g.quadraticCurveTo(r * L * 0.5, r * W * 1.2, 0, r * W); g.closePath(); g.fill();
-    });
-    g.restore();
-  }
-  function ball(g, x, y, r, spin){   // classic black + white football (pentagons), our own drawing
-    g.save(); g.translate(x, y); g.rotate(spin || 0);
-    g.beginPath(); g.arc(0, 0, r, 0, 7); g.fillStyle = rad(g, 0, 0, r, ['#FFFFFF', '#F2F2F2', '#B9BEC8']); g.fill();
-    g.save(); g.clip(); g.fillStyle = '#16181E';
-    const pent = (cx, cy, s, rot) => { g.beginPath(); for(let i = 0; i < 5; i++){ const a = rot + i * Math.PI * 2 / 5; g.lineTo(cx + Math.cos(a) * s, cy + Math.sin(a) * s); } g.closePath(); g.fill(); };
-    pent(0, 0, r * 0.36, -Math.PI / 2); for(let i = 0; i < 5; i++){ const a = -Math.PI / 2 + i * Math.PI * 2 / 5 + Math.PI / 5; pent(Math.cos(a) * r * 0.98, Math.sin(a) * r * 0.98, r * 0.32, a + Math.PI / 2); }
-    g.strokeStyle = '#16181E'; g.lineWidth = r * 0.05; for(let i = 0; i < 5; i++){ const a = -Math.PI / 2 + i * Math.PI * 2 / 5; g.beginPath(); g.moveTo(Math.cos(a) * r * 0.36, Math.sin(a) * r * 0.36); g.lineTo(Math.cos(a) * r * 0.72, Math.sin(a) * r * 0.72); g.stroke(); }
-    g.restore();
-    g.fillStyle = 'rgba(255,255,255,.55)'; g.beginPath(); g.ellipse(-r * 0.35, -r * 0.45, r * 0.24, r * 0.13, -0.6, 0, 7); g.fill();   // shine
-    g.lineWidth = r * 0.07; g.strokeStyle = 'rgba(10,12,20,.85)'; g.beginPath(); g.arc(0, 0, r, 0, 7); g.stroke();
-    g.restore();
-  }
-  function rocket(g, T, x, y, r, ang){   // the BlasOff rocket-ball: football + 3 fins + exhaust flame
-    g.save(); g.translate(x, y); g.rotate(ang);   // nose points along +x
-    trail(g, T, -r * 0.9, 0, r * 0.75, Math.PI);
-    g.fillStyle = lin(g, -r, -r, -r, r, [T.rim[0], T.rim[1]]); g.strokeStyle = 'rgba(10,12,20,.8)'; g.lineWidth = r * 0.06;
-    [[-1], [1]].forEach(([s]) => { g.beginPath(); g.moveTo(-r * 0.2, s * r * 0.75); g.lineTo(-r * 1.25, s * r * 1.25); g.lineTo(-r * 0.95, s * r * 0.35); g.closePath(); g.fill(); g.stroke(); });
-    g.beginPath(); g.moveTo(-r * 0.6, -r * 0.18); g.lineTo(-r * 1.35, 0); g.lineTo(-r * 0.6, r * 0.18); g.closePath(); g.fill(); g.stroke();
-    ball(g, 0, 0, r, 0.3);
-    g.restore();
-  }
-  /* 🏃 solid player silhouettes (Aowu 09:44: like the sheet, not stick figures) — side view, facing right.
-     Pose = absolute segment angles (0 = straight down, + = toward +x): torso (hip → shoulder), neck, legs [thigh, shin, foot], arms [upper, fore].
-     Each segment = a tapered capsule; the whole body is filled once in the look's fire colours, with a dark rim + glow behind. */
-  const POSES = {
-    kick:    {torso: Math.PI - 0.28, neck: Math.PI - 0.15, legs: [[0.18, 0.02, 1.57], [-0.75, -2.05, -1.2]], arms: [[1.95, 2.35], [-1.55, -1.15]], kickLeg: 1, plantLeg: 0},
-    bicycle: {torso: -1.25, neck: -1.45, legs: [[2.85, 2.55, 1.7], [1.55, 1.05, 1.35]], arms: [[-0.25, 0.15], [-2.1, -2.5]], kickLeg: 0},
-    flick:   {torso: Math.PI - 0.12, neck: Math.PI - 0.05, legs: [[0.06, -0.02, 1.57], [-0.45, -2.6, -2.2]], arms: [[2.05, 2.4], [-2.05, -2.4]], kickLeg: 1},
-    volley:  {torso: Math.PI + 0.75, neck: Math.PI + 0.55, legs: [[1.95, 1.85, 1.65], [0.45, -0.55, 1.1]], arms: [[3.65, 3.3], [1.35, 1.15]], kickLeg: 0}
-  };
-  const SEG = {thigh: [0.24, 0.072, 0.05], shin: [0.23, 0.048, 0.032], foot: [0.1, 0.034, 0.026], upper: [0.16, 0.042, 0.034], fore: [0.15, 0.032, 0.026], torso: [0.3, 0.078, 0.098], neck: [0.06, 0.034, 0.034]};
-  function figure(g, T, pose, x, y, h){
-    const P = POSES[pose]; if(!P) return null;
-    const dir = a => [Math.sin(a), Math.cos(a)], caps = [];
-    const seg = (p, a, k) => { const [L, r1, r2] = SEG[k], d = dir(a), q = [p[0] + d[0] * L, p[1] + d[1] * L]; caps.push([p, q, r1, r2]); return q; };
-    const hip = [0, 0], sh = seg(hip, P.torso, 'torso'), nk = seg(sh, P.neck, 'neck'), hd = dir(P.neck), head = [nk[0] + hd[0] * 0.07, nk[1] + hd[1] * 0.07];
-    const toes = P.legs.map(([a, b, c]) => { const knee = seg([hip[0], hip[1]], a, 'thigh'), ank = seg(knee, b, 'shin'); return seg(ank, c, 'foot'); });
-    P.arms.forEach(([a, b]) => { const el = seg([sh[0] - dir(P.torso)[0] * 0.03, sh[1] - dir(P.torso)[1] * 0.03], a, 'upper'); const hand = seg(el, b, 'fore'); caps.push([hand, hand, 0.034, 0.034]); });
-    const W = (p) => [x + p[0] * h, y + p[1] * h];
-    const path = (grow) => { g.beginPath();
-      caps.forEach(([p, q, r1, r2]) => { const a = W(p), b = W(q), R1 = (r1 + grow) * h, R2 = (r2 + grow) * h, dx = b[0] - a[0], dy = b[1] - a[1], m = Math.hypot(dx, dy);
-        if(m < 0.01){ g.moveTo(a[0] + R1, a[1]); g.arc(a[0], a[1], R1, 0, 7); return; }
-        const t = Math.atan2(dy, dx); g.moveTo(a[0] + Math.cos(t + Math.PI / 2) * R1, a[1] + Math.sin(t + Math.PI / 2) * R1);
-        g.arc(a[0], a[1], R1, t + Math.PI / 2, t - Math.PI / 2); g.arc(b[0], b[1], R2, t - Math.PI / 2, t + Math.PI / 2); g.closePath(); });
-      const c = W(head); g.moveTo(c[0] + (0.085 + grow) * h, c[1]); g.arc(c[0], c[1], (0.085 + grow) * h, 0, 7); };
-    g.save(); g.shadowColor = T.glow; g.shadowBlur = 14 * SC; g.fillStyle = '#0B0D14'; path(0.022); g.fill('nonzero'); g.restore();   // dark rim + glow
-    g.fillStyle = lin(g, x, y - h * 0.55, x, y + h * 0.5, [T.fire[0], T.fire[1], T.fire[2]]); path(0); g.fill('nonzero');
-    g.save(); g.globalAlpha = 0.35; g.fillStyle = '#FFFFFF'; const hc = W(head); g.beginPath(); g.arc(hc[0] - 0.025 * h, hc[1] - 0.03 * h, 0.035 * h, 0, 7); g.fill(); g.restore();   // head shine
-    return {toe: W(toes[P.kickLeg]), plant: W(toes[P.plantLeg == null ? 1 - P.kickLeg : P.plantLeg]), head: W(head)};
-  }
-  function swoosh(g, T, x, y, r, a0, a1){ g.save(); g.lineCap = 'round'; [[1, 5, T.fire[1]], [1.22, 3, T.glow], [1.42, 2, '#FFFFFF']].forEach(([k, w, c], i) => { g.globalAlpha = 0.85 - i * 0.2; g.strokeStyle = c; g.lineWidth = w; g.beginPath(); g.arc(x, y, r * k, a0, a1); g.stroke(); }); g.restore(); }
-  function scene(g, T, kind){
-    g.save();
-    if(kind === 'goal'){   // goal frame + net, top-left
-      g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 1.4;
-      for(let x = -86; x <= -6; x += 9){ g.beginPath(); g.moveTo(x, -84); g.lineTo(x + 14, -20); g.stroke(); }
-      for(let y = -84; y <= -20; y += 9){ g.beginPath(); g.moveTo(-86 + (y + 84) * 0.22, y); g.lineTo(-6 + (y + 84) * 0.22, y); g.stroke(); }
-      g.strokeStyle = '#FFFFFF'; g.lineWidth = 5; g.beginPath(); g.moveTo(-86, -20); g.lineTo(-86, -84); g.lineTo(-6, -84); g.lineTo(-6, -20); g.stroke();
-    } else if(kind === 'court'){   // futsal court lines: halfway line + centre circle + small goal
-      g.fillStyle = lin(g, 0, -10, 0, 120, ['rgba(56,200,255,.18)', 'rgba(56,200,255,.38)']); g.fillRect(-100, -10, 200, 130);
-      g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 3;
-      g.beginPath(); g.moveTo(-100, 40); g.lineTo(100, 40); g.stroke(); g.beginPath(); g.ellipse(0, 40, 46, 18, 0, 0, 7); g.stroke();
-      g.strokeStyle = '#FFFFFF'; g.lineWidth = 4; g.beginPath(); g.moveTo(-38, -10); g.lineTo(-38, -58); g.lineTo(38, -58); g.lineTo(38, -10); g.stroke();
-      g.lineWidth = 1.2; g.strokeStyle = 'rgba(255,255,255,.45)'; for(let x = -30; x <= 30; x += 8){ g.beginPath(); g.moveTo(x, -56); g.lineTo(x, -12); g.stroke(); }
-    } else if(kind === 'swirl'){   // trick rings around the ball
-      g.lineCap = 'round';
-      [[64, 22, 0.35, T.glow], [52, 16, -0.4, '#FFFFFF']].forEach(([rx, ry, rot, c], i) => { g.strokeStyle = c; g.globalAlpha = i ? 0.8 : 1; g.lineWidth = i ? 3 : 6; g.beginPath(); g.ellipse(0, -30, rx, ry, rot, 0.2, Math.PI * 1.7); g.stroke(); });
-      g.globalAlpha = 1;
-    } else if(kind === 'cage'){   // 🏙️ street cage: wall + painted goal + wire fence + graffiti star
-      g.fillStyle = lin(g, 0, -110, 0, 120, ['#3A3F4C', '#20232C']); g.fillRect(-100, -110, 200, 230);
-      g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1.2; for(let y = -100; y < 60; y += 16){ g.beginPath(); g.moveTo(-100, y); g.lineTo(100, y); g.stroke(); for(let x = -100 + (y / 16 % 2 ? 0 : 16); x < 100; x += 32){ g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 16); g.stroke(); } }
-      g.strokeStyle = '#FFFFFF'; g.lineWidth = 5; g.beginPath(); g.moveTo(-60, 40); g.lineTo(-60, -40); g.lineTo(60, -40); g.lineTo(60, 40); g.stroke();
-      g.save(); g.translate(-62, -76); g.rotate(-0.25); g.fillStyle = T.glow; g.globalAlpha = 0.9; star(g, 18, 8); g.fill(); g.restore();
-      g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(-100, 40, 200, 80);
-      g.strokeStyle = 'rgba(200,210,230,.45)'; g.lineWidth = 1.3; for(let k = -260; k < 260; k += 18){ g.beginPath(); g.moveTo(k, -110); g.lineTo(k + 230, 120); g.stroke(); g.beginPath(); g.moveTo(k, 120); g.lineTo(k + 230, -110); g.stroke(); }
-    } else if(kind === 'cup'){   // trophy (R4)
-      g.fillStyle = lin(g, -40, -90, 40, 40, ['#FFF4C8', '#FFD23F', '#B8861A']); g.strokeStyle = '#3A2A06'; g.lineWidth = 4;
-      g.beginPath(); g.moveTo(-42, -84); g.lineTo(42, -84); g.quadraticCurveTo(40, -20, 8, -8); g.lineTo(8, 18); g.lineTo(26, 30); g.lineTo(-26, 30); g.lineTo(-8, 18); g.lineTo(-8, -8); g.quadraticCurveTo(-40, -20, -42, -84); g.closePath(); g.fill(); g.stroke();
-      g.lineWidth = 7; g.strokeStyle = '#D9A82A'; [[-1], [1]].forEach(([s]) => { g.beginPath(); g.arc(s * 46, -60, 16, s > 0 ? -1.4 : 1.4 - Math.PI * 2, s > 0 ? 1.4 : Math.PI * 2 - 1.4 + Math.PI * 2, s < 0); g.stroke(); });
-      g.fillStyle = '#5A3A10'; g.fillRect(-34, 30, 68, 16);
-    }
-    g.restore();
-  }
-  function word(g, x, y, px, a, b, fillA, fillB, ink){   // "Blas" + "Off", one word, two fills
-    g.font = FONT('900 italic', px); g.textBaseline = 'middle'; g.lineJoin = 'round';
-    const wa = g.measureText(a).width, wb = g.measureText(b).width, x0 = x - (wa + wb) / 2;
-    g.lineWidth = px * 0.24; g.strokeStyle = ink; g.strokeText(a, x0, y); g.strokeText(b, x0 + wa, y);
-    g.fillStyle = fillA; g.fillText(a, x0, y); g.fillStyle = fillB; g.fillText(b, x0 + wa, y);
-    return wa + wb;
-  }
-
-  function badge(g, T, md, small){   // drawn in the unit box (≈ 220 × 260); small = icon only (the mode box shows the name)
-    g.save(); g.shadowColor = T.glow; g.shadowBlur = 26 * SC; shield(g); g.lineWidth = 10; g.strokeStyle = T.glow; g.stroke(); g.restore();
-    shield(g); g.fillStyle = rad(g, 0, -10, 150, [T.back[0], T.back[1]]); g.fill();
-    g.save(); shield(g); g.clip();
-    rays(g, T, 170, 22); sparks(g, T, 18, 110, 1);
-    scene(g, T, md.scene);
-    if(md.scene === 'cup'){ ball(g, 0, -40, small ? 24 : 18, 0.2); }
-    else if(small){ const by = md.scene === 'swirl' ? -30 : -24; if(md.scene !== 'swirl') trail(g, T, 4, by, 42, -2.6); ball(g, 4, by, 42, 0.5); }
-    else {
-      const F = {match: [-2, 2, 124], futsal: [-34, -14, 124], trick: [8, 6, 124], street: [-16, 0, 128]}[md.key] || [0, 0, 124];
-      const f = figure(g, T, md.pose, F[0], F[1], F[2]);
-      if(md.pose === 'flick'){ ball(g, f.head[0] + 6, f.head[1] - 34, 18, 0.5); }
-      else if(md.pose === 'kick'){ const bx = f.plant[0] + 30, by = f.plant[1] - 12; swoosh(g, T, f.toe[0] + 10, f.toe[1] + 6, 26, 2.2, 3.9); trail(g, T, bx, by, 15, -2.9); ball(g, bx, by, 15, 0.4); }
-      else { const bx = f.toe[0] + 14, by = f.toe[1] - 10; swoosh(g, T, f.toe[0] - 16, f.toe[1] + 10, 30, md.pose === 'bicycle' ? 3.6 : 2.4, md.pose === 'bicycle' ? 5.4 : 4.2); trail(g, T, bx, by, 16, md.pose === 'bicycle' ? 2.3 : -2.7); ball(g, bx, by, 16, 0.6); }
-    }
-    g.restore();
-    shield(g); g.lineWidth = 6; g.strokeStyle = lin(g, 0, -120, 0, 120, [T.rim[0], T.rim[1], T.rim[0], T.rim[1]]); g.stroke();
-    if(small) return;
-    g.save(); g.fillStyle = lin(g, 0, 62, 0, 100, ['#1A1206', '#08060A']);   // ribbon with the name
-    g.beginPath(); g.moveTo(-112, 66); g.lineTo(112, 66); g.lineTo(104, 82); g.lineTo(112, 98); g.lineTo(-112, 98); g.lineTo(-104, 82); g.closePath(); g.fill();
-    g.lineWidth = 3; g.strokeStyle = T.rim[0]; g.stroke(); g.restore();
-    const px = 36; g.font = FONT('900 italic', px); const w = g.measureText(md.name).width, sc = Math.min(1, 190 / w);
-    g.save(); g.translate(0, 82); g.scale(sc, sc); g.textAlign = 'left';
-    word(g, 0, 1, px, '', md.name, '#FFFFFF', lin(g, 0, -18, 0, 18, ['#FFFFFF', md.ac, md.ac]), '#120A02'); g.restore();
-  }
-
-  function main(g, T, small){   // drawn in the unit box (≈ 480 × 360): star + rocket ball + "BlasOff" + tagline
-    g.save(); g.translate(0, -36);
-    g.save(); star(g, 150, 84); g.fillStyle = rad(g, 0, 0, 160, [T.space[0], T.space[1]]); g.fill(); g.clip();
-    rays(g, T, 180, 26); sparks(g, T, 30, 130, 2);
-    g.fillStyle = '#FFFFFF'; for(let i = 0; i < 14; i++){ const a = i * 2.1, d = 30 + (i * 53 % 90); g.globalAlpha = 0.6; g.beginPath(); g.arc(Math.cos(a) * d, Math.sin(a) * d, 1.4, 0, 7); g.fill(); } g.globalAlpha = 1;
-    g.restore();
-    g.save(); g.shadowColor = T.glow; g.shadowBlur = 30 * SC; g.lineJoin = 'round'; g.lineWidth = 12;
-    g.strokeStyle = lin(g, -150, -150, 150, 150, [T.rim[0], T.glow, T.rim[1]]); star(g, 150, 84); g.stroke(); g.restore();
-    g.lineWidth = 4; g.strokeStyle = T.rim[0]; star(g, 150, 84); g.stroke();
-    // twin rocket flames left + right (from the sheet)
-    [[-1], [1]].forEach(([s]) => { g.save(); g.translate(s * 118, 60); g.rotate(s * 0.35); trail(g, T, 0, 0, 16, Math.PI / 2); g.restore(); });
-    rocket(g, T, 24, -42, 44, -0.95);
-    g.restore();
-    const ink = '#120A02', chrome = lin(g, 0, 70, 0, 128, ['#FFFFFF', '#E3E7EF', '#9AA3B5', '#F4F6FA']), fire = lin(g, 0, 70, 0, 128, [T.fire[0], T.fire[1], T.fire[2]]);
-    g.save(); g.shadowColor = T.glow; g.shadowBlur = 18 * SC; word(g, 0, 102, 84, 'Blas', 'Off', chrome, fire, ink); g.restore();
-    word(g, 0, 102, 84, 'Blas', 'Off', chrome, fire, ink);
-    if(small) return;   // tagline only where it can be read
-    const tag = 'THE ULTIMATE KICK + GOAL GAME'; g.font = FONT('800', 20); const tw = g.measureText(tag).width + 34;
-    g.fillStyle = 'rgba(8,6,10,.85)'; g.beginPath(); g.moveTo(-tw / 2, 138); g.lineTo(tw / 2, 138); g.lineTo(tw / 2 - 10, 162); g.lineTo(-tw / 2 + 10, 162); g.closePath(); g.fill();
-    g.lineWidth = 2; g.strokeStyle = T.glow; g.stroke();
-    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#FFFFFF'; g.fillText(tag, 0, 151); g.textAlign = 'start';
-  }
-
-  const BOX = {main: [520, 430], match: [272, 300], futsal: [272, 300], street: [272, 300], trick: [272, 300], cup: [272, 300]};   // room for the glow
-  function draw(g, kind, x, y, px, look, css){   // px = width in canvas pixels · css = width on screen (size steps follow it; default px)
-    const T = THEME[look] || THEME.classic, [bw] = BOX[kind] || BOX.match, s = px / bw; SC = s;
-    g.save(); g.translate(x, y); g.scale(s, s); g.textAlign = 'start';
-    const cw = css || px; kind === 'main' ? main(g, T, cw < 260) : badge(g, T, MODE[kind] || MODE.match, cw < 110);
-    g.restore();
-  }
-  function pic(kind, look, px, css){
-    css = css || px; const key = kind + ':' + (look || 'classic') + ':' + px + ':' + css; if(cache[key]) return cache[key];
-    const [bw, bh0] = BOX[kind] || BOX.match, bh = kind === 'main' && css < 260 ? 370 : bh0, c = document.createElement('canvas'); c.width = px; c.height = Math.round(px * bh / bw);   // small main: no tagline → a shorter picture
-    draw(c.getContext('2d'), kind, px / 2, c.height / 2 + (kind === 'main' ? px * (css < 260 ? 0.025 : 0.04) : 0), px, look, css);
-    return (cache[key] = c);
-  }
-  const url = (kind, look, px, css) => pic(kind, look, px, css).toDataURL('image/png');
-  return {draw, pic, url, MODE, THEME, BOX};
-})();
-window.BlasLogo = BlasLogo;
 </script>
 <script>
 const WEBAPP_URL = ''+__SP("webAppUrl")+'';
@@ -2121,12 +2003,12 @@ const LOOKS = {
 };
 const LOOK_KEYS = Object.keys(LOOKS);
 const ADS = ['SlaBrall', 'Turbo Trail', 'Snakize', 'Pinball', 'BeatCorner', 'WisDeck', 'Soul Bopper', 'GeoScout', 'Brawl Buddies', 'Artifactory'];
-const ACTIONS = [['up', '⬆️ Up'], ['down', '⬇️ Down'], ['left', '⬅️ Left'], ['right', '➡️ Right'], ['pass', '⚽ Pass / tackle'], ['shoot', '💥 Shoot / slide'], ['trick', '🌀 Trick / call'], ['jump', '🦘 Jump (2× = flick up)'], ['sprint', '💨 Sprint'], ['sw', '🔄 Switch player'], ['shoutL', '📣 Shout ⬅️'], ['shoutR', '📣 Shout ➡️']];
+const ACTIONS = [['up', '⬆️ Up'], ['down', '⬇️ Down'], ['left', '⬅️ Left'], ['right', '➡️ Right'], ['pass', '⚽ Pass / tackle'], ['thru', '🏃 Pass ahead (hold = over the top)'], ['shoot', '💥 Shoot / slide'], ['trick', '🌀 Trick / call'], ['jump', '🦘 Jump (2× = flick up)'], ['sprint', '💨 Sprint'], ['sw', '🔄 Switch player'], ['shoutL', '📣 Shout ⬅️'], ['shoutR', '📣 Shout ➡️']];
 const DEFAULT_KEYS = [
-  {up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', pass: 'KeyJ', shoot: 'KeyK', trick: 'KeyL', jump: 'Space', sprint: 'ShiftLeft', sw: 'KeyC', shoutL: 'KeyQ', shoutR: 'KeyE'},
-  {up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', pass: 'Numpad1', shoot: 'Numpad2', trick: 'Numpad3', jump: 'Numpad0', sprint: 'ShiftRight', sw: 'NumpadEnter', shoutL: 'Numpad4', shoutR: 'Numpad6'}
+  {up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD', pass: 'KeyJ', thru: 'KeyU', shoot: 'KeyK', trick: 'KeyL', jump: 'Space', sprint: 'ShiftLeft', sw: 'KeyC', shoutL: 'KeyQ', shoutR: 'KeyE'},
+  {up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', pass: 'Numpad1', thru: 'Numpad5', shoot: 'Numpad2', trick: 'Numpad3', jump: 'Numpad0', sprint: 'ShiftRight', sw: 'NumpadEnter', shoutL: 'Numpad4', shoutR: 'Numpad6'}
 ];
-const LOGIC = {pass: 'J', shoot: 'K', trick: 'L', jump: 'SP'};
+const LOGIC = {pass: 'J', thru: 'T', shoot: 'K', trick: 'L', jump: 'SP'};   /* 🏃 bo-pass: T = pass ahead */
 
 /* 🗂️ MODE GROUPS (mg-1) + 🃏 mode cards (R1 = ⚽ Soccer 4v4 + 7v7; the 🔜 box shows what the next rounds add) */
 const MODE_GROUPS = [
@@ -3039,4 +2921,4 @@ const ANN = (function(){
 <script src="inc/BlasOffMotion.js"></script>   <!-- ⚽ bo-cover: 🎬 cover + 🧾 ONE setup page + 🏁 shared card (born split — blasoff-build/frame.js) -->
 </body>
 </html>
-<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a+bo-5b+bo-pz+bo-5c+bo-5d+r4a+r4b+r4c+r4d+bo-7+bo-7b+bo-8+bo-9a+bo-9b+bo-9c+bo-9c2+bo-10+bo-10b+an-1+an-2+bo-cover+s-bo) END OF BlasOff.html -->
+<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a+bo-5b+bo-pz+bo-5c+bo-5d+r4a+r4b+r4c+r4d+bo-7+bo-7b+bo-8+bo-9a+bo-9b+bo-9c+bo-9c2+bo-10+bo-10b+an-1+an-2+bo-cover+s-bo+bo-pass) END OF BlasOff.html -->
