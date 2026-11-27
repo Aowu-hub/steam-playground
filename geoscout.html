@@ -356,7 +356,7 @@ const GS = (function(){
   const MODES = {
     scale: {icon: '⚖️', name: 'Scale', sub: 'More, less or the same? Balance it!'},
     count: {icon: '🧱', name: 'Count', sub: 'Snap and split blocks to make the number'},
-    shape: {icon: '🔷', name: 'Shape builder', sub: 'Squares, rectangles, steps — corners and area'},
+    shape: {icon: '🔷', name: 'Shape builder', sub: 'L · T · ✚ · steps · pyramids — corners + way round'},
     tens: {icon: '🔟', name: 'Tens tower', sub: 'Ten ones snap into a ten-tower'},
     next: {icon: '🧩', name: 'What comes next', sub: 'Patterns, steps, odd and even'},
     frac: {icon: '🍕', name: 'Fractions', sub: 'Halves, thirds, quarters — which is bigger?'},
@@ -480,9 +480,19 @@ const GS = (function(){
   const GRID = [6, 8, 8, 10, 10, 12];
   function stairCorners(n){ return 2 * n + 2; }
   function makeShape(Li, r, round){
-    const Gn = GRID[Li], kinds = Li === 0 ? ['rect', 'rect', 'quiz'] : Li === 1 ? ['rect', 'quiz', 'steps', 'rect'] : Li === 2 ? ['area', 'steps', 'quiz', 'rect'] : Li === 3 ? ['perim', 'area', 'quiz', 'steps'] : ['both', 'perim', 'quiz', 'area', 'steps'];
+    const Gn = GRID[Li], full = fullFence(Li), kinds = [['rect', 'copy', 'quiz', 'copy'], ['copy', 'rect', 'quiz', 'steps', 'copy', 'wquiz'], ['copy', 'area', 'wquiz', 'fence', 'copy', 'quiz'], ['fence', 'copy', 'cmp', 'perim', 'most', 'wquiz'], ['both', 'most', 'cmp', 'copy', 'side', 'fence'], ['grow', 'most', 'side', 'copy', 'both', 'cmp']][Li];   /* 🔷 gs2-g4 */
     const kind = kinds[round % kinds.length], sMax = [3, 5, 6, 7, 8, 10][Li], sMin = Li === 0 ? 2 : 2;
     let w = ri(r, sMin, sMax), h = ri(r, sMin, sMax); if(Li === 0 && r() < 0.5) h = w;
+    /* 🔷 gs2-g4: way round of ANY shape · which is longer · missing side · blocks / corners of the new shapes */
+    if(kind === 'wquiz' || (kind === 'quiz' && Li >= 1 && r() < 0.6)){ const S = bankShape(r, Li, Gn), ask = kind === 'wquiz' ? 'perimeter' : pick(r, Li >= 2 ? ['blocks', 'corners', 'corners'] : ['blocks', 'corners']), F = fenceOf(S.cells);
+      const ans = ask === 'perimeter' ? F.outer + (full ? F.inner : 0) : ask === 'corners' ? cornersOf(S.cells) : S.cells.length;
+      const q = ask === 'perimeter' ? 'How long is the way round of ' + S.name + (full && F.inner ? ' — outside AND inside?' : '?') : ask === 'corners' ? 'How many corners does ' + S.name + ' have?' : 'How many blocks make ' + S.name + '?';
+      return {kind: 'choice', ck: 'shape', ask, q, full, vis: {type: 'grid', cells: S.cells, n: Gn, down: true}, options: numOptions(r, ans, 4), answer: ans, par: 0}; }
+    if(kind === 'cmp'){ let A, B, guard = 0; do { A = r() < 0.5 ? {cells: rectCells(ri(r, 2, 4), ri(r, 2, 4))} : bankShape(r, Li, Gn); B = bankShape(r, Li, Gn); if(r() < 0.35){ const want = wayRound(A.cells, full); for(let g2 = 0; g2 < 40 && wayRound(B.cells, full) !== want; g2++) B = r() < 0.5 ? bankShape(r, Li, Gn) : {cells: rectCells(ri(r, 1, 6), ri(r, 1, 6))}; } } while(guard++ < 20 && A.cells.length + B.cells.length > 30);
+      const pa = wayRound(A.cells, full), pb = wayRound(B.cells, full), ans = pa > pb ? 'A' : pa < pb ? 'B' : 'Same';
+      return {kind: 'choice', ck: 'shape', ask: 'cmp', full, q: 'Which shape has the LONGER way round?', vis: {type: 'grid2', a: A.cells, b: B.cells, pa, pb}, options: ['A', 'Same', 'B'], answer: ans, par: 0}; }
+    if(kind === 'side'){ const w0 = ri(r, 2, 8), h0 = ri(r, 2, 6), P = 2 * (w0 + h0);
+      return {kind: 'choice', ck: 'shape', ask: 'side', q: 'The way round is ' + P + '. How long is the ❓ side?', vis: {type: 'side', w: w0, h: h0, P}, options: numOptions(r, h0, 4), answer: h0, par: 0}; }
     if(kind === 'quiz'){
       const steps = Li >= 1 && r() < 0.4, n = ri(r, 2, Math.min(5, Gn - 1)), ask = pick(r, steps ? ['corners', 'blocks'] : Li >= 3 ? ['blocks', 'perimeter', 'perimeter', 'corners'] : ['blocks', 'blocks', 'corners']);
       const cells = steps ? stairCells(n) : rectCells(w, h), area = cells.length, per = steps ? 4 * n : 2 * (w + h);
@@ -490,10 +500,14 @@ const GS = (function(){
       const q = ask === 'corners' ? 'How many corners does this shape have?' : ask === 'blocks' ? 'How many blocks make this shape?' : 'How long is the way round (perimeter)?';
       return {kind: 'choice', ck: 'shape', q, vis: {type: 'grid', cells, n: Gn}, options: numOptions(r, ans, 4), answer: ans, par: 0};
     }
-    const it = {kind: 'grid', ck: kind, n: Gn, cells: [], slack: [0, 4]};
+    const it = {kind: 'grid', ck: kind, n: Gn, cells: [], slack: [0, 4], full};   /* 🕳️ gs2-g4 Q13 C */
     if(kind === 'rect'){ it.w = w; it.h = h; it.par = w * h; it.goal = w === h ? 'a ' + w + ' × ' + w + ' square' : 'a ' + w + ' × ' + h + ' rectangle'; }
     else if(kind === 'area'){ it.area = w * h; it.par = w * h; it.goal = 'a rectangle of ' + it.area + ' blocks'; }
     else if(kind === 'steps'){ const n = ri(r, 3, Math.min(Li + 3, Gn - 1)); it.steps = n; it.par = n * (n + 1) / 2; it.goal = 'steps ' + Array.from({length: n}, (_, i) => i + 1).join(' ') + ' (' + it.par + ' blocks)'; }
+    else if(kind === 'copy'){ const S = bankShape(r, Li, Gn); it.bp = S.cells; it.shape = S.k; it.par = S.cells.length; it.goal = S.name + ' (' + S.cells.length + ' blocks)'; it.turned = Li >= 3; }   /* 🔷 gs2-g4 */
+    else if(kind === 'fence'){ const S = r() < 0.7 ? bankShape(r, Li, Gn) : {cells: rectCells(ri(r, 1, 2), ri(r, 3, Math.min(7, Gn)))}; it.sol = S.cells; it.area = S.cells.length; it.perim = wayRound(S.cells, full); it.par = it.area; it.goal = it.area + ' blocks with a way round of ' + it.perim; }
+    else if(kind === 'most'){ const s2 = ri(r, 4, Math.min(Gn, 8)), P = 2 * s2; it.perim = P; it.par = mostFor(P); it.sol = rectCells(Math.floor(s2 / 2), Math.ceil(s2 / 2)); it.goal = 'the MOST blocks inside a fence of ' + P; }
+    else if(kind === 'grow'){ const a = ri(r, 3, 5), b = ri(r, 3, 5), L = BANK.L.make(a, b).map(c => [c[0] + 1, c[1] + 1]); it.lock = L; it.cells = L.map(c => c.slice()); it.perim = fenceOf(L).outer; it.area = L.length + 1; it.sol = L.concat([[2, a - 1]]); it.par = 1; it.goal = 'ONE more block — the way round stays ' + it.perim; }
     else if(kind === 'perim'){ it.perim = 2 * (w + h); let best = 1e9; for(let a = 1; a <= Gn; a++){ const b = it.perim / 2 - a; if(b >= 1 && b <= Gn) best = Math.min(best, a * b); } it.par = best; it.goal = 'a rectangle with a way round of ' + it.perim; }
     else { it.area = w * h; it.perim = 2 * (w + h); it.par = w * h; it.goal = 'a rectangle: ' + it.area + ' blocks, way round ' + it.perim; }
     return it;
@@ -518,23 +532,79 @@ const GS = (function(){
     if(it.ck === 'area') return !!s.rect && s.area === it.area;
     if(it.ck === 'steps') return s.steps === it.steps;
     if(it.ck === 'perim') return !!s.rect && s.perim === it.perim;
+    if(it.ck === 'copy') return sameShape(it.cells, it.bp);   /* 🔷 gs2-g4: any turn / flip */
+    if(it.ck === 'fence') return piecesOf(it.cells) === 1 && it.cells.length === it.area && wayRound(it.cells, it.full) === it.perim;
+    if(it.ck === 'most') return piecesOf(it.cells) === 1 && wayRound(it.cells, it.full) === it.perim && it.cells.length === it.par;
+    if(it.ck === 'grow') return it.cells.length === it.area && it.lock.every(l => it.cells.some(c => c[0] === l[0] && c[1] === l[1])) && piecesOf(it.cells) === 1 && wayRound(it.cells, it.full) === it.perim;
     return !!s.rect && s.area === it.area && s.perim === it.perim;
   }
   function gridToggle(M, x, y, on){
     const it = M.item; if(!it || it.kind !== 'grid' || it.done || x < 0 || y < 0 || x >= it.n || y >= it.n) return null;
     const i = it.cells.findIndex(c => c[0] === x && c[1] === y), has = i >= 0;
     if(on === true && has) return {same: true}; if(on === false && !has) return {same: true};
+    if(has && it.lock && it.lock.some(l => l[0] === x && l[1] === y)) return {same: true, locked: true};   /* 🔷 gs2-g4 ➕ the start shape stays */
     if(has) it.cells.splice(i, 1); else it.cells.push([x, y]); it.moves++;
     if(gridDone(it) && !subm(M)){ it.done = it.ok = true; } return {on: !has, done: it.done};
   }
   // a solution for tests / hints: the cells of one right shape
   function gridSolution(it){
     if(it.ck === 'rect') return rectCells(it.w, it.h);
+    if(it.ck === 'copy') return norm(it.bp);
+    if(it.sol) return it.sol.map(c => c.slice());   /* 🔷 gs2-g4 */
     if(it.ck === 'steps') return stairCells(it.steps).map(c => [c[0], it.n - 1 - c[1]]);
     if(it.ck === 'perim'){ for(let a = 1; a <= it.n; a++){ const b = it.perim / 2 - a; if(b >= 1 && b <= it.n && a * b === it.par) return rectCells(a, b); } }
     for(let a = 1; a <= it.n; a++) if(it.area % a === 0 && it.area / a <= it.n && (it.ck !== 'both' || 2 * (a + it.area / a) === it.perim)) return rectCells(a, it.area / a);
     return [];
   }
+  /* 🔷 SHAPES START (gs2-g4) — Aowu: "expand Way round · add different shapes, not just square / rectangle".
+     Cells here are SCREEN cells [x, y] (y goes DOWN). A copy round is right in ANY turn or flip. The way round = the OUTSIDE fence (🐜 walks it). */
+  const BANK = {
+    L:       {name: 'an L shape',       size: (r, m) => [ri(r, 3, m), ri(r, 2, m - 1)], make: (a, b) => { const o = []; for(let y = 0; y < a; y++) o.push([0, y]); for(let x = 1; x < b; x++) o.push([x, a - 1]); return o; }},
+    T:       {name: 'a T shape',        size: (r, m) => [ri(r, 1, Math.max(1, Math.floor((m - 1) / 2))), ri(r, 3, m)], make: (a, b) => { const o = []; for(let x = 0; x < 2 * a + 1; x++) o.push([x, 0]); for(let y = 1; y < b; y++) o.push([a, y]); return o; }},
+    U:       {name: 'a U shape',        size: (r, m) => [ri(r, 3, m), ri(r, 3, m)], make: (w, h) => { const o = []; for(let y = 0; y < h; y++){ o.push([0, y]); o.push([w - 1, y]); } for(let x = 1; x < w - 1; x++) o.push([x, h - 1]); return o; }},
+    plus:    {name: 'a plus ✚',         size: (r, m) => [ri(r, 1, Math.max(1, Math.floor((m - 1) / 2)))], make: a => { const o = []; for(let i = 0; i <= 2 * a; i++){ o.push([i, a]); if(i !== a) o.push([a, i]); } return o; }},
+    steps:   {name: 'steps',            size: (r, m) => [ri(r, 3, Math.min(m, 6))], make: n => { const o = []; for(let x = 0; x < n; x++) for(let k = 0; k <= x; k++) o.push([x, n - 1 - k]); return o; }},
+    pyramid: {name: 'a pyramid',        size: (r, m) => [ri(r, 2, Math.max(2, Math.min(4, Math.floor((m + 1) / 2))))], make: n => { const o = []; for(let k = 0; k < n; k++) for(let x = n - 1 - k; x <= n - 1 + k; x++) o.push([x, k]); return o; }},
+    hollow:  {name: 'a hollow square',  size: (r, m) => { const a = ri(r, 3, Math.min(m, 6)); return [a, r() < 0.5 ? a : ri(r, 3, Math.min(m, 6))]; }, make: (w, h) => { const o = []; for(let y = 0; y < h; y++) for(let x = 0; x < w; x++) if(x === 0 || y === 0 || x === w - 1 || y === h - 1) o.push([x, y]); return o; }},
+    zig:     {name: 'a zigzag',         size: (r, m) => [ri(r, 2, Math.max(2, Math.floor((m + 1) / 2))), ri(r, 2, m)], make: (a, b) => { const o = []; for(let x = 0; x < a; x++) o.push([x, 0]); for(let y = 1; y < b; y++) o.push([a - 1, y]); for(let x = a; x < 2 * a - 1; x++) o.push([x, b - 1]); return o; }}
+  };
+  const BANK_LV = [['L', 'steps', 'T'], ['L', 'T', 'U', 'steps', 'pyramid'], ['T', 'U', 'plus', 'pyramid', 'hollow', 'L'], ['plus', 'hollow', 'zig', 'U', 'T', 'pyramid'], Object.keys(BANK), Object.keys(BANK)];
+  function bankShape(r, Li, n, only){ const k = only || pick(r, BANK_LV[Li]), B = BANK[k], m = Math.max(3, Math.min(n - 1, [4, 5, 6, 7, 8, 9][Li])); const cells = norm(B.make.apply(null, B.size(r, m))); return {k, name: B.name, cells}; }
+  function norm(cells){ if(!cells.length) return []; const x0 = Math.min(...cells.map(c => c[0])), y0 = Math.min(...cells.map(c => c[1])); return cells.map(c => [c[0] - x0, c[1] - y0]); }
+  function keyOf(cells){ return norm(cells).map(c => c[0] + ',' + c[1]).sort().join(';'); }
+  function turns(cells){ const out = []; let c = cells; for(let i = 0; i < 4; i++){ c = c.map(([x, y]) => [-y, x]); out.push(c, c.map(([x, y]) => [-x, y])); } return out; }
+  function sameShape(a, b){ if(!a.length || a.length !== b.length) return false; const k = keyOf(a); return turns(b).some(t => keyOf(t) === k); }
+  function piecesOf(cells){ const set = new Set(cells.map(c => c[0] + ',' + c[1])), seen = new Set(); let n = 0;
+    cells.forEach(c => { const k0 = c[0] + ',' + c[1]; if(seen.has(k0)) return; n++; const st = [c]; seen.add(k0);
+      while(st.length){ const [x, y] = st.pop(); [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(d => { const k = (x + d[0]) + ',' + (y + d[1]); if(set.has(k) && !seen.has(k)){ seen.add(k); st.push([x + d[0], y + d[1]]); } }); } });
+    return n; }
+  // 🐜 the fence: outer = edges that touch the OUTSIDE (the way round) · inner = edges round a hole · path = the outer edges in walking order (clockwise)
+  function fenceOf(cells){ if(!cells.length) return {outer: 0, inner: 0, path: []};
+    const set = new Set(cells.map(c => c[0] + ',' + c[1])), xs = cells.map(c => c[0]), ys = cells.map(c => c[1]), x0 = Math.min(...xs) - 1, x1 = Math.max(...xs) + 1, y0 = Math.min(...ys) - 1, y1 = Math.max(...ys) + 1;
+    const out = new Set([x0 + ',' + y0]), st = [[x0, y0]];
+    while(st.length){ const [x, y] = st.pop(); [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(d => { const nx = x + d[0], ny = y + d[1], k = nx + ',' + ny; if(nx < x0 || nx > x1 || ny < y0 || ny > y1 || set.has(k) || out.has(k)) return; out.add(k); st.push([nx, ny]); }); }
+    const E = [], I = [];
+    cells.forEach(([x, y]) => [[0, -1, [x, y], [x + 1, y]], [1, 0, [x + 1, y], [x + 1, y + 1]], [0, 1, [x + 1, y + 1], [x, y + 1]], [-1, 0, [x, y + 1], [x, y]]].forEach(([dx, dy, a, b]) => {
+      const k = (x + dx) + ',' + (y + dy); if(set.has(k)) return; (out.has(k) ? E : I).push([a, b]); }));
+    return {outer: E.length, inner: I.length, path: chainOf(E), ipath: chainOf(I)}; }
+  function chainOf(E){ const from = {}; E.forEach((e, i) => { const k = e[0][0] + ',' + e[0][1]; (from[k] = from[k] || []).push(i); });
+    const used = new Set(), path = [];
+    while(used.size < E.length){ let i = E.map((e, j) => j).filter(j => !used.has(j)).sort((p, q) => E[p][0][1] - E[q][0][1] || E[p][0][0] - E[q][0][0])[0];
+      while(i != null && !used.has(i)){ used.add(i); path.push(E[i]); const e = E[i], dx = e[1][0] - e[0][0], dy = e[1][1] - e[0][1], nx = (from[e[1][0] + ',' + e[1][1]] || []).filter(j => !used.has(j));
+        nx.sort((p, q) => { const t = j => { const f = E[j], ex = f[1][0] - f[0][0], ey = f[1][1] - f[0][1]; return ex === -dy && ey === dx ? 0 : ex === dx && ey === dy ? 1 : 2; }; return t(p) - t(q); });   // a pinch: turn right first
+        i = nx[0]; } }
+    return path; }
+  function cornersOf(cells){ if(!cells.length) return 0; const set = new Set(cells.map(c => c[0] + ',' + c[1])), h = (x, y) => set.has(x + ',' + y) ? 1 : 0, xs = cells.map(c => c[0]), ys = cells.map(c => c[1]); let n = 0;
+    for(let vy = Math.min(...ys); vy <= Math.max(...ys) + 1; vy++) for(let vx = Math.min(...xs); vx <= Math.max(...xs) + 1; vx++){ const a = h(vx - 1, vy - 1), b = h(vx, vy - 1), c = h(vx - 1, vy), d = h(vx, vy), s = a + b + c + d;
+      if(s === 1 || s === 3) n++; else if(s === 2 && a === d) n += 2; }
+    return n; }
+  /* 🕳️ Q13 C (Aowu "go" 10:36): the way round = the OUTSIDE fence up to ⚡ Hard; from 🌋 Extreme a hole's fence counts too (item.full) */
+  function fullFence(Li){ return Li >= 4; }
+  function wayRound(cells, full){ const F = fenceOf(cells); return F.outer + (full ? F.inner : 0); }
+  function wayKind(it){ return !!it && (['perim', 'both', 'fence', 'most', 'grow'].indexOf(it.ck) >= 0 || it.ask === 'perimeter' || it.ask === 'cmp' || it.ask === 'side'); }
+  function mostFor(P){ const s = P / 2; return Math.floor(s / 2) * Math.ceil(s / 2); }
+  function shapeName(cells){ const s = shapeOf(cells); if(s.rect) return s.rect[0] === s.rect[1] ? 'a square' : 'a rectangle'; for(const k in BANK){ for(let a = 1; a <= 9; a++) for(let b = 1; b <= 9; b++){ let c; try{ c = BANK[k].make(a, b); }catch(e){ continue; } if(c.length === cells.length && sameShape(cells, c)) return BANK[k].name; } } return ''; }
+  /* 🔷 SHAPES END (gs2-g4) */
   function numOptions(r, ans, k, step){
     const out = [ans], d = step || Math.max(1, Math.round(ans * 0.15)); let guard = 0;
     while(out.length < k && guard++ < 80){ const v = ans + (ri(r, 1, 3) * d) * (r() < 0.5 ? -1 : 1) + (guard > 30 ? ri(r, -3, 3) : 0); if(v > 0 && out.indexOf(v) < 0) out.push(v); }
@@ -878,7 +948,7 @@ const GS = (function(){
     const it = M.item; if(!it || it.done) return '';
     if(it.kind === 'compare') return 'Count the blocks on each side — which side is heavier?';
     if(it.kind === 'choice') return it.ck === 'next' ? 'How much does it change each time?' : it.ck === 'frac' ? 'Count the pieces: how many are coloured, how many in all?' : 'Count slowly, one at a time.';
-    if(it.kind === 'grid') return 'Tap squares to fill them. ' + (it.ck === 'perim' ? 'The way round = all the outside edges.' : 'Fill rows of the same length.');
+    if(it.kind === 'grid') return 'Tap squares to fill them. ' + (it.bp ? 'Copy the 📐 card — any turn is fine.' : wayKind(it) ? 'The way round = every outside edge — the gold fence counts them.' : 'Fill rows of the same length.');
     if(it.kind === 'tens' && it.start){ const D = Math.abs(it.target - it.start), d = digits(D); return (it.target < it.start ? 'Take away ' : 'Add ') + [d[0] ? d[0] + ' hundred' + (d[0] > 1 ? 's' : '') : '', d[1] ? d[1] + ' ten' + (d[1] > 1 ? 's' : '') : '', d[2] ? d[2] + ' one' + (d[2] > 1 ? 's' : '') : ''].filter(Boolean).join(', ') + ': ' + it.start + (it.target < it.start ? ' − ' : ' + ') + D + ' = ' + it.target + (it.target < it.start && d[2] > it.start % 10 ? ' (not enough ones? break a ten into 10 ones!)' : ''); }   /* ➖ gs2-g3 */
     if(it.kind === 'tens') return it.target + ' = ' + (it.target >= 100 ? Math.floor(it.target / 100) + ' hundreds, ' : '') + Math.floor(it.target % 100 / 10) + ' tens and ' + it.target % 10 + ' ones.';
     if(it.kind === 'colour') return 'Cut into ' + it.frac.d + ' teams of ' + (it.len / it.frac.d) + ' — colour ' + it.frac.n + ' team' + (it.frac.n > 1 ? 's' : '') + '.';
@@ -891,7 +961,7 @@ const GS = (function(){
     subm, penFor, readyOf, submit, optionsOf, optionsLeft,   /* ✅ gs2-g1 */
     makeCompare, makeBalance, makeAvatar, makeScale, makeCount, newGame, deal, scaleAnswer, scalePut, scaleTake, balanceState, cSnap, cSplit, cCopy, cShare, canOp,
     finishRound, advance, finish, starsFor, starsOfRound, speedPart, playPlan, hintFor, isQuiz,
-    digits, GRID, makeShape, shapeOf, gridDone, gridToggle, gridSolution, rectCells, stairCells, stairCorners, TENS_R, tensUnits, minPieces, makeTens, tensAdd, tensWay, tensStep, tensPlan, tensBreak, takeAmount, partsOf, pcOf, autoBreak, makeNext, gcd, fstr, FR_D, makeFrac, colourToggle,
+    digits, GRID, makeShape, shapeOf, gridDone, gridToggle, gridSolution, BANK, bankShape, norm, sameShape, piecesOf, fenceOf, chainOf, cornersOf, wayRound, fullFence, wayKind, mostFor, shapeName, rectCells, stairCells, stairCorners, TENS_R, tensUnits, minPieces, makeTens, tensAdd, tensWay, tensStep, tensPlan, tensBreak, takeAmount, partsOf, pcOf, autoBreak, makeNext, gcd, fstr, FR_D, makeFrac, colourToggle,
     CHARS, charName, CHAPTERS, storyPlan, subsetPlan, journeyItem, castStep,
     WOB, minCount, wobblePlan, makeWobble, wobAdd, wobPop, answerChoice, BAT, newBattle, battleDeal, buildValue, allBuilds, scoreFor, robotBuild, battleLock, battleJudge};
 })();
@@ -1084,7 +1154,7 @@ function openCover(){
 }
 function howLines(mode){
   const R2 = {
-    shape: ['🔷 Tap squares on the grid to fill them and build the shape at the top (drag to paint many).', '📏 Area = how many blocks. Way round (perimeter) = all the outside edges. A rectangle has 4 corners.', '🪜 Steps 1 2 3 = a staircase standing on the floor.', '⌨️ arrows move · Space fills / empties.'],
+    shape: ['🔷 Tap squares on the grid to fill them and build the shape at the top (drag to paint many).', '📐 Copy the blue card — L, T, U, ✚, steps, pyramids … any turn is fine.', '🐜 Way round = every OUTSIDE edge — the gold fence; the ant counts it for you after ✅ Submit.', '📏 Area = how many blocks. Same blocks can have a longer or shorter way round!', '⌨️ arrows move · Space fills / empties.'],
     tens: ['🔟 Build the number with +1 (ones), +10 (ten-towers) and +100 (hundred slabs).', '✨ When you have 10 ones they snap into one ten-tower by themselves!', '🔢 Quiz rounds: what number do the blocks make? how many tens?', '⌨️ 1 = +1 · T = +10 · H = +100 · Backspace = −1.'],
     next: ['🧩 Look at the pattern — how much does it grow (or shrink) each time? Pick the number for the ❓.', '🍪 Odd or even: can the blocks all pair up? Even = yes, odd = one is left over.', '⌨️ 1–4 pick an answer.'],
     frac: ['🍕 Colour the right part of the bar: ½ = 1 of 2 equal teams, ¼ = 1 of 4 …', '⚖️ Which pizza piece is bigger? Tap &lt; = &gt; (the left one is less / the same / more).', '🔢 Name it: how much of the bar is coloured?', '⌨️ ← → + Space colour · &lt; = &gt; compare · 1–4 answer.'],
@@ -1113,7 +1183,7 @@ function startGame(){ setTimeout(cheerMount, 0); /* 📣 cs-4b */ if(ScoutCover)
   G = {M, id: ++GID, theme: SET.theme, skin: SET.skin, t0: performance.now(), roundT0: 0, phase: 'play', fx: [], sel: 0, splitK: 1, hist: [], drag: null, pos: {}, tilt: 0, tiltLock: true, A: {gest: null, pose: null}, timeLeft: GS.LEVELS[SET.level].time || 0, hints: 0, lastTick: 0, msg: ''};
   showScreen('play'); $('h-time').classList.toggle('hidden', !G.timeLeft); sizeCanvas(); nextRound(true); startLoop();
 }
-function nextRound(first){
+function nextRound(first){ if(G) G.walk = null;   /* 🐜 gs2-g4: a new round never keeps the old walk */
   if(!G) return; const M = G.M; GS.deal(M); G.phase = 'play'; G.roundT0 = performance.now(); G.sel = 0; G.splitK = 1; G.hist = []; G.drag = null; G.tiltLock = M.item.kind === 'compare'; G.tilt = 0; G.answerShown = false;
   G.pos = {}; G.pick = null; G.revealTo = null; G.cntW = null; G.cut = null; NumberSkins.limbs(true, (M.seed + M.round * 7919) >>> 0); NumberSkins.hundreds(window.HUN_LOOK || 'plate'); G.takeA = G.tensBreak = null; G.tensHits = [];   /* 💯 ➖ gs2-g3 */ cutHide();   /* 🙆 ✂️ gs2-g2 */ hideRib(); hud(); renderBar(); renderGoal(); hideBanner();
   if(M.item.kind === 'avatar'){ banner('🧑 How many blocks do <b>you</b> weigh?', ''); setTimeout(hideBanner, 1600 * SPEED + 1); }
@@ -1127,7 +1197,7 @@ function renderGoal(){
   else if(it.kind === 'compare') gl.innerHTML = '⚖️ Left is … <b>&lt; = &gt;</b> … right?<small>' + (GS.LEVELS[G.M.level].hint ? 'Count the blocks on each pan' : 'Work out each side') + '</small>';
   else if(it.kind === 'avatar') gl.innerHTML = '🧑 Weigh <b>' + UI.esc(S.player) + '</b>!<small>Put blocks on the right pan until it balances</small>';
   else if(it.kind === 'balance') gl.innerHTML = '⚖️ Make it <b>balance</b><small>Drag blocks onto the right pan</small>';
-  else if(it.kind === 'grid') gl.innerHTML = '🔷 Build <b>' + UI.esc(it.goal) + '</b><small>Tap or drag on the grid to fill squares</small>';
+  else if(it.kind === 'grid') gl.innerHTML = '🔷 Build <b>' + UI.esc(it.goal) + '</b><small>' + (it.bp ? '📐 Copy the card' + (it.turned ? ' — it is turned! Any turn is fine' : ' · any turn is fine') : it.ck === 'grow' ? '➕ Tap ONE empty square · the gold fence counts the way round' : GS.wayKind(it) ? 'Tap or drag to fill squares · 🐜 the gold fence = the way round' : 'Tap or drag on the grid to fill squares') + '</small>';   /* 🔷 gs2-g4 */
   else if(it.kind === 'tens' && it.start) gl.innerHTML = '🔟 You have <b>' + it.start + '</b> · make <b>' + it.target + '</b><small>' + (it.target < it.start ? '➖ Take away ' + (it.units.length > 2 ? 'hundreds, ' : '') + (it.units.length > 1 ? 'towers and ones' : 'ones') + (GS.autoBreak(G.M.level) ? '' : ' · 🔨 break one when you run out') : '➕ Add ' + (it.units.length > 1 ? 'towers and ones' : 'ones')) + '</small>';   /* ➖ gs2-g3 */
   else if(it.kind === 'tens') gl.innerHTML = '🔟 Build <b>' + it.target + '</b><small>' + (it.units.length > 1 ? 'Use ones, tens' + (it.units.length > 2 ? ' and hundreds' : '') + ' — the fewest blocks' : '10 ones snap into a ten-tower') + '</small>';
   else if(it.kind === 'colour') gl.innerHTML = '🍕 Colour <b>' + it.frac.n + '/' + it.frac.d + '</b> of the bar<small>Tap blocks to colour them</small>';
@@ -1446,7 +1516,13 @@ function submitRound(){
 function whyText(it, r){ const k = it.kind;
   if(k === 'balance' || k === 'avatar') return r.R > r.L ? 'Too heavy — the right pan is down' : 'Not enough yet — the left pan is down';
   if(k === 'count') return 'No tower is <b>' + it.target + '</b> yet';
-  if(k === 'grid') return 'That is not ' + UI.esc(it.goal) + ' yet';
+  if(k === 'grid'){ const n = it.cells.length, P = GS.wayRound(it.cells, it.full), one = GS.piecesOf(it.cells) === 1;   /* 🔷 gs2-g4: say WHAT is off */
+    if(!one) return 'Keep it in ONE piece — ' + GS.piecesOf(it.cells) + ' pieces now';
+    if(it.ck === 'copy') return n !== it.bp.length ? n + ' blocks — the card has <b>' + it.bp.length + '</b>' : 'Same blocks, different shape — look at the 📐 card again';
+    if(it.ck === 'most') return P !== it.perim ? 'Way round ' + P + ' — the fence is <b>' + it.perim + '</b>' : 'Fence ' + P + ' ✓ · ' + n + ' blocks — can you fit <b>more</b>?';
+    if(it.ck === 'grow') return n !== it.area ? 'Add just ONE block' : 'Way round ' + P + ' — it must stay <b>' + it.perim + '</b>';
+    if(it.ck === 'fence') return n !== it.area ? n + ' blocks — we need <b>' + it.area + '</b>' : 'Way round ' + P + ' — we need <b>' + it.perim + '</b>';
+    return 'That is not ' + UI.esc(it.goal) + ' yet'; }
   if(k === 'tens') return 'That is ' + r.value + ' — we need <b>' + it.target + '</b>';
   if(k === 'colour') return r.count + ' coloured — we need <b>' + it.want + '</b>';
   if(k === 'wobble') return 'Height ' + r.height + ' — we need <b>' + it.target + '</b>';
@@ -1512,7 +1588,7 @@ async function roundDone(ok, r){
   else if(it.kind === 'avatar') msg = '⚖️ <b>' + UI.esc(S.player) + ' = ' + it.need + ' blocks!</b>';
   else if(it.kind === 'balance') msg = '⚖️ Balanced! <b>' + GS.total(it.left) + ' = ' + GS.total(it.right) + '</b>';
   else if(it.kind === 'choice') msg = ok ? '✅ Yes! <b>' + UI.esc(String(it.answer)) + '</b>' : '❌ It was <b>' + UI.esc(String(it.answer)) + '</b>';
-  else if(it.kind === 'grid') msg = '🔷 ' + UI.esc(it.goal) + '! ' + (rec.stars === 3 ? 'Perfect!' : rec.moves + ' taps (best ' + it.par + ')');
+  else if(it.kind === 'grid'){ const nm = it.bp ? GS.BANK[it.shape].name : GS.shapeName(it.cells); msg = '🔷 ' + (nm ? nm.charAt(0).toUpperCase() + nm.slice(1) : UI.esc(it.goal)) + '! <b>' + it.cells.length + ' blocks · ' + GS.cornersOf(it.cells) + ' corners · way round ' + GS.wayRound(it.cells, it.full) + '</b> ' + (rec.stars === 3 ? 'Perfect!' : rec.moves + ' taps (best ' + it.par + ')'); }   /* 🔷 gs2-g4 */
   else if(it.kind === 'tens' && it.start) msg = '🔟 <b>' + it.start + (it.target < it.start ? ' − ' : ' + ') + Math.abs(it.target - it.start) + ' = ' + it.target + '</b>! ' + (rec.stars === 3 ? 'The fewest taps!' : rec.moves + ' taps (best ' + it.par + ')');   /* ➖ gs2-g3 */
   else if(it.kind === 'tens') msg = '🔟 <b>' + it.target + '</b>! ' + (rec.stars === 3 ? 'The fewest blocks!' : rec.moves + ' taps (best ' + it.par + ')');
   else if(it.kind === 'colour') msg = '🍕 <b>' + it.want + ' of ' + it.len + ' = ' + it.frac.n + '/' + it.frac.d + '</b>!';
@@ -1524,6 +1600,7 @@ async function roundDone(ok, r){
   if(quiz && FX && SPEED){ renderBar(); await wait(ok ? 950 : 1950); if(!G || G.id !== id || G.M.item !== it || G.phase !== 'done') return; }
   cheerSay(ok ? (rec.stars === 3 ? 'big' : 'goal') : 'miss', 'round'); /* 📣 cs-4b */
   if(ok){ if(!quiz) SND.win(); avatarDo(rec.stars === 3 ? 'dance' : it.auto ? 'think' : 'cheer'); if(!it.auto) confetti(); } else { if(!quiz) SND.bad(); avatarDo('shrug'); }
+  if(GS.wayKind(it)) G.walk = {t: 0, it};   /* 🐜 gs2-g4: the ant walks the fence and counts */
   renderGoal(); rib(msg + '  ' + (rec.stars ? '⭐'.repeat(rec.stars) : '') + ' +' + rec.pts, ok ? 'good' : 'bad');   /* ✅ gs2-g1 Q2 B: a ribbon under the question, the board stays */
   renderBar();   /* ▶ Next glows — no timer (Aowu: "do NOT auto-next") */
 }
@@ -1589,7 +1666,7 @@ async function endGame(timeUp){
   if(res.cleared){ UISound.play('success'); confetti(true); } else UISound.play('pop');
   const lvl = M.level, timeSec = Math.round((performance.now() - G.t0) / 1000), themeTxt = modeLabel(M.mode) + ' · ' + THEMES[G.theme].icon + ' ' + THEMES[G.theme].name;
   const L = M.log;
-  const tip = res.cleared ? '' : ({scale: 'Count each pan slowly — say the numbers out loud.', count: 'Look for two numbers that make the target together.', shape: 'Fill rows of the same length — a rectangle has straight sides.', tens: 'Use the big blocks first: hundreds, then tens, then ones.', next: 'Say how much it changes each time: +2, +2, +2 …', frac: 'Cut the bar into equal teams first.', wobble: 'Use the biggest blocks first, then fix the top.'}[M.mode] || '');
+  const tip = res.cleared ? '' : ({scale: 'Count each pan slowly — say the numbers out loud.', count: 'Look for two numbers that make the target together.', shape: 'Count the outside edges one by one — the gold fence shows them.', tens: 'Use the big blocks first: hundreds, then tens, then ones.', next: 'Say how much it changes each time: +2, +2, +2 …', frac: 'Cut the bar into equal teams first.', wobble: 'Use the biggest blocks first, then fix the top.'}[M.mode] || '');
   b3Card({win: res.cleared, icon: res.cleared ? '🏆' : timeUp ? '⏱️' : M.failed ? '💀' : '🔢', title: res.cleared ? 'Great scouting!' : timeUp ? 'Time is up!' : M.failed ? 'One mistake on 💀 Hardcore' : 'Nice try!',   /* 🧱 b3w3: the shared 🏁 card */
     sub: tip ? '💡 ' + tip : '', stars: res.stars || 0, score: M.score, save: 'Saving…',
     stats: [['🎮', modeLabel(M.mode)], ['✅', L.filter(x => x.q === 1).length + ' / ' + M.total + ' perfect']].concat(M.stats.snaps ? [['🧲', M.stats.snaps + ' snaps']] : [], M.stats.balances ? [['⚖️', M.stats.balances + ' balanced']] : [], M.stats.avatarWeighs ? [['🧑', S.player + ' = ' + GS.avatarWeight(S.player, lvl) + ' blocks']] : [], [['⏱️', fmtS(timeSec)]]),
@@ -1682,371 +1759,13 @@ function startLoop(){ stopLoop(); LAST = performance.now(); const step = now => 
 function stopLoop(){ if(RAF) cancelAnimationFrame(RAF); RAF = 0; }
 function stopTimer(){ if(TIMER) clearInterval(TIMER); TIMER = 0; }
 function tick(dt){
-  if(!G) return; if(G.swap){ G.swap.t += dt; if(G.swap.t > 0.55) G.swap = null; } const sb = $('btn-submit'); if(sb){ const idle = !canSubmit(); if(sb.classList.contains('idle') !== idle) sb.classList.toggle('idle', idle); }   /* ✅ gs2-g1 */ helperTick(dt); revealTick(dt); tensFxTick(dt);   /* ➖ gs2-g3 */ GSStack.tick(dt); GSStack.dropTick(dt);   /* 🧊 gs-anim */ if(G.throwT != null) G.throwT += dt; try{ guideTick(); }catch(e){} const A = G.A;
+  if(!G) return; if(G.swap){ G.swap.t += dt; if(G.swap.t > 0.55) G.swap = null; } const sb = $('btn-submit'); if(sb){ const idle = !canSubmit(); if(sb.classList.contains('idle') !== idle) sb.classList.toggle('idle', idle); }   /* ✅ gs2-g1 */ helperTick(dt); revealTick(dt); tensFxTick(dt);   /* ➖ gs2-g3 */ if(G.walk && !G.walk.hold) G.walk.t += dt;   /* 🐜 gs2-g4 */ GSStack.tick(dt); GSStack.dropTick(dt);   /* 🧊 gs-anim */ if(G.throwT != null) G.throwT += dt; try{ guideTick(); }catch(e){} const A = G.A;
   const it0 = G.M && G.M.item; if(FX && it0 && G.phase === 'play' && (it0.kind === 'choice' || it0.kind === 'compare') && !A.gest){ G.idleT = (G.idleT || 0) + dt; if(G.idleT > 4.5){ G.idleT = 0; avatarDo('think'); } } if(A.gest){ A.gest.t += dt; if(A.gest.t > A.gest.g.d) A.gest = null; }
   G.fx = G.fx.filter(f => (f.t += dt) < f.life);
   if(G.B2 && G.B2.gest){ G.B2.gest.t += dt; if(G.B2.gest.t > G.B2.gest.g.d) G.B2.gest = null; }
   const it = G.M.item; if(it && it.left){ const Lw = GS.total(it.left), Rw = GS.total(it.right), tgt = G.tiltLock ? 0 : Math.max(-1, Math.min(1, (Rw - Lw) / Math.max(1, Lw, Rw))) * TILT_MAX; G.tilt += (tgt - G.tilt) * Math.min(1, dt * 6); }
 }
-// ---- pieces: number blocks, shapes, the avatar, sums (expressions) ----
-function pieceSize(p, u){
-  if(p.t === 'n'){ const m = NumberSkins.measure(p.n, u); return {w: m.w, h: m.h}; }
-  if(p.t === 's') return {w: u * 1.9, h: u * 1.9};
-  if(p.t === 'av') return {w: u * 2.4, h: u * 3.6};
-  if(p.t === 'x'){ const v = exprVisual(p); if(v === 'minus') return pieceSize({t: 'n', n: p.a}, u); if(v === 'copies'){ const m = NumberSkins.measure(p.a, u); return {w: m.w * p.b + u * 0.3 * (p.b - 1), h: m.h}; } if(v === 'plus'){ const a = NumberSkins.measure(p.a, u), b = NumberSkins.measure(p.b, u); return {w: a.w + b.w + u * 0.9, h: Math.max(a.h, b.h)}; } return {w: Math.max(u * 3.2, crateW(p, u)), h: u * 2.2}; }
-  return {w: u, h: u};
-}
-function exprVisual(p){ const Li = G ? G.M.level : 0; if(Li >= 4) return 'crate'; if(p.op === '-' && p.a <= 20) return 'minus'; if(p.op === 'x' && p.b <= 5 && p.a <= 10) return 'copies'; if(p.op === '+' && p.a <= 20 && p.b <= 20) return 'plus'; return 'crate'; }
-function crateW(p, u){ CTX.font = '800 ' + Math.round(u * 0.9) + 'px Fredoka, sans-serif'; return CTX.measureText(GS.text(p)).width + u * 1.2; }
-function drawPiece(g, p, x, floor, u, opt){
-  opt = opt || {}; const sk = G.skin, mat = THEMES[G.theme].mat, t = opt.t || 0, label = opt.label;
-  if(p.t === 'n'){ NumberSkins.draw(g, p.n, x, floor, u, {skin: sk, mat, t, mood: opt.mood, label, sel: opt.sel, alpha: opt.alpha}); return; }
-  if(p.t === 's'){ const S2 = GS.SHAPES[p.k], s = u * 1.9, cx = x + s / 2, cy = floor - s / 2, rad = s * 0.46, k = S2.w; g.save(); if(opt.alpha != null) g.globalAlpha = opt.alpha;
-    g.beginPath(); for(let i = 0; i < k; i++){ const a = -Math.PI / 2 + i * Math.PI * 2 / k + (k === 4 ? Math.PI / 4 : 0), rr2 = k === 4 ? rad * 1.12 : rad; g.lineTo(cx + Math.cos(a) * rr2, cy + Math.sin(a) * rr2); } g.closePath();
-    const gr = g.createLinearGradient(0, cy - rad, 0, cy + rad); gr.addColorStop(0, NumberSkins.shade(S2.col, 0.3)); gr.addColorStop(1, NumberSkins.shade(S2.col, -0.2)); g.fillStyle = gr; g.fill(); g.lineWidth = Math.max(1.5, u * 0.08); g.strokeStyle = NumberSkins.shade(S2.col, -0.45); g.stroke();
-    g.fillStyle = '#fff'; for(let i = 0; i < k; i++){ const a = -Math.PI / 2 + i * Math.PI * 2 / k + (k === 4 ? Math.PI / 4 : 0), rr2 = (k === 4 ? rad * 1.12 : rad) * 0.86; g.beginPath(); g.arc(cx + Math.cos(a) * rr2, cy + Math.sin(a) * rr2, Math.max(2, u * 0.13), 0, 7); g.fill(); }
-    if(label){ g.fillStyle = '#fff'; g.font = '800 ' + Math.round(u * 0.8) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 3; g.strokeText(String(k), cx, cy + u * 0.05); g.fillText(String(k), cx, cy + u * 0.05); }
-    if(opt.sel) selRing(g, x, floor, s, s, u); g.restore(); return; }
-  if(p.t === 'av'){ const sz = pieceSize(p, u), k = sz.h / 112; try{ drawAvatar(g, {name: p.name, av: myAvatar(p.name), dir: 1, walkT: 0, gest: G.A.gest}, x + sz.w / 2, floor - 2, k, {t}); }catch(e){} return; }
-  if(p.t === 'x'){ const v = exprVisual(p);
-    if(v === 'minus'){ NumberSkins.draw(g, p.a - p.b, x, floor, u, {skin: sk, mat, t, label: false}); g.save(); g.globalAlpha = 0.28; for(let k = p.a - p.b; k < p.a; k++) NumberSkins.block(g, x, floor - (k + 1) * u, u, '#ffffff', 'smooth', t, k, {noTop: k < p.a - 1}); g.globalAlpha = 1; g.strokeStyle = '#FF4D6D'; g.lineWidth = Math.max(2, u * 0.12); g.beginPath(); g.moveTo(x - u * 0.1, floor - p.a * u); g.lineTo(x + u * 1.1, floor - (p.a - p.b) * u); g.stroke(); g.restore(); }
-    else if(v === 'copies'){ const m = NumberSkins.measure(p.a, u); for(let i = 0; i < p.b; i++) NumberSkins.draw(g, p.a, x + i * (m.w + u * 0.3), floor, u, {skin: sk, mat, t}); }
-    else if(v === 'plus'){ const a = NumberSkins.measure(p.a, u); NumberSkins.draw(g, p.a, x, floor, u, {skin: sk, mat, t}); NumberSkins.draw(g, p.b, x + a.w + u * 0.9, floor, u, {skin: sk, mat, t}); }
-    else { const sz = pieceSize(p, u); g.save(); const gr = g.createLinearGradient(0, floor - sz.h, 0, floor); gr.addColorStop(0, '#E2B57A'); gr.addColorStop(1, '#A9743F'); g.fillStyle = gr; roundRect(g, x, floor - sz.h, sz.w, sz.h, u * 0.3); g.fill(); g.strokeStyle = '#6B4423'; g.lineWidth = Math.max(1.5, u * 0.1); g.stroke();
-      g.strokeStyle = 'rgba(107,68,35,0.5)'; g.beginPath(); g.moveTo(x + u * 0.3, floor - sz.h * 0.5); g.lineTo(x + sz.w - u * 0.3, floor - sz.h * 0.5); g.stroke();
-      g.fillStyle = '#2B1A0A'; g.font = '800 ' + Math.round(u * 0.9) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#FFF6E0'; g.strokeStyle = '#3A2410'; g.lineWidth = Math.max(2, u * 0.12); g.strokeText(GS.text(p), x + sz.w / 2, floor - sz.h / 2); g.fillText(GS.text(p), x + sz.w / 2, floor - sz.h / 2); g.restore(); }
-    if(v !== 'crate' && label !== false){ const sz = pieceSize(p, u); textTag(g, GS.text(p), x + sz.w / 2, floor - sz.h - u * 0.55, u * 0.6); }
-  }
-}
-function selRing(g, x, floor, w, h, u){ g.save(); g.strokeStyle = '#FFE14D'; g.lineWidth = 3; g.setLineDash([6, 4]); roundRect(g, x - u * 0.2, floor - h - u * 0.25, w + u * 0.4, h + u * 0.4, u * 0.3); g.stroke(); g.restore(); }
-function roundRect(g, x, y, w, h, r){ r = Math.min(r, w / 2, h / 2); g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
-function textTag(g, txt, cx, cy, fs){ fs = Math.max(11, fs); g.save(); g.font = '800 ' + Math.round(fs) + 'px Fredoka, sans-serif'; const w = g.measureText(txt).width + fs * 0.8; g.fillStyle = 'rgba(10,20,40,0.8)'; roundRect(g, cx - w / 2, cy - fs * 0.62, w, fs * 1.24, fs * 0.45); g.fill(); g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, cx, cy + 1); g.restore(); }
-
-// ---- background ----
-function drawRoom(g, t){
-  const T = THEMES[G.theme], gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, T.top); gr.addColorStop(1, T.bot); g.fillStyle = gr; g.fillRect(0, 0, W, H);
-  const gy = H - Math.max(26, H * 0.08); g.fillStyle = T.grass; g.fillRect(0, gy - 4, W, 6); g.fillStyle = T.ground; g.fillRect(0, gy, W, H - gy);
-  if(G.theme === 'disco'){ for(let i = 0; i < 6; i++){ g.fillStyle = 'hsla(' + ((t * 60 + i * 60) % 360) + ',90%,60%,0.10)'; g.beginPath(); g.moveTo(W * (0.1 + i * 0.16), 0); g.lineTo(W * (0.02 + i * 0.16), gy); g.lineTo(W * (0.2 + i * 0.16), gy); g.closePath(); g.fill(); } }
-  if(G.theme === 'space'){ g.fillStyle = 'rgba(255,255,255,0.8)'; for(let i = 0; i < 40; i++){ const x = (i * 97.3) % W, y = (i * 53.7) % (gy * 0.9), s = (i % 3) * 0.6 + 0.6; g.globalAlpha = 0.4 + 0.4 * Math.sin(t * 2 + i); g.fillRect(x, y, s, s); } g.globalAlpha = 1; }
-  if(G.theme === 'robot'){ g.strokeStyle = 'rgba(120,220,255,0.08)'; g.lineWidth = 1; for(let x = 0; x < W; x += 28){ g.beginPath(); g.moveTo(x, 0); g.lineTo(x, gy); g.stroke(); } for(let y = 0; y < gy; y += 28){ g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); } }
-  const sz = Math.max(18, Math.min(34, W * 0.045));
-  T.deco.forEach((d, i) => { const x = W * (0.06 + i * 0.22) % W, y = i % 2 ? gy - sz * 0.45 : H * (0.12 + (i % 3) * 0.08) + Math.sin(t * 1.3 + i) * 4; g.globalAlpha = 0.5; emo(g, d, x, y, sz); g.globalAlpha = 1; });
-  return gy;
-}
-
-// ---- the scale ----
-const TILT_MAX = 0.2;
-function isWide(){ return W / Math.max(1, H) > 2.0 && H < 430; }
-function goalBottom(){ const g = $('goal'); return g && g.offsetHeight ? g.offsetTop + g.offsetHeight : 60; }
-function scaleGeom(gy){
-  const it = G.M.item, compare = it.kind === 'compare';
-  if(isWide()){   // 📱 phone landscape: scale on the left, goal card + tray on the right
-    const sw = compare ? W : W * 0.62, bl = Math.min(sw * 0.36, 300), top = (compare ? goalBottom() : 8) + 10 + bl * TILT_MAX * 0.7;
-    return {px: sw / 2, py: top, bl, sl: Math.max(40, (gy - top) * 0.62), pw: Math.min(sw * 0.34, 260, 2 * (sw / 2 - bl) - 8), trayTop: gy, trayH: 0, side: !compare, tx0: sw + 6, tx1: W - 8 - W * 0.09, ttop: goalBottom() + 8};
-  }
-  const bl = Math.min(W * 0.34, 330), top = goalBottom() + 14 + bl * TILT_MAX;
-  const trayH = compare ? 0 : Math.max(60, Math.min(H * 0.36, 230)), sl = Math.max(50, (gy - trayH - top) * 0.72);
-  return {px: W / 2, py: top, bl, sl, pw: Math.min(W * 0.3, 300, 2 * (W / 2 - bl) - 8), trayTop: gy - trayH, trayH};
-}
-function layoutRow(list, u, maxW){ const gap = u * 0.6; let w = 0; const sizes = list.map(p => pieceSize(p, u)); sizes.forEach((s, i) => w += s.w + (i ? gap : 0)); return {w, h: Math.max(0, ...sizes.map(s => s.h)), sizes, gap}; }
-function fitU(list, maxW, maxH, uMax){ let u = uMax; for(let k = 0; k < 30; k++){ const L = layoutRow(list, u, maxW); if((L.w <= maxW && L.h <= maxH) || u < 5) break; u *= 0.9; } return u; }
-function drawScale(g, t, gy){
-  const it = G.M.item, Gm = scaleGeom(gy), a = G.tilt, cx = Gm.px, cy = Gm.py, T = THEMES[G.theme]; G.revealTo = {x: cx, y: cy + Gm.sl * 0.55};
-  const ex = Math.cos(a) * Gm.bl, ey = Math.sin(a) * Gm.bl, L = {x: cx - ex, y: cy - ey}, R = {x: cx + ex, y: cy + ey};
-  // post + base
-  g.fillStyle = T.post; roundRect(g, cx - 7, cy, 14, Gm.trayTop - cy - (it.kind === 'compare' ? 0 : 6) + (it.kind === 'compare' ? gy - Gm.trayTop : 0), 5); g.fill();
-  g.fillStyle = NumberSkins.shade(T.post, -0.2); roundRect(g, cx - 46, (it.kind === 'compare' ? gy : Gm.trayTop) - 12, 92, 14, 6); g.fill();
-  // beam
-  g.save(); g.translate(cx, cy); g.rotate(a); g.fillStyle = T.beam; roundRect(g, -Gm.bl - 10, -7, Gm.bl * 2 + 20, 14, 7); g.fill(); g.strokeStyle = NumberSkins.shade(T.beam, -0.35); g.lineWidth = 2; g.stroke();
-  // notch pointer
-  g.fillStyle = Math.abs(a) < 0.02 && !G.tiltLock ? '#1FA463' : '#FFC845'; g.beginPath(); g.moveTo(-8, -7); g.lineTo(8, -7); g.lineTo(0, -24); g.closePath(); g.fill(); g.restore();
-  g.fillStyle = '#FFC845'; g.beginPath(); g.arc(cx, cy, 9, 0, 7); g.fill(); g.strokeStyle = '#7A5A00'; g.lineWidth = 2; g.stroke();
-  if(G.tiltLock){ emo(g, '🔒', cx, cy + 26, 18); }
-  // pans + items
-  G.hits = [];
-  [[L, it.left, 'L'], [R, it.right, 'R']].forEach(([P, items, side]) => {
-    const surf = P.y + Gm.sl, pw = Gm.pw;
-    g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 2; g.beginPath(); g.moveTo(P.x, P.y); g.lineTo(P.x - pw * 0.46, surf); g.moveTo(P.x, P.y); g.lineTo(P.x + pw * 0.46, surf); g.stroke();
-    drawPan(g, P.x, surf, pw, T);
-    if(it.kind === 'compare' || side === 'R') textTag(g, side === 'L' ? '⬅ LEFT' : (it.kind === 'compare' ? 'RIGHT ➡' : 'RIGHT ➡ put blocks here'), P.x, P.y + 16, 12);
-    const maxH = Gm.sl - 26, u = fitU(items, pw * 0.92, maxH, Math.min(58, maxH / 3)), row = layoutRow(items, u);
-    let x = P.x - row.w / 2;
-    items.forEach((p, i) => { const sz = row.sizes[i], dragging = G.drag && G.drag.id === p.id && G.drag.on; if(!dragging){ drawPiece(g, p, x, surf - 2, u, {t, label: showLabels() || (side === 'R' && it.kind !== 'compare') }); }
-      if(side === 'R' && !p.fixed) G.hits.push({kind: 'pan', id: p.id, x, y: surf - sz.h - 4, w: sz.w, h: sz.h + 8, u, p});
-      x += sz.w + row.gap; });
-    if(side === 'R') G.panBox = {x: P.x - pw * 0.6, y: P.y, w: pw * 1.2, h: Gm.sl + 30};
-    if(G.answerShown || (it.kind !== 'compare' && (showLabels() || side === 'R')) || (it.kind === 'compare' && it.done)) { const v = GS.total(items); if(items.length > 1 || !showLabels() || it.kind === 'avatar' || !items.length) textTag(g, (side === 'L' && it.kind === 'avatar' && !it.done) ? '? blocks' : '= ' + v, P.x, surf + Math.max(12, pw * 0.12) * 1.5 + 14, 15); }
-  });
-  // tray
-  if(it.kind !== 'compare'){
-    const side = Gm.side, ty = gy - 4, maxW = side ? Gm.tx1 - Gm.tx0 - 20 : W - 24, maxH = side ? gy - Gm.ttop - 34 : Gm.trayH - 30, u = fitU(it.tray, maxW, maxH, Math.min(52, maxH / 3)), row = layoutRow(it.tray, u);
-    let x = (side ? (Gm.tx0 + Gm.tx1) / 2 : W / 2) - row.w / 2;
-    g.fillStyle = 'rgba(0,0,0,0.18)'; roundRect(g, x - 14, side ? ty - row.h - 14 : Gm.trayTop + 4, row.w + 28, side ? row.h + 30 : gy - Gm.trayTop - 2, 16); g.fill();
-    it.tray.forEach((p, i) => { const sz = row.sizes[i], dragging = G.drag && G.drag.id === p.id && G.drag.on, sel = G.kbd && G.kbdIdx === i;
-      if(!dragging) drawPiece(g, p, x, ty, u, {t, label: true, sel});
-      G.hits.push({kind: 'tray', id: p.id, x, y: ty - sz.h - 4, w: sz.w, h: sz.h + 26, u, p}); x += sz.w + row.gap; });
-    if(!it.tray.length && !it.done){ textTag(g, 'Tap a block on the pan to take it back', side ? (Gm.tx0 + Gm.tx1) / 2 : W / 2, side ? gy - 40 : Gm.trayTop + Gm.trayH / 2, 12); }
-  }
-  // shape legend
-  const shapes = [...it.left, ...it.right, ...(it.tray || [])].filter(p => p.t === 's').map(p => p.k).filter((k, i, a) => a.indexOf(k) === i);
-  if(shapes.length){ const lu = 12; let lx = 10, ly = goalBottom() + 26; g.fillStyle = 'rgba(10,20,40,0.6)'; roundRect(g, 6, ly - 18, 112, shapes.length * 28 + 12, 12); g.fill();
-    shapes.forEach((k, i) => { drawPiece(g, {t: 's', k}, lx, ly + i * 28 + 8, lu, {}); g.fillStyle = '#fff'; g.font = '800 13px Nunito, sans-serif'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText('= ' + GS.SHAPES[k].w + ' blocks', lx + 28, ly + i * 28 - 3); }); }
-  return Gm;
-}
-function showLabels(){ return GS.LEVELS[G.M.level].hint; }
-function drawPan(g, x, y, pw, T){
-  g.save(); const h = Math.max(12, pw * 0.12);
-  if(G.theme === 'dino'){ g.fillStyle = T.pan; g.beginPath(); g.ellipse(x, y, pw / 2, h * 1.4, 0, 0, Math.PI); g.fill(); g.strokeStyle = '#B89A5A'; g.lineWidth = 2; g.beginPath(); for(let i = 0; i <= 8; i++){ const xx = x - pw / 2 + i * pw / 8; g.lineTo(xx, y + (i % 2 ? 6 : 0)); } g.stroke(); g.fillStyle = 'rgba(120,90,40,0.25)'; [0.3, 0.6].forEach(f => { g.beginPath(); g.arc(x - pw / 2 + pw * f, y + h * 0.6, 3, 0, 7); g.fill(); }); }
-  else if(G.theme === 'sea'){ g.fillStyle = T.pan; g.beginPath(); g.ellipse(x, y, pw / 2, h * 1.5, 0, 0, Math.PI); g.fill(); g.strokeStyle = T.panRim; g.lineWidth = 2; for(let i = 1; i < 6; i++){ g.beginPath(); g.moveTo(x, y + h * 1.4); g.lineTo(x - pw / 2 + i * pw / 6, y); g.stroke(); } }
-  else { g.fillStyle = T.pan; g.beginPath(); g.moveTo(x - pw / 2, y); g.lineTo(x + pw / 2, y); g.lineTo(x + pw * 0.38, y + h); g.lineTo(x - pw * 0.38, y + h); g.closePath(); g.fill();
-    if(G.theme === 'disco'){ for(let i = 0; i < 8; i++){ g.fillStyle = 'hsl(' + ((i * 45 + performance.now() / 8) % 360) + ',90%,60%)'; g.beginPath(); g.arc(x - pw * 0.4 + i * pw * 0.115, y + h * 0.45, 2.5, 0, 7); g.fill(); } }
-    if(G.theme === 'robot'){ g.fillStyle = '#5CFFB0'; g.fillRect(x - pw * 0.3, y + h * 0.35, pw * 0.6, 3); }
-    if(G.theme === 'space'){ g.fillStyle = 'rgba(0,0,0,0.15)'; [0.25, 0.55, 0.75].forEach(f => { g.beginPath(); g.ellipse(x - pw / 2 + pw * f, y + h * 0.5, 6, 3, 0, 0, 7); g.fill(); }); }
-    if(G.theme === 'sky'){ g.fillStyle = '#FFF6D0'; for(let i = 0; i < 5; i++) g.fillRect(x - pw * 0.34 + i * pw * 0.16, y + 2, 4, h - 3); } }
-  g.fillStyle = T.panRim; g.fillRect(x - pw / 2, y - 3, pw, 5); g.restore();
-}
-
-// ---- count floor ----
-function countLayout(gy){
-  const it = G.M.item, aw = Math.min(110, W * 0.18), goalW1 = NumberSkins.measure(it.target, 1).w + 1.6, top = isWide() ? 26 : 76;
-  const hU = Math.max(it.target > 10 ? 9 : it.target, ...it.stacks.map(s => NumberSkins.measure(s.n, 1).h)) + 1.3;
-  const wU = it.stacks.reduce((s, q) => s + NumberSkins.measure(q.n, 1).w, 0) + 1.0 * Math.max(0, it.stacks.length - 1) + goalW1 + 2.4;
-  const u = Math.max(6, Math.min(56, (gy - top - 14) / hU, (W - aw - 24) / wU));
-  return {u, aw, top, goalX: W - 12 - goalW1 * u, goalW: goalW1 * u};
-}
-function drawCount(g, t, gy){
-  const it = G.M.item, CL = countLayout(gy), u = CL.u, dropT = dropTarget(); G.hits = [];   /* 🧲 gs2-g2: last frame's hits */ G.cl = CL; G.stackX = G.stackX || {};
-  { const ws = it.stacks.reduce((a, s) => a + NumberSkins.measure(s.n, u).w, 0) + u * Math.max(0, it.stacks.length - 1); if(!G.cntW || G.cntW.it !== it || G.cntW.u !== u) G.cntW = {it, u, w: ws}; else G.cntW.w = Math.max(G.cntW.w, ws);
-    const grp = G.cntW.w + u * 1.6 + CL.goalW, gx0 = midX(grp, CL.aw + 8); CL.goalX = Math.min(W - 12 - CL.goalW, gx0 + G.cntW.w + u * 1.6); CL.left0 = gx0; }   /* ✅ gs2-g1 📏 centred */
-  // goal pad + ghost
-  const gm = NumberSkins.measure(it.target, u), gx = CL.goalX + (CL.goalW - gm.w) / 2;
-  g.save(); g.fillStyle = 'rgba(255,225,77,0.16)'; roundRect(g, CL.goalX, gy - gm.h - u * 1.1, CL.goalW, gm.h + u * 1.1, u * 0.4); g.fill(); g.setLineDash([6, 5]); g.strokeStyle = '#FFE14D'; g.lineWidth = 2; g.stroke(); g.setLineDash([]);
-  NumberSkins.draw(g, it.target, gx, gy - 4, u, {skin: G.skin, mat: 'smooth', alpha: it.done ? 0 : 0.22, noFace: true}); g.restore();
-  textTag(g, '🎯 ' + it.target, CL.goalX + CL.goalW / 2, gy - gm.h - u * 1.1 - 12, Math.max(13, u * 0.5));
-  G.goalBox = {x: CL.goalX, y: gy - gm.h - u * 1.5, w: CL.goalW, h: gm.h + u * 1.5};
-  // stacks in a row
-  const widths = it.stacks.map(s => NumberSkins.measure(s.n, u).w), gap = u * 1.0, tot = widths.reduce((a, b) => a + b, 0) + gap * Math.max(0, widths.length - 1);
-  const x0 = Math.max(CL.aw + 8, CL.left0 + (G.cntW.w - tot) / 2); let x = x0, later = null;
-  it.stacks.forEach((s, i) => {
-    const w = widths[i], m = NumberSkins.measure(s.n, u); let P = G.pos[s.id]; if(!P || P.x == null) P = G.pos[s.id] = {x, y: gy - 4};
-    const hitDone = it.done && it.hit === s.id, tx = hitDone ? gx : x; if(hitDone && P.hop0 == null) P.hop0 = P.x; P.x += (tx - P.x) * Math.min(1, 0.22);
-    const hopP = hitDone && P.hop0 != null && Math.abs(tx - P.hop0) > 2 ? Math.max(0, Math.min(1, 1 - Math.abs(tx - P.x) / Math.abs(tx - P.hop0))) : 1; P.y = gy - 4 - (FX ? Math.sin(hopP * Math.PI) * Math.min(u * 2.2, (gy - CL.top) * 0.25) : 0);   // 🧊 hop onto the 🎯 pad
-    const liftPx = (P.liftU || 0) * u; if(P.liftU){ P.liftU *= 0.84; if(P.liftU < 0.03) P.liftU = 0; } const pop = P.pop || 0; if(pop){ P.pop *= 0.9; if(P.pop < 0.02) P.pop = 0; }
-    const dragging = G.drag && G.drag.id === s.id && G.drag.on, sel = G.sel === s.id || (G.kbd && G.kbdIdx === i);
-    if(G.drag && G.drag.on && G.drag.kind === 'stack' && !dragging) dropGlow(g, t, s, P, m, u, dropT === s.id);   /* 🧲 gs2-g2 */
-    const paint = () => { if(!dragging && G.st && G.st.bId === s.id && G.st.jId == null && !GSStack.morphDone()){ GSStack.draw(g, t, P, u, G.skin, THEMES[G.theme].mat); return; }   // 🧊 gs-anim
-    if(!dragging){ g.save(); if(pop){ const sy = 1 + Math.sin(pop * Math.PI * 3) * 0.16 * pop, cx = P.x + w / 2; g.translate(cx, P.y); g.scale(1 / Math.sqrt(sy), sy); g.translate(-cx, -P.y); }
-      const cutK = G.cut && G.cut.id === s.id && G.cut.k ? G.cut.k : 0;   /* ✂️ gs2-g2: the top k lift a little while you choose */
-      NumberSkins.draw(g, s.n, P.x, P.y, u, {key: s.id, skin: G.skin, mat: THEMES[G.theme].mat, t, label: true, sel, mood: hitDone || pop > 0.3 || dropT === s.id ? 'wow' : 'happy', lift: cutK ? {k: cutK, dy: u * 0.42} : P.liftK && liftPx > 0.5 ? {k: Math.min(P.liftK, s.n), dy: liftPx} : (P.whole && liftPx > 0.5 ? {k: s.n, dy: liftPx / 1.4} : null)}); g.restore();
-      if(cutK) cutLine(g, P.x, P.y - (s.n - cutK) * u - (NumberSkins.LEG_H * u), m.w, u); } };
-    const back = G.cut && G.cut.id !== s.id; if(back){ g.save(); g.globalAlpha = 0.32; }   /* ✂️ gs2-g2: the others step back while you choose */
-    if(hitDone) later = paint; else paint();   // 🧊 the finished tower is painted last (in front of the others)
-    if(back) g.restore();
-    G.stackX[s.id] = P.x + w / 2;
-    G.hits.push({kind: 'stack', id: s.id, x: P.x, y: P.y - m.h, w: m.w, h: m.h + u * 0.9, u, n: s.n, floor: P.y});
-    x += w + gap;
-  });
-  later && later(); cutPlace();   /* ✂️ gs2-g2 */
-}
-function drawAvatarCorner(g, t, gy){
-  const it = G.M.item; if(it.kind === 'avatar' && !it.done) return;   // on the pan
-  const scaleKind = it.kind === 'compare' || it.kind === 'balance' || it.kind === 'avatar', wide = scaleKind && isWide();
-  if(G.avBox === null && !sideRoom()) return; const bx = G.avBox && G.avBox.w ? G.avBox : null; if(G.avBox && !G.avBox.w) return;
-  const quiz = it.kind === 'choice', aw = bx ? bx.w : Math.min(quiz ? 220 : 110, W * (wide ? 0.085 : quiz ? 0.21 : 0.18)), ah = bx ? bx.h : Math.min(gy - 70, aw * (quiz ? 1.7 : 1.5)); if(ah < 40) return;
-  const ax = bx ? bx.x : !wide ? 8 : it.kind === 'compare' ? W / 2 + 22 : W - aw - 4;
-  const key = aw + 'x' + ah; if(!G.avFit || G.avFit.key !== key){ const F = avatarFit(myAvatar(S.player), S.player, aw, ah, {gests: IDLE, pad: 2}); G.avFit = {key, k: F.k, cx: F.cx}; }
-  const Hh = G.helper; if(Hh){ Hh.home = ax + G.avFit.cx; if(Hh.id && G.stackX && G.stackX[Hh.id] != null) Hh.tx = G.stackX[Hh.id] - (G.stackX[Hh.id] > W * 0.6 ? 34 : -34); else if(it.kind === 'wobble') Hh.tx = W / 2 - 80; }
-  const moving = Hh && Hh.state && Hh.x != null, carrying = moving && Hh.carry && Hh.state !== 'back';
-  const cntBeat = GSStack.pointing() ? Math.max(0, 1 - (G.st.t - G.st.litT) / 0.12) : 0;   // 🧊 gs-anim: points at the tower, bobs on each count
-  const throwing = G.throwT != null && G.throwT < 0.45, pose = GSStack.pointing() ? {armL: 0.35, armR: 2.2 + cntBeat * 0.35, mouth: cntBeat > 0.3 ? 'open' : 'smile'} : throwing ? {armL: 0.5, armR: 2.9 - G.throwT * 3, mouth: 'open'} : (G.drag && G.drag.on) || carrying || (Hh && Hh.state === 'lift') ? {armL: 2.6, armR: 2.6, mouth: 'open'} : null, hx = moving ? Hh.x : ax + G.avFit.cx;
-  G.avHand = {x: hx + G.avFit.k * 30, y: gy - 2 - G.avFit.k * 118}; G.avHead = {x: hx, y: gy - 2 - G.avFit.k * 150};
-  try{ drawAvatar(g, {name: S.player, av: myAvatar(S.player), dir: moving && Hh.state !== 'lift' ? Hh.dir || 1 : 1, walkT: moving && Hh.state !== 'lift' ? Hh.walkT : 0, gest: pose ? null : G.A.gest}, hx, gy - 2, G.avFit.k, {t, pose}); }catch(e){}
-  const waiting = G.phase === 'play' && (it.kind === 'choice' || it.kind === 'compare') && !it.done && !moving;
-  if(waiting && FX){ const r2 = Math.max(12, Math.min(26, G.avFit.k * 22)), bx2 = Math.min(W - r2 - 4, G.avHead.x + G.avFit.k * 40), by2 = Math.max(r2 * 1.8 + 4, G.avHead.y - G.avFit.k * 14) + Math.sin(t * 2) * 3; g.save(); g.fillStyle = 'rgba(255,255,255,0.95)'; [[0.25, -0.2, 0.18], [0.5, -0.55, 0.28]].forEach(c => { g.beginPath(); g.arc(G.avHead.x + (bx2 - G.avHead.x) * c[0], G.avHead.y + (by2 - G.avHead.y) * (c[0]) + r2 * c[1] * 0, r2 * c[2], 0, 7); g.fill(); });
-    g.beginPath(); g.arc(bx2, by2 - r2 * 0.6, r2, 0, 7); g.fill(); g.restore(); emo(g, '🤔', bx2, by2 - r2 * 0.6, r2 * 1.3); }
-  if(carrying){ const bs = Math.max(10, G.avFit.k * 22), n = Math.min(3, Hh.carry); for(let i = 0; i < n; i++) NumberSkins.block(g, hx - bs / 2, gy - 2 - G.avFit.k * 128 - bs * (i + 1) + (Hh.state === 'lift' ? -Math.sin(Hh.t * 10) * 3 : 0), bs, NumberSkins.colour(G.skin, Hh.carry), THEMES[G.theme].mat, t, i, {noTop: i < n - 1}); }
-}
-function draw(t){
-  if(!G || !W) return; const g = CTX; g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, H);
-  const gy = drawRoom(g, t);
-  G.cheerT = t; /* 📣 cs-4b */
-  if(G.battle){ drawBattle(g, t, gy); drawFx(g); return; }
-  if(G.J && !G.M.item){ drawJourney(g, t, gy); drawFx(g); return; }
-  const it = G.M.item; if(!it) return; G.avBox = undefined; const SW = swapK();
-  if(SW){ const e = 1 - Math.pow(1 - SW.inn, 3); g.save(); g.globalAlpha = SW.inn; g.translate(0, -(1 - e) * Math.min(36, H * 0.05)); }   /* ✅ gs2-g1: beat 2 — the new board drops in */
-  if(it.kind === 'count') drawCount(g, t, gy); else if(it.kind === 'grid') drawGrid(g, t, gy); else if(it.kind === 'tens') drawTens(g, t, gy); else if(it.kind === 'choice') drawChoice(g, t, gy); else if(it.kind === 'colour') drawColour(g, t, gy); else if(it.kind === 'wobble') drawWobble(g, t, gy); else drawScale(g, t, gy);
-  if(SW) g.restore();
-  drawAvatarCorner(g, t, gy);
-  // dragged piece on top
-  if(G.drag && G.drag.on){ const d = G.drag; if(d.n != null) NumberSkins.draw(g, d.n, d.px - d.ox, d.py - d.oy, d.u, {key: d.id, skin: G.skin, mat: THEMES[G.theme].mat, t, label: true, mood: 'wow'}); else if(d.p) drawPiece(g, d.p, d.px - d.ox, d.py - d.oy, d.u, {t, label: true}); }
-  drawReveal(g); drawFx(g);
-  const SW2 = swapK(); if(SW2 && SW2.out > 0){ g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = SW2.out; g.drawImage(G.swap.img, 0, 0); g.restore(); }   /* ✅ gs2-g1: beat 1 — the old board fades away */
-}
-function drawFx(g){ G.fx.forEach(f => { const p = f.t / f.life; g.save(); g.globalAlpha = Math.max(0, 1 - p * p);
-  if(f.kind === 'txt'){ g.font = '800 ' + Math.round(f.size) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,0.55)'; const y = f.y - p * 40; g.strokeText(f.text, f.x, y); g.fillStyle = f.col; g.fillText(f.text, f.x, y); }
-  else { const x = f.x + f.vx * f.t, y = f.y + f.vy * f.t + 300 * f.t * f.t; emo(g, f.ch, x, y, f.size); }
-  g.restore(); }); }
-function hitById(id){ return (G.hits || []).find(h => h.id === id); }
-function floatText(text, id, col){ const h = hitById(id); const x = h ? h.x + h.w / 2 : W / 2, y = h ? h.y - 10 : H / 2; G.fx.push({kind: 'txt', text, x, y, col: col || '#fff', size: Math.max(16, Math.min(30, W * 0.04)), t: 0, life: 1.4}); }
-function burst(id, m){ if(!FX) return; const h = hitById(id); if(!h) return; for(let i = 0; i < m * 3; i++) G.fx.push({kind: 'p', ch: '✨', x: h.x + h.w / 2, y: h.y + h.h / 2, vx: (Math.random() - 0.5) * 240, vy: -120 - Math.random() * 160, size: 16, t: 0, life: 0.9}); }
-function confetti(big){ if(!FX || !G) return; const set = ['🎉', '⭐', '🔢', THEMES[G.theme].icon]; for(let i = 0; i < (big ? 36 : 18); i++) G.fx.push({kind: 'p', ch: set[i % set.length], x: W * Math.random(), y: H * 0.3, vx: (Math.random() - 0.5) * 300, vy: -200 - Math.random() * 200, size: 18 + Math.random() * 10, t: 0, life: 1.4}); }
-
-/* ================= ROUND 2 PAINTERS (🔷 🔟 🧩 🍕 🏗️) ================= */
-function boardTop(){ return goalBottom() + 12; }
-function avatarBoxDefault(gy){ const aw = Math.min(110, W * 0.18); return {x: 8, w: aw, h: Math.min(gy - 70, aw * 1.5)}; }
-function midX(w, left){ return Math.max(left, Math.min((W - w) / 2, W - 12 - w)); }   /* ✅ gs2-g1: centred on the screen, never over the avatar's corner */
-function sideRoom(){ const it = G && G.M && G.M.item, quiz = it && it.kind === 'choice'; return W > H * 1.1 ? Math.min(quiz ? 230 : 120, W * (quiz ? 0.22 : 0.18)) + 10 : 0; }   // keep the avatar's corner free on wide screens
-function gridGeom(gy, n){
-  const left = sideRoom(), top = boardTop(), S = Math.max(60, Math.min(W - left - 16, gy - top - 34)), c = S / n;
-  return {x: midX(S, left), y: top + 4, S, c};
-}
-function drawGrid(g, t, gy){
-  const it = G.M.item, GG = gridGeom(gy, it.n), set = new Set(it.cells.map(c => c[0] + ',' + c[1])), col = NumberSkins.colour(G.skin, (it.par % 9) + 1), mat = THEMES[G.theme].mat;
-  G.gridGeo = GG;
-  g.fillStyle = 'rgba(10,20,40,0.35)'; roundRect(g, GG.x - 6, GG.y - 6, GG.S + 12, GG.S + 12, 12); g.fill();
-  for(let y = 0; y < it.n; y++) for(let x = 0; x < it.n; x++){ const px = GG.x + x * GG.c, py = GG.y + y * GG.c;
-    if(set.has(x + ',' + y)) NumberSkins.block(g, px + 1, py + 1, GG.c - 2, col, mat, t, x + y * it.n, {noTop: true});
-    else { g.strokeStyle = 'rgba(255,255,255,0.28)'; g.lineWidth = 1; g.strokeRect(px + 2, py + 2, GG.c - 4, GG.c - 4); }
-    if(G.kbd && G.cur && G.cur[0] === x && G.cur[1] === y){ g.strokeStyle = '#FFE14D'; g.lineWidth = 3; g.strokeRect(px + 1, py + 1, GG.c - 2, GG.c - 2); } }
-  const sh = GS.shapeOf(it.cells), Li = G.M.level;
-  textTag(g, '🔷 ' + sh.area + ' blocks' + (Li >= 2 || it.ck === 'perim' ? ' · way round ' + sh.perim : '') + (sh.rect ? ' · ' + sh.rect[0] + ' × ' + sh.rect[1] : sh.steps ? ' · steps!' : ''), GG.x + GG.S / 2, GG.y + GG.S + 18, 14);
-  const below = gy - (GG.y + GG.S + 30); G.avBox = sideRoom() ? null : below > 60 ? {x: 8, w: Math.min(90, below / 1.5), h: below} : {x: 0, w: 0, h: 0};
-}
-function cellAt(x, y){ const GG = G.gridGeo, it = G.M.item; if(!GG) return null; const cx = Math.floor((x - GG.x) / GG.c), cy = Math.floor((y - GG.y) / GG.c); return cx >= 0 && cy >= 0 && cx < it.n && cy < it.n ? [cx, cy] : null; }
-/* ➖ TENS DRAW START (gs2-g3) — the number is drawn from its PIECES (after a break: 4 tens + 12 ones); 🧺 the tray beside it (phones upright: above it) holds what was taken away */
-function takeMarks(g, v, take, x, fl, u){ const L = NumberSkins.layout(v, u), d = GS.digits(take);   // ❓ "what is left?": the pieces taken away are crossed out
-  const mark = (x0, y0, w, h) => { g.save(); g.fillStyle = 'rgba(20,10,30,0.55)'; g.fillRect(x0, y0, w, h); g.strokeStyle = '#FF5A5F'; g.lineWidth = Math.max(3, u * 0.14); g.lineCap = 'round'; g.beginPath(); g.moveTo(x0 + w * 0.15, y0 + h * 0.1); g.lineTo(x0 + w * 0.85, y0 + h * 0.9); g.moveTo(x0 + w * 0.85, y0 + h * 0.1); g.lineTo(x0 + w * 0.15, y0 + h * 0.9); g.stroke(); g.restore(); };
-  const rods = L.cols.filter(c => c.kind === 'rod'); rods.slice(rods.length - d[1]).forEach(c => mark(x + c.x, fl - c.h, c.w, c.h));
-  const one = L.cols.find(c => c.kind === 'one'); if(one && d[2]) mark(x + one.x, fl - one.k * u, one.w, d[2] * u);
-  const hu = L.cols.find(c => c.kind === 'plate' || c.kind === 'wall'); if(hu && d[0]){ if(hu.kind === 'plate') mark(x + hu.x, fl - hu.k * hu.th, hu.pw, d[0] * hu.th); else mark(x + hu.x, fl - hu.s, hu.s, hu.s); }
-  const lastR = rods[rods.length - 1]; textTag(g, '−' + take, lastR && d[1] ? x + lastR.x + lastR.w / 2 - (d[1] - 1) * lastR.w * 0.55 : x + L.w - u, fl - L.h - 30, 15); }
-function tensPiece(g, unit, x, y, u, rot, sc, t, alpha, col1){ const mat = THEMES[G.theme].mat, col10 = NumberSkins.colour(G.skin, 10), s = unit === 1 ? u : u * 0.9;   // one piece in flight: x, y = its bottom-left
-  g.save(); g.globalAlpha *= alpha; const w = unit === 100 ? s * 10 : s, h = unit === 10 ? s * 10 : s; g.translate(x + w / 2, y); g.rotate(rot); g.scale(sc[0], sc[1]); g.translate(-w / 2, 0);
-  if(unit === 1) NumberSkins.block(g, 0, -s, s, col1 || NumberSkins.colour(G.skin, 1), mat, t, 0, {});
-  else if(unit === 10) for(let k = 0; k < 10; k++) NumberSkins.block(g, 0, -(k + 1) * s, s, col10, mat, t, k, {noTop: k < 9});
-  else NumberSkins.hunDraw(g, NumberSkins.hunCol(1, u, 0), 0, 0, G.skin, mat, t, 0);
-  g.restore(); }
-function tensSource(P, unit, x, fl, u){ const L = NumberSkins.layout(pv(P), u, false, P), c = L.cols.filter(q => unit === 100 ? q.kind === 'plate' || q.kind === 'wall' : unit === 10 ? q.kind === 'rod' : q.kind === 'one').slice(-1)[0];   // where the piece leaves from
-  if(!c) return {x: x + L.w / 2, y: fl}; return unit === 100 ? {x: x + c.x, y: fl - (c.k - 1) * c.th} : unit === 10 ? {x: x + c.x, y: fl} : {x: x + c.x, y: fl - (c.k - 1) * u}; }
-function pv(P){ return P.h * 100 + P.t * 10 + P.o; }
-function drawTens(g, t, gy){
-  const it = G.M.item, P = GS.pcOf(it), v = it.value, top = boardTop(), left = sideRoom(), mat = THEMES[G.theme].mat, fl = gy - 26, port = W < H * 0.95;
-  const TA = G.takeA, TB = G.tensBreak && G.tensBreak.t < BREAK_T ? G.tensBreak : null, TF = G.tensFrom, flying = TA && TA.t >= TA.delay && TA.t < TA.delay + TAKE_T;
-  const base = TB ? TB.Pb : P, D = it.start ? it.start - v : 0, Dshow = D - (TA && TA.t < TA.delay + TAKE_T * 0.75 ? TA.unit : 0);
-  // size: room for the biggest number this round + (take rounds) the 🧺 tray — beside it, or on top on upright phones
-  const big = Math.max(v, it.start || 0, it.target, 1), maxD = Math.max(0, (it.start || 0) - Math.min(it.target, v)), trayW = maxD ? NumberSkins.measure(maxD, 0.6).w + 1.6 : 0, trayH = maxD ? NumberSkins.measure(maxD, 0.6).h + 1.6 : 0;
-  const mB = NumberSkins.measure(big, 1), mP = NumberSkins.measure(Math.max(v, 1), 1, false, pv(base) ? base : null), wU = Math.max(mB.w, mP.w), hU = Math.max(mB.h, mP.h, 10.5);
-  const maxH = gy - top - 50, maxW = W - left - 30, u = Math.max(5, Math.min(56, port ? Math.min(maxH / (hU + 1 + trayH), maxW / (wU + 1)) : Math.min(maxH / (hU + 1), maxW / (wU + 1 + trayW))));
-  const m = NumberSkins.measure(Math.max(pv(base), 1), u, false, base), x = midX(m.w + (port ? 0 : trayW * u), left);
-  const DS = GSStack.dropState(Math.min(u * 6, fl - top)); G.tensHits = [];
-  const opt = {skin: G.skin, mat, t, parts: base, mood: it.done || DS.on || TB || flying ? 'wow' : 'happy'};
-  if(TF && DS.on && !DS.landed){   // 🧊 + : the old number stands, the new piece falls into its place, lands, then the number changes
-    const P0 = TF.P0 || GS.partsOf(TF.v0, it.units), m0 = NumberSkins.measure(Math.max(TF.v0, 1), u, false, P0); if(TF.v0 > 0) NumberSkins.draw(g, TF.v0, midX(m0.w + (port ? 0 : trayW * u), left), fl, u, Object.assign({}, opt, {parts: P0, mood: 'wow'}));
-    const L = NumberSkins.layout(v, u, false, P), cols = L.cols, kind = TF.unit === 100 || TF.snappedH ? 'hun' : TF.unit === 10 || TF.snapped ? 'rod' : 'one', c = cols.filter(q => kind === 'hun' ? q.kind === 'plate' || q.kind === 'wall' : q.kind === kind).slice(-1)[0] || cols[cols.length - 1], cx = x + c.x;
-    if(kind === 'hun' && c.th) NumberSkins.hunDraw(g, Object.assign({}, c, {k: 1}), x, fl - (c.k - 1) * c.th - DS.dy, G.skin, mat, t, 0);
-    else if(kind === 'rod' && !TF.snapped){ const s2 = c.w; for(let k = 0; k < 10; k++) NumberSkins.block(g, cx, fl - (k + 1) * s2 - DS.dy, s2, NumberSkins.colour(G.skin, 10), mat, t, k, {noTop: k < 9}); }
-    else { const s2 = kind === 'rod' ? c.w : u, k = kind === 'rod' ? 9 : c.k - 1; NumberSkins.block(g, cx, fl - (k + 1) * s2 - DS.dy, s2, NumberSkins.colour(G.skin, v <= 10 ? v : v % 10 || 10), mat, t, k, {}); } }
-  else if(TB){   // 🔨 the broken ten (hundred) pops apart: its 10 cubes (tens) jump, gold sparks between them, then they settle into place
-    const L = NumberSkins.layout(pv(TB.Pb), u, false, TB.Pb), p = Math.min(1, Math.max(0, TB.t / BREAK_T)), e = Math.sin(p * Math.PI), skip = new Set(), s = u * 0.9;
-    let pops = []; if(TB.unit === 10){ const oi = L.cols.findIndex(c => c.kind === 'one'); if(oi >= 0){ skip.add(oi); pops = [{c: L.cols[oi], one: true}]; } }
-    else L.cols.forEach((c, i) => { if(c.kind === 'rod' && i >= L.cols.length - 10 - (L.cols[L.cols.length - 1].kind === 'one' ? 1 : 0)){ skip.add(i); pops.push({c, i}); } });
-    NumberSkins.draw(g, pv(TB.Pb), x, fl, u, Object.assign({}, opt, {skip}));
-    g.save(); g.fillStyle = '#FFE14D';
-    pops.forEach((q, j) => { const c = q.c;
-      if(q.one){ const fresh = c.k - 10; for(let k = 0; k < c.k; k++){ const pop = k >= fresh, kk = k - fresh, yy = fl - (k + 1) * u - (pop ? kk * u * 0.22 * e : 0), xx = x + c.x + (pop ? (kk % 2 ? 1 : -1) * u * 0.14 * e : 0); NumberSkins.block(g, xx, yy, u, NumberSkins.colour(G.skin, c.k % 10 || 1), mat, t, k, {}); if(pop && kk > 0){ const r = u * 0.12 * e; star5(g, x + c.x - u * 0.25, yy + u + u * 0.11 * e, r); star5(g, x + c.x + u * 1.25, yy + u + u * 0.11 * e, r); } } }
-      else { const yy = -s * (0.4 + 0.08 * j) * e; for(let k = 0; k < 10; k++) NumberSkins.block(g, x + c.x, fl - (k + 1) * s + yy, s, NumberSkins.colour(G.skin, 10), mat, t, k, {noTop: k < 9}); star5(g, x + c.x + s / 2, fl - 10 * s + yy - s * 0.3, s * 0.16 * e); } });
-    g.restore();
-    textTag(g, TB.unit === 10 ? '1 ten → 10 ones' : '1 hundred → 10 tens', x + m.w / 2, fl - m.h - 30, 16); }
-  else if(v > 0){ g.save(); if(DS.on && DS.sy !== 1){ g.translate(W / 2, fl); g.scale(1 + (1 - DS.sy) * 0.6, DS.sy); g.translate(-W / 2, -fl); } NumberSkins.draw(g, v, x, fl, u, opt); g.restore();
-    if(TF && (TF.snapped || TF.snappedH) && DS.on && DS.chip < 1){ const c = NumberSkins.layout(v, u, false, P).cols.filter(q => TF.snappedH ? q.kind === 'plate' || q.kind === 'wall' : q.kind === 'rod').slice(-1)[0]; if(c){ g.save(); g.globalAlpha = 1 - DS.chip; g.strokeStyle = '#FFF2A0'; g.lineWidth = Math.max(2, u * 0.1); g.beginPath(); g.roundRect(x + c.x - 4, fl - c.h - 4, c.w + 8, c.h + 8, u * 0.2); g.stroke(); g.restore(); } } }
-  else textTag(g, it.start ? 'All taken away — tap +1 to add' : 'Tap +1 to add a block', W / 2, gy - 60, 15);
-  // 👆 Q11: every piece on the board can be tapped to take it away (hit boxes from the same layout)
-  if(!TB && v > 0){ const L = NumberSkins.layout(v, u, false, P); L.cols.forEach(c => { const h = c.kind === 'plate' ? c.k * c.th + c.d : c.kind === 'wall' ? c.h : c.kind === 'rod' ? c.h : c.k * u; G.tensHits.push({x: x + c.x, y: fl - h, w: c.w, h, unit: c.kind === 'plate' || c.kind === 'wall' || c.kind === 'slab' ? 100 : c.kind === 'rod' ? 10 : 1}); }); }
-  // 🧺 the take-away tray (what was taken away, grey, no face) — beside the number, or above it on upright phones
-  let tray = null;
-  if(it.start && (D > 0 || TA)){ const su = u * 0.6, md = NumberSkins.measure(Math.max(1, maxD), su), bw = md.w + u * 1.2, bh = Math.max(md.h + u * 0.9, u * 2.4);
-    const tx = port ? Math.min(W - 12 - bw, x + m.w - bw + u * 0.6) : Math.min(W - 12 - bw, x + m.w + u * 1.2), tb = port ? fl - m.h - u * 1.6 : fl + u * 0.25;
-    tray = {x: tx, y: tb - bh, w: bw, h: bh};
-    g.save(); g.setLineDash([8, 6]); g.strokeStyle = 'rgba(255,120,120,0.85)'; g.lineWidth = 2.5; g.fillStyle = 'rgba(255,90,95,0.12)'; g.beginPath(); g.roundRect(tx, tb - bh, bw, bh, u * 0.4); g.fill(); g.stroke(); g.restore();
-    if(Dshow > 0) NumberSkins.draw(g, Dshow, tx + u * 0.6, tb - u * 0.3, su, {skin: G.skin, mat, t, alpha: 0.55, noFace: true, noLimbs: true});
-    textTag(g, 'taken away −' + Math.max(0, D), tx + bw / 2, tb - bh + 14, 13); }
-  else if(it.start && D < 0) textTag(g, '+' + (-D) + ' added', x + m.w + u * 1.2 + 34, fl - m.h - 12, 14);
-  // ➖ the hop: lift (anticipation) → arc into the 🧺 → land (squash) → settle
-  if(flying && tray){ const p = (TA.t - TA.delay) / TAKE_T, s0 = tensSource(TA.P0, TA.unit, x, fl, u), ex = tray.x + tray.w / 2 - (TA.unit === 100 ? u * 4.5 : u * 0.45), ey = tray.y + tray.h - u * 0.3;
-    let px = s0.x, py = s0.y, sc = [1, 1], rot = 0, al = 1;
-    if(p < 0.22){ const q = p / 0.22; py -= u * 0.45 * Math.sin(q * Math.PI / 2); sc = [1 + 0.08 * Math.sin(q * Math.PI), 1 - 0.08 * Math.sin(q * Math.PI)]; }
-    else if(p < 0.75){ const q = 0.5 - 0.5 * Math.cos(Math.PI * (p - 0.22) / 0.53); px = s0.x + (ex - s0.x) * q; py = s0.y - u * 0.45 + (ey - s0.y + u * 0.45) * q - u * 2.4 * Math.sin(q * Math.PI); rot = 0.25 * Math.sin(q * Math.PI) * (ex > s0.x ? 1 : -1); const k = TA.unit === 100 ? 0.6 : 1; sc = [1 - (1 - k * 0.6) * q, 1 - (1 - k * 0.6) * q]; }
-    else { const q = (p - 0.75) / 0.25, k = TA.unit === 100 ? 0.36 : 0.6; px = ex; py = ey; sc = [k * (1 + 0.12 * Math.sin(q * Math.PI)), k * (1 - 0.12 * Math.sin(q * Math.PI))]; al = 1 - q * 0.45; }
-    const P0 = TA.P0, v0 = pv(P0); tensPiece(g, TA.unit, px, py, u, rot, sc, t, al, NumberSkins.colour(G.skin, P0.o >= 10 ? P0.o % 10 || 1 : v0 <= 10 ? v0 : v0 % 10 || 10)); }
-  const T3 = [base.h, base.t, base.o];
-  textTag(g, (T3[0] ? T3[0] + ' hundred' + (T3[0] > 1 ? 's' : '') + ' + ' : '') + (T3[1] || T3[0] ? T3[1] + ' ten' + (T3[1] !== 1 ? 's' : '') + ' + ' : '') + T3[2] + ' one' + (T3[2] !== 1 ? 's' : '') + ' = ' + pv(base) + (D ? '   ·   ' + it.start + (D > 0 ? ' − ' + D : ' + ' + (-D)) + ' = ' + v : ''), Math.min(W - 160, Math.max(160, x + (m.w + (!port && tray ? tray.w + u * 1.2 : 0)) / 2)), gy - 10, 15);
-  G.avBox = null;
-}
-function star5(g, x, y, r){ if(r < 0.5) return; g.beginPath(); for(let j = 0; j < 8; j++){ const a = j * Math.PI / 4, rr2 = j % 2 ? r * 0.4 : r; g.lineTo(x + Math.cos(a) * rr2, y + Math.sin(a) * rr2); } g.closePath(); g.fill(); }
-/* ➖ TENS DRAW END */
-function drawSeq(g, t, gy, seq){
-  const top = boardTop(), left = sideRoom() || Math.min(80, W * 0.2) + 4, maxH = gy - top - 40, items = seq.map(v => v == null ? {t: 'q'} : {t: 'n', n: v});
-  const wOf = (p, u) => p.t === 'q' ? u * 1.4 : NumberSkins.measure(p.n, u).w, hU = Math.max(...seq.filter(v => v != null).map(v => NumberSkins.measure(v, 1).h)), gap = 1;
-  let u = Math.min(52, maxH / (hU + 1.5)); for(let k = 0; k < 30; k++){ const w = items.reduce((s, p) => s + wOf(p, u), 0) + gap * u * (items.length - 1); if(w <= W - left - 24 || u < 4) break; u *= 0.9; }
-  const tot = items.reduce((s, p) => s + wOf(p, u), 0) + gap * u * (items.length - 1); let x = midX(tot, left); const fl = gy - 26;
-  items.forEach(p => { if(p.t === 'q'){ const h = Math.min(maxH * 0.6, u * 4); G.revealTo = {x: x + u * 0.7, y: fl - h / 2}; g.save(); g.setLineDash([6, 5]); g.strokeStyle = '#FFE14D'; g.lineWidth = 3; roundRect(g, x, fl - h, u * 1.4, h, 8); g.stroke(); g.restore(); textTag(g, '?', x + u * 0.7, fl - h / 2, Math.max(16, u * 0.8)); }
-    else NumberSkins.draw(g, p.n, x, fl, u, {skin: G.skin, mat: THEMES[G.theme].mat, t, label: true}); x += wOf(p, u) + gap * u; });
-}
-function pie(g, cx, cy, R, f, on, t){   // 🍕 a pizza cut into f.d slices, f.n coloured
-  g.save(); g.fillStyle = '#E7B26A'; g.beginPath(); g.arc(cx, cy, R * 1.06, 0, 7); g.fill();
-  for(let i = 0; i < f.d; i++){ const a0 = -Math.PI / 2 + i * 2 * Math.PI / f.d, a1 = a0 + 2 * Math.PI / f.d; g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R, a0, a1); g.closePath();
-    g.fillStyle = i < (on == null ? f.n : on) ? '#FF6B4A' : '#FFE9B8'; g.fill(); g.strokeStyle = '#8A5A2B'; g.lineWidth = 2; g.stroke();
-    if(i < (on == null ? f.n : on)){ g.fillStyle = '#C0392B'; const am = (a0 + a1) / 2; g.beginPath(); g.arc(cx + Math.cos(am) * R * 0.6, cy + Math.sin(am) * R * 0.6, R * 0.08, 0, 7); g.fill(); } }
-  g.restore();
-}
-function barGeom(gy, len){ const left = sideRoom(), w = Math.min(W - left - 30, 640), c = w / len, x = midX(w, left), y = Math.max(boardTop() + 20, (boardTop() + gy) / 2 - c / 2); return {x, y, c: Math.min(c, (gy - boardTop()) * 0.5), w}; }
-function drawBar(g, t, gy, len, onSet, tappable){
-  const B = barGeom(gy, len), col = NumberSkins.colour(G.skin, len % 9 + 1), mat = THEMES[G.theme].mat; G.barGeo = B;
-  for(let i = 0; i < len; i++){ const on = onSet(i), x = B.x + i * B.c; NumberSkins.block(g, x + 1, B.y, B.c - 2, on ? col : 'rgba(255,255,255,0.18)', on ? mat : 'smooth', t, i, {noTop: false});
-    if(G.kbd && tappable && G.cur === i){ g.strokeStyle = '#FFE14D'; g.lineWidth = 3; g.strokeRect(x, B.y - 2, B.c, B.c + 4); } }
-}
-function drawChoice(g, t, gy){
-  const it = G.M.item, V = it.vis || {}; G.avBox = undefined; G.revealTo = null;   /* ✅ gs2-g1: each picture below sets its own ❓ spot (qSpot) */
-  if(V.type === 'seq') drawSeq(g, t, gy, V.seq);
-  else if(V.type === 'value'){ const top = boardTop(), left = sideRoom(), u = Math.max(5, Math.min(48, (gy - top - 100) / 10.5, (W - left - 30) / (NumberSkins.measure(V.v, 1).w + 1))), m = NumberSkins.measure(V.v, u), x = midX(m.w, left); NumberSkins.draw(g, V.v, x, gy - 20, u, {skin: G.skin, mat: THEMES[G.theme].mat, t}); if(V.take) takeMarks(g, V.v, V.take, x, gy - 20, u); qSpot(g, x + m.w / 2, gy - 20 - m.h - (V.take ? 60 : 44), t); }
-  else if(V.type === 'pairs'){ const v = V.v, top = boardTop(), left = sideRoom();
-    if(v > 40){ textTag(g, String(v), W / 2, (top + gy) / 2, Math.min(70, H * 0.12)); return; }
-    const rows = Math.ceil(v / 2), u = Math.min(40, (gy - top - 90) / (rows + 1), (W - left) / 6), x0 = midX(u * 2.05, left); const col = NumberSkins.colour(G.skin, v % 10);
-    for(let i = 0; i < v; i++){ const row = Math.floor(i / 2), c = i % 2; NumberSkins.block(g, x0 + c * u * 1.05, gy - 14 - (row + 1) * u * 1.02, u, col, THEMES[G.theme].mat, t, i, {noTop: row < rows - 1}); }
-    qSpot(g, x0 + u * 1.02, gy - 14 - rows * u * 1.02 - 44, t); }
-  else if(V.type === 'bar'){ drawBar(g, t, gy, V.len, i => i < V.on, false); const B = G.barGeo; qSpot(g, B.x + B.w / 2, B.y - 46, t); }
-  else if(V.type === 'bars'){ const left = sideRoom(), R = Math.min((W - left) * 0.18, (gy - boardTop()) * 0.36), cy = (boardTop() + gy) / 2, sp = (W - left) * 0.23, mid = midX(2 * sp, left) + sp; const xa = mid - sp, xb = mid + sp;
-    qSpot(g, (xa + xb) / 2, cy, t); pie(g, xa, cy, R, V.a, null, t); pie(g, xb, cy, R, V.b, null, t); textTag(g, V.a.n + '/' + V.a.d, xa, cy + R + 22, 20); textTag(g, V.b.n + '/' + V.b.d, xb, cy + R + 22, 20);
-  }
-  else if(V.type === 'grid'){ const left = sideRoom(), cells = V.cells, w = Math.max(...cells.map(c => c[0])) + 1, h = Math.max(...cells.map(c => c[1])) + 1, top = boardTop(), c = Math.min(46, (W - left - 40) / w, (gy - top - 90) / h), x0 = midX(w * c, left), col = NumberSkins.colour(G.skin, cells.length % 9 + 1);
-    if(!it.done) qSpot(g, x0 + w * c / 2, gy - 20 - h * c - 44, t);
-    cells.forEach(([x, y]) => NumberSkins.block(g, x0 + x * c + 1, gy - 20 - (y + 1) * c + 1, c - 2, col, THEMES[G.theme].mat, t, x + y * 9, {noTop: true}));
-    if(it.done && it.ck === 'shape'){ textTag(g, '= ' + it.answer, x0 + w * c / 2, gy - 20 - h * c - 20, 20); } }
-}
-/* ✅ gs2-g1: the ❓ spot the avatar throws the answer onto — ON the thing the question asks about (Aowu: "the avatar throwing the answer lands somewhere else") */
-function qSpot(g, x, y, t){ G.revealTo = {x, y}; const it = G.M.item, R_ = G.reveal; if(it && it.done) return; if(R_ && !R_.tryOnly) return;
-  const r = Math.max(18, Math.min(30, W * 0.03)), k = 1 + Math.sin(t * 3) * 0.05; g.save(); g.translate(x, y); g.scale(k, k); g.fillStyle = 'rgba(10,20,40,0.45)'; g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill();
-  g.setLineDash([6, 5]); g.strokeStyle = '#FFE14D'; g.lineWidth = 3; g.stroke(); g.setLineDash([]); g.fillStyle = '#FFE14D'; g.font = '900 ' + Math.round(r * 1.1) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', 0, 1); g.restore(); }
-function drawColour(g, t, gy){ const it = G.M.item; const on = new Set(it.on); drawBar(g, t, gy, it.len, i => on.has(i), true);
-  const B = G.barGeo; textTag(g, it.on.length + ' of ' + it.len + ' coloured · want ' + it.frac.n + '/' + it.frac.d, B.x + B.w / 2, B.y + B.c + 26, 15);
-  for(let k = 1; k < it.frac.d; k++){ const x = B.x + k * it.len / it.frac.d * B.c; g.strokeStyle = 'rgba(255,255,255,0.75)'; g.setLineDash([4, 4]); g.lineWidth = 2; g.beginPath(); g.moveTo(x, B.y - 10); g.lineTo(x, B.y + B.c + 6); g.stroke(); g.setLineDash([]); }
-  pie(g, B.x + B.w / 2, Math.max(boardTop() + 34, B.y - 70), Math.min(40, (B.y - boardTop()) / 2 - 6), it.frac, null, t);
-}
-const WOB_COLS = ['#FF8A3D', '#3F7BFF', '#22C3A1'];
-function drawWobble(g, t, gy){
-  const it = G.M.item, h = it.tower.reduce((a, b) => a + b, 0), top = boardTop() + 10, left = sideRoom(), maxU = Math.max(h, it.target) + 3, u = Math.max(1.2, Math.min(40, (gy - top - 20) / maxU)), tw = Math.min(110, W * 0.18), x = midX(tw, left + 60), fl = gy - 6, over = h > it.target;
-  const ty = fl - it.target * u; g.save(); g.setLineDash([8, 6]); g.strokeStyle = '#FFE14D'; g.lineWidth = 3; g.beginPath(); g.moveTo(x - 60, ty); g.lineTo(x + tw + 60, ty); g.stroke(); g.restore();
-  textTag(g, '🎯 ' + it.target, x + tw + 70, ty, 15);
-  g.save(); if(over){ g.translate(x + tw / 2, fl); g.rotate(Math.sin(t * 9) * 0.05); g.translate(-(x + tw / 2), -fl); }
-  const DS = GSStack.dropState(Math.min(Math.max(90, u * 6), (fl - h * u) - top)), dropPx = DS.on ? DS.dy : 0;   // 🧊 gs-anim: gravity fall + landing squash
-  if(DS.on && DS.sy !== 1){ g.translate(x + tw / 2, fl); g.scale(1 + (1 - DS.sy) * 0.6, DS.sy); g.translate(-(x + tw / 2), -fl); }
-  let y = fl; it.tower.forEach((s, i) => { const hh = s * u; if(i === it.tower.length - 1) y -= dropPx; const ci = it.sizes.indexOf(s), col = WOB_COLS[ci] || '#FF8A3D'; g.fillStyle = col; roundRect(g, x, y - hh + 1, tw, hh - 2, Math.min(8, hh / 3)); g.fill(); g.strokeStyle = NumberSkins.shade(col, -0.4); g.lineWidth = 2; g.stroke();
-    if(hh > 12){ g.fillStyle = '#fff'; g.font = '800 ' + Math.round(Math.min(18, hh * 0.6)) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(s), x + tw / 2, y - hh / 2); } y -= hh; });
-  g.restore();
-  const lastZ = it.tower.length ? it.tower[it.tower.length - 1] : 0, hShow = DS.on && !DS.landed ? h - lastZ : h, tagK = DS.on && DS.chip > 0 && DS.chip < 1 ? 1 + 0.3 * Math.sin(DS.chip * Math.PI) : 1;   // 🧊 the height counts up only when it lands
-  textTag(g, 'height ' + hShow + (DS.on && !DS.landed ? '' : over ? ' — too tall! 😬' : h === it.target ? ' ✅' : ''), x + tw / 2, fl - h * u - 18, Math.round(15 * tagK));
-}
-
+/* 📏 gs2-g4: the painters (pieces · scale · count floor · 🔷 grid · 🐜 fence · 📐 card · 🔟 tens · 🧩 🍕 🏗️) live in GeoScoutShapes.html (include after this script) */
 /* ================= ⚔️ TOWER BATTLE ================= */
 function oppName(){ return SET.opp && SET.opp !== '🤖' && S.players.some(p => p.Name === SET.opp) ? SET.opp : ''; }
 function startBattle(){
@@ -2306,6 +2025,7 @@ msAfter('choosePlayer', name => {
 });
 /* ✨ END MODE SPOTLIGHT */
 </script>
+<script src="inc/GeoScoutShapes.js"></script>   <!-- 📏 gs2-g4 born split: the painters -->
 <script>
 /* 🎵 MOOD (24u-b) START — ✨ polish chat · UiKit ambient mood (UISound.mood, plan `Ambient Moods — full plan.md` §7). Don't edit by hand:
    Test Harness/patch_24ub_moods.py re-applies it. Starts with the game's cheerMount() (= play starts, also 🔄 Again), stops with
@@ -2347,4 +2067,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (gs-4+p1d+p3a+cs-4b+b3w3+24u-c+gs-anim+gs2-g1+gs2-g2+gs2-g3) END OF GeoScout.html -->
+<!-- (gs-4+p1d+p3a+cs-4b+b3w3+24u-c+gs-anim+gs2-g1+gs2-g2+gs2-g3+gs2-g4) END OF GeoScout.html -->
