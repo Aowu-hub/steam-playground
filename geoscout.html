@@ -182,6 +182,16 @@
   @keyframes gs-pop{0%{transform:scale(0);}70%{transform:scale(1.3);}100%{transform:scale(1);}}
   .tb.lt{--c1:#9FE3FF;--c2:#38B6F0;--c3:#1A6F99;} .tb.eq{--c1:#FFE58A;--c2:#FFBE2E;--c3:#A86F00;} .tb.gt{--c1:#FFC2CB;--c2:#FF7A90;--c3:#A33449;} .tb.big.act{--c1:#C9FFF1;--c2:#3DD9B3;--c3:#178268;}
   .tb.act{background:#B9F3E8;} .tb.cp{background:#FFD08A;} .tb.sh{background:#D8C2FF;}
+  /* ✂️ gs2-g2 split picker on the board */
+  .cutbtn{position:absolute;z-index:6;width:46px;height:46px;border-radius:50%;border:3px solid #15263F;background:#FFE14D;font-size:1.35rem;line-height:1;padding:0;cursor:pointer;box-shadow:0 3px 0 rgba(0,0,0,0.4),0 0 0 4px rgba(255,225,77,0.35);display:none;animation:cutbob 1.4s ease-in-out infinite;font-family:'Fredoka',sans-serif;}
+  .cutbtn.on{display:block;} .cutbtn.open{background:#FF8FA8;animation:none;}
+  @keyframes cutbob{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-3px) rotate(-12deg)}}
+  .cutpick{position:absolute;z-index:7;display:none;flex-direction:column;gap:4px;padding:6px;border-radius:16px;background:rgba(21,38,63,0.92);border:2px solid #FFE14D;box-shadow:0 6px 18px rgba(0,0,0,0.45);}
+  .cutpick.on{display:flex;} .cutpick.grid{display:none;flex-direction:row;flex-wrap:wrap;width:auto;} .cutpick.grid.on{display:flex;}
+  .cutpick .lab2{color:#FFE14D;font:800 0.78rem 'Fredoka',sans-serif;text-align:center;white-space:nowrap;padding:0 2px;}
+  .cutpick .ck{min-width:44px;min-height:40px;border:none;border-radius:12px;background:#E7F6F3;color:#15263F;font:900 1.15rem 'Fredoka',sans-serif;box-shadow:0 3px 0 rgba(0,0,0,0.35);cursor:pointer;padding:0 8px;}
+  .cutpick .ck:hover,.cutpick .ck.hov{background:#FFE14D;} .cutpick .ck small{font-size:0.62rem;font-weight:700;margin-left:2px;opacity:0.7;}
+  .bar .lab.cuthint{background:#FFF3B0;color:#15263F;border-radius:10px;padding:6px 10px;font-size:0.95rem;font-weight:800;white-space:normal;max-width:none;flex:0 1 auto;}
   .grp{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.08);border-radius:16px;padding:4px 6px;flex-wrap:wrap;justify-content:center;}
   .grp .lab{font-size:0.75rem;font-weight:900;color:#CFE3FF;padding:0 3px;}
   .grp .val{min-width:30px;text-align:center;font-family:'Fredoka',sans-serif;font-weight:700;font-size:1.2rem;}
@@ -313,7 +323,7 @@
   </div>
   <div class="body">
     <div class="stage" id="stage">
-      <canvas id="cv"></canvas>
+      <canvas id="cv"></canvas><button class="cutbtn" id="cut-btn" data-sound="none" aria-label="Split" onclick="cutOpen()">✂️</button><div class="cutpick" id="cut-pick"></div>
       <div class="goal" id="goal"></div>
       <div class="banner" id="banner"></div>
       <div class="rib" id="rib"></div>
@@ -1054,7 +1064,7 @@ function startGame(){ setTimeout(cheerMount, 0); /* 📣 cs-4b */ if(ScoutCover)
 }
 function nextRound(first){
   if(!G) return; const M = G.M; GS.deal(M); G.phase = 'play'; G.roundT0 = performance.now(); G.sel = 0; G.splitK = 1; G.hist = []; G.drag = null; G.tiltLock = M.item.kind === 'compare'; G.tilt = 0; G.answerShown = false;
-  G.pos = {}; G.pick = null; G.revealTo = null; G.cntW = null; hideRib(); hud(); renderBar(); renderGoal(); hideBanner();
+  G.pos = {}; G.pick = null; G.revealTo = null; G.cntW = null; G.cut = null; NumberSkins.limbs(true, (M.seed + M.round * 7919) >>> 0); cutHide();   /* 🙆 ✂️ gs2-g2 */ hideRib(); hud(); renderBar(); renderGoal(); hideBanner();
   if(M.item.kind === 'avatar'){ banner('🧑 How many blocks do <b>you</b> weigh?', ''); setTimeout(hideBanner, 1600 * SPEED + 1); }
 }
 function hud(){ if(!G) return; if(G.J){ jHud(); return; } const M = G.M; $('h-round').textContent = 'Round ' + Math.min(M.round + 1, M.total) + ' / ' + M.total; $('h-score').textContent = '🏆 ' + M.score.toLocaleString();
@@ -1073,7 +1083,7 @@ function renderGoal(){
   else if(it.kind === 'choice') gl.innerHTML = '<b>' + UI.esc(it.q) + '</b><small>' + modeLabel(G.M.mode) + '</small>';
   const sm = gl.querySelector('small'); if(sm) sm.textContent += GS.isQuiz(it) ? ' · pick, then ✅ Submit' : ' · then ✅ Submit';   /* ✅ gs2-g1 */
 }
-function countSub(it){ const L = G.M.level; return L >= 3 ? '🧲 snap · ✂️ split · ✖️ copy · ➗ share' : L >= 1 ? '🧲 drag to snap · ✂️ tap to split' : '🧲 drag one number onto another to snap'; }
+function countSub(it){ const L = G.M.level; return (L >= 3 ? '🧲 snap · ✂️ split · ✖️ copy · ➗ share' : L >= 1 ? '🧲 drag to snap · 👆 tap a number, then ✂️ to split' : '🧲 drag one number onto another to snap') ; }   /* gs2-g2 */
 function selStack(){ const it = G.M.item; return it.kind === 'count' ? it.stacks.find(s => s.id === G.sel) : null; }
 function renderBar(){
   const bar = $('bar'), it = G.M.item, M = G.M; if(!it) return;
@@ -1088,10 +1098,10 @@ function renderBar(){
   if(it.kind === 'wobble'){ bar.innerHTML = it.sizes.map((z, i) => '<button class="tb big" style="background:' + WOB_COLS[i] + ';color:#fff" data-s="' + z + '" data-sound="none" onclick="wobBtn(' + z + ')">+' + z + '<small>key ' + (i + 1) + '</small></button>').join('') + '<button class="tb" data-sound="tap" onclick="wobUndo()">↩️ Take top off</button>' + (M.level <= 2 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB; return; }
   if(it.kind !== 'count'){ bar.innerHTML = '<div class="hint">👆 Drag blocks onto the right pan (or tap them). Tap a block on the pan to take it back.</div><button class="tb" data-sound="tap" onclick="takeAll()">↩️ Take all back</button>' + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡 Hint</button>' : '') + SUB; return; }
   const s = selStack(); let h = '';
-  if(!s) h = '<div class="hint">' + (M.level === 0 ? '🧲 Drag one number onto another to snap them together.' : '👆 Tap a number to split / copy / share it — or drag it onto another to snap.') + '</div>';
+  if(!s) h = '<div class="hint">' + (M.level === 0 ? '🧲 Drag a number onto another one → they snap together (3 + 4 = 7).' : '🧲 Drag a number onto another to snap them · 👆 tap a number to ✂️ split' + (GS.canOp(M, 'copy') ? ', ✖️ copy or ➗ share' : '') + ' it.') + '</div>';   /* gs2-g2 words */
   else {
     h = '<span class="grp"><span class="lab">' + s.n + '</span>';
-    if(GS.canOp(M, 'split') && s.n > 1){ G.splitK = Math.max(1, Math.min(s.n - 1, G.splitK)); h += '<span class="lab">✂️ take away</span><button class="tb" data-sound="tap" onclick="bumpK(-1)">−</button><span class="val" id="split-k">' + G.splitK + '</span><button class="tb" data-sound="tap" onclick="bumpK(1)">+</button><button class="tb act" data-sound="none" onclick="doSplit()">✂️ Split</button>'; }
+    if(GS.canOp(M, 'split') && s.n > 1) h += '<span class="lab cuthint">' + (G.cut ? '✂️ How many come off? Tap a number' : '✂️ Tap the scissors beside ' + s.n) + '</span>';   /* ✂️ gs2-g2 */
     h += '</span>';
     if(GS.canOp(M, 'copy')){ h += '<span class="grp"><span class="lab">✖️ copy</span>' + [2, 3, 4, 5].map(m => '<button class="tb cp" data-sound="none" ' + (s.n * m > GS.capFor(M.level) ? 'disabled ' : '') + 'onclick="doCopy(' + m + ')">×' + m + '</button>').join('') + '</span>'; }
     if(GS.canOp(M, 'share')){ h += '<span class="grp"><span class="lab">➗ share</span>' + [2, 3, 4, 5].map(m => '<button class="tb sh" data-sound="none" ' + (s.n % m ? 'disabled ' : '') + 'onclick="doShare(' + m + ')">÷' + m + '</button>').join('') + '</span>'; }
@@ -1099,6 +1109,50 @@ function renderBar(){
   h += '<button class="tb" data-sound="tap" onclick="undo()"' + (G.hist.length ? '' : ' disabled') + '>↩️ Undo</button>' + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB;
   bar.innerHTML = h;
 }
+/* ✂️ CUT START (gs2-g2, Aowu 2026-11-27 "a selection of how many to split, with a split button on the block's right side … a 3-click split")
+   tap a number (1) → ✂️ on its right (2) → a ladder of "how many" chips beside its blocks, each one next to the block where the cut goes (3).
+   Hover / focus a chip = the top k blocks lift + a dashed cut line; tap it = split. 🧲 while dragging: every number it can snap onto glows. */
+function cutHide(){ const b = $('cut-btn'), p = $('cut-pick'); if(b) b.classList.remove('on', 'open'); if(p){ p.classList.remove('on'); p.innerHTML = ''; } }
+function cutClose(){ if(!G) return; G.cut = null; const p = $('cut-pick'); if(p){ p.classList.remove('on'); p.innerHTML = ''; } renderBar(); }
+function cutOpen(){ const s = selStack(); if(!G || G.phase !== 'play' || !s || s.n < 2 || !GS.canOp(G.M, 'split')) return; if(G.cut && G.cut.id === s.id){ cutClose(); return; }
+  G.cut = {id: s.id, k: 0}; UISound.play('pop'); const p = $('cut-pick'), big = s.n > 10, ks = []; for(let k = 1; k < s.n && ks.length < 18; k++) if(!big || k < 10 || k % 10 === 0) ks.push(k);
+  p.innerHTML = '<div class="lab2">✂️ take off</div>' + ks.map(k => '<button class="ck" data-k="' + k + '" data-sound="none" onclick="cutDo(' + k + ')" onmouseenter="cutHov(' + k + ')" onfocus="cutHov(' + k + ')" onmouseleave="cutHov(0)">' + k + '</button>').join('');
+  p.classList.add('on'); renderBar(); cutPlace(); }
+function cutHov(k){ if(G && G.cut){ G.cut.k = k; document.querySelectorAll('#cut-pick .ck').forEach(b => b.classList.toggle('hov', Number(b.dataset.k) === k)); } }
+function cutDo(k){ if(!G || !G.cut) return; const s = selStack(); if(!s || k < 1 || k >= s.n) return; G.cut = null; cutHide(); doSplit(k); }
+// keep the ✂️ button + the chips glued to the picked number (called every frame from drawCount)
+function cutPlace(){
+  const b = $('cut-btn'), p = $('cut-pick'); if(!b || !G) return; const it = G.M.item, s = it && it.kind === 'count' && G.phase === 'play' && !(G.drag && G.drag.on) ? selStack() : null;
+  const can = s && s.n > 1 && GS.canOp(G.M, 'split'), h = can && (G.hits || []).find(q => q.kind === 'stack' && q.id === s.id);
+  if(!h){ if(b.classList.contains('on')) cutHide(); if(G.cut && !s) G.cut = null; return; }
+  const u = h.u, LH = NumberSkins.LEG_H * u, colTop = h.floor - LH - Math.min(10, s.n) * u, colH = Math.min(10, s.n) * u, bs = 46;
+  let bx = h.x + h.w + Math.max(6, u * 0.25), flip = bx + bs > W - 4; if(flip) bx = h.x - bs - Math.max(6, u * 0.25);
+  const by = Math.max(4, Math.min(H - bs - 4, colTop + colH / 2 - bs / 2));
+  const key = Math.round(bx) + ',' + Math.round(by); if(b.dataset.at !== key){ b.style.left = bx + 'px'; b.style.top = by + 'px'; b.dataset.at = key; }
+  b.classList.add('on'); b.classList.toggle('open', !!G.cut);
+  if(!G.cut || !p.classList.contains('on')) return;
+  // chips: one per block when the blocks are tall enough to sit beside, else a small card of chips
+  const chips = [...p.querySelectorAll('.ck')], ch = 40, gap = 4, ladder = s.n <= 10 && u >= ch + gap - 2, px0 = flip ? bx - 8 : bx + bs + 8;
+  p.classList.toggle('grid', !ladder);
+  if(ladder){ p.style.padding = '0'; p.style.background = 'transparent'; p.style.border = 'none'; p.style.boxShadow = 'none'; p.firstChild.style.display = 'none';
+    chips.forEach(c => { const k = Number(c.dataset.k); c.style.position = 'absolute'; c.style.left = '0px'; c.style.top = ((k - 0.5) * u - ch / 2) + 'px'; });
+    p.style.width = '52px'; p.style.height = colH + 'px'; const lx = flip ? px0 - 52 : px0; p.style.left = lx + 'px'; p.style.top = colTop + 'px'; }
+  else { p.style.padding = ''; p.style.background = ''; p.style.border = ''; p.style.boxShadow = ''; p.firstChild.style.display = ''; chips.forEach(c => { c.style.position = ''; c.style.top = ''; c.style.left = ''; });
+    const cols = Math.min(chips.length, W < 520 ? 3 : 5); p.style.width = (cols * 48 + 12) + 'px'; p.style.height = '';
+    const pw = cols * 48 + 12, ph = p.offsetHeight || 120; let lx = flip ? px0 - pw : px0; lx = Math.max(4, Math.min(W - pw - 4, lx)); p.style.left = lx + 'px'; p.style.top = Math.max(4, Math.min(H - ph - 4, by + bs / 2 - ph / 2)) + 'px'; }
+}
+function cutLine(g, x, y, w, u){ g.save(); g.strokeStyle = '#FF4D6D'; g.lineWidth = Math.max(2, u * 0.08); g.setLineDash([Math.max(4, u * 0.18), Math.max(3, u * 0.12)]); g.beginPath(); g.moveTo(x - u * 0.35, y); g.lineTo(x + w + u * 0.35, y); g.stroke(); g.setLineDash([]);
+  g.fillStyle = '#FF4D6D'; g.font = '800 ' + Math.round(Math.max(12, u * 0.5)) + 'px Fredoka, sans-serif'; g.textAlign = 'right'; g.textBaseline = 'middle'; g.fillText('✂', x - u * 0.4, y); g.restore(); }
+// 🧲 which number the dragged one would snap onto (same test as the drop)
+function dropTarget(){ const d = G && G.drag; if(!d || !d.on || d.kind !== 'stack') return 0; const p = {x: d.px, y: d.py};
+  const tg = (G.hits || []).find(h => h.kind === 'stack' && h.id !== d.id && p.x >= h.x - h.u * 0.6 && p.x <= h.x + h.w + h.u * 0.6 && p.y >= h.y - h.u * 1.2 && p.y <= h.floor + h.u * 0.8); return tg ? tg.id : 0; }
+function dropGlow(g, t, s, P, m, u, on){
+  const pad = u * 0.35, x = P.x - pad, y = P.y - m.h - pad, w = m.w + pad * 2, h = m.h + pad * 1.6, pulse = 0.5 + 0.5 * Math.sin(t * 6);
+  g.save(); g.fillStyle = on ? 'rgba(255,225,77,0.38)' : 'rgba(31,191,174,' + (0.12 + pulse * 0.1).toFixed(3) + ')'; roundRect(g, x, y, w, h, u * 0.4); g.fill();
+  g.setLineDash(on ? [] : [7, 5]); g.lineDashOffset = -t * 30; g.lineWidth = on ? 4 : 3; g.strokeStyle = on ? '#FFE14D' : '#5FF0D9'; g.shadowColor = on ? '#FFE14D' : '#5FF0D9'; g.shadowBlur = on ? 18 : 8 + pulse * 6; g.stroke(); g.restore();
+  const dn = G.drag.n; textTag(g, on ? dn + ' + ' + s.n : '🧲', P.x + m.w / 2, y - Math.max(12, u * 0.45), Math.max(13, u * (on ? 0.55 : 0.45)));
+}
+/* ✂️ CUT END */
 function bumpK(d){ const s = selStack(); if(!s) return; G.splitK = Math.max(1, Math.min(s.n - 1, G.splitK + d)); const el = $('split-k'); if(el) el.textContent = G.splitK; }
 function snapshot(){ G.hist.push(JSON.stringify(G.M.item.stacks)); if(G.hist.length > 30) G.hist.shift(); }
 function undo(){ if(G && GSStack.busy()){ GSStack.skip(); return; } if(!G || G.phase !== 'play' || !G.hist.length) return; G.M.item.stacks = JSON.parse(G.hist.pop()); G.sel = 0; renderBar(); }
@@ -1179,7 +1233,8 @@ const GSStack = (function(){
     },
     // paint the tower (b + arrivals) at P (x = left, y = floor) + the jumping numbers
     draw(g, t, P, u, skin, mat){
-      const S = G.st, T = S.t, x0 = P.x;
+      const S = G.st, T = S.t, x0 = P.x, F0 = P.y, LH = NumberSkins.limbsOn() ? NumberSkins.LEG_H * u : 0, LK = LH ? NumberSkins.limbKit(S.bN, S.bId != null ? S.bId : S.bN) : null;   /* 🙆 GSSTACK LIMBS gs2-g2 */
+      if(LK){ NumberSkins.legs(g, LK, x0 + u * 0.08, Math.max(u * 0.84, NumberSkins.measure(S.bN, u).w - u * 0.16), F0, LH, u, NumberSkins.colour(skin, colN(S.bN)), t); P = {x: P.x, y: P.y - LH}; }
       const colB = NumberSkins.colour(skin, colN(S.bN)), colNew = NumberSkins.colour(skin, colN(S.n)), col10 = NumberSkins.colour(skin, 10);
       const landed = S.lands.filter(L => T >= L.C), clicks = S.lands.filter(L => L.click != null && T >= L.C);
       const rodsIn = S.bR + landed.filter(L => L.rod).length + clicks.length;
@@ -1213,6 +1268,7 @@ const GSStack = (function(){
       });
       // faces: b's face on b's own top block · the last number's face on its top block — at the morph they become ONE face
       const bTop = B.filter(o => o.b).slice(-1)[0], aTop = B.filter(o => !o.b && o.g != null).slice(-1)[0], allIn = landed.length === S.lands.length;
+      if(LK && B.length){ const yT = Math.min(...B.map(o => o.y)), xR = Math.max(...B.map(o => o.x + o.s)); NumberSkins.arms(g, LK, {x: x0, top: yT, w: xR - x0, h: P.y - yT}, u, NumberSkins.colour(skin, colN(S.bN)), t, S.lit ? 'happy' : 'wow'); }   /* 🙆 gs2-g2 */
       if(morphP < 0.5){ if(bTop) NumberSkins.face(g, bTop.x + bTop.s / 2, bTop.y + bTop.s / 2, bTop.s, S.bN, skin, S.lit ? 'happy' : 'wow', t);
         if(aTop && allIn) NumberSkins.face(g, aTop.x + aTop.s / 2, aTop.y + aTop.s / 2, aTop.s, S.G[aTop.g].aN, skin, S.lit ? 'happy' : 'wow', t); }
       g.restore();
@@ -1267,7 +1323,7 @@ const GSStack = (function(){
         if(T - S.click.t < 0.32){ g.save(); g.globalAlpha = 1 - (T - S.click.t) / 0.32; g.font = '800 ' + Math.round(Math.max(12, u * 0.55)) + 'px Fredoka, sans-serif'; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,0.6)'; const ty = Math.max(topY(rx - u, rx + u * 2) + 6, ry - u * 0.9 - (T - S.click.t) * u * 2); g.strokeText('10!', rx + ROD * u / 2, ty); g.fillStyle = '#FFE14D'; g.fillText('10!', rx + ROD * u / 2, ty); g.restore(); } }
       // the name badge under the tower: b's number until the morph, then the new one
       if(S.jId == null){ const txt = String(S.morphT != null ? S.n : S.bN), fs = Math.max(11, u * 0.62), w0 = NumberSkins.measure(S.morphT != null ? S.n : S.bN, u).w;
-        g.save(); g.font = '800 ' + Math.round(fs) + 'px Fredoka, sans-serif'; const tw = g.measureText(txt).width + fs * 0.7, bx = x0 + w0 / 2 - tw / 2, by = P.y + u * 0.12;
+        g.save(); g.font = '800 ' + Math.round(fs) + 'px Fredoka, sans-serif'; const tw = g.measureText(txt).width + fs * 0.7, bx = x0 + w0 / 2 - tw / 2, by = F0 + u * 0.12;
         g.fillStyle = 'rgba(20,14,40,0.82)'; g.beginPath(); g.roundRect(bx, by, tw, fs * 1.15, fs * 0.4); g.fill(); g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(txt, x0 + w0 / 2, by + fs * 0.6); g.restore(); }
     },
     // 🏗️ Wobble + 🔟 Tens: the light landing beat (fall with gravity → contact squash + clack → small overshoot → the count chip pops) — then `after`
@@ -1293,7 +1349,7 @@ function doSnap(aId, bId, from){   // 🧊 gs-anim: jump → land one by one →
 function doSplit(k){
   if(GSStack.busy()){ GSStack.skip(); return; }   // 🧊 gs-anim
   const s = selStack(); if(!s) return; k = k || G.splitK; const n0 = s.n; snapshot(); const r = GS.cSplit(G.M, s.id, k); if(!r){ G.hist.pop(); UISound.play('error'); return; }
-  SND.split(); floatText(n0 + ' − ' + k + ' = ' + r.n, s.id, '#9FE8FF'); const P0 = G.pos[s.id] || {}; G.pos[r.newId] = {x: P0.x, liftU: Math.min(10, r.n + 0.5), whole: true, pop: 0.6}; P0.pop = 0.5; helperGo(r.newId, k); G.sel = 0; afterMove(r);
+  SND.split(); G.cut = null; G.M.splitSeen = true; floatText(n0 + ' − ' + k + ' = ' + r.n, s.id, '#9FE8FF'); const P0 = G.pos[s.id] || {}; G.pos[r.newId] = {x: P0.x, liftU: Math.min(10, r.n + 0.5), whole: true, pop: 0.6}; P0.pop = 0.5; helperGo(r.newId, k); G.sel = 0; afterMove(r);
 }
 function doCopy(m){ if(GSStack.busy()){ GSStack.skip(); return; } const s = selStack(); if(!s) return; const n0 = s.n; snapshot(); const r = GS.cCopy(G.M, s.id, m); if(!r){ G.hist.pop(); UISound.play('error'); UI.toast('Too big to copy'); return; } SND.copy();   // 🧊 gs-anim
   const it = G.M.item, keep = {done: it.done, ok: it.ok, hit: it.hit}; it.done = false; G.sel = 0;
@@ -1424,12 +1480,17 @@ function helperTick(dt){
   else if(H_.state === 'back'){ H_.state = ''; H_.x = home; }
 }
 /* 🌱 Basic guide: a 👆 hand shows the first move of every round (until the player moves) */
-function guideOn(){ return G && !G.battle && G.M.level === 0 && G.phase === 'play' && G.M.item && (G.M.item.moves === 0 || guideReady()) && !G.M.item.done && !G.drag; }
+function guideSplit(){ const it = G && G.M.item; return !!(it && it.kind === 'count' && !G.M.splitSeen && it.moves === 0 && it.plan[0] && it.plan[0][0] === 'split' && G.M.level <= 2); }   /* ✂️ gs2-g2 */
+function guideOn(){ return G && !G.battle && (G.M.level === 0 || guideSplit()) && G.phase === 'play' && G.M.item && (G.M.item.moves === 0 || guideReady()) && !G.M.item.done && !G.drag; }
 function guideReady(){ const it = G.M.item; return GS.isQuiz(it) ? G.pick != null : GS.readyOf(G.M).ok; }   /* ✅ gs2-g1 */
 function guideTarget(){
   const it = G.M.item, r = CV.getBoundingClientRect(), C = (x, y) => ({x: r.left + x, y: r.top + y}), btn = sel => { const b = document.querySelector(sel); if(!b) return null; const q = b.getBoundingClientRect(); return {x: q.left + q.width / 2, y: q.top + q.height / 2}; };
   const hit = id => (G.hits || []).find(h => h.id === id);
   if(guideReady()){ const b = btn('#btn-submit'); return b ? {from: b, to: b, tap: true, text: GS.isQuiz(it) ? '👆 Sure? Press <b>✅ Submit</b> to throw it' : '✅ Looks right? Press <b>Submit</b>'} : null; }   /* ✅ gs2-g1 */
+  if(it.kind === 'count' && guideSplit()){ const p = it.plan[0], a = it.stacks.find(s => s.n === p[1]), ha = a && hit(a.id); if(!ha) return null;   /* ✂️ gs2-g2: tap → ✂️ → how many */
+    if(G.sel !== a.id){ const c = C(ha.x + ha.w / 2, ha.floor - ha.u * Math.min(a.n, 10) * 0.5); return {from: c, to: c, tap: true, text: '👆 Tap <b>' + p[1] + '</b> — we need to take some away'}; }
+    if(!G.cut){ const b = btn('#cut-btn'); return b ? {from: b, to: b, tap: true, text: '✂️ Tap the <b>scissors</b> beside ' + p[1]} : null; }
+    const b = btn('#cut-pick .ck[data-k="' + p[2] + '"]'); return b ? {from: b, to: b, tap: true, text: '👆 Take <b>' + p[2] + '</b> off: ' + p[1] + ' − ' + p[2] + ' = ' + (p[1] - p[2])} : null; }
   if(it.kind === 'count'){ const p = it.plan[0]; if(!p) return null; const a = it.stacks.find(s => s.n === p[2]), b = a && it.stacks.find(s => s.n === p[1] && s.id !== a.id), ha = a && hit(a.id), hb = b && hit(b.id); if(!ha || !hb) return null;
     return {from: C(ha.x + ha.w / 2, ha.y + ha.h * 0.45), to: C(hb.x + hb.w / 2, hb.y + hb.h * 0.45), text: '👆 Drag <b>' + p[2] + '</b> onto <b>' + p[1] + '</b> to snap them: ' + p[1] + ' + ' + p[2] + ' = ' + (p[1] + p[2])}; }
   if(it.kind === 'balance' || it.kind === 'avatar'){ const v = it.plan[0], pc = it.tray.find(x => x.n === v), h = pc && hit(pc.id), pb = G.panBox; if(!h || !pb) return null; return {from: C(h.x + h.w / 2, h.y + h.h * 0.4), to: C(pb.x + pb.w / 2, pb.y + pb.h * 0.7), text: '👆 Drag a block onto the right pan — stop when the scale is level'}; }
@@ -1684,7 +1745,7 @@ function countLayout(gy){
   return {u, aw, top, goalX: W - 12 - goalW1 * u, goalW: goalW1 * u};
 }
 function drawCount(g, t, gy){
-  const it = G.M.item, CL = countLayout(gy), u = CL.u; G.hits = []; G.cl = CL; G.stackX = G.stackX || {};
+  const it = G.M.item, CL = countLayout(gy), u = CL.u, dropT = dropTarget(); G.hits = [];   /* 🧲 gs2-g2: last frame's hits */ G.cl = CL; G.stackX = G.stackX || {};
   { const ws = it.stacks.reduce((a, s) => a + NumberSkins.measure(s.n, u).w, 0) + u * Math.max(0, it.stacks.length - 1); if(!G.cntW || G.cntW.it !== it || G.cntW.u !== u) G.cntW = {it, u, w: ws}; else G.cntW.w = Math.max(G.cntW.w, ws);
     const grp = G.cntW.w + u * 1.6 + CL.goalW, gx0 = midX(grp, CL.aw + 8); CL.goalX = Math.min(W - 12 - CL.goalW, gx0 + G.cntW.w + u * 1.6); CL.left0 = gx0; }   /* ✅ gs2-g1 📏 centred */
   // goal pad + ghost
@@ -1702,15 +1763,20 @@ function drawCount(g, t, gy){
     const hopP = hitDone && P.hop0 != null && Math.abs(tx - P.hop0) > 2 ? Math.max(0, Math.min(1, 1 - Math.abs(tx - P.x) / Math.abs(tx - P.hop0))) : 1; P.y = gy - 4 - (FX ? Math.sin(hopP * Math.PI) * Math.min(u * 2.2, (gy - CL.top) * 0.25) : 0);   // 🧊 hop onto the 🎯 pad
     const liftPx = (P.liftU || 0) * u; if(P.liftU){ P.liftU *= 0.84; if(P.liftU < 0.03) P.liftU = 0; } const pop = P.pop || 0; if(pop){ P.pop *= 0.9; if(P.pop < 0.02) P.pop = 0; }
     const dragging = G.drag && G.drag.id === s.id && G.drag.on, sel = G.sel === s.id || (G.kbd && G.kbdIdx === i);
+    if(G.drag && G.drag.on && G.drag.kind === 'stack' && !dragging) dropGlow(g, t, s, P, m, u, dropT === s.id);   /* 🧲 gs2-g2 */
     const paint = () => { if(!dragging && G.st && G.st.bId === s.id && G.st.jId == null && !GSStack.morphDone()){ GSStack.draw(g, t, P, u, G.skin, THEMES[G.theme].mat); return; }   // 🧊 gs-anim
     if(!dragging){ g.save(); if(pop){ const sy = 1 + Math.sin(pop * Math.PI * 3) * 0.16 * pop, cx = P.x + w / 2; g.translate(cx, P.y); g.scale(1 / Math.sqrt(sy), sy); g.translate(-cx, -P.y); }
-      NumberSkins.draw(g, s.n, P.x, P.y, u, {skin: G.skin, mat: THEMES[G.theme].mat, t, label: true, sel, mood: hitDone || pop > 0.3 ? 'wow' : 'happy', lift: P.liftK && liftPx > 0.5 ? {k: Math.min(P.liftK, s.n), dy: liftPx} : (P.whole && liftPx > 0.5 ? {k: s.n, dy: liftPx / 1.4} : null)}); g.restore(); } };
+      const cutK = G.cut && G.cut.id === s.id && G.cut.k ? G.cut.k : 0;   /* ✂️ gs2-g2: the top k lift a little while you choose */
+      NumberSkins.draw(g, s.n, P.x, P.y, u, {key: s.id, skin: G.skin, mat: THEMES[G.theme].mat, t, label: true, sel, mood: hitDone || pop > 0.3 || dropT === s.id ? 'wow' : 'happy', lift: cutK ? {k: cutK, dy: u * 0.42} : P.liftK && liftPx > 0.5 ? {k: Math.min(P.liftK, s.n), dy: liftPx} : (P.whole && liftPx > 0.5 ? {k: s.n, dy: liftPx / 1.4} : null)}); g.restore();
+      if(cutK) cutLine(g, P.x, P.y - (s.n - cutK) * u - (NumberSkins.LEG_H * u), m.w, u); } };
+    const back = G.cut && G.cut.id !== s.id; if(back){ g.save(); g.globalAlpha = 0.32; }   /* ✂️ gs2-g2: the others step back while you choose */
     if(hitDone) later = paint; else paint();   // 🧊 the finished tower is painted last (in front of the others)
+    if(back) g.restore();
     G.stackX[s.id] = P.x + w / 2;
     G.hits.push({kind: 'stack', id: s.id, x: P.x, y: P.y - m.h, w: m.w, h: m.h + u * 0.9, u, n: s.n, floor: P.y});
     x += w + gap;
   });
-  later && later();
+  later && later(); cutPlace();   /* ✂️ gs2-g2 */
 }
 function drawAvatarCorner(g, t, gy){
   const it = G.M.item; if(it.kind === 'avatar' && !it.done) return;   // on the pan
@@ -1742,7 +1808,7 @@ function draw(t){
   if(SW) g.restore();
   drawAvatarCorner(g, t, gy);
   // dragged piece on top
-  if(G.drag && G.drag.on){ const d = G.drag; if(d.n != null) NumberSkins.draw(g, d.n, d.px - d.ox, d.py - d.oy, d.u, {skin: G.skin, mat: THEMES[G.theme].mat, t, label: true, mood: 'wow'}); else if(d.p) drawPiece(g, d.p, d.px - d.ox, d.py - d.oy, d.u, {t, label: true}); }
+  if(G.drag && G.drag.on){ const d = G.drag; if(d.n != null) NumberSkins.draw(g, d.n, d.px - d.ox, d.py - d.oy, d.u, {key: d.id, skin: G.skin, mat: THEMES[G.theme].mat, t, label: true, mood: 'wow'}); else if(d.p) drawPiece(g, d.p, d.px - d.ox, d.py - d.oy, d.u, {t, label: true}); }
   drawReveal(g); drawFx(g);
   const SW2 = swapK(); if(SW2 && SW2.out > 0){ g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = SW2.out; g.drawImage(G.swap.img, 0, 0); g.restore(); }   /* ✅ gs2-g1: beat 1 — the old board fades away */
 }
@@ -2038,9 +2104,7 @@ function tapOn(h, p){
   if(h.kind === 'tray'){ putOnPan(h.id); return; }
   if(h.kind === 'pan'){ takeBack(h.id); return; }
   if(h.kind === 'stack'){
-    if(G.sel === h.id && h.n > 1 && h.n <= 10 && GS.canOp(G.M, 'split')){   // tap a block of the picked number → split there
-      const fromTop = Math.floor((p.y - (h.floor - h.n * h.u)) / h.u); const k = Math.max(1, Math.min(h.n - 1, fromTop + 1)); G.splitK = k; doSplit(k); return; }
-    G.sel = G.sel === h.id ? 0 : h.id; G.splitK = 1; UISound.play('tap'); renderBar();
+    G.sel = G.sel === h.id ? 0 : h.id; G.splitK = 1; G.cut = null; UISound.play('tap'); renderBar();   /* ✂️ gs2-g2: split = ✂️ → how many */
   }
 }
 
@@ -2068,6 +2132,8 @@ document.addEventListener('keydown', e => {
   if(it.kind === 'compare'){ const m = {'<': '<', ',': '<', '>': '>', '.': '>', '=': '=', '+': '='}[k]; if(m){ e.preventDefault(); pickAns(m); } return; }
   const list = it.kind === 'count' ? it.stacks : it.tray;
   if(k === 'ArrowRight' || k === 'ArrowLeft'){ e.preventDefault(); if(!list.length) return; G.kbd = true; G.kbdIdx = ((G.kbdIdx || 0) + (k === 'ArrowRight' ? 1 : -1) + list.length) % list.length; if(it.kind === 'count'){ G.sel = list[G.kbdIdx].id; renderBar(); } return; }
+  if(G.cut && it.kind === 'count' && /^[1-9]$/.test(k)){ const c = selStack(); if(c && Number(k) < c.n) cutDo(Number(k)); return; }   /* ✂️ gs2-g2 */
+  if(k === 'Escape' && G.cut){ cutClose(); return; }
   if(/^[1-9]$/.test(k)){ const i = list.findIndex(s => (s.n != null ? s.n : GS.val(s)) === Number(k)); if(i >= 0){ G.kbd = true; G.kbdIdx = i; if(it.kind === 'count'){ G.sel = list[i].id; renderBar(); } } return; }
   if(it.kind !== 'count'){
     if(k === 'Enter' || k === ' '){ e.preventDefault(); const p = list[G.kbdIdx || 0]; if(p) putOnPan(p.id); G.kbdIdx = Math.min(G.kbdIdx || 0, Math.max(0, it.tray.length - 1)); return; }
@@ -2077,7 +2143,7 @@ document.addEventListener('keydown', e => {
   const s = selStack();
   if(k === 'ArrowUp' || k === 'ArrowDown'){ e.preventDefault(); bumpK(k === 'ArrowUp' ? 1 : -1); return; }
   if(k === ' '){ e.preventDefault(); if(s){ const others = it.stacks.filter(q => q.id !== s.id); if(others.length){ const nb = others[0]; doSnap(s.id, nb.id); } } return; }   /* ✅ gs2-g1: Space snaps (Enter = Submit) */
-  if(k === 's' || k === 'S'){ doSplit(); return; }
+  if(k === 's' || k === 'S'){ if(s && GS.canOp(G.M, 'split') && s.n > 1) cutOpen(); return; }   /* ✂️ gs2-g2 */
   if(k === 'c' || k === 'C'){ doCopy(2); return; }
   if(k === 'd' || k === 'D'){ doShare(2); return; }
   if(k === 'u' || k === 'U' || k === 'Backspace'){ e.preventDefault(); undo(); return; }
@@ -2155,4 +2221,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (gs-4+p1d+p3a+cs-4b+b3w3+24u-c+gs-anim+gs2-g1) END OF GeoScout.html -->
+<!-- (gs-4+p1d+p3a+cs-4b+b3w3+24u-c+gs-anim+gs2-g1+gs2-g2) END OF GeoScout.html -->
