@@ -1,5 +1,5 @@
 <!-- CreatureLab.html — 🐾 CreatureKit lab (av-r0c, hidden: ?page=creatures). Not in the Gameroom. Every creature on the shared rig: 📚 all · 📏 size ladder next to your avatar ·
-     ⚔️ battle (the camera zooms out so a ×2.8 boss fits) · 🗺️ map (baked walk frames) · 🐣 pets (5 stages) · 🌊 sea · 🪄 cast (av-naga6) — and ▶ every act on the beat timeline. -->
+     ⚔️ battle (the camera zooms out so a ×2.8 boss fits) · 🗺️ map (baked walk frames) · 🐣 pets (5 stages) · 🌊 sea (→ 🥊 Phaya Naga's fight, av-naga7) · 🪄 cast (av-naga6) · 🪽 sky — and ▶ every act on the beat timeline. -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -103,9 +103,14 @@ const SKG = SKY ? [['🟫 Ground ①', ['asHookL', 'asHookR', 'asTeep', 'asRound
 const SK_X = {asCatch: ['🫳', 'Catch'], asFlyOut: ['⬆️', 'Fly out'], asPause: ['🫁', 'Pause'], asOneTwo: ['👊', '1-2']}, SK_C = {lrTeep: 'L · R · Teep', lrCroc: 'L · R · Croc', landEle: 'Land · Elephant', sky: 'Sky combo', double: 'Double swoop'};
 const skBlock = k => SKY.BLOCKS.find(b => b.act === k || b.act + 'H' === k) || null;
 const skyChips = () => SKY ? SKG[S.sg][1].map(k => { if(k.indexOf('combo:') === 0){ const id = k.slice(6); return [k, SKY.COMBOS[id].icon.slice(0, 2), SK_C[id] || id]; } const b = skBlock(k), x = SK_X[k]; return [k, x ? x[0] : b.icon, x ? x[1] : b.name.split(' ').slice(-2).join(' ')]; }).concat([['sview', '🧭', SKV[S.skv][2]]]) : [];
-const actList = () => S.view === 'sea' ? SEA_ACTS : S.view === 'cast' ? castChips() : S.view === 'sky' ? skyChips() : ACTS;
+/* 🥊 av-naga7: the Fight view — Phaya Naga (CreatureSea, Creatures.NAGA) plays every block / combo of a form at a hero dummy; ◀ ▶ = form · page, 🧭 = the view */
+const NG = C.NAGA || null, NGF = ['🌊 Tide Maker', '🌋 Cave Quaker', '🎤 Naga Queen', '⛈️ Naga King'], NGV = [[undefined, '➡️ side'], ['SW', '↙ SW'], ['SE', '↘ SE'], ['NW', '↖ NW'], ['NE', '↗ NE']];
+const NGP = NG ? [0, 1, 2, 3].reduce((all, f) => { const mv = NG.BLOCKS.filter(b => b.act && b.forms.includes(f)).map(b => b.id), cs = NG.BLOCKS.filter(b => b.cast && b.forms.includes(f)).map(b => b.id), co = Object.keys(NG.COMBOS).filter(k => NG.COMBOS[k].form === f).map(k => 'combo:' + k);
+  for(let i = 0; i < mv.length; i += 6) all.push([f, '🧱' + (mv.length > 6 ? ' ' + (i / 6 + 1) : ''), mv.slice(i, i + 6)]); if(cs.length) all.push([f, '🪄', cs]); if(co.length) all.push([f, '🔗', co]); return all; }, []) : [];
+const fightChips = () => NG ? NGP[S.fp][2].map(k => { if(k.indexOf('combo:') === 0){ const c = NG.COMBOS[k.slice(6)]; return [k, [...c.icon].slice(0, 2).join(''), c.name.split(' → ')[0].split(' (')[0] + ' →']; } const b = NG.blockOf(k); return [k, b.icon, b.name]; }).concat([['fview', '🧭', NGV[S.fv][1]]]) : [];
+const actList = () => S.view === 'fight' ? fightChips() : S.view === 'sea' ? SEA_ACTS : S.view === 'cast' ? castChips() : S.view === 'sky' ? skyChips() : ACTS;
 const ALL = C.list().filter(id => !C.LIST[id].pet);
-const S = {view: 'all', act: null, actT0: 0, sel: 0, form: 2, pet: 0, sv: 0, cf: 3, cv: 0, castC: null, castT0: 0, castSp: null, hits: 0, sg: 0, skv: 1, sk: null, skT0: 0, skLast: '', turn: false, W: 0, H: 0, dpr: 1, fits: null, frameMs: 0, drawn: [], log: []};
+const S = {view: 'all', act: null, actT0: 0, sel: 0, form: 2, pet: 0, sv: 0, cf: 3, cv: 0, castC: null, castT0: 0, castSp: null, hits: 0, sg: 0, skv: 1, sk: null, skT0: 0, skLast: '', turn: false, fp: 0, fv: 0, fk: null, fT0: 0, fu: {}, W: 0, H: 0, dpr: 1, fits: null, frameMs: 0, drawn: [], log: []};
 const name = CURRENT_PLAYER && CURRENT_PLAYER.indexOf('<' + '?') < 0 ? CURRENT_PLAYER : 'Aowu';
 const who = {name, av: (typeof defaultAvatar === 'function') ? defaultAvatar(name) : null, dir: 1, walkT: 0};
 let AVH = 0; function avH(){ if(!AVH) AVH = C.box('lab:av', q => drawAvatar(q, who, 0, 0, 1, {t: 0.5, still: true})).h; return AVH; }
@@ -113,13 +118,14 @@ function avatarAt(x, y, px){ drawAvatar(g, who, x, y, px / avH(), {t: S.t, still
 const PETS = C.list().filter(id => { const d = C.LIST[id]; return d.rank !== 'boss' && d.fam !== 'giant' && C.friendChance(d) > 0 || d.pet; });
 function chipRow(box, list, cur, on){ box.innerHTML = ''; list.forEach(([k, ic, lb]) => { const b = document.createElement('button'); b.className = 'chip' + (k === cur ? ' on' : ''); b.dataset.k = k;
     b.innerHTML = ic + '<span class="lb"> ' + lb + '</span>'; b.onclick = () => on(k, b); box.appendChild(b); }); }
-function pickRow(){ const P = $('pick'); P.innerHTML = ''; if(S.view !== 'battle' && S.view !== 'pets' && S.view !== 'sea' && S.view !== 'cast' && S.view !== 'sky') return;
-  const lab = S.view === 'sky' ? SKG[S.sg][0] : S.view === 'cast' ? FORMS[S.cf] : S.view === 'sea' ? SV[S.sv][1] + ' ' + SV[S.sv][0] : S.view === 'battle' ? ['Grand Yak', '✦ Elite', '✦✦ Awakened'][S.form] : C.LIST[PETS[S.pet]].name;
-  P.innerHTML = '<button class="chip" id="pk-prev">◀</button><b id="pk-name">' + lab + '</b><button class="chip" id="pk-next">▶</button>';
-  const step = d => { if(S.view === 'sky'){ S.sg = (S.sg + d + SKG.length) % SKG.length; S.sk = null; chipRow($('acts'), actList(), null, playAct); } else if(S.view === 'cast'){ S.cf = (S.cf - 1 + d + 3) % 3 + 1; S.castC = null; chipRow($('acts'), actList(), null, playAct); } else if(S.view === 'sea') S.sv = (S.sv + d + 4) % 4; else if(S.view === 'battle') S.form = (S.form + d + 3) % 3; else S.pet = (S.pet + d + PETS.length) % PETS.length; pickRow(); };
-  $('pk-prev').onclick = () => step(-1); $('pk-next').onclick = () => step(1); }
-function setView(v){ const was = S.view, grp = x => x === 'sea' || x === 'cast' || x === 'sky' ? x : 'core'; S.view = v; S.castC = null; if(grp(was) !== grp(v)){ S.act = null; chipRow($('acts'), actList(), null, playAct); } chipRow($('views'), VIEWS, v, setView); pickRow(); }
-function playAct(a){ if(S.view === 'sky'){ if(a === 'sview') S.skv = (S.skv + 1) % SKV.length; else { S.sk = a; S.skT0 = performance.now(); S.hits = 0; S.skLast = ''; S.turn = false; S.log.push(a); } chipRow($('acts'), actList(), a === 'sview' ? S.sk : a, playAct); return; }
+function pickRow(){ const P = $('pick'); P.innerHTML = ''; if(S.view !== 'battle' && S.view !== 'pets' && S.view !== 'sea' && S.view !== 'cast' && S.view !== 'sky' && S.view !== 'fight') return;
+  const lab = S.view === 'fight' ? NGF[NGP[S.fp][0]] + ' · ' + NGP[S.fp][1] : S.view === 'sky' ? SKG[S.sg][0] : S.view === 'cast' ? FORMS[S.cf] : S.view === 'sea' ? SV[S.sv][1] + ' ' + SV[S.sv][0] : S.view === 'battle' ? ['Grand Yak', '✦ Elite', '✦✦ Awakened'][S.form] : C.LIST[PETS[S.pet]].name;
+  P.innerHTML = '<button class="chip" id="pk-prev">◀</button><b id="pk-name">' + lab + '</b><button class="chip" id="pk-next">▶</button>' + (S.view === 'sea' && NG ? '<button class="chip" id="pk-fight" data-k="fight">🥊<span class="lb"> Fight</span></button>' : '');   /* 🥊 av-naga7: Sea → Fight */
+  const step = d => { if(S.view === 'fight'){ S.fp = (S.fp + d + NGP.length) % NGP.length; S.fk = null; chipRow($('acts'), actList(), null, playAct); } else if(S.view === 'sky'){ S.sg = (S.sg + d + SKG.length) % SKG.length; S.sk = null; chipRow($('acts'), actList(), null, playAct); } else if(S.view === 'cast'){ S.cf = (S.cf - 1 + d + 3) % 3 + 1; S.castC = null; chipRow($('acts'), actList(), null, playAct); } else if(S.view === 'sea') S.sv = (S.sv + d + 4) % 4; else if(S.view === 'battle') S.form = (S.form + d + 3) % 3; else S.pet = (S.pet + d + PETS.length) % PETS.length; pickRow(); };
+  $('pk-prev').onclick = () => step(-1); $('pk-next').onclick = () => step(1); if($('pk-fight')) $('pk-fight').onclick = () => { S.fp = 0; S.fk = null; setView('fight'); }; }
+function setView(v){ const was = S.view, grp = x => x === 'sea' || x === 'cast' || x === 'sky' || x === 'fight' ? x : 'core'; S.view = v; S.castC = null; if(grp(was) !== grp(v)){ S.act = null; chipRow($('acts'), actList(), null, playAct); } chipRow($('views'), VIEWS, v === 'fight' ? 'sea' : v, setView); pickRow(); }
+function playAct(a){ if(S.view === 'fight'){ if(a === 'fview') S.fv = (S.fv + 1) % NGV.length; else { S.fk = a; S.fT0 = performance.now(); S.hits = 0; S.turn = false; S.log.push(a); } chipRow($('acts'), actList(), a === 'fview' ? S.fk : a, playAct); return; }
+  if(S.view === 'sky'){ if(a === 'sview') S.skv = (S.skv + 1) % SKV.length; else { S.sk = a; S.skT0 = performance.now(); S.hits = 0; S.skLast = ''; S.turn = false; S.log.push(a); } chipRow($('acts'), actList(), a === 'sview' ? S.sk : a, playAct); return; }
   if(S.view === 'cast'){ if(a === 'cview'){ S.cv = (S.cv + 1) % CVIEWS.length; S.castC = null; } else { S.castSp = a; S.castC = null; S.castT0 = performance.now(); S.log.push(a); } chipRow($('acts'), actList(), S.castSp, playAct); return; }
   S.act = a; S.actT0 = performance.now(); S.log.push(a); chipRow($('acts'), actList(), a, playAct); }
 function size(){ const r = $('stage').getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1); if(r.width === S.W && r.height === S.H && dpr === S.dpr) return;
@@ -197,16 +203,35 @@ function vSky(){ const floor = S.H - 22, def = C.get('grandyak'), hpx = Math.min
   avatarAt(ax, floor, av); rec(ax - av / 3, floor - av, av / 1.5, av);
   C.draw(g, def, bx, floor, size, o); if(!o.act) rec(bx - hpx / 3, floor - hpx, hpx / 1.5, hpx);
   $('note').textContent = label + (S.hits ? ' · 💥 HIT ×' + S.hits : '') + (S.turn ? ' · 🫁 your turn!' : ''); }
-const DRAW = {all: vAll, sizes: vSizes, battle: vBattle, map: vMap, pets: vPets, sea: vSea, cast: vCast, sky: vSky};
+// 🥊 av-naga7: Phaya Naga + a hero dummy at the pool; every aimed head reaches the dummy's head ({target}); cast blocks draw their warnings + FX; 💥 HIT once per hit · 🫁 = your turn
+function vFight(){ const form = NGP[S.fp][0], V = NGV[S.fv], view = V[0], mir = view === 'SE' || view === 'NE', def = C.get('phayanaga'), nh = Math.min(S.H * 0.62, S.W * 0.5), size = 100 * nh / C.heightOf(def, {form});
+  if(S.fu[form] == null){ const q = document.createElement('canvas').getContext('2d'); S.fu[form] = C.draw(q, def, 0, 0, 100, {form, t: 0}).u; }
+  const u = S.fu[form] * size / 100, wy = S.H * 0.8, cx = mir ? S.W * 0.36 : S.W * 0.64, hx = cx + (mir ? 1 : -1) * Math.min(95 * u, S.W * 0.5), av = 52 * u, to = [hx, wy + 10];
+  g.fillStyle = '#E8D9A8'; g.beginPath(); g.ellipse(S.W / 2, wy + 14, S.W * 0.55, S.W * 0.12, 0, 0, 7); g.fill(); g.fillStyle = '#2F8FC8'; g.beginPath(); g.ellipse(cx, wy + 10, S.W * 0.26, S.W * 0.055, 0, 0, 7); g.fill();
+  const tgt = [-Math.abs(hx - cx) / u, -45], base = {form, view, target: tgt, x: cx, y: wy, size, to, toH: av};
+  let o = {form, view, t: S.t, pose: 'idle', target: tgt}, label = '🥊 ' + NG.FORMS[form] + ' · tap a move', L = null, ms = 0, sh = {x: 0, y: 0}, casts = [];
+  if(S.fk){ ms = performance.now() - S.fT0; const combo = S.fk.indexOf('combo:') === 0; try { L = combo ? NG.timeline(S.fk.slice(6), base) : NG.blockTimeline(S.fk, base); } catch(e){ S.err = e.message; S.fk = null; }
+    if(L && ms > L.T + 700){ S.fk = null; L = null; chipRow($('acts'), actList(), null, playAct); } }
+  if(L){ const q = Object.assign(combo_(L, ms), {t: S.t}), I = q.info; o = q; casts = I.casts;
+    S.hits = L.hits.filter(h => ms >= h).length; const ps = L.segs.find(s => s.pause); S.turn = !!ps && ms >= ps.contact;
+    casts.forEach(c => { const st = C.castAt(c.C, c.ms); sh.x += st.shake.x; sh.y += st.shake.y; });
+    const b = NG.blockOf(String(I.k).split(':')[0]), cb = L.combo; label = (cb ? cb.icon + ' ' + cb.name + ' · ' + L.hits.length + ' hits · ' : '') + (b ? b.icon + ' ' + b.name + ' · ' + b.th + ' · tell: ' + b.tell + ' → ' + b.answer : (NG.HELPERS[I.id] ? NG.HELPERS[I.id].icon + ' ' + NG.HELPERS[I.id].name : I.id)) + (I.beat ? ' · ' + I.beat : ''); }
+  if(form === 0 && (S.fk === 'tune' || S.fk === 'greet')) o.stone = 1; o.count = 5;
+  g.save(); g.translate(sh.x, sh.y); casts.forEach(c => C.castFx(g, c.C, c.ms, 'back'));
+  g.save(); g.translate(hx, wy + 10); if(S.hits && L && ms - L.hits[S.hits - 1] < 500) g.rotate(-0.12 * Math.sin((ms - L.hits[S.hits - 1]) / 500 * Math.PI)); avatarAt(0, 0, av); g.restore(); rec(hx - av / 3, wy + 10 - av, av / 1.5, av);
+  const A = C.draw(g, def, cx, wy, size, o); casts.forEach(c => C.castFx(g, c.C, c.ms, 'front', A)); g.restore(); rec(cx - nh / 2, wy - nh, nh, nh);
+  $('note').textContent = label + (S.hits ? ' · 💥 HIT ×' + S.hits : '') + (S.turn ? ' · 🫁 your turn!' : ''); }
+function combo_(L, ms){ return L.id ? NG.comboAt(L.id, ms, L.o) : NG.blockAt(L.items[0], ms, L.o); }
+const DRAW = {all: vAll, sizes: vSizes, battle: vBattle, map: vMap, pets: vPets, sea: vSea, cast: vCast, sky: vSky, fight: vFight};
 function frame(now){ size(); S.t = now / 1000; S.drawn = []; const t0 = performance.now();
-  g.setTransform(S.dpr, 0, 0, S.dpr, 0, 0); g.clearRect(0, 0, S.W, S.H); if(S.view !== 'battle' && S.view !== 'map' && S.view !== 'pets' && S.view !== 'sea' && S.view !== 'cast' && S.view !== 'sky') $('note').textContent = '🐾 ' + C.list().length + ' creatures · v ' + C.VERSION;
+  g.setTransform(S.dpr, 0, 0, S.dpr, 0, 0); g.clearRect(0, 0, S.W, S.H); if(S.view !== 'battle' && S.view !== 'map' && S.view !== 'pets' && S.view !== 'sea' && S.view !== 'cast' && S.view !== 'sky' && S.view !== 'fight') $('note').textContent = '🐾 ' + C.list().length + ' creatures · v ' + C.VERSION;
   try { DRAW[S.view](); } catch(e){ S.err = e.message; }
   S.frameMs = S.frameMs * 0.9 + (performance.now() - t0) * 0.1; requestAnimationFrame(frame); }
 setView('all'); chipRow($('acts'), ACTS, null, playAct);
-window.CK_LAB = {S, setView, playAct, PETS, ALL, SEA, SV, seaView(v){ S.sv = v; pickRow(); }, castForm(f){ S.cf = f; S.castC = null; pickRow(); chipRow($('acts'), actList(), null, playAct); }, castView(i){ S.cv = i; S.castC = null; }, CVIEWS, SKG, SKV, skyGroup(i){ S.sg = i; S.sk = null; pickRow(); chipRow($('acts'), actList(), null, playAct); }, skyView(i){ S.skv = i; chipRow($('acts'), actList(), S.sk, playAct); }};
+window.CK_LAB = {S, setView, playAct, PETS, ALL, SEA, SV, seaView(v){ S.sv = v; pickRow(); }, castForm(f){ S.cf = f; S.castC = null; pickRow(); chipRow($('acts'), actList(), null, playAct); }, castView(i){ S.cv = i; S.castC = null; }, CVIEWS, SKG, SKV, skyGroup(i){ S.sg = i; S.sk = null; pickRow(); chipRow($('acts'), actList(), null, playAct); }, skyView(i){ S.skv = i; chipRow($('acts'), actList(), S.sk, playAct); }, NGP, NGV, fightPage(i){ S.fp = i; S.fk = null; pickRow(); chipRow($('acts'), actList(), null, playAct); }, fightForm(f){ this.fightPage(NGP.findIndex(x => x[0] === f)); }, fightView(i){ S.fv = i; chipRow($('acts'), actList(), S.fk, playAct); }};
 requestAnimationFrame(frame);
 })();
 </script>
 </body>
 </html>
-<!-- (av-r0c+av-naga4+av-naga6+av-asura-b1) END OF CreatureLab.html -->
+<!-- (av-r0c+av-naga4+av-naga6+av-asura-b1+av-naga7) END OF CreatureLab.html -->
