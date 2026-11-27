@@ -64,6 +64,7 @@
 <script src="inc/AvatarWeapons.js"></script>
 <script src="inc/CreatureKit.js"></script>
 <script src="inc/CreatureSea.js"></script>
+<script src="inc/CreatureSky.js"></script>
 <script src="inc/MotionCreature.js"></script>
 <script src="inc/CreatureCast.js"></script>
 </head>
@@ -86,16 +87,23 @@ UI.navBar(document.getElementById('back-btn'), {});
 (function(){
 'use strict';
 const C = window.Creatures, $ = id => document.getElementById(id), cv = $('cv'), g = cv.getContext('2d');
-const VIEWS = [['all', '📚', 'All'], ['sizes', '📏', 'Sizes'], ['battle', '⚔️', 'Battle'], ['map', '🗺️', 'Map'], ['pets', '🐣', 'Pets']].concat(C.SEA ? [['sea', '🌊', 'Sea']] : []).concat(C.cast ? [['cast', '🪄', 'Cast']] : []);   // 🌊 av-naga4: CreatureSea families · 🪄 av-naga6: CreatureCast spells
+const VIEWS = [['all', '📚', 'All'], ['sizes', '📏', 'Sizes'], ['battle', '⚔️', 'Battle'], ['map', '🗺️', 'Map'], ['pets', '🐣', 'Pets']].concat(C.SEA ? [['sea', '🌊', 'Sea']] : []).concat(C.cast ? [['cast', '🪄', 'Cast']] : []).concat(C.SKY ? [['sky', '🪽', 'Sky']] : []);   // 🪽 av-asura-b1: Asurapaksi's moves + combos · 🌊 av-naga4: CreatureSea families · 🪄 av-naga6: CreatureCast spells
 const ACTS = [['attack', '⚔️', 'Attack'], ['cast', '✨', 'Cast'], ['hurt', '🤕', 'Hurt'], ['ko', '💫', 'KO'], ['cheer', '🎉', 'Cheer']];
 const SEA_ACTS = [['rise', '🔥', 'Rise'], ['lunge', '🐍', 'Lunge'], ['sweep', '🌀', 'Sweep'], ['dive', '🤿', 'Dive']].filter(a => C.ACTS[a[0]]).concat([['fish', '🐟', 'Fish moves']]);   // 🐟 = every fish plays its own move
 const FISH_ACT = {glidray: 'glide', mudhopper: 'hop', bettaflare: 'flare'};
 const SEA = C.list().filter(id => ['serpent', 'fish'].indexOf(C.LIST[id].fam) >= 0), SV = [['SW', '↙'], ['SE', '↘'], ['NW', '↖'], ['NE', '↗']];   // 🧭 the 4 main views
 const FORMS = [null, '✦ Elite · 3', '✦✦ Awakened · 7', '✦✦✦ Prime · 9'], CVIEWS = [[undefined, '➡️ side'], ['SW', '↙ SW'], ['SE', '↘ SE'], ['NW', '↖ NW'], ['NE', '↗ NE']];   // 🪄 av-naga6
 const castChips = () => C.cast ? C.castable('phayanaga', S.cf).map(k => [k, C.SPELLS[k].icon, C.SPELLS[k].name]).concat([['cview', '🧭', CVIEWS[S.cv][1]]]) : [];
-const actList = () => S.view === 'sea' ? SEA_ACTS : S.view === 'cast' ? castChips() : ACTS;
+/* 🪽 av-asura-b1: the Sky view — Asurapaksi (Grand Yak ✦✦✦, CreatureSky) plays every move block / combo at a hero dummy; ◀ ▶ = the group, 🧭 = the view */
+const SKY = C.SKY || null, SKV = [[undefined, undefined, '➡️ side'], [-40, undefined, '↙ SW'], [-40, 'right', '↘ SE'], [-138, undefined, '↖ NW'], [-138, 'right', '↗ NE']];
+const SKG = SKY ? [['🟫 Ground ①', ['asHookL', 'asHookR', 'asTeep', 'asRoundhouse', 'asMonkSweep']], ['🟫 Ground ②', ['asElephant', 'asGuard', 'asCatch', 'asClinch', 'asCroc']], ['☁️ Air', ['asSwoop', 'asSpin', 'asAxeH', 'asOneTwo', 'asFlyOut']],
+  ['🙏 Start · finish', ['asWaiKhru', 'asGust', 'asClubSlam', 'asPause']], ['🔗 Combos', Object.keys(SKY.COMBOS).map(k => 'combo:' + k)]] : [];
+const SK_X = {asCatch: ['🫳', 'Catch'], asFlyOut: ['⬆️', 'Fly out'], asPause: ['🫁', 'Pause'], asOneTwo: ['👊', '1-2']}, SK_C = {lrTeep: 'L · R · Teep', lrCroc: 'L · R · Croc', landEle: 'Land · Elephant', sky: 'Sky combo', double: 'Double swoop'};
+const skBlock = k => SKY.BLOCKS.find(b => b.act === k || b.act + 'H' === k) || null;
+const skyChips = () => SKY ? SKG[S.sg][1].map(k => { if(k.indexOf('combo:') === 0){ const id = k.slice(6); return [k, SKY.COMBOS[id].icon.slice(0, 2), SK_C[id] || id]; } const b = skBlock(k), x = SK_X[k]; return [k, x ? x[0] : b.icon, x ? x[1] : b.name.split(' ').slice(-2).join(' ')]; }).concat([['sview', '🧭', SKV[S.skv][2]]]) : [];
+const actList = () => S.view === 'sea' ? SEA_ACTS : S.view === 'cast' ? castChips() : S.view === 'sky' ? skyChips() : ACTS;
 const ALL = C.list().filter(id => !C.LIST[id].pet);
-const S = {view: 'all', act: null, actT0: 0, sel: 0, form: 2, pet: 0, sv: 0, cf: 3, cv: 0, castC: null, castT0: 0, castSp: null, hits: 0, W: 0, H: 0, dpr: 1, fits: null, frameMs: 0, drawn: [], log: []};
+const S = {view: 'all', act: null, actT0: 0, sel: 0, form: 2, pet: 0, sv: 0, cf: 3, cv: 0, castC: null, castT0: 0, castSp: null, hits: 0, sg: 0, skv: 1, sk: null, skT0: 0, skLast: '', turn: false, W: 0, H: 0, dpr: 1, fits: null, frameMs: 0, drawn: [], log: []};
 const name = CURRENT_PLAYER && CURRENT_PLAYER.indexOf('<' + '?') < 0 ? CURRENT_PLAYER : 'Aowu';
 const who = {name, av: (typeof defaultAvatar === 'function') ? defaultAvatar(name) : null, dir: 1, walkT: 0};
 let AVH = 0; function avH(){ if(!AVH) AVH = C.box('lab:av', q => drawAvatar(q, who, 0, 0, 1, {t: 0.5, still: true})).h; return AVH; }
@@ -103,13 +111,14 @@ function avatarAt(x, y, px){ drawAvatar(g, who, x, y, px / avH(), {t: S.t, still
 const PETS = C.list().filter(id => { const d = C.LIST[id]; return d.rank !== 'boss' && d.fam !== 'giant' && C.friendChance(d) > 0 || d.pet; });
 function chipRow(box, list, cur, on){ box.innerHTML = ''; list.forEach(([k, ic, lb]) => { const b = document.createElement('button'); b.className = 'chip' + (k === cur ? ' on' : ''); b.dataset.k = k;
     b.innerHTML = ic + '<span class="lb"> ' + lb + '</span>'; b.onclick = () => on(k, b); box.appendChild(b); }); }
-function pickRow(){ const P = $('pick'); P.innerHTML = ''; if(S.view !== 'battle' && S.view !== 'pets' && S.view !== 'sea' && S.view !== 'cast') return;
-  const lab = S.view === 'cast' ? FORMS[S.cf] : S.view === 'sea' ? SV[S.sv][1] + ' ' + SV[S.sv][0] : S.view === 'battle' ? ['Grand Yak', '✦ Elite', '✦✦ Awakened'][S.form] : C.LIST[PETS[S.pet]].name;
+function pickRow(){ const P = $('pick'); P.innerHTML = ''; if(S.view !== 'battle' && S.view !== 'pets' && S.view !== 'sea' && S.view !== 'cast' && S.view !== 'sky') return;
+  const lab = S.view === 'sky' ? SKG[S.sg][0] : S.view === 'cast' ? FORMS[S.cf] : S.view === 'sea' ? SV[S.sv][1] + ' ' + SV[S.sv][0] : S.view === 'battle' ? ['Grand Yak', '✦ Elite', '✦✦ Awakened'][S.form] : C.LIST[PETS[S.pet]].name;
   P.innerHTML = '<button class="chip" id="pk-prev">◀</button><b id="pk-name">' + lab + '</b><button class="chip" id="pk-next">▶</button>';
-  const step = d => { if(S.view === 'cast'){ S.cf = (S.cf - 1 + d + 3) % 3 + 1; S.castC = null; chipRow($('acts'), actList(), null, playAct); } else if(S.view === 'sea') S.sv = (S.sv + d + 4) % 4; else if(S.view === 'battle') S.form = (S.form + d + 3) % 3; else S.pet = (S.pet + d + PETS.length) % PETS.length; pickRow(); };
+  const step = d => { if(S.view === 'sky'){ S.sg = (S.sg + d + SKG.length) % SKG.length; S.sk = null; chipRow($('acts'), actList(), null, playAct); } else if(S.view === 'cast'){ S.cf = (S.cf - 1 + d + 3) % 3 + 1; S.castC = null; chipRow($('acts'), actList(), null, playAct); } else if(S.view === 'sea') S.sv = (S.sv + d + 4) % 4; else if(S.view === 'battle') S.form = (S.form + d + 3) % 3; else S.pet = (S.pet + d + PETS.length) % PETS.length; pickRow(); };
   $('pk-prev').onclick = () => step(-1); $('pk-next').onclick = () => step(1); }
-function setView(v){ const was = S.view, grp = x => x === 'sea' || x === 'cast' ? x : 'core'; S.view = v; S.castC = null; if(grp(was) !== grp(v)){ S.act = null; chipRow($('acts'), actList(), null, playAct); } chipRow($('views'), VIEWS, v, setView); pickRow(); }
-function playAct(a){ if(S.view === 'cast'){ if(a === 'cview'){ S.cv = (S.cv + 1) % CVIEWS.length; S.castC = null; } else { S.castSp = a; S.castC = null; S.castT0 = performance.now(); S.log.push(a); } chipRow($('acts'), actList(), S.castSp, playAct); return; }
+function setView(v){ const was = S.view, grp = x => x === 'sea' || x === 'cast' || x === 'sky' ? x : 'core'; S.view = v; S.castC = null; if(grp(was) !== grp(v)){ S.act = null; chipRow($('acts'), actList(), null, playAct); } chipRow($('views'), VIEWS, v, setView); pickRow(); }
+function playAct(a){ if(S.view === 'sky'){ if(a === 'sview') S.skv = (S.skv + 1) % SKV.length; else { S.sk = a; S.skT0 = performance.now(); S.hits = 0; S.skLast = ''; S.turn = false; S.log.push(a); } chipRow($('acts'), actList(), a === 'sview' ? S.sk : a, playAct); return; }
+  if(S.view === 'cast'){ if(a === 'cview'){ S.cv = (S.cv + 1) % CVIEWS.length; S.castC = null; } else { S.castSp = a; S.castC = null; S.castT0 = performance.now(); S.log.push(a); } chipRow($('acts'), actList(), S.castSp, playAct); return; }
   S.act = a; S.actT0 = performance.now(); S.log.push(a); chipRow($('acts'), actList(), a, playAct); }
 function size(){ const r = $('stage').getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1); if(r.width === S.W && r.height === S.H && dpr === S.dpr) return;
   S.W = r.width; S.H = r.height; S.dpr = dpr; cv.width = Math.round(S.W * dpr); cv.height = Math.round(S.H * dpr); }
@@ -169,16 +178,33 @@ function vCast(){ const form = S.cf, view = CVIEWS[S.cv][0], def = C.get('phayan
   const A = Cc ? C.castDraw(g, Cc, ms) : C.draw(g, 'phayanaga', cx, wy, size, {form, view, t: S.t, pose: 'idle', castEls: C.castEls(form)}); if(Cc) C.castFx(g, Cc, ms, 'front', A); g.restore();
   rec(cx - nh / 2, wy - nh, nh, nh);
   const sp = S.castSp && C.SPELLS[S.castSp]; $('note').textContent = sp ? sp.icon + ' ' + sp.name + ' · ' + (st.beat || (st.done ? 'done' : '…')) + (S.hits ? ' · 💥 HIT ×' + S.hits : '') : '🪄 ' + C.castable('phayanaga', form).length + ' spells · ' + FORMS[form] + ' heads · tap a spell'; }
-const DRAW = {all: vAll, sizes: vSizes, battle: vBattle, map: vMap, pets: vPets, sea: vSea, cast: vCast};
+// 🪽 av-asura-b1: Asurapaksi + a hero dummy on the floor; every strike aims at the dummy's chest ({target}); 💥 HIT once per contact · 🫁 = your turn (a combo's pause)
+function vSky(){ const floor = S.H - 22, def = C.get('grandyak'), hpx = Math.min((S.H - 40) * 0.42, S.W * 0.3), size = 100 * hpx / C.heightOf(def, {form: 3}), V = SKV[S.skv], mir = V[1] === 'right';
+  if(!S.skH){ const q = document.createElement('canvas').getContext('2d'); S.skH = C.draw(q, def, 0, 0, 100, {form: 3, pose: 'asStance', t: 0}).H; }   // his height in plan units
+  const k = hpx / S.skH, ax = mir ? S.W * 0.76 : S.W * 0.24, av = hpx / 2.1, bx0 = mir ? S.W * 0.34 : S.W * 0.66;
+  g.fillStyle = 'rgba(120,200,110,.35)'; g.fillRect(0, floor, S.W, S.H - floor);
+  let o = {form: 3, t: S.t, yaw: V[0]}, faceR = mir, bx = bx0, label = '🪽 Asurapaksi · tap a move', act = null, seg = 0;
+  if(S.sk){ const ms = performance.now() - S.skT0;
+    if(S.sk.indexOf('combo:') === 0){ const id = S.sk.slice(6), L = SKY.timeline(id); if(ms > L.T + 600){ S.sk = null; chipRow($('acts'), actList(), null, playAct); }
+      else { const q = SKY.comboAt(id, ms); act = q.act; seg = q.seg; Object.assign(o, {act: q.act, ms: q.ms, from: q.from}); if(q.face === 'right'){ faceR = !mir; bx = 2 * ax - bx0; } label = SKY.COMBOS[id].icon + ' ' + SKY.COMBOS[id].name + ' · ' + SKY.hitsOf(id) + ' hits'; } }
+    else { const A = C.ACTS[S.sk], len = A.reduce((a, b) => a + b.ms, 0); if(ms > len + 600){ S.sk = null; chipRow($('acts'), actList(), null, playAct); } else { act = S.sk; Object.assign(o, {act: S.sk, ms: Math.min(ms, len), from: A.from}); const b = skBlock(S.sk), x = SK_X[S.sk]; label = (x ? x[0] + ' ' + x[1] : b.icon + ' ' + b.name + ' · ' + b.th) + (b ? ' · tell: ' + b.tell + ' → ' + b.answer : ''); } } }
+  if(!o.act) o.pose = 'asStance';
+  if(faceR) o.face = 'right';
+  o.target = [(faceR ? bx - ax : ax - bx) / k, -av * 0.55 / k];   // plan units from his feet, + = behind him
+  if(o.act){ const sm = C.sample(o.act, o.ms, o.from), key = S.sk + ':' + seg + ':' + sm.i; if(sm.contact && S.skLast !== key){ S.skLast = key; if(/^asPause/.test(o.act)) S.turn = true; else S.hits++; } label += ' · ' + sm.beat; }
+  avatarAt(ax, floor, av); rec(ax - av / 3, floor - av, av / 1.5, av);
+  C.draw(g, def, bx, floor, size, o); if(!o.act) rec(bx - hpx / 3, floor - hpx, hpx / 1.5, hpx);
+  $('note').textContent = label + (S.hits ? ' · 💥 HIT ×' + S.hits : '') + (S.turn ? ' · 🫁 your turn!' : ''); }
+const DRAW = {all: vAll, sizes: vSizes, battle: vBattle, map: vMap, pets: vPets, sea: vSea, cast: vCast, sky: vSky};
 function frame(now){ size(); S.t = now / 1000; S.drawn = []; const t0 = performance.now();
-  g.setTransform(S.dpr, 0, 0, S.dpr, 0, 0); g.clearRect(0, 0, S.W, S.H); if(S.view !== 'battle' && S.view !== 'map' && S.view !== 'pets' && S.view !== 'sea' && S.view !== 'cast') $('note').textContent = '🐾 ' + C.list().length + ' creatures · v ' + C.VERSION;
+  g.setTransform(S.dpr, 0, 0, S.dpr, 0, 0); g.clearRect(0, 0, S.W, S.H); if(S.view !== 'battle' && S.view !== 'map' && S.view !== 'pets' && S.view !== 'sea' && S.view !== 'cast' && S.view !== 'sky') $('note').textContent = '🐾 ' + C.list().length + ' creatures · v ' + C.VERSION;
   try { DRAW[S.view](); } catch(e){ S.err = e.message; }
   S.frameMs = S.frameMs * 0.9 + (performance.now() - t0) * 0.1; requestAnimationFrame(frame); }
 setView('all'); chipRow($('acts'), ACTS, null, playAct);
-window.CK_LAB = {S, setView, playAct, PETS, ALL, SEA, SV, seaView(v){ S.sv = v; pickRow(); }, castForm(f){ S.cf = f; S.castC = null; pickRow(); chipRow($('acts'), actList(), null, playAct); }, castView(i){ S.cv = i; S.castC = null; }, CVIEWS};
+window.CK_LAB = {S, setView, playAct, PETS, ALL, SEA, SV, seaView(v){ S.sv = v; pickRow(); }, castForm(f){ S.cf = f; S.castC = null; pickRow(); chipRow($('acts'), actList(), null, playAct); }, castView(i){ S.cv = i; S.castC = null; }, CVIEWS, SKG, SKV, skyGroup(i){ S.sg = i; S.sk = null; pickRow(); chipRow($('acts'), actList(), null, playAct); }, skyView(i){ S.skv = i; chipRow($('acts'), actList(), S.sk, playAct); }};
 requestAnimationFrame(frame);
 })();
 </script>
 </body>
 </html>
-<!-- (av-r0c+av-naga4+av-naga6) END OF CreatureLab.html -->
+<!-- (av-r0c+av-naga4+av-naga6+av-asura-b1) END OF CreatureLab.html -->
