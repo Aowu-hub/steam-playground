@@ -126,6 +126,10 @@
   /* ✅ gs2-g1 (GeoScout 2): ❓ bigger question · ✅ Submit · ▶ Next glow · ✅ ribbon under the question · ✗ shake + −points · 0.5 s change between rounds */
   .goal{font-size:1.6rem;padding:8px 18px;border-width:3px;width:max-content;}   /* width: an absolute box at left:50% only gets HALF the stage to wrap in — max-content + max-width uses the whole width */ .goal small{font-size:0.98rem;margin-top:2px;}
   @media (max-width:640px){ .goal{font-size:1.2rem;padding:6px 12px;} .goal small{font-size:0.8rem;} }
+  .bt-pad{position:absolute;z-index:4;display:flex;flex-direction:column;justify-content:center;pointer-events:none;touch-action:manipulation;user-select:none;-webkit-user-select:none;}   /* ⚔️ gs2-g6: one pad per player, inside their half */
+  .bt-pad.rot{transform:rotate(180deg);} .bt-pad .bt-row{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px;pointer-events:auto;}
+  .bt-pad .tb{min-height:50px;min-width:52px;font-size:1.1rem;} .bt-pad .tb.sg{font-size:1.75rem;line-height:1;min-width:54px;background:#fff;} .bt-pad .tb.lock{min-width:72px;} .bt-pad .tb.lock[aria-label]:not(:empty){min-width:72px;} .bt-pad.p2 .tb.lock{background:#FFD3BF;} .bt-pad .tb:disabled{opacity:.45;cursor:default;}
+  @media (orientation:landscape) and (max-height:500px){ .bt-pad .tb{min-height:44px;min-width:46px;padding:4px 9px;} .bt-pad .tb.sg{min-width:44px;font-size:1.45rem;padding:4px 6px;} .bt-pad .tb.lock{min-width:60px;} .bt-pad .bt-row{gap:6px;} }
   .goal.warn{border-color:#FF7A80;} .goal small.warn{color:#FFC2C5;}
   .bar .tb.take{background:#FFE1E1;color:#9A1C22;border-color:#FF9AA0;}   /* ➖ gs2-g3 */
   .bar .tb.brk{background:#FFF1C7;color:#6B4A00;border-color:#FFC845;}
@@ -311,7 +315,7 @@
   <div class="opts">
     <div class="box"><h3>🎨 House theme <span class="note">(blocks, scale + room)</span></h3><div class="chips scroll" id="theme-list"></div></div>
     <div class="box"><h3>🔢 My number blocks <span class="note">(looks only — also on ➗ Algebros tiles · 🔒 earn more in 📖 Journey)</span></h3><div class="chips scroll" id="skin-list"></div></div>
-    <div class="box hidden" id="opp-box"><h3>⚔️ Battle against <span class="note">(2 players take turns on this device)</span></h3><div class="chips scroll" id="opp-list"></div></div>
+    <div class="box hidden" id="opp-box"><h3>⚔️ Battle against <span class="note">(the same puzzle for both · race on this device)</span></h3><div class="chips scroll" id="opp-list"></div><h3>🔀 Rounds</h3><div class="chips" id="bt-types"></div></div>
   </div>
   <div class="section-head" id="level-head">🎚️ Pick a level</div>
   <div class="levels" id="level-list"></div>
@@ -371,7 +375,7 @@ const GS = (function(){
     frac: {icon: '🍕', name: 'Fractions', sub: 'Halves, thirds, quarters — which is bigger?'},
     wobble: {icon: '🏗️', name: 'Wobble tower', sub: 'Stack to the EXACT height'},
     journey: {icon: '📖', name: 'Journey', sub: 'Meet the number friends — 6 story chapters'},
-    battle: {icon: '⚔️', name: 'Tower battle', sub: '2 players · higher or lower wins · best of 5', multi: true}
+    battle: {icon: '⚔️', name: 'Tower battle', sub: '⚡ speed + 🧮 signs · same puzzle · first to 3', multi: true}
   };
   // a shape weighs as many blocks as it has corners (Geometric!)
   const SHAPES = {tri: {name: 'triangle', w: 3, col: '#FF7A59'}, sq: {name: 'square', w: 4, col: '#4C9AFF'}, pent: {name: 'pentagon', w: 5, col: '#9B6BFF'}, hex: {name: 'hexagon', w: 6, col: '#22C3A1'}};
@@ -847,28 +851,89 @@ const GS = (function(){
     if(subm(M) && !ok) return wrongTry(M, it, v, it.answer);   // ✅ gs2-g1
     it.done = true; it.ok = ok; it.picked = v; if(!ok) M.mistakes++; return {ok, answer: it.answer}; }
 
-  /* ---------- ⚔️ TOWER BATTLE (2 players, or you vs 🤖) ---------- */
-  const BAT = [{lo: 1, hi: 5, k: 3, miss: 0.5}, {lo: 1, hi: 9, k: 3, miss: 0.4}, {lo: 2, hi: 15, k: 4, miss: 0.3, near: true}, {lo: 5, hi: 40, k: 4, miss: 0.2, near: true, x2: true}, {lo: 5, hi: 60, k: 5, miss: 0.12, near: true, x2: true}, {lo: 20, hi: 300, k: 5, miss: 0.05, near: true, x2: true}];
-  function newBattle(cfg){ const seed = cfg.seed != null ? cfg.seed : ((Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0); return {cfg, level: cfg.level, r: rng(seed), names: cfg.names.slice(0, 2), robot: !!cfg.robot, wins: [0, 0], round: 0, log: [], need: 3, maxRounds: 7, over: false, winner: -1, deal: null}; }
-  function battleDeal(B){
-    const C = BAT[B.level], r = B.r, rules = ['high', 'low'].concat(C.near ? ['near'] : []), rule = pick(r, rules);
-    const hand = () => Array.from({length: C.k}, () => ri(r, C.lo, C.hi));
-    const target = rule === 'near' ? ri(r, C.lo * 2, C.hi * 2) : 0;
-    B.deal = {rule, target, hands: [hand(), hand()], picks: [null, null], x2: !!C.x2}; return B.deal;
+  /* ⚔️ BATTLE 2 START (gs2-g6) — ⚡ Speed + 🧮 Signs: BOTH players get the SAME puzzle and race; first right 🔒 wins the round */
+  // per level: ⚡ k blocks lo..hi, the target uses `use` blocks · 🧮 n numbers up to `max`, signs `ops` · robot seconds [⚡, 🧮] + miss chance
+  const BAT = [
+    {k: 3, lo: 1, hi: 5,   use: [2, 2], n: 2, max: 10, ops: '+-',   order: 'lr',   robot: [13, 15], miss: 0.35, time: 60},
+    {k: 4, lo: 1, hi: 9,   use: [2, 3], n: 3, max: 10, ops: '+-',   order: 'lr',   robot: [11, 14], miss: 0.3,  time: 60},
+    {k: 5, lo: 2, hi: 15,  use: [2, 3], n: 3, max: 12, ops: '+-x',  order: 'lr',   robot: [10, 12], miss: 0.25, time: 60},
+    {k: 5, lo: 5, hi: 40,  use: [3, 3], n: 3, max: 12, ops: '+-x/', order: 'lr',   robot: [9, 11],  miss: 0.2,  time: 60},
+    {k: 6, lo: 5, hi: 60,  use: [3, 4], n: 4, max: 12, ops: '+-x/', order: 'lr',   robot: [8, 10],  miss: 0.12, time: 75},
+    {k: 6, lo: 20, hi: 300, use: [3, 4], n: 4, max: 15, ops: '+-x/', order: 'math', robot: [7, 9],  miss: 0.06, time: 75}
+  ];
+  const SIGN = {'+': '+', '-': '−', 'x': '×', '/': '÷'};
+  function newBattle(cfg){ const seed = cfg.seed != null ? cfg.seed : ((Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0);
+    return {cfg, level: cfg.level, r: rng(seed), names: cfg.names.slice(0, 2), robot: !!cfg.robot, types: cfg.types || 'mix', wins: [0, 0], round: 0, log: [], need: 3, maxRounds: 5, over: false, winner: -1, deal: null}; }
+  function batType(B){ return B.types === 'speed' || B.types === 'signs' ? B.types : (B.round % 2 ? 'signs' : 'speed'); }
+  // ⚡ subsets of blocks that make the target
+  function speedSols(blocks, target){ const out = []; for(let m = 1; m < (1 << blocks.length); m++){ let s = 0; const use = []; for(let i = 0; i < blocks.length; i++) if(m & (1 << i)){ s += blocks[i]; use.push(i); } if(s === target) out.push(use); } return out; }
+  function speedPuzzle(C, r){
+    for(let tries = 0; tries < 400; tries++){
+      const blocks = Array.from({length: C.k}, () => ri(r, C.lo, C.hi)), need = ri(r, C.use[0], C.use[1]), idx = shuffle(r, blocks.map((_, i) => i)).slice(0, need), target = idx.reduce((a, i) => a + blocks[i], 0);
+      if(blocks.indexOf(target) >= 0) continue;                       // never ONE block = the answer
+      if(new Set(blocks).size < blocks.length - 1) continue;          // at most one pair of twins
+      const sols = speedSols(blocks, target); if(sols.some(u => u.length < 2)) continue;
+      if(C.k >= 5 && sols.length > 2) continue;                       // ⚡+: a real hunt, not "anything works"
+      return {type: 'speed', blocks, target, sols};
+    }
+    return {type: 'speed', blocks: [2, 3, 4].slice(0, C.k), target: 5, sols: [[0, 1]]};
   }
-  // a build: {use: [indexes], x2: bool} → its value
-  function buildValue(hand, b){ const s = (b.use || []).reduce((a, i) => a + (hand[i] || 0), 0); return b.x2 ? s * 2 : s; }
-  function allBuilds(hand, x2){ const out = []; for(let m = 1; m < (1 << hand.length); m++){ const use = []; for(let i = 0; i < hand.length; i++) if(m & (1 << i)) use.push(i); out.push({use, x2: false}); if(x2) out.push({use, x2: true}); } return out; }
-  function scoreFor(rule, v, target){ return rule === 'high' ? v : rule === 'low' ? -v : -Math.abs(v - target); }
-  function robotBuild(B, seat){ const D = B.deal, C = BAT[B.level], list = allBuilds(D.hands[seat], D.x2); if(B.r() < C.miss) return pick(B.r, list); return list.reduce((b, x) => scoreFor(D.rule, buildValue(D.hands[seat], x), D.target) > scoreFor(D.rule, buildValue(D.hands[seat], b), D.target) ? x : b, list[0]); }
-  function battleLock(B, seat, build){ const D = B.deal; if(!D || D.picks[seat] || !build || !build.use || !build.use.length) return false; if(build.x2 && !D.x2) return false; D.picks[seat] = {use: build.use.slice(), x2: !!build.x2}; return true; }
-  function battleJudge(B){
-    const D = B.deal; if(!D || !D.picks[0] || !D.picks[1]) return null;
-    const v = [0, 1].map(s => buildValue(D.hands[s], D.picks[s])), sc = v.map(x => scoreFor(D.rule, x, D.target)), w = sc[0] === sc[1] ? -1 : sc[0] > sc[1] ? 0 : 1;
-    if(w >= 0) B.wins[w]++; B.round++; B.log.push({rule: D.rule, target: D.target, v, w});
-    if(B.wins[0] >= B.need || B.wins[1] >= B.need || B.round >= B.maxRounds){ B.over = true; B.winner = B.wins[0] === B.wins[1] ? -1 : B.wins[0] > B.wins[1] ? 0 : 1; }
-    B.deal = null; return {v, w, over: B.over, winner: B.winner};
+  // 🧮 left-to-right ('lr') or real maths order ('math' = × ÷ first). null = not allowed (below 0 · not whole)
+  function evalSigns(nums, signs, order){
+    if(signs.some(s => !s)) return null;
+    const ap = (a, s, b) => s === '+' ? a + b : s === '-' ? a - b : s === 'x' ? a * b : (b && a % b === 0 ? a / b : null);
+    if(order === 'math'){ const v = [nums[0]], o = [];
+      for(let i = 0; i < signs.length; i++){ if(signs[i] === 'x' || signs[i] === '/'){ const x = ap(v[v.length - 1], signs[i], nums[i + 1]); if(x == null) return null; v[v.length - 1] = x; } else { v.push(nums[i + 1]); o.push(signs[i]); } }
+      let a = v[0]; for(let i = 0; i < o.length; i++){ a = ap(a, o[i], v[i + 1]); if(a < 0) return null; } return a; }
+    let a = nums[0]; for(let i = 0; i < signs.length; i++){ a = ap(a, signs[i], nums[i + 1]); if(a == null || a < 0) return null; } return a;
   }
+  function signCombos(ops, k){ let out = [[]]; for(let i = 0; i < k; i++){ const nx = []; out.forEach(c => ops.split('').forEach(o => nx.push(c.concat(o)))); out = nx; } return out; }
+  function signsPuzzle(C, r){
+    const all = signCombos(C.ops, C.n - 1);
+    for(let tries = 0; tries < 600; tries++){
+      const nums = Array.from({length: C.n}, () => ri(r, 1, C.max)), want = pick(r, all), target = evalSigns(nums, want, C.order);
+      if(target == null || target > 99) continue;
+      if(C.ops.length > 2 && !want.some(s => s === 'x' || s === '/') && r() < 0.6) continue;   // 🔦+: most puzzles need a × or ÷
+      if(want.some((s, i) => (s === 'x' || s === '/') && nums[i + 1] === 1)) continue;              // no × 1 / ÷ 1 freebies
+      const sols = all.filter(c => evalSigns(nums, c, C.order) === target);
+      if(sols.length > 2) continue;                                   // 1 or 2 ways, never "any sign works"
+      return {type: 'signs', nums, target, ops: C.ops, order: C.order, sols};
+    }
+    return {type: 'signs', nums: [7, 3, 5].slice(0, C.n), target: C.n === 2 ? 10 : 5, ops: C.ops, order: C.order, sols: [C.n === 2 ? ['+'] : ['+', '-']]};
+  }
+  function seatOf(P){ return {use: [], signs: P.type === 'signs' ? P.nums.slice(1).map(() => null) : [], sel: 0, frozen: 0, tries: 0, done: false, time: null, last: null}; }
+  function battleDeal(B){ const C = BAT[B.level], P = batType(B) === 'speed' ? speedPuzzle(C, B.r) : signsPuzzle(C, B.r);
+    B.deal = Object.assign(P, {seats: [seatOf(P), seatOf(P)], t: 0, limit: C.time, won: -1, over: false}); return B.deal; }
+  function seatValue(D, s){ const S_ = D.seats[s]; return D.type === 'speed' ? S_.use.reduce((a, i) => a + D.blocks[i], 0) : evalSigns(D.nums, S_.signs, D.order); }
+  function seatReady(D, s){ const S_ = D.seats[s]; return D.type === 'speed' ? S_.use.length >= 2 : S_.signs.every(Boolean); }
+  const live = (D, s) => D && !D.over && !D.seats[s].done && D.t >= D.seats[s].frozen;
+  function batTap(B, s, i){ const D = B.deal; if(!live(D, s) || D.type !== 'speed' || D.blocks[i] == null) return false; const U = D.seats[s].use, k = U.indexOf(i); if(k >= 0) U.splice(k, 1); else U.push(i); return true; }
+  function batSlot(B, s, i){ const D = B.deal; if(!live(D, s) || D.type !== 'signs') return false; const S_ = D.seats[s]; if(S_.sel === i && S_.signs[i]) S_.signs[i] = null; S_.sel = i; return true; }
+  function batSign(B, s, op){ const D = B.deal; if(!live(D, s) || D.type !== 'signs' || D.ops.indexOf(op) < 0) return false; const S_ = D.seats[s];
+    let i = S_.signs[S_.sel] == null ? S_.sel : S_.signs.indexOf(null); if(i < 0) i = S_.sel; S_.signs[i] = op; const nx = S_.signs.indexOf(null); S_.sel = nx >= 0 ? nx : i; return true; }
+  function batClear(B, s){ const D = B.deal; if(!live(D, s)) return false; const S_ = D.seats[s]; S_.use = []; S_.signs = S_.signs.map(() => null); S_.sel = 0; return true; }
+  // 🔒 lock in: right = wins the round · wrong = 🧊 3 s freeze + the reason
+  const FREEZE = 3;
+  function batLock(B, s){ const D = B.deal; if(!live(D, s) || !seatReady(D, s)) return null; const S_ = D.seats[s], v = seatValue(D, s); S_.tries++;
+    if(v === D.target){ S_.done = true; S_.time = D.t; D.won = s; D.over = true; B.wins[s]++; B.round++; B.log.push({type: D.type, target: D.target, w: s, time: D.t, how: D.type === 'speed' ? S_.use.map(i => D.blocks[i]) : S_.signs.slice(), nums: D.nums, blocks: D.blocks});
+      if(B.wins[0] >= B.need || B.wins[1] >= B.need || B.round >= B.maxRounds){ B.over = true; B.winner = B.wins[0] === B.wins[1] ? -1 : B.wins[0] > B.wins[1] ? 0 : 1; }
+      return {ok: true, v, time: D.t, over: B.over}; }
+    S_.frozen = D.t + FREEZE; S_.last = v;
+    return {ok: false, v, why: v == null ? (D.type === 'signs' ? 'goes below 0 or is not whole' : '') : v > D.target ? 'too big' : 'too small'}; }
+  function batTime(B){ const D = B.deal; if(!D || D.over) return false; D.over = true; D.won = -1; B.round++; B.log.push({type: D.type, target: D.target, w: -1, time: D.limit, how: D.type === 'speed' ? D.sols[0].map(i => D.blocks[i]) : D.sols[0], nums: D.nums, blocks: D.blocks});
+    if(B.wins[0] >= B.need || B.wins[1] >= B.need || B.round >= B.maxRounds){ B.over = true; B.winner = B.wins[0] === B.wins[1] ? -1 : B.wins[0] > B.wins[1] ? 0 : 1; } return true; }
+  // 🤖 Robo-Scout's plan for this round: a list of {at (s), act} — it taps at a kid's pace, sometimes locks a wrong one (then 🧊 like anyone)
+  function robotPlan(B, rr){ const D = B.deal, C = BAT[B.level], base = C.robot[D.type === 'speed' ? 0 : 1] * (0.8 + (rr || B.r)() * 0.5), out = [], miss = (rr || B.r)() < C.miss;
+    const right = pick(rr || B.r, D.sols), steps = D.type === 'speed' ? right.map(i => ({act: 'tap', i})) : right.map(op => ({act: 'sign', op}));
+    let t0 = 0;
+    if(miss){ const wrong = D.type === 'speed' ? ([-2, -1, 1, 2, -3, 3].map(d => speedSols(D.blocks, D.target + d).find(u => u.length >= 2)).find(Boolean) || D.blocks.map((_, i) => i).filter(i => right.indexOf(i) < 0).concat(right).slice(0, Math.max(2, right.length))) : signCombos(D.ops, D.nums.length - 1).find(c => evalSigns(D.nums, c, D.order) !== D.target);
+      const ws = D.type === 'speed' ? wrong.map(i => ({act: 'tap', i})) : wrong.map(op => ({act: 'sign', op})), wt = base * 0.65;
+      ws.forEach((st, k) => out.push(Object.assign({at: wt * (k + 1) / (ws.length + 1)}, st))); out.push({at: wt, act: 'lock'}); out.push({at: wt + FREEZE + 0.3, act: 'clear'}); t0 = wt + FREEZE + 0.3; }
+    steps.forEach((st, k) => out.push(Object.assign({at: t0 + base * (k + 1) / (steps.length + 1)}, st))); out.push({at: t0 + base, act: 'lock'});
+    return out; }
+  function robotStep(B, st){ const s = 1; if(st.act === 'tap') return batTap(B, s, st.i); if(st.act === 'sign') return batSign(B, s, st.op); if(st.act === 'clear') return batClear(B, s); if(st.act === 'lock') return batLock(B, s); return false; }
+  function signsText(nums, signs, target){ return nums.map((n, i) => (i ? ' ' + (signs[i - 1] ? SIGN[signs[i - 1]] : '?') + ' ' : '') + n).join('') + (target != null ? ' = ' + target : ''); }
+  /* ⚔️ BATTLE 2 END */
   /* ---------- 📖 JOURNEY (round 3): our own number characters + 6 chapters ---------- */
   const CHARS = {1: {name: 'Pip', who: 'a brave little explorer', icon: '🧭'}, 2: {name: 'Tik & Tok', who: 'twins who finish each other\'s sentences', icon: '👯'}, 3: {name: 'Tri', who: 'a triangle-loving builder', icon: '🔺'},
     4: {name: 'Quadra', who: 'square, tidy and loves rules', icon: '⬛'}, 5: {name: 'Hi-Five', who: 'the high-fiver', icon: '🖐️'}, 6: {name: 'Dicey', who: 'a dice-rolling gamer', icon: '🎲'}, 7: {name: 'Stella', who: 'a dreamer who loves the stars', icon: '🌟'},
@@ -1079,7 +1144,7 @@ const GS = (function(){
     digits, GRID, makeShape, shapeOf, gridDone, gridToggle, gridSolution, BANK, bankShape, norm, sameShape, piecesOf, fenceOf, chainOf, cornersOf, wayRound, fullFence, wayKind, mostFor, shapeName, rectCells, stairCells, stairCorners, TENS_R, tensUnits, minPieces, makeTens, tensAdd, tensWay, tensStep, tensPlan, tensBreak, takeAmount, partsOf, pcOf, autoBreak, makeNext, gcd, fstr, FR_D, makeFrac, colourToggle,
     CHARS, charName, CHAPTERS, storyPlan, subsetPlan, journeyItem, castStep,
     FR_D, FR_MIX, FR_NAME, fracDeck, makeFrac, fShare, fOrder, fLine, fracReady, fracHint, fstr, fraw,   /* 🍕 gs2-g5 */
-    WOB, minCount, wobblePlan, makeWobble, wobAdd, wobPop, answerChoice, BAT, newBattle, battleDeal, buildValue, allBuilds, scoreFor, robotBuild, battleLock, battleJudge};
+    WOB, minCount, wobblePlan, makeWobble, wobAdd, wobPop, answerChoice, BAT, SIGN, newBattle, batType, speedSols, speedPuzzle, evalSigns, signCombos, signsPuzzle, battleDeal, seatValue, seatReady, batTap, batSlot, batSign, batClear, batLock, batTime, robotPlan, robotStep, signsText /* ⚔️ gs2-g6 */};
 })();
 // ENGINE END
 
@@ -1216,6 +1281,8 @@ function renderOpp(){
   const list = [{k: '🤖', label: '🤖 Robo-Scout'}].concat(S.players.filter(p => p.Name !== S.player).map(p => ({k: p.Name, label: '👤 ' + UI.esc(p.Name)}))); if(!list.some(o => o.k === SET.opp)) SET.opp = '🤖';
   const ob = $('opp-list'); ob.innerHTML = list.map(o => '<button class="chip' + (o.k === SET.opp ? ' on' : '') + '" data-k="' + UI.esc(o.k) + '" data-sound="tap">' + o.label + '</button>').join('');
   ob.querySelectorAll('.chip').forEach(b => b.onclick = () => { SET.opp = b.dataset.k; ob.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b)); });
+  const tb = $('bt-types'); if(tb){ SET.batTypes = SET.batTypes || 'mix'; tb.innerHTML = BAT_TYPES.map(o => '<button class="chip' + (o[0] === SET.batTypes ? ' on' : '') + '" data-k="' + o[0] + '" data-sound="tap">' + o[1] + '</button>').join('');   /* ⚔️ gs2-g6 */
+    tb.querySelectorAll('.chip').forEach(b => b.onclick = () => { SET.batTypes = b.dataset.k; tb.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b)); }); }
 }
 function levelInfo(i){ const L = GS.LEVELS[i]; return '🔢 up to ' + L.max + ' · ' + L.rounds + ' rounds' + (L.time ? ' · ⏱️ ' + Math.round(L.time / 60) + ' min' : ''); }
 function renderLevels(){
@@ -1259,7 +1326,7 @@ function b3Card(o, more){
 function nextLevel(lvl){ return lvl < 4 ? () => { if(!canPlay(lvl + 1)){ UISound.play('error'); UI.toast('Get ⭐ to open the next level'); backToMenu(); return; } SET.level = lvl + 1; chosenLevel = lvl + 1; try{ localStorage.setItem(setupKey('lv'), String(lvl + 1)); }catch(e){} startGame(); } : null; }
 // 🎬 the cover (GameFrame): who's here + champions + how to play; ▶ Play opens the setup page
 let ScoutCover = null;
-const SCOUT_VERSION = '2.1';   /* 🧱 b3w3: shown on the cover footer — bump with each round */
+const SCOUT_VERSION = '2.2';   /* 🧱 b3w3: shown on the cover footer — bump with each round */
 function openCover(){
   if(!window.GF){ showScreen('menu'); return; }
   if(ScoutCover && ScoutCover.who !== S.player){ ScoutCover.destroy(); ScoutCover = null; }
@@ -1275,7 +1342,7 @@ function howLines(mode){
     next: ['🧩 Look at the pattern — how much does it grow (or shrink) each time? Pick the number for the ❓.', '🍪 Odd or even: can the blocks all pair up? Even = yes, odd = one is left over.', '⌨️ 1–4 pick an answer.'],
     frac: ['🍕 Colour the right part of the bar: ½ = 1 of 2 equal teams, ¼ = 1 of 4 …', '⚖️ Which pizza piece is bigger? Tap &lt; = &gt; (the left one is less / the same / more).', '🔢 Name it: how much of the bar is coloured?', '⌨️ ← → + Space colour · &lt; = &gt; compare · 1–4 answer.'],
     wobble: ['🏗️ Stack blocks to EXACTLY the 🎯 height. You only get some sizes (like 5s and 4s)!', '😬 Too tall? The tower wobbles — take the top block off (↩️).', '⭐⭐⭐ = the fewest blocks. It is a maths puzzle, not a balancing game.', '⌨️ 1 / 2 / 3 add a size · Backspace takes the top off.'],
-    battle: ['⚔️ Each player gets some number blocks and builds ONE tower from them (tap the blocks you want).', '🃏 The rule card says who wins the round: ⬆️ higher, ⬇️ lower or 🎯 closest to a number.', '✖️2 card (⚡ Hard+): doubles your tower.', '🙈 Pass the device — no peeking! First to 3 round wins.']
+    battle: ['⚔️ Both players get the SAME puzzle at the SAME time — 3 · 2 · 1 · GO!', '⚡ Speed: tap blocks that add up to the 🎯 number, then 🔒 Lock in.', '🧮 Signs: fill + − × ÷ so the sum makes the number (7 ? 3 ? 5 = 5 → 7 + 3 − 5).', '🧊 A wrong 🔒 freezes you for 3 s. First right 🔒 wins the round · first to 3 ⭐ wins.']
   };
   R2.journey = ['📖 Six story chapters: the number friends meet, add (+), take away (−), make copies (×), share (÷), hop the number line and balance (=).', '▶ Tap Next (or the picture) to read on. When there is a puzzle, solve it to continue the story.', '🏅 Each chapter gives a sticker, a new 🎨 number look (also for ➗ Algebros tiles) + Adventure miles the first time, and opens the next chapter.', '🧑 You walk the road with Pip, Tik & Tok, Tri, Quadra, Hi-Five, Dicey, Stella, Ollie, Whisk, Cap, Hal and Centi!'];
   if(R2[mode]) return R2[mode];
@@ -1290,7 +1357,7 @@ function openSheet(html){ $('sheet-card').innerHTML = html; $('sheet').classList
 function closeSheet(){ $('sheet').classList.add('hidden'); }
 
 /* ================= PLAY ================= */
-function startGame(){ setTimeout(cheerMount, 0); /* 📣 cs-4b */ if(ScoutCover) ScoutCover.hide();   /* 🧱 b3w3 */
+function startGame(){ batPadsOff(); setTimeout(cheerMount, 0); /* 📣 cs-4b */ if(ScoutCover) ScoutCover.hide();   /* 🧱 b3w3 */
   if(SET.mode === 'battle'){ startBattle(); return; }
   if(SET.mode === 'journey'){ startJourney(Math.min(6, journeyDone(S.player) + 1)); return; }
   hideResult(); closeSheet();
@@ -1892,7 +1959,8 @@ function leavePlay(){
   UI.confirm ? UI.confirm('Leave this game?', 'Your points so far will be lost.', 'Leave', 'Keep playing').then(ok => { if(ok) backToMenu(); }) : backToMenu();
 }
 function pauseGame(){}
-function backToMenu(){ if(window.Cheer) Cheer.unmount(); stopLoop(); stopTimer(); $('say').classList.add('hidden'); G = null; GID++; hideResult(); closeSheet(); renderMenu(); showScreen('menu'); }
+function batPadsOff(){ document.querySelectorAll('.bt-pad').forEach(e => e.remove()); const gl = $('goal'); if(gl) gl.classList.remove('hidden'); }   /* ⚔️ gs2-g6 */
+function backToMenu(){ batPadsOff(); if(window.Cheer) Cheer.unmount(); stopLoop(); stopTimer(); $('say').classList.add('hidden'); G = null; GID++; hideResult(); closeSheet(); renderMenu(); showScreen('menu'); }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
 function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
 window.feedbackContext = () => ({page: 'GeoScout', game: GAME_ID, level: G ? G.M.level : SET.level, mode: G ? G.M.mode : SET.mode});
@@ -1906,80 +1974,88 @@ function startLoop(){ stopLoop(); LAST = performance.now(); const step = now => 
 function stopLoop(){ if(RAF) cancelAnimationFrame(RAF); RAF = 0; }
 function stopTimer(){ if(TIMER) clearInterval(TIMER); TIMER = 0; }
 function tick(dt){
-  if(!G) return; if(G.swap){ G.swap.t += dt; if(G.swap.t > 0.55) G.swap = null; } const sb = $('btn-submit'); if(sb){ const idle = !canSubmit(); if(sb.classList.contains('idle') !== idle) sb.classList.toggle('idle', idle); }   /* ✅ gs2-g1 */ helperTick(dt); revealTick(dt); tensFxTick(dt);   /* ➖ gs2-g3 */ if(G.walk && !G.walk.hold) G.walk.t += dt;   /* 🐜 gs2-g4 */ GSStack.tick(dt); GSStack.dropTick(dt);   /* 🧊 gs-anim */ if(G.throwT != null) G.throwT += dt; try{ guideTick(); }catch(e){} const A = G.A;
+  if(!G) return; if(G.battle) batTick(dt);   /* ⚔️ gs2-g6 */ if(G.swap){ G.swap.t += dt; if(G.swap.t > 0.55) G.swap = null; } const sb = $('btn-submit'); if(sb){ const idle = !canSubmit(); if(sb.classList.contains('idle') !== idle) sb.classList.toggle('idle', idle); }   /* ✅ gs2-g1 */ helperTick(dt); revealTick(dt); tensFxTick(dt);   /* ➖ gs2-g3 */ if(G.walk && !G.walk.hold) G.walk.t += dt;   /* 🐜 gs2-g4 */ GSStack.tick(dt); GSStack.dropTick(dt);   /* 🧊 gs-anim */ if(G.throwT != null) G.throwT += dt; try{ guideTick(); }catch(e){} const A = G.A;
   const it0 = G.M && G.M.item; if(FX && it0 && G.phase === 'play' && (it0.kind === 'choice' || it0.kind === 'compare') && !A.gest){ G.idleT = (G.idleT || 0) + dt; if(G.idleT > 4.5){ G.idleT = 0; avatarDo('think'); } } if(A.gest){ A.gest.t += dt; if(A.gest.t > A.gest.g.d) A.gest = null; }
   G.fx = G.fx.filter(f => (f.t += dt) < f.life);
   if(G.B2 && G.B2.gest){ G.B2.gest.t += dt; if(G.B2.gest.t > G.B2.gest.g.d) G.B2.gest = null; }
   const it = G.M.item; if(it && it.left){ const Lw = GS.total(it.left), Rw = GS.total(it.right), tgt = G.tiltLock ? 0 : Math.max(-1, Math.min(1, (Rw - Lw) / Math.max(1, Lw, Rw))) * TILT_MAX; G.tilt += (tgt - G.tilt) * Math.min(1, dt * 6); }
 }
 /* 📏 gs2-g4: the painters (pieces · scale · count floor · 🔷 grid · 🐜 fence · 📐 card · 🔟 tens · 🧩 🍕 🏗️) live in GeoScoutShapes.html (include after this script) */
-/* ================= ⚔️ TOWER BATTLE ================= */
+/* ⚔️ BATTLE 2 PAGE START (gs2-g6) — ⚡ Speed + 🧮 Signs: the same puzzle on both sides, a 3-2-1 start, first right 🔒 wins · wrong 🔒 = 🧊 3 s */
 function oppName(){ return SET.opp && SET.opp !== '🤖' && S.players.some(p => p.Name === SET.opp) ? SET.opp : ''; }
+const BAT_TYPES = [['mix', '🔀 Both — take turns'], ['speed', '⚡ Speed only'], ['signs', '🧮 Signs only']];
+const BAT_COL = ['#2EC4B6', '#FF8A5B'];
 function startBattle(){
   hideResult(); closeSheet(); const opp = oppName();
-  const B = GS.newBattle({level: SET.level, names: [S.player, opp || '🤖 Robo-Scout'], robot: !opp});
-  G = {M: {mode: 'battle', level: SET.level, item: null, log: [], quals: [], score: 0, total: 0, round: 0}, battle: {B, seat: 0, phase: 'build', sel: {use: [], x2: false}}, id: ++GID, theme: SET.theme, skin: SET.skin, t0: performance.now(), phase: 'battle', fx: [], hits: [], A: {gest: null}, B2: {gest: null}};
-  showScreen('play'); $('h-time').classList.add('hidden'); sizeCanvas(); GS.battleDeal(B); battleTurn(); startLoop();
+  const B = GS.newBattle({level: SET.level, names: [S.player, opp || '🤖 Robo-Scout'], robot: !opp, types: SET.batTypes || 'mix'});
+  G = {M: {mode: 'battle', level: SET.level, item: null, log: [], quals: [], score: 0, total: 0, round: 0}, battle: {B, phase: 'count', cd: 0, msg: [null, null], plan: [], pi: 0}, id: ++GID, theme: SET.theme, skin: SET.skin, t0: performance.now(), phase: 'battle', fx: [], hits: [], A: {gest: null}, B2: {gest: null}};
+  showScreen('play'); $('h-time').classList.remove('hidden'); sizeCanvas(); batRound(); startLoop();
 }
-function batHud(){ const b = G.battle.B; $('h-round').textContent = '⚔️ ' + Math.min(b.round + 1, b.maxRounds); $('h-score').textContent = '⭐ ' + b.wins[0] + ' : ' + b.wins[1]; $('h-stars').textContent = '🏁 3'; }
-function ruleText(D){ return D.rule === 'high' ? '⬆️ HIGHER wins' : D.rule === 'low' ? '⬇️ LOWER wins' : '🎯 CLOSEST to ' + D.target + ' wins'; }
-function battleTurn(){
-  const T = G.battle, B = T.B, D = B.deal; batHud(); T.sel = {use: [], x2: false};
-  $('goal').innerHTML = ruleText(D) + '<small>' + UI.esc(B.names[T.seat]) + ': tap blocks to build your tower, then 🔒 lock in</small>';
-  if(T.seat === 1 && B.robot){ GS.battleLock(B, 1, GS.robotBuild(B, 1)); battleReveal(); return; }
-  T.phase = 'build'; renderBatBar();
-}
-function renderBatBar(){
-  const T = G.battle, B = T.B, D = B.deal, bar = $('bar');
-  if(T.phase === 'pass'){ bar.innerHTML = '<div class="hint">📱 Pass to <b>' + UI.esc(B.names[1]) + '</b> — no peeking! 🙈</div><button class="tb act" data-sound="pop" onclick="batReady()">I\'m ' + UI.esc(B.names[1]) + ' ▶</button>'; return; }
-  if(T.phase === 'reveal'){ bar.innerHTML = '<button class="tb act" data-sound="pop" onclick="batNext()">' + (B.over ? '🏆 See who won' : '▶ Next round') + '</button>'; return; }
-  const v = T.sel.use.length ? GS.buildValue(D.hands[T.seat], T.sel) : 0;
-  bar.innerHTML = '<div class="hint">' + UI.esc(B.names[T.seat]) + ': your tower = <b>' + v + '</b></div>' + (D.x2 ? '<button class="tb cp' + (T.sel.x2 ? ' on' : '') + '" data-sound="tap" onclick="batX2()">✖️2 card ' + (T.sel.x2 ? '✅' : '') + '</button>' : '') +
-    '<button class="tb act" data-sound="none" onclick="batLock()"' + (T.sel.use.length ? '' : ' disabled') + '>🔒 Lock in</button>';
-}
-function batToggle(i){ const T = G.battle; if(T.phase !== 'build') return; const k = T.sel.use.indexOf(i); if(k >= 0) T.sel.use.splice(k, 1); else T.sel.use.push(i); UISound.play('tap'); renderBatBar(); }
-function batX2(){ const T = G.battle; T.sel.x2 = !T.sel.x2; renderBatBar(); }
-function batLock(){
-  const T = G.battle, B = T.B; if(T.phase !== 'build' || !GS.battleLock(B, T.seat, T.sel)) return; SND.snap(GS.buildValue(B.deal.hands[T.seat], T.sel));
-  if(T.seat === 0){ T.seat = 1; if(B.robot) battleTurn(); else { T.phase = 'pass'; renderBatBar(); } } else battleReveal();
-}
-function batReady(){ const T = G.battle; T.phase = 'build'; battleTurn(); }
-function battleReveal(){
-  const T = G.battle, B = T.B, D = B.deal; T.last = {hands: D.hands, picks: D.picks, rule: D.rule, target: D.target}; const r = GS.battleJudge(B); T.res = r; T.phase = 'reveal'; T.seat = 0; batHud();
-  const w = r.w; banner(w < 0 ? '🤝 Same score — nobody gets the point' : '⭐ <b>' + UI.esc(B.names[w]) + '</b> wins the round! (' + r.v[0] + ' vs ' + r.v[1] + ')', w === 0 || (w === 1 && !B.robot) ? 'good' : '');
-  if(w >= 0){ SND.win(); (w === 0 ? G.A : G.B2).gest = {g: gestOf('cheer'), t: 0}; (w === 0 ? G.B2 : G.A).gest = {g: gestOf('shrug'), t: 0}; } renderBatBar();
-}
-function batNext(){ const T = G.battle, B = T.B; hideBanner(); if(B.over){ battleEnd(); return; } GS.battleDeal(B); T.seat = 0; battleTurn(); }
+function batRound(){ const T = G.battle, B = T.B; GS.battleDeal(B); T.phase = 'count'; T.cd = SPEED ? 3.2 : 0; T.cdLast = 4; T.msg = [null, null]; T.plan = B.robot ? GS.robotPlan(B) : []; T.pi = 0; T.fz = [-1, -1];
+  hideBanner(); batHud(); batGoal(); renderBatBar(); renderBatPads(); }
+function batWide(){ return innerWidth >= innerHeight * 0.95; }   // from the SCREEN, not the stage — the ▶ Next bar must never flip the halves round
+function batF2F(){ return !!(G && G.battle && !G.battle.B.robot && !batWide()); }   // two people, upright screen = face to face (the top half is turned round)
+function batHud(){ const T = G.battle, B = T.B, D = B.deal; $('h-round').textContent = '⚔️ ' + Math.min(B.round + (D && D.over ? 0 : 1), B.maxRounds) + ' / ' + B.maxRounds + (D ? ' · ' + (D.type === 'speed' ? '⚡' : '🧮') : ''); $('h-score').textContent = '⭐ ' + B.wins[0] + ' : ' + B.wins[1]; $('h-stars').textContent = '🏁 ' + B.need; batClock(); }
+function batClock(){ const D = G.battle.B.deal, el = $('h-time'); if(!D) return; const left = Math.max(0, Math.ceil(D.limit - D.t)); el.textContent = '⏱️ ' + fmtS(left); el.classList.toggle('low', left <= 10 && !D.over); }
+function batGoal(){ const D = G.battle.B.deal, gl = $('goal'); gl.classList.toggle('hidden', batF2F());
+  gl.innerHTML = D.type === 'speed' ? '⚡ SPEED — build <b>' + D.target + '</b>!<small>Same blocks for both · tap blocks, then 🔒 — first right wins</small>'
+    : '🧮 SIGNS — make <b>' + D.target + '</b>!<small>Same numbers for both · fill ' + D.ops.split('').map(o => GS.SIGN[o]).join(' ') + (D.order === 'math' ? ' (× ÷ first!)' : '') + ', then 🔒</small>'; }
+function renderBatBar(){ const T = G.battle, B = T.B, D = B.deal, bar = $('bar'), r = Math.min(B.round + (D.over ? 0 : 1), B.maxRounds);
+  if(T.phase === 'reveal'){ bar.innerHTML = '<div class="hint">' + (D.won < 0 ? '⏰ Nobody got it this time' : '⭐ <b>' + UI.esc(B.names[D.won]) + '</b> was first — ' + D.seats[D.won].time.toFixed(1) + ' s') + '</div><button class="tb act big" data-sound="pop" onclick="batNext()">' + (B.over ? '🏆 See who won' : '▶ Next round') + '</button>'; return; }
+  bar.innerHTML = '<div class="hint">' + (D.type === 'speed' ? '⚡' : '🧮') + ' Round ' + r + ' of ' + B.maxRounds + ' · ' + (B.types === 'mix' ? 'next: ' + (r % 2 ? '🧮 Signs' : '⚡ Speed') + ' · ' : '') + 'first to ' + B.need + ' ⭐ wins</div>'; }
+// one pad per player, INSIDE their half (the top one is turned round when you sit face to face)
+function batPadHtml(s){ const T = G.battle, B = T.B, D = B.deal, S_ = D.seats[s], fz = D.t < S_.frozen, ready = D.type === 'speed' ? S_.use.length >= 2 : S_.signs.every(Boolean), off = T.phase !== 'race' || S_.done || fz;
+  const tight = !!(T.Z && T.Z[s] && T.Z[s].w < 560);   // small halves: 🧽 + 🔒 only, so the pad stays ONE row
+  const signs = D.type === 'signs' ? D.ops.split('').map(o => '<button class="tb sg" data-sound="none" data-op="' + o + '" onclick="batSignBtn(' + s + ',\'' + o + '\')"' + (off ? ' disabled' : '') + '>' + GS.SIGN[o] + '</button>').join('') : '';
+  return '<div class="bt-row">' + signs + '<button class="tb clr" data-sound="tap" onclick="batClearBtn(' + s + ')"' + (off ? ' disabled' : '') + ' aria-label="Clear">🧽' + (tight ? '' : ' Clear') + '</button><button class="tb act lock" data-sound="none" onclick="batLockBtn(' + s + ')"' + (off || !ready ? ' disabled' : '') + ' aria-label="Lock in">🔒' + (tight ? '' : ' Lock in') + '</button></div>'; }
+function renderBatPads(){ const st = $('stage'); [0, 1].forEach(s => { let el = $('bt-pad' + s); if(!G || !G.battle || (s === 1 && G.battle.B.robot) || G.battle.phase === 'reveal' || G.battle.phase === 'over'){ if(el) el.remove(); return; }
+  if(!el){ el = document.createElement('div'); el.id = 'bt-pad' + s; el.className = 'bt-pad'; st.appendChild(el); } el.innerHTML = batPadHtml(s); el.classList.toggle('p2', s === 1); batPadPlace(s); }); }
+function batPadPlace(s){ const el = $('bt-pad' + s); if(!el || !G.battle.Z) return; const z = G.battle.Z[s]; el.style.left = Math.round(z.x + 6) + 'px'; el.style.width = Math.round(z.w - 12) + 'px';
+  el.style.top = Math.round(z.rot ? z.y + 4 : z.y + z.h - z.padH + 2) + 'px'; el.style.height = Math.round(z.padH - 6) + 'px'; el.classList.toggle('rot', !!z.rot);
+  const T = G.battle, rows = new Set([...el.querySelectorAll('.tb')].map(b => Math.round(b.offsetTop))).size || 1; T.padRows = T.padRows || [1, 1]; if(rows !== T.padRows[s]){ T.padRows[s] = rows; T.zKey = null; } }   // the pad really wraps to `rows` → the half makes room next frame
+function batSay(s, text, cls){ G.battle.msg[s] = {text, cls: cls || '', t: performance.now()}; }
+function batAct(s, fn){ const T = G && G.battle; if(!T || T.phase !== 'race') return; if(fn()){ UISound.play('tap'); renderBatPads(); } }
+function batTapBlock(s, i){ batAct(s, () => GS.batTap(G.battle.B, s, i)); }
+function batSlotTap(s, i){ batAct(s, () => GS.batSlot(G.battle.B, s, i)); }
+function batSignBtn(s, op){ batAct(s, () => GS.batSign(G.battle.B, s, op)); }
+function batClearBtn(s){ batAct(s, () => GS.batClear(G.battle.B, s)); }
+function batLockBtn(s){ const T = G && G.battle; if(!T || T.phase !== 'race') return; batAfterLock(s, GS.batLock(T.B, s)); }
+function batAfterLock(s, res){ const T = G.battle, D = T.B.deal, A = s === 0 ? G.A : G.B2; if(!res) return;
+  if(res.ok){ SND.snap(D.target); batReveal(s); return; }
+  SND.bad(); A.gest = {g: gestOf('shrug'), t: 0}; const how = D.type === 'speed' ? D.seats[s].use.map(i => D.blocks[i]).join(' + ') : GS.signsText(D.nums, D.seats[s].signs);
+  batSay(s, res.v == null ? how + ' — ' + res.why : how + ' = ' + res.v + ' — ' + res.why + '!', 'bad'); renderBatPads(); }
+function batReveal(w){ const T = G.battle, B = T.B, D = B.deal; T.phase = 'reveal'; batHud(); renderBatPads();
+  if(w >= 0){ SND.win(); (w === 0 ? G.A : G.B2).gest = {g: gestOf('cheer'), t: 0}; (w === 0 ? G.B2 : G.A).gest = {g: gestOf('shrug'), t: 0}; batSay(w, '✅ ' + D.seats[w].time.toFixed(1) + ' s', 'good'); }
+  banner(w < 0 ? '⏰ Time! One way: <b>' + batOneWay(D) + '</b>' : '⭐ <b>' + UI.esc(B.names[w]) + '</b> wins round ' + B.round + '! <small>' + batOneWay(D, w) + ' · ' + D.seats[w].time.toFixed(1) + ' s</small>', w === 0 || (w === 1 && !B.robot) ? 'good' : '');
+  renderBatBar(); }
+function batOneWay(D, s){ if(D.type === 'speed'){ const u = s != null && s >= 0 ? D.seats[s].use : D.sols[0]; return u.map(i => D.blocks[i]).join(' + ') + ' = ' + D.target; } return GS.signsText(D.nums, s != null && s >= 0 ? D.seats[s].signs : D.sols[0], D.target); }
+function batNext(){ const T = G.battle, B = T.B; hideBanner(); if(B.over){ battleEnd(); return; } batRound(); }
+function batTick(dt){ const T = G.battle, B = T.B, D = B.deal; if(!D || T.hold) return;   // T.hold: the look test freezes a moment
+  if(T.phase === 'count'){ T.cd -= dt; const n = Math.ceil(T.cd); if(n !== T.cdLast && n > 0 && SPEED){ T.cdLast = n; tone(520, 0.12, 'sine', 0.05); } if(T.cd <= 0){ T.phase = 'race'; tone(880, 0.2, 'triangle', 0.06); renderBatPads(); } return; }
+  if(T.phase !== 'race') return; D.t += dt;
+  while(T.plan && T.pi < T.plan.length && T.plan[T.pi].at <= D.t && T.phase === 'race'){ const st = T.plan[T.pi++]; const r = GS.robotStep(B, st); if(st.act === 'lock') batAfterLock(1, r); }
+  [0, 1].forEach(s => { const fz = D.t < D.seats[s].frozen ? Math.ceil(D.seats[s].frozen - D.t) : 0; if(fz !== T.fz[s]){ T.fz[s] = fz; if(!fz && T.msg[s] && T.msg[s].cls === 'bad') T.msg[s] = null; renderBatPads(); } });
+  if(Math.ceil(D.limit - D.t) !== T.clk){ T.clk = Math.ceil(D.limit - D.t); batClock(); }
+  if(T.phase === 'race' && D.t >= D.limit && GS.batTime(B)){ SND.bad(); batReveal(-1); } }
 function battleEnd(){
-  const B = G.battle.B, w = B.winner; G.phase = 'over'; UISound.play('success'); confetti(true);
+  const B = G.battle.B, w = B.winner; G.phase = 'over'; G.battle.phase = 'over'; UISound.play('success'); confetti(true); renderBatPads();
   showResult('<div class="big">⚔️</div><h2>' + (w < 0 ? 'A draw — great battle!' : UI.esc(B.names[w]) + ' wins the battle!') + '</h2><div class="score-big">' + B.wins[0] + ' : ' + B.wins[1] + '</div>' +
-    '<div class="stats">' + B.log.map((l, i) => '<span>' + (l.rule === 'high' ? '⬆️' : l.rule === 'low' ? '⬇️' : '🎯' + l.target) + ' ' + l.v[0] + ' vs ' + l.v[1] + (l.w < 0 ? ' 🤝' : l.w === 0 ? ' ⭐' : ' ☆') + '</span>').join('') + '</div>' +
+    '<div class="stats">' + B.log.map(l => '<span>' + (l.type === 'speed' ? '⚡ ' + l.how.join(' + ') + ' = ' + l.target : '🧮 ' + GS.signsText(l.nums, l.how, l.target)) + ' · ' + (l.w < 0 ? '⏰' : (l.w === 0 ? '⭐ ' : '☆ ') + UI.esc(B.names[l.w].replace('🤖 ', '')) + ' ' + l.time.toFixed(1) + ' s') + '</span>').join('') + '</div>' +
     '<div class="save-note" id="save-note">💾 Saving…</div><div class="res-btns"><button class="btn sp-btn sp-primary" data-sound="pop" onclick="startBattle()">🔁 Again</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="backToMenu()">🎚️ Levels</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button></div>');
   const notes = []; [0, 1].forEach(s => { if(s === 1 && B.robot) return; const nm = B.names[s], st = {games: 1, battles: 1, battleWins: w === s ? 1 : 0, bestStreak: 0};
     google.script.run.withSuccessHandler(res => { notes[s] = UI.esc(nm) + ': ' + featText(res, '✅ Saved'); putNote(notes.filter(Boolean).join('<br>')); }).withFailureHandler(() => { writePending(readPending().concat([{name: nm, feats: true, stats: st}])); notes[s] = UI.esc(nm) + ': ⚠️ will be sent next time'; putNote(notes.filter(Boolean).join('<br>')); }).saveFeats(nm, GAME_ID, st); });
 }
-function drawBattle(g, t, gy){
-  const T = G.battle, B = T.B, port = W < H * 0.95, top = boardTop(); G.hits = [];
-  const show = T.phase === 'reveal' ? T.last : B.deal; if(!show) return;
-  // zones: landscape = left | right · portrait = opponent on top, you at the bottom
-  const zone = s => port ? {x: 0, y: s === 0 ? top + (gy - top) / 2 : top, w: W, h: (gy - top) / 2} : {x: s === 0 ? 0 : W / 2, y: top, w: W / 2, h: gy - top};
-  g.fillStyle = 'rgba(255,255,255,0.1)'; if(port) g.fillRect(0, top + (gy - top) / 2 - 1, W, 2); else g.fillRect(W / 2 - 1, top, 2, gy - top);
-  [0, 1].forEach(s => {
-    const Z = zone(s), fl = Z.y + Z.h - 24, hand = show.hands[s], mine = T.phase === 'build' && T.seat === s, hidden = T.phase !== 'reveal' && !mine;
-    const av = s === 0 ? S.player : (B.robot ? '' : B.names[1]), A = s === 0 ? G.A : G.B2, ah = Math.min(Z.h - 30, 130), aw = Math.min(ah / 1.5, Z.w * 0.2);
-    const ax = s === 0 || port ? Z.x + 6 : Z.x + Z.w - aw - 6;
-    if(av){ try{ const F = avatarFit(myAvatar(av), av, aw, ah, {gests: IDLE, pad: 2}); drawAvatar(g, {name: av, av: myAvatar(av), dir: s === 0 || port ? 1 : -1, walkT: 0, gest: A.gest}, ax + F.cx, fl + 20, F.k, {t}); }catch(e){} }
-    else emo(g, '🤖', ax + aw / 2, fl - aw * 0.4, aw * 0.9);
-    textTag(g, B.names[s] + ' · ' + B.wins[s] + ' ⭐', Z.x + Z.w / 2, Z.y + 14, 14);
-    if(hidden){ textTag(g, '🙈 hidden', Z.x + Z.w / 2, Z.y + Z.h / 2, 18); return; }
-    const pick = T.phase === 'reveal' ? show.picks[s] : (mine ? T.sel : {use: []}), used = new Set(pick.use || []);
-    const x0 = s === 0 || port ? ax + aw + 14 : Z.x + 14, area = Z.w - aw - 34, wU = hand.reduce((a, n) => a + NumberSkins.measure(n, 1).w, 0) + hand.length, hU = Math.max(...hand.map(n => NumberSkins.measure(n, 1).h)) + 1.6;
-    const u = Math.max(4, Math.min(40, (Z.h - 70) / hU, area / wU)); let x = x0;
-    hand.forEach((n, i) => { const on = used.has(i), m = NumberSkins.measure(n, u); NumberSkins.draw(g, n, x, on ? fl - u * 0.6 : fl, u, {skin: G.skin, mat: THEMES[G.theme].mat, t, label: true, sel: on, alpha: T.phase === 'reveal' && !on ? 0.35 : 1});
-      if(mine) G.hits.push({kind: 'bat', i, x, y: fl - m.h - u, w: m.w, h: m.h + u * 1.6}); x += m.w + u; });
-    if(T.phase === 'reveal' || mine){ const v = pick.use && pick.use.length ? GS.buildValue(hand, pick) : 0; textTag(g, '= ' + v + (pick.x2 ? ' (×2)' : ''), Math.min(Z.x + Z.w - 40, x + 30), Z.y + 40, 22); }
-  });
-}
+function batPointer(p){ const T = G.battle; if(!T || T.phase !== 'race') return; const hs = G.hits || [];
+  // exact box first, then the NEAREST box within 6 px (small blocks sit close together — never a padded neighbour)
+  let best = null, bd = 1e9; hs.forEach(h => { const q = h.rot ? {x: 2 * h.rot.cx - p.x, y: 2 * h.rot.cy - p.y} : p, dx = Math.max(h.x - q.x, 0, q.x - (h.x + h.w)), dy = Math.max(h.y - q.y, 0, q.y - (h.y + h.h)), d = Math.hypot(dx, dy) * 1000 + Math.abs(q.x - (h.x + h.w / 2)); if(dx <= 6 && dy <= 6 && d < bd){ bd = d; best = h; } });
+  if(best){ if(best.kind === 'bblk') batTapBlock(best.s, best.i); else if(best.kind === 'bslot') batSlotTap(best.s, best.i); } }
+function batKey(e){ const T = G.battle, k = e.key, D = T.B.deal; if(T.phase === 'reveal'){ if(k === 'Enter' || k === ' ' || k === 'n' || k === 'N'){ e.preventDefault(); batNext(); } return; } if(T.phase !== 'race') return;
+  if(D.type === 'speed' && /^[1-6]$/.test(k)) batTapBlock(0, Number(k) - 1);
+  else if(D.type === 'signs' && ({'+': '+', '-': '-', '*': 'x', 'x': 'x', 'X': 'x', '/': '/'})[k]) batSignBtn(0, ({'+': '+', '-': '-', '*': 'x', 'x': 'x', 'X': 'x', '/': '/'})[k]);
+  else if(D.type === 'signs' && (k === 'ArrowLeft' || k === 'ArrowRight')){ const S_ = D.seats[0]; S_.sel = Math.max(0, Math.min(S_.signs.length - 1, S_.sel + (k === 'ArrowLeft' ? -1 : 1))); }
+  else if(k === 'Backspace'){ e.preventDefault(); batClearBtn(0); }
+  else if(k === 'Enter'){ e.preventDefault(); batLockBtn(0); } }
+/* ⚔️ BATTLE 2 PAGE END */
 /* ================= 📖 JOURNEY (round 3) ================= */
 function journeyDone(name){ return Math.max(Number((S.geoJourney || {})[name]) || 0, Number(ls('sp_geoscout_jr:' + name)) || 0); }
 function renderChapters(){
@@ -2063,7 +2139,7 @@ function ptPos(e){ const r = CV.getBoundingClientRect(); return {x: e.clientX - 
 function hitAt(x, y){ const list = G.hits || []; for(let i = list.length - 1; i >= 0; i--){ const h = list[i]; if(x >= h.x - 6 && x <= h.x + h.w + 6 && y >= h.y - 6 && y <= h.y + h.h + 6) return h; } return null; }
 CV.addEventListener('pointerdown', e => {
   if(G && G.st){ GSStack.skip(); e.preventDefault(); return; }   // 🧊 gs-anim: tap = ×4 fast
-  if(G && G.battle){ const p = ptPos(e), h = hitAt(p.x, p.y); if(h && h.kind === 'bat') batToggle(h.i); return; }
+  if(G && G.battle){ G.kbd = false; batPointer(ptPos(e)); e.preventDefault(); return; }   /* ⚔️ gs2-g6: every finger on its own half */
   if(G && G.J && !G.M.item){ jNext(); return; }   /* (a tap during a 🧊 join = ×4 fast, above) */
   if(!G || G.phase !== 'play') return; const p = ptPos(e); G.kbd = false; const it0 = G.M.item;
   if(it0.kind === 'grid'){ const c = cellAt(p.x, p.y); if(c){ const has = it0.cells.some(q => q[0] === c[0] && q[1] === c[1]); G.paint = {on: !has}; gridTap(c[0], c[1], !has); try{ CV.setPointerCapture(e.pointerId); }catch(err){} e.preventDefault(); } return; }
@@ -2105,7 +2181,7 @@ document.addEventListener('keydown', e => {
   if(!G || $('scr-play').classList.contains('hidden') || !$('sheet').classList.contains('hidden') || !$('result').classList.contains('hidden')) return;
   if(G.st){ GSStack.skip(); e.preventDefault(); return; }   // 🧊 gs-anim: any key = ×4 fast
   if(G.J && !G.M.item){ if(G.phase === 'story' && (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight')){ e.preventDefault(); jNext(); } return; }
-  if(G.battle){ const T = G.battle; if(T.phase === 'build' && /^[1-5]$/.test(e.key)) batToggle(Number(e.key) - 1); else if(e.key === 'Enter'){ e.preventDefault(); if(T.phase === 'build') batLock(); else if(T.phase === 'pass') batReady(); else if(T.phase === 'reveal') batNext(); } return; }
+  if(G.battle){ batKey(e); return; }   /* ⚔️ gs2-g6 */
   const it = G.M.item, k = e.key; if(!it) return;
   if(G.J && G.phase === 'story' && (k === 'Enter' || k === ' ' || k === 'ArrowRight')){ e.preventDefault(); jNext(); return; }
   if(G.phase === 'done' && (k === 'Enter' || k === ' ' || k === 'n' || k === 'N')){ e.preventDefault(); goNext(); return; }
@@ -2218,4 +2294,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (gs-4+p1d+p3a+cs-4b+b3w3+24u-c+gs-anim+gs2-g1+gs2-g2+gs2-g3+gs2-g4+gs2-g5) END OF GeoScout.html -->
+<!-- (gs-4+p1d+p3a+cs-4b+b3w3+24u-c+gs-anim+gs2-g1+gs2-g2+gs2-g3+gs2-g4+gs2-g5+gs2-g6) END OF GeoScout.html -->
