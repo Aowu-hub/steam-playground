@@ -130,6 +130,7 @@
   .bt-pad.rot{transform:rotate(180deg);} .bt-pad .bt-row{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px;pointer-events:auto;}
   .bt-pad .tb{min-height:50px;min-width:52px;font-size:1.1rem;} .bt-pad .tb.sg{font-size:1.75rem;line-height:1;min-width:54px;background:#fff;} .bt-pad .tb.lock{min-width:72px;} .bt-pad .tb.lock[aria-label]:not(:empty){min-width:72px;} .bt-pad.p2 .tb.lock{background:#FFD3BF;} .bt-pad .tb:disabled{opacity:.45;cursor:default;}
   @media (orientation:landscape) and (max-height:500px){ .bt-pad .tb{min-height:44px;min-width:46px;padding:4px 9px;} .bt-pad .tb.sg{min-width:44px;font-size:1.45rem;padding:4px 6px;} .bt-pad .tb.lock{min-width:60px;} .bt-pad .bt-row{gap:6px;} }
+  #stage-btn{position:absolute;z-index:4;transform:translate(-50%,-50%);display:none;} #stage-btn.on{display:block;} #stage-btn .tb{margin:0;} @media (max-width:640px){ .bar .hint.sc{display:none;} }   /* the goal card already says it → one bar row on phones */   /* ✅ gs2-g7: Submit / Next on the scale post */
   .goal.warn{border-color:#FF7A80;} .goal small.warn{color:#FFC2C5;}
   .bar .tb.take{background:#FFE1E1;color:#9A1C22;border-color:#FF9AA0;}   /* ➖ gs2-g3 */
   .bar .tb.brk{background:#FFF1C7;color:#6B4A00;border-color:#FFC845;}
@@ -1327,7 +1328,7 @@ function b3Card(o, more){
 function nextLevel(lvl){ return lvl < 4 ? () => { if(!canPlay(lvl + 1)){ UISound.play('error'); UI.toast('Get ⭐ to open the next level'); backToMenu(); return; } SET.level = lvl + 1; chosenLevel = lvl + 1; try{ localStorage.setItem(setupKey('lv'), String(lvl + 1)); }catch(e){} startGame(); } : null; }
 // 🎬 the cover (GameFrame): who's here + champions + how to play; ▶ Play opens the setup page
 let ScoutCover = null;
-const SCOUT_VERSION = '2.2';   /* 🧱 b3w3: shown on the cover footer — bump with each round */
+const SCOUT_VERSION = '2.3';   /* 🧱 b3w3: shown on the cover footer — bump with each round */
 function openCover(){
   if(!window.GF){ showScreen('menu'); return; }
   if(ScoutCover && ScoutCover.who !== S.player){ ScoutCover.destroy(); ScoutCover = null; }
@@ -1410,7 +1411,7 @@ function renderBar(){
   if(it.kind === 'fline'){ bar.innerHTML = '<div class="hint">👆 Tap the line where ' + frHtml(it.frac.n + '/' + it.frac.d) + ' goes</div>' + (M.level <= 2 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB; return; }
   if(it.kind === 'colour'){ bar.innerHTML = '<div class="hint">👆 Tap ' + ({pizza: 'slices', choc: 'squares'}[it.shape] || 'blocks') + ' to colour them (tap again to clear one)</div><button class="tb" data-sound="tap" onclick="colourClear()">🧽 Clear</button>' + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB; return; }
   if(it.kind === 'wobble'){ bar.innerHTML = it.sizes.map((z, i) => '<button class="tb big" style="background:' + WOB_COLS[i] + ';color:#fff" data-s="' + z + '" data-sound="none" onclick="wobBtn(' + z + ')">+' + z + '<small>key ' + (i + 1) + '</small></button>').join('') + '<button class="tb" data-sound="tap" onclick="wobUndo()">↩️ Take top off</button>' + (M.level <= 2 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB; return; }
-  if(it.kind !== 'count'){ bar.innerHTML = '<div class="hint">👆 Drag blocks onto the right pan (or tap them). Tap a block on the pan to take it back.</div><button class="tb" data-sound="tap" onclick="takeAll()">↩️ Take all back</button>' + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡 Hint</button>' : '') + SUB; return; }
+  if(it.kind !== 'count'){ bar.innerHTML = '<div class="hint sc">👆 Drag or tap blocks onto the right pan · tap one on the pan to take it back</div><button class="tb" data-sound="tap" onclick="takeAll()">↩️ Take all back</button>' + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡 Hint</button>' : '') + SUB; return; }
   const s = selStack(); let h = '';
   if(!s) h = '<div class="hint">' + (M.level === 0 ? '🧲 Drag a number onto another one → they snap together (3 + 4 = 7).' : '🧲 Drag a number onto another to snap them · 👆 tap a number to ✂️ split' + (GS.canOp(M, 'copy') ? ', ✖️ copy or ➗ share' : '') + ' it.') + '</div>';   /* gs2-g2 words */
   else {
@@ -1426,6 +1427,15 @@ function renderBar(){
 /* ✂️ CUT START (gs2-g2, Aowu 2026-11-27 "a selection of how many to split, with a split button on the block's right side … a 3-click split")
    tap a number (1) → ✂️ on its right (2) → a ladder of "how many" chips beside its blocks, each one next to the block where the cut goes (3).
    Hover / focus a chip = the top k blocks lift + a dashed cut line; tap it = split. 🧲 while dragging: every number it can snap onto glows. */
+/* ✅ STAGE BUTTON START (gs2-g7) — on a ⚖️ scale the ✅ Submit / ▶ Next sits ON the scale post (between the pans), not in the bar → the bar is one row and the tray gets the room */
+function scaleKind(it){ return !!(it && it.left && it.right); }
+function stageBtn(){ let h = $('stage-btn'); const it = G && G.M && G.M.item, on = !!(G && !G.battle && !G.J && scaleKind(it));
+  if(!on){ if(h){ h.innerHTML = ''; h.classList.remove('on'); } return; }
+  if(!h){ h = document.createElement('div'); h.id = 'stage-btn'; $('stage').appendChild(h); }
+  const b = $('bar').querySelector('#btn-submit, #btn-next'); if(b){ h.innerHTML = ''; h.appendChild(b); } h.classList.add('on'); stageBtnPlace(); }
+function stageBtnPlace(){ const h = $('stage-btn'), P = G && G.subAt; if(!h || !P) return; const k = Math.round(P.x) + ',' + Math.round(P.y); if(h.dataset.at === k) return; h.dataset.at = k; h.style.left = Math.round(P.x) + 'px'; h.style.top = Math.round(P.y) + 'px'; }
+renderBar = (f => function(){ f.apply(this, arguments); try{ stageBtn(); }catch(e){} })(renderBar);   /* ✅ gs2-g7: every bar redraw re-seats the button */
+/* ✅ STAGE BUTTON END */
 function cutHide(){ const b = $('cut-btn'), p = $('cut-pick'); if(b) b.classList.remove('on', 'open'); if(p){ p.classList.remove('on'); p.innerHTML = ''; } }
 function cutClose(){ if(!G) return; G.cut = null; const p = $('cut-pick'); if(p){ p.classList.remove('on'); p.innerHTML = ''; } renderBar(); }
 function cutOpen(){ const s = selStack(); if(!G || G.phase !== 'play' || !s || s.n < 2 || !GS.canOp(G.M, 'split')) return; if(G.cut && G.cut.id === s.id){ cutClose(); return; }
@@ -1725,7 +1735,7 @@ function wrongFx(r, text){ SND.bad(); avatarDo('shrug'); hud(); cheerSay('miss',
   sm.className = 'warn'; sm.innerHTML = '✗ ' + text; gl.classList.add('warn'); gl.classList.remove('shake'); void gl.offsetWidth; gl.classList.add('shake');
   if(r.pen){ const sc = $('h-score').getBoundingClientRect(), m = document.createElement('div'); m.className = 'minus'; m.textContent = '−' + r.pen; m.style.left = Math.round(sc.left + sc.width / 2 - 18) + 'px'; m.style.top = Math.round(sc.bottom + 2) + 'px'; document.body.appendChild(m); setTimeout(() => m.remove(), 1400); }
   clearTimeout(G.warnT); G.warnT = setTimeout(() => { if(!G || G.id !== id || G.M.item !== it || G.phase !== 'play') return; gl.classList.remove('warn', 'shake'); renderGoal(); }, 2600 * Math.max(SPEED, 0.01)); }
-function rib(html, cls){ const el = $('rib'); if(!el) return; el.innerHTML = html; el.style.setProperty('--rt', ($('goal').classList.contains('side') || $('goal').classList.contains('sideL') ? 8 : goalBottom() + 8) + 'px');
+function rib(html, cls){ const el = $('rib'); if(!el) return; el.innerHTML = html; el.style.setProperty('--rt', ($('goal').classList.contains('side') || $('goal').classList.contains('sideL') ? 8 : scaleKind(G && G.M && G.M.item) && G.scaleTop ? G.scaleTop : goalBottom() + 8) + 'px');   /* 🫧 gs2-g7: the ✅ ribbon sits under the level */
   const gl = $('goal'), sd = gl.classList.contains('side'); el.style.left = sd ? Math.round((picLeft() + gl.offsetLeft) / 2) + 'px' : ''; el.style.maxWidth = sd ? Math.max(200, gl.offsetLeft - picLeft() - 16) + 'px' : '';   /* 🍕 gs2-g5: phone sideways — the ribbon sits over the picture, not over the goal card */
   el.className = 'rib on ' + (cls || ''); }
 function hideRib(){ const el = $('rib'); if(el) el.className = 'rib'; }
@@ -1869,7 +1879,7 @@ function guideTick(){
   const T = guideTarget(); if(!T){ hand.classList.add('hidden'); tip.classList.add('hidden'); return; }
   const ph = (performance.now() / 1600) % 1, k = T.tap ? 0 : Math.min(1, Math.max(0, (ph - 0.2) / 0.55)), e = k * k * (3 - 2 * k), x = T.from.x + (T.to.x - T.from.x) * e, y = T.from.y + (T.to.y - T.from.y) * e + (T.tap ? Math.abs(Math.sin(ph * Math.PI * 2)) * -14 : 0);
   hand.classList.remove('hidden'); hand.style.transform = 'translate(' + Math.round(x - 10) + 'px,' + Math.round(y - 4) + 'px) scale(' + (T.tap ? 1 : ph < 0.2 || ph > 0.75 ? 1 : 0.88) + ')'; hand.style.opacity = ph > 0.9 ? (1 - ph) * 10 : 1;
-  if(tip.dataset.t !== T.text){ tip.innerHTML = T.text; tip.dataset.t = T.text; } tip.style.top = (goalBottom() + 8) + 'px'; tip.classList.remove('hidden');
+  if(tip.dataset.t !== T.text){ tip.innerHTML = T.text; tip.dataset.t = T.text; } tip.style.top = (scaleKind(G.M.item) && G.scaleTop ? G.scaleTop : goalBottom() + 8) + 'px'; { const sw = scaleKind(G.M.item) && isWide(); tip.style.left = sw ? Math.round(W * 0.81) + 'px' : ''; tip.style.maxWidth = sw ? Math.round(W * 0.38 - 16) + 'px' : ''; }   /* 🫧 gs2-g7: never over the level / ✅ (phone sideways: in the tray column) */ tip.classList.remove('hidden');
 }
 
 /* ================= RESULT + SAVE ================= */
@@ -1961,7 +1971,7 @@ function leavePlay(){
 }
 function pauseGame(){}
 function batPadsOff(){ document.querySelectorAll('.bt-pad').forEach(e => e.remove()); const gl = $('goal'); if(gl) gl.classList.remove('hidden'); }   /* ⚔️ gs2-g6 */
-function backToMenu(){ batPadsOff(); if(window.Cheer) Cheer.unmount(); stopLoop(); stopTimer(); $('say').classList.add('hidden'); G = null; GID++; hideResult(); closeSheet(); renderMenu(); showScreen('menu'); }
+function backToMenu(){ batPadsOff(); { const h = $('stage-btn'); if(h){ h.innerHTML = ''; h.classList.remove('on'); } } if(window.Cheer) Cheer.unmount(); stopLoop(); stopTimer(); $('say').classList.add('hidden'); G = null; GID++; hideResult(); closeSheet(); renderMenu(); showScreen('menu'); }
 function sessionQuery(){ let q = ''; if(S.player || CURRENT_PLAYER) q += '&player=' + encodeURIComponent(S.player || CURRENT_PLAYER); if(SESSION_START) q += '&sessionStart=' + SESSION_START; if(DURATION_MIN) q += '&durationMin=' + DURATION_MIN; return q; }
 function goGameroom(){ UI.back(WEBAPP_URL + '?page=gameroom' + sessionQuery(), 'rooms'); }
 window.feedbackContext = () => ({page: 'GeoScout', game: GAME_ID, level: G ? G.M.level : SET.level, mode: G ? G.M.mode : SET.mode});
@@ -2295,4 +2305,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (gs-4+p1d+p3a+cs-4b+b3w3+24u-c+gs-anim+gs2-g1+gs2-g2+gs2-g3+gs2-g4+gs2-g5+gs2-g6) END OF GeoScout.html -->
+<!-- (gs-4+p1d+p3a+cs-4b+b3w3+24u-c+gs-anim+gs2-g1+gs2-g2+gs2-g3+gs2-g4+gs2-g5+gs2-g6+gs2-g7) END OF GeoScout.html -->
