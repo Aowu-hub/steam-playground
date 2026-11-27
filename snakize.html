@@ -147,7 +147,15 @@
   .pill{background:rgba(0,0,0,0.38);border:none;color:#fff;border-radius:14px;padding:6px 10px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:0.88rem;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;min-height:38px;font-variant-numeric:tabular-nums;flex:0 0 auto;}
   button.pill{cursor:pointer;min-width:38px;justify-content:center;} button.pill:active{transform:translateY(2px);}
   .pill.lbl{flex:0 1 auto;min-width:0;display:block;overflow:hidden;text-overflow:ellipsis;line-height:26px;}
-  .gb-nano [data-k="m:grow"], .gb-nano [data-k="m:grow1"]{display:none !important;}   /* 🎛️ p1c: small phones — the 🐍 3/15 counter says the same */
+  .gb-nano [data-k="m:grow"], .gb-nano [data-k="m:grow1"]{display:none !important;}
+  /* 🎯 24zr: 2–4 riders = ONE race meter in the bar — a thin track per rider in the seat colour (red · blue · gold · purple, like the pads), shown on small phones too */
+  .gb-meter.sn-race{gap:4px;} .gb-meter.sn-race .gb-mt{display:inline-flex;flex-direction:column;justify-content:center;gap:2px;width:62px;height:auto;padding:1px 0;background:none;box-shadow:none;overflow:visible;border-radius:0;}
+  .sn-race .gb-mt s{display:block;position:relative;height:5px;border-radius:3px;border-left:4px solid var(--c);background:rgba(255,255,255,0.2);overflow:hidden;box-shadow:inset 0 1px 1px rgba(0,0,0,0.35);transition:opacity .3s;}
+  .sn-race.n2 .gb-mt s{height:6px;} .sn-race.n4 .gb-mt s{height:4px;}
+  .sn-race .gb-mt s u{display:block;height:100%;width:0;border-radius:0 3px 3px 0;background:var(--c);transition:width .3s;}
+  .sn-race .gb-mt s.lead{box-shadow:0 0 0 1px rgba(255,255,255,0.75), 0 0 7px var(--c);} .sn-race .gb-mt s.out{opacity:0.35;}
+  .gb-tiny .sn-race .gb-mt{width:48px;} .gb-nano .sn-race .gb-mt{width:38px;} .gb-nano .gb-meter.sn-race{gap:3px;}
+  .gb-nano .sn-race.n3 > i, .gb-nano .sn-race.n4 > i{display:none;}   /* small phones, 3–4 riders: the coloured rows say it, the 🎯 makes room */   /* 🎛️ p1c: small phones — the 🐍 3/15 counter says the same */
   .hud .grow{flex:1 1 auto;min-width:40px;height:14px;border-radius:8px;background:rgba(255,255,255,0.16);overflow:hidden;position:relative;}
   .hud .grow b{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#2FB862,#FFC845);border-radius:8px;transition:width .2s;}
   .hud .grow b.p2{top:50%;background:linear-gradient(90deg,#3D8BFD,#6EE7F9);}
@@ -1782,7 +1790,7 @@ function startGame(opts){
   cheerMount(); calloutSetup(); /* 💬 24t-f */   /* 📣 cs-2b: the crowd for this game (Off = nothing) */
   if(window.GameComic) GameComic._reset(mode);   /* 💥 ck-2c (G.hold in loop() = a comic page is open) */
   BAR.level(opts.label || (MODES[mode].icon + ' ' + SN.LEVEL_NAMES[lvl] + (endless ? ' ♾️' : '')), lvl === 5 ? 'hc' : '');
-  BAR.meter('grow', '🎯', 0, 'Progress'); if(humans > 1) BAR.meter('grow1', '🎯', 0, 'Player 2 progress'); else BAR.hide('grow1');
+  raceMeter(humans);   /* 🎯 24zr: a meter for every rider */
   BAR.extra('mus-btn', {icon: musicOn() ? '🎵' : '🔇', label: musicOn() ? 'Music: on' : 'Music: off'});
   musicStart(theme);
   banner(mode === 'castle' ? (M.win ? '🏰 Grab ' + M.win + ' % of the map!' : '🏰 Most land in ' + fmtS(M.time) + '!') : mode === 'feast' ? (endless ? '♾️ Endless — eat as much as you can!' : '🍎 Grow to ' + M.target + '!') : mode === 'gate' ? (M.time ? '🧭 Be the longest in ' + fmtS(M.time) + '!' : '🧭 Last snake wins!') : '', 'good', 2200);
@@ -2015,6 +2023,25 @@ function musicStart(theme){
 }
 
 /* ================= HUD ================= */
+/* 🎯 24zr: 2–4 riders → ONE 🎯 race meter (a row per rider in the seat colour, leader glows, an out rider fades); 1 rider → the old 🎯 Progress meter */
+function raceMeter(n){
+  if(n < 2){ BAR.hide('race'); BAR.hide('grow1'); BAR.meter('grow', '🎯', 0, 'Progress'); G.race = null; return; }
+  BAR.hide('grow'); BAR.hide('grow1');
+  BAR.meter('race', '🎯', 0, 'Everyone\u2019s progress');
+  const slot = document.querySelector('#gbar [data-k="m:race"]'), mt = slot && slot.querySelector('.gb-mt'); if(!mt) return;
+  const hs = humanIdx();
+  slot.classList.add('sn-race'); slot.classList.remove('n2', 'n3', 'n4'); slot.classList.add('n' + Math.min(4, n));
+  mt.innerHTML = hs.map(i => '<s style="--c:' + (G.cols[i] || SEAT_COL[i % 4]) + '" title="' + String(G.seats[i] ? G.seats[i].name : 'Player ' + (i + 1)).replace(/[<>"&]/g, '') + '"><u></u></s>').join('');
+  G.race = {rows: [...mt.children], last: []};
+  if(BAR.fit) BAR.fit();
+}
+function raceSet(hs, ws){
+  const R = G.race; if(!R) return;
+  const top = Math.max(...ws), M = G.M;
+  hs.forEach((i, k) => { const row = R.rows[k]; if(!row) return; const w = Math.round(Math.max(0, Math.min(100, ws[k]))), lead = top > 0 && ws[k] === top && ws.filter(x => x === top).length === 1, out = M.snakes[i].alive === false;
+    const key = w + (lead ? 'L' : '') + (out ? 'O' : ''); if(R.last[k] === key) return; R.last[k] = key;   /* write the DOM only when it changes */
+    row.firstChild.style.width = w + '%'; row.classList.toggle('lead', lead); row.classList.toggle('out', out); });
+}
 function hud(){
   const M = G.M, me = M.snakes[0], hs = humanIdx();
   const len = SN.lenOf(M, me), tgt = M.mode === 'feast' && isFinite(M.target) ? M.target : (M.mode === 'gate' && M.goalLen ? M.goalLen : 0);
@@ -2023,12 +2050,12 @@ function hud(){
   else BAR.count('len', '🐍', len + (tgt ? '/' + tgt : ''), 'Snake length');
   const best = M.mode === 'gate' ? Math.max(1, ...M.snakes.map(s => s.len)) : 0;
   const bestLand = M.mode === 'castle' ? Math.max(1, ...M.snakes.map(s => s.land)) : 0;
-  hs.slice(0, 2).forEach((i, k) => { const s = M.snakes[i], L = SN.lenOf(M, s), w = M.story ? Math.min(100, (M.story.have || 0) / M.story.need * 100) : M.mode === 'castle' ? Math.min(100, s.land / (M.win || Math.max(bestLand, 30)) * 100) : tgt ? Math.min(100, L / tgt * 100) : M.mode === 'gate' ? Math.min(100, L / best * 100) : Math.min(100, (L % 50) * 2);
-    BAR.meter(k ? 'grow1' : 'grow', '🎯', w / 100, k ? 'Player 2 progress' : 'Progress'); });
+  const ws = hs.map(i => { const s = M.snakes[i], L = SN.lenOf(M, s); return M.story ? Math.min(100, (M.story.have || 0) / M.story.need * 100) : M.mode === 'castle' ? Math.min(100, s.land / (M.win || Math.max(bestLand, 30)) * 100) : tgt ? Math.min(100, L / tgt * 100) : M.mode === 'gate' ? Math.min(100, L / best * 100) : Math.min(100, (L % 50) * 2); });   /* 🎯 24zr: every rider, not just 2 */
+  if(hs.length > 1) raceSet(hs, ws); else { if(G.race){ BAR.hide('race'); G.race = null; } BAR.meter('grow', '🎯', ws[0] / 100, 'Progress'); }   /* 📱 own screens: each phone = ONE rider (me) */
   BAR.score(SN.score(M, 0).toLocaleString());
   const stT = M.story && M.story.time, timed = stT || ((M.mode === 'gate' || M.mode === 'castle') && M.time), tl = timed ? Math.max(0, (stT || M.time) - M.t) : M.t;
   BAR.time(fmtS(tl), !!timed && tl <= 10);
-  if(M.mode === 'castle' && !M.L.lives) BAR.hide('lives'); else BAR.lives(hs.map(i => Math.max(0, M.snakes[i].lives)).join(' · '), hs.length === 1 && M.snakes[hs[0]].lives === 1);   // 🎛️ p1c
+  if(M.mode === 'castle' && !M.L.lives) BAR.hide('lives'); else BAR.lives(hs.map(i => Math.max(0, M.snakes[i].lives)).join(hs.length > 2 ? '·' : ' · '), hs.length === 1 && M.snakes[hs[0]].lives === 1);   // 🎛️ p1c
   // skill button + quest cards
   hs.slice(0, 2).forEach((i, k) => {
     const s = M.snakes[i], q = $('quest' + k), btn = document.querySelector('.tb.skl[data-seat="' + k + '"]');
@@ -2972,4 +2999,4 @@ const ANN = (function(){
 </script>
 </body>
 </html>
-<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a+p3e+cs-2b+ck-2c+pz-1+24n+24s+b3w5b+24u-d1+24t-f+b3b8+an-1+an-2+24y-b+lk-8c+sbp-p+24zq) END OF Snakize.html -->
+<!-- (11y-4+r33+r36+back-1+modes-3+mg-1+af-4+p1c+p2+p3a+p3e+cs-2b+ck-2c+pz-1+24n+24s+b3w5b+24u-d1+24t-f+b3b8+an-1+an-2+24y-b+lk-8c+sbp-p+24zq+24zr) END OF Snakize.html -->
