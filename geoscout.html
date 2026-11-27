@@ -127,6 +127,9 @@
   .goal{font-size:1.6rem;padding:8px 18px;border-width:3px;width:max-content;}   /* width: an absolute box at left:50% only gets HALF the stage to wrap in — max-content + max-width uses the whole width */ .goal small{font-size:0.98rem;margin-top:2px;}
   @media (max-width:640px){ .goal{font-size:1.2rem;padding:6px 12px;} .goal small{font-size:0.8rem;} }
   .goal.warn{border-color:#FF7A80;} .goal small.warn{color:#FFC2C5;}
+  .bar .tb.take{background:#FFE1E1;color:#9A1C22;border-color:#FF9AA0;}   /* ➖ gs2-g3 */
+  .bar .tb.brk{background:#FFF1C7;color:#6B4A00;border-color:#FFC845;}
+  .bar .tb.brk.glow{animation:gs3-brk .5s ease-in-out 3 alternate;} @keyframes gs3-brk{0%{box-shadow:0 0 0 0 rgba(255,200,69,0);transform:none;}100%{box-shadow:0 0 0 6px rgba(255,200,69,0.75);transform:scale(1.08);}}
   .goal.shake{animation:gs2-shake .45s ease;} @keyframes gs2-shake{0%,100%{translate:0 0;}20%{translate:-10px 0;}40%{translate:10px 0;}60%{translate:-6px 0;}80%{translate:6px 0;}}
   .goal.swap, .bar.swap{animation:gs2-in .42s ease both;} @keyframes gs2-in{0%{opacity:0;}100%{opacity:1;}}
   .tb.submit{background:linear-gradient(180deg,#6BEA97,#1FA463);color:#fff;font-size:1.25rem;min-width:140px;min-height:54px;box-shadow:0 5px 0 #0E6B3C,0 0 0 3px rgba(255,255,255,.35);text-shadow:0 2px 0 rgba(0,0,0,.25);}
@@ -544,17 +547,63 @@ const GS = (function(){
   function minPieces(T, units){ let n = 0; units.slice().sort((a, b) => b - a).forEach(u => { n += Math.floor(T / u); T %= u; }); return n; }
   function makeTens(Li, r, round){
     const [lo, hi] = TENS_R[Li], T = ri(r, lo, hi), units = tensUnits(Li);
+    if(Li >= 2 && round % 4 === 3){ const D = takeAmount(Li, r, T, units), take = D >= 10 && digits(D)[2] <= digits(T)[2] ? D : Math.min(T - 1, Math.floor(T / 10) % 10 ? (Math.floor(T / 10) % 10) * 10 : 10), ans = T - take, dd = digits(take);   /* ➖ gs2-g3: what is left? */
+      return {kind: 'choice', ck: 'tens', q: T + ' take away ' + [dd[0] ? dd[0] + ' hundred' + (dd[0] > 1 ? 's' : '') : '', dd[1] ? dd[1] + ' ten' + (dd[1] > 1 ? 's' : '') : '', dd[2] ? dd[2] + ' one' + (dd[2] > 1 ? 's' : '') : ''].filter(Boolean).join(' + ') + ' — what is left?', vis: {type: 'value', v: T, take}, options: numOptions(r, ans, 4, ans >= 100 || take >= 10 ? 10 : 1), answer: ans, par: 0}; }
     if(Li >= 2 && round % 2 === 1){
       const ask = r() < 0.5 ? 'value' : 'tens', ans = ask === 'value' ? T : Math.floor(T / 10) % 10;
       return {kind: 'choice', ck: 'tens', q: ask === 'value' ? 'What number do these blocks make?' : 'How many TENS (towers of 10) are in ' + T + '?', vis: {type: 'value', v: T}, options: ask === 'value' ? numOptions(r, ans, 4, T >= 100 ? 10 : 1) : shuffle(r, [ans].concat(distractors(r, [ans], 9, 3).map(x => x % 10))).filter((v, i, a) => a.indexOf(v) === i).slice(0, 4), answer: ans, par: 0};
     }
-    return {kind: 'tens', target: T, value: 0, units, par: minPieces(T, units), slack: [0, 2]};
+    const way = makeTensWay(Li, r, round, units); if(way) return way;   /* ➖ gs2-g3 */
+    return {kind: 'tens', way: 'build', start: 0, target: T, value: 0, pc: {h: 0, t: 0, o: 0}, units, par: minPieces(T, units), slack: [0, 2]};
   }
-  function tensAdd(M, unit){
+  /* ➖ TENS WAYS START (gs2-g3): a tens round = PIECES {h, t, o} (it.pc) · build from 0 · ➖ take away ("you have 152, make 132") · ➕ add on ("you have 34, make 58")
+     🔨 no ones left: 🌱 Basic – 🔦 Intermediate break a ten by themselves; from ⚡ Hard the player taps 🔨 first (Aowu Q9 C) */
+  function tensWay(Li, round){ if(Li === 0) return round % 2 ? 'take' : 'build'; const k = Li >= 2 ? Math.floor(round / 2) : round; return ['take', 'build', 'take', 'add'][k % 4]; }
+  function digits(v){ return [Math.floor(v / 100), Math.floor(v % 100 / 10), v % 10]; }
+  function partsOf(v, units){ const big = !units || units.indexOf(100) >= 0, h = big ? Math.floor(v / 100) : 0, r = v - h * 100; return {h, t: Math.floor(r / 10), o: r % 10}; }
+  function pval(P){ return P.h * 100 + P.t * 10 + P.o; }
+  function pcOf(it){ if(!it.pc || pval(it.pc) !== it.value) it.pc = partsOf(it.value, it.units); return it.pc; }   // a test (or a look script) may set it.value by hand
+  function autoBreak(Li){ return Li <= 2; }
+  // one move on the pieces: '+1' '+10' '+100' '-1' '-10' '-100' 'b10' (a ten → 10 ones) 'b100' (a hundred → 10 tens). → {P, snapped, snappedH, broke} | {need} (refused: break first) | null
+  function tensStep(P0, act, units, auto){ const P = {h: P0.h, t: P0.t, o: P0.o}, has100 = units.indexOf(100) >= 0; let snapped = false, snappedH = false, broke = 0;
+    if(act === 'b10'){ if(!P.t) return null; P.t--; P.o += 10; return {P, broke: 10}; }
+    if(act === 'b100'){ if(!P.h) return null; P.h--; P.t += 10; return {P, broke: 100}; }
+    const u = +act.slice(1), up = act[0] === '+';
+    if(up){ if(u === 100) P.h++; else if(u === 10) P.t++; else P.o++; if(u === 1 && P.o >= 10){ P.o -= 10; P.t++; snapped = true; } if(P.t >= 10 && has100 && u < 100){ P.t -= 10; P.h++; snappedH = true; } if(pval(P) > 1999) return null; return {P, snapped, snappedH, broke}; }
+    if(!pval(P)) return null;
+    if(u === 1){ if(!P.o){ if(P.t && auto){ P.t--; P.o += 10; broke = 10; } else if(!P.t && P.h && auto){ P.h--; P.t += 9; P.o += 10; broke = 100; } else return {need: P.t ? 10 : P.h ? 100 : 0}; } P.o--; }
+    else if(u === 10){ if(!P.t){ if(P.h && auto){ P.h--; P.t += 10; broke = 100; } else return {need: P.h ? 100 : 0}; } P.t--; }
+    else { if(!P.h) return {need: 0}; P.h--; }
+    return {P, snapped, snappedH, broke}; }
+  // the fewest taps from the pieces P to the value T (BFS over pieces — the ⭐⭐⭐ par, also the 💡 plan for tests)
+  function tensPlan(P0, T, units, auto){ const acts = units.reduce((a, u) => a.concat(['+' + u, '-' + u]), []).concat(auto ? [] : (units.indexOf(10) >= 0 || P0.t ? ['b10'] : []).concat(units.indexOf(100) >= 0 ? ['b100'] : []));
+    const key = P => P.h + ',' + P.t + ',' + P.o, seen = new Map([[key(P0), null]]), Q = [P0]; if(pval(P0) === T) return [];
+    for(let qi = 0; qi < Q.length && qi < 40000; qi++){ const P = Q[qi];
+      for(const a of acts){ const r = tensStep(P, a, units, auto); if(!r || !r.P || r.P.h > 12 || r.P.t > 22 || r.P.o > 22) continue; const k = key(r.P); if(seen.has(k)) continue; seen.set(k, [key(P), a]);
+        if(pval(r.P) === T){ const path = []; let kk = k; while(seen.get(kk)){ path.unshift(seen.get(kk)[1]); kk = seen.get(kk)[0]; } return path; } Q.push(r.P); } }
+    return null; }
+  // how much to take away from S: each place ≤ that place of S (no break) — or, from ⚡ Hard (🐣 Junior: now and then), a place bigger = break a ten / a hundred
+  function takeAmount(Li, r, S, units){ const ds = digits(S), brk = (Li >= 3 && r() < 0.45) || (Li === 1 && S % 10 < 9 && r() < 0.3);
+    for(let tries = 0; tries < 40; tries++){ let D = 0;
+      if(Li <= 1) D = brk ? ri(r, S % 10 + 1, Math.min(9, S - 1)) : ri(r, 1, Math.max(1, Math.min(S % 10 || S - 1, Li === 0 ? 4 : 9)));
+      else { const big = units.indexOf(100) >= 0, h = big ? ri(r, 0, ds[0]) : 0, t = ri(r, 0, ds[1]), o = ri(r, 0, ds[2]); D = h * 100 + t * 10 + o;
+        if(brk){ D = ri(r, Math.max(2, Math.round(S * 0.1)), Math.round(S * (Li >= 4 ? 0.7 : 0.6))); const dd = digits(D); if(!(dd[2] > ds[2] || dd[1] > ds[1])) continue; } }
+      if(D >= 1 && S - D >= 1 && (Li < 2 || D >= 10 || brk)) return D; }
+    return Math.max(1, Math.min(S - 1, Li <= 1 ? 1 : 10)); }
+  function tensRound(way, S, T, units, Li){ const pc = partsOf(S, units), plan = tensPlan(pc, T, units, autoBreak(Li)) || [];
+    return {kind: 'tens', way, start: S, target: T, value: S, pc, units, par: plan.length, slack: [0, 2]}; }
+  function makeTensWay(Li, r, round, units){ const [lo, hi] = TENS_R[Li], way = tensWay(Li, round);
+    if(way === 'build') return null;
+    if(way === 'take'){ const S = ri(r, Math.max(lo, Li === 0 ? 4 : lo), hi), D = takeAmount(Li, r, S, units); return tensRound(way, S, S - D, units, Li); }
+    const T = ri(r, Math.max(lo, 3), hi), A = Li <= 1 ? ri(r, 1, Math.min(5, T - 1)) : Math.max(1, Math.round(T * (0.2 + r() * 0.5))); return tensRound(way, T - A, T, units, Li); }
+  function tensBreak(M, unit){ const it = M.item; if(!it || it.kind !== 'tens' || it.done) return null; const r = tensStep(pcOf(it), 'b' + unit, it.units, false); if(!r) return null; it.pc = r.P; it.moves++; return {broke: unit, pc: r.P}; }
+  /* ➖ TENS WAYS END */
+  function tensAdd(M, unit){   /* ➖ gs2-g3: on the pieces — a refused take (no ones from ⚡ Hard) returns {refused, need} */
     const it = M.item; if(!it || it.kind !== 'tens' || it.done || it.units.indexOf(Math.abs(unit)) < 0) return null;
-    const v = it.value + unit; if(v < 0 || v > 1999) return null; const before = it.value; it.value = v; it.moves++;
-    const snapped = unit > 0 && Math.floor(v / 10) > Math.floor(before / 10) && unit < 10;   // 10 ones → a ten-tower
-    if(v === it.target && !subm(M)){ it.done = it.ok = true; } return {value: v, snapped, done: it.done};
+    const before = it.value, r = tensStep(pcOf(it), (unit > 0 ? '+' : '-') + Math.abs(unit), it.units, autoBreak(M.level)); if(!r) return null;
+    if(!r.P) return r.need ? {refused: true, need: r.need, value: before} : null;
+    it.pc = r.P; const v = pval(r.P); it.value = v; it.moves++;
+    if(v === it.target && !subm(M)){ it.done = it.ok = true; } return {value: v, snapped: r.snapped, snappedH: r.snappedH, broke: r.broke, done: it.done};
   }
 
   /* ---------- 🧩 WHAT COMES NEXT ---------- */
@@ -830,6 +879,7 @@ const GS = (function(){
     if(it.kind === 'compare') return 'Count the blocks on each side — which side is heavier?';
     if(it.kind === 'choice') return it.ck === 'next' ? 'How much does it change each time?' : it.ck === 'frac' ? 'Count the pieces: how many are coloured, how many in all?' : 'Count slowly, one at a time.';
     if(it.kind === 'grid') return 'Tap squares to fill them. ' + (it.ck === 'perim' ? 'The way round = all the outside edges.' : 'Fill rows of the same length.');
+    if(it.kind === 'tens' && it.start){ const D = Math.abs(it.target - it.start), d = digits(D); return (it.target < it.start ? 'Take away ' : 'Add ') + [d[0] ? d[0] + ' hundred' + (d[0] > 1 ? 's' : '') : '', d[1] ? d[1] + ' ten' + (d[1] > 1 ? 's' : '') : '', d[2] ? d[2] + ' one' + (d[2] > 1 ? 's' : '') : ''].filter(Boolean).join(', ') + ': ' + it.start + (it.target < it.start ? ' − ' : ' + ') + D + ' = ' + it.target + (it.target < it.start && d[2] > it.start % 10 ? ' (not enough ones? break a ten into 10 ones!)' : ''); }   /* ➖ gs2-g3 */
     if(it.kind === 'tens') return it.target + ' = ' + (it.target >= 100 ? Math.floor(it.target / 100) + ' hundreds, ' : '') + Math.floor(it.target % 100 / 10) + ' tens and ' + it.target % 10 + ' ones.';
     if(it.kind === 'colour') return 'Cut into ' + it.frac.d + ' teams of ' + (it.len / it.frac.d) + ' — colour ' + it.frac.n + ' team' + (it.frac.n > 1 ? 's' : '') + '.';
     if(it.kind === 'wobble') return 'Try: ' + it.plan.join(' + ') + ' = ' + it.target;
@@ -841,7 +891,7 @@ const GS = (function(){
     subm, penFor, readyOf, submit, optionsOf, optionsLeft,   /* ✅ gs2-g1 */
     makeCompare, makeBalance, makeAvatar, makeScale, makeCount, newGame, deal, scaleAnswer, scalePut, scaleTake, balanceState, cSnap, cSplit, cCopy, cShare, canOp,
     finishRound, advance, finish, starsFor, starsOfRound, speedPart, playPlan, hintFor, isQuiz,
-    GRID, makeShape, shapeOf, gridDone, gridToggle, gridSolution, rectCells, stairCells, stairCorners, TENS_R, tensUnits, minPieces, makeTens, tensAdd, makeNext, gcd, fstr, FR_D, makeFrac, colourToggle,
+    digits, GRID, makeShape, shapeOf, gridDone, gridToggle, gridSolution, rectCells, stairCells, stairCorners, TENS_R, tensUnits, minPieces, makeTens, tensAdd, tensWay, tensStep, tensPlan, tensBreak, takeAmount, partsOf, pcOf, autoBreak, makeNext, gcd, fstr, FR_D, makeFrac, colourToggle,
     CHARS, charName, CHAPTERS, storyPlan, subsetPlan, journeyItem, castStep,
     WOB, minCount, wobblePlan, makeWobble, wobAdd, wobPop, answerChoice, BAT, newBattle, battleDeal, buildValue, allBuilds, scoreFor, robotBuild, battleLock, battleJudge};
 })();
@@ -1065,7 +1115,7 @@ function startGame(){ setTimeout(cheerMount, 0); /* 📣 cs-4b */ if(ScoutCover)
 }
 function nextRound(first){
   if(!G) return; const M = G.M; GS.deal(M); G.phase = 'play'; G.roundT0 = performance.now(); G.sel = 0; G.splitK = 1; G.hist = []; G.drag = null; G.tiltLock = M.item.kind === 'compare'; G.tilt = 0; G.answerShown = false;
-  G.pos = {}; G.pick = null; G.revealTo = null; G.cntW = null; G.cut = null; NumberSkins.limbs(true, (M.seed + M.round * 7919) >>> 0); cutHide();   /* 🙆 ✂️ gs2-g2 */ hideRib(); hud(); renderBar(); renderGoal(); hideBanner();
+  G.pos = {}; G.pick = null; G.revealTo = null; G.cntW = null; G.cut = null; NumberSkins.limbs(true, (M.seed + M.round * 7919) >>> 0); NumberSkins.hundreds(window.HUN_LOOK || 'plate'); G.takeA = G.tensBreak = null; G.tensHits = [];   /* 💯 ➖ gs2-g3 */ cutHide();   /* 🙆 ✂️ gs2-g2 */ hideRib(); hud(); renderBar(); renderGoal(); hideBanner();
   if(M.item.kind === 'avatar'){ banner('🧑 How many blocks do <b>you</b> weigh?', ''); setTimeout(hideBanner, 1600 * SPEED + 1); }
 }
 function hud(){ if(!G) return; if(G.J){ jHud(); return; } const M = G.M; $('h-round').textContent = 'Round ' + Math.min(M.round + 1, M.total) + ' / ' + M.total; $('h-score').textContent = '🏆 ' + M.score.toLocaleString();
@@ -1078,6 +1128,7 @@ function renderGoal(){
   else if(it.kind === 'avatar') gl.innerHTML = '🧑 Weigh <b>' + UI.esc(S.player) + '</b>!<small>Put blocks on the right pan until it balances</small>';
   else if(it.kind === 'balance') gl.innerHTML = '⚖️ Make it <b>balance</b><small>Drag blocks onto the right pan</small>';
   else if(it.kind === 'grid') gl.innerHTML = '🔷 Build <b>' + UI.esc(it.goal) + '</b><small>Tap or drag on the grid to fill squares</small>';
+  else if(it.kind === 'tens' && it.start) gl.innerHTML = '🔟 You have <b>' + it.start + '</b> · make <b>' + it.target + '</b><small>' + (it.target < it.start ? '➖ Take away ' + (it.units.length > 2 ? 'hundreds, ' : '') + (it.units.length > 1 ? 'towers and ones' : 'ones') + (GS.autoBreak(G.M.level) ? '' : ' · 🔨 break one when you run out') : '➕ Add ' + (it.units.length > 1 ? 'towers and ones' : 'ones')) + '</small>';   /* ➖ gs2-g3 */
   else if(it.kind === 'tens') gl.innerHTML = '🔟 Build <b>' + it.target + '</b><small>' + (it.units.length > 1 ? 'Use ones, tens' + (it.units.length > 2 ? ' and hundreds' : '') + ' — the fewest blocks' : '10 ones snap into a ten-tower') + '</small>';
   else if(it.kind === 'colour') gl.innerHTML = '🍕 Colour <b>' + it.frac.n + '/' + it.frac.d + '</b> of the bar<small>Tap blocks to colour them</small>';
   else if(it.kind === 'wobble') gl.innerHTML = '🏗️ Exactly <b>' + it.target + '</b> high<small>Only blocks of ' + it.sizes.join(', ') + ' — fewest blocks wins ⭐⭐⭐</small>';
@@ -1094,7 +1145,9 @@ function renderBar(){
   if(it.kind === 'choice' && !it.syms){ bar.innerHTML = it.options.map((o, i) => '<button class="tb big ' + ['lt', 'eq', 'gt', 'act'][i % 4] + '" style="--i:' + i + '" data-opt="' + UI.esc(o) + '" data-sound="none" onclick="pickAns(this.dataset.opt)">' + UI.esc(o) + '<small>' + (i + 1) + '</small></button>').join('') + SUB; markTried(); return; }
   if(it.kind === 'choice' || it.kind === 'compare'){ bar.innerHTML = SYMS + SUB; markTried(); return; }
   if(it.kind === 'grid'){ bar.innerHTML = '<div class="hint">👆 Tap or drag to fill squares · tap a filled one to empty it</div><button class="tb" data-sound="tap" onclick="gridClear()">🧽 Clear</button>' + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB; return; }
-  if(it.kind === 'tens'){ bar.innerHTML = it.units.map(u => '<button class="tb act" data-u="' + u + '" data-sound="none" onclick="tensBtn(' + u + ')">+' + u + '</button>').join('') + it.units.map(u => '<button class="tb" data-u="-' + u + '" data-sound="none" onclick="tensBtn(-' + u + ')">−' + u + '</button>').join('') + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB; return; }
+  if(it.kind === 'tens'){ const tk = it.start > it.target, PL = it.units.map(u => '<button class="tb act" data-u="' + u + '" data-sound="none" onclick="tensBtn(' + u + ')">+' + u + '</button>').join(''), MI = it.units.map(u => '<button class="tb' + (tk ? ' take' : '') + '" data-u="-' + u + '" data-sound="none" onclick="tensBtn(-' + u + ')">−' + u + '</button>').join('');   /* ➖ gs2-g3: take-away rounds put − first · 🔨 from ⚡ Hard */
+    const BR = tk && !GS.autoBreak(M.level) ? [10, 100].filter(u => u === 10 ? it.units.indexOf(10) >= 0 : it.units.indexOf(100) >= 0).map(u => '<button class="tb brk" data-b="' + u + '" data-sound="none" onclick="tensBreakBtn(' + u + ')" title="' + (u === 10 ? 'B' : 'Shift+B') + '">🔨 ' + u + '</button>').join('') : '';
+    bar.innerHTML = (tk ? MI + BR + PL : PL + MI) + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB; return; }
   if(it.kind === 'colour'){ bar.innerHTML = '<div class="hint">👆 Tap blocks to colour them (tap again to clear one)</div><button class="tb" data-sound="tap" onclick="colourClear()">🧽 Clear</button>' + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB; return; }
   if(it.kind === 'wobble'){ bar.innerHTML = it.sizes.map((z, i) => '<button class="tb big" style="background:' + WOB_COLS[i] + ';color:#fff" data-s="' + z + '" data-sound="none" onclick="wobBtn(' + z + ')">+' + z + '<small>key ' + (i + 1) + '</small></button>').join('') + '<button class="tb" data-sound="tap" onclick="wobUndo()">↩️ Take top off</button>' + (M.level <= 2 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB; return; }
   if(it.kind !== 'count'){ bar.innerHTML = '<div class="hint">👆 Drag blocks onto the right pan (or tap them). Tap a block on the pan to take it back.</div><button class="tb" data-sound="tap" onclick="takeAll()">↩️ Take all back</button>' + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡 Hint</button>' : '') + SUB; return; }
@@ -1425,9 +1478,23 @@ function drawReveal(g){
 }
 function gridTap(x, y, on){ const r = GS.gridToggle(G.M, x, y, on); if(!r || r.same) return r; SND.split(); if(r.done) roundDone(true); return r; }
 function gridClear(){ const it = G.M.item; if(G.phase !== 'play' || !it.cells.length) return; it.cells = []; it.moves++; }
-function tensBtn(u){ dropNow(); if(!G || G.phase !== 'play') return; const v0 = G.M.item.value, r = GS.tensAdd(G.M, u); if(!r){ UISound.play('error'); return; }   // 🧊 gs-anim
-  if(u < 0){ SND.split(); if(r.done) roundDone(true); return; }
-  G.tensFrom = {v0, unit: u, snapped: r.snapped}; GSStack.drop({kind: 'tens', after(){ G.tensFrom = null; SND.snap(Math.abs(u)); if(r.snapped){ G.fx.push({kind: 'txt', text: '10 ones → 1 ten! ✨', x: W / 2, y: H * 0.35, col: '#FFE14D', size: 22, t: 0, life: 1.4}); avatarDo('clap'); } if(r.done) roundDone(true); }}); }
+function tensBtn(u){ dropNow(); if(!G || G.phase !== 'play') return; const it = G.M.item, P0 = Object.assign({}, GS.pcOf(it)), v0 = it.value, r = GS.tensAdd(G.M, u); if(!r){ UISound.play('error'); return; }   // 🧊 gs-anim · ➖ gs2-g3
+  if(r.refused){ needBreak(r.need); return; }
+  if(u < 0){ SND.split(); tensTakeFx(-u, P0, r); if(r.done) roundDone(true); return; }
+  G.tensFrom = {v0, P0, unit: u, snapped: r.snapped, snappedH: r.snappedH}; GSStack.drop({kind: 'tens', after(){ G.tensFrom = null; SND.snap(Math.abs(u)); if(r.snapped || r.snappedH){ G.fx.push({kind: 'txt', text: r.snappedH ? '10 tens → 1 hundred! ✨' : '10 ones → 1 ten! ✨', x: W / 2, y: H * 0.35, col: '#FFE14D', size: 22, t: 0, life: 1.4}); avatarDo('clap'); } if(r.done) roundDone(true); }}); }
+/* ➖ TENS TAKE START (gs2-g3): the piece taken hops into the 🧺 tray (lift · arc · land · settle) · 🔨 a ten / a hundred pops apart (0.6 s) · no ones left from ⚡ Hard = "break one first" */
+const TAKE_T = 0.55, BREAK_T = 0.6;
+function tensTakeFx(unit, P0, r){ if(!SPEED || !FX) return; const now = Object.assign({}, GS.pcOf(G.M.item));
+  if(r.broke){ const Pb = r.broke === 10 ? {h: P0.h, t: P0.t - 1, o: P0.o + 10} : {h: P0.h - 1, t: P0.t + 10, o: P0.o}; G.tensBreak = {unit: r.broke, t: 0, Pb}; breakSay(r.broke); P0 = Pb; }
+  G.takeA = {unit, P0, now, t: 0, delay: r.broke ? BREAK_T : 0}; }
+function breakSay(unit){ SND.snap(10); avatarDo('clap'); }   // the words "1 ten → 10 ones" sit right above the number while it pops
+function tensBreakBtn(unit){ dropNow(); if(!G || G.phase !== 'play') return; const r = GS.tensBreak(G.M, unit); if(!r){ UISound.play('error'); return; }
+  SND.split(); const b = document.querySelector('#bar .tb.brk.glow'); if(b) b.classList.remove('glow'); if(SPEED && FX){ G.tensBreak = {unit, t: 0, Pb: Object.assign({}, r.pc)}; breakSay(unit); } }
+function needBreak(need){ UISound.play('error'); avatarDo('think'); const b = document.querySelector('#bar .tb.brk[data-b="' + need + '"]'); if(b){ b.classList.remove('glow'); void b.offsetWidth; b.classList.add('glow'); }
+  G.fx.push({kind: 'txt', text: need === 10 ? 'No ones left — break a ten first!' : need === 100 ? 'No tens left — break a hundred first!' : 'There is nothing to take', x: W / 2, y: H * 0.36, col: '#FF9AA0', size: 20, t: 0, life: 1.6}); }
+function tensFxTick(dt){ if(G.tensBreak){ G.tensBreak.t += dt; if(G.tensBreak.t > BREAK_T) G.tensBreak = null; } if(G.takeA){ G.takeA.t += dt; if(G.takeA.t > G.takeA.delay + TAKE_T) G.takeA = null; } }
+function tensTap(p){ const h = (G.tensHits || []).find(q => p.x >= q.x - 6 && p.x <= q.x + q.w + 6 && p.y >= q.y - 6 && p.y <= q.y + q.h + 6); if(!h) return false; tensBtn(-h.unit); return true; }
+/* ➖ TENS TAKE END */
 function colourTap(i){ const r = GS.colourToggle(G.M, i); if(!r) return; SND.drop(); if(r.done) roundDone(true); }
 function colourClear(){ const it = G.M.item; if(G.phase !== 'play' || !it.on.length) return; it.on = []; it.moves++; }
 function dropNow(){ const D = G && G.dropA; if(D){ G.dropA = null; D.after && D.after(); } }   // 🧊 a quick next tap finishes the last drop at once
@@ -1446,6 +1513,7 @@ async function roundDone(ok, r){
   else if(it.kind === 'balance') msg = '⚖️ Balanced! <b>' + GS.total(it.left) + ' = ' + GS.total(it.right) + '</b>';
   else if(it.kind === 'choice') msg = ok ? '✅ Yes! <b>' + UI.esc(String(it.answer)) + '</b>' : '❌ It was <b>' + UI.esc(String(it.answer)) + '</b>';
   else if(it.kind === 'grid') msg = '🔷 ' + UI.esc(it.goal) + '! ' + (rec.stars === 3 ? 'Perfect!' : rec.moves + ' taps (best ' + it.par + ')');
+  else if(it.kind === 'tens' && it.start) msg = '🔟 <b>' + it.start + (it.target < it.start ? ' − ' : ' + ') + Math.abs(it.target - it.start) + ' = ' + it.target + '</b>! ' + (rec.stars === 3 ? 'The fewest taps!' : rec.moves + ' taps (best ' + it.par + ')');   /* ➖ gs2-g3 */
   else if(it.kind === 'tens') msg = '🔟 <b>' + it.target + '</b>! ' + (rec.stars === 3 ? 'The fewest blocks!' : rec.moves + ' taps (best ' + it.par + ')');
   else if(it.kind === 'colour') msg = '🍕 <b>' + it.want + ' of ' + it.len + ' = ' + it.frac.n + '/' + it.frac.d + '</b>!';
   else if(it.kind === 'wobble') msg = '🏗️ Exactly <b>' + it.target + '</b>! ' + (rec.stars === 3 ? 'Fewest blocks!' : '');
@@ -1497,6 +1565,7 @@ function guideTarget(){
   if(it.kind === 'balance' || it.kind === 'avatar'){ const v = it.plan[0], pc = it.tray.find(x => x.n === v), h = pc && hit(pc.id), pb = G.panBox; if(!h || !pb) return null; return {from: C(h.x + h.w / 2, h.y + h.h * 0.4), to: C(pb.x + pb.w / 2, pb.y + pb.h * 0.7), text: '👆 Drag a block onto the right pan — stop when the scale is level'}; }
   if(it.kind === 'compare'){ const b = btn('#bar .tb[data-sym="=" ]') || btn('#bar .tb.eq'); return b ? {from: b, to: b, tap: true, text: '👀 Count both pans. Left smaller → <b>&lt;</b> · same → <b>=</b> · left bigger → <b>&gt;</b> — then ✅ Submit'} : null; }
   if(it.kind === 'grid'){ const GG = G.gridGeo, c = GS.gridSolution(it)[0]; if(!GG || !c) return null; const a = C(GG.x + (c[0] + 0.5) * GG.c, GG.y + (c[1] + 0.5) * GG.c), b = C(GG.x + (Math.min(it.n - 1, c[0] + 2) + 0.5) * GG.c, GG.y + (c[1] + 0.5) * GG.c); return {from: a, to: b, text: '👆 Tap (or drag across) squares to fill them'}; }
+  if(it.kind === 'tens' && it.start){ const up = it.target > it.start, b = btn('#bar .tb[data-u="' + (up ? '' : '-') + '1"]'); return b ? {from: b, to: b, tap: true, text: up ? '👆 Tap <b>+1</b> to add a block — up to ' + it.target : '👆 Tap <b>−1</b> (or a block) to take one away — down to ' + it.target} : null; }   /* ➖ gs2-g3 */
   if(it.kind === 'tens'){ const b = btn('#bar .tb[data-u="1"]'); return b ? {from: b, to: b, tap: true, text: '👆 Tap <b>+1</b> to add a block — count up to ' + it.target} : null; }
   if(it.kind === 'colour'){ const B = G.barGeo; if(!B) return null; const a = C(B.x + B.c / 2, B.y + B.c / 2); return {from: a, to: a, tap: true, text: '👆 Tap a block to colour it — colour <b>' + it.want + '</b> of ' + it.len}; }
   if(it.kind === 'wobble'){ const b = btn('#bar .tb[data-s]'); return b ? {from: b, to: b, tap: true, text: '👆 Tap a block size to stack it — reach the 🎯 line exactly'} : null; }
@@ -1613,7 +1682,7 @@ function startLoop(){ stopLoop(); LAST = performance.now(); const step = now => 
 function stopLoop(){ if(RAF) cancelAnimationFrame(RAF); RAF = 0; }
 function stopTimer(){ if(TIMER) clearInterval(TIMER); TIMER = 0; }
 function tick(dt){
-  if(!G) return; if(G.swap){ G.swap.t += dt; if(G.swap.t > 0.55) G.swap = null; } const sb = $('btn-submit'); if(sb){ const idle = !canSubmit(); if(sb.classList.contains('idle') !== idle) sb.classList.toggle('idle', idle); }   /* ✅ gs2-g1 */ helperTick(dt); revealTick(dt); GSStack.tick(dt); GSStack.dropTick(dt);   /* 🧊 gs-anim */ if(G.throwT != null) G.throwT += dt; try{ guideTick(); }catch(e){} const A = G.A;
+  if(!G) return; if(G.swap){ G.swap.t += dt; if(G.swap.t > 0.55) G.swap = null; } const sb = $('btn-submit'); if(sb){ const idle = !canSubmit(); if(sb.classList.contains('idle') !== idle) sb.classList.toggle('idle', idle); }   /* ✅ gs2-g1 */ helperTick(dt); revealTick(dt); tensFxTick(dt);   /* ➖ gs2-g3 */ GSStack.tick(dt); GSStack.dropTick(dt);   /* 🧊 gs-anim */ if(G.throwT != null) G.throwT += dt; try{ guideTick(); }catch(e){} const A = G.A;
   const it0 = G.M && G.M.item; if(FX && it0 && G.phase === 'play' && (it0.kind === 'choice' || it0.kind === 'compare') && !A.gest){ G.idleT = (G.idleT || 0) + dt; if(G.idleT > 4.5){ G.idleT = 0; avatarDo('think'); } } if(A.gest){ A.gest.t += dt; if(A.gest.t > A.gest.g.d) A.gest = null; }
   G.fx = G.fx.filter(f => (f.t += dt) < f.life);
   if(G.B2 && G.B2.gest){ G.B2.gest.t += dt; if(G.B2.gest.t > G.B2.gest.g.d) G.B2.gest = null; }
@@ -1844,23 +1913,77 @@ function drawGrid(g, t, gy){
   const below = gy - (GG.y + GG.S + 30); G.avBox = sideRoom() ? null : below > 60 ? {x: 8, w: Math.min(90, below / 1.5), h: below} : {x: 0, w: 0, h: 0};
 }
 function cellAt(x, y){ const GG = G.gridGeo, it = G.M.item; if(!GG) return null; const cx = Math.floor((x - GG.x) / GG.c), cy = Math.floor((y - GG.y) / GG.c); return cx >= 0 && cy >= 0 && cx < it.n && cy < it.n ? [cx, cy] : null; }
+/* ➖ TENS DRAW START (gs2-g3) — the number is drawn from its PIECES (after a break: 4 tens + 12 ones); 🧺 the tray beside it (phones upright: above it) holds what was taken away */
+function takeMarks(g, v, take, x, fl, u){ const L = NumberSkins.layout(v, u), d = GS.digits(take);   // ❓ "what is left?": the pieces taken away are crossed out
+  const mark = (x0, y0, w, h) => { g.save(); g.fillStyle = 'rgba(20,10,30,0.55)'; g.fillRect(x0, y0, w, h); g.strokeStyle = '#FF5A5F'; g.lineWidth = Math.max(3, u * 0.14); g.lineCap = 'round'; g.beginPath(); g.moveTo(x0 + w * 0.15, y0 + h * 0.1); g.lineTo(x0 + w * 0.85, y0 + h * 0.9); g.moveTo(x0 + w * 0.85, y0 + h * 0.1); g.lineTo(x0 + w * 0.15, y0 + h * 0.9); g.stroke(); g.restore(); };
+  const rods = L.cols.filter(c => c.kind === 'rod'); rods.slice(rods.length - d[1]).forEach(c => mark(x + c.x, fl - c.h, c.w, c.h));
+  const one = L.cols.find(c => c.kind === 'one'); if(one && d[2]) mark(x + one.x, fl - one.k * u, one.w, d[2] * u);
+  const hu = L.cols.find(c => c.kind === 'plate' || c.kind === 'wall'); if(hu && d[0]){ if(hu.kind === 'plate') mark(x + hu.x, fl - hu.k * hu.th, hu.pw, d[0] * hu.th); else mark(x + hu.x, fl - hu.s, hu.s, hu.s); }
+  const lastR = rods[rods.length - 1]; textTag(g, '−' + take, lastR && d[1] ? x + lastR.x + lastR.w / 2 - (d[1] - 1) * lastR.w * 0.55 : x + L.w - u, fl - L.h - 30, 15); }
+function tensPiece(g, unit, x, y, u, rot, sc, t, alpha, col1){ const mat = THEMES[G.theme].mat, col10 = NumberSkins.colour(G.skin, 10), s = unit === 1 ? u : u * 0.9;   // one piece in flight: x, y = its bottom-left
+  g.save(); g.globalAlpha *= alpha; const w = unit === 100 ? s * 10 : s, h = unit === 10 ? s * 10 : s; g.translate(x + w / 2, y); g.rotate(rot); g.scale(sc[0], sc[1]); g.translate(-w / 2, 0);
+  if(unit === 1) NumberSkins.block(g, 0, -s, s, col1 || NumberSkins.colour(G.skin, 1), mat, t, 0, {});
+  else if(unit === 10) for(let k = 0; k < 10; k++) NumberSkins.block(g, 0, -(k + 1) * s, s, col10, mat, t, k, {noTop: k < 9});
+  else NumberSkins.hunDraw(g, NumberSkins.hunCol(1, u, 0), 0, 0, G.skin, mat, t, 0);
+  g.restore(); }
+function tensSource(P, unit, x, fl, u){ const L = NumberSkins.layout(pv(P), u, false, P), c = L.cols.filter(q => unit === 100 ? q.kind === 'plate' || q.kind === 'wall' : unit === 10 ? q.kind === 'rod' : q.kind === 'one').slice(-1)[0];   // where the piece leaves from
+  if(!c) return {x: x + L.w / 2, y: fl}; return unit === 100 ? {x: x + c.x, y: fl - (c.k - 1) * c.th} : unit === 10 ? {x: x + c.x, y: fl} : {x: x + c.x, y: fl - (c.k - 1) * u}; }
+function pv(P){ return P.h * 100 + P.t * 10 + P.o; }
 function drawTens(g, t, gy){
-  const it = G.M.item, v = it.value, top = boardTop(), left = sideRoom(), maxH = gy - top - 40, maxW = W - left - 30;
-  const u = Math.max(6, Math.min(56, maxH / 10.5, maxW / Math.max(2, NumberSkins.measure(Math.max(v, 1), 1).w + 1)));
-  const m = NumberSkins.measure(Math.max(v, 1), u), x = midX(m.w, left);
-  const TF = G.tensFrom, DS = GSStack.dropState(Math.min(u * 6, gy - 26 - top)), mat = THEMES[G.theme].mat;   // 🧊 gs-anim: the new piece falls into its place, lands, then the number changes
-  if(TF && DS.on && !DS.landed){ const m0 = NumberSkins.measure(Math.max(TF.v0, 1), u); if(TF.v0 > 0) NumberSkins.draw(g, TF.v0, midX(m0.w, left), gy - 26, u, {skin: G.skin, mat, t, mood: 'wow'});
-    const L = NumberSkins.layout(v, u), cols = L.cols, fl = gy - 26, kind = TF.unit === 100 ? 'slab' : TF.unit === 10 || TF.snapped ? 'rod' : 'one', c = cols.filter(q => q.kind === kind).slice(-1)[0] || cols[cols.length - 1], cx = x + c.x;
-    if(kind === 'slab'){ const col = NumberSkins.colour(G.skin, 10), yy = fl - c.k * c.sh - DS.dy; g.fillStyle = col; roundRect(g, cx, yy + 1, c.w, c.sh - 2, c.sh * 0.3); g.fill(); g.strokeStyle = NumberSkins.shade(col, -0.4); g.lineWidth = 2; g.stroke(); }
+  const it = G.M.item, P = GS.pcOf(it), v = it.value, top = boardTop(), left = sideRoom(), mat = THEMES[G.theme].mat, fl = gy - 26, port = W < H * 0.95;
+  const TA = G.takeA, TB = G.tensBreak && G.tensBreak.t < BREAK_T ? G.tensBreak : null, TF = G.tensFrom, flying = TA && TA.t >= TA.delay && TA.t < TA.delay + TAKE_T;
+  const base = TB ? TB.Pb : P, D = it.start ? it.start - v : 0, Dshow = D - (TA && TA.t < TA.delay + TAKE_T * 0.75 ? TA.unit : 0);
+  // size: room for the biggest number this round + (take rounds) the 🧺 tray — beside it, or on top on upright phones
+  const big = Math.max(v, it.start || 0, it.target, 1), maxD = Math.max(0, (it.start || 0) - Math.min(it.target, v)), trayW = maxD ? NumberSkins.measure(maxD, 0.6).w + 1.6 : 0, trayH = maxD ? NumberSkins.measure(maxD, 0.6).h + 1.6 : 0;
+  const mB = NumberSkins.measure(big, 1), mP = NumberSkins.measure(Math.max(v, 1), 1, false, pv(base) ? base : null), wU = Math.max(mB.w, mP.w), hU = Math.max(mB.h, mP.h, 10.5);
+  const maxH = gy - top - 50, maxW = W - left - 30, u = Math.max(5, Math.min(56, port ? Math.min(maxH / (hU + 1 + trayH), maxW / (wU + 1)) : Math.min(maxH / (hU + 1), maxW / (wU + 1 + trayW))));
+  const m = NumberSkins.measure(Math.max(pv(base), 1), u, false, base), x = midX(m.w + (port ? 0 : trayW * u), left);
+  const DS = GSStack.dropState(Math.min(u * 6, fl - top)); G.tensHits = [];
+  const opt = {skin: G.skin, mat, t, parts: base, mood: it.done || DS.on || TB || flying ? 'wow' : 'happy'};
+  if(TF && DS.on && !DS.landed){   // 🧊 + : the old number stands, the new piece falls into its place, lands, then the number changes
+    const P0 = TF.P0 || GS.partsOf(TF.v0, it.units), m0 = NumberSkins.measure(Math.max(TF.v0, 1), u, false, P0); if(TF.v0 > 0) NumberSkins.draw(g, TF.v0, midX(m0.w + (port ? 0 : trayW * u), left), fl, u, Object.assign({}, opt, {parts: P0, mood: 'wow'}));
+    const L = NumberSkins.layout(v, u, false, P), cols = L.cols, kind = TF.unit === 100 || TF.snappedH ? 'hun' : TF.unit === 10 || TF.snapped ? 'rod' : 'one', c = cols.filter(q => kind === 'hun' ? q.kind === 'plate' || q.kind === 'wall' : q.kind === kind).slice(-1)[0] || cols[cols.length - 1], cx = x + c.x;
+    if(kind === 'hun' && c.th) NumberSkins.hunDraw(g, Object.assign({}, c, {k: 1}), x, fl - (c.k - 1) * c.th - DS.dy, G.skin, mat, t, 0);
     else if(kind === 'rod' && !TF.snapped){ const s2 = c.w; for(let k = 0; k < 10; k++) NumberSkins.block(g, cx, fl - (k + 1) * s2 - DS.dy, s2, NumberSkins.colour(G.skin, 10), mat, t, k, {noTop: k < 9}); }
     else { const s2 = kind === 'rod' ? c.w : u, k = kind === 'rod' ? 9 : c.k - 1; NumberSkins.block(g, cx, fl - (k + 1) * s2 - DS.dy, s2, NumberSkins.colour(G.skin, v <= 10 ? v : v % 10 || 10), mat, t, k, {}); } }
-  else if(v > 0){ g.save(); if(DS.on && DS.sy !== 1){ g.translate(W / 2, gy - 26); g.scale(1 + (1 - DS.sy) * 0.6, DS.sy); g.translate(-W / 2, -(gy - 26)); } NumberSkins.draw(g, v, x, gy - 26, u, {skin: G.skin, mat, t, mood: it.done || DS.on ? 'wow' : 'happy'}); g.restore();
-    if(TF && TF.snapped && DS.on && DS.chip < 1){ const c = NumberSkins.layout(v, u).cols.filter(q => q.kind === 'rod').slice(-1)[0]; if(c){ g.save(); g.globalAlpha = 1 - DS.chip; g.strokeStyle = '#FFF2A0'; g.lineWidth = Math.max(2, u * 0.1); g.beginPath(); g.roundRect(x + c.x - 4, gy - 26 - c.h - 4, c.w + 8, c.h + 8, u * 0.2); g.stroke(); g.restore(); } } }
-  else textTag(g, 'Tap +1 to add a block', W / 2, gy - 60, 15);
-  const H_ = Math.floor(v / 100), T_ = Math.floor(v % 100 / 10), O_ = v % 10;
-  textTag(g, (H_ ? H_ + ' hundred' + (H_ > 1 ? 's' : '') + ' + ' : '') + (T_ || H_ ? T_ + ' ten' + (T_ !== 1 ? 's' : '') + ' + ' : '') + O_ + ' one' + (O_ !== 1 ? 's' : '') + ' = ' + v, x + m.w / 2, gy - 10, 15);
+  else if(TB){   // 🔨 the broken ten (hundred) pops apart: its 10 cubes (tens) jump, gold sparks between them, then they settle into place
+    const L = NumberSkins.layout(pv(TB.Pb), u, false, TB.Pb), p = Math.min(1, Math.max(0, TB.t / BREAK_T)), e = Math.sin(p * Math.PI), skip = new Set(), s = u * 0.9;
+    let pops = []; if(TB.unit === 10){ const oi = L.cols.findIndex(c => c.kind === 'one'); if(oi >= 0){ skip.add(oi); pops = [{c: L.cols[oi], one: true}]; } }
+    else L.cols.forEach((c, i) => { if(c.kind === 'rod' && i >= L.cols.length - 10 - (L.cols[L.cols.length - 1].kind === 'one' ? 1 : 0)){ skip.add(i); pops.push({c, i}); } });
+    NumberSkins.draw(g, pv(TB.Pb), x, fl, u, Object.assign({}, opt, {skip}));
+    g.save(); g.fillStyle = '#FFE14D';
+    pops.forEach((q, j) => { const c = q.c;
+      if(q.one){ const fresh = c.k - 10; for(let k = 0; k < c.k; k++){ const pop = k >= fresh, kk = k - fresh, yy = fl - (k + 1) * u - (pop ? kk * u * 0.22 * e : 0), xx = x + c.x + (pop ? (kk % 2 ? 1 : -1) * u * 0.14 * e : 0); NumberSkins.block(g, xx, yy, u, NumberSkins.colour(G.skin, c.k % 10 || 1), mat, t, k, {}); if(pop && kk > 0){ const r = u * 0.12 * e; star5(g, x + c.x - u * 0.25, yy + u + u * 0.11 * e, r); star5(g, x + c.x + u * 1.25, yy + u + u * 0.11 * e, r); } } }
+      else { const yy = -s * (0.4 + 0.08 * j) * e; for(let k = 0; k < 10; k++) NumberSkins.block(g, x + c.x, fl - (k + 1) * s + yy, s, NumberSkins.colour(G.skin, 10), mat, t, k, {noTop: k < 9}); star5(g, x + c.x + s / 2, fl - 10 * s + yy - s * 0.3, s * 0.16 * e); } });
+    g.restore();
+    textTag(g, TB.unit === 10 ? '1 ten → 10 ones' : '1 hundred → 10 tens', x + m.w / 2, fl - m.h - 30, 16); }
+  else if(v > 0){ g.save(); if(DS.on && DS.sy !== 1){ g.translate(W / 2, fl); g.scale(1 + (1 - DS.sy) * 0.6, DS.sy); g.translate(-W / 2, -fl); } NumberSkins.draw(g, v, x, fl, u, opt); g.restore();
+    if(TF && (TF.snapped || TF.snappedH) && DS.on && DS.chip < 1){ const c = NumberSkins.layout(v, u, false, P).cols.filter(q => TF.snappedH ? q.kind === 'plate' || q.kind === 'wall' : q.kind === 'rod').slice(-1)[0]; if(c){ g.save(); g.globalAlpha = 1 - DS.chip; g.strokeStyle = '#FFF2A0'; g.lineWidth = Math.max(2, u * 0.1); g.beginPath(); g.roundRect(x + c.x - 4, fl - c.h - 4, c.w + 8, c.h + 8, u * 0.2); g.stroke(); g.restore(); } } }
+  else textTag(g, it.start ? 'All taken away — tap +1 to add' : 'Tap +1 to add a block', W / 2, gy - 60, 15);
+  // 👆 Q11: every piece on the board can be tapped to take it away (hit boxes from the same layout)
+  if(!TB && v > 0){ const L = NumberSkins.layout(v, u, false, P); L.cols.forEach(c => { const h = c.kind === 'plate' ? c.k * c.th + c.d : c.kind === 'wall' ? c.h : c.kind === 'rod' ? c.h : c.k * u; G.tensHits.push({x: x + c.x, y: fl - h, w: c.w, h, unit: c.kind === 'plate' || c.kind === 'wall' || c.kind === 'slab' ? 100 : c.kind === 'rod' ? 10 : 1}); }); }
+  // 🧺 the take-away tray (what was taken away, grey, no face) — beside the number, or above it on upright phones
+  let tray = null;
+  if(it.start && (D > 0 || TA)){ const su = u * 0.6, md = NumberSkins.measure(Math.max(1, maxD), su), bw = md.w + u * 1.2, bh = Math.max(md.h + u * 0.9, u * 2.4);
+    const tx = port ? Math.min(W - 12 - bw, x + m.w - bw + u * 0.6) : Math.min(W - 12 - bw, x + m.w + u * 1.2), tb = port ? fl - m.h - u * 1.6 : fl + u * 0.25;
+    tray = {x: tx, y: tb - bh, w: bw, h: bh};
+    g.save(); g.setLineDash([8, 6]); g.strokeStyle = 'rgba(255,120,120,0.85)'; g.lineWidth = 2.5; g.fillStyle = 'rgba(255,90,95,0.12)'; g.beginPath(); g.roundRect(tx, tb - bh, bw, bh, u * 0.4); g.fill(); g.stroke(); g.restore();
+    if(Dshow > 0) NumberSkins.draw(g, Dshow, tx + u * 0.6, tb - u * 0.3, su, {skin: G.skin, mat, t, alpha: 0.55, noFace: true, noLimbs: true});
+    textTag(g, 'taken away −' + Math.max(0, D), tx + bw / 2, tb - bh + 14, 13); }
+  else if(it.start && D < 0) textTag(g, '+' + (-D) + ' added', x + m.w + u * 1.2 + 34, fl - m.h - 12, 14);
+  // ➖ the hop: lift (anticipation) → arc into the 🧺 → land (squash) → settle
+  if(flying && tray){ const p = (TA.t - TA.delay) / TAKE_T, s0 = tensSource(TA.P0, TA.unit, x, fl, u), ex = tray.x + tray.w / 2 - (TA.unit === 100 ? u * 4.5 : u * 0.45), ey = tray.y + tray.h - u * 0.3;
+    let px = s0.x, py = s0.y, sc = [1, 1], rot = 0, al = 1;
+    if(p < 0.22){ const q = p / 0.22; py -= u * 0.45 * Math.sin(q * Math.PI / 2); sc = [1 + 0.08 * Math.sin(q * Math.PI), 1 - 0.08 * Math.sin(q * Math.PI)]; }
+    else if(p < 0.75){ const q = 0.5 - 0.5 * Math.cos(Math.PI * (p - 0.22) / 0.53); px = s0.x + (ex - s0.x) * q; py = s0.y - u * 0.45 + (ey - s0.y + u * 0.45) * q - u * 2.4 * Math.sin(q * Math.PI); rot = 0.25 * Math.sin(q * Math.PI) * (ex > s0.x ? 1 : -1); const k = TA.unit === 100 ? 0.6 : 1; sc = [1 - (1 - k * 0.6) * q, 1 - (1 - k * 0.6) * q]; }
+    else { const q = (p - 0.75) / 0.25, k = TA.unit === 100 ? 0.36 : 0.6; px = ex; py = ey; sc = [k * (1 + 0.12 * Math.sin(q * Math.PI)), k * (1 - 0.12 * Math.sin(q * Math.PI))]; al = 1 - q * 0.45; }
+    const P0 = TA.P0, v0 = pv(P0); tensPiece(g, TA.unit, px, py, u, rot, sc, t, al, NumberSkins.colour(G.skin, P0.o >= 10 ? P0.o % 10 || 1 : v0 <= 10 ? v0 : v0 % 10 || 10)); }
+  const T3 = [base.h, base.t, base.o];
+  textTag(g, (T3[0] ? T3[0] + ' hundred' + (T3[0] > 1 ? 's' : '') + ' + ' : '') + (T3[1] || T3[0] ? T3[1] + ' ten' + (T3[1] !== 1 ? 's' : '') + ' + ' : '') + T3[2] + ' one' + (T3[2] !== 1 ? 's' : '') + ' = ' + pv(base) + (D ? '   ·   ' + it.start + (D > 0 ? ' − ' + D : ' + ' + (-D)) + ' = ' + v : ''), Math.min(W - 160, Math.max(160, x + (m.w + (!port && tray ? tray.w + u * 1.2 : 0)) / 2)), gy - 10, 15);
   G.avBox = null;
 }
+function star5(g, x, y, r){ if(r < 0.5) return; g.beginPath(); for(let j = 0; j < 8; j++){ const a = j * Math.PI / 4, rr2 = j % 2 ? r * 0.4 : r; g.lineTo(x + Math.cos(a) * rr2, y + Math.sin(a) * rr2); } g.closePath(); g.fill(); }
+/* ➖ TENS DRAW END */
 function drawSeq(g, t, gy, seq){
   const top = boardTop(), left = sideRoom() || Math.min(80, W * 0.2) + 4, maxH = gy - top - 40, items = seq.map(v => v == null ? {t: 'q'} : {t: 'n', n: v});
   const wOf = (p, u) => p.t === 'q' ? u * 1.4 : NumberSkins.measure(p.n, u).w, hU = Math.max(...seq.filter(v => v != null).map(v => NumberSkins.measure(v, 1).h)), gap = 1;
@@ -1885,7 +2008,7 @@ function drawBar(g, t, gy, len, onSet, tappable){
 function drawChoice(g, t, gy){
   const it = G.M.item, V = it.vis || {}; G.avBox = undefined; G.revealTo = null;   /* ✅ gs2-g1: each picture below sets its own ❓ spot (qSpot) */
   if(V.type === 'seq') drawSeq(g, t, gy, V.seq);
-  else if(V.type === 'value'){ const top = boardTop(), left = sideRoom(), u = Math.max(5, Math.min(48, (gy - top - 100) / 10.5, (W - left - 30) / (NumberSkins.measure(V.v, 1).w + 1))), m = NumberSkins.measure(V.v, u), x = midX(m.w, left); NumberSkins.draw(g, V.v, x, gy - 20, u, {skin: G.skin, mat: THEMES[G.theme].mat, t}); qSpot(g, x + m.w / 2, gy - 20 - m.h - 44, t); }
+  else if(V.type === 'value'){ const top = boardTop(), left = sideRoom(), u = Math.max(5, Math.min(48, (gy - top - 100) / 10.5, (W - left - 30) / (NumberSkins.measure(V.v, 1).w + 1))), m = NumberSkins.measure(V.v, u), x = midX(m.w, left); NumberSkins.draw(g, V.v, x, gy - 20, u, {skin: G.skin, mat: THEMES[G.theme].mat, t}); if(V.take) takeMarks(g, V.v, V.take, x, gy - 20, u); qSpot(g, x + m.w / 2, gy - 20 - m.h - (V.take ? 60 : 44), t); }
   else if(V.type === 'pairs'){ const v = V.v, top = boardTop(), left = sideRoom();
     if(v > 40){ textTag(g, String(v), W / 2, (top + gy) / 2, Math.min(70, H * 0.12)); return; }
     const rows = Math.ceil(v / 2), u = Math.min(40, (gy - top - 90) / (rows + 1), (W - left) / 6), x0 = midX(u * 2.05, left); const col = NumberSkins.colour(G.skin, v % 10);
@@ -2078,6 +2201,7 @@ CV.addEventListener('pointerdown', e => {
   if(G && G.J && !G.M.item){ jNext(); return; }   /* (a tap during a 🧊 join = ×4 fast, above) */
   if(!G || G.phase !== 'play') return; const p = ptPos(e); G.kbd = false; const it0 = G.M.item;
   if(it0.kind === 'grid'){ const c = cellAt(p.x, p.y); if(c){ const has = it0.cells.some(q => q[0] === c[0] && q[1] === c[1]); G.paint = {on: !has}; gridTap(c[0], c[1], !has); try{ CV.setPointerCapture(e.pointerId); }catch(err){} e.preventDefault(); } return; }
+  if(it0.kind === 'tens'){ if(tensTap(p)) e.preventDefault(); return; }   /* ➖ gs2-g3 Q11: tap a piece on the board = take it away */
   if(it0.kind === 'colour'){ const B = G.barGeo; if(B && p.y >= B.y - 8 && p.y <= B.y + B.c + 8){ const i = Math.floor((p.x - B.x) / B.c); colourTap(i); } return; }
   const h = hitAt(p.x, p.y);
   if(!h){ if(G.M.item.kind === 'count' && G.sel){ G.sel = 0; renderBar(); } return; }
@@ -2121,6 +2245,7 @@ document.addEventListener('keydown', e => {
   if(G.phase !== 'play') return;
   if(k === 'Enter'){ e.preventDefault(); submitRound(); return; }   /* ✅ gs2-g1 */
   if(it.kind === 'choice'){ if(it.syms){ const m = {'<': '<', ',': '<', '>': '>', '.': '>', '=': '=', '+': '='}[k]; if(m){ e.preventDefault(); pickAns(m); } } else if(/^[1-4]$/.test(k) && it.options[Number(k) - 1] != null){ pickAns(it.options[Number(k) - 1]); } return; }
+  if(it.kind === 'tens' && (k === 'b' || k === 'B')){ tensBreakBtn(k === 'B' ? 100 : 10); return; }   /* 🔨 gs2-g3 */
   if(it.kind === 'tens'){ const u = {'1': 1, 't': 10, 'T': 10, 'h': 100, 'H': 100}[k]; if(u && it.units.indexOf(u) >= 0) tensBtn(u); if(k === 'Backspace'){ e.preventDefault(); tensBtn(-1); } return; }
   if(it.kind === 'wobble'){ if(/^[1-3]$/.test(k) && it.sizes[Number(k) - 1]) wobBtn(it.sizes[Number(k) - 1]); if(k === 'Backspace'){ e.preventDefault(); wobUndo(); } return; }
   if(it.kind === 'grid' || it.kind === 'colour'){
@@ -2222,4 +2347,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (gs-4+p1d+p3a+cs-4b+b3w3+24u-c+gs-anim+gs2-g1+gs2-g2) END OF GeoScout.html -->
+<!-- (gs-4+p1d+p3a+cs-4b+b3w3+24u-c+gs-anim+gs2-g1+gs2-g2+gs2-g3) END OF GeoScout.html -->
