@@ -2097,11 +2097,16 @@ window.addEventListener('blur', () => { if(G) G.keys.clear(); });
 window.addEventListener('resize', () => { if(G && !$('scr-play').classList.contains('hidden')) layoutPlay(); });
 
 /* ================= SOUND (tiny synth) ================= */
+/* 🔊 24s-c (✨ polish chat, 2026-11-27): this game's synth plays on UiKit's ONE shared AudioContext into the 🔊 Effects bus
+   (UISound.out → master: 🔇 · volume · 🔊 Effects slider work live; no AudioContext of its own). Own context only if UiKit has none. */
+function sharedCtx(){ try{ const c = window.UISound && UISound.ctx && UISound.ctx(); if(c) return c; }catch(e){} return null; }
+function sharedOut(c){ try{ const o = c && window.UISound && UISound.out && UISound.out(); if(o && o.context === c) return o; }catch(e){} return c ? c.destination : null; }
+function onSharedBus(c){ return !!c && sharedOut(c) !== c.destination; }
 let AC = null;
 function boing(freq, len, type, vol, slide){
-  try{ if(!UISound.get().enabled) return; AC = AC || new (window.AudioContext || window.webkitAudioContext)(); const t0 = AC.currentTime, o = AC.createOscillator(), g = AC.createGain();
-    o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t0); if(slide) o.frequency.exponentialRampToValueAtTime(slide, t0 + len); g.gain.setValueAtTime((vol || 0.2) * (UISound.get().volume == null ? 1 : UISound.get().volume), t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + len);
-    o.connect(g); g.connect(AC.destination); o.start(t0); o.stop(t0 + len + 0.02); }catch(e){}
+  try{ if(!UISound.get().enabled) return; AC = AC || sharedCtx() || new (window.AudioContext || window.webkitAudioContext)(); const t0 = AC.currentTime, o = AC.createOscillator(), g = AC.createGain();
+    o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t0); if(slide) o.frequency.exponentialRampToValueAtTime(slide, t0 + len); g.gain.setValueAtTime((vol || 0.2) * (onSharedBus(AC) ? 1 : (UISound.get().volume == null ? 1 : UISound.get().volume)), t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + len);
+    o.connect(g); g.connect(sharedOut(AC)); o.start(t0); o.stop(t0 + len + 0.02); }catch(e){}
 }
 function popSound(big){ boing(big ? 140 : 190, 0.28, 'sawtooth', 0.14, 50); boing(90, 0.32, 'sine', 0.22, 40); }
 
@@ -2438,9 +2443,9 @@ function ease(q){ q = Math.max(0, Math.min(1, q)); return 1 - Math.pow(1 - q, 3)
 let NOISE = null;
 function noiseBuf(){ if(NOISE || !AC) return NOISE; const n = Math.floor(AC.sampleRate * 0.5); NOISE = AC.createBuffer(1, n, AC.sampleRate); const d = NOISE.getChannelData(0); for(let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2); return NOISE; }
 function boom(size, chain){
-  try{ if(!UISound.get().enabled) return; AC = AC || new (window.AudioContext || window.webkitAudioContext)(); const t0 = AC.currentTime, vol = UISound.get().volume == null ? 1 : UISound.get().volume, up = 1 + Math.min(4, chain || 0) * 0.18;
+  try{ if(!UISound.get().enabled) return; AC = AC || sharedCtx() || new (window.AudioContext || window.webkitAudioContext)(); const t0 = AC.currentTime, vol = onSharedBus(AC) ? 1 : (UISound.get().volume == null ? 1 : UISound.get().volume), up = 1 + Math.min(4, chain || 0) * 0.18;
     const src = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain(); src.buffer = noiseBuf(); f.type = 'lowpass'; f.frequency.setValueAtTime(1800 * up, t0); f.frequency.exponentialRampToValueAtTime(160, t0 + 0.35);
-    g.gain.setValueAtTime(0.35 * vol * (0.6 + size * 0.5), t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.4); src.connect(f); f.connect(g); g.connect(AC.destination); src.start(t0); src.stop(t0 + 0.45);
+    g.gain.setValueAtTime(0.35 * vol * (0.6 + size * 0.5), t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.4); src.connect(f); f.connect(g); g.connect(sharedOut(AC)); src.start(t0); src.stop(t0 + 0.45);
     boing(85 * up, 0.38, 'sine', 0.3 * (0.6 + size * 0.4), 32); if(chain) boing(440 * up, 0.12, 'triangle', 0.12, 880 * up); }catch(e){}
 }
 const JINGLE = {bomb: [523, 659], fire: [587, 880], speed: [659, 988], kick: [440, 660], toss: [494, 740], shield: [392, 784], remote: [523, 1046], dash: [698, 1046], error: [300, 180]};
@@ -2959,4 +2964,4 @@ const ANN = (function(){
 </script>
 </body>
 </html>
-<!-- (sb-8+r33+back-1+modes-3+mg-1+p1c+sb-9a+sb-9a2+p2+p3a+p3c+ck-2a+cs-2b+sb-9+pz-1+b3w5+24t-d+24u-d1+b3b7+an-1+an-2+24z-c+24y-b+lk-8b+sbp-p) END OF SoulBopper.html -->
+<!-- (sb-8+r33+back-1+modes-3+mg-1+p1c+sb-9a+sb-9a2+p2+p3a+p3c+ck-2a+cs-2b+sb-9+pz-1+b3w5+24t-d+24u-d1+b3b7+an-1+an-2+24z-c+24y-b+lk-8b+sbp-p+24s-c) END OF SoulBopper.html -->
