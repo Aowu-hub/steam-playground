@@ -153,6 +153,11 @@
   .say b{display:block;font-family:'Fredoka',sans-serif;color:#0F8A7C;font-size:0.9rem;}
   .goal small{display:block;font-family:'Nunito',sans-serif;font-size:0.85rem;font-weight:800;opacity:.92;}
   .goal b{color:#FFC845;font-size:1.3em;}
+  .fr{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.02;margin:0 .1em;font-size:.8em;font-weight:800;}   /* 🍕 gs2-g5: stacked fractions */
+  .fr i{font-style:normal;padding:0 .14em;}
+  .fr i:first-child{border-bottom:.1em solid currentColor;padding-bottom:.05em;}
+  .fr i:last-child{padding-top:.06em;}
+  .tb .fr{font-size:.86em;}
   .banner{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%) scale(.6);opacity:0;z-index:5;background:rgba(10,20,40,0.88);color:#fff;border-radius:20px;padding:12px 20px;
     font-family:'Fredoka',sans-serif;font-weight:700;font-size:1.25rem;text-align:center;pointer-events:none;transition:opacity .2s,transform .25s;max-width:92%;}
   .banner.on{opacity:1;transform:translate(-50%,-50%) scale(1);animation:gs-banner .55s cubic-bezier(.2,1.5,.4,1) both;}
@@ -694,30 +699,134 @@ const GS = (function(){
   }
 
   /* ---------- 🍕 FRACTIONS ---------- */
+  /* 🍕 FRAC BANK START (gs2-g5, Aowu 2026-11-27 "Fractions needs more and more different equation designs — too repetitive")
+     13 task types, each with its own picture: 🎨 colour (bar · pizza · chocolate) · 🔢 name it · 🔍 which one (equal pieces!) · 🍬 share onto plates ·
+     ⚖️ bigger? · 🟰 same amount · 📏 number line · 🍕 what is left · ➕ add · ➖ take away · 🍬 part of a number · 📶 order · 🧩 the whole · 🥧 more than one.
+     Every game deals the level's mix in a NEW order: each type once before any repeats, never the same type twice in a row (fracDeck). */
   function gcd(a, b){ return b ? gcd(b, a % b) : a; }
   function fstr(f){ const g = gcd(f.n, f.d); return (f.n / g) + '/' + (f.d / g); }
-  const FR_D = [[2], [2, 4], [2, 3, 4], [2, 3, 4, 5, 6, 8], [3, 4, 5, 6, 8], [4, 5, 6, 8, 10, 12]];
-  function makeFrac(Li, r, round){
-    const ds = FR_D[Li], kinds = Li === 0 ? ['colour'] : Li === 1 ? ['colour', 'name', 'colour'] : ['colour', 'compare', 'name', 'compare'], kind = kinds[round % kinds.length];
-    const unit = Li <= 2, f = () => { const d = pick(r, ds), n = unit ? 1 : ri(r, 1, d - 1); return {n, d}; };
-    if(kind === 'compare'){
-      let a = f(), b = f(), guard = 0; while(a.n === b.n && a.d === b.d && guard++ < 20) b = f();
-      if(Li >= 4 && r() < 0.25){ const k = ri(r, 2, 3); b = {n: a.n * k, d: a.d * k}; }   // equivalent: 2/4 = 1/2
-      return {kind: 'choice', ck: 'frac', syms: true, q: 'Which is bigger?', vis: {type: 'bars', a, b}, options: ['<', '=', '>'], answer: cmp(a.n * b.d, b.n * a.d), par: 0};
-    }
-    const fr = f(), k = Li >= 3 ? ri(r, 1, 2) : (fr.d <= 3 ? 2 : 1), L = fr.d * k;
-    if(kind === 'name'){
-      const right = fstr(fr), opts = [right]; let guard = 0; while(opts.length < (Li <= 1 ? 3 : 4) && guard++ < 60){ const g = f(), s = fstr(g); if(opts.indexOf(s) < 0) opts.push(s); }
-      if(opts.length < 3) ['1/2', '1/3', '1/4', '3/4', '2/3'].forEach(s => { if(opts.length < 3 && opts.indexOf(s) < 0) opts.push(s); });
-      return {kind: 'choice', ck: 'frac', q: 'How much of the bar is coloured?', vis: {type: 'bar', len: L, on: fr.n * k}, options: shuffle(r, opts), answer: right, par: 0};
-    }
-    return {kind: 'colour', frac: fr, len: L, want: fr.n * k, on: [], par: fr.n * k, slack: [0, 2]};
+  function fraw(f){ return f.n + '/' + f.d; }
+  const FR_D = [[2, 4], [2, 3, 4], [2, 3, 4, 5, 6], [2, 3, 4, 5, 6, 8], [3, 4, 5, 6, 8, 10, 12], [4, 5, 6, 8, 10, 12]];
+  const FR_MIX = [
+    ['colour', 'which', 'share', 'name', 'colour', 'share'],
+    ['colour', 'name', 'cmp', 'share', 'eq', 'line', 'which', 'left'],
+    ['add', 'left', 'of', 'cmp', 'eq', 'order', 'line', 'colour'],
+    ['add', 'sub', 'cmp', 'eq', 'order', 'of', 'line', 'left'],
+    ['eq', 'order', 'add', 'whole', 'cmp', 'of', 'line', 'sub', 'left', 'mixed'],
+    ['mixed', 'whole', 'add', 'order', 'eq', 'cmp', 'of', 'line', 'sub', 'left']];
+  const FR_NAME = {colour: '🎨 Colour it', name: '🔢 Name it', which: '🔍 Which one?', share: '🍬 Share fairly', cmp: '⚖️ Which is bigger?', eq: '🟰 The same amount', line: '📏 Number line',
+    left: '🍕 What is left?', add: '➕ Add', sub: '➖ Take away', of: '🍬 Part of a number', order: '📶 Put in order', whole: '🧩 Find the whole', mixed: '🥧 More than one'};
+  function noTwice(r, a, last, first){ const rest = shuffle(r, a), out = []; if(first && rest.indexOf(first) >= 0){ rest.splice(rest.indexOf(first), 1); out.push(first); last = first; }
+    while(rest.length){ const i = rest.findIndex(x => x !== last);
+      if(i >= 0){ last = rest.splice(i, 1)[0]; out.push(last); continue; }
+      const x = rest.shift(), j = out.findIndex((y, q) => q >= (first ? 1 : 0) && y !== x && (q === 0 || out[q - 1] !== x)); if(j < 0) out.push(x); else out.splice(j, 0, x); last = out[out.length - 1]; }
+    return out; }
+  function fracDeck(M){   // 🌱 the guide starts on 🎨 colour
+    if(!M.fdeck || !M.fdeck.length) M.fdeck = noTwice(M.r, FR_MIX[M.level], M.flast, M.round === 0 && M.level === 0 ? 'colour' : null);
+    const k = M.fdeck.shift(); M.flast = k; return k; }
+  function fopts(r, right, more, k){ const out = [right]; more.forEach(s => { if(out.length < k && out.indexOf(s) < 0 && s && !/^0\/|\/0$|^-/.test(s)) out.push(s); }); return shuffle(r, out); }
+  // 🌋 Q20 B (Aowu "ok" 2026-11-27 11:39): from Extreme the answer must be the SIMPLEST form — the same-value long form (3/6) becomes a wrong option
+  function simplest(Li, right, more, say){ if(Li < 4) return {right, more, say, tail: ''}; const p = right.split('/'), sr = fstr({n: +p[0], d: +p[1]});
+    return {right: sr, more: sr !== right ? [right].concat(more) : more, say: sr !== right ? say + ' = ' + sr + ' (simplest)' : say, tail: ' (simplest!)'}; }
+  function rectOf(n){ let rows = 1; for(let a = 2; a * a <= n; a++) if(n % a === 0) rows = a; return {rows, cols: n / rows}; }
+  function makeFrac(Li, r, round, M, force){
+    const fk = force || (M ? fracDeck(M) : FR_MIX[Li][round % FR_MIX[Li].length]), ds = FR_D[Li], unit = Li <= 1;
+    const f = (o) => { o = o || {}; const d = o.d || pick(r, ds.filter(x => !o.min || x >= o.min)), n = o.unit || unit ? 1 : ri(r, 1, d - 1); return {n, d}; };
+    const base = {ck: 'frac', fk, fname: FR_NAME[fk], par: 0};
+    const Q = (q, vis, right, opts, say) => Object.assign({}, base, {kind: 'choice', q, vis, options: opts, answer: right, say});
+    if(fk === 'colour'){
+      const fr = f(), shape = Li === 0 ? pick(r, ['bar', 'pizza']) : pick(r, ['bar', 'pizza', 'choc']);
+      const k = shape === 'choc' ? (fr.d <= 3 ? ri(r, 2, 3) : 2) : shape === 'pizza' ? (Li >= 3 && fr.d <= 4 ? 2 : 1) : (Li >= 3 ? ri(r, 1, 2) : (fr.d <= 3 ? 2 : 1)), L = fr.d * k, R = rectOf(L);
+      return Object.assign({}, base, {kind: 'colour', shape, frac: fr, len: L, want: fr.n * k, on: [], rows: R.rows, cols: R.cols, par: fr.n * k, slack: [0, 2]}); }
+    if(fk === 'name'){
+      const fr = f(), pic = pick(r, Li === 0 ? ['fpie', 'bar'] : ['fpie', 'bar', 'fchoc', 'fsweets']), k = pic === 'fpie' ? 1 : pic === 'fsweets' ? ri(r, 1, 3) : (fr.d <= 3 ? 2 : 1), L = fr.d * k, right = fstr(fr);
+      const more = shuffle(r, ds.flatMap(d => [fstr({n: 1, d}), fstr({n: Math.max(1, d - 1), d})]).concat([fraw({n: fr.n * k, d: L + fr.n * k})]));
+      const vis = pic === 'bar' ? {type: 'bar', len: L, on: fr.n * k} : pic === 'fchoc' ? Object.assign({type: 'fchoc', len: L, on: fr.n * k}, rectOf(L)) : {type: pic, len: L, on: fr.n * k};
+      return Q(pic === 'fsweets' ? 'What part of the sweets are red?' : pic === 'fpie' ? 'How much of the pizza is coloured?' : pic === 'fchoc' ? 'How much of the chocolate is coloured?' : 'How much of the bar is coloured?', vis, right, fopts(r, right, more, Li <= 1 ? 3 : 4),
+        fr.n * k + ' of ' + L + ' = ' + right); }
+    if(fk === 'which'){
+      const d = pick(r, ds.filter(x => x <= 6)), n = unit ? 1 : ri(r, 1, d - 1), right = {n, d}, kind = pick(r, ['fpie', 'bar']);
+      const cards = [{n, d}, {n, d, uneq: true}]; cards.push(n < d - 1 ? {n: n + 1, d} : {n, d: d + 1}); if(Li >= 1) cards.push(n > 1 ? {n: n - 1, d} : {n, d: d === 2 ? 4 : d + 2});
+      const pics = shuffle(r, cards), L = ['A', 'B', 'C', 'D'].slice(0, pics.length), ans = L[pics.findIndex(c => c.n === n && c.d === d && !c.uneq)];
+      return Q('Which one shows ' + fraw(right) + '?', {type: 'fwhich', kind, pics, f: right}, ans, L, 'Equal pieces: ' + n + ' of ' + d + ' — the cut in ' + L[pics.findIndex(c => c.uneq)] + ' is NOT fair'); }
+    if(fk === 'share'){
+      const d = pick(r, Li === 0 ? [2, 2, 4] : [2, 3, 4]), m = ri(r, 2, d >= 4 ? 3 : 4), N = d * m;
+      return Object.assign({}, base, {kind: 'fshare', frac: {n: 1, d}, d, N, plates: new Array(d).fill(0), log: [], par: m, slack: [N - m, 2 * N]}); }
+    if(fk === 'cmp'){
+      let a = f(), b = f(), g = 0; while(a.n * b.d === b.n * a.d && g++ < 30) b = f();
+      if(Li >= 4 && r() < 0.3){ const k = ri(r, 2, 3); b = {n: a.n * k, d: a.d * k}; }   // 🟰 2/4 = 1/2
+      else if(Li >= 3 && r() < 0.5){ const d = pick(r, ds), n = ri(r, 1, d - 2); a = {n, d}; b = {n: n + 1, d: d + 1}; }   // 3/4 vs 4/5 — close!
+      const ans = cmp(a.n * b.d, b.n * a.d);
+      return Object.assign(Q('Which is bigger?', {type: Li >= 3 ? 'fwall' : 'bars', a, b}, ans, ['<', '=', '>'], fraw(a) + ' ' + ans + ' ' + fraw(b)), {syms: true}); }
+    if(fk === 'eq'){
+      const a = f({min: 2}), k = Li >= 4 ? ri(r, 2, 4) : Li >= 3 ? ri(r, 2, 3) : 2, b = {n: a.n * k, d: a.d * k}, bottom = Li >= 4 && r() < 0.5, ans = bottom ? b.d : b.n;
+      return Q(fraw(a) + ' = ' + (bottom ? b.n + '/?' : '?/' + b.d), {type: 'feq', a, b, bottom}, ans, numOptions(r, ans, 4, bottom ? a.d : 1), fraw(a) + ' = ' + fraw(b) + ' — ' + k + ' × more pieces, ' + k + ' × as many coloured'); }
+    if(fk === 'line'){
+      const fr = f({unit: Li <= 1}), k = Li >= 3 ? ri(r, 1, 2) : 1, T = fr.d * k;
+      return Object.assign({}, base, {kind: 'fline', frac: fr, ticks: T, want: fr.n * k, pos: null, par: 1, slack: [1, 3]}); }
+    if(fk === 'left'){
+      const d = pick(r, ds.filter(x => x >= 3)), e = ri(r, 1, d - 1), ate = {n: e, d}, left = {n: d - e, d}, right = fraw(left), who = pick(r, ['Pip', 'Tri', 'Hi-Five', 'Ollie', 'Stella']);
+      const S = simplest(Li, right, [fraw(ate), fraw({n: d - e, d: d + 1}), fraw({n: Math.max(1, d - e - 1), d}), fraw({n: Math.min(d - 1, d - e + 1), d})], d + '/' + d + ' − ' + fraw(ate) + ' = ' + right);
+      return Q(who + ' ate ' + fraw(ate) + ' of the pizza. How much is left?' + S.tail, {type: 'fleft', ate, left, raw: right}, S.right, fopts(r, S.right, S.more, 4), S.say); }
+    if(fk === 'add' || fk === 'sub'){
+      const big = Li >= 4, d = pick(r, ds.filter(x => x >= 3)); let a, b, right, more;
+      if(Li >= 5 && fk === 'add' && r() < 0.5){ const d1 = pick(r, [2, 3, 4]), d2 = d1 * 2; a = {n: 1, d: d1}; b = {n: ri(r, 1, d2 - 3), d: d2}; right = fraw({n: 2 + b.n, d: d2}); more = [fraw({n: 1 + b.n, d: d1 + d2}), fraw({n: 1 + b.n, d: d2}), fraw({n: 3 + b.n, d: d2})]; }
+      else if(fk === 'add'){ const s = ri(r, 2, big ? d + ri(r, 1, d - 1) : d - 1); const an = ri(r, 1, s - 1); a = {n: an, d}; b = {n: s - an, d}; right = fraw({n: s, d}); more = [fraw({n: s, d: 2 * d}), fraw({n: s - 1, d}), fraw({n: s + 1, d}), fraw({n: s, d: d + 1})]; }
+      else { const an = ri(r, 2, d), bn = ri(r, 1, an - 1); a = {n: an, d}; b = {n: bn, d}; right = fraw({n: an - bn, d}); more = [fraw({n: an - bn, d: 0}), fraw({n: an + bn, d}), fraw({n: Math.max(1, an - bn - 1), d}), fraw({n: an - bn + 1, d}), fraw({n: an - bn, d: d + 1})]; }
+      const op = fk === 'add' ? '+' : '−', say = a.d === b.d ? 'Same bottom — ' + (fk === 'add' ? 'add' : 'take away') + ' the tops: ' + a.n + ' ' + op + ' ' + b.n + ' = ' + right.split('/')[0] + ' — the bottom stays ' + a.d : fraw(a) + ' = ' + fraw({n: 2, d: b.d}) + ', so ' + fraw({n: 2, d: b.d}) + ' + ' + fraw(b) + ' = ' + right;
+      const S = simplest(Li, right, more, say);
+      return Q(fraw(a) + ' ' + op + ' ' + fraw(b) + ' = ?' + S.tail, {type: 'f' + fk, a, b, op, raw: right}, S.right, fopts(r, S.right, S.more, 4), S.say); }
+    if(fk === 'of'){
+      const fr = f({unit: Li <= 2}), m = ri(r, 2, Li >= 4 ? 5 : 4), N = fr.d * m, ans = fr.n * m;
+      return Q(fraw(fr) + ' of ' + N + ' = ?', {type: 'fof', N, f: fr, groups: Li <= 2}, ans, numOptions(r, ans, 4, 1), N + ' into ' + fr.d + ' teams = ' + m + ' each · ' + fr.n + ' team' + (fr.n > 1 ? 's' : '') + ' = ' + ans); }
+    if(fk === 'order'){
+      const n = Li >= 5 ? 4 : 3, cards = []; let g = 0;
+      while(cards.length < n && g++ < 200){ const c = Li <= 2 ? f({unit: true}) : Li === 3 && cards.length && r() < 0.6 ? {n: ri(r, 1, cards[0].d - 1), d: cards[0].d} : f(); if(!cards.some(x => x.n * c.d === c.n * x.d)) cards.push(c); }
+      return Object.assign({}, base, {kind: 'forder', cards: shuffle(r, cards), picked: [], pics: Li <= 3, par: n, slack: [0, 2]}); }
+    if(fk === 'whole'){
+      const fr = Li >= 5 ? f() : {n: 1, d: pick(r, ds)}, per = ri(r, 2, 5), have = fr.n * per, ans = fr.d * per;
+      return Q(have + ' sweets are ' + fraw(fr) + ' of the bag. How many in the whole bag?', {type: 'fwhole', f: fr, per}, ans, numOptions(r, ans, 4, per), fr.n + ' part' + (fr.n > 1 ? 's' : '') + ' = ' + have + ', so 1 part = ' + per + ' · ' + fr.d + ' parts = ' + ans); }
+    if(fk === 'mixed'){
+      const d = pick(r, ds.filter(x => x <= 8)), w = Li >= 5 ? ri(r, 1, 2) : 1, rem = ri(r, 1, d - 1), top = w * d + rem, back = Li >= 5 && r() < 0.5;
+      if(back) return Q(w + ' ' + rem + '/' + d + ' = ?/' + d, {type: 'fmixed', w, rem, d}, top, numOptions(r, top, 4, 1), w + ' whole = ' + w * d + '/' + d + ' · + ' + rem + ' = ' + top + '/' + d);
+      return Q(top + '/' + d + ' = ' + w + ' and ?/' + d, {type: 'fmixed', w, rem, d}, rem, numOptions(r, rem, 4, 1), top + ' pieces: ' + w * d + ' make ' + w + ' whole pizza' + (w > 1 ? 's' : '') + ' · ' + rem + ' left = ' + rem + '/' + d); }
+    return makeFrac(Li, r, round, null, 'colour');
   }
   function colourToggle(M, i){
     const it = M.item; if(!it || it.kind !== 'colour' || it.done || i < 0 || i >= it.len) return null;
     const j = it.on.indexOf(i); if(j >= 0) it.on.splice(j, 1); else it.on.push(i); it.moves++;
     if(it.on.length === it.want && !subm(M)){ it.done = it.ok = true; } return {count: it.on.length, done: it.done};
   }
+  function fShare(M, p){ const it = M.item; if(!it || it.kind !== 'fshare' || it.done) return null; const pile = it.N - it.plates.reduce((a, b) => a + b, 0);
+    if(p === 'each'){ if(pile < it.d) return null; it.plates = it.plates.map(x => x + 1); it.log.push('each'); it.moves++; fAuto(M); return {pile: pile - it.d, each: true}; }
+    if(p === 'undo'){ const l = it.log.pop(); if(l == null) return null; if(l === 'each') it.plates = it.plates.map(x => x - 1); else it.plates[l]--; it.moves++; return {pile: pile + (l === 'each' ? it.d : 1)}; }
+    if(!(p >= 0 && p < it.d) || !pile) return null; it.plates[p]++; it.log.push(p); it.moves++; fAuto(M); return {pile: pile - 1, plate: p}; }
+  function fOrder(M, i){ const it = M.item; if(!it || it.kind !== 'forder' || it.done || !(i >= 0 && i < it.cards.length)) return null; const j = it.picked.indexOf(i);
+    if(j >= 0) it.picked = it.picked.slice(0, j); else it.picked.push(i); it.moves++; fAuto(M); return {picked: it.picked.slice()}; }
+  function fLine(M, pos){ const it = M.item; if(!it || it.kind !== 'fline' || it.done || !(pos >= 0 && pos <= it.ticks)) return null; it.pos = pos; it.moves++; fAuto(M); return {pos}; }
+  function fAuto(M){ const it = M.item, c = fracReady(it); if(c && c.ok && !subm(M)){ it.done = it.ok = true; } }   // without ✅ Submit (old tests) a right build ends the round, like 🎨 colour
+  function fracReady(it){ const k = it.kind;
+    if(k === 'fshare'){ const pile = it.N - it.plates.reduce((a, b) => a + b, 0), fair = it.plates.every(x => x === it.plates[0]); return {ok: !pile && fair, pile, fair, plates: it.plates.slice()}; }
+    if(k === 'forder'){ const v = it.picked.map(i => it.cards[i].n / it.cards[i].d), up = v.every((x, i) => !i || x > v[i - 1]); return {ok: it.picked.length === it.cards.length && up, full: it.picked.length === it.cards.length, up}; }
+    if(k === 'fline') return {ok: it.pos === it.want, pos: it.pos};
+    return null; }
+  function fracHint(it){ const fk = it.fk, f = it.frac || {};
+    if(fk === 'colour') return it.shape === 'pizza' ? 'The pizza has ' + it.len + ' slices — ' + fraw(f) + ' means ' + f.n + ' of every ' + f.d + ': colour ' + it.want + '.' : it.shape === 'choc' ? 'Cut the chocolate into ' + f.d + ' equal teams of ' + it.len / f.d + ' squares — colour ' + f.n + ' team' + (f.n > 1 ? 's' : '') + '.' : null;
+    if(fk === 'share') return 'Give ONE to every plate, again and again — 🍬 One each does that for you.';
+    if(fk === 'order') return 'Same top? The bigger bottom number = smaller pieces. Look at the pizzas!';
+    if(fk === 'line') return 'Cut 0 → 1 into ' + it.ticks + ' equal jumps — ' + fraw(f) + (it.ticks !== f.d ? ' = ' + it.want + '/' + it.ticks : '') + ': count ' + it.want + ' jumps from 0.';
+    if(fk === 'which') return 'Look for EQUAL pieces first — then count the coloured ones.';
+    if(fk === 'cmp') return 'Same top: fewer pieces = bigger pieces. Different tops: look at how far each bar reaches.';
+    if(fk === 'eq') return 'More pieces, same size of pizza: ' + it.vis.b.d / it.vis.a.d + ' × more pieces → ' + it.vis.b.d / it.vis.a.d + ' × as many coloured.';
+    if(fk === 'left') return 'The whole pizza = ' + it.vis.ate.d + '/' + it.vis.ate.d + '. Take away what was eaten.';
+    if(fk === 'add') return it.vis.a.d === it.vis.b.d ? 'Same bottom → add the tops, the bottom stays ' + it.vis.a.d + '.' : '1/' + it.vis.a.d + ' = ' + 2 + '/' + it.vis.b.d + ' — then add the tops.';
+    if(fk === 'sub') return 'Same bottom → take away the tops, the bottom stays ' + it.vis.a.d + '.';
+    if(fk === 'of') return 'Share ' + it.vis.N + ' into ' + it.vis.f.d + ' teams, then take ' + it.vis.f.n + ' team' + (it.vis.f.n > 1 ? 's' : '') + '.';
+    if(fk === 'whole') return 'Find ONE part first (' + it.vis.f.n * it.vis.per + ' ÷ ' + it.vis.f.n + '), then times ' + it.vis.f.d + '.';
+    if(fk === 'mixed') return it.vis.d + ' pieces make ONE whole pizza.';
+    if(fk === 'name') return 'Count the pieces: how many are coloured, how many in all?';
+    return null; }
+  /* 🍕 FRAC BANK END */
 
   /* ---------- 🏗️ WOBBLE TOWER (a maths puzzle: exact height — not physics) ---------- */
   const WOB = [{s: [1, 2], R: [3, 5]}, {s: [2, 3], R: [5, 10]}, {s: [3, 5], R: [11, 20]}, {s: [4, 7], R: [20, 60]}, {s: [5, 8, 13], R: [40, 100]}, {s: [7, 11, 17], R: [100, 200]}];
@@ -849,7 +958,7 @@ const GS = (function(){
   }
   function deal(M){
     const Li = M.level, r = M.r, k = M.round, md = M.mode;
-    const it = md === 'scale' ? makeScale(Li, r, k, {avatar: M.cfg.avatar}) : md === 'shape' ? makeShape(Li, r, k) : md === 'tens' ? makeTens(Li, r, k) : md === 'next' ? makeNext(Li, r, k) : md === 'frac' ? makeFrac(Li, r, k) : md === 'wobble' ? makeWobble(Li, r) : makeCount(Li, r, k);
+    const it = md === 'scale' ? makeScale(Li, r, k, {avatar: M.cfg.avatar}) : md === 'shape' ? makeShape(Li, r, k) : md === 'tens' ? makeTens(Li, r, k) : md === 'next' ? makeNext(Li, r, k) : md === 'frac' ? makeFrac(Li, r, k, M, M.cfg.fk) : md === 'wobble' ? makeWobble(Li, r) : makeCount(Li, r, k);
     it.moves = 0; it.done = false; it.ok = false;
     if(it.kind === 'count') it.stacks = it.tray.map(n => ({id: M.nid++, n}));
     else if(it.left){ it.left = it.left.map(x => Object.assign({id: M.nid++, fixed: true}, x)); it.right = it.right.map(x => Object.assign({id: M.nid++, fixed: true}, x)); it.tray = it.tray.map(x => Object.assign({id: M.nid++}, x)); }
@@ -877,6 +986,7 @@ const GS = (function(){
     if(k === 'tens') return {ok: it.value === it.target, value: it.value};
     if(k === 'colour') return {ok: it.on.length === it.want, count: it.on.length};
     if(k === 'wobble'){ const h = it.tower.reduce((a, b) => a + b, 0); return {ok: h === it.target, height: h}; }
+    { const fr = fracReady(it); if(fr) return fr; }   /* 🍕 gs2-g5 */
     return {ok: false}; }
   function submit(M){ const it = M.item; if(!it || it.done || isQuiz(it)) return null; const c = readyOf(M);
     if(c.ok){ it.done = it.ok = true; if(c.hit) it.hit = c.hit; return Object.assign({ok: true}, c); }
@@ -948,6 +1058,7 @@ const GS = (function(){
   }
   function hintFor(M){
     const it = M.item; if(!it || it.done) return '';
+    if(it.ck === 'frac'){ const h = fracHint(it); if(h) return h; }   /* 🍕 gs2-g5 */
     if(it.kind === 'compare') return 'Count the blocks on each side — which side is heavier?';
     if(it.kind === 'choice') return it.ck === 'next' ? 'How much does it change each time?' : it.ck === 'frac' ? 'Count the pieces: how many are coloured, how many in all?' : 'Count slowly, one at a time.';
     if(it.kind === 'grid') return 'Tap squares to fill them. ' + (it.bp ? 'Copy the 📐 card — any turn is fine.' : wayKind(it) ? 'The way round = every outside edge — the gold fence counts them.' : 'Fill rows of the same length.');
@@ -965,6 +1076,7 @@ const GS = (function(){
     finishRound, advance, finish, starsFor, starsOfRound, speedPart, playPlan, hintFor, isQuiz,
     digits, GRID, makeShape, shapeOf, gridDone, gridToggle, gridSolution, BANK, bankShape, norm, sameShape, piecesOf, fenceOf, chainOf, cornersOf, wayRound, fullFence, wayKind, mostFor, shapeName, rectCells, stairCells, stairCorners, TENS_R, tensUnits, minPieces, makeTens, tensAdd, tensWay, tensStep, tensPlan, tensBreak, takeAmount, partsOf, pcOf, autoBreak, makeNext, gcd, fstr, FR_D, makeFrac, colourToggle,
     CHARS, charName, CHAPTERS, storyPlan, subsetPlan, journeyItem, castStep,
+    FR_D, FR_MIX, FR_NAME, fracDeck, makeFrac, fShare, fOrder, fLine, fracReady, fracHint, fstr, fraw,   /* 🍕 gs2-g5 */
     WOB, minCount, wobblePlan, makeWobble, wobAdd, wobPop, answerChoice, BAT, newBattle, battleDeal, buildValue, allBuilds, scoreFor, robotBuild, battleLock, battleJudge};
 })();
 // ENGINE END
@@ -1202,9 +1314,12 @@ function renderGoal(){
   else if(it.kind === 'grid') gl.innerHTML = '🔷 Build <b>' + UI.esc(it.goal) + '</b><small>' + (it.bp ? '📐 Copy the card' + (it.turned ? ' — it is turned! Any turn is fine' : ' · any turn is fine') : it.ck === 'grow' ? '➕ Tap ONE empty square · the gold fence counts the way round' : GS.wayKind(it) ? 'Tap or drag to fill squares · 🐜 the gold fence = the way round' : 'Tap or drag on the grid to fill squares') + '</small>';   /* 🔷 gs2-g4 */
   else if(it.kind === 'tens' && it.start) gl.innerHTML = '🔟 You have <b>' + it.start + '</b> · make <b>' + it.target + '</b><small>' + (it.target < it.start ? '➖ Take away ' + (it.units.length > 2 ? 'hundreds, ' : '') + (it.units.length > 1 ? 'towers and ones' : 'ones') + (GS.autoBreak(G.M.level) ? '' : ' · 🔨 break one when you run out') : '➕ Add ' + (it.units.length > 1 ? 'towers and ones' : 'ones')) + '</small>';   /* ➖ gs2-g3 */
   else if(it.kind === 'tens') gl.innerHTML = '🔟 Build <b>' + it.target + '</b><small>' + (it.units.length > 1 ? 'Use ones, tens' + (it.units.length > 2 ? ' and hundreds' : '') + ' — the fewest blocks' : '10 ones snap into a ten-tower') + '</small>';
-  else if(it.kind === 'colour') gl.innerHTML = '🍕 Colour <b>' + it.frac.n + '/' + it.frac.d + '</b> of the bar<small>Tap blocks to colour them</small>';
+  else if(it.kind === 'colour') gl.innerHTML = '🍕 Colour <b>' + frHtml(it.frac.n + '/' + it.frac.d) + '</b> of the ' + ({pizza: 'pizza', choc: 'chocolate'}[it.shape] || 'bar') + '<small>' + ({pizza: 'Tap slices', choc: 'Tap squares'}[it.shape] || 'Tap blocks') + ' to colour them</small>';   /* 🍕 gs2-g5 */
+  else if(it.kind === 'fshare') gl.innerHTML = '🍬 <b>' + frHtml('1/' + it.d) + ' of ' + it.N + '</b> = ?<small>Share ' + it.N + ' sweets fairly onto ' + it.d + ' plates</small>';
+  else if(it.kind === 'forder') gl.innerHTML = '📶 <b>Smallest first!</b><small>Tap the cards in order: smallest → biggest</small>';
+  else if(it.kind === 'fline') gl.innerHTML = '📏 Put <b>' + frHtml(it.frac.n + '/' + it.frac.d) + '</b> on the line<small>Tap the line where it goes</small>';
   else if(it.kind === 'wobble') gl.innerHTML = '🏗️ Exactly <b>' + it.target + '</b> high<small>Only blocks of ' + it.sizes.join(', ') + ' — fewest blocks wins ⭐⭐⭐</small>';
-  else if(it.kind === 'choice') gl.innerHTML = '<b>' + UI.esc(it.q) + '</b><small>' + modeLabel(G.M.mode) + '</small>';
+  else if(it.kind === 'choice') gl.innerHTML = '<b>' + (it.ck === 'frac' ? frHtml(UI.esc(it.q)) : UI.esc(it.q)) + '</b><small>' + (it.ck === 'frac' && it.fname ? '🍕 ' + it.fname : modeLabel(G.M.mode)) + '</small>';   /* 🍕 gs2-g5 */
   const sm = gl.querySelector('small'); if(sm) sm.textContent += GS.isQuiz(it) ? ' · pick, then ✅ Submit' : ' · then ✅ Submit';   /* ✅ gs2-g1 */
 }
 function countSub(it){ const L = G.M.level; return (L >= 3 ? '🧲 snap · ✂️ split · ✖️ copy · ➗ share' : L >= 1 ? '🧲 drag to snap · 👆 tap a number, then ✂️ to split' : '🧲 drag one number onto another to snap') ; }   /* gs2-g2 */
@@ -1214,13 +1329,16 @@ function renderBar(){
   const SUB = '<button class="tb submit" id="btn-submit" data-sound="none" onclick="submitRound()" title="Enter">✅ Submit</button>';   /* ✅ gs2-g1 Q1 A: always at the end of the bar */
   if(G.phase !== 'play'){ bar.innerHTML = '<div class="hint">' + (G.lastOk ? (GS.isQuiz(it) ? (it.auto ? '👀 Look at the answer — then go on' : '🎉 Right! Go on when you are ready') : '🎉 Look at what you made — then go on') : '👀 Look at the answer — then go on') + '</div><button class="tb submit glow" id="btn-next" data-sound="pop" onclick="goNext()" title="Enter">▶ Next</button>'; return; }   /* Q2 B: no timer — ▶ Next glows */
   const SYMS = ['<', '=', '>'].map((m, i) => '<button class="tb big ' + ['lt', 'eq', 'gt'][i] + '" style="--i:' + i + '" data-sym="' + UI.esc(m) + '" data-sound="none" onclick="pickAns(this.dataset.sym)">' + UI.esc(m) + '<small>' + ['left is less', 'the same', 'left is more'][i] + '</small></button>').join('');
-  if(it.kind === 'choice' && !it.syms){ bar.innerHTML = it.options.map((o, i) => '<button class="tb big ' + ['lt', 'eq', 'gt', 'act'][i % 4] + '" style="--i:' + i + '" data-opt="' + UI.esc(o) + '" data-sound="none" onclick="pickAns(this.dataset.opt)">' + UI.esc(o) + '<small>' + (i + 1) + '</small></button>').join('') + SUB; markTried(); return; }
+  if(it.kind === 'choice' && !it.syms){ bar.innerHTML = it.options.map((o, i) => '<button class="tb big ' + ['lt', 'eq', 'gt', 'act'][i % 4] + '" style="--i:' + i + '" data-opt="' + UI.esc(o) + '" data-sound="none" onclick="pickAns(this.dataset.opt)">' + (it.ck === 'frac' ? frHtml(UI.esc(o)) : UI.esc(o)) + '<small>' + (i + 1) + '</small></button>').join('') + SUB; markTried(); return; }
   if(it.kind === 'choice' || it.kind === 'compare'){ bar.innerHTML = SYMS + SUB; markTried(); return; }
   if(it.kind === 'grid'){ bar.innerHTML = '<div class="hint">👆 Tap or drag to fill squares · tap a filled one to empty it</div><button class="tb" data-sound="tap" onclick="gridClear()">🧽 Clear</button>' + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB; return; }
   if(it.kind === 'tens'){ const tk = it.start > it.target, PL = it.units.map(u => '<button class="tb act" data-u="' + u + '" data-sound="none" onclick="tensBtn(' + u + ')">+' + u + '</button>').join(''), MI = it.units.map(u => '<button class="tb' + (tk ? ' take' : '') + '" data-u="-' + u + '" data-sound="none" onclick="tensBtn(-' + u + ')">−' + u + '</button>').join('');   /* ➖ gs2-g3: take-away rounds put − first · 🔨 from ⚡ Hard */
     const BR = tk && !GS.autoBreak(M.level) ? [10, 100].filter(u => u === 10 ? it.units.indexOf(10) >= 0 : it.units.indexOf(100) >= 0).map(u => '<button class="tb brk" data-b="' + u + '" data-sound="none" onclick="tensBreakBtn(' + u + ')" title="' + (u === 10 ? 'B' : 'Shift+B') + '">🔨 ' + u + '</button>').join('') : '';
     bar.innerHTML = (tk ? MI + BR + PL : PL + MI) + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB; return; }
-  if(it.kind === 'colour'){ bar.innerHTML = '<div class="hint">👆 Tap blocks to colour them (tap again to clear one)</div><button class="tb" data-sound="tap" onclick="colourClear()">🧽 Clear</button>' + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB; return; }
+  if(it.kind === 'fshare'){ bar.innerHTML = '<div class="hint">👆 Tap a plate to give it a sweet</div><button class="tb act" data-sound="none" onclick="fShareTap(\'each\')" title="E">🍬 One each</button><button class="tb" data-sound="tap" onclick="fShareTap(\'undo\')">↩️ Undo</button>' + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB; return; }   /* 🍕 gs2-g5 */
+  if(it.kind === 'forder'){ bar.innerHTML = '<div class="hint">👆 Tap the cards: smallest first (tap again to undo)</div><button class="tb" data-sound="tap" onclick="fOrderClear()">🧽 Clear</button>' + (M.level <= 2 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB; return; }
+  if(it.kind === 'fline'){ bar.innerHTML = '<div class="hint">👆 Tap the line where ' + frHtml(it.frac.n + '/' + it.frac.d) + ' goes</div>' + (M.level <= 2 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB; return; }
+  if(it.kind === 'colour'){ bar.innerHTML = '<div class="hint">👆 Tap ' + ({pizza: 'slices', choc: 'squares'}[it.shape] || 'blocks') + ' to colour them (tap again to clear one)</div><button class="tb" data-sound="tap" onclick="colourClear()">🧽 Clear</button>' + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB; return; }
   if(it.kind === 'wobble'){ bar.innerHTML = it.sizes.map((z, i) => '<button class="tb big" style="background:' + WOB_COLS[i] + ';color:#fff" data-s="' + z + '" data-sound="none" onclick="wobBtn(' + z + ')">+' + z + '<small>key ' + (i + 1) + '</small></button>').join('') + '<button class="tb" data-sound="tap" onclick="wobUndo()">↩️ Take top off</button>' + (M.level <= 2 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡</button>' : '') + SUB; return; }
   if(it.kind !== 'count'){ bar.innerHTML = '<div class="hint">👆 Drag blocks onto the right pan (or tap them). Tap a block on the pan to take it back.</div><button class="tb" data-sound="tap" onclick="takeAll()">↩️ Take all back</button>' + (M.level <= 1 ? '<button class="tb" data-sound="tap" onclick="showHint()">💡 Hint</button>' : '') + SUB; return; }
   const s = selStack(); let h = '';
@@ -1527,6 +1645,9 @@ function whyText(it, r){ const k = it.kind;
     return 'That is not ' + UI.esc(it.goal) + ' yet'; }
   if(k === 'tens') return 'That is ' + r.value + ' — we need <b>' + it.target + '</b>';
   if(k === 'colour') return r.count + ' coloured — we need <b>' + it.want + '</b>';
+  if(k === 'fshare') return r.pile ? r.pile + ' sweet' + (r.pile > 1 ? 's are' : ' is') + ' still in the bowl' : 'Not fair yet — the plates have ' + r.plates.join(' · ');   /* 🍕 gs2-g5 */
+  if(k === 'forder') return !r.full ? 'Tap all <b>' + it.cards.length + '</b> cards' : fOrderWhy(it);
+  if(k === 'fline') return 'That is ' + frHtml(r.pos + '/' + it.ticks) + ' — we need <b>' + frHtml(it.frac.n + '/' + it.frac.d) + '</b>';
   if(k === 'wobble') return 'Height ' + r.height + ' — we need <b>' + it.target + '</b>';
   return 'Not yet — try again'; }
 function wrongFx(r, text){ SND.bad(); avatarDo('shrug'); hud(); cheerSay('miss', 'round');
@@ -1534,7 +1655,9 @@ function wrongFx(r, text){ SND.bad(); avatarDo('shrug'); hud(); cheerSay('miss',
   sm.className = 'warn'; sm.innerHTML = '✗ ' + text; gl.classList.add('warn'); gl.classList.remove('shake'); void gl.offsetWidth; gl.classList.add('shake');
   if(r.pen){ const sc = $('h-score').getBoundingClientRect(), m = document.createElement('div'); m.className = 'minus'; m.textContent = '−' + r.pen; m.style.left = Math.round(sc.left + sc.width / 2 - 18) + 'px'; m.style.top = Math.round(sc.bottom + 2) + 'px'; document.body.appendChild(m); setTimeout(() => m.remove(), 1400); }
   clearTimeout(G.warnT); G.warnT = setTimeout(() => { if(!G || G.id !== id || G.M.item !== it || G.phase !== 'play') return; gl.classList.remove('warn', 'shake'); renderGoal(); }, 2600 * Math.max(SPEED, 0.01)); }
-function rib(html, cls){ const el = $('rib'); if(!el) return; el.innerHTML = html; el.style.setProperty('--rt', ($('goal').classList.contains('side') || $('goal').classList.contains('sideL') ? 8 : goalBottom() + 8) + 'px'); el.className = 'rib on ' + (cls || ''); }
+function rib(html, cls){ const el = $('rib'); if(!el) return; el.innerHTML = html; el.style.setProperty('--rt', ($('goal').classList.contains('side') || $('goal').classList.contains('sideL') ? 8 : goalBottom() + 8) + 'px');
+  const gl = $('goal'), sd = gl.classList.contains('side'); el.style.left = sd ? Math.round((picLeft() + gl.offsetLeft) / 2) + 'px' : ''; el.style.maxWidth = sd ? Math.max(200, gl.offsetLeft - picLeft() - 16) + 'px' : '';   /* 🍕 gs2-g5: phone sideways — the ribbon sits over the picture, not over the goal card */
+  el.className = 'rib on ' + (cls || ''); }
 function hideRib(){ const el = $('rib'); if(el) el.className = 'rib'; }
 /* ✅ gs2-g1 SUBMIT END */
 function revealTick(dt){ const R = G.reveal; if(!R) return; const before = R.t; R.t += dt;
@@ -1573,6 +1696,20 @@ function needBreak(need){ UISound.play('error'); avatarDo('think'); const b = do
 function tensFxTick(dt){ if(G.tensBreak){ G.tensBreak.t += dt; if(G.tensBreak.t > BREAK_T) G.tensBreak = null; } if(G.takeA){ G.takeA.t += dt; if(G.takeA.t > G.takeA.delay + TAKE_T) G.takeA = null; } }
 function tensTap(p){ const h = (G.tensHits || []).find(q => p.x >= q.x - 6 && p.x <= q.x + q.w + 6 && p.y >= q.y - 6 && p.y <= q.y + q.h + 6); if(!h) return false; tensBtn(-h.unit); return true; }
 /* ➖ TENS TAKE END */
+/* 🍕 FRAC PAGE START (gs2-g5, Aowu 2026-11-27 "Fractions: more and more different designs") — stacked fractions in the question / answers / ribbon,
+   taps for 🎨 pizza + chocolate, 🍬 plates, 📶 cards, 📏 the number line. */
+function frHtml(s){ return String(s).replace(/(\d+) (\d+)\/(\d+)/g, '$1<span class="fr"><i>$2</i><i>$3</i></span>').replace(/(\d+|\?)\/(\d+|\?)/g, '<span class="fr"><i>$1</i><i>$2</i></span>'); }
+function fShareTap(p){ if(!G || G.phase !== 'play') return; const r = GS.fShare(G.M, p); if(!r){ UISound.play('error'); return; } SND.drop(); if(p === 'each') avatarDo('clap'); }
+function fOrderTap(i){ if(!G || G.phase !== 'play') return; if(GS.fOrder(G.M, i)) SND.drop(); }
+function fOrderClear(){ const it = G && G.M.item; if(!it || G.phase !== 'play' || !it.picked || !it.picked.length) return; it.picked = []; it.moves++; SND.split(); }
+function fLineTap(pos){ if(!G || G.phase !== 'play') return; if(GS.fLine(G.M, pos)){ SND.drop(); G.cur = pos; } }
+function fCanvasTap(p){ const it = G.M.item;
+  if(it.kind === 'colour' && it.shape && it.shape !== 'bar'){ const i = fColourAt(p); if(i >= 0) colourTap(i); return true; }
+  if(it.kind === 'fshare' || it.kind === 'forder'){ const h = (G.fHits || []).find(q => p.x >= q.x && p.x <= q.x + q.w && p.y >= q.y && p.y <= q.y + q.h); if(h){ if(it.kind === 'fshare') fShareTap(h.i); else fOrderTap(h.i); } return true; }
+  if(it.kind === 'fline'){ const i = fLineAt(p); if(i >= 0) fLineTap(i); return true; }
+  return false; }
+function fOrderWhy(it){ const c = it.picked.map(i => it.cards[i]); for(let i = 1; i < c.length; i++) if(c[i].n / c[i].d <= c[i - 1].n / c[i - 1].d) return frHtml(c[i - 1].n + '/' + c[i - 1].d) + ' is bigger than ' + frHtml(c[i].n + '/' + c[i].d) + ' — look at the pizzas'; return 'Not in order yet'; }
+/* 🍕 FRAC PAGE END */
 function colourTap(i){ const r = GS.colourToggle(G.M, i); if(!r) return; SND.drop(); if(r.done) roundDone(true); }
 function colourClear(){ const it = G.M.item; if(G.phase !== 'play' || !it.on.length) return; it.on = []; it.moves++; }
 function dropNow(){ const D = G && G.dropA; if(D){ G.dropA = null; D.after && D.after(); } }   // 🧊 a quick next tap finishes the last drop at once
@@ -1589,11 +1726,15 @@ async function roundDone(ok, r){
   if(it.kind === 'compare') msg = ok ? '✅ Yes! ' + GS.sideText(it.left) + ' <b>' + r.answer + '</b> ' + GS.sideText(it.right) : '❌ It was <b>' + r.L + ' ' + r.answer + ' ' + r.R + '</b>';
   else if(it.kind === 'avatar') msg = '⚖️ <b>' + UI.esc(S.player) + ' = ' + it.need + ' blocks!</b>';
   else if(it.kind === 'balance') msg = '⚖️ Balanced! <b>' + GS.total(it.left) + ' = ' + GS.total(it.right) + '</b>';
+  else if(it.kind === 'choice' && it.ck === 'frac') msg = (ok ? '✅ Yes! <b>' : '❌ It was <b>') + frHtml(UI.esc(String(it.answer))) + '</b>' + (it.say ? ' · ' + frHtml(UI.esc(it.say)) : '');   /* 🍕 gs2-g5: say WHY */
   else if(it.kind === 'choice') msg = ok ? '✅ Yes! <b>' + UI.esc(String(it.answer)) + '</b>' : '❌ It was <b>' + UI.esc(String(it.answer)) + '</b>';
   else if(it.kind === 'grid'){ const nm = it.bp ? GS.BANK[it.shape].name : GS.shapeName(it.cells); msg = '🔷 ' + (nm ? nm.charAt(0).toUpperCase() + nm.slice(1) : UI.esc(it.goal)) + '! <b>' + it.cells.length + ' blocks · ' + GS.cornersOf(it.cells) + ' corners · way round ' + GS.wayRound(it.cells, it.full) + '</b> ' + (rec.stars === 3 ? 'Perfect!' : rec.moves + ' taps (best ' + it.par + ')'); }   /* 🔷 gs2-g4 */
   else if(it.kind === 'tens' && it.start) msg = '🔟 <b>' + it.start + (it.target < it.start ? ' − ' : ' + ') + Math.abs(it.target - it.start) + ' = ' + it.target + '</b>! ' + (rec.stars === 3 ? 'The fewest taps!' : rec.moves + ' taps (best ' + it.par + ')');   /* ➖ gs2-g3 */
   else if(it.kind === 'tens') msg = '🔟 <b>' + it.target + '</b>! ' + (rec.stars === 3 ? 'The fewest blocks!' : rec.moves + ' taps (best ' + it.par + ')');
-  else if(it.kind === 'colour') msg = '🍕 <b>' + it.want + ' of ' + it.len + ' = ' + it.frac.n + '/' + it.frac.d + '</b>!';
+  else if(it.kind === 'colour') msg = '🍕 <b>' + it.want + ' of ' + it.len + ' = ' + frHtml(it.frac.n + '/' + it.frac.d) + '</b>!';
+  else if(it.kind === 'fshare') msg = '🍬 ' + it.N + ' shared by ' + it.d + ' = ' + it.N / it.d + ' each · <b>' + frHtml('1/' + it.d) + ' of ' + it.N + ' = ' + it.N / it.d + '</b>!';   /* 🍕 gs2-g5 */
+  else if(it.kind === 'forder') msg = '📶 <b>' + it.picked.map(i => frHtml(it.cards[i].n + '/' + it.cards[i].d)).join(' &lt; ') + '</b>!';
+  else if(it.kind === 'fline') msg = '📏 <b>' + frHtml(it.frac.n + '/' + it.frac.d) + '</b> = ' + it.want + ' of ' + it.ticks + ' jumps from 0!';
   else if(it.kind === 'wobble') msg = '🏗️ Exactly <b>' + it.target + '</b>! ' + (rec.stars === 3 ? 'Fewest blocks!' : '');
   else msg = '🎯 <b>' + it.target + '</b>! ' + (rec.stars === 3 ? 'In the fewest moves!' : rec.moves + ' moves (best ' + it.par + ')');
   if(it.auto) msg = '👉 Only one answer was left — it is <b>' + UI.esc(String(it.kind === 'compare' ? r.answer : it.answer)) + '</b>';   /* ✅ gs2-g1 (after the whole if / else chain) */
@@ -1646,6 +1787,8 @@ function guideTarget(){
   if(it.kind === 'grid'){ const GG = G.gridGeo, c = GS.gridSolution(it)[0]; if(!GG || !c) return null; const a = C(GG.x + (c[0] + 0.5) * GG.c, GG.y + (c[1] + 0.5) * GG.c), b = C(GG.x + (Math.min(it.n - 1, c[0] + 2) + 0.5) * GG.c, GG.y + (c[1] + 0.5) * GG.c); return {from: a, to: b, text: '👆 Tap (or drag across) squares to fill them'}; }
   if(it.kind === 'tens' && it.start){ const up = it.target > it.start, b = btn('#bar .tb[data-u="' + (up ? '' : '-') + '1"]'); return b ? {from: b, to: b, tap: true, text: up ? '👆 Tap <b>+1</b> to add a block — up to ' + it.target : '👆 Tap <b>−1</b> (or a block) to take one away — down to ' + it.target} : null; }   /* ➖ gs2-g3 */
   if(it.kind === 'tens'){ const b = btn('#bar .tb[data-u="1"]'); return b ? {from: b, to: b, tap: true, text: '👆 Tap <b>+1</b> to add a block — count up to ' + it.target} : null; }
+  if(it.kind === 'colour' && it.shape && it.shape !== 'bar' && G.fGeo){ const F = G.fGeo, a = F.pie ? C(F.pie.cx + Math.cos(-Math.PI / 2 + Math.PI / it.len) * F.pie.R * 0.6, F.pie.cy + Math.sin(-Math.PI / 2 + Math.PI / it.len) * F.pie.R * 0.6) : C(F.choc.x + F.choc.c / 2, F.choc.y + F.choc.c / 2); return {from: a, to: a, tap: true, text: '👆 Tap a ' + (F.pie ? 'slice' : 'square') + ' to colour it — colour <b>' + it.want + '</b> of ' + it.len}; }   /* 🍕 gs2-g5 */
+  if(it.kind === 'fshare'){ const h = (G.fHits || [])[it.plates.indexOf(Math.min.apply(null, it.plates))]; if(!h) return null; const a = C(h.x + h.w / 2, h.y + h.h * 0.55); return {from: a, to: a, tap: true, text: '👆 Tap a plate — give EVERY plate one sweet, again and again'}; }
   if(it.kind === 'colour'){ const B = G.barGeo; if(!B) return null; const a = C(B.x + B.c / 2, B.y + B.c / 2); return {from: a, to: a, tap: true, text: '👆 Tap a block to colour it — colour <b>' + it.want + '</b> of ' + it.len}; }
   if(it.kind === 'wobble'){ const b = btn('#bar .tb[data-s]'); return b ? {from: b, to: b, tap: true, text: '👆 Tap a block size to stack it — reach the 🎯 line exactly'} : null; }
   if(it.kind === 'choice'){ const b = btn('#bar .tb:not(.gone):not(.submit)'); return b ? {from: b, to: b, tap: true, text: it.ck === 'next' ? '🧩 What number goes in the ❓ box? Pick it' : '👆 Pick the right answer'} : null; }
@@ -1923,6 +2066,7 @@ CV.addEventListener('pointerdown', e => {
   if(!G || G.phase !== 'play') return; const p = ptPos(e); G.kbd = false; const it0 = G.M.item;
   if(it0.kind === 'grid'){ const c = cellAt(p.x, p.y); if(c){ const has = it0.cells.some(q => q[0] === c[0] && q[1] === c[1]); G.paint = {on: !has}; gridTap(c[0], c[1], !has); try{ CV.setPointerCapture(e.pointerId); }catch(err){} e.preventDefault(); } return; }
   if(it0.kind === 'tens'){ if(tensTap(p)) e.preventDefault(); return; }   /* ➖ gs2-g3 Q11: tap a piece on the board = take it away */
+  if(it0.ck === 'frac' && fCanvasTap(p)) return;   /* 🍕 gs2-g5 */
   if(it0.kind === 'colour'){ const B = G.barGeo; if(B && p.y >= B.y - 8 && p.y <= B.y + B.c + 8){ const i = Math.floor((p.x - B.x) / B.c); colourTap(i); } return; }
   const h = hitAt(p.x, p.y);
   if(!h){ if(G.M.item.kind === 'count' && G.sel){ G.sel = 0; renderBar(); } return; }
@@ -1969,6 +2113,9 @@ document.addEventListener('keydown', e => {
   if(it.kind === 'tens' && (k === 'b' || k === 'B')){ tensBreakBtn(k === 'B' ? 100 : 10); return; }   /* 🔨 gs2-g3 */
   if(it.kind === 'tens'){ const u = {'1': 1, 't': 10, 'T': 10, 'h': 100, 'H': 100}[k]; if(u && it.units.indexOf(u) >= 0) tensBtn(u); if(k === 'Backspace'){ e.preventDefault(); tensBtn(-1); } return; }
   if(it.kind === 'wobble'){ if(/^[1-3]$/.test(k) && it.sizes[Number(k) - 1]) wobBtn(it.sizes[Number(k) - 1]); if(k === 'Backspace'){ e.preventDefault(); wobUndo(); } return; }
+  if(it.kind === 'fshare'){ if(/^[1-9]$/.test(k) && Number(k) <= it.d) fShareTap(Number(k) - 1); if(k === 'e' || k === 'E' || k === ' '){ e.preventDefault(); fShareTap('each'); } if(k === 'Backspace'){ e.preventDefault(); fShareTap('undo'); } return; }   /* 🍕 gs2-g5 */
+  if(it.kind === 'forder'){ if(/^[1-9]$/.test(k) && Number(k) <= it.cards.length) fOrderTap(Number(k) - 1); if(k === 'Backspace'){ e.preventDefault(); fOrderClear(); } return; }
+  if(it.kind === 'fline'){ const dd = {ArrowLeft: -1, ArrowRight: 1}[k]; if(dd){ e.preventDefault(); G.kbd = true; G.cur = Math.max(0, Math.min(it.ticks, (typeof G.cur === 'number' ? G.cur : 0) + dd)); return; } if(k === ' '){ e.preventDefault(); fLineTap(typeof G.cur === 'number' ? G.cur : 0); } return; }
   if(it.kind === 'grid' || it.kind === 'colour'){
     const grid = it.kind === 'grid'; if(G.cur == null || grid !== Array.isArray(G.cur)) G.cur = grid ? [0, 0] : 0;
     const d = {ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1]}[k];
@@ -2069,4 +2216,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (gs-4+p1d+p3a+cs-4b+b3w3+24u-c+gs-anim+gs2-g1+gs2-g2+gs2-g3+gs2-g4) END OF GeoScout.html -->
+<!-- (gs-4+p1d+p3a+cs-4b+b3w3+24u-c+gs-anim+gs2-g1+gs2-g2+gs2-g3+gs2-g4+gs2-g5) END OF GeoScout.html -->
