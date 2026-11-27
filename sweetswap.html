@@ -274,6 +274,7 @@
 <script src="inc/AvatarActs.js"></script>
 <script src="inc/AvatarWeapons.js"></script>
 <script src="inc/AvatarKitRealm.js"></script>
+<script src="inc/FamFaces.js"></script>   <!-- 🧑‍🤝‍🧑 24r-c: the family's faces as pictures (FamFaces.html) -->
 <script src="inc/CheerSquad.js"></script>   <!-- 📣 cs-4a: the cheering crowd (CheerSquad.html) -->
 <script src="inc/GameFrame.js"></script>
 <script src="inc/GameCovers.js"></script>
@@ -403,103 +404,36 @@ const THEMES = {
    then replayed on a small overlay canvas: 💤 idle now and then · ✨ match 3 small · 🎉 4 / ✖️ / ✨ power = pops out · 💥 L/T = high-five
    · 🌈 5 = the person's own 🎭 Signature act · 😅 swap back · 🔗 combos ×2 amazed · ×3 gasp · ×4 wave · ×5+ party · 🏆 win.
    Calm (🌱 Basic, reduced motion): no idle, combos = one small ripple. Off: window.SS_FAMFX = false (pictures stay, no moves). */
-const FAM_RIM = ['#FF5A5F', '#F5A300', '#9B5CF6', '#22A86A', '#3B82F6', '#F2711C'];
-const FAM_BUDDY = ['Bo', 'Pip', 'Zuzu', 'Kiki', 'Momo', 'Tiko'];
 const THEME_MULT = [1, 1.25, 1.5];
 Object.assign(THEMES, {
   family: {name: 'Family', fam: 1, hard: 1, pics: ['😀', '😄', '😎', '🤩', '😊', '🥳'], t: ['#FFF0F7', '#FFCFE4'], board: '#B04E86', slot: 'rgba(255,255,255,0.28)', cage: {ic: '🧺', name: 'picnic basket', cls: ''}, power: {ic: '📸', name: 'Family photo', fx: 'rain'}},
   faces: {name: 'Faces only', fam: 2, hard: 2, pics: ['😀', '😄', '😎', '🤩', '😊', '🥳'], t: ['#F1EEF6', '#CFC6DE'], board: '#5B4B6B', slot: 'rgba(255,255,255,0.2)', cage: {ic: '🎁', name: 'gift box', cls: 'ck-box'}, power: {ic: '📸', name: 'Group photo', fx: 'rain'}}
 });
-const FAM = {who: [], img: [], key: '', strips: {}, live: [], raf: 0, idleT: 0, R: 144};
-const FAM_POOLS = {
-  idle: ['cool', 'gest.peekaboo', 'gest.yawn', 'curious', 'giggle', 'shy'],
-  small: ['gest.clap', 'laugh', 'wave', 'excited', 'cheer.hop'],
-  big: ['cheer', 'cheer.fist', 'gest.dab', 'flex', 'victory'],
-  bomb: ['gest.highfive', 'hug-pair', 'cheer.starjump', 'gest.spin'],
-  oops: ['oops', 'shrug', 'confused', 'facepalm'],
-  amazed: ['amazed', 'gasp'], wave: ['cheer.starjump', 'cheer.hop'], party: ['gest.dance', 'cheer.disco', 'cheer.floss'], win: ['victory', 'cheer']};
-function famOn(){ return !!(window.Acting && window.SS_FAMFX !== false); }
+/* 🧩 24r-c (✨ Polish chat, Aowu 2026-11-27 "go"): the pictures, chips, moves and the hidden list now come from the shared FamFaces kit
+   (FamFaces.html, also 🫧 Pop Blocks + 🔀 Double Up); this block keeps only Sweet Swap's own moments. Same look; two people with the same
+   first letter now get 2 letters (Ben → Be, Bo → Bo). */
+let FAMF = null;
+function famOn(){ return !!(window.Acting && window.FamFaces && window.SS_FAMFX !== false); }
 function famCalm(){ return !!(G && G.lvl === 0) || !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }
-function famHidden(){ try{ return JSON.parse(localStorage.getItem('sp_ss_famhide') || '[]'); }catch(e){ return []; } }
-function famSetHidden(list){ try{ localStorage.setItem('sp_ss_famhide', JSON.stringify(list)); }catch(e){} }
-function famHash(t){ let h = 2166136261; for(let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
-function famActOk(a){ return window.Acting && Acting.has('acts', a); }
-// the people for this game: me first, then a shuffled mix of the rest (hidden ones skipped), 🤖 buddies fill
-function famPick(K, mix){
-  const hide = famHidden(), me = S.player, names = (S.players || []).map(p => p.Name).filter(n => n && n !== me && hide.indexOf(n) < 0);
-  const list = (me && hide.indexOf(me) < 0 ? [me] : []).concat(mix ? shuffle(names) : names);
-  const who = list.slice(0, K).map(n => ({name: n, av: myAvatar(n)}));
-  for(let i = 0; who.length < K; i++) who.push({name: FAM_BUDDY[i % FAM_BUDDY.length], av: defaultAvatar('🤖' + FAM_BUDDY[i % FAM_BUDDY.length]), buddy: true});
-  return who;
-}
-// one avatar drawn into a tile (S px): rim tile (Family) or plain card (Faces only); pop = bigger frame, the body pops out of the tile
-function famDraw(q, w, act, t, S, k, faceOnly, popK){
-  const Z = Math.round(S * (popK || 1)), ox = (Z - S) / 2, oy = (Z - S) * 0.38, rim = faceOnly ? 'rgba(60,40,80,.22)' : FAM_RIM[k % 6];
-  const f = Acting.fit(w, ['idle'], S, S * 1.9, {pad: 2});
-  if(popK){ q.fillStyle = (faceOnly ? '#7B6B8B' : FAM_RIM[k % 6]) + '38'; q.beginPath(); for(let i = 0; i < 24; i++){ const a = i / 24 * 6.283 + t * 1.2, r = Z * (i % 2 ? 0.36 : 0.5); q.lineTo(Z / 2 + Math.cos(a) * r, Z * 0.48 + Math.sin(a) * r); } q.fill(); }
-  q.save(); q.beginPath(); q.roundRect(ox + 1, oy + 1, S - 2, S - 2, S * 0.24);
-  const gr = q.createLinearGradient(0, oy, 0, oy + S); gr.addColorStop(0, faceOnly ? '#FFFFFF' : rim + '30'); gr.addColorStop(1, faceOnly ? '#ECE8F2' : rim + '70'); q.fillStyle = gr; q.fill();
-  if(!popK) q.clip();
-  try{ Acting.draw(q, w, ox + f.x, oy + f.y + S * 0.18, f.k * 1.05, act, {t, noPet: true, ride: 'drop'}); }catch(e){}
-  q.restore();
-  q.lineWidth = Math.max(2, S * 0.07); q.strokeStyle = rim; q.beginPath(); q.roundRect(ox + 1 + q.lineWidth / 2, oy + 1 + q.lineWidth / 2, S - 2 - q.lineWidth, S - 2 - q.lineWidth, S * 0.22); q.stroke();
-  if(!faceOnly && !popK){ q.fillStyle = rim; q.beginPath(); q.arc(ox + S * 0.84, oy + S * 0.84, S * 0.15, 0, 7); q.fill(); q.fillStyle = '#fff'; q.font = '800 ' + Math.round(S * 0.19) + 'px Fredoka, Nunito, sans-serif'; q.textAlign = 'center'; q.textBaseline = 'middle'; q.fillText((w.name || '?').replace(/^\W+/, '')[0] || '?', ox + S * 0.84, oy + S * 0.855); }
-}
-// the still pictures for the tiles (+ the 🎨 chip): drawn once per game, kept only in memory
-function famPrep(K, mix, force){
-  const T = THEMES[theme] && THEMES[theme].fam ? THEMES[theme] : THEMES.family, fo = T.fam === 2;
-  const who = famPick(K, mix), key = fo + '|' + who.map(w => w.name + ':' + famHash(JSON.stringify(w.av || {})) + ':' + (Acting.sig ? Acting.sig(w.av) : '')).join(',');
-  if(!force && key === FAM.key && FAM.img.length >= K) return;
-  FAM.key = key; FAM.who = who; FAM.fo = fo; FAM.strips = {}; FAM.img = who.map((w, k) => { const c = document.createElement('canvas'); c.width = c.height = FAM.R; famDraw(c.getContext('2d'), w, 'idle', 0, FAM.R, k, fo); return c.toDataURL('image/png'); });
-}
+function famOpts(fo){ return {fo, me: S.player, players: S.players, avatarOf: myAvatar}; }
+function famHidden(){ return window.FamFaces ? FamFaces.hidden() : []; }
 function famPic(k, T){
-  if(!window.Acting) return T.pics[k];
-  if(G && THEMES[G.theme] === T && FAM.img[k]) return '<img class="famp" alt="' + UI.esc(famName(k)) + '" src="' + FAM.img[k] + '">';
-  const fo = T.fam === 2, ck = (fo ? 'f' : 'r') + (S.player || '') + famHidden().join(','); FAM.chip = FAM.chip || {};   // 🎨 setup chip: the first 3 faces, its own small cache
-  if(!FAM.chip[ck]){ try{ FAM.chip[ck] = famPick(3, false).map((w, j) => { const c = document.createElement('canvas'); c.width = c.height = 64; famDraw(c.getContext('2d'), w, 'idle', 0, 64, j, fo); return c.toDataURL('image/png'); }); }catch(e){ FAM.chip[ck] = []; } }
-  return FAM.chip[ck][k] ? '<img class="famp" alt="" src="' + FAM.chip[ck][k] + '">' : T.pics[k];
+  if(!window.Acting || !window.FamFaces) return T.pics[k];
+  if(G && THEMES[G.theme] === T && FAMF && FAMF.img[k]) return '<img class="famp" alt="' + UI.esc(famName(k)) + '" src="' + FAMF.url(k) + '">';
+  const u = FamFaces.chips(3, famOpts(T.fam === 2));   // 🎨 setup chip: the first 3 faces (the kit's own small cache)
+  return u[k] ? '<img class="famp" alt="" src="' + u[k] + '">' : T.pics[k];
 }
-function famName(k){ const w = FAM.who[k]; return w ? w.name : ''; }
-// a move = N frames drawn once (cached per person × act × size kind), replayed by one shared animation loop
-function famStrip(k, act, pop){
-  const id = k + '|' + act + '|' + (pop ? 'p' : 's'); if(FAM.strips[id]) return FAM.strips[id];
-  const w = FAM.who[k]; if(!w || !famActOk(act)) return null;
-  const N = 6, S = FAM.R, P = pop ? 1.55 : 1, Z = Math.round(S * P), c = document.createElement('canvas'); c.width = Z * N; c.height = Z; const q = c.getContext('2d');
-  for(let i = 0; i < N; i++){ q.save(); q.translate(i * Z, 0); famDraw(q, w, act, i / N, S, k, FAM.fo, pop ? P : 0); q.restore(); }
-  return (FAM.strips[id] = {c, N, Z, P});
-}
-function famBake(){   // draw the common moves while the player looks at the board (idle time), so the first match never waits
-  if(!G || !THEMES[G.theme].fam || !famOn()) return; const g = G, jobs = [];
-  FAM.who.forEach((w, k) => { ['small', 'big', 'oops', 'amazed'].forEach(p => FAM_POOLS[p].slice(0, 2).forEach(a => jobs.push([k, a, p === 'big']))); jobs.push([k, Acting.sig(w.av), true]); });
-  const step = d => { if(G !== g) return; const t0 = performance.now(); while(jobs.length && performance.now() - t0 < 12){ const j = jobs.shift(); famStrip(j[0], j[1], j[2]); } if(jobs.length) (window.requestIdleCallback || (f => setTimeout(f, 40)))(step); };
-  (window.requestIdleCallback || (f => setTimeout(f, 300)))(step);
-}
-// play a move over cell i (the tile's kind k): pop = bigger frame on top of the neighbours; plays `loops` times then fades
+function famName(k){ const w = FAMF && FAMF.who[k]; return w ? w.name : ''; }
+// play a move over cell i (the tile's kind k): pop = bigger frame on top of the neighbours; plays `loops` times then fades (CSS famin)
 function famPlay(i, k, pool, o){
-  o = o || {}; if(!G || !famOn() || !THEMES[G.theme].fam || k == null || k < 0 || !FAM.who[k]) return false;
-  if(FAM.live.length >= (o.max || 24)) return false;
-  const acts = typeof pool === 'string' && FAM_POOLS[pool] ? FAM_POOLS[pool].filter(famActOk) : [].concat(pool).filter(famActOk); if(!acts.length) return false;
-  const st = famStrip(k, acts[Math.floor(Math.random() * acts.length)], !!o.pop); if(!st) return false;
-  const [x, y] = xy(i), D = CS * st.P, el = document.createElement('canvas'), dpr = Math.min(2, window.devicePixelRatio || 1);
-  el.className = 'famfx' + (o.pop ? ' pop' : ''); el.width = Math.round(D * dpr); el.height = Math.round(D * dpr);
-  el.style.cssText = 'left:' + (x + CS / 2 - D / 2) + 'px;top:' + (y + CS / 2 - D * (o.pop ? 0.62 : 0.5)) + 'px;width:' + D + 'px;height:' + D + 'px;animation-delay:' + (o.delay || 0) + 'ms;--fd:' + ((o.ms || 700) + (o.delay || 0)) + 'ms';
-  $('board').appendChild(el);
-  const live = {el, st, t0: performance.now() + (o.delay || 0), ms: o.ms || 700, loops: o.loops || 2, cell: i}; FAM.live.push(live); famLoop();
-  return true;
+  if(!G || !famOn() || !THEMES[G.theme].fam || !FAMF) return false;
+  const [x, y] = xy(i); return FAMF.playEl($('board'), x + CS / 2, y + CS / 2, CS, k, pool, o);
 }
-function famLoop(){
-  if(FAM.raf) return;
-  const tick = now => { FAM.raf = 0;
-    FAM.live = FAM.live.filter(L => { const age = now - L.t0; if(age > L.ms || !L.el.isConnected){ L.el.remove(); return false; } if(age < 0) return true;
-      const f = Math.min(L.st.N - 1, Math.floor((age / L.ms * L.loops % 1) * L.st.N)); if(f !== L.f){ L.f = f; const q = L.el.getContext('2d'); q.clearRect(0, 0, L.el.width, L.el.height); q.drawImage(L.st.c, f * L.st.Z, 0, L.st.Z, L.st.Z, 0, 0, L.el.width, L.el.height); } return true; });
-    if(FAM.live.length) FAM.raf = requestAnimationFrame(tick); };
-  FAM.raf = requestAnimationFrame(tick);
-}
-function famClear(){ FAM.live.forEach(L => L.el.remove()); FAM.live = []; clearInterval(FAM.idleT); FAM.idleT = 0; }
+function famClear(){ if(FAMF) FAMF.clear(); clearInterval(famClear.t); famClear.t = 0; }
 // 🎉 a match group popped: the bigger the group, the bigger the move (sp = what the match makes)
 function famMatch(gr, sp, k){
-  if(!G || !THEMES[G.theme].fam) return; const cells = [...gr.cells], mid = cells[(cells.length / 2) | 0];
-  if(sp === 'rainbow') famPlay(mid, k, [Acting.sig(FAM.who[k] && FAM.who[k].av)], {pop: true, ms: 1100, loops: 2});
+  if(!G || !THEMES[G.theme].fam || !FAMF) return; const cells = [...gr.cells], mid = cells[(cells.length / 2) | 0];
+  if(sp === 'rainbow') famPlay(mid, k, [Acting.sig(FAMF.who[k] && FAMF.who[k].av)], {pop: true, ms: 1100, loops: 2});
   else if(sp === 'bomb') famPlay(mid, k, 'bomb', {pop: true, ms: 900});
   else if(sp === 'x' || sp === 'power' || cells.length >= 4) famPlay(mid, k, 'big', {pop: true, ms: 850});
   else famPlay(mid, k, 'small', {ms: 600});
@@ -516,17 +450,19 @@ function famCombo(n){
 }
 function famWin(){ if(!G || !THEMES[G.theme].fam || !famOn()) return; const g = G.g, cells = []; g.forEach((t, i) => { if(t && t.k >= 0) cells.push(i); }); shuffle(cells).slice(0, famCalm() ? 4 : 14).forEach((i, j) => famPlay(i, g[i].k, 'win', {ms: 1000, delay: j * 60, pop: j < 2})); }
 // 💤 now and then one face does a little thing (only while nobody is moving)
-function famIdle(){ clearInterval(FAM.idleT); if(!G || !THEMES[G.theme].fam || !famOn() || famCalm()) return;
-  FAM.idleT = setInterval(() => { if(!G || G.over || G.busy || G.paused || $('scr-play').classList.contains('hidden') || FAM.live.length) return; const cells = []; G.g.forEach((t, i) => { if(t && t.k >= 0 && !t.sp) cells.push(i); }); if(!cells.length) return; const i = cells[Math.floor(Math.random() * cells.length)]; famPlay(i, G.g[i].k, 'idle', {ms: 900}); }, 4200); }
-function famStart(){ if(!G || !THEMES[G.theme].fam) return; famClear(); try{ famPrep(G.K, true, true); }catch(e){} famIdle(); famBake(); }
-// 👁️ who is in the game (setup page, Family pictures only): tap a face to hide it on this device
+function famIdle(){ clearInterval(famClear.t); if(!G || !THEMES[G.theme].fam || !famOn() || famCalm()) return;
+  famClear.t = setInterval(() => { if(!G || G.over || G.busy || G.paused || $('scr-play').classList.contains('hidden') || !FAMF || FAMF.liveEl.length) return; const cells = []; G.g.forEach((t, i) => { if(t && t.k >= 0 && !t.sp) cells.push(i); }); if(!cells.length) return; const i = cells[Math.floor(Math.random() * cells.length)]; famPlay(i, G.g[i].k, 'idle', {ms: 900}); }, 4200); }
+function famStart(){ if(!G || !THEMES[G.theme].fam || !window.FamFaces) return; famClear(); if(FAMF) FAMF.stop();
+  try{ FAMF = FamFaces.make(G.K, Object.assign(famOpts(THEMES[G.theme].fam === 2), {calm: famCalm()})); }catch(e){ FAMF = null; return; }
+  famIdle(); if(famOn()) FAMF.bake(); }
+// 👁️ who is in the game (setup page, Family pictures only): tap a face to hide it on this device (one list for every family-faces game)
 function renderFamWho(){
   const box = $('fam-who'); if(!box) return; const T = THEMES[theme];
-  if(!T || !T.fam){ box.innerHTML = ''; box.classList.add('hidden'); return; }
+  if(!T || !T.fam || !window.FamFaces){ box.innerHTML = ''; box.classList.add('hidden'); return; }
   const hide = famHidden(), names = (S.players || []).map(p => p.Name).filter(Boolean);
   box.classList.remove('hidden');
   box.innerHTML = '<span class="fw-lab">👁️ Faces in the game · tap to hide</span>' + names.map(n => '<button class="chip fw' + (hide.indexOf(n) < 0 ? ' on' : ' off') + '" data-sound="pop" data-fam-name="' + UI.esc(n) + '">' + (hide.indexOf(n) < 0 ? '🙂 ' : '🙈 ') + UI.esc(n) + '</button>').join('');
-  box.querySelectorAll('[data-fam-name]').forEach(b => b.onclick = () => { const n = b.dataset.famName, h = famHidden(), at = h.indexOf(n); if(at < 0) h.push(n); else h.splice(at, 1); famSetHidden(h); FAM.key = ''; FAM.chip = {}; renderMenu(); });
+  box.querySelectorAll('[data-fam-name]').forEach(b => b.onclick = () => { FamFaces.toggle(b.dataset.famName); renderMenu(); });
 }
 const THEME_KEYS = Object.keys(THEMES);
 /* 🧩 24n BOARD SHAPES (✨ polish chat, Aowu 2026-11-16 18:30 "i like the shown yes … without a sweet to swap it should shuffle … each map has
@@ -1325,4 +1261,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (r22+back-1+p1b+p2+cs-4a+b3w2+24n+24r+24s-b+24u-b+24y-b) END OF SweetSwap.html -->
+<!-- (r22+back-1+p1b+p2+cs-4a+b3w2+24n+24r+24s-b+24u-b+24y-b+24r-c) END OF SweetSwap.html -->
