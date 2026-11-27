@@ -34,7 +34,7 @@
   .top-btn{position:fixed;top:calc(10px + env(safe-area-inset-top));left:calc(10px + env(safe-area-inset-left));z-index:30;cursor:pointer;
     --sk:#2B2440;--sc:#FFFFFF;}   /* 🔘 24g-5b: the look = UiKit .sp-btn.sp-back (white candy, ink text — this page's own --ink is light) */
   .wrap{max-width:1180px;margin:0 auto;padding:58px 16px 22px;}
-  .title{text-align:center;font-size:clamp(1.5rem,3.4vw,2.6rem);letter-spacing:.06em;}
+  .title{-webkit-user-select:none;user-select:none;text-align:center;font-size:clamp(1.5rem,3.4vw,2.6rem);letter-spacing:.06em;}
   .title .tt{background:linear-gradient(90deg,#FFC845,#FF4D8D,#7A5CFA);-webkit-background-clip:text;background-clip:text;color:transparent;}
   .title .ti{display:inline-block;animation:bob 2.4s ease-in-out infinite}
   .sub{text-align:center;color:var(--soft);font-weight:800;margin-top:4px;}
@@ -75,6 +75,7 @@
   .gcard .pl{font:800 .8rem Nunito,sans-serif;opacity:.9;display:block}
   .gcard .votes{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-top:8px;min-height:26px}
   .gcard .votes span{background:rgba(255,255,255,.92);color:#3B2A78;border-radius:99px;padding:2px 8px;font:800 .75rem Nunito,sans-serif;animation:pop .35s cubic-bezier(.2,1.6,.4,1)}
+  #stage .gcard{cursor:default}   /* 📺 st-fix2: the TV shelf is a picture — players vote on their phones (a tap shows how) */
   .gcard.mine{outline:4px solid #FFC845;transform:translateY(-3px)}
   .gcard.mine::after{content:'✓ my vote';position:absolute;top:-10px;right:10px;background:#FFC845;color:#3B2A78;border-radius:99px;padding:2px 8px;font:800 .72rem Nunito,sans-serif}
   .gcard.win{animation:winner 1s ease-in-out infinite alternate}
@@ -258,10 +259,11 @@ const lvOf = g => LV.slice(0, ((g && g.top != null) ? g.top : 5) + 1);   // 📺
 // ONLY when Aowu approved it (GameLogos.ok); else the icon + name. New logos appear by themselves once the 🏷️ logo chat approves them.
 const LOGO_OK_FALLBACK = ['snakize', 'numbergrid', 'memory', 'wisdeck', 'pokadif'];   // approved 2026-11-16 23:1x — used only while the live kit has no .ok()
 const LOGO_KINDS = ['main', 'wide', 'badge'];   // main = the tall cover logo (fills the card best)
+const LOGO_URL = {};   // 📺 st-fix2: logo pictures, made ONCE per logo · kind · size (was a fresh PNG for 15 logos every 1.5 s)
 function logoOk(id){ const L = window.GameLogos; if(!L || !id) return false; try{ return L.ok ? !!L.ok(id) : (L.has(id) && LOGO_OK_FALLBACK.indexOf(id) >= 0); }catch(e){ return false; } }
 function logoHtml(g, px){
   if(!logoOk(g.logo)) return '';
-  try{ const ks = GameLogos.kinds(g.logo), k = LOGO_KINDS.find(x => ks.indexOf(x) >= 0) || ks[0]; const u = k && GameLogos.url(g.logo, k, undefined, px); return u ? '<span class="lg"><img alt="' + esc(g.name) + '" src="' + u + '"></span>' : ''; }catch(e){ return ''; }
+  try{ const ks = GameLogos.kinds(g.logo), k = LOGO_KINDS.find(x => ks.indexOf(x) >= 0) || ks[0], ck = g.logo + '|' + k + '|' + px; const u = k && (LOGO_URL[ck] || (LOGO_URL[ck] = GameLogos.url(g.logo, k, undefined, px))); return u ? '<span class="lg"><img alt="' + esc(g.name) + '" src="' + u + '"></span>' : ''; }catch(e){ return ''; }
 }
 function cardTop(g, px){ const l = logoHtml(g, px); return l ? l : '<span class="ic">' + g.icon + '</span>'; }
 try{ if(window.GameLogos && GameLogos.ready) GameLogos.ready(() => setTimeout(() => { if(S.st){ if(S.tv) paintTvStage(); else paintPhone(); } }, 0)); }catch(e){}   // repaint once the logo fonts are in
@@ -313,11 +315,13 @@ $('b-join').onclick = () => needWho('Who are you?', openPad);
 /* ================= 📺 TV ================= */
 async function openTv(){
   if(!S.code){
+    UI.loading('station', 'Opening the TV station');   // ⏳ st-fix2 (Aowu 2026-11-27 11:11): the wait for the station number shows the 📺 loader
     const r = await Station.run('stationOpen', {name: S.me, token: S.tok}).catch(e => ({err: e.message}));
+    UI.loaded();
     if(!r || r.err){ UISound.play('error'); UI.toast('😕 ' + ((r && r.err) || 'Could not open the station'), 'err'); show('choose'); return; }
     S.code = r.code; S.st = r.state; UISound.play('success');
   }
-  remember(); show('tv'); $('sub').textContent = 'This screen is the TV station — play on your own phones';
+  remember(); show('tv'); tvTapHint(); $('sub').textContent = 'This screen is the TV station — play on your own phones';
   $('tiles').innerHTML = S.code.split('').map(d => '<div class="tile">' + d + '</div>').join('');
   try{ const qr = qrcode(0, 'L'); qr.addData(WEBAPP_URL + '?page=station&st=' + S.code); qr.make(); const n = qr.getModuleCount(), q = $('qr'), g = q.getContext('2d'); q.width = q.height = n * 4;
     g.fillStyle = '#fff'; g.fillRect(0, 0, q.width, q.height); g.fillStyle = '#1B1140'; for(let r = 0; r < n; r++) for(let c = 0; c < n; c++) if(qr.isDark(r, c)) g.fillRect(c * 4, r * 4, 4, 4); }catch(e){}
@@ -367,6 +371,29 @@ function paintTvStage(){
     el.innerHTML = '<div class="big"><span class="ic">' + (g.icon || '🎮') + '</span><h2>🔀 Off to ' + esc(g.name || 'the game') + '!</h2><div class="hint">' + (go.lvl != null ? LV[go.lvl][0] + ' ' + LV[go.lvl][1] : '') + sportTxt(go) + '</div>' +
       '<div class="names">' + (go.players || []).map(n => '<span>🎮 ' + esc(n) + '</span>').join('') + (go.watchers || []).map(n => '<span class="w">👀 ' + esc(n) + '</span>').join('') + '</div></div>';
   }
+}
+/* 📺 st-fix2 (Aowu 2026-11-27 11:13 "does the logo need to refresh all the time? or just the left box?"): the TV + phone stages were
+   rebuilt from scratch on every poll (1.5 s / 2 s) → every logo picture reloaded. Now a stage is rewritten ONLY when what it shows changed;
+   while only the ⏱️ seconds + the vote bar move, just those two are updated. The 👥 left box was already updated person by person. */
+const HTML_SET = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML').set, HTML_GET = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML').get;
+function calmStage(el){
+  if(!el || el.__calm) return; el.__calm = 1; let last = null;
+  const keyOf = v => v.replace(/⏱️ \d+ s/g, '⏱️ # s').replace(/(class="bar"><i style="width:)\d+%/g, '$1#%');
+  Object.defineProperty(el, 'innerHTML', {configurable: true, get(){ return HTML_GET.call(this); }, set(v){
+    v = String(v); const key = keyOf(v);
+    if(key === last){
+      el.__skipped = (el.__skipped || 0) + 1;
+      const h = /<div class="hint">([\s\S]*?)<\/div>/.exec(v), hint = el.querySelector('.hint'); if(h && hint && HTML_GET.call(hint) !== h[1]) HTML_SET.call(hint, h[1]);
+      const w = /class="bar"><i style="width:(\d+)%/.exec(v), bar = el.querySelector('.bar > i'); if(w && bar) bar.style.width = w[1] + '%';
+      return;
+    }
+    last = key; el.__writes = (el.__writes || 0) + 1; HTML_SET.call(this, v);
+  }});
+}
+calmStage($('stage')); calmStage($('pstage'));
+function tvTapHint(){   /* 📺 st-fix2 (Aowu 2026-11-27 11:12 "the logo is not clickable"): a tap on the TV shelf says where the vote is */
+  const el = $('stage'); if(!el || el.__tapHint) return; el.__tapHint = 1;
+  el.addEventListener('click', e => { if(!e.target.closest('.gcard, .lcard')) return; UISound.play('pop'); UI.toast('📱 Vote on your phone — Gameroom → 📺 TV Game Station → Join the TV → ' + (S.code || '')); });
 }
 function sportTxt(go){ const w = go && go.sport && WAYS[go.game], x = w && w.list.find(y => y[0] === go.sport); return x ? ' · ' + x[1] + ' ' + x[2] : ''; }   /* 📺 st-2b · ✋ lk-pp1b: any game's way */
 function tally(map, keys){
@@ -441,7 +468,9 @@ function openPad(){
 }
 function paintTyped(){ [...$('typed').children].forEach((d, i) => { d.textContent = S.typed[i] || ''; }); }
 async function joinNow(){
+  UI.loading('station', 'Joining the TV station');   // ⏳ st-fix2: joining waits for the server too
   const r = await Station.run('stationJoin', S.code, {name: S.me, token: tok()}).catch(e => ({err: e.message}));
+  UI.loaded();
   if(!r || r.err){
     UISound.play('error');
     const why = r && r.err === 'nocode' ? '🔢 No TV station with that number — check the TV' : r && r.err === 'full' ? '🈵 The station is full (8 players)' : '😕 ' + ((r && r.err) || 'Could not join');
@@ -504,4 +533,4 @@ boot();
 </script>
 </body>
 </html>
-<!-- (st-1+st-1b+st-2a+st-2a2+st-2b+st-3+lk-pp1b+lk-ax3+lk-8b+lk-8c+lk-8d+lk-8e+24g-5b+lk-8f+lk-8g) END OF Station.html -->
+<!-- (st-1+st-1b+st-2a+st-2a2+st-2b+st-3+lk-pp1b+lk-ax3+lk-8b+lk-8c+lk-8d+lk-8e+24g-5b+lk-8f+lk-8g+st-fix2) END OF Station.html -->
