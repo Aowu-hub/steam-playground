@@ -83,6 +83,7 @@
   @media (max-height:520px) and (orientation:landscape){ #tray{width:292px;} #tools{gap:4px;flex-wrap:nowrap;} #tools .sp-btn{padding:4px 6px;min-width:36px;} #tools .sp-btn.on .bl{display:none;} #tabs{gap:4px;} }   /* ip-3b */
   @media (max-height:520px) and (orientation:landscape){ #tabs{gap:3px;} .tab{min-width:36px;padding:4px 6px;} .tab.on .bl{display:none;} }   /* ip-4d2: 24 set tabs = 4 rows of 7 on a phone held sideways (5 rows pushed the cards out of the tray) */
   @media (max-height:520px) and (orientation:landscape){ #tray{width:304px;} #tabs{gap:2px;} #tabs .tab{min-width:34px;padding:4px 4px;} }   /* ip-4f: 29 set tabs = 4 rows of 8 on a phone held sideways (a 5th row pushed the cards out of the tray) — 8 × 34 + 7 × 2 = 286 px fits the 304 px tray */
+  @media (max-height:520px) and (orientation:landscape){ #tray{width:338px;} }   /* 🦘 ip-9: 33 set tabs (+ 🌍 touch + 🐘 isle1) = 4 rows of 9 on a phone held sideways (a 5th row pushed the cards down) — 9 × 34 + 8 × 2 = 322 px fits the 322 px row, tabs stay ≥ 34 px */
   @media (max-height:520px) and (orientation:landscape){ .pcard{height:64px;} .pcard canvas{height:42px;} }   /* ip-7c: phone held sideways — the card names fit their row */
   .hidden{display:none !important;}
 </style>
@@ -135,6 +136,8 @@
 <script src="inc/IsoLook_toybox.js"></script>
 <script src="inc/IsoLook_dust.js"></script>
 <script src="inc/IsoLook_trail.js"></script>
+<script src="inc/IsoLook_touch.js"></script>
+<script src="inc/IsoLook_isle1.js"></script>
 <script src="inc/IsoLook_wonder.js"></script>
 <script src="inc/IsoLook_wonder2.js"></script>
 <script src="inc/IsoLook_wonder3.js"></script>
@@ -150,6 +153,8 @@
   <button id="s-var" class="sp-btn sp-secondary sp-sm" data-sound="none"><span class="bi">🎲</span> <span class="bl">Variant</span></button>
   <button id="s-state" class="sp-btn sp-secondary sp-sm hidden" data-sound="none"><span class="bi">🔀</span> <span class="bl">State</span></button>
   <button id="s-touch" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">🔥</span> <span class="bl">Fire</span></button>
+  <button id="s-hop" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">🦘</span> <span class="bl">Hop guide</span></button>
+  <button id="s-dance" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">💃</span> <span class="bl">Dance</span></button>
   <button id="s-wonder" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">⏱️</span> <span class="bl">Claim</span></button>
   <button id="s-shrink" class="sp-btn sp-secondary sp-sm hidden" data-sound="none"><span class="bi">◀</span> <span class="bl">Shrink</span></button>
   <button id="s-grow" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">🌱</span> <span class="bl">Grow</span></button>
@@ -184,7 +189,7 @@ const $ = id => document.getElementById(id);
 let LOOK_KEYS = Object.keys(Props.LOOKS), SET_KEYS = Object.keys(Props.SETS);   /* 📦 ip-4a: filled again once every look file is in (keysNow) */
 const inOrder = (keys, first) => first.filter(k => keys.indexOf(k) >= 0).concat(keys.filter(k => first.indexOf(k) < 0));
 function keysNow(){ LOOK_KEYS = inOrder(Object.keys(Props.LOOKS), ['jungle', 'cherry', 'desert', 'snow', 'farm', 'lava', 'coral', 'moon', 'castle', 'raptor', 'bolt']);
-  SET_KEYS = inOrder(Object.keys(Props.SETS), ['jungle', 'village', 'temple', 'bits', 'landmark', 'cherry', 'desert', 'snow', 'farm', 'grow', 'lava', 'coral', 'moon', 'castle', 'realm', 'raptor', 'bolt', 'wild', 'kitchen', 'horde', 'monster', 'myth', 'reef', 'cloud', 'wizard', 'gear', 'detective', 'toybox', 'dust', 'trail', 'wonder']); }
+  SET_KEYS = inOrder(Object.keys(Props.SETS), ['jungle', 'village', 'temple', 'bits', 'landmark', 'cherry', 'desert', 'snow', 'farm', 'grow', 'lava', 'coral', 'moon', 'castle', 'realm', 'raptor', 'bolt', 'wild', 'kitchen', 'horde', 'monster', 'myth', 'reef', 'cloud', 'wizard', 'gear', 'detective', 'toybox', 'dust', 'trail', 'touch', 'isle1', 'wonder']); }   /* 🦘 ip-9: 🌍 touch + 🐘 Island 1 tabs */
 const S = {set: 'village', look: 'jungle', cond: null, hold: null, sel: null, props: [], walkers: [], items: [], walk: true, M: null, V: null, ghost: null, drag: null, placed: 0, missed: []};
 const sound = k => { try{ if(window.UI && UI.sound) UI.sound(k); }catch(e){} };
 const shake = el => { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); };
@@ -271,6 +276,7 @@ function showBar(){ const it = S.sel, h = S.hold, bar = $('selbar'); if(!it && !
   const key = it ? it.prop : h.key, def = Props.DEFS[key]; $('sel-name').textContent = (h ? '✋ ' : '') + def.name + ' · ' + def.foot.join('×');
   const stNow = it ? it.state : h.state != null ? h.state : def.states ? Props.stateOf(key) : null; const plainWall = def.wall && !def.gate, shrine = key === 'realm_shrine' && !!it; $('s-state').classList.toggle('hidden', !(def.states && !plainWall) && !shrine); if(def.states && !plainWall) $('sel-name').textContent += ' · ' + stNow;   /* 🧱 ar-4: a wall's state = its joins (made by the helper) · ⭐ shrine = capture steps */
   lookBar(def, it);   /* 🗼 ip-8 */
+  hopBar(def, it);   /* 🦘 ip-9 */
   growBar(def, stNow); touchBar(def, it);   /* 🌍 ip-6a */ wonderBar(def, it);   /* 🌌 ip-7a */
   $('s-move').classList.toggle('hidden', !it); $('s-del').classList.toggle('hidden', !it); $('s-var').classList.toggle('hidden', def.variants < 2); bar.classList.remove('hidden'); placeUi(); }
 // re-place a prop with new settings (turn / variant); it stays put when the new shape doesn't fit
@@ -285,6 +291,19 @@ $('s-state').onclick = () => { const key = S.hold ? S.hold.key : S.sel && S.sel.
   if(!S.hold && S.sel && d && d.upState && Props.AR && Props.AR.lookout){ lookStep(S.sel, d); return; }   /* 🗼 ip-8 ⬆️ Lookout ladder */
   if(!S.hold && S.sel && d && d.gate){ const open = S.sel.state !== 'ready'; Props.setGate(S.sel, open, S.M); if(open) S.sel.touchT = S.lastT || 0; showBar(); sound(open ? 'success' : 'tap'); tip((open ? '✨ ' : '🔒 ') + d.name + ' · ' + S.sel.state); return; }   /* 🧭 ip-6a gates */ if(!S.hold && S.sel && key === 'realm_shrine'){ tip('⭐ ' + arCapStep(S.sel)); sound('tap'); return; } if(!d || !d.states) return; const cur = S.hold ? (S.hold.state != null ? S.hold.state : Props.stateOf(key)) : S.sel.state, nx = d.states[(d.states.indexOf(cur) + 1) % d.states.length];
   if(S.hold){ S.hold.state = nx; } else { Props.setState(S.sel, nx, S.M); pop(S.sel); } showBar(); sound('tap'); tip('🔀 ' + d.name + ' · ' + nx); };
+// 🦘 ip-9 JUMP GATES: 🦘 Hop guide walks the jump path one hop at a time (Props.hopHint = the 🌱 Basic arc + landing ring) · 💃 Dance opens an emote gate (firefly arch)   /* 🦘 ip-9 hop guide + 💃 dance */
+const hopsOf = it => it && Props.hops ? Props.hops(it) : [];
+function hopBar(def, it){ const h = $('s-hop'), dn = $('s-dance'), placed = !!(it && !S.hold), n = placed ? hopsOf(it).length : 0;
+  h.classList.toggle('hidden', n < 2); if(n >= 2) label(h, it.hopN ? '🦘 Hop ' + it.hopN + ' / ' + (n - 1) : '🦘 Hop guide');
+  const emote = placed && typeof def.gate === 'string' && def.gate.indexOf('emote:') === 0; dn.classList.toggle('hidden', !(emote && it.state !== 'ready'));
+  if(emote) label(dn, '💃 ' + def.gate.slice(6).replace(/^./, c => c.toUpperCase())); }
+function hopNext(){ const it = S.sel, n = hopsOf(it).length; if(!it || n < 2) return; it.hopN = ((it.hopN || 0) + 1) % n; showBar(); sound('tap');
+  tip(it.hopN ? '🦘 hop ' + it.hopN + ' of ' + (n - 1) + ' — the arc shows where to land' + (it.state !== 'ready' ? ' (🔀 = ready to really jump)' : '') : '🦘 guide off'); }
+function danceNow(){ const it = S.sel, d = it && Props.DEFS[it.prop]; if(!d || typeof d.gate !== 'string' || d.gate.indexOf('emote:') !== 0) return; Props.setGate(it, true, S.M); it.touchT = S.lastT || 0; showBar(); sound('success');
+  tip('💃 ' + d.name + ' — every firefly blinks in time · the way is open'); }
+$('s-hop').onclick = () => hopNext(); $('s-dance').onclick = () => danceNow();
+function hopHints(g, V, t){ const it = S.sel; if(!it || !it.hopN || S.hold || !Props.hopHint) return; Props.hopHint(g, V, it, it.hopN, t); }
+S.hopNext = hopNext; S.danceNow = danceNow;
 // 🌱 ip-3c growing props: ◀ Shrink · 🌱 Grow (at the young stage: ① / ② = the two branches, in their SkillKit colours) — Props.grow + the ✨ morph moment
 function growBar(def, st){ const G = def.grow, ids = ['s-shrink', 's-grow', 's-grow2']; if(!G){ ids.forEach(x => $(x).classList.add('hidden')); return; }
   $('s-state').classList.add('hidden'); const n = parseInt(st, 10), br = String(st).slice(1) || null, young = n === G.branchAt - 1;
@@ -360,7 +379,7 @@ function render(alpha, t){ S.lastT = t;
   for(const w of S.walkers){ const it = w.it; it.x = w.px + (w.x - w.px) * alpha; it.y = w.py + (w.y - w.py) * alpha; it.pic = w.frames[w.path ? Math.floor(w.dist * 3.2) % Iso.WALK_N : 0]; it.flip = w.flip; }
   Props.tick(S.props, t);
   if(t - seeT > 0.1){ seeT = t; Props.seeThrough(S.V, S.props, S.walkers.map(w => w.it)); }
-  const st = Iso.frame(S.V, {items: S.items, t, groundFx: (g, V) => { touchHints(g, V, t); wondersGround(g, V, t); lookSweep(g, V, t); }, overlay: (g, V) => { burst(g, V, t); morphs(g, V, t); touches(g, V, t); wondersAir(g, V, t); ringSel(g, V, t); ghostDraw(g, V, t); }});
+  const st = Iso.frame(S.V, {items: S.items, t, groundFx: (g, V) => { touchHints(g, V, t); wondersGround(g, V, t); lookSweep(g, V, t); }, overlay: (g, V) => { burst(g, V, t); morphs(g, V, t); touches(g, V, t); hopHints(g, V, t); wondersAir(g, V, t); ringSel(g, V, t); ghostDraw(g, V, t); }});
   if(performance.now() - lastInfo > 400){ lastInfo = performance.now(); S.ms = st.ms; info(); }
 }
 function diamond(g, V, x, y, w, d, z){ const p = (a, b) => { const s = V.toScreen(a, b, z || 0); return [s.x - V._sx(), s.y - V._sy()]; }; g.beginPath(); [p(x, y), p(x + w, y), p(x + w, y + d), p(x, y + d)].forEach((q, k) => k ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.closePath(); }
@@ -445,4 +464,4 @@ start();
 </script>
 </body>
 </html>
-<!-- (ip-2+ip-3b+ip-3c+ip-4a+ar-1+ar-4+ar-7+ip-4b+ip-4c+ip-4d+ip-4d2+ip-4e+ip-5+ip-4f+ip-6a+ip-7a+ip-7c+ip-8) END OF IsoPropsLab.html -->
+<!-- (ip-2+ip-3b+ip-3c+ip-4a+ar-1+ar-4+ar-7+ip-4b+ip-4c+ip-4d+ip-4d2+ip-4e+ip-5+ip-4f+ip-6a+ip-7a+ip-7c+ip-8+ip-9) END OF IsoPropsLab.html -->
