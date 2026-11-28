@@ -751,6 +751,7 @@
     <div class="ms-dots" id="ms-dots"></div>
   </section>
 
+  <div class="gs-wrap" id="gs-wrap"></div>   <!-- 🔍 gr-16: Find a game (GameroomSearch.html) -->
   <div class="filters" id="filters" role="tablist" aria-label="Filter games"></div>
 
   <div id="game-grid-wrap" style="min-height:220px;border-radius:24px;">
@@ -788,6 +789,7 @@
   </div>
 </div>
 
+<script src="inc/GameroomSearch.js"></script>   <!-- 🔍 gr-16: the search box (matcher + hidden also-known-as words per game) -->
 <script src="inc/BooksParts.js"></script>
 <script src="inc/BooksCorner.js"></script>
 <script src="inc/Book_st1.js"></script>
@@ -1061,6 +1063,7 @@ function matches(g){
 }
 
 function renderFilters(){
+  searchMount();   /* 🔍 gr-16 */
   const box = document.getElementById('filters'); box.innerHTML = '';
   const items = [['all', '🎮', 'All games'], ['multi', '👥', '2 players'], ['party', '👨‍👩‍👧‍👦', '3–4 players', 'gap']];
   if(favs.some(id => allGames.some(g => g.GameID === id))) items.push(['fav', '❤️', 'My favourites']);
@@ -1076,7 +1079,7 @@ function renderFilters(){
     b.setAttribute('aria-selected', filter === key ? 'true' : 'false');
     b.setAttribute('data-sound', 'pop');
     b.innerHTML = '<span>' + icon + '</span><span>' + UI.esc(label) + '</span><span class="n">' + n + '</span>';
-    b.onclick = () => { filter = key; renderFilters(); render(); };
+    b.onclick = () => { searchClear(); filter = key; renderFilters(); render(); };
     box.appendChild(b);
   });
   kindsChip(box, items);   /* 🎴 gr-9 */
@@ -1099,7 +1102,7 @@ function kindsChip(box, items){
     : '<span>🗂️</span><span>Kinds of game</span><span class="n">' + KIND_ITEMS.length + '</span><span class="dn">▾</span>';
   b.title = sel ? 'Kind: ' + sel[2] + ' — tap to pick another kind' : 'Pick a kind of game (Math, Words, Sport…)';
   b.onclick = e => {
-    if(e.target.closest('.x')){ filter = 'all'; renderFilters(); render(); return; }
+    if(e.target.closest('.x')){ searchClear(); filter = 'all'; renderFilters(); render(); return; }
     openKinds();
   };
   box.appendChild(b);
@@ -1120,7 +1123,7 @@ function openKinds(){
   sh.innerHTML = '<div class="kc"><div class="kh"><b>🗂️ Kinds of game</b><span class="th">ประเภทเกม</span>'
     + '<button type="button" class="kx" aria-label="Close" data-sound="pop">✕</button></div><div class="kg"></div></div>';
   const kg = sh.querySelector('.kg');
-  const pick = (key) => { filter = key; closeKinds(); renderFilters(); render(); };
+  const pick = (key) => { searchClear(); filter = key; closeKinds(); renderFilters(); render(); };
   const all = document.createElement('button'); all.type = 'button';
   all.className = 'pill t-chip all' + (filter.indexOf('t:') === 0 ? '' : ' active'); all.setAttribute('data-sound', 'pop');
   all.innerHTML = '<span>🎮</span><span>Every kind</span>'; all.onclick = () => pick('all'); kg.appendChild(all);
@@ -1142,7 +1145,58 @@ function openKinds(){
 addEventListener('resize', () => { const sh = document.getElementById('kind-sheet'); if(sh && !sh.dataset.closing && innerWidth >= 900) closeKinds(); });
 
 
+/* 🔍 gr-16 SEARCH (Aowu 2026-11-28 "ok" = gr-16p A · Thai now · resets to All): the bar above the filters finds a game by ANY word —
+   name · old name · kind (EN + TH) · ways to play · tagline · description · hidden also-known-as words (GameroomSearch.html GSearch.AKA).
+   Typing → the filter goes back to 🎮 All and the cards show best match first (no groups); a filter tap clears the search. */
+const SEARCH = {q: '', bar: null, hits: null};
+function searchDocs(){
+  return allGames.map(g => { const a = GAME_ART[g.GameID] || {};
+    const kinds = typesOf(g), grp = GROUPS.find(x => x.k === groupOf(g));
+    return GSearch.doc({id: g.GameID, names: [nameOf(g), g.GameName, a.name].filter(Boolean),
+      kinds: kinds, kindWords: kinds.map(k => (TYPE_INFO.find(t => t[0] === k) || [])[2]).filter(Boolean).concat(grp ? [grp.en, grp.th] : []).concat(isMulti(g) ? ['2 players', 'two players', 'together', 'friends', 'เล่นด้วยกัน', '2 คน'] : []).concat(maxPlayers(g) >= 3 ? ['3 players', '4 players', 'family', 'party', 'ครอบครัว'] : []),
+      modes: MODES.list.filter(m => m.game === g.GameID).map(m => m.name),
+      tags: [a.tag, g.STEAMFocus].filter(Boolean), desc: [g.Description || ''].concat(NAME_STORY[g.GameID] ? [String(NAME_STORY[g.GameID]).replace(/\*\*/g, '')] : [])}); });
+}
+function searchSet(q){
+  SEARCH.q = q; SEARCH.hits = null;
+  document.body.classList.toggle('gs-on', !!q);
+  if(q && filter !== 'all'){ filter = 'all'; renderFilters(); }
+  render();
+}
+function searchClear(){ if(SEARCH.bar) SEARCH.bar.clear(true); SEARCH.q = ''; SEARCH.hits = null; document.body.classList.remove('gs-on'); }
+let EMPTY_HTML = null;
+function searchEmpty(on, q){
+  const el = document.getElementById('empty-msg'); if(!el) return;
+  if(EMPTY_HTML == null) EMPTY_HTML = el.innerHTML;
+  if(!on){ if(el.dataset.gs){ el.innerHTML = EMPTY_HTML; delete el.dataset.gs; } return; }
+  el.dataset.gs = '1'; el.innerHTML = GSearch.noneHtml(q);
+  const t = el.querySelector('.gs-tell'); if(t) t.onclick = () => GSearch.wish(q);
+}
+function renderSearch(){
+  const hits = GSearch.find(searchDocs(), SEARCH.q), rank = {}; hits.forEach((h, i) => rank[h.id] = i);
+  SEARCH.hits = hits;
+  const shown = allGames.filter(g => rank[g.GameID] != null).sort((a, b) => rank[a.GameID] - rank[b.GameID]);
+  const big = shown.filter(g => !isMini(g)), mini = shown.filter(isMini);
+  const grid = document.getElementById('game-grid'), mg = document.getElementById('mini-grid');
+  grid.innerHTML = ''; mg.innerHTML = ''; ++renderSeq;
+  if(big.length) grid.appendChild(groupHead({k: 'search', icon: '🔍', en: 'Best match first', th: '“' + SEARCH.q + '”'}, big.length));
+  big.forEach(g => grid.appendChild(sizeArt(bigCard(g))));
+  mini.forEach(g => mg.appendChild(miniTile(g)));
+  document.getElementById('big-sec').classList.toggle('hidden', !big.length);
+  const tip = document.getElementById('fav-tip'); if(tip) tip.classList.add('hidden');
+  document.getElementById('mini-sec').classList.toggle('hidden', !mini.length);
+  searchEmpty(!shown.length, SEARCH.q);
+  document.getElementById('empty-msg').classList.toggle('hidden', !!shown.length);
+  if(SEARCH.bar) SEARCH.bar.count(shown.length);
+}
+function searchMount(){
+  const host = document.getElementById('gs-wrap'); if(!host || SEARCH.bar || !window.GSearch || !GSearch.bar) return;
+  SEARCH.bar = GSearch.bar(host, {onChange: searchSet});
+}
+
 function render(){
+  if(SEARCH.q) return renderSearch();
+  searchEmpty(false);
   const shown = allGames.filter(matches);
   // gro-1: ❤️ favourites first (the player's own order), then NEWEST games first (new games are the last rows of the Games tab).
   const order = g => { const f = favs.indexOf(g.GameID); if(f >= 0) return f - 100000; const n = NEW_ORDER.indexOf(g.GameID); return n >= 0 ? n - 50000 : -allGames.indexOf(g); };
@@ -1371,7 +1425,7 @@ function gameroomGuide(){
     {icon: '👋', title: 'Welcome to the Gameroom, ' + who + '!', body: 'Every game here grows a different super-power: **maths, words, logic, memory, music** and more. Here is how it works.'},
     {icon: '🎮', title: 'Big adventures', lines: [['🪜', '6 levels each: Basic → Junior → Intermediate → Hard → Extreme → **💀 Hardcore**.'], ['🔓', 'Clear a level to open the next one.'], ['⭐', 'Up to 3 stars per level — faster and cleaner = more stars.'], ['🎯', '"Great for you!" marks games that fit your age.']]},
     {icon: '🎲', title: 'Mini games', lines: [['⚡', 'Quick little games for younger players (colours, counting, sorting, coding).'], ['🪜', 'Pick a stage first — stars open the next stages.']]},
-    {icon: '🔍', title: 'Find a game', lines: [['👥', '**2 players** / **3–4 players** = play together on one screen.'], ['🗂️', 'Kind chips (Math, Words, Colours…) show one kind of game — on a phone or tablet tap 🗂️ **Kinds of game**.'], ['❤️', 'Tap the heart to keep a favourite at the top.'], ['❓', 'Tap ❓ on a card to see how to play it.']]},
+    {icon: '🔍', title: 'Find a game', lines: [['⌨️', 'Type ANY word in **🔍 Find a game** — ball, crossword, chess… (English or ไทย) — best match first.'], ['👥', '**2 players** / **3–4 players** = play together on one screen.'], ['🗂️', 'Kind chips (Math, Words, Colours…) show one kind of game — on a phone or tablet tap 🗂️ **Kinds of game**.'], ['❤️', 'Tap the heart to keep a favourite at the top.'], ['❓', 'Tap ❓ on a card to see how to play it.']]},
     {icon: '🏆', title: 'Earn cool stuff', lines: [['🏅', 'Badges for clearing levels.'], ['👕', 'New clothes, pets and items for your avatar (see 📖 Collection).'], ['🐾', 'Adventure miles unlock ride-ons.'], ['🏷️', 'Titles to wear on the Dashboard.']]}
   ];
 }
@@ -1600,4 +1654,4 @@ loadGameroom();
 </script>
 </body>
 </html>
-<!-- (11m+11j+11i+11x-1+11y-1+sb-4+pp-4+ebr-3+r34+wd-1+bc-3+r35b+modes-2+gr-1+gs-2+af-1+mg-1+gro-1+sb2-2+p5+p5-2+p5-3+p5-4+p5-5+p5-6+p5-7+p5-8+lk-1b-g+lk-2c+lk-1b-g2+lk-2e+td-1+pd-1+bo-1+pk-1+gr-td1+sc-1+pk-2a+gr-lk3+sc-2a+pk-2b+pk-3a+lk-5a+sc-2b+lk-5f+sc-2d+gr-23+gr-2b+sc-3a+sc-3b+sc-3c+st-1+gr-5+ap-1+sc-3d+gr-6+sc-4a+gr-7+sc-4b+sc-4c+gr-9+sc-4d+sc-4d2+an-5+st-3+ar-r1c-b+24g-3+24g-3b+gr-13+gr-13b+gr-15a) END OF Gameroom.html -->
+<!-- (11m+11j+11i+11x-1+11y-1+sb-4+pp-4+ebr-3+r34+wd-1+bc-3+r35b+modes-2+gr-1+gs-2+af-1+mg-1+gro-1+sb2-2+p5+p5-2+p5-3+p5-4+p5-5+p5-6+p5-7+p5-8+lk-1b-g+lk-2c+lk-1b-g2+lk-2e+td-1+pd-1+bo-1+pk-1+gr-td1+sc-1+pk-2a+gr-lk3+sc-2a+pk-2b+pk-3a+lk-5a+sc-2b+lk-5f+sc-2d+gr-23+gr-2b+sc-3a+sc-3b+sc-3c+st-1+gr-5+ap-1+sc-3d+gr-6+sc-4a+gr-7+sc-4b+sc-4c+gr-9+sc-4d+sc-4d2+an-5+st-3+ar-r1c-b+24g-3+24g-3b+gr-13+gr-13b+gr-15a+gr-16) END OF Gameroom.html -->
