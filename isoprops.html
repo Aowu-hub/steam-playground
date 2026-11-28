@@ -170,6 +170,7 @@
   <button id="s-touch" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">🔥</span> <span class="bl">Fire</span></button>
   <button id="s-hop" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">🦘</span> <span class="bl">Hop guide</span></button>
   <button id="s-dance" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">💃</span> <span class="bl">Dance</span></button>
+  <button id="s-mirror" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">👗</span> <span class="bl">Mirror</span></button>
   <button id="s-wonder" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">⏱️</span> <span class="bl">Claim</span></button>
   <button id="s-shrink" class="sp-btn sp-secondary sp-sm hidden" data-sound="none"><span class="bi">◀</span> <span class="bl">Shrink</span></button>
   <button id="s-grow" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">🌱</span> <span class="bl">Grow</span></button>
@@ -291,7 +292,7 @@ function showBar(){ const it = S.sel, h = S.hold, bar = $('selbar'); if(!it && !
   const key = it ? it.prop : h.key, def = Props.DEFS[key]; $('sel-name').textContent = (h ? '✋ ' : '') + def.name + ' · ' + def.foot.join('×');
   const stNow = it ? it.state : h.state != null ? h.state : def.states ? Props.stateOf(key) : null; const plainWall = def.wall && !def.gate, shrine = key === 'realm_shrine' && !!it; $('s-state').classList.toggle('hidden', !(def.states && !plainWall) && !shrine); if(def.states && !plainWall) $('sel-name').textContent += ' · ' + stNow;   /* 🧱 ar-4: a wall's state = its joins (made by the helper) · ⭐ shrine = capture steps */
   lookBar(def, it);   /* 🗼 ip-8 */
-  hopBar(def, it);   /* 🦘 ip-9 */
+  hopBar(def, it);   /* 🦘 ip-9 */ mirrorBar(def, it);   /* 👗 ip-6c */
   growBar(def, stNow); touchBar(def, it);   /* 🌍 ip-6a */ wonderBar(def, it);   /* 🌌 ip-7a */
   $('s-move').classList.toggle('hidden', !it); $('s-del').classList.toggle('hidden', !it); $('s-var').classList.toggle('hidden', def.variants < 2); bar.classList.remove('hidden'); placeUi(); }
 // re-place a prop with new settings (turn / variant); it stays put when the new shape doesn't fit
@@ -319,6 +320,18 @@ function danceNow(){ const it = S.sel, d = it && Props.DEFS[it.prop]; if(!d || t
 $('s-hop').onclick = () => hopNext(); $('s-dance').onclick = () => danceNow();
 function hopHints(g, V, t){ const it = S.sel; if(!it || !it.hopN || S.hold || !Props.hopHint) return; Props.hopHint(g, V, it, it.hopN, t); }
 S.hopNext = hopNext; S.danceNow = danceNow;
+// 👗 ip-6c mirror: a placed mirror stand (def.mirror) shows 👗 Mirror — tap = it shines + a stand-in hero in the glass (Props.mirrorDraw; a game paints its own AvatarKit hero) · tap again = off
+function mirrorBar(def, it){ const b = $('s-mirror'), on = !!(it && !S.hold && def.mirror && Props.mirrorDraw); b.classList.toggle('hidden', !on); if(on) label(b, it.mirrorOn ? '👗 Mirror off' : '👗 Mirror'); }
+function mirrorNow(){ const it = S.sel, d = it && Props.DEFS[it.prop]; if(!d || !d.mirror) return; it.mirrorOn = !it.mirrorOn;
+  if(d.states && d.states.indexOf('shine') >= 0){ Props.setState(it, it.mirrorOn ? 'shine' : d.states[0], S.M); pop(it); } showBar(); sound(it.mirrorOn ? 'success' : 'tap');
+  tip(!it.mirrorOn ? '👗 mirror off' : it.mirror && it.mirror.see && it.cond !== 'ruined' ? '👗 a new look! — a game paints its own hero in the glass (this one is a stand-in)' : '👗 turn it to face you (↻) to see the glass'); }
+$('s-mirror').onclick = () => mirrorNow();
+function mirrorKid(g, o){ const s = o.h / 52; g.save(); g.translate(o.x, o.y); g.scale(s * o.dir, s); g.fillStyle = '#4A3A5A'; g.fillRect(-6, -16, 5, 16); g.fillRect(1, -16, 5, 16);
+  g.fillStyle = '#2FBFB0'; g.beginPath(); g.roundRect(-9, -32, 18, 18, 5); g.fill(); g.fillStyle = '#F2C9A0'; g.beginPath(); g.arc(0, -40, 9, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#3A2A1E'; g.beginPath(); g.arc(0, -42, 9.4, Math.PI * 1.05, Math.PI * 1.95); g.fill(); g.fillStyle = '#2A1C14'; g.beginPath(); g.arc(3, -40, 1.2, 0, Math.PI * 2); g.fill(); g.beginPath(); g.arc(-2.4, -40, 1.2, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = '#2A1C14'; g.lineWidth = 1.2; g.beginPath(); g.arc(0.6, -37, 2.6, 0.2, Math.PI - 0.2); g.stroke(); g.restore(); }
+function mirrors(g, V){ S.props.forEach(it => { if(it.mirrorOn && Props.mirrorDraw) it.mirrorShown = Props.mirrorDraw(g, V, it, mirrorKid); }); }
+S.mirrorNow = mirrorNow;
 // 🌱 ip-3c growing props: ◀ Shrink · 🌱 Grow (at the young stage: ① / ② = the two branches, in their SkillKit colours) — Props.grow + the ✨ morph moment
 function growBar(def, st){ const G = def.grow, ids = ['s-shrink', 's-grow', 's-grow2']; if(!G){ ids.forEach(x => $(x).classList.add('hidden')); return; }
   $('s-state').classList.add('hidden'); const n = parseInt(st, 10), br = String(st).slice(1) || null, young = n === G.branchAt - 1;
@@ -394,7 +407,7 @@ function render(alpha, t){ S.lastT = t;
   for(const w of S.walkers){ const it = w.it; it.x = w.px + (w.x - w.px) * alpha; it.y = w.py + (w.y - w.py) * alpha; it.pic = w.frames[w.path ? Math.floor(w.dist * 3.2) % Iso.WALK_N : 0]; it.flip = w.flip; }
   Props.tick(S.props, t);
   if(t - seeT > 0.1){ seeT = t; Props.seeThrough(S.V, S.props, S.walkers.map(w => w.it)); }
-  const st = Iso.frame(S.V, {items: S.items, t, groundFx: (g, V) => { touchHints(g, V, t); wondersGround(g, V, t); lookSweep(g, V, t); }, overlay: (g, V) => { burst(g, V, t); morphs(g, V, t); touches(g, V, t); hopHints(g, V, t); wondersAir(g, V, t); ringSel(g, V, t); ghostDraw(g, V, t); }});
+  const st = Iso.frame(S.V, {items: S.items, t, groundFx: (g, V) => { touchHints(g, V, t); wondersGround(g, V, t); lookSweep(g, V, t); }, overlay: (g, V) => { burst(g, V, t); morphs(g, V, t); touches(g, V, t); hopHints(g, V, t); mirrors(g, V); wondersAir(g, V, t); ringSel(g, V, t); ghostDraw(g, V, t); }});
   if(performance.now() - lastInfo > 400){ lastInfo = performance.now(); S.ms = st.ms; info(); }
 }
 function diamond(g, V, x, y, w, d, z){ const p = (a, b) => { const s = V.toScreen(a, b, z || 0); return [s.x - V._sx(), s.y - V._sy()]; }; g.beginPath(); [p(x, y), p(x + w, y), p(x + w, y + d), p(x, y + d)].forEach((q, k) => k ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.closePath(); }
@@ -479,4 +492,4 @@ start();
 </script>
 </body>
 </html>
-<!-- (ip-2+ip-3b+ip-3c+ip-4a+ar-1+ar-4+ar-7+ip-4b+ip-4c+ip-4d+ip-4d2+ip-4e+ip-5+ip-4f+ip-6a+ip-7a+ip-7c+ip-8+ip-9+ip-10) END OF IsoPropsLab.html -->
+<!-- (ip-2+ip-3b+ip-3c+ip-4a+ar-1+ar-4+ar-7+ip-4b+ip-4c+ip-4d+ip-4d2+ip-4e+ip-5+ip-4f+ip-6a+ip-7a+ip-7c+ip-8+ip-9+ip-10+ip-6c) END OF IsoPropsLab.html -->
