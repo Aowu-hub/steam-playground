@@ -1008,8 +1008,8 @@ function fdHints(){ if(!isFarm()) return; FDP.hint = (G.lvl <= 1 || G.freeMoveT 
 
 /* ---------- 👆 tapping the map: plant (tap twice) · open a plant · move ---------- */
 function fdCellAt(px, py){ const p = fdWorldAt(px, py), x = p.x, y = p.y; return {i: Math.floor(x + FD.O), j: Math.floor(y + FD.O)}; }
-function fdWorldAt(px, py){ const a = (px - ISO.OX) / ISO.A, b = (py - ISO.OY) / ISO.B, x1 = (a + b) / 2, y1 = (b - a) / 2; if(!ISO.rq) return {x: x1, y: y1};   // 🔄 fd-1d: undo the turn
-  const dx = x1 - ISO.rcx, dy = y1 - ISO.rcy; return {x: ISO.rcx + ISO.rc * dx + ISO.rs * dy, y: ISO.rcy - ISO.rs * dx + ISO.rc * dy}; }
+function fdWorldAt(px, py){ const a = (px - ISO.OX) / ISO.A, b = (py - ISO.OY) / ISO.B, x1 = (a + b) / 2, y1 = (b - a) / 2; if(!ISO.rq) return {x: x1, y: y1};   // 🔄 undo the turn (🧱 IsoKit iso-turn core)
+  return Iso.turnBack(x1, y1, FDR.th, ISO.rcx, ISO.rcy, {}); }
 function fdTap(e){
   if(FDR.spin) return;   // 🔄 no planting mid-spin
   if(!isFarm() || pickOpen || G.paused || G.state === 'won' || G.state === 'lost' || G.state === 'pick') return;
@@ -1094,11 +1094,12 @@ function fdItem(key, prop, i, j, o){ const k = key + '|' + prop + '|' + i + ',' 
    a mirror). The angle is kept per player (localStorage). 🔄 td-turn: BOTH books turn (book 1 bakes its own turned island — b1Isl — and keeps
    its view per player AND per book); ISO.rq = 0 = the old formulas in view 0. */
 const FDR = {k: 0, th: 0, spin: null};
-function fdSetRot(th){ const q = th / (Math.PI / 2), k = Math.round(q), ex = Math.abs(q - k) < 1e-9, m = ((k % 4) + 4) % 4;
-  ISO.rc = ex ? [1, 0, -1, 0][m] : Math.cos(th); ISO.rs = ex ? [0, 1, 0, -1][m] : Math.sin(th); ISO.rcx = ISO.rcy = TD_MID; ISO.rq = ex && m === 0 ? 0 : 1; FDR.th = th; }
-const fdK = () => ((Math.round(FDR.th / (Math.PI / 2)) % 4) + 4) % 4;
+// 🔄 iso-turn: the turn math is IsoKit's core (Iso.turnCS / turnPt / turnBack / turnK / turnEase / turnMap / faceTrack / turnLeft); TD keeps its own camera (IX / IY / groundTf)
+function fdSetRot(th){ const cs = Iso.turnCS(th); ISO.rc = cs[0]; ISO.rs = cs[1]; ISO.rcx = ISO.rcy = TD_MID; ISO.rq = cs[0] === 1 && cs[1] === 0 ? 0 : 1; FDR.th = th; }
+const fdK = () => Iso.turnK(FDR.th);
 // a world point (x, y) in the turned view's own frame
-function fdRot(x, y){ if(!ISO.rq) return [x, y]; const dx = x - ISO.rcx, dy = y - ISO.rcy; return [ISO.rcx + ISO.rc * dx - ISO.rs * dy, ISO.rcy + ISO.rs * dx + ISO.rc * dy]; }
+const FDQ = {x: 0, y: 0};
+function fdRot(x, y){ if(!ISO.rq) return [x, y]; Iso.turnPt(x, y, FDR.th, ISO.rcx, ISO.rcy, FDQ); return [FDQ.x, FDQ.y]; }
 const fdDep = (x, y) => { const r = fdRot(x, y); return r[0] + r[1]; };   // far → near in the turned view
 /* 📏 s-td farmer#12 → TDBook_farmer.html */
 /* 🌱 fd-1c: the plants ARE IsoProps growing props (ip-3c) — one line per kind, the state IS the stage: 1 seed · 2 sprout · 3 young · 4a / 5a branch ① ·
@@ -1253,8 +1254,8 @@ function fdTurn(dir, to){ if(!G || FDR.spin) return false; const farm = isFarm()
   const W0 = FDZ.z > 1.001 ? fdWorldAt(VIEW.px / 2, VIEW.ph / 2) : null;
   const L0 = farm ? fdIsl(k0) : b1Isl(k0), L1 = farm ? fdIsl(k1) : b1Isl(k1); if(farm) fdWarm(k1);   // 🔄 td-turn: book 1 = its own turned island layers
   if(!FX){ fdSetRot(toTh); fdTurnEnd(W0); return true; }
-  FDR.spin = {from, to: toTh, t0: performance.now(), dur: 420, q: 0, L0, L1, W0}; UISound.play('whoosh'); return true; }
-function fdSpinStep(now){ const sp = FDR.spin; if(!sp) return; const t = Math.min(1, (now - sp.t0) / sp.dur), e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  FDR.spin = {from, to: toTh, t0: performance.now(), dur: Iso.TURN_MS, q: 0, L0, L1, W0}; UISound.play('whoosh'); return true; }
+function fdSpinStep(now){ const sp = FDR.spin; if(!sp) return; const t = Math.min(1, (now - sp.t0) / sp.dur), e = Iso.turnEase(t);
   sp.q = t; if(t >= 1){ fdSetRot(sp.to); FDR.spin = null; fdTurnEnd(sp.W0, sp); return; }
   fdSetRot(sp.from + (sp.to - sp.from) * e); if(sp.W0) fdKeep(sp.W0); }
 function fdKeep(W0){ const px = IX(W0.x, W0.y), py = IY(W0.x, W0.y, 0); FDZ.ox += VIEW.px / 2 - px; FDZ.oy += VIEW.ph / 2 - py; fdZoomApply(); }
@@ -1270,7 +1271,7 @@ function fdRotButtons(z){ if(z.querySelector('.fd-rot')) return; const r = docum
 function fdRotBadge(){ const c = document.querySelector('#fd-zoom .fd-compass'); if(!c) return; const k = FDR.spin ? null : fdK(); c.classList.toggle('on', !!k); const i = c.querySelector('i'); if(i) i.style.transform = 'rotate(' + (-(k || 0) * 90) + 'deg)';
   const f = isFarm(); document.querySelectorAll('#fd-zoom .fd-rot [data-r]').forEach(b => { const d = +b.dataset.r; if(d) b.title = (d < 0 ? 'Turn left (' : 'Turn right (') + (f ? (d < 0 ? 'Q' : 'E') : (d < 0 ? '[' : ']')) + ')'; }); }   // 🔄 td-turn: book 1's keys are [ ]
 // which way someone faces in a turned view: by where they moved ON SCREEN
-function fdFaceL(o, x){ if(o._lx != null && Math.abs(x - o._lx) > 0.05) o._fl = x < o._lx; o._lx = x; return o._fl != null ? o._fl : (o.face || 1) < 0; }
+const fdFaceL = (o, x) => Iso.faceTrack(o, x, (o.face || 1) < 0);
 (function(){ const st = document.createElement('style'); st.id = 'fd-css-rot'; st.textContent = [
   '.fd-zoom .fd-rot{display:flex;gap:4px;margin-bottom:2px}',
   '.fd-zoom .fd-rot button{font-size:1.25rem;line-height:1}',
@@ -1783,4 +1784,4 @@ function tdResultBadge(){
 /* 🏷️ TD LOGO END */</script>
 </body>
 </html>
-<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a+fd-1a2+fd-1b+fd-1c+fd-1d+fd-1e+fd-2a+wr-1+fd-2b+td-wear+mo-td+td-turn+s-td) END OF TDStories.html -->
+<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a+fd-1a2+fd-1b+fd-1c+fd-1d+fd-1e+fd-2a+wr-1+fd-2b+td-wear+mo-td+td-turn+s-td+iso-turn) END OF TDStories.html -->
