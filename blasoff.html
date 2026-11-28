@@ -478,9 +478,9 @@ var BO = (function () {
     {name: 'Basic', half: 90, spd: 0.66, react: 0.55, tackle: 0.12, tkCd: 3.2, press: 1, smart: 0, passAcc: 0.5, shotAcc: 0.3, range: 11, keeper: 0.46, aim: 3, offside: 0, fouls: 0, cards: 0, stamina: 0, slide: 0, draw: 'golden', trickFail: 0, steal: 0.92, guided: 2},
     {name: 'Junior', half: 105, spd: 0.76, react: 0.42, tackle: 0.22, tkCd: 2.3, press: 1, smart: 0, passAcc: 0.66, shotAcc: 0.42, range: 13, keeper: 0.5, aim: 2, offside: 0, fouls: 0, cards: 0, stamina: 0, slide: 0, draw: 'golden', trickFail: 0.06, steal: 0.82, guided: 1},
     {name: 'Intermediate', half: 120, spd: 0.85, react: 0.32, tackle: 0.34, tkCd: 1.7, press: 1, smart: 0, passAcc: 0.76, shotAcc: 0.52, range: 15, keeper: 0.55, aim: 1, offside: 0, fouls: 1, cards: 0, stamina: 0, slide: 1, draw: 'golden', trickFail: 0.12, steal: 0.72, guided: 0},
-    {name: 'Hard', half: 120, spd: 0.92, react: 0.25, tackle: 0.44, tkCd: 1.3, press: 2, smart: 0, passAcc: 0.83, shotAcc: 0.6, range: 16, keeper: 0.6, aim: 1, offside: 1, fouls: 1, cards: 0, stamina: 1, slide: 1, draw: 'pens', trickFail: 0.18, steal: 0.64, guided: 0},
-    {name: 'Extreme', half: 180, spd: 0.875, react: 0.2, tackle: 0.5, tkCd: 1.05, press: 2, smart: 1, passAcc: 0.88, shotAcc: 0.68, range: 17, keeper: 0.57, aim: 0, offside: 2, fouls: 1, cards: 1, stamina: 1, slide: 1, draw: 'pens', trickFail: 0.25, steal: 0.58, guided: 0},
-    {name: 'Hardcore', half: 180, spd: 0.86, react: 0.16, tackle: 0.54, tkCd: 0.85, press: 3, smart: 1, passAcc: 0.92, shotAcc: 0.69, range: 18, keeper: 0.58, aim: 0, offside: 2, fouls: 1, cards: 1, stamina: 1, slide: 1, draw: 'pens', trickFail: 0.3, steal: 0.58, guided: 0, hardcore: true, hcBy: 4}
+    {name: 'Hard', half: 120, spd: 0.86, react: 0.28, tackle: 0.38, tkCd: 1.3, press: 2, smart: 0, passAcc: 0.83, shotAcc: 0.6, range: 16, keeper: 0.6, aim: 1, offside: 1, fouls: 1, cards: 0, stamina: 1, slide: 1, draw: 'pens', trickFail: 0.18, steal: 0.64, guided: 0},
+    {name: 'Extreme', half: 180, spd: 0.74, react: 0.34, tackle: 0.3, tkCd: 1.05, press: 2, smart: 1, passAcc: 0.88, shotAcc: 0.68, range: 17, keeper: 0.48, aim: 0, offside: 2, fouls: 1, cards: 1, stamina: 1, slide: 1, draw: 'pens', trickFail: 0.25, steal: 0.58, guided: 0},
+    {name: 'Hardcore', half: 180, spd: 0.77, react: 0.3, tackle: 0.35, tkCd: 0.85, press: 3, smart: 1, passAcc: 0.92, shotAcc: 0.69, range: 18, keeper: 0.5, aim: 0, offside: 2, fouls: 1, cards: 1, stamina: 1, slide: 1, draw: 'pens', trickFail: 0.3, steal: 0.58, guided: 0, hardcore: true, hcBy: 4}
   ];
   var RUN = 5.4, SPRINT = 7.4, ACC = 22;
   // ⚡ bo-2c: how long a critical-moment prompt stays (s) per level · 🎯 penalty marker speed per level
@@ -712,6 +712,12 @@ var BO = (function () {
 
   // ---------- actions ----------
   function aimHalf(level) { return [0, 0.5, 0.8, 1.22][level]; }   // pass cone (radians, each side) for aim help 0..3
+  function passMargin(M, p, q, dist) {   // 🔥 bo-tune: the smallest head start (s) the ball has over any defender along the pass line (< 0 = cut out)
+    var dx = q.x - p.x, dy = q.y - p.y, best = 9, vb = 3.5 + dist * 0.3 + Math.sqrt(2 * 3.6 * dist), avg = Math.max(6, vb * 0.75);
+    M.players.forEach(function (o) { if (o.side === p.side || o.st === 'down') return; var t = clamp(((o.x - p.x) * dx + (o.y - p.y) * dy) / (dist * dist), 0, 1); if (t > 0.97) return;
+      var px = p.x + dx * t, py = p.y + dy * t, tb = t * dist / avg, to = Math.max(0, hyp(px - o.x, py - o.y) - (o.gk ? 1.2 : 0.8)) / (speedOf(M, o) || 5) + (M.L.react || 0.3) * 0.6; best = Math.min(best, to - tb); });
+    return best;
+  }
   function bestPass(M, p, ax, ay, cone, forTrick) {
     var d = dirOf(p.side, M), best = null, bs = -1e9, am = hyp(ax, ay) || 1; ax /= am; ay /= am;
     M.players.forEach(function (q) {
@@ -719,7 +725,8 @@ var BO = (function () {
       var dx = q.x - p.x, dy = q.y - p.y, dist = hyp(dx, dy); if (dist < 2 || dist > 34) return;
       var ang = Math.acos(clamp((dx * ax + dy * ay) / dist, -1, 1)); if (ang > cone && !forTrick) return;
       var open = 9; M.players.forEach(function (o) { if (o.side === p.side) return; var t = clamp(((o.x - p.x) * dx + (o.y - p.y) * dy) / (dist * dist), 0, 1); var lx = p.x + dx * t - o.x, ly = p.y + dy * t - o.y; open = Math.min(open, hyp(lx, ly) + (t > 0.95 ? 1 : 0)); });
-      var s = -ang * 2.4 + Math.min(open, 4) * 0.9 + (q.x - p.x) * d * 0.08 - Math.abs(dist - 12) * 0.05 + (q.callT > 0 ? 1.4 : 0);   // 🙋 bo-8: a friend calling for it gets it
+      var safe = M.level >= 3 || sideHuman(M, p.side) ? passMargin(M, p, q, dist) : 0;   // 🔥 bo-tune: can a defender get to the line first?
+      var s = (safe < 0 ? -3 : Math.min(safe, 1) * 1.2) - ang * 2.4 + Math.min(open, 4) * 0.9 + (q.x - p.x) * d * 0.08 - Math.abs(dist - 12) * 0.05 + (q.callT > 0 ? 1.4 : 0);   // 🙋 bo-8: a friend calling for it gets it
       if (s > bs) { bs = s; best = q; }
     });
     return best;
@@ -819,7 +826,7 @@ var BO = (function () {
     var power = o.power || 0, speed, tx, ty, loft = o.loft || (power > 0.78 && !o.trick);
     /* 🙈 bo-8 (Aowu 12:53): a no-look pass finds the best friend in ANY direction (it used to need one in front) · 🎯 a long ball gets a little aim help up to ⚡ Hard (🌋 💀 stay pure aim) */
     var cone = o.trick ? 1.6 : Math.max(aimHalf(o.aimHelp == null ? 3 : o.aimHelp), loft && o.human && M.level < 4 ? 0.45 : 0), tgt = o.to && o.to.side === p.side ? o.to : cone > 0 || o.trick ? bestPass(M, p, ax, ay, cone, !!o.trick) : null;
-    var fine = sideHuman(M, p.side) && !o.safe, run = null;   // 🤝 bo-pass: a team with a person passes the solved way (robot-only teams: as before)
+    var fine = (sideHuman(M, p.side) || M.level >= 3) && !o.safe, run = null;   // 🔥 bo-tune: robots from Hard up pass the solved way too   // 🤝 bo-pass: a team with a person passes the solved way (robot-only teams: as before)
     if (o.through && !o.trick && fine) { run = bestRunner(M, p, ax, ay, o.human ? (o.aimHelp == null ? 3 : o.aimHelp) : 3); if (run) tgt = run.q; }
     if (tgt && fine) {
       var fa = fricOf(M), T, tl = 0.5, fD = 0, arr = 0;
@@ -877,7 +884,7 @@ var BO = (function () {
     var ty = side * S.goalW * (0.55 + 0.25 * Math.abs(ay)), tz;
     if (help >= 1) ty = clamp(ty, -S.goalW + 0.45, S.goalW - 0.45);
     if (!o.human) { var acc = o.acc == null ? 0.6 : o.acc; ty += (M.rnd() - 0.5) * (1 - acc) * S.goalW * 2.4; }
-    else ty += (M.rnd() - 0.5) * [1.8, 0.9, 0.5, 0.25][help] * (0.5 + power);
+    else { ty += (M.rnd() - 0.5) * [1.8, 0.9, 0.5, 0.25][help] * (0.5 + power); if (help <= 1 && !o.perfect && !o.blast) ty += (M.rnd() - 0.5) * 2 * Math.max(0, dist - 14) * [0, 0, 0.06, 0.1, 0.1, 0.1][M.level]; }   // 🎯 bo-tune: the further out, the wider it can go (🌿 up)
     if (help === 0 && Math.abs(ay) > 0.2 && o.human) ty = Math.abs(ay) > Math.abs(ax) ? Math.sign(ay) * S.goalW * 0.95 : p.y + ay / Math.max(0.2, Math.abs(ax)) * dist * 0.8;   // no aim help = the stick decides · a stick more sideways than forward = the post on that side
     if (o.human) ty = clamp(ty, -S.goalW - 1.4, S.goalW + 1.4);   // ⚽ bo-pass (Aowu 08:46): a shot always goes at the goal — running sideways never sends it to the corner flag
     var speed = 13 + power * 15, vz;
@@ -894,7 +901,7 @@ var BO = (function () {
     kickBall(M, p, dx / tt, dy / tt, vz, kind === 'rabona' ? -side * 5 : (o.spin || 0));
     kickShow(M, p);
     if (kind === 'rabona') b.vy += side * 5 * tt * 0.5;   // curve back in on the way
-    b.shot = {side: p.side, by: p.i, t: M.t, kind: kind, decided: false, power: power, perfect: !!o.perfect, blast: !!o.blast, fk: !!o.fk};
+    b.shot = {side: p.side, by: p.i, t: M.t, kind: kind, decided: false, power: power, perfect: !!o.perfect, blast: !!o.blast, fk: !!o.fk, dist: dist, human: !!o.human};
     M.stats[p.side].shots++; p.g.shots++;
     var e = ev(M, 'shot', {by: p.i, side: p.side, kind: kind, power: Math.round(power * 100) / 100, volley: !!o.volley, perfect: !!o.perfect, blast: !!o.blast, curve: o.spin ? Math.sign(o.spin) : 0});
     if (o.blast) ev(M, 'blast', {by: p.i, side: p.side});
@@ -1306,8 +1313,11 @@ var BO = (function () {
     if (kind === 'corner') M.stats[side].corners++;
     ev(M, kind === 'throw' ? 'throwin' : kind, {side: side, x: Math.round(x), y: Math.round(y)});
   }
+  function restartSpot(M, rs, p) { var d = dirOf(p.side, M); return rs.kind === 'throw' || rs.kind === 'kickin' ? {x: rs.x, y: rs.y + Math.sign(rs.y || 1) * 0.4} : {x: rs.x - d * 0.3, y: rs.y}; }   // 🙌 bo-tune: a throw-in is taken from just outside the line
   function takeRestart(M, p, c, what, power, to, high) {
-    var rs = M.rs; if (!rs || rs.taker !== p.i || M.phaseT < 0.35) return;
+    var rs = M.rs; if (!rs || rs.taker !== p.i) return;
+    var sp = restartSpot(M, rs, p), far = hyp(p.x - sp.x, p.y - sp.y) > 0.9; if (c && (M.phaseT < 0.35 || (far && M.phaseT <= 2.5))) { rs.q = {ci: c.ci, what: what, power: power, to: to ? to.i : -1, high: high}; return; }   // 🙌 bo-tune: a quick press waits — the taker steps out to the line first (max 2.5 s, then he is put there)
+    if (M.phaseT < 0.35) return; if (far) { p.x = sp.x; p.y = sp.y; p.vx = p.vy = 0; }
     M.ball.owner = p.i; M.phase = 'play'; M.rs = null; p.st = 'ok';
     var spin = c && rs.kind !== 'throw' && rs.kind !== 'kickoff' ? c.curve * 6.5 : 0, ax = to ? to.x - p.x : c ? c.ax : dirOf(p.side, M), ay = to ? to.y - p.y : c ? c.ay : 0;
     if (c) c.curve = 0;
@@ -1328,7 +1338,7 @@ var BO = (function () {
   function throwTo(M, ci, qi) {
     var c = M.ctrls[ci], rs = M.rs, p = c && M.players[c.pi], q = M.players[qi];
     if (!rs || rs.kind !== 'throw' || !p || rs.taker !== p.i || !q || q.side !== p.side || q === p || M.phaseT < 0.35) return false;
-    p.x = rs.x - dirOf(p.side, M) * 0.3; p.y = rs.y; takeRestart(M, p, c, 'pass', clamp(hyp(q.x - p.x, q.y - p.y) / 22, 0.25, 0.55), q); return true;
+    var ts = restartSpot(M, rs, p); p.x = ts.x; p.y = ts.y; takeRestart(M, p, c, 'pass', clamp(hyp(q.x - p.x, q.y - p.y) / 22, 0.25, 0.55), q); return true;
   }
   /* 🙋 our goal kick (Aowu 18:12): the keeper waits — the player runs free and presses J (Pass) = "to me!" → the keeper plays it to them (lofted when far, always lands inside the pitch) */
   function askBall(M, c) {
@@ -1375,11 +1385,13 @@ var BO = (function () {
     if (on) M.stats[sh.side].onTarget++;
     if (!on) { sh.out = 'miss'; return; }
     var real = Math.abs(yc - k.y) < 0.7 ? 0 : Math.sign(yc - k.y), sw = M.shout[ds], fresh = sw && M.t - sw.t < 2.2, guess, pRight;
+    var lk = sh.human && !sh.fk ? clamp(((sh.dist || 0) - 14) / 12, 0, 1) * [0, 0.15, 0.5, 0.9, 1, 1][M.level] : 0;   // 🎯 bo-tune: a long shot by a person gives the keeper time (0 inside 14 m)
     if (fresh) guess = sw.s;   // 📣 a shout wins over the keeper's own guess
-    else { pRight = sideHuman(M, ds) ? 0.5 : M.L.keeper; guess = M.rnd() < pRight ? real : (real === 0 ? (M.rnd() < 0.5 ? -1 : 1) : (M.rnd() < 0.5 ? 0 : -real)); }
+    else { pRight = (sideHuman(M, ds) ? 0.5 : M.L.keeper) + lk * 0.25; guess = M.rnd() < pRight ? real : (real === 0 ? (M.rnd() < 0.5 ? -1 : 1) : (M.rnd() < 0.5 ? 0 : -real)); }
     var right = guess === real || (real === 0 && Math.abs(yc - k.y) < 1.1);
     var corner = Math.abs(yc) > S.goalW - 0.55, fast = clamp((hyp(b.vx, b.vy) - 14) / 14, 0, 1), high = zc > S.goalH - 0.5;
     var pSave = right ? clamp(0.94 - fast * 0.3 - (corner ? 0.22 : 0) - (high && corner ? 0.1 : 0) - (sh.kind === 'chip' ? 0.35 : 0) - (sh.kind === 'bicycle' || sh.kind === 'flip' ? 0.15 : 0), 0.2, 0.95) : (Math.abs(yc - k.y) < 0.55 ? 0.5 : 0.03);
+    if (lk) pSave = right ? Math.min(0.95, pSave + lk * 0.3) : Math.max(pSave, lk * 0.55);   // 🎯 bo-tune: right way = safer hands · wrong way = time to scramble back
     if (sh.blast) pSave *= [0.3, 0.35, 0.45, 0.55, 0.62, 0.68][M.level]; else if (sh.perfect) pSave *= [0.45, 0.5, 0.55, 0.65, 0.75, 0.8][M.level];   // higher levels: keepers still read the big ones
     if (sh.forced) pSave = sh.forced === 'save' ? 1 : 0;
     sh.save = M.rnd() < pSave; sh.guess = guess; sh.right = right; sh.shout = fresh ? sw.s : 0;
@@ -1571,7 +1583,7 @@ var BO = (function () {
     if (c && M.phase !== 'goal' && M.phase !== 'half' && M.phase !== 'end' && !(p.gk)) {
       var m = hyp(c.ix, c.iy); p.sprint = c.sprint;
       var bl = M.ball, bdx = bl.x - p.x, bdy = bl.y - p.y, bdd = hyp(bdx, bdy) || 1; c.awayT = M.phase === 'play' && bl.owner < 0 && (m < 0.2 || (c.ix * bdx + c.iy * bdy) / (m * bdd) < 0.3) ? (c.awayT || 0) + dt : 0; c.assist = false;   // 🤝 bo-pass: are you going for the ball?   /* keys: Shift · touch: the page sends sprint when the stick is pushed far */
-      if (M.phase === 'restart' && M.rs && M.rs.taker === p.i) { var rs = M.rs; moveTo(M, p, rs.x - dirOf(p.side, M) * 0.3, rs.y, dt); if (hyp(c.ix, c.iy) > 0.2) { p.fx = c.ix / m; p.fy = c.iy / m; } }
+      if (M.phase === 'restart' && M.rs && M.rs.taker === p.i) { var rs = M.rs, rsp = restartSpot(M, rs, p); p.sprint = hyp(p.x - rsp.x, p.y - rsp.y) > 2; moveTo(M, p, rsp.x, rsp.y, dt); if (hyp(c.ix, c.iy) > 0.2) { p.fx = c.ix / m; p.fy = c.iy / m; } }
       else if (M.phase === 'kickoff' && M.rs == null) steer(p, 0, 0, dt);
       else if (m < 0.2 && M.phase === 'play' && meetLongBall(M, p, dt)) { /* 🎯 bo-8 */ }
       else if (m < 0.2 && M.phase === 'play' && passIsFor(M, p)) { goMeet(M, p, dt); c.assist = true; }   /* 🤝 bo-pass H2: run to where the slowing ball can be met */
@@ -1600,7 +1612,7 @@ var BO = (function () {
     if (M.phase === 'kickoff') { if (M.rs && M.rs.taker === p.i) { steer(p, 0, 0, dt); return; } steer(p, 0, 0, dt); return; }
     if (M.phase === 'restart') {
       var rs = M.rs;
-      if (rs && rs.taker === p.i) { moveTo(M, p, rs.x - d * 0.35, rs.y, dt); return; }
+      if (rs && rs.taker === p.i) { var rq = restartSpot(M, rs, p); moveTo(M, p, rq.x - (rs.kind === 'throw' || rs.kind === 'kickin' ? 0 : d * 0.05), rq.y, dt); return; }
       var wm = rs && rs.wall && rs.wall.find(function (w) { return w.i === p.i; }); if (wm) { moveTo(M, p, wm.x, wm.y, dt); p.sprint = true; var wx = rs.x - p.x, wy = rs.y - p.y, wn = hyp(wx, wy) || 1; if (hyp(p.vx, p.vy) < 0.5) { p.fx = wx / wn; p.fy = wy / wn; } return; }
       var h = homeOf(M, p, rs && rs.side === p.side), hx = h.x, hy = h.y;
       if (rs && rs.side !== p.side && hyp(hx - rs.x, hy - rs.y) < 4.5) { var a = Math.atan2(hy - rs.y, hx - rs.x); hx = rs.x + Math.cos(a) * 4.6; hy = rs.y + Math.sin(a) * 4.6; }
@@ -1608,7 +1620,7 @@ var BO = (function () {
       moveTo(M, p, hx, hy, dt, 0.8); return;
     }
     if (human && meetLongBall(M, p, dt)) return;   // 🎯 bo-8: only on a team with a person (robot-vs-robot balance unchanged)
-    if (human && M.phase === 'play' && passIsFor(M, p)) { goMeet(M, p, dt); return; }   // 🤝 bo-pass H1: the pass is mine
+    if ((human || M.level >= 3) && M.phase === 'play' && passIsFor(M, p)) { goMeet(M, p, dt); return; }   // 🔥 bo-tune: from Hard up a robot comes to meet a pass too   // 🤝 bo-pass H1: the pass is mine
     if (p.runT > 0) p.runT -= dt;
     p.aiT -= dt;
     var owner = b.owner >= 0 ? M.players[b.owner] : null, mine = owner === p, ours = owner && owner.side === p.side;
@@ -1625,6 +1637,7 @@ var BO = (function () {
       } else if (!ours) {
         var pressers = pressersOf(M, p.side);
         if (pressers.indexOf(p) >= 0 || p.pressT > 0) role = 'press';
+        else if (coverOf(M, p.side, owner) === p) role = 'press';   // 🧱 bo-tune: nobody blocks the runner → the back man steps in
         else if (L.smart) role = 'mark';
       } else role = 'support';
       p.role = role;
@@ -1674,6 +1687,13 @@ var BO = (function () {
   function closestToBall(M, side, outfield) {
     var b = M.ball, best = null, bd = 1e9;
     M.players.forEach(function (q) { if (q.side !== side || (outfield && q.gk) || q.st === 'down') return; var dd = hyp(q.x - b.x, q.y - b.y) / (speedOf(M, q) || 1); if (dd < bd) { bd = dd; best = q; } });
+    return best;
+  }
+  function coverOf(M, side, o) {   // 🧱 bo-tune: null while someone of `side` stands goal-side of the carrier o (≤ 6 m, in his lane); else the closest robot between him and the goal
+    if (!o) return null; var g = -dirOf(side, M), best = null, bd = 1e9;
+    var blocked = M.players.some(function (q) { return q.side === side && !q.gk && q.st === 'ok' && (q.x - o.x) * g > 0.3 && hyp(q.x - o.x, q.y - o.y) < 6 && Math.abs(q.y - o.y) < 4; });
+    if (blocked) return null;
+    M.players.forEach(function (q) { if (q.side !== side || q.gk || q.ctrl >= 0 || q.st !== 'ok' || (q.x - o.x) * g <= 0) return; var dd = hyp(q.x - o.x, q.y - o.y); if (dd < bd) { bd = dd; best = q; } });
     return best;
   }
   function pressersOf(M, side) {
@@ -1916,9 +1936,12 @@ var BO = (function () {
       var rthr = M.fast ? 0.25 : rs.ask ? rs.wait : 1.6 + M.L.react;
       if (tp && !ctrlOf(M, tp) && !M.fast && !M.drill && (rs.kind === 'corner' || rs.kind === 'free') && M.phaseT > rthr - 0.44 && tp.act !== 'runup' && !rs.ran) { rs.ran = 1; runUp(M, tp, rs.x, rs.y, 0.44); }   /* 🎯 bo-5d: 3–5 steps in at an angle, then the kick */
       if (tp && tp.act === 'runup' && tp.ru) stepRun(M, tp);
-      if (tp && !ctrlOf(M, tp) && M.phaseT > rthr) { tp.x = rs.x - dirOf(tp.side, M) * 0.3; tp.y = rs.y; robotRestart(M, tp); }
-      else if (tp && ctrlOf(M, tp) && M.fast && M.phaseT > 0.3) {   /* a person's set piece waits for J / K (Aowu 2026-11-14) — only the test-speed mode takes it by itself */
-        tp.x = rs.x - dirOf(tp.side, M) * 0.3; tp.y = rs.y; takeRestart(M, tp, ctrlOf(M, tp), 'pass', 0.4); }
+      if (tp && rs.q && ctrlOf(M, tp)) { var qs = restartSpot(M, rs, tp), qd = hyp(tp.x - qs.x, tp.y - qs.y);   /* 🙌 bo-tune: the queued press goes when the taker is on the spot (a hop onto the line) */
+        if (M.phaseT >= 0.35 && (qd < 0.6 || M.phaseT > 2.5)) { var Q = rs.q; rs.q = null; tp.x = qs.x; tp.y = qs.y; tp.vx = tp.vy = 0; if (qd > 0.05 && tp.z <= 0 && (rs.kind === 'throw' || rs.kind === 'kickin')) tp.vz = 1.6; takeRestart(M, tp, M.ctrls[Q.ci], Q.what, Q.power, Q.to >= 0 ? M.players[Q.to] : null, Q.high); }
+        else if (qd >= 0.6 && tp.z <= 0 && qd < 2.2 && !tp.hopT) { tp.hopT = 1; tp.vz = 2.2; } }
+      if (tp && M.rs && !ctrlOf(M, tp) && M.phaseT > rthr) { var rsq = restartSpot(M, rs, tp); tp.x = rsq.x; tp.y = rsq.y; robotRestart(M, tp); }
+      else if (tp && M.rs && ctrlOf(M, tp) && M.fast && M.phaseT > 0.3) {   /* a person's set piece waits for J / K (Aowu 2026-11-14) — only the test-speed mode takes it by itself */
+        var fs = restartSpot(M, rs, tp); tp.x = fs.x; tp.y = fs.y; takeRestart(M, tp, ctrlOf(M, tp), 'pass', 0.4); }
     }
     for (var i = 0; i < M.players.length; i++) stepPlayer(M, M.players[i], dt);
     separate(M);
@@ -2938,4 +2961,4 @@ const ANN = (function(){
 <script src="inc/BlasOffMotion.js"></script>   <!-- ⚽ bo-cover: 🎬 cover + 🧾 ONE setup page + 🏁 shared card (born split — blasoff-build/frame.js) -->
 </body>
 </html>
-<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a+bo-5b+bo-pz+bo-5c+bo-5d+r4a+r4b+r4c+r4d+bo-7+bo-7b+bo-8+bo-9a+bo-9b+bo-9c+bo-9c2+bo-10+bo-10b+an-1+an-2+bo-cover+s-bo+bo-pass+24js-r) END OF BlasOff.html -->
+<!-- (bo-2d+bo-3a+bo-3b+bo-3c+bo-3d+bo-6+bo-5a+bo-5b+bo-pz+bo-5c+bo-5d+r4a+r4b+r4c+r4d+bo-7+bo-7b+bo-8+bo-9a+bo-9b+bo-9c+bo-9c2+bo-10+bo-10b+an-1+an-2+bo-cover+s-bo+bo-pass+24js-r+bo-tune) END OF BlasOff.html -->
