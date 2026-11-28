@@ -647,8 +647,10 @@ function qStep(id){ const a = G.ST && G.ST.data.q[id]; return G.ST && G.ST.statu
 const near = (a, b, r) => a && b && Math.hypot(a.x - b.x, a.y - b.y) < r;
 function freeSpot(k){ const s = G.W.spot(k); return s ? G.W.freeNear(s.x, s.y, 2) : null; }
 /* 🐾 your pet follows a little behind Pudding (levels with you, §17w-3) */
-function drawPet(g, sx, sy, k){ const Q = G.Q, o = {t: G.t, face: Q.dir > 0 ? 'right' : 'left', pet: true}; if(Q.moving && Creatures.walkPose) o.pose = Creatures.walkPose(Q.walkT);
-  try { Creatures.drawFor(g, G.save.pet, sx, sy, 88 * k * AK * 0.62, o); } catch(e){} }
+function drawPetOf(Q, id, g, sx, sy, k){ const o = {t: G.t, face: Q.dir > 0 ? 'right' : 'left', pet: true}; if(Q.moving && Creatures.walkPose) o.pose = Creatures.walkPose(Q.walkT);
+  try { Creatures.drawFor(g, id, sx, sy, 88 * k * AK * 0.62, o); } catch(e){} }
+function drawPet(g, sx, sy, k){ drawPetOf(G.Q, G.save.pet, g, sx, sy, k); }
+function drawPet2(g, sx, sy, k){ drawPetOf(G.Q2, G.save.pet2, g, sx, sy, k); }   /* 🐾 av-bag1: the 2nd pet slot */
 /* 👾 monsters you can see (touch one = a battle — never a surprise battle, §16c) */
 function mobItem(m){ const it = {x: m.x, y: m.y, z: G.W.M.heightAt(Math.floor(m.x), Math.floor(m.y)), mob: m,
     draw(g, sx, sy, k){ const L = m.list, n = L.length, sp = 15 * k * AK, face = G.H.x < m.x ? 'left' : 'right';
@@ -698,7 +700,10 @@ function placePeople(){ const noi = G.people.find(p => p.id === 'noi'); if(noi &
   if(!want && tara){ G.people = G.people.filter(p => p !== tara); G.items = G.items.filter(x => x !== tara); } }
 /* 🐘 Pudding ran off to Mango Grove (m2 ① ②) */
 function placePudding(){ const s = qStep('il1.m2'); if(s === 0 || s === 1){ const p = freeSpot('pudgrove'); G.P.on = false; G.P.x = G.P.px = p.x; G.P.y = G.P.py = p.y; } else if(G.flags['il1.m1']) G.P.on = true; }
-function petFollow(){ const s = G.save; if(s.pet && !G.Q){ const p = G.W.freeNear(G.H.x - 1, G.H.y + 1, 2); G.Q = AvWorld.follower(G.W, G.H, {x: p.x, y: p.y, gap: 1.75, on: true}); G.Q.it = {x: G.Q.x, y: G.Q.y, z: G.Q.z, draw: drawPet}; G.items.push(G.Q.it); } }
+function petFollow(){ const s = G.save; if(s.pet && !G.Q){ const p = G.W.freeNear(G.H.x - 1, G.H.y + 1, 2); G.Q = AvWorld.follower(G.W, G.H, {x: p.x, y: p.y, gap: 1.75, on: true}); G.Q.it = {x: G.Q.x, y: G.Q.y, z: G.Q.z, draw: drawPet}; G.items.push(G.Q.it); }
+  if(s.pet2 && G.Q && !G.Q2){ const p = G.W.freeNear(G.Q.x - 1, G.Q.y + 1, 2); G.Q2 = AvWorld.follower(G.W, G.H, {x: p.x, y: p.y, gap: 2.8, on: true}); G.Q2.it = {x: G.Q2.x, y: G.Q2.y, z: G.Q2.z, draw: drawPet2}; G.items.push(G.Q2.it); } }   /* 🐾 av-bag1: pet 2 walks a little further back on your trail (a follower follows the hero's trail) */
+function petsRefresh(){ const drop = q => { if(!q) return; const i = G.items.indexOf(q.it); if(i >= 0) G.items.splice(i, 1); }; drop(G.Q2); G.Q2 = null; if(G.Q && G.Q.pid !== G.save.pet){ drop(G.Q); G.Q = null; } petFollow(); if(G.Q) G.Q.pid = G.save.pet; }
+function petList(){ const s = G.save, ids = []; [s.pet, s.pet2].concat((s.pets || []).map(x => x.id)).forEach(id => { if(id && ids.indexOf(id) < 0) ids.push(id); }); const nm = id => (id === s.pet && s.petName) ? s.petName : ((AvBattle.PETS[id] || {}).names || [id])[0]; return ids.map(id => ({id, name: nm(id)})); }
 function setupS1b(){ const s = G.save; drawLv(); petFollow();
   if(!G.critters.length){ critter('kaikai', 'kaikai', 'crow'); critter('paddypinch', 'paddy', 'pinch'); }
   placePudding(); placePeople(); syncMobs(); syncDrops(); dressPads(); }
@@ -766,7 +771,7 @@ function goalS1b(){ const m2 = G.ST.status('il1.m2'), s = qStep('il1.m2');
   if(i3 === 'open') return {text: w('talkNoi'), target: G.people.find(p => p.id === 'noi')};
   return undefined; }
 /* ⏱️ each tick: Pudding found · mangoes · the stream · touching a monster · critters potter */
-function stepS1b(dt){ if(G.Q) G.Q.step(dt); if(G.talking || !G.ST) return; const H = G.H, s = qStep('il1.m2');
+function stepS1b(dt){ if(G.Q) G.Q.step(dt); if(G.Q2) G.Q2.step(dt); if(G.talking || !G.ST) return; const H = G.H, s = qStep('il1.m2');
   if(s === 0 && G.W.zoneAt(H.x, H.y) === 'mango') G.ST.event({do: 'go', what: 'mango'});
   if(s === 1 && near(G.P, H, 1.8) && !H.moving){ talkP('t.il1.m2.step2').then(() => { G.ST.event({do: 'talk', who: 'avateer.pudding'}); }); return; }
   if(s === 3){ const d = G.drops.find(x => near(x, H, 0.9)); if(d){ G.drops = G.drops.filter(x => x !== d); G.items = G.items.filter(x => x !== d); sound('pop'); const p = G.V.toScreen(d.x, d.y, d.z); sticker(p.x, p.y - 30 * G.V.zoom, '🥭'); G.ST.event({do: 'collect', what: 'mango'}); return; } }
@@ -814,8 +819,8 @@ function watch(dt){ if(G.talking || !G.ST) return; const H = G.H, z = G.W.zoneAt
   /* a device copy every 20 s of play */
   G.saveT += dt; if(G.saveT > 20){ G.saveT = 0; saveLocal(); } }
 function render(alpha, t){ G.t = t; const H = G.H, P = G.P, lerp = (a, b) => a + (b - a) * alpha;
-  H.it.x = lerp(H.px, H.x); H.it.y = lerp(H.py, H.y); H.it.z = H.z; P.it.x = lerp(P.px, P.x); P.it.y = lerp(P.py, P.y); P.it.z = P.z; if(G.Q){ G.Q.it.x = lerp(G.Q.px, G.Q.x); G.Q.it.y = lerp(G.Q.py, G.Q.y); G.Q.it.z = G.Q.z; }
-  try { Props.tick(G.W.items, t); Props.seeThrough(G.V, G.W.items, [H.it, P.it].concat(G.Q ? [G.Q.it] : [])); } catch(e){}
+  H.it.x = lerp(H.px, H.x); H.it.y = lerp(H.py, H.y); H.it.z = H.z; P.it.x = lerp(P.px, P.x); P.it.y = lerp(P.py, P.y); P.it.z = P.z; if(G.Q){ G.Q.it.x = lerp(G.Q.px, G.Q.x); G.Q.it.y = lerp(G.Q.py, G.Q.y); G.Q.it.z = G.Q.z; } if(G.Q2){ G.Q2.it.x = lerp(G.Q2.px, G.Q2.x); G.Q2.it.y = lerp(G.Q2.py, G.Q2.y); G.Q2.it.z = G.Q2.z; }
+  try { Props.tick(G.W.items, t); Props.seeThrough(G.V, G.W.items, [H.it, P.it].concat(G.Q ? [G.Q.it] : [], G.Q2 ? [G.Q2.it] : [])); } catch(e){}
   Iso.frame(G.V, {items: G.items, t, groundFx: groundFx, airFx: airFx}); if(PETS) PETS.frame();
   guide(); }
 function groundFx(g, V){ if(G.foot && Iso.footsteps) try { Iso.footsteps(g, [{x: G.H.x, y: G.H.y}].concat(G.foot), (x, y) => V.toScreen(x, y, G.W.M.heightAt(Math.floor(x), Math.floor(y))), {t: G.t, col: 'rgba(255,178,26,.9)', pulse: !calm, size: 3.6 * V.zoom}); } catch(e){} }
@@ -890,12 +895,20 @@ function camPad(){ if(!G.V) return; const top = $('top'), trk = $('trk'), goal =
 const LW = (window.LootWear && window.Loot) ? {bag: null, look: {}} : null;
 function lwKey(k){ return 'sp_avateer_' + k + ':' + (CURRENT_PLAYER || 'guest'); }
 function lwSave(){ try { localStorage.setItem(lwKey('bag'), JSON.stringify(LW.bag.toJSON())); localStorage.setItem(lwKey('look'), JSON.stringify(LW.look)); } catch(e){} }
+/* 🧍 av-bag1: what the paper doll needs from the game — weapons from your job · 2 pet slots · stat pills */
+function dollOpts(){ const s = G.save, J = s && s.job ? JOB() : null, set = J ? (curSets()[s.set || 0] || curSets()[0]) : null;
+  const wpn = (id, nm) => id && window.AvWeapons ? {name: nm, pic: (g, w, h) => AvWeapons.fit(g, AvWeapons.idx(id, 0), w * 0.1, h * 0.1, w * 0.8, h * 0.8, {pair: false})} : null;
+  return {arm: av => { if(!set || !window.AvWeapons) return av; try { return AvWeapons.arm(av, AvWeapons.design(AvWeapons.idx(set[0], 0)), set[1] ? AvWeapons.design(AvWeapons.idx(set[1], 0)) : null); } catch(e){ return av; } },
+    weapon: sl => !set ? null : sl === 'hand' ? wpn(set[0], (AvWeapons.info(AvWeapons.idx(set[0], 0)) || {}).name || 'Weapon') : sl === 'off' && set[1] ? wpn(set[1], (AvWeapons.info(AvWeapons.idx(set[1], 0)) || {}).name || 'Off hand') : null,
+    pets: {slots: [s.pet || null, s.pet2 || null], list: petList(), pic: (g, id, n) => { try { Creatures.drawFor(g, id, n / 2, n * 0.94, n * 1.15, {t: 0.3}); } catch(e){} },
+      pick: (k, id) => { if(k === 0){ if(!id) return; s.pet = id; if(s.pet2 === id) s.pet2 = null; } else s.pet2 = id || null; petsRefresh(); saveLocal(); }},
+    stats: () => { const st = window.AvBattle ? AvBattle.statsFor('hero', s.lv || 1) : {}; return [['⚔️', st.pw], ['🛡️', st.gd], ['👟', st.sp], ['❤️', st.hp], ['🍀', st.lk], ['⭐', 'Lv ' + (s.lv || 1)]].filter(x => x[1] != null); }}; }
 function lwStart(){ if(!LW){ $('b-bag').classList.add('hidden'); G.redress = () => { G.heroDressed = lookAv(); armHero(); }; G.redress(); return; } let s = null, l = null; try { s = JSON.parse(localStorage.getItem(lwKey('bag')) || 'null'); l = JSON.parse(localStorage.getItem(lwKey('look')) || 'null'); } catch(e){}
   LW.bag = Loot.bag(s || {}); LW.look = l || {};
   if(!s){ ['head', 'body', 'feet'].forEach((sl, i) => { LW.bag.add({base: 'wear.isl.jungle.' + sl, tier: 0, lv: 1, seed: 11 + i, sock: 0, runes: []}); LW.bag.wear(LW.bag.g.length - 1, sl); }); lwSave(); }
   const dress = () => { try { G.heroDressed = LootWear.dressFor(lookAv(), LW.bag, LW.look); } catch(e){ G.heroDressed = lookAv(); } armHero(); }; dress(); G.redress = dress;
   $('b-bag').onclick = () => { if(G.talking) return; if(Loot.react) Loot.react(); document.body.classList.add('lw-open');
-    LootWear.bagSheet($('scr-play'), LW.bag, {av: G.heroBase, look: LW.look, jobs: {}, theme: 'gold', basic: true,
+    LootWear.bagSheet($('scr-play'), LW.bag, {av: G.heroBase, look: LW.look, jobs: {}, theme: 'gold', basic: true, ...dollOpts(),
       onLook: l => { LW.look = l; dress(); lwSave(); }, onChange: () => { dress(); lwSave(); }, onClose: () => document.body.classList.remove('lw-open')}); }; }
 
 window.AVATEER = {pets: () => PETS, petFollow, placePeople, spawnWin, syncSpawns, isleReveal, G, WORDS, setLang, talkTo, jumpPress, doEmote, openEmotes, cleanName, okName, saveLocal, saveServer, snapshot, goalNow, stepIs, fight, swingPress, gainXp, xpNeed, qStep, village: () => VIL, bag: () => LW ? LW.bag : null};
@@ -904,4 +917,4 @@ boot().catch(e => { if(window.console) console.error(e); $('load-text').textCont
 </script>
 </body>
 </html>
-<!-- (av-r0b+av-wear4+av-s1a+av-s1b+av-s1c+av-s2a1+av-pet1+av-boat+av-lag1+av-fix1+av-fix2+24js-r) END OF Avateer.html -->
+<!-- (av-r0b+av-wear4+av-s1a+av-s1b+av-s1c+av-s2a1+av-pet1+av-boat+av-lag1+av-fix1+av-fix2+24js-r+av-bag1) END OF Avateer.html -->
