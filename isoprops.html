@@ -172,6 +172,7 @@
   <button id="s-hop" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">🦘</span> <span class="bl">Hop guide</span></button>
   <button id="s-dance" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">💃</span> <span class="bl">Dance</span></button>
   <button id="s-mirror" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">👗</span> <span class="bl">Mirror</span></button>
+  <button id="s-head" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">🧭</span> <span class="bl">Heading</span></button>
   <button id="s-wonder" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">⏱️</span> <span class="bl">Claim</span></button>
   <button id="s-shrink" class="sp-btn sp-secondary sp-sm hidden" data-sound="none"><span class="bi">◀</span> <span class="bl">Shrink</span></button>
   <button id="s-grow" class="sp-btn sp-primary sp-sm hidden" data-sound="none"><span class="bi">🌱</span> <span class="bl">Grow</span></button>
@@ -293,7 +294,7 @@ function showBar(){ const it = S.sel, h = S.hold, bar = $('selbar'); if(!it && !
   const key = it ? it.prop : h.key, def = Props.DEFS[key]; $('sel-name').textContent = (h ? '✋ ' : '') + def.name + ' · ' + def.foot.join('×');
   const stNow = it ? it.state : h.state != null ? h.state : def.states ? Props.stateOf(key) : null; const plainWall = def.wall && !def.gate, shrine = key === 'realm_shrine' && !!it; $('s-state').classList.toggle('hidden', !(def.states && !plainWall) && !shrine); if(def.states && !plainWall) $('sel-name').textContent += ' · ' + stNow;   /* 🧱 ar-4: a wall's state = its joins (made by the helper) · ⭐ shrine = capture steps */
   lookBar(def, it);   /* 🗼 ip-8 */
-  hopBar(def, it);   /* 🦘 ip-9 */ mirrorBar(def, it);   /* 👗 ip-6c */
+  hopBar(def, it);   /* 🦘 ip-9 */ mirrorBar(def, it);   /* 👗 ip-6c */ headBar(def, it);   /* 🛶 ip-14 */
   growBar(def, stNow); touchBar(def, it);   /* 🌍 ip-6a */ wonderBar(def, it);   /* 🌌 ip-7a */
   $('s-move').classList.toggle('hidden', !it); $('s-del').classList.toggle('hidden', !it); $('s-var').classList.toggle('hidden', def.variants < 2); bar.classList.remove('hidden'); placeUi(); }
 // re-place a prop with new settings (turn / variant); it stays put when the new shape doesn't fit
@@ -333,6 +334,20 @@ function mirrorKid(g, o){ const s = o.h / 52; g.save(); g.translate(o.x, o.y); g
   g.strokeStyle = '#2A1C14'; g.lineWidth = 1.2; g.beginPath(); g.arc(0.6, -37, 2.6, 0.2, Math.PI - 0.2); g.stroke(); g.restore(); }
 function mirrors(g, V){ S.props.forEach(it => { if(it.mirrorOn && Props.mirrorDraw) it.mirrorShown = Props.mirrorDraw(g, V, it, mirrorKid); }); }
 S.mirrorNow = mirrorNow;
+// 🛶 ip-14 rowboat: 🧭 Heading turns a placed rowboat one of its 16 ways (Props.rowboat.at = what a game calls along its path) · a stand-in rower sits in while it rows (Props.rowboat.rider)
+const isBoat = (def, it) => !!(it && !S.hold && def && def.moves && it.prop === 'rowboat' && Props.rowboat);
+function headBar(def, it){ const b = $('s-head'), on = isBoat(def, it); b.classList.toggle('hidden', !on); if(on) label(b, '🧭 ' + ((it.headN | 0) + 1) + ' / ' + (Props.rowboat.WAYS || 16)); }
+function headNow(){ const it = S.sel, d = it && Props.DEFS[it.prop]; if(!isBoat(d, it)) return;
+  if(it.heading == null){ const w = Props.turner(1, 1, it.turn | 0).nrm(0, 1); it.heading = Math.atan2(w[1], w[0]); }
+  Props.rowboat.at(it, it.x + 0.5, it.y + 0.5, it.heading + Math.PI / 8, {state: it.state}); it.headN = ((it.headN | 0) + 1) % (Props.rowboat.WAYS || 16); pop(it); showBar(); sound('tap');
+  tip('🧭 way ' + (it.headN + 1) + ' of 16 — a game turns the boat along its path with Props.rowboat.at' + (it.state !== 'rowing' ? ' (🔀 = row)' : '')); }
+$('s-head').onclick = () => headNow();
+function rowerKid(g, o){ mirrorKid(g, {x: o.x, y: o.y + 12 * o.zoom, h: 40 * o.zoom, dir: o.dir}); }
+function rowers(){ S.props.forEach(it => { const want = it.prop === 'rowboat' && it.state === 'rowing' && it.cond !== 'ruined' && !!Props.rowboat;
+    if(want && !it.rowerIt){ it.rowerIt = Props.rowboat.rider(it, rowerKid); it.rowerIt.rower = it; S.items.push(it.rowerIt); }
+    if(!want && it.rowerIt){ const k = S.items.indexOf(it.rowerIt); if(k >= 0) S.items.splice(k, 1); it.rowerIt = null; } });
+  for(let k = S.items.length - 1; k >= 0; k--){ const r = S.items[k]; if(r && r.rower && S.props.indexOf(r.rower) < 0) S.items.splice(k, 1); } }
+S.headNow = headNow;
 // 🌱 ip-3c growing props: ◀ Shrink · 🌱 Grow (at the young stage: ① / ② = the two branches, in their SkillKit colours) — Props.grow + the ✨ morph moment
 function growBar(def, st){ const G = def.grow, ids = ['s-shrink', 's-grow', 's-grow2']; if(!G){ ids.forEach(x => $(x).classList.add('hidden')); return; }
   $('s-state').classList.add('hidden'); const n = parseInt(st, 10), br = String(st).slice(1) || null, young = n === G.branchAt - 1;
@@ -406,6 +421,7 @@ function step(dt){ for(const w of S.walkers){ w.px = w.x; w.py = w.y;
 let seeT = 0, lastInfo = 0;
 function render(alpha, t){ S.lastT = t;
   for(const w of S.walkers){ const it = w.it; it.x = w.px + (w.x - w.px) * alpha; it.y = w.py + (w.y - w.py) * alpha; it.pic = w.frames[w.path ? Math.floor(w.dist * 3.2) % Iso.WALK_N : 0]; it.flip = w.flip; }
+  rowers();   /* 🛶 ip-14 */
   Props.tick(S.props, t);
   if(t - seeT > 0.1){ seeT = t; Props.seeThrough(S.V, S.props, S.walkers.map(w => w.it)); }
   const st = Iso.frame(S.V, {items: S.items, t, groundFx: (g, V) => { touchHints(g, V, t); wondersGround(g, V, t); lookSweep(g, V, t); }, overlay: (g, V) => { burst(g, V, t); morphs(g, V, t); touches(g, V, t); hopHints(g, V, t); mirrors(g, V); wondersAir(g, V, t); ringSel(g, V, t); ghostDraw(g, V, t); }});
@@ -493,4 +509,4 @@ start();
 </script>
 </body>
 </html>
-<!-- (ip-2+ip-3b+ip-3c+ip-4a+ar-1+ar-4+ar-7+ip-4b+ip-4c+ip-4d+ip-4d2+ip-4e+ip-5+ip-4f+ip-6a+ip-7a+ip-7c+ip-8+ip-9+ip-10+ip-6c) END OF IsoPropsLab.html -->
+<!-- (ip-2+ip-3b+ip-3c+ip-4a+ar-1+ar-4+ar-7+ip-4b+ip-4c+ip-4d+ip-4d2+ip-4e+ip-5+ip-4f+ip-6a+ip-7a+ip-7c+ip-8+ip-9+ip-10+ip-6c+ip-14) END OF IsoPropsLab.html -->
