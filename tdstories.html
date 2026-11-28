@@ -2050,6 +2050,7 @@ function startGame(ch, lvl, opt){
   if(S.book === 'farmer') return fdStart(ch, lvl, opt); fdLeave();   // 👨‍🌾 fd-1
   opt = opt || {}; S.chapter = ch; S.level = lvl; stopLoop(); hideResult(); S.jail = opt.jail ? {ch, lvl} : null;
   G = TD.newMatch({book: S.book, chapter: ch, level: lvl, auto: autoOn, jail: !!opt.jail, bonusHearts: opt.bonus || 0});
+  FDR.spin = null; fdSetRot(fdRotSaved() * Math.PI / 2); FDR.k = fdK();   // 🔄 td-turn: book 1 opens in its own saved view
   act2Reset(); if(window.ActionFX) ActionFX.opts.shake = lvl > 0;   // 🎬 act-2 (🌱 Basic: no shake)
   G.breakLen = lvl === 0 ? 4 : 2.6; FT = []; guideUsed = 0; pickOpen = false; speedOn = false; G.speed = 1;
   if(UI.modeTried) UI.modeTried(S.player, GAME_ID, S.book);
@@ -2057,7 +2058,7 @@ function startGame(ch, lvl, opt){
   paintAuto();
   $('speed-btn').textContent = '⏩'; $('goal').style.opacity = 1;
   $('goal').textContent = G.jail ? '💍 Hold off the guards until the bells stop — then crash the wedding!' : opt.bonus ? '💖 Second chance: +' + opt.bonus + ' ❤️ — keep the suitors away!' : '🏰 Keep the suitors away from the tower!';
-  showScreen('play'); BAR.fit(); renderPanel(); layout(); BAR.fit(); fdZoomButtons(); hudTick(true);   // fd-1a2: 🤏 zoom in book 1 too
+  showScreen('play'); BAR.fit(); renderPanel(); layout(); BAR.fit(); fdZoomButtons(); fdRotBadge(); hudTick(true);   // fd-1a2: 🤏 zoom in book 1 too
   last = 0; raf = requestAnimationFrame(loop);
   setTimeout(nextPick, FX ? 450 : 0);
 }
@@ -2187,7 +2188,7 @@ function loop(now){
   if(was === 'break' && G.state === 'wave'){ goHide(); if(HAND === $('go-btn')) hideHand(); }
   handleEvents(TD.takeEvents(G));
   FT = FT.filter(f => (f.t += dt) < f.dur);
-  paintFrame(now / 1000); panelTick(); hudTick(); guideTick();
+  fdSpinStep(now); paintFrame(now / 1000); panelTick(); hudTick(); guideTick();   // 🔄 td-turn: the spin steps in book 1 too
   if(G && (G.state === 'won' || G.state === 'lost') && !G.ended){ G.ended = 1; setTimeout(() => finish(), FX ? 1300 : 0); }
 }
 function hudTick(force){
@@ -2862,15 +2863,17 @@ function drawSky(g, P, W, H, R){
   g.strokeStyle = P.night ? 'rgba(255,255,255,.5)' : 'rgba(70,60,90,.45)'; g.lineWidth = 1.4; for(let i = 0; i < 6; i++){ const x = W * (0.3 + R() * 0.45), y = H * (0.07 + R() * 0.16), k = W * (0.005 + R() * 0.004); g.beginPath(); g.moveTo(x - k, y - k * 0.4); g.quadraticCurveTo(x - k * 0.4, y - k * 0.6, x, y); g.quadraticCurveTo(x + k * 0.4, y - k * 0.6, x + k, y - k * 0.4); g.stroke(); }
 }
 // one background picture per time of day: sky + island + roads + moat + pads + decor (+ a dusk / night tint)
-function bakeBG(tod){
-  const cv = $('cv'), c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; const g = c.getContext('2d'), s = VIEW.s, W = VIEW.px, H = VIEW.ph, d = VIEW.dpr;
-  const base = scenePal(), P = Object.assign({}, base, tod && !base.night ? TOD_SKY[tod] : {}), R = TD.rngOf((G.jail ? 77 : G.C.n) * 97 + 3), M = isoIsland();
+function bakeBG(tod){ const L = b1Layers(tod, true); B1R.sky = {key: b1SkyKey(tod), c: L.sky}; return b1Compose(L); }   // 🔄 td-turn: built from parts (sky · island · standing things · tint)
+// the parts of one background in the CURRENT view: 🌤️ sky (only when asked) · 🏝️ island ground + roads / moat / pads (with the matrix it was baked with) · 🌳 the standing things
+function b1Layers(tod, wantSky){
+  const cv = $('cv'), c = document.createElement('canvas'); c.width = wantSky ? cv.width : 1; c.height = wantSky ? cv.height : 1; const g = c.getContext('2d'), s = VIEW.s, W = VIEW.px, H = VIEW.ph, d = VIEW.dpr;
+  const base = scenePal(), P = Object.assign({}, base, tod && !base.night ? TOD_SKY[tod] : {}), R = TD.rngOf((G.jail ? 77 : G.C.n) * 97 + 3), M = isoIsland(), MB = b1MapK(fdK());   // MB = the island turned to this view
   g.setTransform(d, 0, 0, d, 0, 0); drawSky(g, P, W, H, R);
   // 🏝️ the island ground (IsoKit chunks, baked at this screen scale)
-  const isl = document.createElement('canvas'); isl.width = c.width; isl.height = c.height; const ig = isl.getContext('2d'), zs = ISO.zi * d, oy = ISO.OY - 2 * ISO.O * ISO.B;
-  for(let cj = 0; cj < Math.ceil(M.h / Iso.CH); cj++) for(let ci = 0; ci < Math.ceil(M.w / Iso.CH); ci++){ const C = Iso._bakeChunk(M, ci, cj, zs); if(C) ig.drawImage(C.c, Math.round((ISO.OX + C.ox * ISO.zi) * d), Math.round((oy + C.oy * ISO.zi) * d)); }
+  const isl = document.createElement('canvas'); isl.width = cv.width; isl.height = cv.height; const ig = isl.getContext('2d'), zs = ISO.zi * d, oy = ISO.OY - 2 * ISO.O * ISO.B;
+  for(let cj = 0; cj < Math.ceil(M.h / Iso.CH); cj++) for(let ci = 0; ci < Math.ceil(M.w / Iso.CH); ci++){ const C = Iso._bakeChunk(MB, ci, cj, zs); if(C) ig.drawImage(C.c, Math.round((ISO.OX + C.ox * ISO.zi) * d), Math.round((oy + C.oy * ISO.zi) * d)); }
   // roads + moat + pads in world units on top of the ground, then cut by the island's own see-through edge
-  const rc = document.createElement('canvas'); rc.width = c.width; rc.height = c.height; const rg = rc.getContext('2d'); groundTf(rg);
+  const rc = document.createElement('canvas'); rc.width = isl.width; rc.height = isl.height; const rg = rc.getContext('2d'); groundTf(rg); const m = rg.getTransform();
   rg.fillStyle = '#4FA6DE'; rg.beginPath(); rg.arc(TD.CX, TD.CY, 1.95, 0, Math.PI * 2); rg.fill(); rg.strokeStyle = 'rgba(255,255,255,.55)'; rg.lineWidth = 0.05; rg.beginPath(); rg.arc(TD.CX, TD.CY, 1.75, 0, Math.PI * 2); rg.stroke();
   rg.strokeStyle = base.g3; rg.lineWidth = 0.14; rg.beginPath(); rg.arc(TD.CX, TD.CY, 1.98, 0, Math.PI * 2); rg.stroke();
   G.paths.forEach(Pp => { const line = () => { rg.beginPath(); Pp.pts.forEach((p, i) => i ? rg.lineTo(p[0], p[1]) : rg.moveTo(p[0], p[1])); };
@@ -2889,20 +2892,54 @@ function bakeBG(tod){
       const ic = R() < 0.6 ? (pal.includes('🌲') && R() < 0.5 ? '🌲' : '🌳') : pal[Math.floor(R() * pal.length)], big = ic === '🌳' || ic === '🌲'; deco.push({x, y, ic, sz: big ? 1.0 + R() * 0.35 : 0.5 + R() * 0.15}); } }
   for(let n = 0; n < 40; n++){ const x = -1 + R() * 18, y = -1 + R() * 18; if(!solid(x, y) || Math.hypot(x - TD.CX, y - TD.CY) < 2.7 || nearRoad(x, y) < 0.8 || G.spots.some(p => Math.hypot(p.x - x, p.y - y) < 0.7)) continue; deco.push({x, y, ic: ['🌼', '🌸', '🌷', '🍄', '🪨', '🌿', '🌾'][n % 7], sz: 0.36 + R() * 0.14}); }
   G.paths.forEach(Pp => { for(let q = 1.2; q < Pp.len - 2.4; q += 2.6){ const p = TD.ptAt(Pp, q), nx = -Math.sin(p.ang), ny = Math.cos(p.ang), sd = (q / 2.6 | 0) % 2 ? 1 : -1, x = p.x + nx * 0.72 * sd, y = p.y + ny * 0.72 * sd; if(solid(x, y)) ISO.lanterns.push({x, y}); } });
-  g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(isl, 0, 0); g.setTransform(d, 0, 0, d, 0, 0);
-  G.paths.forEach(Pp => { const st = Pp.pts[0]; if(solid(st[0], st[1])) emo(g, '🚩', IX(st[0], st[1]), IY(st[0], st[1], 0.4), s * 0.5, 0.9); });
-  const stand = deco.map(o => Object.assign(o, {k: 'd'})).concat(ISO.lanterns.map(o => ({x: o.x, y: o.y, k: 'l'}))).sort((a, b) => (a.x + a.y) - (b.x + b.y));
-  stand.forEach(o => { const z = isoGroundZ(o.x, o.y), px = IX(o.x, o.y), py = IY(o.x, o.y, z);
-    if(o.k === 'l'){ g.strokeStyle = '#7A5230'; g.lineWidth = Math.max(1.2, s * 0.06); g.beginPath(); g.moveTo(px, py); g.lineTo(px, py - s * 0.62); g.stroke(); g.fillStyle = tod ? '#FFE38A' : '#FFF4D6'; g.strokeStyle = '#7A5230'; g.lineWidth = Math.max(1, s * 0.035); g.beginPath(); g.rect(px - s * 0.1, py - s * 0.84, s * 0.2, s * 0.22); g.fill(); g.stroke(); return; }
-    shadow(g, o.x, o.y, o.sz * 0.42); emo(g, o.ic, px, py - s * o.sz * 0.45, s * o.sz); });
-  if(base.tint){ g.fillStyle = base.tint; g.fillRect(0, 0, W, H); }
-  if(tod){ g.globalCompositeOperation = 'source-atop'; g.fillStyle = tod === 2 ? 'rgba(30,30,110,.40)' : 'rgba(255,120,60,.15)'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over'; }
-  const vg = g.createRadialGradient(W / 2, H * 0.55, Math.min(W, H) * 0.4, W / 2, H * 0.55, Math.max(W, H) * 0.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(40,20,60,.2)'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
-  return c;
+  const flags = G.paths.map(Pp => Pp.pts[0]).filter(st => solid(st[0], st[1]));
+  const stand = deco.map(o => Object.assign(o, {k: 'd'})).concat(ISO.lanterns.map(o => ({x: o.x, y: o.y, k: 'l'})));   // sorted when drawn: far → near in the view of that moment (fdDep)
+  return {sky: wantSky ? c : null, isl, m, flags, stand, base, tod};
 }
+// one finished background from its parts (the sky drawn first, then the island, the 🚩 flags + standing things, the tint / dusk / vignette on top)
+function b1Compose(L, sky){ const cv = $('cv'), c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; const g = c.getContext('2d'), d = VIEW.dpr;
+  g.drawImage(sky || L.sky, 0, 0); g.drawImage(L.isl, 0, 0); g.setTransform(d, 0, 0, d, 0, 0); b1Stand(g, L); fdBgTop(g, L.base, L.tod, VIEW.px, VIEW.ph); return c; }
+// 🚩 flags + 🌳 groves / flowers / 🏮 lantern posts, far → near in the CURRENT view (g in screen px with the dpr transform; live while spinning)
+function b1Stand(g, L){ const s = VIEW.s, tod = L.tod;
+  L.flags.forEach(st => emo(g, '🚩', IX(st[0], st[1]), IY(st[0], st[1], 0.4), s * 0.5, 0.9));
+  L.stand.slice().sort((a, b) => fdDep(a.x, a.y) - fdDep(b.x, b.y)).forEach(o => { const z = isoGroundZ(o.x, o.y), px = IX(o.x, o.y), py = IY(o.x, o.y, z);
+    if(o.k === 'l'){ g.strokeStyle = '#7A5230'; g.lineWidth = Math.max(1.2, s * 0.06); g.beginPath(); g.moveTo(px, py); g.lineTo(px, py - s * 0.62); g.stroke(); g.fillStyle = tod ? '#FFE38A' : '#FFF4D6'; g.strokeStyle = '#7A5230'; g.lineWidth = Math.max(1, s * 0.035); g.beginPath(); g.rect(px - s * 0.1, py - s * 0.84, s * 0.2, s * 0.22); g.fill(); g.stroke(); return; }
+    shadow(g, o.x, o.y, o.sz * 0.42); emo(g, o.ic, px, py - s * o.sz * 0.45, s * o.sz); }); }
+/* ================= 🔄 td-turn — book 1 turns too (🏰 TD-Stories chat, 2026-11-28, plan §16s, Aowu "go") =================
+   The farm's fd-1d turn core serves both books (⟲ 🧭 ⟳ · [ ] keys · 0.42 s cubic in-out · round the tower = TD.CX, TD.CY = the island's middle).
+   🏝️ the island is baked TURNED: isoIsland's cells turned k × 90° (b1MapK, cached per chapter) — roads / moat / pads go through groundTf (turned) ·
+   🌀 a spin frame = the still sky + the baked island through (matrix now) × (matrix it was baked with)⁻¹ + standing things live + tint on top ·
+   💾 the view is kept per player AND per book · view 0 = exactly the old pictures. */
+const B1R = {mapk: {}, sky: null, isl: new Map()};
+function b1MapK(k){ const M0 = isoIsland(); if(!k) return M0; const key = ISO.key + ':' + k, hit = B1R.mapk[k]; if(hit && hit.key === key && hit.src === M0) return hit.m; const N = ISO.N;
+  const m = Iso.map({w: N, h: N, theme: M0.theme, seed: M0.seed, base: M0.base, cell: (i, j) => { let a = i, b = j; for(let q = 0; q < k; q++){ const t = a; a = b; b = N - 1 - t; } const c = M0.get(a, b); return c ? {t: c.t, h: c.h, fade: c.fade, block: c.block} : {t: 'void'}; }});
+  B1R.mapk[k] = {key, src: M0, m}; return m; }
+const b1SkyKey = a => [VIEW.px, VIEW.ph, VIEW.dpr, G.jail ? 'j' : G.C.n, G.C.scene, a].join(':');
+const b1IslKey = a => [b1SkyKey(a), VIEW.s.toFixed(3), Math.round(ISO.OX), Math.round(ISO.OY)].join(':');
+// 🌤️ the sky alone (same seed + same first draws = the same sky the bake drew)
+function b1Sky(a){ const key = b1SkyKey(a); if(B1R.sky && B1R.sky.key === key && B1R.sky.c) return B1R.sky.c;
+  const cv = $('cv'), c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; const g = c.getContext('2d'), base = scenePal(), P = Object.assign({}, base, a && !base.night ? TOD_SKY[a] : {});
+  g.setTransform(VIEW.dpr, 0, 0, VIEW.dpr, 0, 0); drawSky(g, P, VIEW.px, VIEW.ph, TD.rngOf((G.jail ? 77 : G.C.n) * 97 + 3)); B1R.sky = {key, c}; return c; }
+// 🏝️ the island layer for view step k (baked in that view's exact angle; the 2 newest views are kept)
+function b1Isl(k){ const a = Math.floor(TOD.v), key = b1IslKey(a) + ':r' + k, hit = B1R.isl.get(k); if(hit && hit.key === key) return hit;
+  const th0 = FDR.th; fdSetRot(k * Math.PI / 2); const L = b1Layers(a, false); fdSetRot(th0); L.key = key; L.c = L.isl;
+  B1R.isl.set(k, L); for(const kk of Array.from(B1R.isl.keys())){ if(B1R.isl.size <= 2) break; if(kk !== k) B1R.isl.delete(kk); } return L; }
+// one frame of the spin, straight onto the map canvas
+function b1SpinBG(g){ const sp = FDR.spin, L = sp.q < 0.5 ? sp.L0 : sp.L1, d = VIEW.dpr;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(b1Sky(L.tod), 0, 0);
+  groundTf(g); const now = g.getTransform(); g.setTransform(now.multiply(L.m.inverse())); g.drawImage(L.c, 0, 0);
+  g.setTransform(d, 0, 0, d, 0, 0); b1Stand(g, L); fdBgTop(g, L.base, L.tod, VIEW.px, VIEW.ph); g.setTransform(1, 0, 0, 1, 0, 0); }
+// the spin is over: the new view's background comes from the layer the spin already baked (no stall), else a fresh bake
+function b1TurnEnd(sp){ const L = sp && sp.L1, a = Math.floor(TOD.v);
+  if(L && !sp.W0 && L.tod === a && TOD.v === a && L.key === b1IslKey(a) + ':r' + fdK()){ TOD.bgs = [null, null, null]; TOD.bgs[a] = b1Compose(L, b1Sky(a)); BG = TOD.bgs[a]; }
+  else BG = null; }
+// ↔️ which way a suitor faces: by where it walks ON SCREEN in a turned view (view 0 keeps the old rule; mid-spin = the nearer view, so no flicker)
+function b1Left(ang){ const sp = FDR.spin, k = sp ? (((Math.round((sp.q < 0.5 ? sp.from : sp.to) / (Math.PI / 2)) % 4) + 4) % 4) : fdK(), c = Math.cos(ang || 0); if(!k) return c < 0;
+  const rc = [1, 0, -1, 0][k], rs = [0, 1, 0, -1][k]; return (rc - rs) * c - (rs + rc) * Math.sin(ang || 0) < 0; }
 function drawBG(){ setIso(); if(G) fdZoomApply(); TOD.bgs = [null, null, null]; TOD.v = TOD.want = todWant(); TOD.bgs[Math.round(TOD.v)] = bakeBG(Math.round(TOD.v)); BG = TOD.bgs[Math.round(TOD.v)]; TOWER_PIC = null; ISO.fly = []; }
 // background for this frame: the current time of day, cross-fading to the next one (baked when first needed)
 function paintBG(g, dt){
+  if(FDR.spin){ b1SpinBG(g); return; }   // 🔄 td-turn
   const w = todWant(); TOD.want = w; if(TOD.v !== w){ const nx = TOD.v < w ? Math.floor(TOD.v) + 1 : Math.ceil(TOD.v) - 1; if(!TOD.bgs[nx]) TOD.bgs[nx] = bakeBG(nx); TOD.v = TOD.v < w ? Math.min(w, TOD.v + dt * 0.35) : Math.max(w, TOD.v - dt * 0.35); }
   const a = Math.floor(TOD.v), f = TOD.v - a; if(!TOD.bgs[a]) TOD.bgs[a] = bakeBG(a); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(TOD.bgs[a], 0, 0);
   if(f > 0.001){ if(!TOD.bgs[a + 1]) TOD.bgs[a + 1] = bakeBG(a + 1); g.globalAlpha = f; g.drawImage(TOD.bgs[a + 1], 0, 0); g.globalAlpha = 1; } BG = TOD.bgs[a];
@@ -3089,19 +3126,19 @@ function paintFrame(t){
   screenTf(g); if(sx || sy) g.translate(sx, sy);
   drawTrapRunes(g, s, t); G.fx.forEach(f => drawSkillFx(g, f, s, t, 'ground'));
   const items = [];
-  G.traps.forEach(T => items.push({y: T.x + T.y - 0.05, d: () => { emo(g, T.icon, IX(T.x, T.y), IY(T.x, T.y, 0.22), s * 0.55, T.fx === 'lava' ? 0.8 : 1); if(T.charges > 1 && T.charges < 20) dots(g, IX(T.x, T.y), IY(T.x, T.y) + s * 0.3, T.charges, '#A0612C', s); }}));
-  G.walls.forEach(w => items.push({y: w.x + w.y, d: () => { shadow(g, w.x, w.y, 0.45); emo(g, w.icon, IX(w.x, w.y), IY(w.x, w.y, 0.45), s * 0.95); bar(g, IX(w.x, w.y), IY(w.x, w.y, 1.05), s * 0.8, w.hp / w.hpMax, '#22A867'); }}));
-  G.decoys.forEach(dc => items.push({y: dc.x + dc.y, d: () => { shadow(g, dc.x, dc.y, 0.45); emo(g, '🫖', IX(dc.x - 0.25, dc.y), IY(dc.x - 0.25, dc.y, 0.3), s * 0.55); emo(g, '🍰', IX(dc.x + 0.28, dc.y), IY(dc.x + 0.28, dc.y, 0.25), s * 0.5); }}));
-  G.towers.forEach(T => items.push({y: T.x + T.y, d: () => { shadow(g, T.x, T.y, 0.38); const pop = Math.min(1, T.t / 0.35);
+  G.traps.forEach(T => items.push({y: fdDep(T.x, T.y) - 0.05, d: () => { emo(g, T.icon, IX(T.x, T.y), IY(T.x, T.y, 0.22), s * 0.55, T.fx === 'lava' ? 0.8 : 1); if(T.charges > 1 && T.charges < 20) dots(g, IX(T.x, T.y), IY(T.x, T.y) + s * 0.3, T.charges, '#A0612C', s); }}));
+  G.walls.forEach(w => items.push({y: fdDep(w.x, w.y), d: () => { shadow(g, w.x, w.y, 0.45); emo(g, w.icon, IX(w.x, w.y), IY(w.x, w.y, 0.45), s * 0.95); bar(g, IX(w.x, w.y), IY(w.x, w.y, 1.05), s * 0.8, w.hp / w.hpMax, '#22A867'); }}));
+  G.decoys.forEach(dc => items.push({y: fdDep(dc.x, dc.y), d: () => { shadow(g, dc.x, dc.y, 0.45); emo(g, '🫖', IX(dc.x - 0.25, dc.y), IY(dc.x - 0.25, dc.y, 0.3), s * 0.55); emo(g, '🍰', IX(dc.x + 0.28, dc.y), IY(dc.x + 0.28, dc.y, 0.25), s * 0.5); }}));
+  G.towers.forEach(T => items.push({y: fdDep(T.x, T.y), d: () => { shadow(g, T.x, T.y, 0.38); const pop = Math.min(1, T.t / 0.35);
     emo(g, '🗼', IX(T.x, T.y), IY(T.x, T.y, 0.55 * pop), s * 1.05 * (0.5 + 0.5 * pop), T.offT > 0 ? 0.45 : 1); if(T.offT > 0) emo(g, '💐', IX(T.x + 0.3, T.y), IY(T.x + 0.3, T.y, 1.1), s * 0.5); if(T.slowed) emo(g, '🎵', IX(T.x - 0.35, T.y), IY(T.x - 0.35, T.y, 1.2), s * 0.4);
     ring(g, IX(T.x, T.y), IY(T.x, T.y) + s * 0.25, s * 0.14, 1 - T.t / T.dur, '#3A86FF'); }}));
-  G.enemies.forEach(e => items.push({y: e.x + e.y, d: () => drawSuitor(g, e, t, s)}));
-  G.minions.forEach(m => items.push({y: m.x + m.y, d: () => { const hop = Math.abs(Math.sin(t * 9 + m.d)) * 0.18; shadow(g, m.x, m.y, 0.25); emo(g, m.icon, IX(m.x, m.y), IY(m.x, m.y, 0.3 + hop), s * 0.6); if(m.fight) emo(g, '💥', IX(m.x - 0.25, m.y), IY(m.x - 0.25, m.y, 0.8), s * 0.35); bar(g, IX(m.x, m.y), IY(m.x, m.y, 0.8), s * 0.5, m.hp / m.hpMax, '#3A86FF'); }}));
+  G.enemies.forEach(e => items.push({y: fdDep(e.x, e.y), d: () => drawSuitor(g, e, t, s)}));
+  G.minions.forEach(m => items.push({y: fdDep(m.x, m.y), d: () => { const hop = Math.abs(Math.sin(t * 9 + m.d)) * 0.18; shadow(g, m.x, m.y, 0.25); emo(g, m.icon, IX(m.x, m.y), IY(m.x, m.y, 0.3 + hop), s * 0.6); if(m.fight) emo(g, '💥', IX(m.x - 0.25, m.y), IY(m.x - 0.25, m.y, 0.8), s * 0.35); bar(g, IX(m.x, m.y), IY(m.x, m.y, 0.8), s * 0.5, m.hp / m.hpMax, '#3A86FF'); }}));
   items.push({y: TD.CX + TD.CY + 0.1, d: () => drawTower(g, t)});
   const hd = G.heroes.dragon, DT = G.trees.dragon, ds = s * (1.05 + 0.25 * DT.form), dz = 1.9 + Math.sin(t * 3) * 0.15;
-  items.push({y: hd.x + hd.y < TD.CX + TD.CY - 1.2 ? hd.x + hd.y : 99, d: () => drawDragonHero(g, t)});   // 🐉 iso-2: TDDragon
-  G.flyers.forEach(f => items.push({y: f.x + f.y, d: () => { shadow(g, f.x, f.y, 0.18, 0.15); emo(g, f.icon, IX(f.x, f.y), IY(f.x, f.y, 1.2 + Math.sin(t * 10 + f.atk) * 0.1), s * 0.55); }}));
-  items.sort((a, b) => a.y - b.y).forEach(it => it.d());   // depth = x + y (diamond)
+  items.push({y: fdDep(hd.x, hd.y) < TD.CX + TD.CY - 1.2 ? fdDep(hd.x, hd.y) : 99, d: () => drawDragonHero(g, t)});   // 🐉 iso-2: TDDragon
+  G.flyers.forEach(f => items.push({y: fdDep(f.x, f.y), d: () => { shadow(g, f.x, f.y, 0.18, 0.15); emo(g, f.icon, IX(f.x, f.y), IY(f.x, f.y, 1.2 + Math.sin(t * 10 + f.atk) * 0.1), s * 0.55); }}));
+  items.sort((a, b) => a.y - b.y).forEach(it => it.d());   // depth = x + y (diamond) · 🔄 td-turn: in the turned view (fdDep)
   paintLights(g, t);   // 🏮 iso-2 dusk / night lights
   // ✨ air effects + 💬 words
   drawSkillZones(g, s, t);
@@ -3133,7 +3170,7 @@ function drawEmojiSuitor(g, e, t, s){
   const S = e.S, x = IX(e.x, e.y);
   if(e.gone){ const k = e.goneT; if(k > 0.9) return; emo(g, S.emoji, x + k * s * 2, IY(e.x, e.y, 0.3 + k * 2), s * 0.55, Math.max(0, 1 - k)); if(k < 0.5) emo(g, '💖', x, IY(e.x, e.y, 1), s * 0.4); return; }
   shadow(g, e.x, e.y, 0.22); const hop = Math.abs(Math.sin(t * 13 + e.id)) * 0.18, y = IY(e.x, e.y, 0.32 + hop);
-  emo(g, S.emoji, x, y, s * 0.6, 1, Math.cos(e.ang || 0) < 0); emo(g, '💘', x + s * 0.24, y - s * 0.32, s * 0.3);
+  emo(g, S.emoji, x, y, s * 0.6, 1, b1Left(e.ang)); emo(g, '💘', x + s * 0.24, y - s * 0.32, s * 0.3);
   bar(g, x, y - s * 0.45, s * 0.6, e.hp / e.hpMax, '#FF5C9A');
 }
 function drawSuitor(g, e, t, s){
@@ -3147,7 +3184,7 @@ function drawSuitor(g, e, t, s){
   const still = e.stunT > 0 || e.rootT > 0 || e.sleepT > 0 || e.tea || e.atWall, hop = still ? 0 : Math.abs(Math.sin(t * 11 + e.id)) * 0.05;
   shadow(g, e.x, e.y, (S.size || 0.95) * 0.34);
   if(e.charmT > 0){ g.fillStyle = 'rgba(255,92,154,.28)'; g.beginPath(); g.ellipse(IX(e.x, e.y), IY(e.x, e.y), w * 0.45, w * 0.45 * V25.K, 0, 0, Math.PI * 2); g.fill(); }
-  const back = e.charmT > 0 || e.fearT > 0, flip = Math.cos(e.ang || 0) < 0 ? !back : back;
+  const back = e.charmT > 0 || e.fearT > 0, flip = b1Left(e.ang) ? !back : back;   // 🔄 td-turn: faces where it walks on screen
   const fr = e.charmT > 0 ? set.act('love') : (e.stunT > 0 || e.sleepT > 0 || e.rootT > 0 || e.confT > 0) ? set.act('dizzy') : null;
   const pic = fr ? fr[Math.floor(t * 6 + e.id) % fr.length] : still ? set.still : set.walk[Math.floor((t * 1.9 + e.id * 0.37) * WALK_N) % WALK_N];
   const MO = motOn(), alpha = e.hitT > 0 && FX && !MO ? 0.55 + 0.45 * Math.cos(e.hitT * 70) : 1; let fy = IY(e.x, e.y, hop), sx0 = IX(e.x, e.y), kn = null;   // 🎬 mo-td
@@ -3182,7 +3219,7 @@ const K_LOOK = {fireball: 'fire', bolt: 'star', rose: 'rose', bird: 'paper', swa
   push: 'wind', pull: 'cosmic', daze: 'love', sleep: 'dream', fear: 'shadow', confuse: 'candy', slow: 'ice', haste: 'wind', heal: 'nature', shield: 'holy', dome: 'bubble', mirror: 'crystal', whip: 'honey', beam: 'sun'};
 function skillLook(src, k){ try{ if(src && src.key){ const h = src.hero || src.h, P = TD.PACKS[h]; const e = P && P.get(src.key); if(e && e.look) return SkillKit.lookOf(e); } }catch(e){} return SkillKit.LOOKS[K_LOOK[k]] || SkillKit.LOOKS.star; }
 const SKFX = {   // k → [layer, (f, s, p, t) → spec]
-  cone: ['ground', (f, s) => ({shape: 'cone', x: IX(f.x, f.y), y: IY(f.x, f.y, 0.25), ang: f.ang, len: f.len * s, w: f.w * 0.6})],
+  cone: ['ground', (f, s) => ({shape: 'cone', x: IX(f.x, f.y), y: IY(f.x, f.y, 0.25), ang: f.ang + (ISO.rq ? FDR.th : 0), len: f.len * s, w: f.w * 0.6})],
   zap: ['air', f => ({shape: 'chain', x: IX(f.x, f.y), y: IY(f.x, f.y, 1.2), x2: IX(f.x2, f.y2), y2: IY(f.x2, f.y2, 0.6)})],
   swat: ['air', (f, s) => ({shape: 'whip', x: IX(f.x, f.y), y: IY(f.x, f.y, 2.7), x2: IX(f.x2, f.y2), y2: IY(f.x2, f.y2, 0.6), w: s * 0.16})],
   whip: ['air', (f, s) => ({shape: 'whip', x: IX(f.x, f.y), y: IY(f.x, f.y, 2.6), x2: IX(f.x + Math.cos(f.ang) * f.len, f.y + Math.sin(f.ang) * f.len), y2: IY(f.x + Math.cos(f.ang) * f.len, f.y + Math.sin(f.ang) * f.len, 0.4), w: s * f.w * 0.5})],
@@ -3358,6 +3395,7 @@ document.addEventListener('keydown', e => {
   if(!G || $('scr-play').classList.contains('hidden') || e.repeat) return;
   if(pickOpen){ const n = Number(e.key); if(n >= 1 && n <= 4){ const b = document.querySelectorAll('#scr-play .skk-sheet .skk-card')[n - 1]; if(b){ b.click(); e.preventDefault(); } } return; }
   if(e.code === 'Space' || e.key === 'Enter'){ if(G.state === 'break'){ goNow(); e.preventDefault(); } return; }
+  if((e.key === '[' || e.key === ']') && !e.ctrlKey && !e.metaKey && !e.altKey){ if(fdTurn(e.key === ']' ? 1 : -1)) e.preventDefault(); return; }   // 🔄 td-turn: [ ] turn the map (both books; Q / E = the 🐉 dragon's skills in book 1)
   const k = e.key.toUpperCase(); if(k === 'C'){ const b = $('combo-btn'); if(b) b.click(); return; }
   const el = document.querySelector('#panel .skk-btn[data-hk="' + k + '"]'); if(el && !el.classList.contains('empty')){ el.click(); e.preventDefault(); }
 });
@@ -4207,7 +4245,8 @@ function fdProp(g, it, o){ if(!it || !it.pic) return false; o = o || {}; const R
 /* 🔄 fd-1d: the view turns (Aowu 21:26 · his Home Layout app = the guide): only the CAMERA turns — maze, paths, saves never change. ⟲ ⟳ (Q / E) spin 90°
    in 0.42 s round the island (zoomed in: round the spot in the middle of the screen); the ground spins smoothly (the baked island drawn through
    one affine matrix), things standing on it slide with the spin and switch to their turned picture half way (IsoProps rebuilds a turned MODEL, never
-   a mirror). The angle is kept per player (localStorage). Book 1 never turns (ISO.rq = 0 = the old formulas). */
+   a mirror). The angle is kept per player (localStorage). 🔄 td-turn: BOTH books turn (book 1 bakes its own turned island — b1Isl — and keeps
+   its view per player AND per book); ISO.rq = 0 = the old formulas in view 0. */
 const FDR = {k: 0, th: 0, spin: null};
 function fdSetRot(th){ const q = th / (Math.PI / 2), k = Math.round(q), ex = Math.abs(q - k) < 1e-9, m = ((k % 4) + 4) % 4;
   ISO.rc = ex ? [1, 0, -1, 0][m] : Math.cos(th); ISO.rs = ex ? [0, 1, 0, -1][m] : Math.sin(th); ISO.rcx = ISO.rcy = FD.CX; ISO.rq = ex && m === 0 ? 0 : 1; FDR.th = th; }
@@ -4596,21 +4635,21 @@ document.addEventListener('click', e => { if(!inPlay() || !$('scr-play').classLi
   if(hd){ hd.textContent = lv ? (lv.dataset.full || lv.textContent) : ''; hd.style.display = hd.textContent ? '' : 'none'; } fm.classList.toggle('hidden'); }, true);
 /* 🔄 fd-1d turning the view — like Aowu's Home Layout (turnPlan): 90° steps, 0.42 s cubic in-out, round the spot in the middle of the screen, Q / E keys,
    remembered per player, a short note after turning. ⟲ 🧭 ⟳ sit on top of ＋ －; 🧭 = back to the book's own view. */
-const fdRotKey = () => 'sp_fd_rot:' + (S.player || '');
+const fdRotKey = () => S.book === 'farmer' ? 'sp_fd_rot:' + (S.player || '') : 'sp_td_rot:' + (S.book || '') + ':' + (S.player || '');   // 🔄 td-turn: per player AND per book (the farm keeps its old key)
 function fdRotSaved(){ try{ const v = parseInt(localStorage.getItem(fdRotKey()), 10); return v >= 0 && v < 4 ? v : 0; }catch(e){ return 0; } }
-function fdTurn(dir, to){ if(!isFarm() || FDR.spin || !G) return false; const k0 = fdK(), k1 = to != null ? to : (((k0 + dir) % 4) + 4) % 4; if(k1 === k0) return false;
+function fdTurn(dir, to){ if(!G || FDR.spin) return false; const farm = isFarm(), k0 = fdK(), k1 = to != null ? to : (((k0 + dir) % 4) + 4) % 4; if(k1 === k0) return false;
   let step = k1 - k0; if(step > 2) step -= 4; if(step < -2) step += 4;   // the short way round (🧭 from 3 → 0 = one step ⟳)
-  fdCloseCard(); FDP.pick = null; const from = FDR.th, toTh = from + step * Math.PI / 2;
+  if(farm){ fdCloseCard(); FDP.pick = null; } const from = FDR.th, toTh = from + step * Math.PI / 2;
   // the spot in the middle of the screen stays put when zoomed in (at zoom 1 the island turns round its own middle)
   const W0 = FDZ.z > 1.001 ? fdWorldAt(VIEW.px / 2, VIEW.ph / 2) : null;
-  const L0 = fdIsl(k0), L1 = fdIsl(k1); fdWarm(k1);
+  const L0 = farm ? fdIsl(k0) : b1Isl(k0), L1 = farm ? fdIsl(k1) : b1Isl(k1); if(farm) fdWarm(k1);   // 🔄 td-turn: book 1 = its own turned island layers
   if(!FX){ fdSetRot(toTh); fdTurnEnd(W0); return true; }
   FDR.spin = {from, to: toTh, t0: performance.now(), dur: 420, q: 0, L0, L1, W0}; UISound.play('whoosh'); return true; }
 function fdSpinStep(now){ const sp = FDR.spin; if(!sp) return; const t = Math.min(1, (now - sp.t0) / sp.dur), e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-  sp.q = t; if(t >= 1){ fdSetRot(sp.to); FDR.spin = null; fdTurnEnd(sp.W0); return; }
+  sp.q = t; if(t >= 1){ fdSetRot(sp.to); FDR.spin = null; fdTurnEnd(sp.W0, sp); return; }
   fdSetRot(sp.from + (sp.to - sp.from) * e); if(sp.W0) fdKeep(sp.W0); }
 function fdKeep(W0){ const px = IX(W0.x, W0.y), py = IY(W0.x, W0.y, 0); FDZ.ox += VIEW.px / 2 - px; FDZ.oy += VIEW.ph / 2 - py; fdZoomApply(); }
-function fdTurnEnd(W0){ const k = fdK(); fdSetRot(k * Math.PI / 2); FDR.k = k; if(W0) fdKeep(W0); FDP.bgKey = ''; FDP.pics.clear();
+function fdTurnEnd(W0, sp){ const k = fdK(); fdSetRot(k * Math.PI / 2); FDR.k = k; if(W0) fdKeep(W0); FDP.bgKey = ''; FDP.pics.clear(); if(!isFarm()) b1TurnEnd(sp);   // 🔄 td-turn
   try{ localStorage.setItem(fdRotKey(), String(k)); }catch(e){}
   fdRotBadge(); banner(k ? '🔄 Map turned — tap 🧭 to turn it back' : '🧭 Back to the book\'s own view'); fdHints(); }
 // bake the turned pictures before the spin needs them (the switch half way must not stall a frame)
@@ -4619,7 +4658,8 @@ function fdWarm(k){ if(!fdHasProps()) return; const step = Iso.stepFor(ISO.zi * 
 function fdRotButtons(z){ if(z.querySelector('.fd-rot')) return; const r = document.createElement('div'); r.className = 'fd-rot';
   r.innerHTML = '<button type="button" data-r="-1" data-sound="tap" aria-label="Turn the map left" title="Turn left (Q)">⟲</button><button type="button" data-r="0" data-sound="tap" aria-label="Back to the first view" title="Back to the first view" class="fd-compass"><i>🧭</i></button><button type="button" data-r="1" data-sound="tap" aria-label="Turn the map right" title="Turn right (E)">⟳</button>';
   z.prepend(r); r.querySelectorAll('button').forEach(b => b.onclick = ev => { ev.stopPropagation(); const d = +b.dataset.r; if(d) fdTurn(d); else fdTurn(0, 0); }); fdRotBadge(); }
-function fdRotBadge(){ const c = document.querySelector('#fd-zoom .fd-compass'); if(!c) return; const k = FDR.spin ? null : fdK(); c.classList.toggle('on', !!k); const i = c.querySelector('i'); if(i) i.style.transform = 'rotate(' + (-(k || 0) * 90) + 'deg)'; }
+function fdRotBadge(){ const c = document.querySelector('#fd-zoom .fd-compass'); if(!c) return; const k = FDR.spin ? null : fdK(); c.classList.toggle('on', !!k); const i = c.querySelector('i'); if(i) i.style.transform = 'rotate(' + (-(k || 0) * 90) + 'deg)';
+  const f = isFarm(); document.querySelectorAll('#fd-zoom .fd-rot [data-r]').forEach(b => { const d = +b.dataset.r; if(d) b.title = (d < 0 ? 'Turn left (' : 'Turn right (') + (f ? (d < 0 ? 'Q' : 'E') : (d < 0 ? '[' : ']')) + ')'; }); }   // 🔄 td-turn: book 1's keys are [ ]
 // which way someone faces in a turned view: by where they moved ON SCREEN
 function fdFaceL(o, x){ if(o._lx != null && Math.abs(x - o._lx) > 0.05) o._fl = x < o._lx; o._lx = x; return o._fl != null ? o._fl : (o.face || 1) < 0; }
 (function(){ const st = document.createElement('style'); st.id = 'fd-css-rot'; st.textContent = [
@@ -5132,4 +5172,4 @@ function tdResultBadge(){
 /* 🏷️ TD LOGO END */</script>
 </body>
 </html>
-<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a+fd-1a2+fd-1b+fd-1c+fd-1d+fd-1e+fd-2a+wr-1+fd-2b+td-wear+mo-td) END OF TDStories.html -->
+<!-- (td-2+td-logo+iso2-b+act-2+td-scenes+fd-1a+fd-1a2+fd-1b+fd-1c+fd-1d+fd-1e+fd-2a+wr-1+fd-2b+td-wear+mo-td+td-turn) END OF TDStories.html -->
