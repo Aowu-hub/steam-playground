@@ -1159,11 +1159,11 @@ function getLevelGameData(gameId, player) {
   if (gameId === 'pyraspike') { const st = getSettings(); out.looks = {}; activePlayers_(listProfilesFull()).forEach(p => { try { const v = st['PyraLooks_' + p.Name]; if (v) out.looks[p.Name] = JSON.parse(v); } catch (e) {} }); }   // 🎨 pd-4e: each player's picked looks (server row PyraLooks_<Name>)
   return out;
 }
-// 👀🧠 Eyes Brain Riot (11k round 4): 🎯 daily family number — the same 8 digits for everyone today (made on the page from the date),
+// 👀🧠 Eyes Brain Riot (11k round 4): 🎯 daily family number — the same 12 (8 digits + 4 letters, 24ink-x3; was 8 digits) for everyone today (made on the page from the date),
 // ONE try per player per day, kept in Settings EyesDaily = {date, scores: {name: {score, right, secs}}}; 🏅 Brain level = feat longest (longest number remembered perfectly)
 function eyesDaily_() {
   const d = jsonSetting_(getSettings(), 'EyesDaily', {}) || {}, today = today_(), sc = d.date === today && d.scores ? d.scores : {};
-  return { date: today, board: Object.keys(sc).map(k => ({ name: k, score: Number(sc[k].score) || 0, right: Number(sc[k].right) || 0, secs: Number(sc[k].secs) || 0 })).sort((a, b) => b.score - a.score || a.secs - b.secs) };
+  return { date: today, board: Object.keys(sc).map(k => ({ name: k, score: Number(sc[k].score) || 0, right: Number(sc[k].right) || 0, len: Number(sc[k].len) || 8, secs: Number(sc[k].secs) || 0 })).sort((a, b) => b.score - a.score || a.secs - b.secs) };
 }
 function brainLevels_(players) { const names = {}, out = {}; players.forEach(p => { names[p.Name] = true; }); featRows_().forEach(r => { if (r.game === 'eyes-brain' && r.stat === 'longest' && names[r.name]) out[r.name] = Math.max(out[r.name] || 0, Number(r.value) || 0); }); return out; }
 function ebrData_(players) { const all = activePlayers_(listProfilesFull()), pads = {}; all.forEach(p => { try { pads[p.Name] = itemsFor_(p.Name, all).owned.ebrpad || 0; } catch (e) { pads[p.Name] = 0; } }); return { daily: eyesDaily_(), brain: brainLevels_(players), pads: pads }; }
@@ -1172,13 +1172,14 @@ function saveEyesDaily(name, rec) {
   if (!name || !activePlayers_(listProfilesFull()).some(p => p.Name === name)) throw new Error('Pick a player first.');
   const r = rec || {}, today = today_();
   if (r.date && r.date !== today) return { already: false, late: true, daily: eyesDaily_() };   // a page left open past midnight
-  const lock = LockService.getScriptLock(); lock.waitLock(10000); let first = false, right = 0;
+  const lock = LockService.getScriptLock(); lock.waitLock(10000); let first = false, right = 0, len = 8;
   try {
     let d = jsonSetting_(getSettings(), 'EyesDaily', {}) || {}; if (d.date !== today || !d.scores) d = { date: today, scores: {} };
-    if (!d.scores[name]) { right = Math.max(0, Math.min(8, Math.floor(Number(r.right) || 0))); d.scores[name] = { score: Math.max(0, Math.min(5000, Math.round(Number(r.score) || 0))), right: right, secs: Math.max(0, Math.min(3600, Math.round(Number(r.secs) || 0))) }; saveSetting('EyesDaily', JSON.stringify(d)); first = true; }
+    // 24ink-x3: the page sends len (12); a page still open from before the push sends none = the old 8-digit number. Score cap 5000 ≫ the best 12 (12 × 10 × 2 × 1.3 × 1.5 × 1.2 ≈ 562).
+    if (!d.scores[name]) { len = Number(r.len) === 12 ? 12 : 8; right = Math.max(0, Math.min(len, Math.floor(Number(r.right) || 0))); d.scores[name] = { score: Math.max(0, Math.min(5000, Math.round(Number(r.score) || 0))), right: right, len: len, secs: Math.max(0, Math.min(3600, Math.round(Number(r.secs) || 0))) }; saveSetting('EyesDaily', JSON.stringify(d)); first = true; }
   } finally { lock.releaseLock(); }
   const out = { already: !first, daily: eyesDaily_() };
-  if (first) out.feats = safeRecordFeats_(name, 'eyes-brain', { daily: 1, digits: right, perfects: right === 8 ? 1 : 0, longest: right === 8 ? 8 : 0 });
+  if (first) out.feats = safeRecordFeats_(name, 'eyes-brain', { daily: 1, digits: right, perfects: right === len ? 1 : 0, longest: right === len ? len : 0 });
   return out;
 }
 // 🎁 daily treasure counters (today): best run of perfect rounds + longest Challenge
@@ -3398,8 +3399,7 @@ function saveSkillTree(name, game, json) {
   saveSetting(key, JSON.stringify(d));
   return { ok: true, ch: d.ch };
 }
-// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d+gl-r24+av-r0e3+ip-4a+bo-10b+ar-r0b+b3b4+s1+s2a+s2b+s2c+ar-7+ip-4b+av-r0i+s3+mo-3+ip-4c+an-2+an-4+b4a+s4a+av-wear2+b6a+s-brawl+lk-pp1+lk-wd1+b6b+ar-r1c-b+ip-4d+pk-7a+s-sla+mo-10+ip-4e+b6e+ar-r2-1b+mo-12+ip-5+b6d+24y-b+ip-4f+pk-7f+24y-c+mo-14+pk-7b+24y-d+ip-6a+mo-13+lk-8b+mo-15+ar-r2-5+av-naga4+ip-7a+pk-7c+od-1+lk-8c+sw-1b+ip-7c+lk-8d+mo-18+lk-8e+lk-9a+pd-s+bo-cover+b5a+lk-9b+pd-cover+bo-mo+lk-9c+s-bo+lk-9c2+pdmo+av-naga6+lk-8f+mo-19+lk-8g+lk-9d+mo-20+av-asura-b1+mo-21+ip-9+ar-r2-6b+mo-23+mo-24+av-s1a+ip-10+mo-25+mo-26+mo-27+mo-28+av-s2a1+ip-11+mo-30+ip-12+gr-13+ip-13+24lf-s+mo-33+gr-13b+gr-15a+ip-6c+mo-35+b5c+s-td+gr-15c+mo-36+ip-15+mo-37) END OF Code.gs
-
+// (r31+11m-2+11j+11i-C+11x-3+11y-4+sb-4+news-1+pp-4+ebr-4+11j-b4+11j-S4+11j-S5+11j-S6+11i-H+ebr-5+bc-1+bc-4+modes-1+modes-2+off-2+gr-4+wd-13+gs-4+mg-1+ebr-6+gro-1+off-8+bp-1+bp-1+bp-2+bp-2+bp-2+bp-2+bp-2+bp-2+bp-3+bp-3+bp-4+bp-4+bp-4+bp-4+bp-5+bp-5+bp-5+bp-5+bp-5+bp-5+sb2-2+sk-1+bs-1+le-1+dict-1+as-1+as-2+ck-1b+p3a+lk-1c+nz-1+size-1+td-1+pd-1+bo-1+pk-1+sc-1+pd-2b+pd-2c+bo-2a+pd-3a+bo-2b+pd-3b+pk-2a+pd-3c+sc-2a+bo-2c+pk-2b+pk-3a+bo-3a+bo-3b+pk-3b+sc-2b+pd-4a+pk-3d+pd-4b+bo-3c+pd-4c+pd-4d+pd-4d2+sc-2d+pd-4e+sm-0+sm-1+b1b+b1c+gr-23+mm-1+wd-1+mq-w1+gr-2b+mm-3+mq-w2+pd-5b+mq-w3+mq-t1+mm-5+sc-3a+sc-3b+sc-3c+st-1+fx-1a+mq-w4+mq-w5+24j-a+sc-3d+sc-4a+sc-4b+sc-4c+sc-4d+sc-4d2+av-r0b+ip-1+24u-a+av-r0c+fd-1a+av-r0d3+fd-1b+ip-3d+gl-r24+av-r0e3+ip-4a+bo-10b+ar-r0b+b3b4+s1+s2a+s2b+s2c+ar-7+ip-4b+av-r0i+s3+mo-3+ip-4c+an-2+an-4+b4a+s4a+av-wear2+b6a+s-brawl+lk-pp1+lk-wd1+b6b+ar-r1c-b+ip-4d+pk-7a+s-sla+mo-10+ip-4e+b6e+ar-r2-1b+mo-12+ip-5+b6d+24y-b+ip-4f+pk-7f+24y-c+mo-14+pk-7b+24y-d+ip-6a+mo-13+lk-8b+mo-15+ar-r2-5+av-naga4+ip-7a+pk-7c+od-1+lk-8c+sw-1b+ip-7c+lk-8d+mo-18+lk-8e+lk-9a+pd-s+bo-cover+b5a+lk-9b+pd-cover+bo-mo+lk-9c+s-bo+lk-9c2+pdmo+av-naga6+lk-8f+mo-19+lk-8g+lk-9d+mo-20+av-asura-b1+mo-21+ip-9+ar-r2-6b+mo-23+mo-24+av-s1a+ip-10+mo-25+mo-26+mo-27+mo-28+av-s2a1+ip-11+mo-30+ip-12+gr-13+ip-13+24lf-s+mo-33+gr-13b+gr-15a+ip-6c+mo-35+b5c+s-td+gr-15c+mo-36+ip-15+mo-37+24ink-x3) END OF Code.gs
 ;
 /* ===== GameData.gs ===== */
 // GameData.gs — STEAM Playground DATA tables (📏 File Split S1, 2026-11-18: moved WORD FOR WORD out of Code.gs,
@@ -3486,7 +3486,7 @@ const MODES_ = [
   { game: 'eyes-brain', id: 'chain', icon: '➕', name: 'Chain', pitch: 'Take turns adding a digit', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '➕ Chain', feat: [['eyes-brain', 'chainWins']] } },
   { game: 'eyes-brain', id: 'word', icon: '📝', name: 'Word mode', pitch: 'Remember short words', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '📝 Word mode' } },
   { game: 'eyes-brain', id: 'shapes', icon: '🧩', name: 'Shapes', pitch: 'Remember shape patterns', route: 'eyesbrain', tried: { board: 'eyes-brain', themeStart: '🧩 Shapes' } },
-  { game: 'eyes-brain', id: 'daily', icon: '🎯', name: 'Today\'s family number', pitch: 'One try at today\'s number!', route: 'eyesbrain', tried: { feat: [['eyes-brain', 'daily']] } },
+  { game: 'eyes-brain', id: 'daily', icon: '🎯', name: 'Today\'s family number', pitch: 'Today\'s 12: digits + letters!', route: 'eyesbrain', tried: { feat: [['eyes-brain', 'daily']] } },
   { game: 'georead', id: 'phonics', icon: '🔊', name: 'Phonics', pitch: 'Tap the sounds, bump the word!', route: 'georead', tried: { board: 'georead', themeStart: '🔊 Phonics', feat: [['georead', 'blends']] }, added: '2026-11-08' },
   { game: 'georead', id: 'build', icon: '🧱', name: 'Word builder', pitch: 'See the picture, build the word', route: 'georead', tried: { board: 'georead', themeStart: '🧱 Word builder', feat: [['georead', 'built']] }, added: '2026-11-08' },
   { game: 'georead', id: 'rhyme', icon: '🔁', name: 'Rhyme time', pitch: 'cat · hat · bat — swap a box!', route: 'georead', tried: { board: 'georead', themeStart: '🔁 Rhyme time', feat: [['georead', 'rhymes']] }, added: '2026-11-08' },
@@ -5156,8 +5156,7 @@ const DAILY_GOALS = [
   { id: 'avarealm', icon: '🏰', how: 'Win an AvataRealm battle today', r: d => d.rows.some(r => r.game === 'avatarealm' && r.stars > 0) },   // 🏰⚔️ ar-r1c-b
 ];
 
-// (s1+ar-r1c+ar-r1c-b+pk-7b+ar-r2-6b) END OF GameData.gs
-
+// (s1+ar-r1c+ar-r1c-b+pk-7b+ar-r2-6b+24ink-x3) END OF GameData.gs
 ;
 /* ===== PosePartyCode.gs ===== */
 // PosePartyCode.gs — 📷 Pose Party server (plan 11j S2). Separate file so it doesn't clash with other chats in Code.gs.

@@ -217,6 +217,7 @@
   .sw{width:36px;height:36px;border-radius:50%;border:3px solid #fff;cursor:pointer;padding:0;box-shadow:0 2px 0 rgba(0,0,0,0.3);}
   .sw.on{box-shadow:0 0 0 3px #FFC845,0 0 12px #FFC845;transform:scale(1.12);}
   .pad.abc{gap:5px;max-width:520px;} .pad.abc .key{font-size:calc(var(--kh,54px) * 0.42);border-radius:11px;}
+  .pad.abc .key.dim:not(:disabled){opacity:.42;filter:saturate(.4);}   /* 24ink-x3 D4: O I S Z B not in today's letters — faded, still tappable */
   .chunk.lit .tile{transform:scale(1.12);box-shadow:0 0 0 4px #FFC845,0 0 18px #FFC845 !important;}
   .tile.ear .dt{font-size:calc(var(--s) * 0.5);}
   .who-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
@@ -679,7 +680,16 @@ const EBR = (function(){
   function keypadOrder(M, keys){ return M.L.shuffle ? shuffle(M.r, keys) : keys.slice(); }
 
   /* ---------- 🎯 daily family number: same for everyone that day ---------- */
-  function dailyNumber(date){ const r = rng(hashStr('ebr-daily-' + date)); const len = 8; return {toks: digitsOf(r, len), chunks: chunkSizes(len, [3, 4]), look: 6}; }
+  // 24ink-x3 (Aowu 2026-11-28 21:20 + 21:4x): 12 to remember = 8 digits + 4 letters from the safe pool (no O I S Z B), one letter in every chunk of 4 + one more,
+  // never the same letter twice side by side, 9 s to look; own seed key 'ebr-daily12-' so nobody gets half of the old 8-digit number on the day it changes.
+  const DAILY = {len: 12, letters: 4, chunks: [4, 4, 4], look: 9};
+  function dailyNumber(date){
+    const r = rng(hashStr('ebr-daily12-' + date)), toks = digitsOf(r, DAILY.len), spots = []; let at = 0;
+    DAILY.chunks.forEach(n => { spots.push(at + ri(r, 0, n - 1)); at += n; });
+    while(spots.length < DAILY.letters){ const k = ri(r, 0, DAILY.len - 1); if(spots.indexOf(k) < 0) spots.push(k); }
+    spots.sort((a, b) => a - b).forEach(k => { let c, g = 0; do { c = pick(r, LETTERS_SAFE); } while(c === toks[k - 1] && g++ < 20); toks[k] = c; });
+    return {toks, chunks: DAILY.chunks.slice(), look: DAILY.look};
+  }
 
   /* ---------- 💡 memory tips ---------- */
   const TIPS = [
@@ -695,7 +705,7 @@ const EBR = (function(){
 
   return {LEVELS, WAYS, WAY_KEYS, SWITCH_MULT, LETTERS_ALL, LETTERS_SAFE, LOOKALIKE, COLOURS, SHAPES, SHAPE_SETS, WORDS, WORD_PLAN, CHALLENGE_MAX, RIOT_ROUNDS, TIPS,
     hashStr, rng, shuffle, chunkSizes, lookTime, lengthFor, makeTokens, looksFor, lettersFor, letterCount, isLetter, isDigit, align, wayMult, speedPart, comboMult, roundPoints, starsFor, challengeStars, riotGain,
-    newGame, current, alive, deal, keyFn, check, chainAdd, advance, finish, keypadOrder, dailyNumber, digitsOf};
+    newGame, current, alive, deal, keyFn, check, chainAdd, advance, finish, keypadOrder, dailyNumber, DAILY, digitsOf};
 })();
 // ENGINE END
 
@@ -732,7 +742,7 @@ const MODE_GROUPS = [
 const MODE_GROUP_OF = {classic: 'remember', backwards: 'remember', colour: 'remember', letters: 'remember', listen: 'remember', word: 'remember', shapes: 'remember', challenge: 'challenge', daily: 'challenge', chain: 'party'};   // 🗂️ mg-1
 const MODE_ORDER = ['classic', 'backwards', 'colour', 'letters', 'listen', 'word', 'shapes', 'challenge', 'daily', 'chain'];
 function mgList(){ return MODE_ORDER.filter(k => k === 'daily' || WAYS_ON.indexOf(k) >= 0).map(k => {
-  if(k === 'daily') return {k, g: 'challenge', icon: '🎯', name: 'Daily number', sub: 'Same number for everyone · one try a day', next: '▶ starts right away'};
+  if(k === 'daily') return {k, g: 'challenge', icon: '🎯', name: 'Daily number', sub: '12 digits + letters · same for everyone · one try a day', next: '▶ starts right away'};
   const W = EBR.WAYS[k]; return {k, g: MODE_GROUP_OF[k], icon: W.icon, name: W.name, sub: W.sub + (W.min ? ' · ' + EBR.LEVELS[W.min].name + '+' : W.multi ? ' · 2–4 👥' : ''), next: '👇 then pick a level'}; }); }
 /* 🗂️ END MODE GROUPS */
 // 🏠 6 room themes = digit font + background + sounds (looks only — never the rules)
@@ -932,6 +942,7 @@ function renderHow(){
     '🌱 Basic: <b>👀 Look again</b> once per game (that round counts half). 💀 Hardcore: the keypad shuffles every round.',
     '🔁 Backwards (Hard+): see 1 2 3 → type 3 2 1. 🏔️ Challenge: +1 digit after each perfect round, until you miss.',
     '🖼️ Picture look: pictures stand for digits (🐔 = 1). 🔀 Switch answer: see pictures, type digits (or the other way) — ×1.3 from Intermediate. 📖 Peek at the card once per game from Junior.',
+    '🎯 Daily number: the same 12 for the whole family today — 8 digits + 4 letters (one in every chunk), 9 s to look, ONE try. Tap 🔤 ABC ⇄ for the letters.',
     '🔤 Numbers + letters: tap 🔤 ABC ⇄ for letters (O I S Z B join on Hard). 🎨 Colour digits: from Hard tap the colour too. 👂 Listen: the number is spoken — 🔊 hear it again once on Basic–Junior.'
   ].map(x => '<li>' + x + '</li>').join('');
   $('pts-table').innerHTML = '<tr><th>Part</th><th>Points</th></tr>' + [
@@ -955,7 +966,7 @@ function layout(){
   const pad = $('pad'), cols = Number(getComputedStyle(pad).getPropertyValue('--cols')) || 3, rows = Math.ceil(pad.children.length / cols) || 4;
   const sideW = wide ? Math.min(Math.max(320, W * 0.3), 540) - 24 : Math.min(W - 20, 440);
   let kh = wide ? Math.min(Math.max(66, Math.min(96, H * 0.085)), (H - 48 - 30 - 62 - 56 - 18 - (rows - 1) * 7 - 20) / rows) : Math.min(64, Math.max(40, (H * 0.36 - (rows - 1) * 7) / rows));
-  kh = Math.max(30, Math.min(kh, (sideW - (cols - 1) * 7) / cols * 0.95));
+  kh = Math.max(30, Math.min(kh, (sideW - (cols - 1) * 7) / cols * (pad.classList.contains('abc') ? 1.35 : 0.95)));   // 24ink-x3: ABC keys may stand taller than wide
   pad.style.setProperty('--kh', Math.round(kh) + 'px');
   requestAnimationFrame(() => { sizeStage(); });
   sizeStage();
@@ -1122,7 +1133,7 @@ function newRound(){
   $('parts').innerHTML = ''; $('lookbar').classList.add('hidden');
   const cur = $('curtain'); cur.classList.remove('up'); $('reveal').className = 'reveal'; $('reveal').textContent = '👀 Reveal'; $('reveal').disabled = false; $('nextbtn').classList.add('hidden');
   const p = EBR.current(M);
-  $('board-note').textContent = M.cfg.daily ? '🎯 Today\'s family number — one try!' : M.way === 'challenge' ? '🏔️ ' + M.item.toks.length + ' digits — can you go one more?' : '';
+  $('board-note').textContent = M.cfg.daily ? '🎯 Today\'s family number · ' + M.item.toks.length + ' with letters · one try!' : M.way === 'challenge' ? '🏔️ ' + M.item.toks.length + ' digits — can you go one more?' : '';
   if(M.L.hint && G.lastMiss && !G.multi) banner('📦 Chunk it! Remember little groups', 'gold', 2200);
   placeAvatars(false); setGoal(); coachReveal();
   if(M.way === 'chain'){ G.phase = 'turn'; turnCard(chainTurn); return; }
@@ -1245,7 +1256,8 @@ function shapeCols(n){ return n <= 6 ? 3 : n <= 8 ? 4 : n <= 10 ? 5 : n <= 12 ? 
 function buildPad(){
   if(!G) return; const pad = $('pad'), M = G.M, keys = G.padKeys && G.padRound === M.round ? G.padKeys : (G.padKeys = padKeys(), G.padRound = M.round, G.padKeys);
   const live = G.phase === 'type' || G.phase === 'add', dis = G.phase === 'type' ? '' : ' disabled', fn = '<button class="key fn" data-k="back" aria-label="Delete"' + dis + '>⌫</button>', go = '<button class="key go" data-k="ok" aria-label="Check"' + dis + '>✅</button>';
-  if(M.way === 'word' || (M.way === 'letters' && G.abc)){ pad.style.setProperty('--cols', 7); pad.innerHTML = EBR.LETTERS_ALL.map(keyHtml).join('') + fn + go; }
+  if(M.way === 'word' || (M.way === 'letters' && G.abc)){ pad.style.setProperty('--cols', 7); pad.innerHTML = EBR.LETTERS_ALL.map(keyHtml).join('') + fn + go;
+    if(M.way === 'letters' && (M.cfg.daily || EBR.lettersFor(M.level) === EBR.LETTERS_SAFE)) EBR.LOOKALIKE.forEach(c => { const k = pad.querySelector('.key[data-k="' + c + '"]'); if(k){ k.classList.add('dim'); k.title = 'Not used here — looks like a number'; } }); }   // 24ink-x3 D4
   else if(M.way === 'shapes'){ pad.style.setProperty('--cols', shapeCols(keys.length + 2)); pad.innerHTML = keys.map(keyHtml).join('') + fn + go; }
   else { pad.style.setProperty('--cols', 3); pad.innerHTML = keys.slice(0, 9).map(keyHtml).join('') + fn + keyHtml(keys[9]) + go; }
   applyPadSkin();
@@ -1566,8 +1578,8 @@ function brainOf(name){ return Number(((S.ebr || {}).brain || {})[name]) || 0; }
 function dailyInfo(){ return (S.ebr && S.ebr.daily) || {date: '', board: []}; }
 function renderDaily(){
   const D = dailyInfo(), mine = D.board.find(r => r.name === S.player), box = $('daily-box');
-  box.innerHTML = '<div class="dl-head"><b>🎯 Today\'s family number</b><small>' + UI.esc(D.date || '') + ' · same number for everyone · one try</small></div>' +
-    '<div class="dl-board">' + (D.board.length ? D.board.slice(0, 5).map((r, i) => '<span' + (r.name === S.player ? ' class="me"' : '') + '>' + (['🥇', '🥈', '🥉'][i] || '🎖️') + ' ' + UI.esc(r.name) + ' · ' + Number(r.score).toLocaleString() + ' · ' + r.right + '/8</span>').join('') : '<span>Nobody yet today — be the first!</span>') + '</div>' +
+  box.innerHTML = '<div class="dl-head"><b>🎯 Today\'s family number</b><small>' + UI.esc(D.date || '') + ' · 12 with letters · same for everyone · one try</small></div>' +
+    '<div class="dl-board">' + (D.board.length ? D.board.slice(0, 5).map((r, i) => '<span' + (r.name === S.player ? ' class="me"' : '') + '>' + (['🥇', '🥈', '🥉'][i] || '🎖️') + ' ' + UI.esc(r.name) + ' · ' + Number(r.score).toLocaleString() + ' · ' + r.right + '/' + (r.len || 8) + '</span>').join('') : '<span>Nobody yet today — be the first!</span>') + '</div>' +
     (mine ? '<div class="dl-done">✅ You played today: ' + Number(mine.score).toLocaleString() + ' points</div>' : '<button class="btn sp-btn sp-primary" data-sound="pop" id="daily-go" onclick="startDaily()">🎯 Play today\'s number</button>');
   $('brain-lvl').textContent = brainOf(S.player) ? '🏅 Brain level ' + brainOf(S.player) : '';
   renderPadChips();
@@ -1575,19 +1587,19 @@ function renderDaily(){
 function startDaily(){
   const D = dailyInfo(); if(!D.date){ UI.toast('Today\'s number is not ready — check the connection'); return; }
   if(D.board.some(r => r.name === S.player)){ UISound.play('error'); UI.toast('You already played today\'s number — come back tomorrow! 🎯'); return; }
-  SET.seats = []; startGame({level: 2, way: 'classic', look: 'normal', answer: 'same', players: [S.player], daily: D.date});
+  SET.seats = []; startGame({level: 2, way: 'letters', look: 'normal', answer: 'same', players: [S.player], daily: D.date});   // 🎯 24ink-x3: digits + letters → 🔤 ABC ⇄ keypad
 }
 function endDaily(){
-  const M = G.M, p = M.P[0], res = M.log[0] ? M.log[0].res : {right: 0, len: 8}, secs = Math.max(1, Math.round((performance.now() - G.t0) / 1000));
+  const M = G.M, p = M.P[0], res = M.log[0] ? M.log[0].res : {right: 0, len: EBR.DAILY.len}, secs = Math.max(1, Math.round((performance.now() - G.t0) / 1000));
   cheerEnd(res.perfect); /* 📣 cs-4c */
   UISound.play(res.perfect ? 'success' : 'pop'); if(res.perfect) confetti(['🎯', '🎉', '🧠', '👀'], 22);
-  showResult('<div class="big">🎯</div><h2 class="cheer">Today\'s family number</h2><div class="score-big">🏆 ' + p.score.toLocaleString() + '</div><div class="stats"><span>🔢 ' + res.right + ' / 8 digits</span>' + (res.perfect ? '<span>✅ perfect!</span>' : '') + '</div>' +
+  showResult('<div class="big">🎯</div><h2 class="cheer">Today\'s family number</h2><div class="score-big">🏆 ' + p.score.toLocaleString() + '</div><div class="stats"><span>🔢 ' + res.right + ' / ' + res.len + ' right</span>' + (res.perfect ? '<span>✅ perfect!</span>' : '') + '</div>' +
     '<div class="dl-board" id="daily-board"><span>💾 Saving…</span></div><div class="save-note" id="save-note"></div>' +
     '<div class="res-btns"><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="backToMenu()">🎚️ Levels</button><button class="btn soft sp-btn sp-secondary" data-sound="none" onclick="goGameroom()">🕹️ Gameroom</button></div>');
   const draw = D => { const b = $('daily-board'); if(b) b.innerHTML = (D.board || []).slice(0, 6).map((r, i) => '<span' + (r.name === p.name ? ' class="me"' : '') + '>' + (['🥇', '🥈', '🥉'][i] || '🎖️') + ' ' + UI.esc(r.name) + ' · ' + Number(r.score).toLocaleString() + '</span>').join(''); };
   google.script.run.withSuccessHandler(r => { if(r && r.daily){ S.ebr.daily = r.daily; draw(r.daily); } putNote(0, r && r.already ? '✅ You already played today — your first try counts.' : featText(r && r.feats, '✅ Saved on today\'s board')); })
     .withFailureHandler(() => { putNote(0, '⚠️ Could not save today\'s number — check the connection.'); draw(dailyInfo()); })
-    .saveEyesDaily(p.name, {date: M.cfg.daily, score: p.score, right: res.right, secs});
+    .saveEyesDaily(p.name, {date: M.cfg.daily, score: p.score, right: res.right, len: res.len, secs});
 }
 
 /* ✨ ebr-6 POLISH + 🌱 GUIDED BASIC + 🎨 SKINS (rules rows "Polish + guided Basic" and "No scroll on play screens") */
@@ -1744,4 +1756,4 @@ const GMOOD = (function(){
 </script>
 </body>
 </html>
-<!-- (ebr-4+back-1+modes-3+mg-1+ebr-6+ebr-7+p1d+p3a+cs-4c+ebr-8+ls-1b+b3w3+24u-c) END OF EyesBrainRiot.html -->
+<!-- (ebr-4+back-1+modes-3+mg-1+ebr-6+ebr-7+p1d+p3a+cs-4c+ebr-8+ls-1b+b3w3+24u-c+24ink-x3) END OF EyesBrainRiot.html -->
