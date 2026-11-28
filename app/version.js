@@ -1,1 +1,1 @@
-self.STEAM_VER = "v2026.11.28-2326";
+self.STEAM_VER = "v2026.11.28-2348";
